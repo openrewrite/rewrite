@@ -40,7 +40,7 @@ final class TarballFetcher {
     private final @Nullable Object version;
     private final String dest;
     private final RegistrySource registry;
-    private final YarnClassicOptions config;
+    private final Config config;
     private final List<String> warnings;
 
     /**
@@ -48,7 +48,7 @@ final class TarballFetcher {
      * without a manifest gets, the cache directory.
      */
     TarballFetcher(PackageRemote remote, @Nullable Object name, @Nullable Object version, String dest,
-                   RegistrySource registry, YarnClassicOptions config, List<String> warnings) {
+                   RegistrySource registry, Config config, List<String> warnings) {
         this.remote = remote;
         this.name = name;
         this.version = version;

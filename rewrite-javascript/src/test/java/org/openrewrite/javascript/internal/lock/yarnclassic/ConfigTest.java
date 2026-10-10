@@ -38,7 +38,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
  * The registries' config from the environment and the .npmrc as yarn 1.22.22's bundle answered (the test resources'
  * {@code generate/bundle-rows.js} prints the rows), and the cases of yarn's tests of the registries and env-replace.
  */
-class YarnClassicOptionsTest {
+class ConfigTest {
 
     static Stream<Arguments> environments() {
         return Stream.of(
@@ -64,7 +64,7 @@ class YarnClassicOptionsTest {
     void readsTheEnvironmentIntoTheNpmConfig(Map<String, String> env, String npmConfig) {
         String answer;
         try {
-            answer = Js.jsonStringify(YarnClassicOptions.load(Collections.emptyMap(), env).getNpmConfig());
+            answer = Js.jsonStringify(YarnClassicScenarios.config(Collections.emptyMap(), env).getNpmConfig());
         } catch (JsError e) {
             answer = e.getName() + ": " + e.getMessage();
         }
@@ -121,7 +121,7 @@ class YarnClassicOptionsTest {
     @ParameterizedTest(name = "{0} {1}")
     @MethodSource("registries")
     void requestsMetadataFromTheRegistryYarnDoes(Map<String, String> env, String packageIdent, String registry) {
-        assertThat(YarnClassicOptions.load(Collections.emptyMap(), env).getRegistry(packageIdent)).isEqualTo(registry);
+        assertThat(YarnClassicScenarios.config(Collections.emptyMap(), env).getRegistry(packageIdent)).isEqualTo(registry);
     }
 
     /**
@@ -159,7 +159,7 @@ class YarnClassicOptionsTest {
     @MethodSource("npmrcRegistries")
     void requestsMetadataFromTheRegistryAnNpmrcNames(@Nullable String npmrc, Map<String, String> env,
                                                      String packageIdents, String registries) {
-        YarnClassicOptions options = YarnClassicOptions.load(npmrc == null ? Collections.emptyMap() :
+        Config options = YarnClassicScenarios.config(npmrc == null ? Collections.emptyMap() :
                 Collections.singletonMap(".npmrc", npmrc), env);
         List<String> answers = new ArrayList<>();
         for (String ident : packageIdents.split(" ")) {
@@ -169,15 +169,15 @@ class YarnClassicOptionsTest {
     }
 
     /**
-     * yarn 1.22.22's __tests__/registries/npm-registry.js, getPossibleConfigLocations: the project's directory and
-     * each above it (the home directory's file is the host's).
+     * yarn 1.22.22's __tests__/registries/npm-registry.js, getPossibleConfigLocations: the project's directory, the
+     * home directory's and each directory above the project's.
      */
     @Test
-    void searchesRecursivelyToTheTopOfTheRepository() {
+    void searchesRecursivelyToHomeDirectory() {
         Map<String, String> files = new LinkedHashMap<>();
         files.put("../../.yarnrc", "");
-        assertThat(YarnClassicOptions.getPossibleConfigLocations("npmrc", files))
-                .containsExactly(".npmrc", ".npmrc", "../.npmrc", "../../.npmrc");
+        assertThat(Config.getPossibleConfigLocations("npmrc", files))
+                .containsExactly(".npmrc", "~/.npmrc", ".npmrc", "../.npmrc", "../../.npmrc");
     }
 
     @Test
@@ -188,7 +188,7 @@ class YarnClassicOptionsTest {
         files.put("../../.npmrc", "@s:registry=https://c/s/\n@t:registry=https://c/t/\n");
         files.put("../.yarnrc", "registry \"https://y/\"\n");
         files.put("../../.yarnrc", "registry \"https://z/\"\nsave-prefix \"~\"\n");
-        YarnClassicOptions options = YarnClassicOptions.load(files, env());
+        Config options = YarnClassicScenarios.config(files, env());
         assertThat(options.getRegistry("x")).isEqualTo("https://a/");
         assertThat(options.getRegistry("@s/x")).isEqualTo("https://b/s/");
         assertThat(options.getRegistry("@t/x")).isEqualTo("https://c/t/");
@@ -205,17 +205,17 @@ class YarnClassicOptionsTest {
         Map<String, String> files = new LinkedHashMap<>();
         files.put("../../.yarnrc", "--ignore-engines true\n");
         files.put("../.yarnrc", "--ignore-engines false\n");
-        assertThat(YarnClassicOptions.load(files, env()).getFlags().isIgnoreEngines()).isFalse();
+        assertThat(flags(files).isIgnoreEngines()).isFalse();
 
         files.clear();
         files.put("../.yarnrc", "--ignore-engines false\n");
         files.put("../.yarnrc.yml", "\"--ignore-engines\": true\n");
         files.put(".yarnrc", "--ignore-engines true\n");
-        assertThat(YarnClassicOptions.load(files, env()).getFlags().isIgnoreEngines()).isTrue();
+        assertThat(flags(files).isIgnoreEngines()).isTrue();
 
         files.clear();
         files.put("../.yarnrc.yml", "\"--registry\": \"https://r/\"\n");
-        assertThat(YarnClassicOptions.load(files, env()).getRegistry("x")).isEqualTo("https://r/");
+        assertThat(YarnClassicScenarios.config(files, env()).getRegistry("x")).isEqualTo("https://r/");
     }
 
     /**
@@ -265,7 +265,7 @@ class YarnClassicOptionsTest {
     void resolvesTheDirectoryKeysAgainstTheirFile(Map<String, String> files, String rc) {
         String actual;
         try {
-            actual = YarnClassicOptions.rc(files).toString();
+            actual = Rc.getRcConfigForCwd(files, Collections.emptyMap()).toString();
         } catch (JsError e) {
             actual = e.toString();
         }
@@ -277,10 +277,10 @@ class YarnClassicOptionsTest {
      */
     @Test
     void addsCommandNamePrefixedArguments() {
-        YarnClassicOptions options = YarnClassicOptions.load(Collections.singletonMap(".yarnrc",
-                "--add.ignore-engines true\n--install.ignore-optional true\n"), env());
-        assertThat(options.getFlags().isIgnoreEngines()).isFalse();
-        assertThat(options.getFlags().isIgnoreOptional()).isTrue();
+        Install.Flags flags = flags(Collections.singletonMap(".yarnrc",
+                "--add.ignore-engines true\n--install.ignore-optional true\n"));
+        assertThat(flags.isIgnoreEngines()).isFalse();
+        assertThat(flags.isIgnoreOptional()).isTrue();
     }
 
     /**
@@ -288,7 +288,7 @@ class YarnClassicOptionsTest {
      */
     @Test
     void aCwdLineMovesTheInstallElsewhere() {
-        assertThatThrownBy(() -> YarnClassicOptions.load(Collections.singletonMap(".yarnrc", "--cwd foo\n"), env()))
+        assertThatThrownBy(() -> YarnClassicScenarios.config(Collections.singletonMap(".yarnrc", "--cwd foo\n"), env()))
                 .isInstanceOf(CannotKnow.class)
                 .hasMessageContaining("--cwd foo");
     }
@@ -299,21 +299,21 @@ class YarnClassicOptionsTest {
     @Test
     void replacesATokenThatExistsInTheEnvironment() {
         Map<String, String> env = env("a", "token");
-        assertThat(YarnClassicOptions.envReplace("test ${a} replacement", env)).isEqualTo("test token replacement");
-        assertThat(YarnClassicOptions.envReplace("${a} replacement", env)).isEqualTo("token replacement");
-        assertThat(YarnClassicOptions.envReplace("${a}", env)).isEqualTo("token");
+        assertThat(Config.envReplace("test ${a} replacement", env)).isEqualTo("test token replacement");
+        assertThat(Config.envReplace("${a} replacement", env)).isEqualTo("token replacement");
+        assertThat(Config.envReplace("${a}", env)).isEqualTo("token");
     }
 
     @Test
     void doesNotReplaceATokenThatDoesNotExistInTheEnvironment() {
-        assertThatThrownBy(() -> YarnClassicOptions.envReplace("${a} replacement", env("b", "token")))
+        assertThatThrownBy(() -> Config.envReplace("${a} replacement", env("b", "token")))
                 .isInstanceOf(JsError.class)
                 .hasMessage("Failed to replace env in config: ${a}");
     }
 
     @Test
     void doesNotReplaceATokenPrefixedWithABackslash() {
-        assertThat(YarnClassicOptions.envReplace("\\${a} replacement", env("a", "token")))
+        assertThat(Config.envReplace("\\${a} replacement", env("a", "token")))
                 .isEqualTo("\\${a} replacement");
     }
 
@@ -338,7 +338,7 @@ class YarnClassicOptionsTest {
             "http://foo.bar:80/not@scope/pkg|''",
     })
     void matchesScopeCorrectly(String pathname, String scope) {
-        assertThat(YarnClassicOptions.getScope(pathname)).isEqualTo(scope);
+        assertThat(Config.getScope(pathname)).isEqualTo(scope);
     }
 
     /**
@@ -349,12 +349,20 @@ class YarnClassicOptionsTest {
         Map<String, String> env = env("npm_config_always_auth", "true", "npm_config__auth", "auth",
                 "npm_config__authtoken", "authToken", "npm_config__username", "username", "npm_config__password",
                 "password");
-        Map<String, @Nullable Object> config = YarnClassicOptions.load(Collections.emptyMap(), env).getNpmConfig();
+        Map<String, @Nullable Object> config = YarnClassicScenarios.config(Collections.emptyMap(), env).getNpmConfig();
         assertThat(config).containsEntry("always-auth", true)
                 .containsEntry("_auth", "auth")
                 .containsEntry("_authtoken", "authToken")
                 .containsEntry("_username", "username")
                 .containsEntry("_password", "password");
+    }
+
+    // normalizeFlags of the flags the .yarnrc chain gives an install, as Install reads them
+    private static Install.Flags flags(Map<String, String> configFiles) {
+        YarnClassicLockRegenerator.Inputs inputs = YarnClassicLockRegenerator.Inputs.builder()
+                .configFiles(configFiles).env(env()).build();
+        Map<String, @Nullable Object> flags = YarnClassicLockRegenerator.start(inputs);
+        return new Install.Flags(new Config(inputs, flags, new ArrayList<>()), flags);
     }
 
     private static Map<String, String> env(String... keysAndValues) {

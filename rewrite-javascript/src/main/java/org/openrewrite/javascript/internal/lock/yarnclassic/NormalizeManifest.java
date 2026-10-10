@@ -86,7 +86,7 @@ final class NormalizeManifest {
         Object version = info.getVersion();
         if (version instanceof String) {
             String cleaned = NodeSemver.clean((String) version,
-                    looseSemver ? YarnClassicOptions.LOOSE_SEMVER : YarnClassicOptions.SEMVER);
+                    looseSemver ? Config.LOOSE_SEMVER : Config.SEMVER);
             info.put("version", cleaned != null && !cleaned.isEmpty() ? cleaned : version);
         }
         info.put("name", Js.truthy(info.getName()) ? info.getName() : "");

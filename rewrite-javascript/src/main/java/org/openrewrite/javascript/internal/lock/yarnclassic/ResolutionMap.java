@@ -48,11 +48,11 @@ public final class ResolutionMap {
     }
 
     final Map<String, List<Resolution>> resolutionsByPackage = new LinkedHashMap<>();
-    final YarnClassicOptions config;
+    final Config config;
     final Set<DependencyRequestPattern> delayQueue = new LinkedHashSet<>();
     final List<String> warnings = new ArrayList<>();
 
-    ResolutionMap(YarnClassicOptions config) {
+    ResolutionMap(Config config) {
         this.config = config;
     }
 
@@ -87,7 +87,7 @@ public final class ResolutionMap {
         String name = directories.isEmpty() ? null : directories.remove(directories.size() - 1);
 
         boolean validRange = range instanceof String &&
-                             NodeSemver.validRange((String) range, YarnClassicOptions.SEMVER) != null;
+                             NodeSemver.validRange((String) range, Config.SEMVER) != null;
         if (!validRange && ExoticResolvers.getExoticResolver(range) == null) {
             warnings.add(Lang.format("Resolution field $0 has an invalid version entry and may be ignored", range));
             return null;
@@ -118,9 +118,9 @@ public final class ResolutionMap {
             if (Minimatch.minimatch(modulePath, resolution.getGlobPattern(), Minimatch.Release.V3_0_4)) {
                 String range = resolution.getRange();
                 String reqRange = normalized.getRange();
-                if (NodeSemver.validRange(reqRange, YarnClassicOptions.SEMVER) != null &&
-                    NodeSemver.valid(range, YarnClassicOptions.SEMVER) != null &&
-                    !NodeSemver.satisfies(range, reqRange, YarnClassicOptions.SEMVER)) {
+                if (NodeSemver.validRange(reqRange, Config.SEMVER) != null &&
+                    NodeSemver.valid(range, Config.SEMVER) != null &&
+                    !NodeSemver.satisfies(range, reqRange, Config.SEMVER)) {
                     warnings.add(Lang.format("Resolution field $0 is incompatible with requested version $1",
                             resolution.getPattern(), reqPattern));
                 }
@@ -158,7 +158,7 @@ public final class ResolutionMap {
             Object range = resolutions.get(other);
             if (isValidPackagePath(other) && !otherPath.isEmpty() &&
                 otherPath.get(otherPath.size() - 1).equals(name) && (ExoticResolvers.getExoticResolver(range) != null ||
-                range instanceof String && NodeSemver.validRange((String) range, YarnClassicOptions.SEMVER) != null)) {
+                range instanceof String && NodeSemver.validRange((String) range, Config.SEMVER) != null)) {
                 before.add(other);
             }
         }

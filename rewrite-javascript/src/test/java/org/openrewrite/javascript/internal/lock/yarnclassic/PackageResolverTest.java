@@ -42,7 +42,7 @@ class PackageResolverTest {
 
     @Test
     void addPatternDoesNotAddDuplicates() {
-        PackageResolver resolver = YarnClassicScenarios.resolver(YarnClassicOptions.defaults(), new Lockfile());
+        PackageResolver resolver = YarnClassicScenarios.resolver(YarnClassicScenarios.defaults(), new Lockfile());
         Manifest manifest = new Manifest();
         manifest.put("name", "name");
         resolver.addPattern("patternOne", manifest);
@@ -77,7 +77,7 @@ class PackageResolverTest {
             "1.0|TypeError: Invalid Version: 1.0",
     })
     void getHighestRangeVersionMatchReadsVersionsAsSemverDoes(@Nullable String version, @Nullable String outcome) {
-        PackageResolver resolver = YarnClassicScenarios.resolver(YarnClassicOptions.defaults(), new Lockfile());
+        PackageResolver resolver = YarnClassicScenarios.resolver(YarnClassicScenarios.defaults(), new Lockfile());
         Manifest manifest = new Manifest();
         manifest.put("name", "p");
         manifest.put("version", version);
@@ -124,7 +124,7 @@ class PackageResolverTest {
     }
 
     private static PackageResolver resolve(String lock, Map<String, String> registry, String... roots) {
-        YarnClassicOptions options = YarnClassicOptions.defaults();
+        Config options = YarnClassicScenarios.defaults();
         PackageResolver resolver = new PackageResolver(options, Lockfile.fromDirectory(lock),
                 new ResolutionMap(options), YarnClassicScenarios.packuments((url, name) -> registry.get(name)),
                 new ProjectFiles(Collections.emptyMap(), null), Host.UNKNOWN, new ArrayList<>());

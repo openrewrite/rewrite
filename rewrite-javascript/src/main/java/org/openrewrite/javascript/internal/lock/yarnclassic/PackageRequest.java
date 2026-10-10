@@ -47,7 +47,7 @@ final class PackageRequest {
     final Lockfile lockfile;
     final String registry;
     final PackageResolver resolver;
-    final YarnClassicOptions config;
+    final Config config;
     final boolean optional;
     final @Nullable String hint;
     final String pattern;
@@ -168,7 +168,7 @@ final class PackageRequest {
             ExoticResolvers.getExoticResolver(pattern) != null) {
             return Promise.resolved(loop, pattern);
         }
-        if (NodeSemver.validRange(pattern, YarnClassicOptions.SEMVER) == null) {
+        if (NodeSemver.validRange(pattern, Config.SEMVER) == null) {
             String location = ProjectFiles.location(resolver.files.cwd(), pattern);
             if (location == null) {
                 throw new CannotKnow("whether " + pattern + "/package.json exists outside the project, which makes " +
@@ -228,7 +228,7 @@ final class PackageRequest {
 
     void resolveToExistingVersion(Manifest info) {
         NormalizedPattern normalized = NormalizedPattern.normalizePattern(pattern);
-        String solvedRange = NodeSemver.validRange(normalized.getRange(), YarnClassicOptions.SEMVER) != null ?
+        String solvedRange = NodeSemver.validRange(normalized.getRange(), Config.SEMVER) != null ?
                 Js.templateString(info.getVersion()) : normalized.getRange();
         Manifest resolved = resolver.getHighestRangeVersionMatch(normalized.getName(), solvedRange, info);
         if (resolved == null) {
@@ -246,7 +246,7 @@ final class PackageRequest {
     Promise<Void> find(boolean fresh, boolean frozen) {
         return Promise.async(resolver.loop, this::findVersionInfo).then(info -> {
             Object version = info.getVersion();
-            if (!(version instanceof String) || NodeSemver.valid((String) version, YarnClassicOptions.SEMVER) == null) {
+            if (!(version instanceof String) || NodeSemver.valid((String) version, Config.SEMVER) == null) {
                 throw new MessageError(Lang.format("Can't add $0: invalid package version $1.", info.getName(),
                         info.getVersion()));
             }
@@ -256,7 +256,7 @@ final class PackageRequest {
 
             NormalizedPattern normalized = NormalizedPattern.normalizePattern(pattern);
             String name = normalized.getName();
-            String solvedRange = NodeSemver.validRange(normalized.getRange(), YarnClassicOptions.SEMVER) != null ?
+            String solvedRange = NodeSemver.validRange(normalized.getRange(), Config.SEMVER) != null ?
                     (String) info.getVersion() : normalized.getRange();
             Manifest resolved = !info.fresh || frozen ?
                     resolver.getExactVersionMatch(name, solvedRange, info) :

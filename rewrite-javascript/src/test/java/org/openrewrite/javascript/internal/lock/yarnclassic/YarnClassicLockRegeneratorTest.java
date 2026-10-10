@@ -434,7 +434,7 @@ class YarnClassicLockRegeneratorTest {
         }
         YarnClassicLockRegenerator.Inputs built = inputs.manifest("", WORKSPACE_ROOT)
                 .manifest("packages/a", "{\"name\":\"a\",\"version\":\"1.0.0\"}").build();
-        YarnClassicOptions options = YarnClassicOptions.defaults();
+        Config options = YarnClassicScenarios.defaults();
         PackageResolver resolver = new PackageResolver(options, new Lockfile(), new ResolutionMap(options),
                 YarnClassicScenarios.NO_REGISTRY, new ProjectFiles(built.getManifests(), built.getPaths(),
                 built.getCwd()),
@@ -703,18 +703,18 @@ class YarnClassicLockRegeneratorTest {
 
     private static final class Run {
         final Install install;
-        final YarnClassicOptions options;
+        final Config options;
 
-        Run(Install install, YarnClassicOptions options) {
+        Run(Install install, Config options) {
             this.install = install;
             this.options = options;
         }
     }
 
     private static Run install(YarnClassicLockRegenerator.Inputs inputs, List<String> warnings) {
-        Config config = new Config(inputs);
-        YarnClassicOptions options = YarnClassicLockRegenerator.init(inputs, config, warnings);
-        return new Run(new Install(inputs, config, options, YarnClassicScenarios.NO_REGISTRY, warnings), options);
+        Map<String, @Nullable Object> flags = YarnClassicLockRegenerator.start(inputs);
+        Config config = new Config(inputs, flags, warnings);
+        return new Run(new Install(inputs, config, flags, YarnClassicScenarios.NO_REGISTRY, warnings), config);
     }
 
     private static Map<String, String> env(String... keysAndValues) {

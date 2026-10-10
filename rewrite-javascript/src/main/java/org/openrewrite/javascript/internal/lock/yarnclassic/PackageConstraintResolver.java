@@ -27,9 +27,9 @@ import java.util.List;
  */
 final class PackageConstraintResolver {
 
-    private final YarnClassicOptions config;
+    private final Config config;
 
-    PackageConstraintResolver(YarnClassicOptions config) {
+    PackageConstraintResolver(Config config) {
         this.config = config;
     }
 
@@ -40,7 +40,7 @@ final class PackageConstraintResolver {
         }
         try {
             return NodeSemver.maxSatisfying(versions, range,
-                    config.isLooseSemver() ? YarnClassicOptions.LOOSE_SEMVER : YarnClassicOptions.SEMVER);
+                    config.isLooseSemver() ? Config.LOOSE_SEMVER : Config.SEMVER);
         } catch (IllegalArgumentException e) {
             throw new JsError(JsError.TYPE_ERROR, e.getMessage());
         }

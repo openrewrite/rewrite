@@ -39,7 +39,7 @@ import java.util.Set;
  */
 final class PackageResolver {
 
-    final YarnClassicOptions config;
+    final Config config;
     final Lockfile lockfile;
     final ResolutionMap resolutionMap;
     final EventLoop loop;
@@ -101,7 +101,7 @@ final class PackageResolver {
         Manifest info;
     }
 
-    PackageResolver(YarnClassicOptions config, Lockfile lockfile, ResolutionMap resolutionMap,
+    PackageResolver(Config config, Lockfile lockfile, ResolutionMap resolutionMap,
                     RegistrySource registry, ProjectFiles files, Host host, List<String> warnings) {
         this.config = config;
         this.lockfile = lockfile;
@@ -331,8 +331,8 @@ final class PackageResolver {
         try {
             Object max = null;
             for (Object v : versions) {
-                if (NodeSemver.satisfies(v, range, YarnClassicOptions.SEMVER) &&
-                    (max == null || NodeSemver.compare(max, v, YarnClassicOptions.SEMVER) < 0)) {
+                if (NodeSemver.satisfies(v, range, Config.SEMVER) &&
+                    (max == null || NodeSemver.compare(max, v, Config.SEMVER) < 0)) {
                     max = v;
                 }
             }
@@ -363,11 +363,11 @@ final class PackageResolver {
      * pattern resolves as a new one.
      */
     boolean isLockfileEntryOutdated(@Nullable Object version, String range, boolean hasVersion) {
-        return NodeSemver.validRange(range, YarnClassicOptions.SEMVER) != null &&
-               version instanceof String && NodeSemver.valid((String) version, YarnClassicOptions.SEMVER) != null &&
+        return NodeSemver.validRange(range, Config.SEMVER) != null &&
+               version instanceof String && NodeSemver.valid((String) version, Config.SEMVER) != null &&
                ExoticResolvers.getExoticResolver(range) == null &&
                hasVersion &&
-               !NodeSemver.satisfies((String) version, range, YarnClassicOptions.SEMVER);
+               !NodeSemver.satisfies((String) version, range, Config.SEMVER);
     }
 
     Promise<Void> find(DependencyRequestPattern initialReq) {
@@ -452,7 +452,7 @@ final class PackageResolver {
             availableVersions.add(manifest.getVersion());
         }
         try {
-            availableVersions.sort((a, b) -> NodeSemver.compare(b, a, YarnClassicOptions.SEMVER));
+            availableVersions.sort((a, b) -> NodeSemver.compare(b, a, Config.SEMVER));
         } catch (IllegalArgumentException e) {
             throw new JsError(JsError.TYPE_ERROR, e.getMessage());
         }
@@ -463,7 +463,7 @@ final class PackageResolver {
         for (Object version : availableVersions) {
             boolean all = true;
             for (String range : ranges) {
-                all &= NodeSemver.satisfies(version, range, YarnClassicOptions.SEMVER);
+                all &= NodeSemver.satisfies(version, range, Config.SEMVER);
             }
             if (all) {
                 collapsePackageVersions(name, Js.string(version), collapsablePatterns);

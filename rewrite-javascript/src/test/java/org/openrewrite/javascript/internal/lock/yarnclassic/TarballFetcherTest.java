@@ -30,7 +30,6 @@ import java.io.InputStreamReader;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -94,7 +93,7 @@ class TarballFetcherTest {
             }
         };
         assertThatThrownBy(() -> new TarballFetcher(remote, "x", "1.0.0", "dest", tarballs,
-                YarnClassicOptions.load(Collections.emptyMap(), new LinkedHashMap<>()), new ArrayList<>()).fetch())
+                YarnClassicScenarios.defaults(), new ArrayList<>()).fetch())
                 .isInstanceOf(CannotKnow.class)
                 .hasMessageContaining("the whirlpool digest the integrity of x@1.0.0 names");
     }

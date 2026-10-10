@@ -15,6 +15,7 @@
  */
 package org.openrewrite.javascript.internal.lock.yarnclassic;
 
+import lombok.Getter;
 import lombok.Value;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.javascript.internal.LockFileRegeneration.Reason;
@@ -46,17 +47,52 @@ final class Install {
     private static final List<String> OWNED_DEPENDENCY_TYPES = Arrays.asList("devDependencies",
             "dependencies", "optionalDependencies");
 
+    /**
+     * {@code normalizeFlags}: the flags of {@code yarn install} that the .yarnrc's {@code --flag} lines set or the
+     * config turns on.
+     */
+    @Getter
+    static final class Flags {
+        private final boolean ignorePlatform;
+        private final boolean ignoreEngines;
+        private final boolean ignoreScripts;
+        private final boolean ignoreOptional;
+        private final boolean force;
+        private final boolean flat;
+        private final boolean lockfile;
+        private final boolean pureLockfile;
+        private final boolean frozenLockfile;
+        private final boolean updateChecksums;
+        private final boolean skipIntegrityCheck;
+
+        Flags(Config config, Map<String, @Nullable Object> rawFlags) {
+            ignorePlatform = Js.truthy(rawFlags.get("ignorePlatform")) ||
+                             Js.truthy(config.getOption("ignore-platform"));
+            ignoreEngines = Js.truthy(rawFlags.get("ignoreEngines")) || Js.truthy(config.getOption("ignore-engines"));
+            ignoreScripts = Js.truthy(rawFlags.get("ignoreScripts")) || Js.truthy(config.getOption("ignore-scripts"));
+            ignoreOptional = Js.truthy(rawFlags.get("ignoreOptional")) ||
+                             Js.truthy(config.getOption("ignore-optional"));
+            force = Js.truthy(rawFlags.get("force")) || Js.truthy(config.getOption("force"));
+            flat = Js.truthy(rawFlags.get("flat"));
+            lockfile = !Boolean.FALSE.equals(rawFlags.get("lockfile"));
+            pureLockfile = Js.truthy(rawFlags.get("pureLockfile"));
+            frozenLockfile = Js.truthy(rawFlags.get("frozenLockfile"));
+            updateChecksums = Js.truthy(rawFlags.get("updateChecksums"));
+            skipIntegrityCheck = Js.truthy(rawFlags.get("skipIntegrityCheck"));
+        }
+    }
+
     private final Inputs inputs;
     private final Config config;
-    private final YarnClassicOptions options;
+    private final Flags flags;
     private final RegistrySource registry;
     private final List<String> warnings;
 
-    Install(Inputs inputs, Config config, YarnClassicOptions options, RegistrySource registry,
+    Install(Inputs inputs, Config config, Map<String, @Nullable Object> flags, RegistrySource registry,
             List<String> warnings) {
         this.inputs = inputs;
         this.config = config;
-        this.options = options;
+        this.flags = new Flags(config, flags);
         this.registry = registry;
         this.warnings = warnings;
     }
@@ -78,7 +114,7 @@ final class Install {
             installAtWorkspaceRoot(config.getWorkspaceRoot(),
                     Objects.requireNonNull(config.getLockfileFolderManifest()));
         }
-        return options.getFlags().isLockfile() ? Lockfile.fromDirectory(inputs.getLock()) : new Lockfile();
+        return flags.isLockfile() ? Lockfile.fromDirectory(inputs.getLock()) : new Lockfile();
     }
 
     /**
@@ -89,11 +125,10 @@ final class Install {
         if (lockfile.getLockfilev2() != null) {
             throw Rejected.discardsLock("the lock is a Yarn Berry lock (__metadata)");
         }
-        if (options.getFlags().isLockfile() && LockfileParser.CONFLICT.equals(lockfile.getParseResultType())) {
+        if (flags.isLockfile() && LockfileParser.CONFLICT.equals(lockfile.getParseResultType())) {
             throw Rejected.discardsLock("the lock's merge conflict does not merge");
         }
-        YarnClassicOptions.Flags flags = options.getFlags();
-        ResolutionMap resolutionMap = new ResolutionMap(options);
+        ResolutionMap resolutionMap = new ResolutionMap(config);
         InstallCwdRequest request = fetchRequestFromCwd(lockfile, resolutionMap);
         String rootText = inputs.getManifests().get("");
         if (rootText != null && Js.jsonParse(StripBom.stripBom(rootText)) instanceof List) {
@@ -102,14 +137,14 @@ final class Install {
         }
 
         List<String> errors = new ArrayList<>();
-        PackageCompatibility compatibility = new PackageCompatibility(options, inputs.getHost(), errors, warnings);
+        PackageCompatibility compatibility = new PackageCompatibility(config, inputs.getHost(), errors, warnings);
         try {
             if (PackageCompatibility.shouldCheck(request.getManifest(), flags.isIgnoreEngines(),
                     flags.isIgnorePlatform())) {
                 compatibility.checkOne(request.getManifest(), flags.isIgnoreEngines());
             }
 
-            PackageResolver resolver = new PackageResolver(options, lockfile, resolutionMap, registry,
+            PackageResolver resolver = new PackageResolver(config, lockfile, resolutionMap, registry,
                     new ProjectFiles(inputs.getManifests(), inputs.getPaths(), inputs.getCwd()), inputs.getHost(),
                     warnings);
             resolver.focus = config.isFocus();
@@ -120,11 +155,11 @@ final class Install {
             flatten(resolver, topLevelPatterns, request.getManifest(), request.isFlat());
             bailout(topLevelPatterns, request.getWorkspaceLayout(), lockfile, flags);
 
-            if (options.isOffline() && !options.isPreferOffline()) {
-                throw options.offlineCache();
+            if (config.isOffline() && !config.isPreferOffline()) {
+                throw config.offlineCache();
             }
             fetchStep(resolver, compatibility);
-            return saveLockfileAndIntegrity(resolver, topLevelPatterns, request.getWorkspaceLayout(), options,
+            return saveLockfileAndIntegrity(resolver, topLevelPatterns, request.getWorkspaceLayout(), config, flags,
                     lockfile, inputs.getLock(), inputs.getHost());
         } catch (MessageError e) {
             if (!errors.isEmpty()) {
@@ -139,8 +174,8 @@ final class Install {
     private void fetchStep(PackageResolver resolver, PackageCompatibility compatibility) {
         Set<String> unfetched = new HashSet<>();
         resolver.updateManifests(PackageFetcher.fetch(resolver.getManifests(), PackageFetcher.remote(resolver,
-                registry, options), warnings, unfetched));
-        compatibility.check(resolver.getManifests(), options.getFlags().isIgnoreEngines());
+                registry, config), warnings, unfetched));
+        compatibility.check(resolver.getManifests(), flags.isIgnoreEngines());
         for (Manifest manifest : resolver.getManifests()) {
             PackageReference ref = manifest.reference;
             if (ref != null && !ref.ignore && unfetched.contains(PackageFetcher.generateModuleCachePath(ref))) {
@@ -190,7 +225,7 @@ final class Install {
      * top-level pattern or did not parse cleanly.
      */
     private static void bailout(List<String> patterns, @Nullable WorkspaceLayout workspaceLayout, Lockfile lockfile,
-                                YarnClassicOptions.Flags flags) {
+                                Flags flags) {
         if (flags.isSkipIntegrityCheck() || flags.isForce() || !Js.truthy(lockfile.getCache())) {
             return;
         }
@@ -213,17 +248,17 @@ final class Install {
      * what the inputs lack: the root's lock when it has one, its resolutions, then its workspaces up to their glob.
      */
     private void installAtWorkspaceRoot(int workspaceRoot, Manifest root) {
-        String up = YarnClassicOptions.up(workspaceRoot);
+        String up = Config.up(workspaceRoot);
         Set<String> paths = inputs.getPaths();
-        if (!options.getFlags().isLockfile() || paths != null && !paths.contains(up + "yarn.lock")) {
+        if (!flags.isLockfile() || paths != null && !paths.contains(up + "yarn.lock")) {
             String cwd = up.substring(0, up.length() - 1);
             String text = Objects.requireNonNull(inputs.getConfigFiles().get(up + "package.json"));
             Manifest projectManifestJson = NormalizeManifest.normalizeManifest(Config.manifest(Fs.readJson(up +
-                    "package.json", text), "_registry"), cwd, cwd, true, options.isLooseSemver(), warnings);
+                    "package.json", text), "_registry"), cwd, cwd, true, config.isLooseSemver(), warnings);
             Map<String, @Nullable Object> resolutions = new LinkedHashMap<>();
             Js.assign(resolutions, projectManifestJson.get("resolutions"));
-            new ResolutionMap(options).init(resolutions);
-            Config.workspacePatterns(root, options, warnings);
+            new ResolutionMap(config).init(resolutions);
+            config.workspacePatterns(root, warnings);
         }
         throw new CannotKnow("the lock yarn writes for this edit: yarn installs at the workspace root " + up +
                              ", whose workspaces list " + inputs.relativePath(workspaceRoot) + ", and writes " + up +
@@ -253,11 +288,11 @@ final class Install {
         List<DependencyRequestPattern> resolutionDeps = new ArrayList<>();
         String rootText = inputs.getManifests().get("");
         if (rootText == null) {
-            return new InstallCwdRequest(resolutionDeps, patterns, new Manifest(), null, options.getFlags().isFlat());
+            return new InstallCwdRequest(resolutionDeps, patterns, new Manifest(), null, flags.isFlat());
         }
         String registry = NpmResolver.NPM_REGISTRY_ID;
         Manifest projectManifestJson = NormalizeManifest.normalizeManifest(Config.manifest(Fs.readJson(
-                "package.json", rootText), "_registry"), "", "", true, options.isLooseSemver(), warnings);
+                "package.json", rootText), "_registry"), "", "", true, config.isLooseSemver(), warnings);
         Manifest manifest = projectManifestJson;
         boolean workspaceRootFolder = Config.isWorkspaceRoot(projectManifestJson);
 
@@ -266,14 +301,14 @@ final class Install {
         resolutionMap.init(resolutions);
         for (String packageName : Js.keys(resolutionMap.resolutionsByPackage)) {
             boolean optional = ObjectPath.has(manifest.get("optionalDependencies"), packageName) &&
-                               options.getFlags().isIgnoreOptional();
+                               flags.isIgnoreOptional();
             for (ResolutionMap.Resolution resolution : resolutionMap.resolutionsByPackage.get(packageName)) {
                 resolutionDeps.add(DependencyRequestPattern.builder().registry(registry)
                         .pattern(resolution.getPattern()).optional(optional).hint("resolution").build());
             }
         }
 
-        boolean flat = options.getFlags().isFlat();
+        boolean flat = flags.isFlat();
         PushDeps pushDeps = (depType, depManifest, hint, optional, isUsed) -> {
             if (flat && !isUsed) {
                 return;
@@ -293,14 +328,13 @@ final class Install {
         };
 
         pushDeps.push("dependencies", projectManifestJson, null, false, true);
-        pushDeps.push("devDependencies", projectManifestJson, "dev", false, !options.isProduction());
+        pushDeps.push("devDependencies", projectManifestJson, "dev", false, !config.isProduction());
         pushDeps.push("optionalDependencies", projectManifestJson, "optional", true, true);
 
         WorkspaceLayout workspaceLayout = null;
         if (workspaceRootFolder) {
-            Map<String, WorkspaceLayout.Workspace> workspaces = config.resolveWorkspaces(projectManifestJson, options,
-                    warnings);
-            workspaceLayout = new WorkspaceLayout(workspaces, options);
+            Map<String, WorkspaceLayout.Workspace> workspaces = config.resolveWorkspaces(projectManifestJson, warnings);
+            workspaceLayout = new WorkspaceLayout(workspaces, config);
             Map<String, @Nullable Object> workspaceDependencies = new LinkedHashMap<>();
             Js.assign(workspaceDependencies, projectManifestJson.get("dependencies"));
             for (String workspaceName : Js.keys(workspaces)) {
@@ -357,7 +391,7 @@ final class Install {
      */
     static @Nullable String saveLockfileAndIntegrity(PackageResolver resolver, List<String> patterns,
                                                      @Nullable WorkspaceLayout workspaceLayout,
-                                                     YarnClassicOptions config, Lockfile lockfile,
+                                                     Config config, Flags flags, Lockfile lockfile,
                                                      @Nullable String rawLock, Host host) {
         Map<String, Manifest> resolvedPatterns = new LinkedHashMap<>();
         for (String pattern : Js.keys(resolver.patterns)) {
@@ -374,7 +408,6 @@ final class Install {
 
         Map<String, @Nullable Object> lockfileBasedOnResolver = lockfile.getLockfile(resolvedPatterns);
 
-        YarnClassicOptions.Flags flags = config.getFlags();
         if (!flags.isLockfile() || flags.isPureLockfile() || flags.isFrozenLockfile()) {
             return null;
         }
@@ -439,7 +472,7 @@ final class Install {
         return Fs.writeFilePreservingEol(rawLock, lockSource, host.getOs());
     }
 
-    private static @Nullable String processVersion(@Nullable String nodeVersion, YarnClassicOptions config) {
+    private static @Nullable String processVersion(@Nullable String nodeVersion, Config config) {
         if (!config.isEnableLockfileVersions()) {
             return null;
         }

@@ -35,12 +35,12 @@ final class NpmRegistry {
     private static final Pattern ENFORCED_HTTPS = Pattern.compile(
             "^https?://([^/]+\\.)?(yarnpkg\\.com|npmjs\\.(org|com))(/|\\z)");
 
-    private final YarnClassicOptions config;
+    private final Config config;
     private final EventLoop loop;
     private final RegistrySource source;
     private final Map<String, Io<Object>> cache = new HashMap<>();
 
-    NpmRegistry(YarnClassicOptions config, EventLoop loop, RegistrySource source) {
+    NpmRegistry(Config config, EventLoop loop, RegistrySource source) {
         this.config = config;
         this.loop = loop;
         this.source = source;

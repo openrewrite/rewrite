@@ -34,11 +34,11 @@ final class WorkspaceLayout {
     }
 
     final Map<String, Workspace> workspaces;
-    final YarnClassicOptions config;
+    final Config config;
     @Nullable
     String virtualManifestName;
 
-    WorkspaceLayout(Map<String, Workspace> workspaces, YarnClassicOptions config) {
+    WorkspaceLayout(Map<String, Workspace> workspaces, Config config) {
         this.workspaces = workspaces;
         this.config = config;
     }
@@ -53,7 +53,7 @@ final class WorkspaceLayout {
         NormalizedPattern normalized = NormalizedPattern.normalizePattern(pattern);
         Workspace workspace = getWorkspaceManifest(normalized.getName());
         if (workspace == null || !NodeSemver.satisfies(workspace.getManifest().getVersion(), normalized.getRange(),
-                config.isLooseSemver() ? YarnClassicOptions.LOOSE_SEMVER : YarnClassicOptions.SEMVER)) {
+                config.isLooseSemver() ? Config.LOOSE_SEMVER : Config.SEMVER)) {
             return null;
         }
         return workspace;

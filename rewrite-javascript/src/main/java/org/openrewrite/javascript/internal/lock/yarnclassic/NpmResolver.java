@@ -42,7 +42,7 @@ final class NpmResolver {
     private static final Object NOT_A_TAG = new Object();
 
     private final PackageRequest request;
-    private final YarnClassicOptions config;
+    private final Config config;
     final String name;
     final String range;
 
@@ -56,7 +56,7 @@ final class NpmResolver {
     /**
      * @throws MessageError when no version matches, as yarn fails a non-interactive install.
      */
-    static @Nullable Object findVersionInRegistryResponse(YarnClassicOptions config, String name, String range,
+    static @Nullable Object findVersionInRegistryResponse(Config config, String name, String range,
                                                           @Nullable Object body) {
         Object versions = Js.get(body, "versions");
         Object distTags = Js.get(body, "dist-tags");
@@ -90,7 +90,7 @@ final class NpmResolver {
 
     private static boolean satisfies(Object version, String range) {
         try {
-            return NodeSemver.satisfies(version, range, YarnClassicOptions.SEMVER);
+            return NodeSemver.satisfies(version, range, Config.SEMVER);
         } catch (IllegalArgumentException e) {
             throw new JsError(JsError.TYPE_ERROR, e.getMessage());
         }
@@ -122,9 +122,9 @@ final class NpmResolver {
                                               Js.string(tags));
     }
 
-    static String cleanRegistry(YarnClassicOptions config, String url) {
-        if (YarnClassicOptions.YARN_REGISTRY.equals(config.getOption("registry"))) {
-            return NPM_REGISTRY_RE.matcher(url).replaceAll(YarnClassicOptions.YARN_REGISTRY);
+    static String cleanRegistry(Config config, String url) {
+        if (Config.YARN_REGISTRY.equals(config.getOption("registry"))) {
+            return NPM_REGISTRY_RE.matcher(url).replaceAll(Config.YARN_REGISTRY);
         }
         return url;
     }

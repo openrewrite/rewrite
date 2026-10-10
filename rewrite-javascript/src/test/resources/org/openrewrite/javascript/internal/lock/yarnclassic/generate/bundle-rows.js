@@ -16,7 +16,7 @@
 // Prints the rows of the Yarn classic tests that hold yarn 1.22.22's own answers, one Java row per line under the name
 // of the test method or row source it belongs to, each answered by yarn's bundle (lib/cli.js) with HOME, the global
 // prefix and the project in an empty scratch directory: NpmResolverTest (findVersionInRegistryResponse), JsYamlTest
-// (js-yaml safeLoad under FAILSAFE_SCHEMA), YarnClassicOptionsTest (the registries' init and getRegistry, rc.js
+// (js-yaml safeLoad under FAILSAFE_SCHEMA), ConfigTest (the registries' init and getRegistry, rc.js
 // getRcConfigForCwd) and NormalizeManifestTest (normalize-manifest, resolve-relative; of its warnings, the collision,
 // since the port does not warn of a missing license).
 //
@@ -161,7 +161,7 @@ async function registries() {
     }
     rows.push('Arguments.of(' + env(e) + ', ' + q(answer) + '),')
   }
-  section('YarnClassicOptionsTest.environments', rows)
+  section('ConfigTest.environments', rows)
 
   const n = {npm_config_registry: 'https://n.example/'}
   const ns = {npm_config_registry: 'https://n.example/', 'npm_config_@s:registry': 'https://s.example/'}
@@ -190,7 +190,7 @@ async function registries() {
         q(await withEnv(e, none, false, npm => npm.getRegistry(ident))) + '),')
     }
   }
-  section('YarnClassicOptionsTest.registries', rows)
+  section('ConfigTest.registries', rows)
 
   const npmrcs = [
     ['registry=https://a/\n@s:registry=https://a/b/\n', {}, 'https://a/b/x https://a/x @s/x x'],
@@ -215,7 +215,7 @@ async function registries() {
     const answers = await withEnv(e, project, true, npm => list.split(' ').map(i => npm.getRegistry(i)).join(' '))
     rows.push('Arguments.of(' + [q(npmrc), env(e), q(list), q(answers)].join(', ') + '),')
   }
-  section('YarnClassicOptionsTest.npmrcRegistries', rows)
+  section('ConfigTest.npmrcRegistries', rows)
 }
 
 function rcDirectoryKeys() {
@@ -241,7 +241,7 @@ function rcDirectoryKeys() {
     {'.yarnrc': 'yarn-path ""'},
   ]
   const KEYS = /^(--)?([^.]+\.)*(yarn-path|cache-folder|global-folder|modules-folder|cwd|offline-cache-folder)$/
-  section('YarnClassicOptionsTest.rcDirectoryKeys', cases.map(files => {
+  section('ConfigTest.rcDirectoryKeys', cases.map(files => {
     const repo = fs.mkdtempSync(path.join(scratch, 'repo-'))
     const app = path.join(repo, 'mid', 'app')
     fs.mkdirSync(app, {recursive: true})

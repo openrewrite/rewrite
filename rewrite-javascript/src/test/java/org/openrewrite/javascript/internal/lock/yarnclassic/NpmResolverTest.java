@@ -52,7 +52,7 @@ class NpmResolverTest {
             "1.1.x, 1.1.3",
     })
     void picksAVersionWithoutALatestTag(String range, String version) {
-        Object picked = NpmResolver.findVersionInRegistryResponse(YarnClassicOptions.defaults(), "left-pad", range,
+        Object picked = NpmResolver.findVersionInRegistryResponse(YarnClassicScenarios.defaults(), "left-pad", range,
                 packument("{\"name\": \"left-pad\", \"dist-tags\": {}, \"versions\": {" +
                           "\"1.1.3\": {\"name\": \"left-pad\", \"version\": \"1.1.3\"}, " +
                           "\"1.3.0\": {\"name\": \"left-pad\", \"version\": \"1.3.0\"}, " +
@@ -121,7 +121,7 @@ class NpmResolverTest {
                                              versions + "}");
         String answer;
         try {
-            answer = "version " + Js.get(NpmResolver.findVersionInRegistryResponse(YarnClassicOptions.defaults(),
+            answer = "version " + Js.get(NpmResolver.findVersionInRegistryResponse(YarnClassicScenarios.defaults(),
                     "p", range, body), "version");
         } catch (MessageError e) {
             answer = e.getMessage();
@@ -145,7 +145,7 @@ class NpmResolverTest {
     })
     void resolvesUnderTheRegistryTheEnvironmentNames(String variable, String value, String registry) {
         Map<String, String> env = value == null ? Collections.emptyMap() : Collections.singletonMap(variable, value);
-        Manifest manifest = resolve(YarnClassicOptions.load(Collections.emptyMap(), env), "left-pad@1.3.0",
+        Manifest manifest = resolve(YarnClassicScenarios.config(Collections.emptyMap(), env), "left-pad@1.3.0",
                 "{\"name\": \"left-pad\", \"dist-tags\": {\"latest\": \"1.3.0\"}, \"versions\": {\"1.3.0\": " +
                 "{\"name\": \"left-pad\", \"version\": \"1.3.0\", \"dist\": {\"tarball\": " +
                 "\"https://registry.npmjs.org/left-pad/-/left-pad-1.3.0.tgz\", " +
@@ -169,7 +169,7 @@ class NpmResolverTest {
                                                                    String outcome) {
         String yarnrc = "experimental-pack-script-packages-in-mirror true\n" +
                         (label.endsWith("without a mirror") ? "" : "yarn-offline-mirror \"./mirror\"\n");
-        YarnClassicOptions options = YarnClassicOptions.load(Collections.singletonMap(".yarnrc", yarnrc),
+        Config options = YarnClassicScenarios.config(Collections.singletonMap(".yarnrc", yarnrc),
                 Collections.emptyMap());
         String lock = "left-pad@1.3.0:\n  version \"1.3.0\"\n  resolved \"https://registry.yarnpkg.com/left-pad/-/" +
                       "left-pad-1.3.0.tgz#5b8a3a7765dfe001261dde915589e782f8c94d1e\"\n" +
@@ -192,7 +192,7 @@ class NpmResolverTest {
         assertThat(answer).isEqualTo(outcome);
     }
 
-    private static Manifest resolve(YarnClassicOptions options, String pattern, String packument) {
+    private static Manifest resolve(Config options, String pattern, String packument) {
         PackageResolver resolver = new PackageResolver(options, new Lockfile(), new ResolutionMap(options),
                 YarnClassicScenarios.packuments((registry, name) -> packument),
                 new ProjectFiles(Collections.emptyMap(), null), Host.UNKNOWN, new ArrayList<>());

@@ -54,7 +54,7 @@ final class PackageFetcher {
      * {@code fetchOneRemote} with what stands for each remote's package.json: a version picked anew reads its
      * tarball's, a reused lock entry is what it holds, a directory reads its own.
      */
-    static Fetcher remote(PackageResolver resolver, RegistrySource registry, YarnClassicOptions config) {
+    static Fetcher remote(PackageResolver resolver, RegistrySource registry, Config config) {
         return ref -> {
             for (PackageResolver.Race race : resolver.races) {
                 if (race.getFirst().reference == ref) {
@@ -105,7 +105,7 @@ final class PackageFetcher {
      * the one it names by its sha1 or integrity, one picked anew is downloaded.
      */
     private static void requireOneTarball(PackageResolver.Race race, PackageReference ref, RegistrySource registry,
-                                          YarnClassicOptions config, List<String> warnings) {
+                                          Config config, List<String> warnings) {
         TarballFetcher first = tarballFetcher(race, race.getFirst(), ref, registry, config, warnings);
         TarballFetcher other = tarballFetcher(race, race.getOther(), ref, registry, config, warnings);
         byte[] firstTarball = download(race, race.getFirst(), first);
@@ -126,7 +126,7 @@ final class PackageFetcher {
     }
 
     private static TarballFetcher tarballFetcher(PackageResolver.Race race, Manifest side, PackageReference ref,
-                                                 RegistrySource registry, YarnClassicOptions config,
+                                                 RegistrySource registry, Config config,
                                                  List<String> warnings) {
         PackageRemote remote = side.remote;
         if (remote == null || side.locked == null && !"tarball".equals(remote.type)) {

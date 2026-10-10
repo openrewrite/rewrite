@@ -55,7 +55,7 @@ final class Cli {
         Object yarnPath = Js.truthy(rc.get("yarn-path")) ? rc.get("yarn-path") : rc.get("yarnPath");
         Map<String, String> env = inputs.getEnv();
         if (!Js.truthy(yarnPath) ||
-            YarnClassicOptions.boolifyWithDefault(env == null ? null : env.get("YARN_IGNORE_PATH"), false)) {
+            Config.boolifyWithDefault(env == null ? null : env.get("YARN_IGNORE_PATH"), false)) {
             return;
         }
         String release = PosixPath.normalize(Js.string(yarnPath));
@@ -70,7 +70,7 @@ final class Cli {
             // the host's paths cover the project and the files directly in each directory above it they reach
             if (!PosixPath.isAbsolute(release) && (!release.startsWith("../") ||
                 IN_A_DIRECTORY_ABOVE.matcher(release).matches() &&
-                YarnClassicOptions.depth(singletonList(release)) <= inputs.reach())) {
+                Config.depth(singletonList(release)) <= inputs.reach())) {
                 throw new JsError(JsError.ERROR, "Cannot find module '" + release + "'");
             }
         }

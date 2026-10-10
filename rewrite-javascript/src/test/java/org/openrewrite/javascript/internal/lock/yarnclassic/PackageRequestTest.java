@@ -81,7 +81,7 @@ class PackageRequestTest {
                     requireNonNull(lock.remote).resolved));
         }
         Lockfile lockfile = new Lockfile(privateDepCache, null, null);
-        PackageResolver resolver = YarnClassicScenarios.resolver(YarnClassicOptions.defaults(), lockfile);
+        PackageResolver resolver = YarnClassicScenarios.resolver(YarnClassicScenarios.defaults(), lockfile);
         return new PackageRequest(DependencyRequestPattern.builder()
                 .pattern(pattern)
                 .registry("npm")

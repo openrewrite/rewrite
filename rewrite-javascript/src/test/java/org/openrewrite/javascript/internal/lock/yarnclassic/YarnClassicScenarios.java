@@ -259,8 +259,8 @@ final class YarnClassicScenarios {
         }
 
         /**
-         * What yarn had in a phase: the lock it started from, the phase's manifests and tree, the recorder's config
-         * files ({@code parent/}, {@code grandparent/}), its paths, and the directory the {@code cwd} file names.
+         * What yarn had in a phase: the lock, manifests and tree, the config files ({@code parent/} too), its paths,
+         * the directory {@code cwd} names, and after the edit the home's {@code user-npmrc} and {@code user-yarnrc}.
          */
         YarnClassicLockRegenerator.Inputs inputs(Phase phase, @Nullable String lock) {
             Map<String, String> configFiles = new LinkedHashMap<>();
@@ -293,10 +293,16 @@ final class YarnClassicScenarios {
                     putIfPresent(configFiles, dir + "/" + name, trees.get("").get(dir + "/" + name));
                 }
             }
+            Map<String, String> home = new LinkedHashMap<>();
+            if (phase == Phase.AFTER) {
+                putIfPresent(home, ".npmrc", file("user-npmrc"));
+                putIfPresent(home, ".yarnrc", file("user-yarnrc"));
+            }
             return YarnClassicLockRegenerator.Inputs.builder()
                     .lock(lock)
                     .manifests(manifests(phase))
                     .configFiles(configFiles)
+                    .homeFiles(home)
                     .paths(has("recorded-with") ? paths : null)
                     .directory(directory())
                     .cwd(cwd == null ? "" : cwd.trim())
@@ -384,7 +390,20 @@ final class YarnClassicScenarios {
 
     static final RegistrySource NO_REGISTRY = packuments((registry, name) -> null);
 
-    static PackageResolver resolver(YarnClassicOptions options, Lockfile lockfile) {
+    /**
+     * The config of an install run with these config files under this environment, read as an install reads it.
+     */
+    static Config config(Map<String, String> configFiles, @Nullable Map<String, String> env) {
+        YarnClassicLockRegenerator.Inputs inputs = YarnClassicLockRegenerator.Inputs.builder()
+                .configFiles(configFiles).env(env).build();
+        return new Config(inputs, YarnClassicLockRegenerator.start(inputs), new ArrayList<>());
+    }
+
+    static Config defaults() {
+        return config(Collections.emptyMap(), Collections.emptyMap());
+    }
+
+    static PackageResolver resolver(Config options, Lockfile lockfile) {
         return new PackageResolver(options, lockfile, new ResolutionMap(options), NO_REGISTRY,
                 new ProjectFiles(Collections.emptyMap(), null), Host.UNKNOWN, new ArrayList<>());
     }

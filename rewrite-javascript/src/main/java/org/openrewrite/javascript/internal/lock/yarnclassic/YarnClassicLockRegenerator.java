@@ -75,6 +75,13 @@ public final class YarnClassicLockRegenerator {
         Map<String, String> configFiles;
 
         /**
+         * The files of the user's home directory yarn reads, by name ({@code .npmrc}, {@code .yarnrc}): the host's
+         * registry configuration is its .npmrc.
+         */
+        @Singular
+        Map<String, String> homeFiles;
+
+        /**
          * The paths the project holds relative to its root, and the files of the directories above it
          * ({@code ../.npmrc}), when the host says; a config file among them the host did not read is unknown.
          */
@@ -131,7 +138,7 @@ public final class YarnClassicLockRegenerator {
             if (!dir.isEmpty() && !cwd.equals(dir) && !cwd.startsWith(dir + "/")) {
                 return null;
             }
-            return YarnClassicOptions.up(segments(cwd) - segments(dir)) + (dir.isEmpty() ? path :
+            return Config.up(segments(cwd) - segments(dir)) + (dir.isEmpty() ? path :
                     path.substring(slash + 1));
         }
 
@@ -151,7 +158,7 @@ public final class YarnClassicLockRegenerator {
             if (paths != null) {
                 files.addAll(paths);
             }
-            return YarnClassicOptions.depth(files);
+            return Config.depth(files);
         }
 
         /**
@@ -159,7 +166,7 @@ public final class YarnClassicLockRegenerator {
          */
         String relativePath(int depth) {
             if (directory == null) {
-                throw new CannotKnow("whether the workspaces of " + YarnClassicOptions.up(depth) + "package.json " +
+                throw new CannotKnow("whether the workspaces of " + Config.up(depth) + "package.json " +
                                      "list this project, whose directory in the repository the host did not give");
             }
             String[] segments = directory.split("/");
@@ -200,21 +207,21 @@ public final class YarnClassicLockRegenerator {
         Inputs these = lock.equals(inputs.getLock()) ? inputs : inputs.toBuilder().lock(lock).build();
         requireConfigFiles(these);
         List<String> warnings = new ArrayList<>();
-        Config config = new Config(these);
-        YarnClassicOptions options = init(these, config, warnings);
-        String saved = new Install(these, config, options, registry, warnings).run();
+        Map<String, @Nullable Object> flags = start(these);
+        Config config = new Config(these, flags, warnings);
+        String saved = new Install(these, config, flags, registry, warnings).run();
         return saved == null ? lock : saved;
     }
 
     /**
-     * cli/index.js {@code start} and {@code main}, then config.js {@code init}.
+     * cli/index.js {@code start} and {@code main}: the flags the .yarnrc chain gives the install.
      */
-    static YarnClassicOptions init(Inputs inputs, Config config, List<String> warnings) {
-        Map<String, @Nullable Object> rc = YarnClassicOptions.rc(inputs.configFilesFromCwd());
+    static Map<String, @Nullable Object> start(Inputs inputs) {
+        Map<String, @Nullable Object> rc = Rc.getRcConfigForCwd(inputs.configFilesFromCwd(), inputs.getHomeFiles());
         Cli cli = new Cli(inputs);
         cli.start(rc);
         cli.main();
-        return config.init(rc, warnings);
+        return Rc.getRcArgs(rc);
     }
 
     // every install reads the config files of the directory it runs in and of each directory above it
@@ -238,11 +245,8 @@ public final class YarnClassicLockRegenerator {
      */
     public static InstallRoot installRoot(Inputs inputs) {
         try {
-            Map<String, @Nullable Object> rc = YarnClassicOptions.rc(inputs.configFilesFromCwd());
-            Cli cli = new Cli(inputs);
-            cli.start(rc);
-            cli.main();
-            int workspaceRoot = new Config(inputs).findWorkspaceRoot(YarnClassicOptions.looseSemver(rc),
+            Map<String, @Nullable Object> flags = start(inputs);
+            int workspaceRoot = Config.findWorkspaceRoot(inputs, !Js.truthy(flags.get("strictSemver")),
                     new ArrayList<>());
             return InstallRoot.at(Math.max(workspaceRoot, 0));
         } catch (RuntimeException e) {

@@ -15,66 +15,135 @@
  */
 package org.openrewrite.javascript.internal.lock.yarnclassic;
 
+import lombok.AccessLevel;
 import lombok.Getter;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.javascript.internal.lock.CannotKnow;
+import org.openrewrite.javascript.internal.lock.HostEnvironment;
+import org.openrewrite.javascript.internal.lock.Ini;
 import org.openrewrite.javascript.internal.lock.JsError;
 import org.openrewrite.javascript.internal.lock.LocaleCompare;
 import org.openrewrite.javascript.internal.lock.Minimatch;
 import org.openrewrite.javascript.internal.lock.PosixPath;
 import org.openrewrite.javascript.internal.lock.yarnclassic.YarnClassicLockRegenerator.Inputs;
+import org.openrewrite.semver.NodeSemver;
 
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collection;
+import java.util.Collections;
+import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 import static java.util.Collections.singletonList;
 
 /**
- * Port of yarn src/config.js (yarn 1.22.22): {@code init}, the workspace root and its members, and the manifests it
- * reads.
+ * Port of yarn src/config.js (yarn 1.22.22) with the config its registries load (registries/npm-registry.js,
+ * yarn-registry.js, base-registry.js): {@code init} sets it, and it is only read afterwards.
  */
 @Getter
 final class Config {
 
+    static final NodeSemver.Options SEMVER = NodeSemver.Options.V5_5_0;
+    static final NodeSemver.Options LOOSE_SEMVER = NodeSemver.Options.V5_5_0_LOOSE;
+
+    static final String YARN_REGISTRY = "https://registry.yarnpkg.com";
+    static final String DEFAULT_REGISTRY = "https://registry.npmjs.org/";
+
+    private static final Map<String, Object> DEFAULTS = new LinkedHashMap<>();
+    private static final Map<String, String> NPM_MAP = new HashMap<>();
+    private static final Pattern ENV_EXPR = Pattern.compile("(\\\\*)\\$\\{([^}]+)}");
+    private static final Pattern SCOPED_PKG = Pattern.compile("(?:^|/)(@[^/?]+?)(?=%2f|/)");
+    private static final Pattern REGISTRY_PREFIX = Pattern.compile("^(https?:)?//", Pattern.CASE_INSENSITIVE);
+    private static final Pattern UNDERSCORE = Pattern.compile("([^_])_");
+    private static final List<String> FALSY_STRINGS = Arrays.asList("0", "false");
+
+    static {
+        DEFAULTS.put("version-tag-prefix", "v");
+        DEFAULTS.put("version-git-tag", true);
+        DEFAULTS.put("version-commit-hooks", true);
+        DEFAULTS.put("version-git-sign", false);
+        DEFAULTS.put("version-git-message", "v%s");
+        DEFAULTS.put("init-version", "1.0.0");
+        DEFAULTS.put("init-license", "MIT");
+        DEFAULTS.put("save-prefix", "^");
+        DEFAULTS.put("bin-links", true);
+        DEFAULTS.put("ignore-scripts", false);
+        DEFAULTS.put("ignore-optional", false);
+        DEFAULTS.put("registry", YARN_REGISTRY);
+        DEFAULTS.put("strict-ssl", true);
+        NPM_MAP.put("version-git-sign", "sign-git-tag");
+        NPM_MAP.put("version-tag-prefix", "tag-version-prefix");
+        NPM_MAP.put("version-git-tag", "git-tag-version");
+        NPM_MAP.put("version-commit-hooks", "commit-hooks");
+        NPM_MAP.put("version-git-message", "message");
+    }
+
+    @Getter(AccessLevel.NONE)
     private final Inputs inputs;
+
+    private final boolean looseSemver;
+    private final boolean focus;
 
     /**
      * {@code workspaceRootFolder} as directories above the project's: 0 the project's own, -1 none.
      */
-    private int workspaceRoot = -1;
-
-    /**
-     * The manifest of {@code lockfileFolder}, read once {@link #init} found it.
-     */
-    private @Nullable Manifest lockfileFolderManifest;
-
-    private boolean focus;
+    private final int workspaceRoot;
 
     /**
      * The name of the workspace a {@code --focus} install runs for: the manifest's where yarn runs.
      */
-    private @Nullable Object focusedWorkspaceName;
+    private final @Nullable Object focusedWorkspaceName;
 
-    Config(Inputs inputs) {
-        this.inputs = inputs;
-    }
+    private final Map<String, @Nullable Object> npmConfig;
+    private final Map<String, @Nullable Object> yarnConfig;
 
     /**
-     * {@code init}: the workspace root from where yarn runs up, the focus check, the registries' config, the manifest
-     * of the lock's directory, the workspaces check.
+     * The manifest of {@code lockfileFolder}, read once the registries are.
      */
-    YarnClassicOptions init(Map<String, @Nullable Object> rc, List<String> warnings) {
-        boolean looseSemver = YarnClassicOptions.looseSemver(rc);
-        requireWorkspaceRootAbove(looseSemver);
-        workspaceRoot = findWorkspaceRoot(looseSemver, warnings);
-        focus = YarnClassicOptions.focus(rc);
+    private final @Nullable Manifest lockfileFolderManifest;
+
+    private final boolean production;
+    private final boolean workspacesEnabled;
+    private final boolean workspacesNohoistEnabled;
+    private final boolean enableLockfileVersions;
+    private final boolean linkFileDependencies;
+    private final boolean packBuiltPackages;
+    private final boolean autoAddIntegrity;
+    private final boolean ignorePlatform;
+
+    /**
+     * cli/index.js: {@code --prefer-offline} turns {@code offline} on too.
+     */
+    private final boolean offline;
+    private final boolean preferOffline;
+
+    @Getter(AccessLevel.NONE)
+    private final PackageConstraintResolver constraintResolver = new PackageConstraintResolver(this);
+
+    /**
+     * {@code init} with the command line's {@code flags}: the workspace root from where yarn runs up, the focus check,
+     * the registries' config, the manifest of the lock's directory, the workspaces check.
+     */
+    Config(Inputs inputs, Map<String, @Nullable Object> flags, List<String> warnings) {
+        this.inputs = inputs;
+        looseSemver = !Js.truthy(flags.get("strictSemver"));
+        focus = Js.truthy(flags.get("focus"));
+        ignorePlatform = Js.truthy(flags.get("ignorePlatform"));
+        preferOffline = Js.truthy(flags.get("preferOffline"));
+        offline = preferOffline || Js.truthy(flags.get("offline"));
+
+        requireWorkspaceRootAbove(inputs, looseSemver);
+        workspaceRoot = findWorkspaceRoot(inputs, looseSemver, warnings);
         if (focus && (workspaceRoot < 0 || workspaceRoot == 0 && inputs.getCwd().isEmpty())) {
             throw new MessageError("This command can only be run inside an individual workspace.");
         }
@@ -82,21 +151,55 @@ final class Config {
             throw new CannotKnow("the lock yarn writes: run in " + inputs.getCwd() + ", which no workspaces list, it " +
                                  "makes that directory its lockfileFolder and writes its yarn.lock, not this lock");
         }
-        if (focus) {
-            focusedWorkspaceName = readRootManifest(looseSemver, warnings).getName();
+        focusedWorkspaceName = focus ? readRootManifest(looseSemver, warnings).getName() : null;
+
+        Map<String, String> configFiles = inputs.configFilesFromCwd();
+        Map<String, String> env = inputs.getEnv();
+        npmConfig = loadNpmConfig(configFiles, inputs.getHomeFiles(), env);
+        yarnConfig = loadYarnConfig(configFiles, inputs.getHomeFiles(), env);
+        Object registry = flags.get("registry");
+        if (registry != null) {
+            yarnConfig.put("registry", registry);
+            npmConfig.put("registry", registry);
         }
-        YarnClassicOptions config = YarnClassicOptions.load(rc, inputs.configFilesFromCwd(), inputs.getEnv());
-        String up = YarnClassicOptions.up(Math.max(workspaceRoot, 0));
+
+        String up = up(Math.max(workspaceRoot, 0));
         String lockfileFolder = up.isEmpty() ? "" : up.substring(0, up.length() - 1);
         String manifest = up.isEmpty() ? inputs.getManifests().get("") :
                 inputs.getConfigFiles().get(up + "package.json");
         lockfileFolderManifest = manifest == null ? null :
                 tryManifest(lockfileFolder, manifest, looseSemver, false, lockfileFolder, warnings);
-        if (workspaceRoot >= 0 && !config.isWorkspacesEnabled()) {
+
+        workspacesEnabled = !Boolean.FALSE.equals(getOption("workspaces-experimental"));
+        workspacesNohoistEnabled = !Boolean.FALSE.equals(getOption("workspaces-nohoist-experimental"));
+        enableLockfileVersions = Js.truthy(getOption("yarn-enable-lockfile-versions"));
+        linkFileDependencies = Js.truthy(getOption("yarn-link-file-dependencies"));
+        packBuiltPackages = Js.truthy(getOption("experimental-pack-script-packages-in-mirror"));
+        autoAddIntegrity = !boolifyWithDefault(Js.string(getOption("unsafe-disable-integrity-migration")), true);
+        Object productionFlag = flags.get("production");
+        // an environment the host does not know counts as one without these variables
+        boolean productionEnv = env != null && "production".equals(env.get("NODE_ENV")) &&
+                                !"false".equals(env.get("NPM_CONFIG_PRODUCTION")) &&
+                                !"false".equals(env.get("YARN_PRODUCTION"));
+        production = productionFlag != null ? boolify(productionFlag) :
+                Js.truthy(getOption("production")) || productionEnv;
+        if (workspaceRoot >= 0 && !workspacesEnabled) {
             throw new MessageError("Your project root defines workspaces but the feature is disabled in your Yarn " +
                                    "config. Please check \"workspaces-experimental\" in your .yarnrc file.");
         }
-        return config;
+    }
+
+    /**
+     * What an install reads from yarn's cache instead of the registry, which the engine does not see.
+     */
+    CannotKnow offlineCache() {
+        return new CannotKnow((preferOffline ? "--prefer-offline" : "--offline") + " in .yarnrc: what yarn " +
+                              "resolves and fetches depends on its cache");
+    }
+
+    @Nullable
+    String resolveConstraints(List<String> versions, String range) {
+        return constraintResolver.reduce(versions, range);
     }
 
     // readRootManifest: the manifest where yarn runs, which yarn requires
@@ -113,7 +216,7 @@ final class Config {
     }
 
     // findWorkspaceRoot starts where yarn runs: a manifest with workspaces below this lock's stops it there
-    private void requireWorkspaceRootAbove(boolean looseSemver) {
+    private static void requireWorkspaceRootAbove(Inputs inputs, boolean looseSemver) {
         Set<String> paths = inputs.getPaths();
         for (String dir = inputs.getCwd(); !dir.isEmpty(); dir = dir.contains("/") ?
                 dir.substring(0, dir.lastIndexOf('/')) : "") {
@@ -139,10 +242,10 @@ final class Config {
      * {@code findWorkspaceRoot}: how many directories above the project's the nearest manifest with a workspaces
      * list is when it is where yarn runs or that list matches the path from it to there, 0 the project's, else -1.
      */
-    int findWorkspaceRoot(boolean looseSemver, List<String> warnings) {
+    static int findWorkspaceRoot(Inputs inputs, boolean looseSemver, List<String> warnings) {
         String cwd = inputs.getCwd();
         for (int depth = 0; depth <= inputs.reach(); depth++) {
-            Manifest manifest = findManifest(depth, looseSemver, warnings);
+            Manifest manifest = findManifest(inputs, depth, looseSemver, warnings);
             Map<String, @Nullable Object> ws = manifest == null ? null : extractWorkspaces(manifest);
             if (ws != null && Js.truthy(ws.get("packages"))) {
                 String relativePath = depth == 0 ? cwd : cwd.isEmpty() ? inputs.relativePath(depth) :
@@ -155,8 +258,9 @@ final class Config {
     }
 
     // findManifest: the directory's package.json, else its yarn.json
-    private @Nullable Manifest findManifest(int depth, boolean looseSemver, List<String> warnings) {
-        String up = YarnClassicOptions.up(depth);
+    private static @Nullable Manifest findManifest(Inputs inputs, int depth, boolean looseSemver,
+                                                   List<String> warnings) {
+        String up = up(depth);
         String text = depth == 0 ? inputs.getManifests().get("") : inputs.getConfigFiles().get(up + "package.json");
         if (text != null) {
             return tryManifest(depth == 0 ? "" : up.substring(0, up.length() - 1), text, looseSemver, true, null,
@@ -281,10 +385,9 @@ final class Config {
      * {@code getWorkspaces}: the root's workspaces config once it is eligible.
      * @throws MessageError members or a nohoist list in a root that is not private, when {@code shouldThrow}.
      */
-    static @Nullable Map<String, @Nullable Object> getWorkspaces(Manifest manifest, boolean shouldThrow,
-                                                                   YarnClassicOptions config,
-                                                                   List<String> warnings) {
-        if (!config.isWorkspacesEnabled()) {
+    @Nullable
+    Map<String, @Nullable Object> getWorkspaces(Manifest manifest, boolean shouldThrow, List<String> warnings) {
+        if (!workspacesEnabled) {
             return null;
         }
         Map<String, @Nullable Object> ws = extractWorkspaces(manifest);
@@ -301,7 +404,7 @@ final class Config {
             wsCopy = null;
         }
         if (wsCopy != null && Js.truthy(wsCopy.get("nohoist")) && Js.length(wsCopy.get("nohoist")) > 0) {
-            if (!config.isWorkspacesNohoistEnabled()) {
+            if (!workspacesNohoistEnabled) {
                 warned.add(Lang.format("$0 defines nohoist but the feature is disabled in your Yarn config " +
                                        "(\"workspaces-nohoist-experimental\" in .yarnrc file)", manifest.getName()));
                 wsCopy.put("nohoist", null);
@@ -327,20 +430,19 @@ final class Config {
      * {@code resolveWorkspaces}: the members whose package.json a {@code packages} glob finds, in the order glob lists
      * them, outside any node_modules.
      */
-    Map<String, WorkspaceLayout.Workspace> resolveWorkspaces(Manifest root, YarnClassicOptions config,
-                                                             List<String> warnings) {
+    Map<String, WorkspaceLayout.Workspace> resolveWorkspaces(Manifest root, List<String> warnings) {
         Map<String, WorkspaceLayout.Workspace> workspaces = new LinkedHashMap<>();
-        if (!config.isWorkspacesEnabled()) {
+        if (!workspacesEnabled) {
             return workspaces;
         }
         Set<String> files = new LinkedHashSet<>();
-        for (Object pattern : workspacePatterns(root, config, warnings)) {
+        for (Object pattern : workspacePatterns(root, warnings)) {
             files.addAll(glob((String) pattern));
         }
         for (String file : files) {
             String loc = Objects.requireNonNull(ProjectFiles.location(PosixPath.dirname(file)));
             Manifest manifest = tryManifest(loc, Objects.requireNonNull(inputs.getManifests().get(loc)),
-                    config.isLooseSemver(), false, "", warnings);
+                    looseSemver, false, "", warnings);
             if (!Js.truthy(manifest.getName())) {
                 warnings.add(Lang.format("Missing name in workspace at $0, ignoring.", loc));
                 continue;
@@ -361,8 +463,8 @@ final class Config {
     /**
      * {@code resolveWorkspaces} up to its glob, which calls replace on every pattern before the first glob starts.
      */
-    static List<?> workspacePatterns(Manifest root, YarnClassicOptions config, List<String> warnings) {
-        Map<String, @Nullable Object> ws = getWorkspaces(root, true, config, warnings);
+    List<?> workspacePatterns(Manifest root, List<String> warnings) {
+        Map<String, @Nullable Object> ws = getWorkspaces(root, true, warnings);
         Object patterns = ws != null && Js.truthy(ws.get("packages")) ? ws.get("packages") : new ArrayList<>();
         if (!(patterns instanceof List)) {
             throw new MessageError("The workspaces field in package.json must be an array.");
@@ -419,5 +521,231 @@ final class Config {
             spelled.add(prefix + file);
         }
         return spelled;
+    }
+
+    /**
+     * npm-registry.js {@code getPossibleConfigLocations}: the project's {@code .<filename>}, the home directory's
+     * ({@code ~/}), then the project's again and each directory's above it, nearest first.
+     */
+    static List<String> getPossibleConfigLocations(String filename, Map<String, String> configFiles) {
+        List<String> locations = new ArrayList<>();
+        locations.add("." + filename);
+        locations.add(Rc.HOME + "." + filename);
+        for (int depth = 0; depth <= depth(configFiles.keySet()); depth++) {
+            locations.add(up(depth) + "." + filename);
+        }
+        return locations;
+    }
+
+    /**
+     * How many directories above the project's the deepest of these paths ({@code ../../.npmrc}) is.
+     */
+    static int depth(Collection<String> paths) {
+        int depth = 0;
+        for (String path : paths) {
+            int d = 0;
+            while (path.startsWith("../", 3 * d)) {
+                d++;
+            }
+            depth = Math.max(depth, d);
+        }
+        return depth;
+    }
+
+    static String up(int depth) {
+        StringBuilder up = new StringBuilder();
+        for (int i = 0; i < depth; i++) {
+            up.append("../");
+        }
+        return up.toString();
+    }
+
+    // base-registry.js init then npm-registry.js loadConfig: the yarn_ and npm_config_ keys over every .npmrc
+    private static Map<String, @Nullable Object> loadNpmConfig(Map<String, String> configFiles,
+                                                               Map<String, String> home,
+                                                               @Nullable Map<String, String> env) {
+        Map<String, @Nullable Object> npmConfig = new LinkedHashMap<>();
+        mergeEnv(npmConfig, "yarn_", env);
+        mergeEnv(npmConfig, "npm_config_", env);
+        for (String loc : getPossibleConfigLocations("npmrc", configFiles)) {
+            String file = loc.startsWith(Rc.HOME) ? home.get(loc.substring(Rc.HOME.length())) : configFiles.get(loc);
+            if (file == null) {
+                continue;
+            }
+            Map<String, @Nullable Object> config = new LinkedHashMap<>();
+            String text = file.replace("\r\n", "\n");
+            for (Map.Entry<String, @Nullable Object> entry : Ini.decode(text, Ini.Release.V1_3_5).entrySet()) {
+                config.put(entry.getKey(), envReplace(normalizeConfigOption(entry.getValue()), env));
+            }
+            config.putAll(npmConfig);
+            npmConfig = config;
+        }
+        return npmConfig;
+    }
+
+    // base-registry.js init then yarn-registry.js loadConfig: the yarn_ keys over every .yarnrc over yarn's defaults
+    private static Map<String, @Nullable Object> loadYarnConfig(Map<String, String> configFiles,
+                                                                Map<String, String> home,
+                                                                @Nullable Map<String, String> env) {
+        Map<String, @Nullable Object> yarnConfig = new LinkedHashMap<>();
+        mergeEnv(yarnConfig, "yarn_", env);
+        for (String loc : getPossibleConfigLocations("yarnrc", configFiles)) {
+            String file = loc.startsWith(Rc.HOME) ? home.get(loc.substring(Rc.HOME.length())) : configFiles.get(loc);
+            if (file == null) {
+                continue;
+            }
+            Map<String, @Nullable Object> config = new LinkedHashMap<>();
+            Js.assign(config, LockfileParser.parseLockfile(file.replace("\r\n", "\n"), ".yarnrc").getObject());
+            config.putAll(yarnConfig);
+            yarnConfig = config;
+        }
+        Map<String, @Nullable Object> withDefaults = new LinkedHashMap<>(DEFAULTS);
+        withDefaults.putAll(yarnConfig);
+        return withDefaults;
+    }
+
+    // base-registry.js mergeEnv
+    private static void mergeEnv(Map<String, @Nullable Object> config, String prefix,
+                                 @Nullable Map<String, String> env) {
+        if (env == null) {
+            return;
+        }
+        for (Map.Entry<String, String> envEntry : env.entrySet()) {
+            String key = envEntry.getKey().toLowerCase(Locale.ROOT);
+            if (!key.startsWith(prefix)) {
+                continue;
+            }
+            Object val = normalizeConfigOption(envEntry.getValue());
+            key = key.substring(prefix.length()).replace("__", ".");
+            key = UNDERSCORE.matcher(key).replaceAll("$1-");
+            ObjectPath.set(config, key, val);
+        }
+    }
+
+    /**
+     * yarn-registry.js {@code getOption}: the yarn config's value, else the npm config's under npm's name for it,
+     * else under the same name.
+     */
+    @Nullable
+    Object getOption(String key) {
+        if (yarnConfig.containsKey(key)) {
+            return yarnConfig.get(key);
+        }
+        // npmMap[key] of a key npm has no name for is undefined, which reads the npm config's key "undefined"
+        String npmKey = NPM_MAP.containsKey(key) ? NPM_MAP.get(key) : "undefined";
+        if (npmConfig.containsKey(npmKey)) {
+            return npmConfig.get(npmKey);
+        }
+        if (npmConfig.containsKey(key)) {
+            return npmConfig.get(key);
+        }
+        return DEFAULTS.get(key);
+    }
+
+    /**
+     * {@code getOfflineMirrorPath} without a package file: npm's registry config, then yarn's.
+     */
+    @Nullable
+    Object getOfflineMirrorPath() {
+        Object mirrorPath = null;
+        for (Map<String, @Nullable Object> registry : Arrays.asList(npmConfig, yarnConfig)) {
+            Object registryMirrorPath = registry.get("yarn-offline-mirror");
+            if (Boolean.FALSE.equals(registryMirrorPath)) {
+                return null;
+            }
+            if (registryMirrorPath != null) {
+                mirrorPath = registryMirrorPath;
+            }
+        }
+        return mirrorPath;
+    }
+
+    /**
+     * npm-registry.js {@code getRegistry}: the registry a package's metadata is requested from.
+     */
+    String getRegistry(String packageIdent) {
+        if (REGISTRY_PREFIX.matcher(packageIdent).find()) {
+            for (Object registry : getAvailableRegistries()) {
+                if (packageIdent.startsWith(Js.string(registry))) {
+                    // find's first match, which an empty registry is as well, and only a truthy one is taken
+                    if (Js.truthy(registry)) {
+                        return Js.string(registry);
+                    }
+                    break;
+                }
+            }
+        }
+        String scope = getScope(packageIdent);
+        for (String s : scope.isEmpty() ? Collections.singletonList("") : Arrays.asList(scope, "")) {
+            String key = s + (s.isEmpty() ? "" : ":") + "registry";
+            Object registry = npmConfig.get(key);
+            if (!Js.truthy(registry)) {
+                registry = getOption(key);
+            }
+            if (Js.truthy(registry)) {
+                return Js.string(registry);
+            }
+        }
+        return DEFAULT_REGISTRY;
+    }
+
+    // base-registry.js getAvailableRegistries over npm's config
+    private List<@Nullable Object> getAvailableRegistries() {
+        List<@Nullable Object> registries = new ArrayList<>();
+        for (String option : Js.keys(npmConfig)) {
+            String[] parts = option.split(":", -1);
+            if ("registry".equals(option) || (parts.length > 1 && "registry".equals(parts[1]))) {
+                registries.add(npmConfig.get(option));
+            }
+        }
+        return registries;
+    }
+
+    static String getScope(String packageIdent) {
+        Matcher match = SCOPED_PKG.matcher(packageIdent);
+        return match.find() ? match.group(1) : "";
+    }
+
+    private static @Nullable Object normalizeConfigOption(@Nullable Object val) {
+        if ("true".equals(val)) {
+            return true;
+        }
+        if ("false".equals(val)) {
+            return false;
+        }
+        return val;
+    }
+
+    // util/env-replace.js
+    static @Nullable Object envReplace(@Nullable Object value, @Nullable Map<String, String> env) {
+        if (!(value instanceof String) || ((String) value).isEmpty()) {
+            return value;
+        }
+        Matcher m = ENV_EXPR.matcher((String) value);
+        StringBuffer out = new StringBuffer();
+        while (m.find()) {
+            String esc = m.group(1);
+            String replacement;
+            if (!esc.isEmpty() && esc.length() % 2 != 0) {
+                replacement = m.group();
+            } else {
+                replacement = HostEnvironment.of(env).reference(m.group(2));
+                if (replacement == null) {
+                    throw new JsError(JsError.ERROR, "Failed to replace env in config: " + m.group());
+                }
+            }
+            m.appendReplacement(out, Matcher.quoteReplacement(replacement));
+        }
+        m.appendTail(out);
+        return out.toString();
+    }
+
+    // util/conversion.js
+    static boolean boolify(@Nullable Object val) {
+        return !FALSY_STRINGS.contains(Js.string(val).toLowerCase(Locale.ROOT));
+    }
+
+    static boolean boolifyWithDefault(@Nullable Object val, boolean defaultResult) {
+        return "".equals(val) || val == null ? defaultResult : boolify(val);
     }
 }

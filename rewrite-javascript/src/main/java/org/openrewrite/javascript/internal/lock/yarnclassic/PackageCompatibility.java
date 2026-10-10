@@ -41,12 +41,12 @@ final class PackageCompatibility {
     private static final List<String> IGNORE = Arrays.asList("npm", "teleport", "rhino", "cordovaDependencies",
             "parcel");
 
-    private final YarnClassicOptions config;
+    private final Config config;
     private final Host host;
     private final List<String> errors;
     private final List<String> warnings;
 
-    PackageCompatibility(YarnClassicOptions config, Host host, List<String> errors, List<String> warnings) {
+    PackageCompatibility(Config config, Host host, List<String> errors, List<String> warnings) {
         this.config = config;
         this.host = host;
         this.errors = errors;
@@ -76,7 +76,7 @@ final class PackageCompatibility {
      * Whether the engine's version satisfies the range; node above 1 also passes as 0.10 to 0.13 of its major.
      */
     static boolean testEngine(String name, @Nullable Object range, String actual, boolean looseSemver) {
-        NodeSemver.Options options = looseSemver ? YarnClassicOptions.LOOSE_SEMVER : YarnClassicOptions.SEMVER;
+        NodeSemver.Options options = looseSemver ? Config.LOOSE_SEMVER : Config.SEMVER;
         if (actual.isEmpty() || NodeSemver.valid(actual, options) == null) {
             return false;
         }

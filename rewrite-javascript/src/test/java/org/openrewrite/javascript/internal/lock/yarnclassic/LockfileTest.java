@@ -155,7 +155,7 @@ class LockfileTest {
     @Test
     void getLockfile() {
         Lockfile lockfile = new Lockfile();
-        PackageResolver resolver = YarnClassicScenarios.resolver(YarnClassicOptions.defaults(), lockfile);
+        PackageResolver resolver = YarnClassicScenarios.resolver(YarnClassicScenarios.defaults(), lockfile);
         Manifest foobar = manifest(resolver, "foobar", "0.0.0", "0.0.0", "http://example.com/foobar", "npm");
         Manifest barfoo = manifest(resolver, "barfoo", "0.0.1", "0.1.0", "http://example.com/barfoo", "yarn");
         barfoo.put("dependencies", object("yes", "no"));
@@ -181,7 +181,7 @@ class LockfileTest {
     @Test
     void getLockfileSorting() {
         Lockfile lockfile = new Lockfile();
-        PackageResolver resolver = YarnClassicScenarios.resolver(YarnClassicOptions.defaults(), lockfile);
+        PackageResolver resolver = YarnClassicScenarios.resolver(YarnClassicScenarios.defaults(), lockfile);
         Manifest foobar = manifest(resolver, "foobar", "0.0.0", null, "http://example.com/foobar", "npm");
         Map<String, Manifest> patterns = new LinkedHashMap<>();
         patterns.put("foobar2", foobar);
@@ -197,7 +197,7 @@ class LockfileTest {
     @Test
     void getLockfileHandlesIntegrityField() {
         Lockfile lockfile = new Lockfile();
-        PackageResolver resolver = YarnClassicScenarios.resolver(YarnClassicOptions.defaults(), lockfile);
+        PackageResolver resolver = YarnClassicScenarios.resolver(YarnClassicScenarios.defaults(), lockfile);
         Manifest foobar = manifest(resolver, "foobar", "0.0.0", null, "http://example.com/foobar", "npm");
         Ssri.Integrity integrity = Ssri.parse("sha1-foo sha512-bar", Ssri.Release.V5_3_0);
         foobar.remote.integrity = integrity;
@@ -302,7 +302,7 @@ class LockfileTest {
         String answer;
         try {
             Lockfile lockfile = Lockfile.fromDirectory("# yarn lockfile v1\n\n\n" + entries);
-            PackageResolver resolver = YarnClassicScenarios.resolver(YarnClassicOptions.defaults(), lockfile);
+            PackageResolver resolver = YarnClassicScenarios.resolver(YarnClassicScenarios.defaults(), lockfile);
             List<String> keys = new ArrayList<>(Js.keys(lockfile.getCache()));
             keys.sort(String::compareTo);
             for (String pattern : keys) {
@@ -352,7 +352,7 @@ class LockfileTest {
         String answer;
         try {
             Lockfile lockfile = Lockfile.fromDirectory("# yarn lockfile v1\n\n\n" + entries);
-            PackageResolver resolver = YarnClassicScenarios.resolver(YarnClassicOptions.defaults(), lockfile);
+            PackageResolver resolver = YarnClassicScenarios.resolver(YarnClassicScenarios.defaults(), lockfile);
             Map<String, Manifest> patterns = new LinkedHashMap<>();
             for (String pattern : Js.keys(lockfile.getCache())) {
                 PackageRequest request = new PackageRequest(DependencyRequestPattern.builder().pattern(pattern)
