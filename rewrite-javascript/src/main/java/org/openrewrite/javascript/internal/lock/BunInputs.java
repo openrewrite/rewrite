@@ -63,8 +63,8 @@ final class BunInputs {
     }
 
     /**
-     * bun's walk from where it runs. Without a bun.lock where it installs it rewrites a bun.lockb, or migrates the first
-     * of package-lock.json, yarn.lock and pnpm-lock.yaml, rewriting package.json after pnpm's: there the walk stops.
+     * bun's walk from where it runs; it stops where bun, finding no bun.lock, rewrites a bun.lockb, or migrates a
+     * pnpm-lock.yaml (no package-lock.json or yarn.lock first) and rewrites package.json, which no regeneration writes.
      */
     static InstallRoot installRoot(LockDirectory dir) {
         InstallRoot walked = BunLockRegenerator.installRoot(from(dir, Host.UNKNOWN, Instant.EPOCH));

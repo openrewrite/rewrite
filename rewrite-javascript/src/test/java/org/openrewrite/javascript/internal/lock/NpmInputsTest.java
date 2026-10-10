@@ -163,7 +163,7 @@ class NpmInputsTest {
         assertThat(result.getFailure()).isNotNull();
         assertThat(result.getFailure().getKind()).isEqualTo(Kind.CANNOT_KNOW);
         assertThat(result.getFailure().getDetail()).isEqualTo("the engine cannot know the lock npm writes: it reads " +
-                                                              "and writes the npm-shrinkwrap.json beside this lock in " +
-                                                              "its place");
+                                                              "and writes the npm-shrinkwrap.json beside this lock " +
+                                                              "in its place");
     }
 }

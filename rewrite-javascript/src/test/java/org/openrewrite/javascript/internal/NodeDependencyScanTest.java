@@ -492,8 +492,8 @@ class NodeDependencyScanTest {
     }
 
     /**
-     * Recorded in a member with its own lock under a root that lists it: npm writes the root's npm-shrinkwrap.json in
-     * place of its lock; bun rewrites a bun.lockb, and migrates a package-lock.json or yarn.lock before a pnpm-lock.yaml.
+     * Recorded in a member with its own lock under a root that lists it: npm rewrites the root's npm-shrinkwrap.json,
+     * bun a bun.lockb; bun migrates a package-lock.json or yarn.lock before a pnpm-lock.yaml.
      */
     @ParameterizedTest
     @CsvSource(delimiter = '|', value = {
