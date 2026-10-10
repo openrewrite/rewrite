@@ -1001,7 +1001,7 @@ public final class NodeDependencyEdits implements PackageJsonHelper.FileEditor {
                 return base;
             }
             return scanned.reread(revision.getClass() == scanned.getDocument().getClass() ? revision :
-                    PackageJsonHelper.reparseLock(scanned.getDocument(), PackageJsonHelper.printed(revision)).withSourcePath(path));
+                    PackageJsonHelper.reparseLock(scanned.getDocument(), PackageJsonHelper.printed(revision)));
         }
 
         NodeCatalogs current() {

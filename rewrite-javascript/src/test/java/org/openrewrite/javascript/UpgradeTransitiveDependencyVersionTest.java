@@ -500,9 +500,9 @@ class UpgradeTransitiveDependencyVersionTest implements RewriteTest {
 
     @ParameterizedTest
     @CsvSource(delimiter = '|', textBlock = """
-      Pnpm | {"name": "p", "packageManager": "pnpm@10.34.6", "pnpm": "hoist"}                 | pnpm is not an object
-      Pnpm | {"name": "p", "packageManager": "pnpm@10.34.6", "pnpm": {"overrides": "none"}} | pnpm.overrides is not an object
-      Npm  | {"name": "p", "overrides": []}                                                  | overrides is not an object
+      Pnpm | {"packageManager": "pnpm@10.34.6", "pnpm": "hoist"}                 | pnpm is not an object
+      Pnpm | {"packageManager": "pnpm@10.34.6", "pnpm": {"overrides": "none"}} | pnpm.overrides is not an object
+      Npm  | {"overrides": []}                                                  | overrides is not an object
       """)
     void anOverridesFieldThatIsNoObjectIsDeclinedWithOneRowAndNothingElse(PackageManager pm, String manifest,
                                                                           String reason) {
