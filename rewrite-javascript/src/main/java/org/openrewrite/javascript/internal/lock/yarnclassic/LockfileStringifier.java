@@ -16,7 +16,6 @@
 package org.openrewrite.javascript.internal.lock.yarnclassic;
 
 import org.jspecify.annotations.Nullable;
-import org.openrewrite.javascript.internal.lock.CannotKnow;
 import org.openrewrite.javascript.internal.lock.V8Sort;
 
 import java.util.ArrayList;
@@ -98,24 +97,16 @@ final class LockfileStringifier {
         return p != null ? p : OBJECT_PROTOTYPE.contains(key) ? Double.NaN : 0;
     }
 
-    // V8's Array.prototype.sort under 64 elements; only an inherited member's name makes the comparator inconsistent
+    // only an inherited member's name makes the comparator inconsistent, and then V8's own sort decides the order
     static List<String> sortKeys(List<String> keys) {
         List<String> a = new ArrayList<>(keys);
-        int n = a.size();
-        if (n < 2) {
-            return a;
-        }
-        if (n >= 64) {
-            for (String key : a) {
-                if (OBJECT_PROTOTYPE.contains(key)) {
-                    throw new CannotKnow("the order yarn writes the " + n + " keys of a map holding \"" + key +
-                                         "\" in, which its comparator does not order consistently");
-                }
+        for (String key : a) {
+            if (OBJECT_PROTOTYPE.contains(key)) {
+                V8Sort.sort(a, LockfileStringifier::priorityThenAlphaSort, "keys of a map holding \"" + key + "\"");
+                return a;
             }
-            a.sort(LockfileStringifier::priorityThenAlphaSort);
-            return a;
         }
-        V8Sort.sort(a, LockfileStringifier::priorityThenAlphaSort, "keys");
+        a.sort(LockfileStringifier::priorityThenAlphaSort);
         return a;
     }
 
