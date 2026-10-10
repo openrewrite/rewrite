@@ -1,0 +1,2 @@
+[ERROR] The named registry alias 'foo' is mapped to 'ftp://example.com/', which is not a valid http(s) URL.
+Provide a URL that starts with http:// or https://, e.g. https://npm.pkg.example.com/

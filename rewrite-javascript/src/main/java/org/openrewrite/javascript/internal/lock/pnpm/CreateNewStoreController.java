@@ -20,16 +20,27 @@ import org.jspecify.annotations.Nullable;
 import java.time.Instant;
 
 /**
- * Port of @pnpm/store.connection-manager src/createNewStoreController.ts (pnpm 11.2.2): the npm resolver of the store
- * controller an install creates.
+ * Port of @pnpm/store.connection-manager src/index.ts and createNewStoreController.ts (pnpm 11.2.2): the npm resolver
+ * of the store controller pnpm creates, which checks the named registries.
  */
 final class CreateNewStoreController {
 
-    private CreateNewStoreController() {
+    private final RegistryMetadata registry;
+    private final Instant now;
+
+    CreateNewStoreController(RegistryMetadata registry, Instant now) {
+        this.registry = registry;
+        this.now = now;
     }
 
-    static NpmResolver createNewStoreController(PnpmOptions options, @Nullable Object fetchFullMetadata,
-                                                RegistryMetadata registry, Instant now) {
+    /**
+     * {@code createStoreController({ ...config, ...context })}: the config's own fetchFullMetadata.
+     */
+    NpmResolver createStoreController(PnpmOptions options) {
+        return createNewStoreController(options, options.get("fetchFullMetadata"));
+    }
+
+    NpmResolver createNewStoreController(PnpmOptions options, @Nullable Object fetchFullMetadata) {
         boolean fullMetadata = fetchFullMetadata != null && fetchFullMetadata != JsYaml.UNDEFINED ?
                 Js.truthy(fetchFullMetadata) : ("time-based".equals(options.get("resolutionMode")) ||
                                                 "no-downgrade".equals(options.get("trustPolicy"))) &&

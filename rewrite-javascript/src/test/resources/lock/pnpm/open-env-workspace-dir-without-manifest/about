@@ -1,0 +1,1 @@
+NPM_CONFIG_WORKSPACE_DIR=. names the project's own directory, which holds no pnpm-workspace.yaml; the edit adds abbrev.

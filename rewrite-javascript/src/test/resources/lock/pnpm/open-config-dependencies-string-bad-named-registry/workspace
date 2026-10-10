@@ -1,0 +1,3 @@
+configDependencies: abc
+namedRegistries:
+  foo: ftp://example.com/

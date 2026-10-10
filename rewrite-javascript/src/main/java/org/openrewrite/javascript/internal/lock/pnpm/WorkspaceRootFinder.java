@@ -60,8 +60,8 @@ public final class WorkspaceRootFinder {
     }
 
     /**
-     * {@code findWorkspaceDir}: the directory of the workspace manifest NPM_CONFIG_WORKSPACE_DIR names, else of the one
-     * found from cwd, or null; an environment the host does not know (null) sets no variable.
+     * {@code findWorkspaceDir}: the directory NPM_CONFIG_WORKSPACE_DIR names from cwd, whether or not it holds a
+     * workspace manifest, else that of the one found from cwd, or null; an unknown environment (null) sets no variable.
      */
     static @Nullable String findWorkspaceDir(Predicate<String> holds, String cwd, @Nullable Map<String, String> env) {
         String workspaceManifestDirEnvVar = env == null ? null : env.containsKey(WORKSPACE_DIR_ENV_VAR) ?
@@ -75,10 +75,6 @@ public final class WorkspaceRootFinder {
                                      workspaceManifestDirEnvVar + ", outside the project)");
             }
             workspaceManifestLocation = RootRelativePath.join(dir, WORKSPACE_MANIFEST_FILENAME);
-            if (!holds.test(workspaceManifestLocation)) {
-                throw new CannotKnow("the workspace " + WORKSPACE_DIR_ENV_VAR + " names (" +
-                                     workspaceManifestDirEnvVar + ", without its " + WORKSPACE_MANIFEST_FILENAME + ")");
-            }
         } else {
             workspaceManifestLocation = findWorkspaceManifest(holds, cwd);
         }

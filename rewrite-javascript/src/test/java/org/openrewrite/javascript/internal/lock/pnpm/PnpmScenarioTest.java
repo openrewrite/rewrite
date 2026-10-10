@@ -87,6 +87,8 @@ class PnpmScenarioTest extends LockScenarioTest {
         if (recording.recordedWith() == null) {
             // a downloaded fixture records no clock and no publish times
             inputs.env(Collections.singletonMap("pnpm_config_minimum_release_age", "0"));
+        } else if (scenario.env() != null) {
+            inputs.env(scenario.env());
         }
         return inputs.build();
     }

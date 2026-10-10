@@ -1,0 +1,1 @@
+pnpm run in packages/b of an unshared workspace whose root gains a .pnpmfile.cjs in the edit (the root's lock and manifest unchanged; the hook adds is-positive to every manifest); b adds is-positive 1.0.0.

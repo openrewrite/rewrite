@@ -30,7 +30,7 @@ import java.util.Set;
 
 /**
  * Port of pnpm/src main.ts and getConfig.ts (pnpm 11.2.2) up to the command: the workspace pnpm finds, its config,
- * the package manager check, the config dependencies and the pnpmfile hooks.
+ * the package manager check, the config dependencies, the pnpmfile hooks and the workspace's projects.
  */
 final class Main {
 
@@ -44,11 +44,14 @@ final class Main {
 
     private final PnpmLockRegenerator.Inputs inputs;
     private final EnvInstaller envInstaller;
+    private final CreateNewStoreController stores;
     private final EnvLockfile.OnDisk lockFile;
 
-    Main(PnpmLockRegenerator.Inputs inputs, EnvInstaller envInstaller, EnvLockfile.OnDisk lockFile) {
+    Main(PnpmLockRegenerator.Inputs inputs, EnvInstaller envInstaller, CreateNewStoreController stores,
+         EnvLockfile.OnDisk lockFile) {
         this.inputs = inputs;
         this.envInstaller = envInstaller;
+        this.stores = stores;
         this.lockFile = lockFile;
     }
 
@@ -71,7 +74,8 @@ final class Main {
                 return InstallRoot.HERE;
             }
             // under lockfileDir pnpm run here would start a lock of every project; run at the root, it writes that one
-            PnpmOptions options = getConfig(inputs);
+            PnpmOptions options = getConfig(inputs, WorkspaceRootFinder.findWorkspaceDir(inputs::holds, lockDir,
+                    inputs.getEnv()));
             return Js.truthy(options.get("lockfileDir")) && FindPackages.findWorkspaceProjects(manifestDirs(inputs),
                     options.getWorkspacePackagePatterns()).contains(lockDir) ? new InstallRoot(workspaceRoot, true) :
                     InstallRoot.HERE;
@@ -92,7 +96,7 @@ final class Main {
         if (!workspaceDir.isEmpty()) {
             return workspaceDir;
         }
-        PnpmOptions options = getConfig(inputs);
+        PnpmOptions options = getConfig(inputs, workspaceDir);
         String lockfileDir = options.getLockfileDir(dir);
         boolean listed = FindPackages.findWorkspaceProjects(manifestDirs(inputs),
                 options.getWorkspacePackagePatterns()).contains(dir);
@@ -100,25 +104,33 @@ final class Main {
     }
 
     /**
-     * main.ts' findWorkspaceDir from the lock's directory, then getConfig.
+     * main.ts' findWorkspaceDir from where pnpm runs, then getConfig.
      */
     PnpmOptions config() {
-        String workspaceDir = WorkspaceRootFinder.findWorkspaceDir(inputs::holds, inputs.getLockDir(),
-                inputs.getEnv());
+        String workspaceDir = WorkspaceRootFinder.findWorkspaceDir(inputs::holds, dir(), inputs.getEnv());
         if (workspaceDir != null && !workspaceDir.equals(WORKSPACE_DIR)) {
-            // the inputs are the workspace's found from the lock up; the environment names another
-            throw new CannotKnow("the workspace in " + workspaceDir + " (NPM_CONFIG_WORKSPACE_DIR), whose files " +
-                                 "the inputs do not hold");
+            // the inputs are rooted at the workspace found from the lock up; the environment names another directory
+            throw new CannotKnow("the config of the workspace in " + workspaceDir + ", which NPM_CONFIG_WORKSPACE_DIR " +
+                                 "names (the inputs are those of the workspace found from the lock up)");
         }
-        return getConfig(inputs);
+        return getConfig(inputs, workspaceDir);
     }
 
-    private static PnpmOptions getConfig(PnpmLockRegenerator.Inputs inputs) {
+    // config.dir: where pnpm runs, the edited manifest's directory, else the lock's
+    private String dir() {
+        return inputs.getDir() != null ? inputs.getDir() : inputs.getLockDir();
+    }
+
+    private static PnpmOptions getConfig(PnpmLockRegenerator.Inputs inputs, @Nullable String workspaceDir) {
         String rootManifestText = inputs.getManifests().get("");
         Map<String, @Nullable Object> rootManifest = rootManifestText == null ? null : rootManifest(rootManifestText);
         requireConfigFiles(inputs);
-        return PnpmOptions.load(inputs.getFiles().get(WorkspaceRootFinder.WORKSPACE_MANIFEST_FILENAME),
-                inputs.getFiles().get(".npmrc"), rootManifest, inputs.getEnv());
+        String workspaceManifest = inputs.getFiles().get(WorkspaceRootFinder.WORKSPACE_MANIFEST_FILENAME);
+        if (workspaceManifest == null && WORKSPACE_DIR.equals(workspaceDir)) {
+            // workspace-manifest-reader reads a missing pnpm-workspace.yaml as an empty one
+            workspaceManifest = "";
+        }
+        return PnpmOptions.load(workspaceManifest, inputs.getFiles().get(".npmrc"), rootManifest, inputs.getEnv());
     }
 
     // Node reads the package.json pnpm runs beside before pnpm starts, and stops at one that is not JSON; config
@@ -144,6 +156,59 @@ final class Main {
                 throw new CannotKnow(file + " (its contents were not read)");
             }
         }
+    }
+
+    /**
+     * main.ts' recursive branch: filterProjectsFromDir's projects of the workspace, each with its manifest as read and
+     * installable under engineStrict and nodeVersion; filters that select some of them are cannot-know.
+     */
+    List<Verification.Project> filterProjectsFromDir(PnpmOptions options) {
+        if (options.isExplicitlySet("recursiveInstall") && !options.isTrue("recursiveInstall") ||
+            options.isTrue("workspaceRoot") || options.isExplicitlySet("filter") ||
+            options.isExplicitlySet("filterProd")) {
+            throw new CannotKnow("which projects pnpm installs (recursiveInstall, workspaceRoot, filter or " +
+                                 "filterProd select them from the directory it runs in)");
+        }
+        List<Verification.Project> projects = new ArrayList<>();
+        for (String dir : FindPackages.findWorkspaceProjects(manifestDirs(inputs),
+                options.getWorkspacePackagePatterns())) {
+            projects.add(new Verification.Project(dir, FindPackages.getLockfileImporterId(dir), readManifest(dir)));
+        }
+        for (Verification.Project project : projects) {
+            PackageIsInstallable.projectIsInstallable(project.getId(), project.getManifest(),
+                    options.isTrue("engineStrict"), options.getNodeVersion(), null, inputs.getHost());
+        }
+        return projects;
+    }
+
+    // project-manifest-reader over the one manifest findPackages lists in dir
+    private Map<String, @Nullable Object> readManifest(String dir) {
+        String text = inputs.getManifests().get(dir);
+        List<String> others = new ArrayList<>();
+        for (String other : PnpmLockRegenerator.OTHER_MANIFEST_NAMES) {
+            String path = RootRelativePath.join(dir, other);
+            if (inputs.holds(path)) {
+                others.add(path);
+            }
+        }
+        if (!others.isEmpty() && (text != null || others.size() > 1)) {
+            // findPackages lists every manifest file of a directory, in the order the filesystem lists them
+            throw new CannotKnow("the manifest pnpm reads from " + others.get(others.size() - 1) +
+                                 " (findPackages lists each manifest of " + (dir.isEmpty() ? "the root" : dir) +
+                                 ", in the order the filesystem gives)");
+        }
+        if (text != null) {
+            return Manifests.readProjectManifest(text, RootRelativePath.join(dir, "package.json"));
+        }
+        String path = others.get(0);
+        String other = inputs.getFiles().get(path);
+        if (other == null) {
+            throw new CannotKnow(path + " (its contents were not read)");
+        }
+        if (!path.endsWith("/package.yaml") && !"package.yaml".equals(path)) {
+            throw new CannotKnow("what pnpm reads from " + path + " (json5's parse is not ported)");
+        }
+        return Manifests.readPackageYaml(other, path);
     }
 
     // the directories holding a manifest findPackages' patterns can match
@@ -172,17 +237,35 @@ final class Main {
         }
         boolean underCorepack = inputs.getEnv() != null && inputs.getEnv().containsKey("COREPACK_ROOT");
         if ("pnpm".equals(pm.getName()) && "download".equals(pm.getOnFail()) && !underCorepack) {
-            new SwitchCliVersion(envInstaller, lockFile, inputs.getLockDir()).switchCliVersion(pm, options,
+            new SwitchCliVersion(envInstaller, stores, lockFile, inputs.getLockDir()).switchCliVersion(pm, options,
                     WORKSPACE_DIR);
             return;
         }
         checkPackageManager(pm, underCorepack);
         if (!inputs.getLockDir().equals(WORKSPACE_DIR)) {
+            if (SyncEnvLockfile.syncEnvLockfile(pm, () -> null) != null) {
+                createStoreControllerUnlessLocked(stores, options);
+            }
             return;
         }
         String version = SyncEnvLockfile.syncEnvLockfile(pm, lockFile::readEnvLockfile);
         if (version != null) {
-            envInstaller.resolvePackageManagerIntegrities(version, lockFile.readEnvLockfile(), true, lockFile, options);
+            envInstaller.resolvePackageManagerIntegrities(version, lockFile.readEnvLockfile(), true, lockFile,
+                    stores.createStoreController(options), options);
+        }
+    }
+
+    /**
+     * The store controller switchCliVersion or syncEnvLockfile creates unless the env document of the lock in
+     * rootProjectManifestDir, which the inputs do not hold, records the release: cannot-know when creating it fails.
+     */
+    static void createStoreControllerUnlessLocked(CreateNewStoreController stores, PnpmOptions options) {
+        try {
+            stores.createStoreController(options);
+        } catch (PnpmError e) {
+            throw new CannotKnow("whether pnpm creates the store controller that rejects the named registries (" +
+                                 e.getMessage() + "): the env document of the workspace's " +
+                                 LockfileReader.WANTED_LOCKFILE + " decides");
         }
     }
 
@@ -220,12 +303,13 @@ final class Main {
 
     /**
      * getConfig.ts' installConfigDepsAndLoadHooks: the config dependencies into the env document of the lock in
-     * lockfileDir, else rootProjectManifestDir; the pnpmfiles, its plugins' among them, from lockfileDir or here.
+     * lockfileDir, else rootProjectManifestDir; the pnpmfiles, its plugins' among them, from lockfileDir or config.dir.
      */
     void installConfigDepsAndLoadHooks(PnpmOptions options, @Nullable String lockfileDir) {
         String lockDir = inputs.getLockDir();
         Object configDependencies = options.get("configDependencies");
         if (Js.truthy(configDependencies)) {
+            stores.createStoreController(options);
             if (!(configDependencies instanceof Map)) {
                 throw new CannotKnow("what pnpm makes of configDependencies (" + Js.typeOf(configDependencies) +
                                      ", where pnpm reads an object)");
@@ -251,7 +335,7 @@ final class Main {
             }
         }
         Object pnpmfile = options.get("pnpmfile");
-        new RequireHooks(inputs).requireHooks(lockfileDir == null ? lockDir : lockfileDir,
+        new RequireHooks(inputs).requireHooks(lockfileDir == null ? dir() : lockfileDir,
                 options.get("globalPnpmfile"), pnpmfile == null || pnpmfile == JsYaml.UNDEFINED ?
                         Collections.emptyList() : pnpmfile instanceof List ? (List<?>) pnpmfile :
                         Collections.singletonList(pnpmfile), tryLoadDefaultPnpmfile(options));

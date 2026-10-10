@@ -154,6 +154,11 @@ public final class PnpmLockRegenerator {
          * Each {@code patchedDependencies} key with its patch file's hash.
          */
         Map<String, String> patchedDependencies;
+
+        /**
+         * The npm resolver of the store controller installDeps creates.
+         */
+        NpmResolver storeController;
     }
 
     /**
@@ -186,6 +191,7 @@ public final class PnpmLockRegenerator {
     private final RegistryMetadata registry;
     private final EnvLockfile.OnDisk lockFile;
     private final EnvInstaller envInstaller;
+    private final CreateNewStoreController stores;
 
     // a project pnpm lists without a package.json, which it reports once the lock is verified
     private @Nullable String missingManifest;
@@ -195,6 +201,7 @@ public final class PnpmLockRegenerator {
         this.registry = registry;
         this.lockFile = new EnvLockfile.OnDisk(inputs.getLock());
         this.envInstaller = new EnvInstaller(registry, inputs.getNow(), inputs.getHost());
+        this.stores = new CreateNewStoreController(registry, inputs.getNow());
     }
 
     /**
@@ -262,25 +269,33 @@ public final class PnpmLockRegenerator {
         Map<String, String> ownOverrides = null;
         for (Verification.Project project : install.getOpts().getAllProjects()) {
             String dir = project.getRootDir();
+            if (dir.equals(lockDir)) {
+                continue;
+            }
+            try {
+                requireHooks(options, dir);
+            } catch (PnpmError e) {
+                throw failsBeside(dir, e);
+            } catch (CannotKnow e) {
+                // getContext runs its readPackage hooks over its manifest, so its lock cannot say whether it resolves
+                throw sharesCacheWith(dir);
+            }
             String lock = inputs.getFiles().get(RootRelativePath.join(dir, LockfileReader.WANTED_LOCKFILE));
-            if (dir.equals(lockDir) || lock == null) {
+            if (lock == null) {
                 continue;
             }
             if (ownOverrides == null) {
                 ownOverrides = projectOverrides(projectConfigs, lockDir, install.getOpts().getAllProjects(), options);
             }
-            boolean ownHooks = !options.isTrue("ignorePnpmfile") &&
-                               (inputs.holds(RootRelativePath.join(dir, ".pnpmfile.mjs")) ||
-                                inputs.holds(RootRelativePath.join(dir, ".pnpmfile.cjs"))) ||
-                               !ownOverrides.equals(projectOverrides(projectConfigs, dir,
-                                       install.getOpts().getAllProjects(), options));
-            PnpmLockRegenerator other = new PnpmLockRegenerator(inputs.toBuilder().lock(lock).lockDir(dir).dir(null)
-                    .build(), registry);
+            boolean ownHooks = !ownOverrides.equals(projectOverrides(projectConfigs, dir,
+                    install.getOpts().getAllProjects(), options));
+            PnpmLockRegenerator other = new PnpmLockRegenerator(inputs.toBuilder().lock(lock).lockDir(dir)
+                    .dir(inputs.getDir() != null ? inputs.getDir() : lockDir).build(), registry);
             Install otherInstall;
             try {
                 otherInstall = other.install();
             } catch (RuntimeException e) {
-                throw ownHooks ? sharesCacheWith(dir) : failsBeside(dir, e);
+                throw failsBeside(dir, e);
             }
             if (otherInstall.getResolution() == null) {
                 continue;
@@ -435,9 +450,7 @@ public final class PnpmLockRegenerator {
             files.put(manifest.getKey().isEmpty() ? "package.json" : manifest.getKey() + "/package.json",
                     manifest.getValue());
         }
-        NpmResolver npmResolver = CreateNewStoreController.createNewStoreController(options,
-                options.getFetchFullMetadata(), registry, inputs.getNow());
-        PackageRequester requester = new PackageRequester(npmResolver, files, inputs.getHost(),
+        PackageRequester requester = new PackageRequester(opts.getStoreController(), files, inputs.getHost(),
                 options.isTrue("engineStrict"), options.isTrue("force"), options.getNodeVersion(),
                 options.getSupportedArchitectures(), registry, options.getNodeDownloadMirrors());
 
@@ -575,7 +588,7 @@ public final class PnpmLockRegenerator {
     }
 
     Install install() {
-        Main main = new Main(inputs, envInstaller, lockFile);
+        Main main = new Main(inputs, envInstaller, stores, lockFile);
         PnpmOptions options = main.config();
         requireSettings(options);
         boolean workspace = options.getWorkspacePackagePatterns() != null;
@@ -583,7 +596,7 @@ public final class PnpmLockRegenerator {
         String lockfileDir = workspace ? options.getLockfileDir(lockDir) : null;
         main.checkWantedPackageManager(options);
         main.installConfigDepsAndLoadHooks(options, lockfileDir);
-        List<Verification.Project> allProjects = workspace ? projects(options, true) : null;
+        List<Verification.Project> allProjects = workspace ? main.filterProjectsFromDir(options) : null;
         if (options.isTrue("global")) {
             throw new PnpmError("GLOBAL_INSTALL_NOT_SUPPORTED", "\"pnpm install -g\" is not supported. Use \"pnpm " +
                                                                 "add -g <pkg>\" to install global packages.");
@@ -591,14 +604,13 @@ public final class PnpmLockRegenerator {
         ProjectsGraph.Result projectsGraph = allProjects == null ? null :
                 ProjectsGraph.createProjectsGraph(allProjects, false, Js.truthy(options.get(
                         "linkWorkspacePackages")));
-        // installDeps creates its store controller, whose npm resolver checks the named registries
-        NpmResolver.mergeNamedRegistries(options.getNamedRegistries());
+        NpmResolver storeController = stores.createNewStoreController(options, options.getFetchFullMetadata());
 
         // in a workspace pnpm install is recursive over the projects it lists, which all install into the lock of
         // lockfileDir, or without one each into its own
         List<Verification.Project> projectManifests;
         if (allProjects == null) {
-            projectManifests = projects(options, false);
+            projectManifests = readProjectManifest(options);
         } else if (lockfileDir != null) {
             projectManifests = new ArrayList<>();
             if (lockfileDir.equals(lockDir)) {
@@ -660,7 +672,7 @@ public final class PnpmLockRegenerator {
             // no project of the workspace installs into this lock: pnpm leaves it as it is
             return new Install(lockFile.text(), null, new PnpmContext(new LockfileObject(), lockDir,
                     Collections.emptyList(), false), new StrictInstallOptions(options, Collections.emptyList(),
-                    false, null, Collections.emptyMap()));
+                    false, null, Collections.emptyMap(), storeController));
         }
         List<ParseOverrides.VersionOverride> parsedOverrides = ParseOverrides.parseOverrides(overrides,
                 options.getCatalogs());
@@ -734,12 +746,12 @@ public final class PnpmLockRegenerator {
             return new Install(null, outdatedLockfileSettings ? outdatedLockfileSettingName :
                     "lockfileVersion " + Js.string(wantedLockfile.getLockfileVersion()), ctx,
                     new StrictInstallOptions(options, workspaceProjects, workspace, readPackageHook,
-                            patchHashes(patchedDependencies)));
+                            patchHashes(patchedDependencies), storeController));
         }
 
         boolean pruneLockfileImporters = workspace;
         StrictInstallOptions opts = new StrictInstallOptions(options, workspaceProjects, pruneLockfileImporters,
-                readPackageHook, patchHashes(patchedDependencies));
+                readPackageHook, patchHashes(patchedDependencies), storeController);
         Map<String, Map<String, Verification.Project>> workspacePackages = workspace ?
                 workspacePackages(workspaceProjects) : null;
         String reason = null;
@@ -787,12 +799,6 @@ public final class PnpmLockRegenerator {
         if (production || dev || Boolean.FALSE.equals(options.get("optional"))) {
             throw new CannotKnow("the lock pnpm writes without its " + (production ? "devDependencies" :
                     dev ? "dependencies" : "optionalDependencies") + " (only, production, dev or optional)");
-        }
-        if (options.isExplicitlySet("recursiveInstall") && !options.isTrue("recursiveInstall") ||
-            options.isTrue("workspaceRoot") || options.isExplicitlySet("filter") ||
-            options.isExplicitlySet("filterProd")) {
-            throw new CannotKnow("which projects pnpm installs (recursiveInstall, workspaceRoot, filter or " +
-                                 "filterProd select them from the directory it runs in)");
         }
         for (String networkOnly : new String[]{"offline", "preferOffline"}) {
             if (options.isTrue(networkOnly)) {
@@ -866,61 +872,19 @@ public final class PnpmLockRegenerator {
                 (List<?>) pnpmfiles : Collections.emptyList(), Main.tryLoadDefaultPnpmfile(options));
     }
 
-    // main.ts' findWorkspaceProjects or installDeps' tryReadProjectManifest: each project's manifest as read, which
-    // cli.utils' packageIsInstallable checks
-    private List<Verification.Project> projects(PnpmOptions options, boolean workspace) {
-        List<String> dirs = new ArrayList<>();
-        if (workspace) {
-            dirs.addAll(FindPackages.findWorkspaceProjects(Main.manifestDirs(inputs),
-                    options.getWorkspacePackagePatterns()));
-        } else {
-            dirs.add(inputs.getLockDir());
+    // installDeps' tryReadProjectManifest: the project's manifest as read, which cli.utils' packageIsInstallable checks
+    private List<Verification.Project> readProjectManifest(PnpmOptions options) {
+        String dir = inputs.getLockDir();
+        String text = inputs.getManifests().get(dir);
+        if (text == null) {
+            missingManifest = dir;
+            return Collections.emptyList();
         }
-        List<Verification.Project> projects = new ArrayList<>();
-        for (String dir : dirs) {
-            String text = inputs.getManifests().get(dir);
-            List<String> others = new ArrayList<>();
-            for (String other : workspace ? OTHER_MANIFEST_NAMES : Collections.<String>emptyList()) {
-                String path = RootRelativePath.join(dir, other);
-                if (inputs.holds(path)) {
-                    others.add(path);
-                }
-            }
-            if (!others.isEmpty() && (text != null || others.size() > 1)) {
-                // findPackages lists every manifest file of a directory, in the order the filesystem lists them
-                throw new CannotKnow("the manifest pnpm reads from " + others.get(others.size() - 1) +
-                                     " (findPackages lists each manifest of " + (dir.isEmpty() ? "the root" : dir) +
-                                     ", in the order the filesystem gives)");
-            }
-            if (text == null && others.isEmpty()) {
-                if (missingManifest == null) {
-                    missingManifest = dir;
-                }
-                continue;
-            }
-            Map<String, @Nullable Object> manifest;
-            if (text != null) {
-                manifest = Manifests.readProjectManifest(text, RootRelativePath.join(dir, "package.json"));
-            } else {
-                String path = others.get(0);
-                String other = inputs.getFiles().get(path);
-                if (other == null) {
-                    throw new CannotKnow(path + " (its contents were not read)");
-                }
-                if (!path.endsWith("/package.yaml") && !"package.yaml".equals(path)) {
-                    throw new CannotKnow("what pnpm reads from " + path + " (json5's parse is not ported)");
-                }
-                manifest = Manifests.readPackageYaml(other, path);
-            }
-            projects.add(new Verification.Project(dir, workspace ? FindPackages.getLockfileImporterId(dir) : ".",
-                    manifest));
-        }
-        for (Verification.Project project : projects) {
-            PackageIsInstallable.projectIsInstallable(project.getId(), project.getManifest(),
-                    options.isTrue("engineStrict"), options.getNodeVersion(),
-                    workspace ? null : options.get("supportedArchitectures"), inputs.getHost());
-        }
-        return projects;
+        Map<String, @Nullable Object> manifest = Manifests.readProjectManifest(text,
+                RootRelativePath.join(dir, "package.json"));
+        PackageIsInstallable.projectIsInstallable(".", manifest, options.isTrue("engineStrict"),
+                options.getNodeVersion(), options.get("supportedArchitectures"), inputs.getHost());
+        return Collections.singletonList(new Verification.Project(dir, ".", manifest));
     }
 
     // installDeps: projects that depend on each other in a cycle, an error under disallowWorkspaceCycles

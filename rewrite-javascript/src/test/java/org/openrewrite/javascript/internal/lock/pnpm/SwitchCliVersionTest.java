@@ -56,10 +56,18 @@ class SwitchCliVersionTest {
                "        version: " + pnpmVersion + "\n\npackages: {}\n\nsnapshots: {}\n\n---\n" + MAIN_DOCUMENT;
     }
 
+    private static final Instant NOW = Instant.parse("2026-10-08T00:00:00Z");
+
     private static void switchCliVersion(PnpmOptions.WantedPackageManager pm, String lock) {
+        switchCliVersion(pm, lock, null, "");
+    }
+
+    private static void switchCliVersion(PnpmOptions.WantedPackageManager pm, String lock,
+                                         @Nullable String workspaceManifest, String lockDir) {
         EnvLockfile.OnDisk lockFile = new EnvLockfile.OnDisk(lock);
-        new SwitchCliVersion(new EnvInstaller(NO_REGISTRY, Instant.parse("2026-10-08T00:00:00Z"), Host.UNKNOWN),
-          lockFile, "").switchCliVersion(pm, PnpmOptions.load(null, null, null, Collections.emptyMap()), "");
+        new SwitchCliVersion(new EnvInstaller(NO_REGISTRY, NOW, Host.UNKNOWN),
+          new CreateNewStoreController(NO_REGISTRY, NOW), lockFile, lockDir)
+          .switchCliVersion(pm, PnpmOptions.load(workspaceManifest, null, null, Collections.emptyMap()), "");
     }
 
     /**
@@ -89,6 +97,41 @@ class SwitchCliVersionTest {
     @Test
     void thePortedReleaseNeedsNoSwitch() {
         switchCliVersion(pm("11.2.2", false), MAIN_DOCUMENT);
+    }
+
+    private static final String BAD_NAMED_REGISTRY = "namedRegistries:\n  foo: ftp://example.com/\n";
+
+    /**
+     * open-pm-pin-other-release-bad-named-registry and open-dev-engines-pm-other-range-bad-named-registry, as pnpm
+     * 11.2.2 rejected them: every way to another release creates the store controller first.
+     */
+    @ParameterizedTest
+    @CsvSource(delimiter = '|', value = {"10.18.3|false|", "^10.0.0|true|", "^11.0.0|true|11.3.0",
+      "^10.0.0|true|10.18.3"})
+    void theStoreControllerBeforeAnotherReleaseChecksTheNamedRegistries(String version, boolean fromDevEngines,
+                                                                       @Nullable String locked) {
+        assertThatThrownBy(() -> switchCliVersion(pm(version, fromDevEngines),
+          locked == null ? MAIN_DOCUMENT : envDocument(locked), BAD_NAMED_REGISTRY, ""))
+          .isInstanceOfSatisfying(PnpmError.class,
+            e -> assertThat(e.getCode()).isEqualTo("ERR_PNPM_INVALID_NAMED_REGISTRY_URL"));
+    }
+
+    @Test
+    void theRunningReleaseNamedExactlyCreatesNoStoreController() {
+        switchCliVersion(pm("11.2.2", false), MAIN_DOCUMENT, BAD_NAMED_REGISTRY, "");
+    }
+
+    /**
+     * A member's own lock: the env document pnpm reads is the workspace root's lock's, which decides whether pnpm
+     * creates a store controller for the running release.
+     */
+    @Test
+    void anotherLocksEnvDocumentDecidesWhetherTheStoreControllerIsCreated() {
+        switchCliVersion(pm("11.2.2", true), MAIN_DOCUMENT, null, "packages/a");
+        assertThatThrownBy(() -> switchCliVersion(pm("11.2.2", true), MAIN_DOCUMENT, BAD_NAMED_REGISTRY,
+          "packages/a"))
+          .isInstanceOfSatisfying(CannotKnow.class,
+            e -> assertThat(e.getSubject()).contains("store controller").contains("ftp://example.com/"));
     }
 
     /**

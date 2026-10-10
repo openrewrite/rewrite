@@ -1,0 +1,1 @@
+pnpm run in packages/a of a shared workspace with NPM_CONFIG_WORKSPACE_DIR=../.. (the root, relative to where pnpm runs); a adds abbrev.

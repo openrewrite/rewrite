@@ -1,0 +1,1 @@
+pnpm run in packages/b of an unshared workspace whose pnpm-workspace.yaml sets pnpmfile: [] (no default pnpmfile is loaded); the root project, holding a .pnpmfile.cjs, and b both add abbrev.

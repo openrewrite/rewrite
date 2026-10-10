@@ -58,12 +58,19 @@ class WorkspaceRootFinderTest {
     }
 
     @Test
-    void aWorkspaceDirectoryTheProjectDoesNotShow() {
+    void aWorkspaceDirectoryOutsideTheProject() {
         assertThatThrownBy(() -> find("", Collections.singletonMap("NPM_CONFIG_WORKSPACE_DIR", "/srv/ws")))
           .isInstanceOf(CannotKnow.class);
         assertThatThrownBy(() -> find("", Collections.singletonMap("NPM_CONFIG_WORKSPACE_DIR", "..")))
           .isInstanceOf(CannotKnow.class);
-        assertThatThrownBy(() -> find("", Collections.singletonMap("NPM_CONFIG_WORKSPACE_DIR", "packages/a")))
-          .isInstanceOfSatisfying(CannotKnow.class, e -> assertThat(e.getSubject()).contains("packages/a"));
+    }
+
+    /**
+     * root-finder's 'finds overridden workspace dir': the directory named, which need not hold a workspace manifest.
+     */
+    @Test
+    void findsOverriddenWorkspaceDir() {
+        assertThat(find("", Collections.singletonMap("NPM_CONFIG_WORKSPACE_DIR", "FAKE_PATH"))).isEqualTo("FAKE_PATH");
+        assertThat(find("tools/x", Collections.singletonMap("NPM_CONFIG_WORKSPACE_DIR", "."))).isEqualTo("tools/x");
     }
 }

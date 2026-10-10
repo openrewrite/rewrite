@@ -270,10 +270,11 @@ final class EnvInstaller {
 
     /**
      * {@code resolvePackageManagerIntegrities}: pnpm, @pnpm/exe and their dependencies into the env document's
-     * packageManagerDependencies, written into the lock when {@code save}.
+     * packageManagerDependencies with the caller's store controller, written into the lock when {@code save}.
      */
     EnvLockfile resolvePackageManagerIntegrities(String pnpmVersion, @Nullable EnvLockfile envLockfile, boolean save,
-                                                 EnvLockfile.OnDisk lockFile, PnpmOptions options) {
+                                                 EnvLockfile.OnDisk lockFile, NpmResolver storeController,
+                                                 PnpmOptions options) {
         EnvLockfile lockfileToUpdate = envLockfile != null ? envLockfile : save ? lockFile.readEnvLockfile() : null;
         if (lockfileToUpdate == null) {
             lockfileToUpdate = EnvLockfile.createEnvLockfile();
@@ -286,7 +287,7 @@ final class EnvInstaller {
         dependencies.put("@pnpm/exe", pnpmVersion);
         Map<String, @Nullable Object> manifest = new LinkedHashMap<>();
         manifest.put("dependencies", dependencies);
-        LockfileObject lockfile = resolveManifestDependencies(manifest, options);
+        LockfileObject lockfile = resolveManifestDependencies(manifest, storeController, options);
         if (lockfile.getPackages() == null) {
             return lockfileToUpdate;
         }
@@ -313,9 +314,9 @@ final class EnvInstaller {
         return lockfileToUpdate;
     }
 
-    // resolveManifestDependencies.ts: the lock deps-resolver writes for one manifest over an empty lock, with the
-    // store controller's resolver
-    private LockfileObject resolveManifestDependencies(Map<String, @Nullable Object> manifest, PnpmOptions options) {
+    // resolveManifestDependencies.ts: the lock deps-resolver writes for one manifest over an empty lock
+    private LockfileObject resolveManifestDependencies(Map<String, @Nullable Object> manifest,
+                                                       NpmResolver storeController, PnpmOptions options) {
         LockfileObject emptyLockfile = new LockfileObject();
         emptyLockfile.set("lockfileVersion", LockfileObject.LOCKFILE_VERSION);
         emptyLockfile.getImporters().put(".", new ProjectSnapshot());
@@ -325,9 +326,7 @@ final class EnvInstaller {
             dep.setUpdateSpec(true);
         }
         Map<String, String> registries = options.getRegistries();
-        // switchCliVersion's store controller takes the config as it is, fetchFullMetadata included
-        PackageRequester requester = new PackageRequester(CreateNewStoreController.createNewStoreController(options,
-                options.get("fetchFullMetadata"), registry, now), new LinkedHashMap<>(), host,
+        PackageRequester requester = new PackageRequester(storeController, new LinkedHashMap<>(), host,
                 options.isTrue("engineStrict"), options.isTrue("force"), options.getNodeVersion(), null, registry,
                 options.getNodeDownloadMirrors());
         ResolveDependencies.ResolutionContext ctx = new ResolveDependencies.ResolutionContext(emptyLockfile, "",

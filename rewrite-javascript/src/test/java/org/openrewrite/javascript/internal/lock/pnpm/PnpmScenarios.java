@@ -186,6 +186,25 @@ final class PnpmScenarios {
         }
 
         /**
+         * The variables the recording set for pnpm ({@code env}, one {@code KEY=VALUE} a line); null without one.
+         */
+        @Nullable
+        Map<String, String> env() {
+            String env = file("env");
+            if (env == null) {
+                return null;
+            }
+            Map<String, String> out = new LinkedHashMap<>();
+            for (String line : env.split("\n")) {
+                int eq = line.indexOf('=');
+                if (eq > 0) {
+                    out.put(line.substring(0, eq), line.substring(eq + 1));
+                }
+            }
+            return out;
+        }
+
+        /**
          * The second phase's command-line flags ({@code --frozen-lockfile}), which a lock-only install does not take.
          */
         @Nullable
