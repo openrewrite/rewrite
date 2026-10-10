@@ -5,7 +5,8 @@ Date: 2026-10-07
 ## Status
 
 Accepted. Supersedes [ADR 0011](0011-native-node-lock-regeneration.md). Amended 2026-10-09: every package manager
-regenerates through the port of its own resolver, and the shared engine of ADR 0011 is removed.
+regenerates through the port of its own resolver, and the shared engine of ADR 0011 is removed. Amended 2026-10-10:
+what `internal.lock` holds, and how the recipes write overrides and follow catalogs for each package manager.
 
 ## Context
 
@@ -23,7 +24,7 @@ its own package with their names, control flow and iteration order; the lock is 
 manager's own model and written whole, as it writes it. `NativeLockEngine` builds the package manager's inputs from
 the request, seen once from the lock's directory (`LockDirectory`), and calls its port. What ports share lives in
 `internal.lock` and is Node's behavior, never resolution: JavaScript's value semantics (`EcmaScript`, which each port's
-`Js` extends), Node's event loop and promises (`EventLoop`), V8's `Date`, `RegExp` and short-array sort, WHATWG URL,
+`Js` extends), Node's event loop and promises (`EventLoop`), V8's `Date`, `RegExp` and sort, WHATWG URL,
 path, ini, `localeCompare`, the host's Node version and platform (`Host`) and environment (`HostEnvironment`).
 
 - npm 11.17.0, `@npmcli/arborist`, in `internal.lock.npm`: the tree (`Node`, `Edge`, `Inventory`, `Link`), `Shrinkwrap`,
@@ -75,3 +76,48 @@ changes only when a recording says so.
   pre-edit manifest its per-dependency proof read.
 - The maintenance commitment is tracking five resolvers: each port names its source version, and a new release is a
   diff against that version, replayed against the corpus.
+
+## Amendment 2026-10-10: the shared package, overrides and catalogs
+
+`internal.lock` holds what more than one port needs, and nothing that resolves:
+
+- the dispatch (`NativeLockEngine`), the request seen from the lock's directory (`LockDirectory`), and per package
+  manager an `*Inputs` value type that selects the files its package manager reads and declares their names, so the
+  recipes' scan captures only those, and a registry source over the host's client;
+- the failure model: `CannotKnow`, `Rejected`, `SharedError`, and `LockOnlyInstall`, which words a failure with the
+  package manager's command and runs the second install;
+- Node's and V8's behavior: `EcmaScript`, `EventLoop`, `V8Date`, `V8RegExp`, `V8Sort` (V8's TimSort at any length),
+  `WhatwgUrl`, `UriComponent`, `PosixPath`, `RootRelativePath`, `Ini`, `LocaleCompare`, `Host`, `HostEnvironment`;
+- one port per upstream library that several package managers bundle, the release an option: `Spec` (npm-package-arg),
+  `GitHost` (hosted-git-info), `Picomatch` (2.3.1 and 4.0.4), `JsYaml` (3.13.1 and 3.14.1), `YarnpkgSemverUtils`.
+
+`Spec` is also the one classifier of a manifest's dependency value for the recipes: npa's kinds, and the catalog,
+workspace, link, portal, patch, jsr and exec protocols npa rejects, each its own kind. A recipe leaves a value that is
+no version range unchanged and records it in `NodeDependencyProtocolsSkipped`.
+
+Overrides are written where the project's package manager reads them, at the workspace root only, and the lock follows:
+
+- npm: `overrides`. Bun: `overrides`, else `resolutions` when the root has only that; a dependency path is declined,
+  since Bun 1.3.10 ignores nested overrides.
+- Yarn classic: `resolutions` with `**/<path>/x`, since `parent/x` matches from the root only. Yarn Berry:
+  `resolutions` with one parent, by name or exact version.
+- pnpm, by the release the project names (`devEngines.packageManager`, `packageManager`, 11.2.2 when none): 11 reads
+  pnpm-workspace.yaml only; 10 reads package.json's `pnpm.overrides` and `resolutions` instead of the workspace's when
+  they hold any; 9 reads package.json only. The recipe writes where that release's own writer would, editing
+  pnpm-workspace.yaml in place or creating the key or file as pnpm places it; a release other than 11.2.2 makes the
+  regeneration cannot-know.
+- An override the package manager cannot read, or one that would win over a declaration through a value that is no
+  version range (a catalog or workspace reference), is declined with a row and writes nothing.
+
+Catalogs are read where each package manager reads them (pnpm's pnpm-workspace.yaml, Bun's root `workspaces` with its
+top-level fallback, Yarn 4.10's `.yarnrc.yml`), as `NodeCatalogs`. A recipe that changes a `catalog:` dependency
+edits the entry in place, quoting kept, and the regeneration reads the edited file. ChangeDependency renames the key
+and gives the catalog the new name's entry; AddDependency and RemoveDependency do what `pnpm add` and `pnpm remove` do
+under `catalogMode`, `saveCatalogName` and `cleanupUnusedCatalogs`, the cleanup counting the projects the
+workspace's `packages` match.
+
+The dependency recipes compose in one cycle as a fold: each adds its edits of manifests and package-manager files to the
+cycle in the order its `generate` runs (`PackageJsonHelper.FileEditor`), decides from the documents as the recipes
+before it leave them, and regenerates from those, so the lock written last holds every recipe's edit in any visit
+order. No marker is read as state: declines are derived from the documents each cycle, a marker is a content-equal
+warning, and rows are deduplicated within a cycle. A recipe outside the fold is seen only at its visit.
