@@ -17,22 +17,32 @@ package org.openrewrite.javascript.internal.lock;
 
 import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
+import org.openrewrite.InMemoryExecutionContext;
 import org.openrewrite.javascript.NodeRegistry;
 import org.openrewrite.javascript.internal.LockFileRegeneration.InstallRoot;
 import org.openrewrite.javascript.internal.LockFileRegeneration.Request;
 import org.openrewrite.javascript.internal.lock.yarnclassic.RegistrySource;
 import org.openrewrite.javascript.internal.lock.yarnclassic.YarnClassicLockRegenerator;
 import org.openrewrite.javascript.internal.lock.yarnclassic.YarnClassicLockRegenerator.Inputs;
+import org.openrewrite.javascript.internal.registry.Environment;
 import org.openrewrite.javascript.internal.registry.NodeRegistries;
+import org.openrewrite.javascript.internal.registry.RegistryDiscovery;
+import org.openrewrite.javascript.marker.NodeResolutionResult.Npmrc;
+import org.openrewrite.javascript.marker.NodeResolutionResult.NpmrcScope;
+import org.openrewrite.javascript.marker.NodeResolutionResult.PackageManager;
 
+import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.Arrays;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.Map;
 
+import static java.util.Collections.singletonMap;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.entry;
+import static org.openrewrite.javascript.Assertions.nodeResolutionResult;
 
 class YarnClassicInputsTest {
 
@@ -255,6 +265,67 @@ class YarnClassicInputsTest {
 
         assertThat(inputs.getHomeFiles().get(".npmrc")).isEqualTo("//corp.example.com/:_authToken=\"corp-token\"\n");
         assertThat(asked).containsExactly(entry("https://corp.example.com/@corp/a", "Bearer corp-token"));
+    }
+
+    /**
+     * yarn 1.22.22 run in packages/a asks the registry the home .npmrc names over the root's
+     * ({@code user-npmrc-member-root-npmrc}): the marker's user npmrc is the home one, its project npmrc the root's.
+     */
+    @Test
+    void aMembersHomeNpmrcIsTheMarkersUserNpmrcNotTheRootsProjectNpmrc(@TempDir Path home) {
+        Request request = Request.builder()
+          .packageJson("{\"name\":\"a\",\"version\":\"1.0.0\",\"dependencies\":{\"ms\":\"2.1.3\"}}")
+          .lock("# yarn lockfile v1\n\n\n")
+          .packageJsonPath(Paths.get("packages/a/package.json"))
+          .manifest(Paths.get("package.json"), "{\"name\":\"root\",\"private\":true,\"workspaces\":[\"packages/*\"]}")
+          .manifest(Paths.get("packages/a/package.json"), "{\"name\":\"a\",\"version\":\"1.0.0\"}")
+          .marker(nodeResolutionResult(PackageManager.YarnClassic).withNpmrcConfigs(Arrays.asList(
+            new Npmrc(NpmrcScope.Project, singletonMap("registry", "https://registry.npmjs.org/")),
+            new Npmrc(NpmrcScope.User, singletonMap("registry", "https://registry.npmmirror.com/")))))
+          .build();
+        InMemoryExecutionContext ctx = new InMemoryExecutionContext();
+        NodeRegistries user = YarnClassicInputs.userConfig(ctx, request.getMarker(), scratch(home));
+        NodeRegistries all = RegistryDiscovery.discover(ctx, request.getMarker(), scratch(home));
+
+        Inputs inputs = YarnClassicInputs.from(LockDirectory.of(request), Host.UNKNOWN, user, all);
+        Map<String, @Nullable String> asked = new LinkedHashMap<>();
+        new YarnClassicLockRegenerator(inputs, new RegistrySource() {
+            @Override
+            public @Nullable String packument(String registry, String name, @Nullable String authorization) {
+                asked.put(registry + name, authorization);
+                return null;
+            }
+
+            @Override
+            public byte @Nullable [] tarball(String url, String name, String version,
+                                             @Nullable String authorization) {
+                return null;
+            }
+        }).regenerate();
+
+        assertThat(inputs.getHomeFiles()).containsEntry(".npmrc", "registry=https://registry.npmmirror.com/\n");
+        assertThat(inputs.getConfigFiles()).containsEntry(".npmrc", "registry=https://registry.npmjs.org/\n");
+        assertThat(asked).containsOnlyKeys("https://registry.npmmirror.com/ms");
+    }
+
+    // a scratch HOME without a .netrc, and no variables
+    private static Environment scratch(Path home) {
+        return new Environment() {
+            @Override
+            public @Nullable String getenv(String name) {
+                return null;
+            }
+
+            @Override
+            public Path userHome() {
+                return home;
+            }
+
+            @Override
+            public String osName() {
+                return "Mac OS X";
+            }
+        };
     }
 
     private static NodeRegistry registry(String url) {

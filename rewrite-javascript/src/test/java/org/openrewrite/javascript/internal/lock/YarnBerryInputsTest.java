@@ -17,13 +17,21 @@ package org.openrewrite.javascript.internal.lock;
 
 import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
+import org.openrewrite.InMemoryExecutionContext;
 import org.openrewrite.javascript.NodeRegistry;
 import org.openrewrite.javascript.internal.LockFileRegeneration.Request;
 import org.openrewrite.javascript.internal.lock.berry.RegistrySource;
 import org.openrewrite.javascript.internal.lock.berry.YarnBerryLockRegenerator;
 import org.openrewrite.javascript.internal.lock.berry.YarnBerryLockRegenerator.Inputs;
+import org.openrewrite.javascript.internal.registry.Environment;
 import org.openrewrite.javascript.internal.registry.NodeRegistries;
+import org.openrewrite.javascript.internal.registry.RegistryDiscovery;
+import org.openrewrite.javascript.marker.NodeResolutionResult.Npmrc;
+import org.openrewrite.javascript.marker.NodeResolutionResult.NpmrcScope;
+import org.openrewrite.javascript.marker.NodeResolutionResult.PackageManager;
 
+import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.time.Instant;
 import java.util.Arrays;
@@ -31,8 +39,10 @@ import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.Map;
 
+import static java.util.Collections.singletonMap;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.entry;
+import static org.openrewrite.javascript.Assertions.nodeResolutionResult;
 
 class YarnBerryInputsTest {
 
@@ -176,6 +186,50 @@ class YarnBerryInputsTest {
         assertThat(inputs.getHomeFiles().get(".yarnrc.yml")).isEqualTo(
           "npmRegistries:\n  \"//corp.example.com\":\n    npmAuthToken: \"corp-token\"\n");
         assertThat(asked).as(String.valueOf(error)).containsExactly(entry("https://corp.example.com @corp/a", "Bearer corp-token"));
+    }
+
+    /**
+     * Yarn 4.10.3 reads neither a project's nor the home directory's .npmrc ({@code yarn config get} answers
+     * registry.yarnpkg.com beside both): the marker's project npmrc, the repository root's, stays out of the home file.
+     */
+    @Test
+    void theHomeYarnrcIsTheMarkersUserNpmrcNotTheRootsProjectNpmrc(@TempDir Path home) {
+        Npmrc root = new Npmrc(NpmrcScope.Project, singletonMap("registry", "https://registry.npmmirror.com/"));
+        Npmrc user = new Npmrc(NpmrcScope.User, singletonMap("registry", "https://registry.yarnpkg.com/"));
+        Npmrc global = new Npmrc(NpmrcScope.Global, singletonMap("@types:registry", "https://types.example/"));
+
+        assertThat(homeYarnrc(home, root)).isEmpty();
+        assertThat(homeYarnrc(home, root, user, global)).isEqualTo("npmRegistryServer: " +
+          "\"https://registry.yarnpkg.com/\"\nnpmScopes:\n  \"types\":\n    npmRegistryServer: \"https://types.example/\"\n");
+    }
+
+    private static String homeYarnrc(Path home, Npmrc... marker) {
+        Request request = Request.builder()
+          .packageJson("{\"name\":\"p\"}")
+          .lock("")
+          .packageJsonPath(Paths.get("app/package.json"))
+          .marker(nodeResolutionResult(PackageManager.YarnBerry).withNpmrcConfigs(Arrays.asList(marker)))
+          .build();
+        InMemoryExecutionContext ctx = new InMemoryExecutionContext();
+        Environment env = new Environment() {
+            @Override
+            public @Nullable String getenv(String name) {
+                return null;
+            }
+
+            @Override
+            public Path userHome() {
+                return home;
+            }
+
+            @Override
+            public String osName() {
+                return "Mac OS X";
+            }
+        };
+        return YarnBerryInputs.from(LockDirectory.of(request), Host.UNKNOWN, Instant.EPOCH,
+          YarnBerryInputs.userConfig(ctx, request.getMarker(), env), RegistryDiscovery.discover(ctx,
+            request.getMarker(), env)).getHomeFiles().get(".yarnrc.yml");
     }
 
     private static NodeRegistry registry(String url) {

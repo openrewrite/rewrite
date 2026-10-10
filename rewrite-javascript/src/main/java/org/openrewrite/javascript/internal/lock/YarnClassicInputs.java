@@ -16,11 +16,16 @@
 package org.openrewrite.javascript.internal.lock;
 
 import org.jspecify.annotations.Nullable;
+import org.openrewrite.ExecutionContext;
 import org.openrewrite.javascript.NodeRegistry;
 import org.openrewrite.javascript.internal.LockFileRegeneration.InstallRoot;
 import org.openrewrite.javascript.internal.lock.yarnclassic.YarnClassicLockRegenerator;
 import org.openrewrite.javascript.internal.lock.yarnclassic.YarnClassicLockRegenerator.Inputs;
+import org.openrewrite.javascript.internal.registry.Environment;
 import org.openrewrite.javascript.internal.registry.NodeRegistries;
+import org.openrewrite.javascript.internal.registry.RegistryDiscovery;
+import org.openrewrite.javascript.marker.NodeResolutionResult;
+import org.openrewrite.javascript.marker.NodeResolutionResult.NpmrcScope;
 
 import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
@@ -30,6 +35,8 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+
+import static java.util.stream.Collectors.toList;
 
 /**
  * The Yarn classic regenerator's inputs: the config files of the lock's directory, of each directory above it and of
@@ -49,6 +56,16 @@ final class YarnClassicInputs {
 
     static InstallRoot installRoot(LockDirectory dir) {
         return YarnClassicLockRegenerator.installRoot(project(dir).build());
+    }
+
+    /**
+     * The host's registries as yarn's user-level config: the view's, else the marker's global and user npmrc; its
+     * project npmrc (the repository root's) yarn reads as a project file, under the home one from a member.
+     */
+    static NodeRegistries userConfig(ExecutionContext ctx, @Nullable NodeResolutionResult marker, Environment env) {
+        return RegistryDiscovery.discover(ctx, marker == null || marker.getNpmrcConfigs() == null ? marker :
+                marker.withNpmrcConfigs(marker.getNpmrcConfigs().stream()
+                        .filter(npmrc -> npmrc.getScope() != NpmrcScope.Project).collect(toList())), env);
     }
 
     static Inputs from(LockDirectory dir, Host host) {

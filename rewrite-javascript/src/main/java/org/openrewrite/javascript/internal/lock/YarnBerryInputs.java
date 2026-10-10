@@ -16,12 +16,17 @@
 package org.openrewrite.javascript.internal.lock;
 
 import org.jspecify.annotations.Nullable;
+import org.openrewrite.ExecutionContext;
 import org.openrewrite.javascript.NodeRegistry;
 import org.openrewrite.javascript.internal.LockFileRegeneration.InstallRoot;
 import org.openrewrite.javascript.internal.lock.berry.Configuration;
 import org.openrewrite.javascript.internal.lock.berry.YarnBerryLockRegenerator;
 import org.openrewrite.javascript.internal.lock.berry.YarnBerryLockRegenerator.Inputs;
+import org.openrewrite.javascript.internal.registry.Environment;
 import org.openrewrite.javascript.internal.registry.NodeRegistries;
+import org.openrewrite.javascript.internal.registry.RegistryDiscovery;
+import org.openrewrite.javascript.marker.NodeResolutionResult;
+import org.openrewrite.javascript.marker.NodeResolutionResult.NpmrcScope;
 
 import java.time.Instant;
 import java.util.ArrayList;
@@ -33,6 +38,7 @@ import java.util.Set;
 import java.util.function.Predicate;
 import java.util.regex.Pattern;
 
+import static java.util.stream.Collectors.toList;
 import static org.openrewrite.javascript.internal.lock.berry.Configuration.DEFAULT_RC_FILENAME;
 
 /**
@@ -53,6 +59,16 @@ final class YarnBerryInputs {
 
     static InstallRoot installRoot(LockDirectory dir) {
         return YarnBerryLockRegenerator.installRoot(holds(dir), dir.depth());
+    }
+
+    /**
+     * The host's registries as the home .yarnrc.yml stands for them: the view's, else the marker's global and user
+     * npmrc; not its project npmrc (the repository root's), as Yarn reads no .npmrc.
+     */
+    static NodeRegistries userConfig(ExecutionContext ctx, @Nullable NodeResolutionResult marker, Environment env) {
+        return RegistryDiscovery.discover(ctx, marker == null || marker.getNpmrcConfigs() == null ? marker :
+                marker.withNpmrcConfigs(marker.getNpmrcConfigs().stream()
+                        .filter(npmrc -> npmrc.getScope() != NpmrcScope.Project).collect(toList())), env);
     }
 
     static Inputs from(LockDirectory dir, Host host, Instant now) {
