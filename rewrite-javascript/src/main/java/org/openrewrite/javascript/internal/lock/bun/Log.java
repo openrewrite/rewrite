@@ -19,16 +19,12 @@ import java.util.ArrayList;
 import java.util.List;
 
 /**
- * The messages bun's {@code logger.Log} collects while it reads a lock, a manifest or a config file.
+ * The errors bun's {@code logger.Log} collects while it reads a lock, a manifest or a config file; the warnings it
+ * prints change nothing a regeneration reports.
  */
 final class Log {
 
-    final List<String> warnings = new ArrayList<>();
     final List<String> errors = new ArrayList<>();
-
-    void addWarning(String message) {
-        warnings.add(message);
-    }
 
     void addError(String message) {
         errors.add(message);

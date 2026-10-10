@@ -399,9 +399,6 @@ final class PackageManager {
                     if (resTag == Resolution.Tag.NPM && verTag == DependencyVersion.Tag.NPM ||
                         resTag == Resolution.Tag.GIT && verTag == DependencyVersion.Tag.GIT ||
                         resTag == Resolution.Tag.GITHUB && verTag == DependencyVersion.Tag.GITHUB) {
-                        Package existing = lockfile.packages.get(first);
-                        log.addWarning("incorrect peer dependency \"" + existing.name + "@" + existing.resolution +
-                                       "\"");
                         assignResolution(dependencyId, first);
                         return new ResolvedPackageResult(lockfile.packages.get(first), false);
                     }
@@ -619,11 +616,8 @@ final class PackageManager {
             String scope = options.scopeForPackageName(task.name);
             String text = registry.packument(scope, task.name, task.extended);
             if (text == null) {
-                String message = "GET " + scope + task.name + " - 404";
                 if (networkDedupeMap.getOrDefault(task.name, true)) {
-                    log.addError(message);
-                } else {
-                    log.addWarning(message);
+                    log.addError("GET " + scope + task.name + " - 404");
                 }
             } else {
                 PackageManifest manifest = PackageManifest.parse(log, text, task.name, task.extended);

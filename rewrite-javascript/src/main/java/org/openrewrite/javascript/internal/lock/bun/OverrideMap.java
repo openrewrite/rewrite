@@ -70,27 +70,25 @@ public final class OverrideMap {
         return out;
     }
 
-    void parseAppend(Lockfile lockfile, Package rootPackage, Log log, Json.Expr expr) {
+    void parseAppend(Lockfile lockfile, Package rootPackage, Json.Expr expr) {
         Json.Expr overrides = expr.get("overrides");
         if (overrides != null) {
-            parseFromOverrides(lockfile, rootPackage, log, overrides);
+            parseFromOverrides(lockfile, rootPackage, overrides);
             return;
         }
         Json.Expr resolutions = expr.get("resolutions");
         if (resolutions != null) {
-            parseFromResolutions(lockfile, rootPackage, log, resolutions);
+            parseFromResolutions(lockfile, rootPackage, resolutions);
         }
     }
 
-    void parseFromOverrides(Lockfile lockfile, Package rootPackage, Log log, Json.Expr expr) {
+    void parseFromOverrides(Lockfile lockfile, Package rootPackage, Json.Expr expr) {
         if (!expr.isObject()) {
-            log.addWarning("\"overrides\" must be an object");
             throw new IllegalArgumentException("Invalid");
         }
         for (Json.Property prop : expr.properties()) {
             String k = prop.key.asString();
             if (k == null || k.isEmpty()) {
-                log.addWarning("Missing overridden package name");
                 continue;
             }
             long nameHash = Wyhash11.stringHash(k);
@@ -101,36 +99,28 @@ public final class OverrideMap {
             } else if (valueExpr.isObject()) {
                 Json.Expr dot = valueExpr.get(".");
                 if (dot == null) {
-                    log.addWarning("Bun currently does not support nested \"overrides\"");
                     continue;
                 }
                 if (!dot.isString()) {
-                    log.addWarning("Invalid override value for \"" + k + "\"");
                     continue;
-                }
-                if (valueExpr.properties().size() > 1) {
-                    log.addWarning("Bun currently does not support nested \"overrides\"");
                 }
                 value = dot;
             } else {
-                log.addWarning("Invalid override value for \"" + k + "\"");
                 continue;
             }
             String versionStr = value.asString();
             if (versionStr.startsWith("patch:")) {
-                log.addWarning("Bun currently does not support patched package \"overrides\"");
                 continue;
             }
-            Dependency version = parseOverrideValue("override", lockfile, rootPackage, log, k, versionStr);
+            Dependency version = parseOverrideValue(lockfile, rootPackage, k, versionStr);
             if (version != null) {
                 map.put(nameHash, version);
             }
         }
     }
 
-    void parseFromResolutions(Lockfile lockfile, Package rootPackage, Log log, Json.Expr expr) {
+    void parseFromResolutions(Lockfile lockfile, Package rootPackage, Json.Expr expr) {
         if (!expr.isObject()) {
-            log.addWarning("\"resolutions\" must be an object with string values");
             return;
         }
         for (Json.Property prop : expr.properties()) {
@@ -139,34 +129,28 @@ public final class OverrideMap {
                 k = k.substring(3);
             }
             if (k.isEmpty()) {
-                log.addWarning("Missing resolution package name");
                 continue;
             }
             Json.Expr value = prop.value;
             if (!value.isString()) {
-                log.addWarning("Expected string value for resolution \"" + k + "\"");
                 continue;
             }
             if (k.charAt(0) == '@') {
                 int firstSlash = k.indexOf('/');
                 if (firstSlash < 0) {
-                    log.addWarning("Invalid package name \"" + k + "\"");
                     continue;
                 }
                 if (k.indexOf('/', firstSlash + 1) >= 0) {
-                    log.addWarning("Bun currently does not support nested \"resolutions\"");
                     continue;
                 }
             } else if (k.indexOf('/') >= 0) {
-                log.addWarning("Bun currently does not support nested \"resolutions\"");
                 continue;
             }
             String versionStr = value.asString();
             if (versionStr.startsWith("patch:")) {
-                log.addWarning("Bun currently does not support patched package \"resolutions\"");
                 continue;
             }
-            Dependency version = parseOverrideValue("resolution", lockfile, rootPackage, log, k, versionStr);
+            Dependency version = parseOverrideValue(lockfile, rootPackage, k, versionStr);
             if (version != null) {
                 map.put(Wyhash11.stringHash(k), version);
             }
@@ -177,10 +161,8 @@ public final class OverrideMap {
      * A {@code $name} value is the root's own dependency of that name, the whole dependency: the lock writes that
      * dependency's name and literal for the key.
      */
-    static @Nullable Dependency parseOverrideValue(String field, Lockfile lockfile, Package rootPackage, Log log,
-                                                   String key, String value) {
+    static @Nullable Dependency parseOverrideValue(Lockfile lockfile, Package rootPackage, String key, String value) {
         if (value.isEmpty()) {
-            log.addWarning("Missing " + field + " value");
             return null;
         }
         if (value.charAt(0) == '$') {
@@ -190,14 +172,11 @@ public final class OverrideMap {
                     return dep;
                 }
             }
-            log.addWarning("Could not resolve " + field + " \"" + value + "\" (you need \"" + refName +
-                           "\" in your dependencies)");
             return null;
         }
         long nameHash = Wyhash11.stringHash(key);
         DependencyVersion version = DependencyVersion.parse(key, nameHash, value);
         if (version == null) {
-            log.addWarning("Invalid " + field + " value \"" + value + "\"");
             return null;
         }
         return new Dependency(nameHash, key, version, Behavior.NONE);

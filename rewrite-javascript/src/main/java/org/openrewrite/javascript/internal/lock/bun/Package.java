@@ -314,7 +314,7 @@ final class Package {
         }
 
         if (features.isMain) {
-            lockfile.overrides.parseAppend(lockfile, this, log, json);
+            lockfile.overrides.parseAppend(lockfile, this, json);
             boolean foundAnyCatalogOrCatalogObject = false;
             boolean hasWorkspaces = false;
             Json.Expr workspacesExpr = json.get("workspaces");
@@ -609,7 +609,6 @@ final class Package {
                     }
                     return null;
                 }
-                log.addWarning("Duplicate dependency: \"" + externalAlias + "\" specified in package.json");
             }
             duplicateCheckerMap.put(aliasHash, true);
         }
