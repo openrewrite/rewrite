@@ -24,8 +24,10 @@ import org.junit.jupiter.params.provider.MethodSource;
 import org.openrewrite.javascript.internal.lock.CannotKnow;
 import org.openrewrite.javascript.internal.lock.HostEnvironment;
 
+import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -102,6 +104,82 @@ class IniTest {
         assertThat(parse("\n'{ \"what\": \"is this\" }' = seriously?\n"))
           .isEqualTo(map("[Object object]", "seriously?"));
         assertThat(parse("\n'[1, 2, 3]' = cmon man\n")).isEqualTo(map("1,2,3", "cmon man"));
+    }
+
+    @Test
+    void reallyLongInput() {
+        String a = String.join("", Collections.nCopies(1024, "a"));
+        assertThat(parse("\n[" + a + ".lol.this.be.long]\nwow = 'hi'\n"))
+          .isEqualTo(map(a, map("lol", map("this", map("be", map("long", map("wow", "hi")))))));
+    }
+
+    @Test
+    void unicode() {
+        assertThat(parse("\nhi👋lol = 'lol hi 👋'\n"))
+          .isEqualTo(map("hi👋lol", "lol hi 👋"));
+        String facepalm = "🤦‍♀️";
+        assertThat(parse("\n[😎.🫒." + facepalm + "]\nlol = 'wtf'\n    "))
+          .isEqualTo(map("😎", map("🫒", map(facepalm, map("lol", "wtf")))));
+    }
+
+    /**
+     * bun's {@code foo.ini}, the npm/ini fixture, and the object its test expects.
+     */
+    @Test
+    @SuppressWarnings("unchecked")
+    void bigboi() throws IOException {
+        String ini;
+        try (InputStream is = IniTest.class.getResourceAsStream("foo.ini")) {
+            ini = new String(readAll(is), StandardCharsets.UTF_8);
+        }
+        Map<String, Object> expected = MAPPER.readValue("{\" xa  n          p \":\"\\\"\\r\\nyoyoyo\\r\\r\\n\"," +
+          "\"[disturbing]\":\"hey you never know\",\"a\":{\"[]\":\"a square?\",\"av\":\"a val\",\"b\":{\"c\":" +
+          "{\"e\":\"1\",\"j\":\"2\"}},\"cr\":[\"four\",\"eight\"],\"e\":\"{ o: p, a: { av: a val, b: { c: { e: " +
+          "\\\"this [value]\\\" } } } }\",\"j\":\"\\\"{ o: \\\"p\\\", a: { av: \\\"a val\\\", b: { c: { e: \\\"this " +
+          "[value]\\\" } } } }\\\"\"},\"a with spaces\":\"b  c\",\"ar\":[\"one\",\"three\",\"this is included\"]," +
+          "\"b\":{},\"br\":\"warm\",\"eq\":\"eq=eq\",\"false\":false,\"null\":null,\"o\":\"p\",\"s\":\"something\"," +
+          "\"s1\":\"\\\"something'\",\"s2\":\"something else\",\"s3\":\"\",\"s4\":\"\",\"s5\":\"   \",\"s6\":\" a \"," +
+          "\"s7\":true,\"true\":true,\"undefined\":\"undefined\",\"x.y.z\":{\"a.b.c\":{\"a.b.c\":\"abc\"," +
+          "\"nocomment\":\"this; this is not a comment\",\"noHashComment\":\"this# this is not a comment\"}," +
+          "\"x.y.z\":\"xyz\"},\"zr\":[\"deedee\"]}", Map.class);
+        assertThat(parse(ini)).isEqualTo(expected);
+    }
+
+    /**
+     * The truncated and invalid UTF-8 cases, each text as the test builds it (the bytes read as Latin-1): no throw.
+     */
+    @ParameterizedTest
+    @MethodSource("truncatedUtf8")
+    void truncatedOrInvalidUtf8DoesNotThrow(String ini) {
+        assertThat(parse(ini)).containsKey("key");
+    }
+
+    static List<String> truncatedUtf8() {
+        int[][] tails = {{0x80}, {0xc0}, {0xe0}, {0xe0, 0x80}, {0xf0}, {0xf0, 0x80}, {0xf0, 0x80, 0x80}};
+        List<String> cases = new ArrayList<>();
+        for (int[] tail : tails) {
+            cases.add("key = " + latin1(tail));
+        }
+        cases.add("key = \\" + latin1(new int[]{0xc0}));
+        cases.add("key = \\" + latin1(new int[]{0x80}));
+        return cases;
+    }
+
+    private static String latin1(int[] bytes) {
+        byte[] b = new byte[bytes.length];
+        for (int i = 0; i < bytes.length; i++) {
+            b[i] = (byte) bytes[i];
+        }
+        return new String(b, StandardCharsets.ISO_8859_1);
+    }
+
+    private static byte[] readAll(InputStream is) throws IOException {
+        ByteArrayOutputStream out = new ByteArrayOutputStream();
+        byte[] buf = new byte[4096];
+        for (int n; (n = is.read(buf)) > 0; ) {
+            out.write(buf, 0, n);
+        }
+        return out.toByteArray();
     }
 
     @Test
