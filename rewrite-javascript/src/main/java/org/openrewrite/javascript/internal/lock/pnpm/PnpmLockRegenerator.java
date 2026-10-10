@@ -242,10 +242,85 @@ public final class PnpmLockRegenerator {
      */
     String writeLock() {
         Install install = install();
+        requireOtherInstalls(install);
         if (install.getResolution() == null) {
             return install.getWritten();
         }
         return resolve(install);
+    }
+
+    // recursive.ts installs every project of an unshared workspace in one run: one that resolves shares pnpm's
+    // resolution cache with this lock's, and its failure stops the run whether or not this lock is written yet
+    private void requireOtherInstalls(Install install) {
+        PnpmOptions options = install.getOpts().getConfig();
+        String lockDir = inputs.getLockDir();
+        if (options.getWorkspacePackagePatterns() == null || options.getLockfileDir(lockDir) != null) {
+            return;
+        }
+        Map<String, Map<String, @Nullable Object>> projectConfigs =
+                ProjectConfigs.createProjectConfigRecord(options.get("packageConfigs"));
+        Map<String, String> ownOverrides = null;
+        for (Verification.Project project : install.getOpts().getAllProjects()) {
+            String dir = project.getRootDir();
+            String lock = inputs.getFiles().get(RootRelativePath.join(dir, LockfileReader.WANTED_LOCKFILE));
+            if (dir.equals(lockDir) || lock == null) {
+                continue;
+            }
+            if (ownOverrides == null) {
+                ownOverrides = projectOverrides(projectConfigs, lockDir, install.getOpts().getAllProjects(), options);
+            }
+            boolean ownHooks = !options.isTrue("ignorePnpmfile") &&
+                               (inputs.holds(RootRelativePath.join(dir, ".pnpmfile.mjs")) ||
+                                inputs.holds(RootRelativePath.join(dir, ".pnpmfile.cjs"))) ||
+                               !ownOverrides.equals(projectOverrides(projectConfigs, dir,
+                                       install.getOpts().getAllProjects(), options));
+            PnpmLockRegenerator other = new PnpmLockRegenerator(inputs.toBuilder().lock(lock).lockDir(dir).dir(null)
+                    .build(), registry);
+            Install otherInstall;
+            try {
+                otherInstall = other.install();
+            } catch (RuntimeException e) {
+                throw ownHooks ? sharesCacheWith(dir) : failsBeside(dir, e);
+            }
+            if (otherInstall.getResolution() == null) {
+                continue;
+            }
+            if (ownHooks) {
+                throw sharesCacheWith(dir);
+            }
+            try {
+                other.resolve(otherInstall);
+            } catch (RuntimeException e) {
+                throw failsBeside(dir, e);
+            }
+        }
+    }
+
+    private static Map<String, String> projectOverrides(Map<String, Map<String, @Nullable Object>> projectConfigs,
+                                                        String dir, List<Verification.Project> allProjects,
+                                                        PnpmOptions options) {
+        for (Verification.Project project : allProjects) {
+            if (project.getRootDir().equals(dir)) {
+                return projectOverrides(ProjectConfigs.getProjectConfig(projectConfigs,
+                        project.getManifest().get("name")), options.getOverrides());
+            }
+        }
+        return options.getOverrides();
+    }
+
+    private CannotKnow sharesCacheWith(String dir) {
+        return new CannotKnow("what the install of " + project(dir) + ", in the same run with readPackage hooks of " +
+                              "its own, leaves in the resolution cache " + lockfilePath(inputs.getLockDir()) +
+                              " reads");
+    }
+
+    private CannotKnow failsBeside(String dir, RuntimeException e) {
+        return new CannotKnow("whether pnpm writes " + lockfilePath(inputs.getLockDir()) + " before the install of " +
+                              project(dir) + ", in the same run, fails (" + e.getMessage() + ")");
+    }
+
+    private static String project(String dir) {
+        return dir.isEmpty() ? "the root project" : dir;
     }
 
     private static Failure failure(RuntimeException e) {
@@ -804,22 +879,39 @@ public final class PnpmLockRegenerator {
         List<Verification.Project> projects = new ArrayList<>();
         for (String dir : dirs) {
             String text = inputs.getManifests().get(dir);
+            List<String> others = new ArrayList<>();
             for (String other : workspace ? OTHER_MANIFEST_NAMES : Collections.<String>emptyList()) {
-                String path = dir.isEmpty() ? other : dir + "/" + other;
+                String path = RootRelativePath.join(dir, other);
                 if (inputs.holds(path)) {
-                    // findPackages lists each manifest file it finds, so a package.json beside it is a second project
-                    throw new CannotKnow("the manifest pnpm reads from " + path + " (only package.json files are " +
-                                         "read)");
+                    others.add(path);
                 }
             }
-            if (text == null) {
+            if (!others.isEmpty() && (text != null || others.size() > 1)) {
+                // findPackages lists every manifest file of a directory, in the order the filesystem lists them
+                throw new CannotKnow("the manifest pnpm reads from " + others.get(others.size() - 1) +
+                                     " (findPackages lists each manifest of " + (dir.isEmpty() ? "the root" : dir) +
+                                     ", in the order the filesystem gives)");
+            }
+            if (text == null && others.isEmpty()) {
                 if (missingManifest == null) {
                     missingManifest = dir;
                 }
                 continue;
             }
-            Map<String, @Nullable Object> manifest = Manifests.readProjectManifest(text,
-                    dir.isEmpty() ? "package.json" : dir + "/package.json");
+            Map<String, @Nullable Object> manifest;
+            if (text != null) {
+                manifest = Manifests.readProjectManifest(text, RootRelativePath.join(dir, "package.json"));
+            } else {
+                String path = others.get(0);
+                String other = inputs.getFiles().get(path);
+                if (other == null) {
+                    throw new CannotKnow(path + " (its contents were not read)");
+                }
+                if (!path.endsWith("/package.yaml") && !"package.yaml".equals(path)) {
+                    throw new CannotKnow("what pnpm reads from " + path + " (json5's parse is not ported)");
+                }
+                manifest = Manifests.readPackageYaml(other, path);
+            }
             projects.add(new Verification.Project(dir, workspace ? FindPackages.getLockfileImporterId(dir) : ".",
                     manifest));
         }

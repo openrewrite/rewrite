@@ -51,7 +51,28 @@ final class Manifests {
      * {@code readProjectManifest} of a package.json: {@code readJsonFile}, then {@code convertManifestAfterRead}.
      */
     static Map<String, @Nullable Object> readProjectManifest(String text, String path) {
-        Map<String, @Nullable Object> manifest = parse(text, path);
+        return convertManifestAfterRead(parse(text, path));
+    }
+
+    /**
+     * {@code readExactProjectManifest} of a package.yaml: read-yaml-file's {@code readYamlFile}, its YAMLException
+     * {@code ERR_PNPM_YAML_PARSE}, then {@code convertManifestAfterRead}.
+     */
+    @SuppressWarnings("unchecked")
+    static Map<String, @Nullable Object> readPackageYaml(String text, String path) {
+        Object value;
+        try {
+            value = JsYaml.load(LockfileReader.stripBom(text));
+        } catch (JsYaml.YamlException e) {
+            throw new PnpmError("YAML_PARSE", e.getMessage() + "\nin " + path);
+        }
+        if (!(value instanceof Map)) {
+            throw new CannotKnow("what pnpm makes of " + path + " (YAML, but not a mapping)");
+        }
+        return convertManifestAfterRead((Map<String, @Nullable Object>) value);
+    }
+
+    private static Map<String, @Nullable Object> convertManifestAfterRead(Map<String, @Nullable Object> manifest) {
         PkgManifestUtils.convertEnginesRuntimeToDependencies(manifest, "devEngines", "devDependencies");
         PkgManifestUtils.convertEnginesRuntimeToDependencies(manifest, "engines", "dependencies");
         return manifest;

@@ -72,6 +72,7 @@ class PnpmScenarioTest extends LockScenarioTest {
         if (npmrc != null) {
             files.put(".npmrc", npmrc);
         }
+        files.putAll(scenario.otherLocks());
         PnpmScenarios.Scenario recording = recording(scenario);
         Map<String, String> manifests = scenario.manifests(false, lock);
         PnpmLockRegenerator.Inputs.InputsBuilder inputs = PnpmLockRegenerator.Inputs.builder()

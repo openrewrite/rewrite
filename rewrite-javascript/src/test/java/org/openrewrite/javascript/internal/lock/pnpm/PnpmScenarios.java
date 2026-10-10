@@ -18,6 +18,7 @@ package org.openrewrite.javascript.internal.lock.pnpm;
 import lombok.Getter;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.javascript.internal.lock.LockScenario;
+import org.openrewrite.javascript.internal.lock.RootRelativePath;
 
 import java.io.IOException;
 import java.io.UncheckedIOException;
@@ -258,6 +259,16 @@ final class PnpmScenarios {
             if (!before) {
                 out.putAll(tree("tree"));
             }
+            return out;
+        }
+
+        /**
+         * The locks of the other projects as the edit's install found them, where the recording kept every project's
+         * ({@code probes/before-locks/}).
+         */
+        Map<String, String> otherLocks() {
+            Map<String, String> out = new TreeMap<>(tree("probes/before-locks"));
+            out.remove(RootRelativePath.join(lockDir(), LockfileReader.WANTED_LOCKFILE));
             return out;
         }
 

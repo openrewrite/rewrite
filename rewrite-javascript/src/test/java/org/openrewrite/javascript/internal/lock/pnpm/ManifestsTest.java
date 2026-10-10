@@ -16,6 +16,7 @@
 package org.openrewrite.javascript.internal.lock.pnpm;
 
 import org.junit.jupiter.api.Test;
+import org.openrewrite.javascript.internal.lock.CannotKnow;
 
 import java.util.Collections;
 import java.util.Set;
@@ -44,6 +45,24 @@ class ManifestsTest {
                                                       "\"version\":\"24\",\"onFail\":\"download\"}}}", "package.json")))
           .isEqualTo("{'engines':{'runtime':{'name':'node','version':'24','onFail':'download'}}," +
                      "'dependencies':{'node':'runtime:24'}}");
+    }
+
+    /**
+     * A package.yaml as read-yaml-file 3.0.0 reads it (@zkochan/js-yaml, the byte order mark stripped), converted as
+     * a package.json is; text that is not YAML is pnpm's ERR_PNPM_YAML_PARSE.
+     */
+    @Test
+    void readPackageYaml() {
+        String yaml = '﻿' + "name: c\nversion: 1.0.0\nengines:\n  runtime:\n    name: node\n    version: '24'\n" +
+                      "    onFail: download\n";
+        assertThat(json(Manifests.readPackageYaml(yaml, "packages/c/package.yaml")))
+          .isEqualTo("{'name':'c','version':'1.0.0','engines':{'runtime':{'name':'node','version':'24'," +
+                     "'onFail':'download'}},'dependencies':{'node':'runtime:24'}}");
+        assertThatThrownBy(() -> Manifests.readPackageYaml("name: [c\n", "packages/c/package.yaml"))
+          .isInstanceOfSatisfying(PnpmError.class, e -> assertThat(e.getCode()).isEqualTo("ERR_PNPM_YAML_PARSE"))
+          .hasMessageEndingWith("\nin packages/c/package.yaml");
+        assertThatThrownBy(() -> Manifests.readPackageYaml("- c\n", "packages/c/package.yaml"))
+          .isInstanceOf(CannotKnow.class);
     }
 
     private static final Set<String> MODIFIED = Collections.singleton("modified");

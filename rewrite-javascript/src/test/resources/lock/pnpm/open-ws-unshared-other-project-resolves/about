@@ -1,0 +1,1 @@
+pnpm run in packages/a of an unshared workspace: a adds abbrev while b, edited too, adds is-number.
