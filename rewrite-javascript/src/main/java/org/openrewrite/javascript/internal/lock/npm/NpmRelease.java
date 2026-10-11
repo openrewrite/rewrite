@@ -120,6 +120,16 @@ public final class NpmRelease implements Comparable<NpmRelease> {
         return atLeast(12, 0, 0) ? "none" : "all";
     }
 
+    // @npmcli/map-workspaces
+
+    /**
+     * The @npmcli/map-workspaces npm bundles: 3.0.6 from npm 10.5.2, which finds the members 5.0.3 finds; 3.0.4
+     * before.
+     */
+    MapWorkspaces.Release mapWorkspaces() {
+        return atLeast(10, 5, 2) ? MapWorkspaces.Release.V5_0_3 : MapWorkspaces.Release.V3_0_4;
+    }
+
     // @npmcli/package-json normalize.js
 
     /**
@@ -139,6 +149,17 @@ public final class NpmRelease implements Comparable<NpmRelease> {
      */
     PickManifest.Release pickManifest() {
         return atLeast(10, 8, 2) ? PickManifest.Release.V11_0_3 : PickManifest.Release.V9_0_1;
+    }
+
+    // pacote dir.js
+
+    /**
+     * The manifest of a directory gets its {@code bin} from the files of {@code directories.bin}: read-package-json-fast
+     * until npm 10.6.0 and @npmcli/package-json 7 from npm 11.6.1 fill it, @npmcli/package-json 5 and 6 between them
+     * do not.
+     */
+    boolean dirFetcherReadsBinDirectory() {
+        return !atLeast(10, 6, 0) || atLeast(11, 6, 1);
     }
 
     @Override

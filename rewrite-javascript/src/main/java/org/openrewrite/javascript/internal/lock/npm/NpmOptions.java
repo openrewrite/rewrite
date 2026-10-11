@@ -643,6 +643,11 @@ public class NpmOptions {
      */
     static int loadLocalPrefix(@Nullable String manifest,
                                Map<String, Map<String, @Nullable String>> parentTrees) {
+        return loadLocalPrefix(NpmRelease.PORTED, manifest, parentTrees);
+    }
+
+    static int loadLocalPrefix(NpmRelease release, @Nullable String manifest,
+                               Map<String, Map<String, @Nullable String>> parentTrees) {
         if (manifest == null) {
             return 0;
         }
@@ -665,7 +670,8 @@ public class NpmOptions {
             if (!truthy(pkg.get("workspaces"))) {
                 continue;
             }
-            if (MapWorkspaces.mapWorkspaces("/", pkg, files).containsValue("/" + parent.getKey())) {
+            if (MapWorkspaces.mapWorkspaces("/", pkg, files, release.mapWorkspaces())
+                    .containsValue("/" + parent.getKey())) {
                 return parent.getKey().split("/").length;
             }
         }

@@ -129,6 +129,25 @@ class PacoteTest {
           .hasMessage("Cannot read properties of undefined (reading 'signatures')");
     }
 
+    // pacote's own answer for a directory whose manifest has only directories.bin: npm 10.5.2 and 11.6.1 return the
+    // bin of its files, npm 10.6.0 to 11.6.0 return none
+    @ParameterizedTest
+    @CsvSource({"10.5.2,true", "10.6.0,false", "10.9.9,false", "11.6.0,false", "11.6.1,true", "11.17.0,true"})
+    void directoryManifestReadsBinDirectory(String release, boolean readsFiles) {
+        VirtualTreeLoader.ProjectFiles files = VirtualTreeLoader.ProjectFiles.builder()
+          .manifest("vendor/x", "{\"name\":\"x\",\"version\":\"1.0.0\",\"directories\":{\"bin\":\"bin\"}}")
+          .build();
+        Pacote pacote = new Pacote(registry(LATEST_BELOW_HIGHEST),
+          NpmOptions.builder().release(NpmRelease.of(release)).build(), files, "/");
+        if (readsFiles) {
+            assertThatThrownBy(() -> pacote.manifest(Spec.npa("file:vendor/x", "/"), Pacote.Options.builder().build()))
+              .isInstanceOf(PackageJson.NeedsPackageFiles.class);
+        } else {
+            assertThat(pacote.manifest(Spec.npa("file:vendor/x", "/"), Pacote.Options.builder().build()))
+              .containsEntry("version", "1.0.0").containsKey("directories").doesNotContainKey("bin");
+        }
+    }
+
     private static @Nullable Object bin(String release, String bin) {
         String packument = "{\"name\":\"x\",\"dist-tags\":{\"latest\":\"1.0.0\"},\"versions\":{\"1.0.0\":" +
                            "{\"name\":\"x\",\"version\":\"1.0.0\",\"bin\":" + bin + "}}}";

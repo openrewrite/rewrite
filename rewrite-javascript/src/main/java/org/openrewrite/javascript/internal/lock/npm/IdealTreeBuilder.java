@@ -292,7 +292,7 @@ public final class IdealTreeBuilder {
             throw new MalformedManifest(err instanceof PackageJson.FieldError ?
                     ((PackageJson.FieldError) err).getField() + ": " + err.getMessage() : err.getMessage(), err);
         }
-        NpmLockRegenerator.setWorkspaces(root, files);
+        NpmLockRegenerator.setWorkspaces(root, files, options.getRelease());
 
         VirtualTreeLoader loader = new VirtualTreeLoader(path, options);
         Node tree = loader.loadVirtual(files, root);

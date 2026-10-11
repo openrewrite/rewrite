@@ -194,7 +194,7 @@ public final class VirtualTreeLoader {
         Object pkg = rootPackage(s);
         rootOptionProvided = root;
         if (root == null) {
-            root = NpmLockRegenerator.setWorkspaces(loadNode("", pkg, true), files);
+            root = NpmLockRegenerator.setWorkspaces(loadNode("", pkg, true), files, options.getRelease());
         }
 
         loadFromShrinkwrap(s, root);
@@ -286,7 +286,8 @@ public final class VirtualTreeLoader {
         }
 
         Map<String, Object> lockWS = new LinkedHashMap<>();
-        Map<String, String> workspaces = MapWorkspaces.virtual(path, Objects.requireNonNull(s.getData()));
+        Map<String, String> workspaces = MapWorkspaces.virtual(path, Objects.requireNonNull(s.getData()),
+                options.getRelease().mapWorkspaces());
         for (Map.Entry<String, String> ws : workspaces.entrySet()) {
             lockWS.put(ws.getKey(), "file:" + ws.getValue());
         }

@@ -178,7 +178,15 @@ final class Pacote {
     private Map<String, Object> directory(Spec spec, Options opts) {
         String realpath = Objects.requireNonNull(spec.getFetchSpec());
         String location = Relpath.relpath(path, realpath);
-        PackageJson manifest = files.manifest(location);
+        PackageJson manifest;
+        try {
+            manifest = files.manifest(location);
+        } catch (PackageJson.NeedsPackageFiles e) {
+            if (options.getRelease().dirFetcherReadsBinDirectory()) {
+                throw e;
+            }
+            manifest = PackageJson.parsed(e.getContent());
+        }
         if (manifest == null) {
             throw new CannotKnow("directory manifest " + spec.getRawSpec() + " (" + location + ")");
         }
