@@ -407,8 +407,8 @@ class PickManifestTest {
         assertThat(version(deprecatedInRange, "^1.0.0")).isEqualTo("1.0.0");
 
         Map<String, Object> engineLatest = packument("{\"dist-tags\":{\"latest\":\"2.0.0\"},\"versions\":{" +
-                                                     "\"1.0.0\":{\"version\":\"1.0.0\"}," +
-                                                     "\"2.0.0\":{\"version\":\"2.0.0\",\"engines\":{\"node\":\">=99\"}}}}");
+                                                     "\"1.0.0\":{\"version\":\"1.0.0\"},\"2.0.0\":{" +
+                                                     "\"version\":\"2.0.0\",\"engines\":{\"node\":\">=99\"}}}}");
         assertThat(version(engineLatest, "*", old.toBuilder().nodeVersion("20.0.0").build())).isEqualTo("2.0.0");
         assertThat(version(engineLatest, "*", PickManifest.Options.builder().nodeVersion("20.0.0").build()))
           .isEqualTo("1.0.0");

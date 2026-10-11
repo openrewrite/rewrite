@@ -154,9 +154,9 @@ public final class NpmRelease implements Comparable<NpmRelease> {
     // pacote dir.js
 
     /**
-     * The manifest of a directory gets its {@code bin} from the files of {@code directories.bin}: read-package-json-fast
-     * until npm 10.6.0 and @npmcli/package-json 7 from npm 11.6.1 fill it, @npmcli/package-json 5 and 6 between them
-     * do not.
+     * The manifest of a directory gets its {@code bin} from the files of {@code directories.bin}:
+     * read-package-json-fast until npm 10.6.0 and @npmcli/package-json 7 from npm 11.6.1 fill it,
+     * @npmcli/package-json 5 and 6 between them do not.
      */
     boolean dirFetcherReadsBinDirectory() {
         return !atLeast(10, 6, 0) || atLeast(11, 6, 1);
