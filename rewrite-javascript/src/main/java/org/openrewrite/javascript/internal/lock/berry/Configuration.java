@@ -63,6 +63,11 @@ public final class Configuration {
             "cacheVersionOverride", "lockfileVersionOverride", "osOverride", "cpuOverride", "libcOverride",
             "binFolder", "version", "flags", "profile", "gpg", "ignoreNode", "wrapOutput", "home", "confDir",
             "registry", "ignoreCwd"));
+    private static final Set<String> IGNORED_ENV_VARIABLES_FROM_4_15 = new LinkedHashSet<>(IGNORED_ENV_VARIABLES);
+
+    static {
+        IGNORED_ENV_VARIABLES_FROM_4_15.add("ignoreScripts");
+    }
 
     private static final List<String> PRIMARY_FIELDS = Arrays.asList("yarnPath", "ignorePath",
             "injectEnvironmentFiles");
@@ -128,14 +133,8 @@ public final class Configuration {
         }
 
         Definition(Type type, @Nullable Object defaultValue, @Nullable List<Object> values, boolean isArray,
-                   boolean isNullable, Map<String, Definition> properties, @Nullable Definition valueDefinition,
-                   @Nullable Function<String, String> normalizeKeys) {
-            this(type, defaultValue, values, isArray, isNullable, properties, valueDefinition, normalizeKeys, null);
-        }
-
-        Definition(Type type, @Nullable Object defaultValue, @Nullable List<Object> values, boolean isArray,
                    boolean isNullable, Map<String, Definition> properties, @Nullable Definition valueDefinition) {
-            this(type, defaultValue, values, isArray, isNullable, properties, valueDefinition, null);
+            this(type, defaultValue, values, isArray, isNullable, properties, valueDefinition, null, null);
         }
 
         static Definition of(Type type, @Nullable Object defaultValue) {
@@ -157,7 +156,7 @@ public final class Configuration {
 
         static Definition map(Definition valueDefinition, @Nullable Function<String, String> normalizeKeys) {
             return new Definition(Type.MAP, null, null, false, false, Collections.emptyMap(), valueDefinition,
-                    normalizeKeys);
+                    normalizeKeys, null);
         }
 
         static Definition shape(Map<String, Definition> properties) {
@@ -212,6 +211,15 @@ public final class Configuration {
 
         DEFINITIONS.put("catalog", Definition.map(Definition.withoutDefault(Type.STRING)));
         DEFINITIONS.put("catalogs", Definition.map(Definition.map(Definition.withoutDefault(Type.STRING))));
+    }
+
+    /**
+     * Configuration.ts's IGNORED_ENV_VARIABLES of the release that reads the sources, null for 4.10.3's. From 4.15.0
+     * it holds {@code ignoreScripts}, which Yarn 1 reads.
+     */
+    private static Set<String> ignoredEnvVariables(@Nullable YarnRelease release) {
+        return release == null || YarnRelease.compareVersions(release.getVersion(), "4.15.0") < 0 ?
+                IGNORED_ENV_VARIABLES : IGNORED_ENV_VARIABLES_FROM_4_15;
     }
 
     /**
@@ -569,9 +577,7 @@ public final class Configuration {
             if (value == Syml.UNDEFINED || "plugins".equals(key)) {
                 continue;
             }
-            if ("<environment>".equals(source) && (IGNORED_ENV_VARIABLES.contains(key) ||
-                                                   "ignoreScripts".equals(key) && release != null &&
-                                                   YarnRelease.compareVersions(release.getVersion(), "4.15.0") >= 0)) {
+            if ("<environment>".equals(source) && ignoredEnvVariables(release).contains(key)) {
                 continue;
             }
             if ("rcFilename".equals(key)) {
