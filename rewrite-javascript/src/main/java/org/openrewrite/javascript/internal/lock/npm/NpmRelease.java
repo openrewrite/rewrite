@@ -569,6 +569,14 @@ public final class NpmRelease implements Comparable<NpmRelease> {
     }
 
     /**
+     * A node's children and edges are case-insensitive-map.js's, one entry for names alike in NFKD lower case, and an
+     * edge is satisfied by a node of its own name only (edge.js), from npm 7.21.0; before, plain {@code Map}s.
+     */
+    boolean matchesNamesCaseInsensitively() {
+        return atLeast(7, 21, 0);
+    }
+
+    /**
      * {@code shouldOmit}: only a node under the project root or a workspace is omitted, from npm 11.6.1.
      */
     boolean omitsUnderProjectTopsOnly() {

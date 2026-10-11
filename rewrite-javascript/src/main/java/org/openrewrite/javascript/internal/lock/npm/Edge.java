@@ -124,7 +124,8 @@ public final class Edge {
     }
 
     public boolean satisfiedBy(Node node) {
-        if (!name.equals(node.getName())) {
+        // from npm 7.21.0, whose children resolve a name of another case
+        if (!name.equals(node.getName()) && release.matchesNamesCaseInsensitively()) {
             return false;
         }
         if (from == null) {

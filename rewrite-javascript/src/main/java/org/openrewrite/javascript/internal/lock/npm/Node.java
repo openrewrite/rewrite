@@ -223,7 +223,7 @@ public class Node {
     @Setter
     private boolean legacyPeerDeps;
 
-    private final CaseInsensitiveMap<Node> children = new CaseInsensitiveMap<>();
+    private final CaseInsensitiveMap<Node> children;
 
     @Getter
     private final Set<Node> fsChildren = new LinkedHashSet<>();
@@ -268,7 +268,7 @@ public class Node {
     private final Set<Edge> edgesIn = new LinkedHashSet<>();
 
     @Getter
-    private final CaseInsensitiveMap<Edge> edgesOut = new CaseInsensitiveMap<>();
+    private final CaseInsensitiveMap<Edge> edgesOut;
 
     @Getter
     @Setter
@@ -302,6 +302,9 @@ public class Node {
     @SuppressWarnings("unchecked")
     public Node(Options options) {
         this.release = options.getRelease();
+        // before npm 7.21.0 plain Maps, which tell names apart by case
+        this.children = new CaseInsensitiveMap<>(release.matchesNamesCaseInsensitively());
+        this.edgesOut = new CaseInsensitiveMap<>(release.matchesNamesCaseInsensitively());
         this.errors = new ArrayList<>();
         if (options.getError() != null) {
             this.errors.add(options.getError());
