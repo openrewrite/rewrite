@@ -62,15 +62,17 @@ public final class NpmRelease implements Comparable<NpmRelease> {
         return compareTo(new NpmRelease(major, minor, patch)) >= 0;
     }
 
+    // @npmcli/config definitions.js
+
     /**
-     * {@code @npmcli/config} definitions.js: the default of {@code allow-git}, {@code none} from npm 12.0.0.
+     * The default of {@code allow-git}: {@code none} from npm 12.0.0.
      */
     String allowGitDefault() {
         return atLeast(12, 0, 0) ? "none" : "all";
     }
 
     /**
-     * {@code @npmcli/config} definitions.js: the default of {@code allow-remote}, {@code none} from npm 12.0.0.
+     * The default of {@code allow-remote}: {@code none} from npm 12.0.0.
      */
     String allowRemoteDefault() {
         return atLeast(12, 0, 0) ? "none" : "all";
