@@ -75,6 +75,14 @@ public final class NpmRelease implements Comparable<NpmRelease> {
     }
 
     /**
+     * {@code #loadPeerSet} resolves an optional peer only against a version in the tree that does not satisfy it, from
+     * npm 11.20.0 and, of npm 12, from 12.1.0; before, every optional peer the virtual root lacks.
+     */
+    boolean peerSetHoldsOptionalPeerOnlyOnConflict() {
+        return atLeast(12, 1, 0) || atLeast(11, 20, 0) && !atLeast(12, 0, 0);
+    }
+
+    /**
      * {@code #loadPeerSet} stops at a node its own peer set detached, where it failed reading the conflict, from npm
      * 11.19.0 and, of npm 12, from 12.0.2.
      */

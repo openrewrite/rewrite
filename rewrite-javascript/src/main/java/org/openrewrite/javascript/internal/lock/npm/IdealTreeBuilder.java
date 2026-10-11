@@ -801,6 +801,13 @@ public final class IdealTreeBuilder {
 
             if (edge.getTo() == null) {
                 if (parentEdge == null) {
+                    if (edge.getType() == Edge.Type.PEER_OPTIONAL &&
+                        options.getRelease().peerSetHoldsOptionalPeerOnlyOnConflict()) {
+                        Node current = sourceReference.resolve(edge.getName());
+                        if (current == null || current.satisfies(edge)) {
+                            continue;
+                        }
+                    }
                     nodeFromEdge(edge, nodeParent, null, required);
                     continue;
                 } else {
