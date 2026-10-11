@@ -329,7 +329,8 @@ class NpmInputsTest {
           .projectPaths(new HashSet<>(Arrays.asList(Paths.get("app/package.json"), Paths.get("app/yarn.lock"))))
           .build();
 
-        Result result = new NpmLockRegenerator(NpmInputs.from(LockDirectory.of(request), HostRegistries.NONE), NO_REGISTRY).regenerate();
+        Result result = new NpmLockRegenerator(NpmInputs.from(LockDirectory.of(request), HostRegistries.NONE),
+          NO_REGISTRY).regenerate();
 
         assertThat(result.getFailure()).isNotNull();
         assertThat(result.getFailure().getKind()).isEqualTo(Kind.CANNOT_KNOW);
@@ -353,7 +354,8 @@ class NpmInputsTest {
             Paths.get("app/npm-shrinkwrap.json"))))
           .build();
 
-        Result result = new NpmLockRegenerator(NpmInputs.from(LockDirectory.of(request), HostRegistries.NONE), NO_REGISTRY).regenerate();
+        Result result = new NpmLockRegenerator(NpmInputs.from(LockDirectory.of(request), HostRegistries.NONE),
+          NO_REGISTRY).regenerate();
 
         assertThat(result.getFailure()).isNotNull();
         assertThat(result.getFailure().getKind()).isEqualTo(Kind.CANNOT_KNOW);

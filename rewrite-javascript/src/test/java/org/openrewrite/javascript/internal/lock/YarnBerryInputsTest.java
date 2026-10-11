@@ -289,7 +289,8 @@ class YarnBerryInputsTest {
         Map<String, @Nullable String> asked = new LinkedHashMap<>();
         String error = new YarnBerryLockRegenerator(inputs, new RegistrySource() {
             @Override
-            public @Nullable String packument(String registry, String name, boolean full, @Nullable String authorization) {
+            public @Nullable String packument(String registry, String name, boolean full,
+                                              @Nullable String authorization) {
                 asked.put(registry + " " + name, authorization);
                 return null;
             }

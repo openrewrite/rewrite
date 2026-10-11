@@ -174,7 +174,8 @@ final class ScenarioReplay {
 
     static NpmOptions options(NpmScenarios.Scenario scenario) {
         String npmrc = scenario.npmrc() == null ? "" : scenario.npmrc() + "\n";
-        return NpmOptions.fromNpmrc(scenario.host().userNpmrc(HostInputs.GLOBAL_AND_USER), npmrc + scenario.argsAfter());
+        return NpmOptions.fromNpmrc(scenario.host().userNpmrc(HostInputs.GLOBAL_AND_USER),
+                npmrc + scenario.argsAfter());
     }
 
     static NpmOptions options(@Nullable String npmrc) {

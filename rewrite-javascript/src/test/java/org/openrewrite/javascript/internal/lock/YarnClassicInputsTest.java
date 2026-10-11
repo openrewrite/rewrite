@@ -318,7 +318,8 @@ class YarnClassicInputsTest {
         Map<String, @Nullable String> asked = new LinkedHashMap<>();
         new YarnClassicLockRegenerator(inputs, new RegistrySource() {
             @Override
-            public @Nullable String packument(String registry, String name, boolean full, @Nullable String authorization) {
+            public @Nullable String packument(String registry, String name, boolean full,
+                                              @Nullable String authorization) {
                 asked.put(registry + name, authorization);
                 return null;
             }

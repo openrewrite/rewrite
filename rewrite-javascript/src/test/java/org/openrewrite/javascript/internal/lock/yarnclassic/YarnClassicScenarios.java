@@ -383,7 +383,8 @@ final class YarnClassicScenarios {
     static RegistrySource packuments(Packuments packuments) {
         return new RegistrySource() {
             @Override
-            public @Nullable String packument(String registry, String name, boolean full, @Nullable String authorization) {
+            public @Nullable String packument(String registry, String name, boolean full,
+                                              @Nullable String authorization) {
                 return packuments.packument(registry, name);
             }
 
