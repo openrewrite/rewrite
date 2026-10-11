@@ -30,8 +30,9 @@ import java.util.Map;
 import static org.openrewrite.javascript.internal.lock.npm.Js.truthy;
 
 /**
- * Port of @npmcli/package-json 7.0.5 as arborist reads a manifest: {@link #normalize(String)} runs the
- * {@code normalizeSteps}, {@link #syncNormalize(Map)} the synchronous ones, as {@code Node} does on its package.
+ * Port of @npmcli/package-json 7.0.5 as arborist reads a manifest: {@link #normalize(String, NpmRelease)} runs the
+ * {@code normalizeSteps}, {@link #syncNormalize(Map, NpmRelease)} the synchronous ones, as {@code Node} does on its
+ * package.
  */
 @Getter
 public final class PackageJson {
@@ -93,11 +94,11 @@ public final class PackageJson {
     }
 
     /**
-     * {@code PackageJson.normalize(path)}: JsonParseException as {@code Invalid package.json}, an Error for a falsy
-     * value, a TypeError for a truthy one that is not an object or array.
+     * {@code PackageJson.normalize(path)} of the library the npm {@code release} bundles: JsonParseException as {@code
+     * Invalid package.json}, an Error for a falsy value, a TypeError for a truthy one that is not an object or array.
      */
     @SuppressWarnings("unchecked")
-    public static PackageJson normalize(String text) {
+    public static PackageJson normalize(String text, NpmRelease release) {
         JsonParseEvenBetterErrors.Parsed parsed;
         try {
             parsed = JsonParseEvenBetterErrors.parse(text);
@@ -123,10 +124,10 @@ public final class PackageJson {
             data.remove("bin");
             throw new NeedsPackageFiles("\"directories\": {\"bin\": " + Js.quote((String) binDir) +
                                         "} names the package's files, which are not known",
-                    syncSteps(data, NORMALIZE_STEPS));
+                    syncSteps(data, NORMALIZE_STEPS, release));
         }
         normalizeBin(data);
-        syncSteps(data, NORMALIZE_STEPS);
+        syncSteps(data, NORMALIZE_STEPS, release);
         return new PackageJson(data, parsed.getIndent(), parsed.getNewline());
     }
 
@@ -137,14 +138,14 @@ public final class PackageJson {
         return new PackageJson(content, null, null);
     }
 
-    static Map<String, Object> syncNormalize(Map<String, Object> data) {
+    static Map<String, Object> syncNormalize(Map<String, Object> data, NpmRelease release) {
         List<String> steps = new ArrayList<>(NORMALIZE_STEPS);
         steps.remove("_attributes");
-        return syncSteps(data, steps);
+        return syncSteps(data, steps, release);
     }
 
     @SuppressWarnings("unchecked")
-    private static Map<String, Object> syncSteps(Map<String, Object> data, List<String> steps) {
+    private static Map<String, Object> syncSteps(Map<String, Object> data, List<String> steps, NpmRelease release) {
         Object name = data.get("name");
         Object version = data.get("version");
         String pkgId = name + "@" + version;
@@ -176,6 +177,14 @@ public final class PackageJson {
             data.put("bundleDependencies", Js.keys(bd));
         } else if (!(bd instanceof List) && data.containsKey("bundleDependencies")) {
             data.remove("bundleDependencies");
+        }
+
+        // the overrides step, which 8.0.0 adds: the field is left absent or an object with keys
+        if (data.containsKey("overrides") && release.normalizesOverrides()) {
+            Object ov = data.get("overrides");
+            if (!(ov instanceof Map) || ((Map<?, ?>) ov).isEmpty()) {
+                data.remove("overrides");
+            }
         }
 
         Object dependencies = data.get("dependencies");

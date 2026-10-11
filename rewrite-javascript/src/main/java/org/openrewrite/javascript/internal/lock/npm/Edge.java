@@ -129,7 +129,10 @@ public final class Edge {
             throw new IllegalArgumentException("Cannot read properties of null (reading 'errors')");
         }
 
-        if (truthy(node.getHasShrinkwrap()) || node.isInShrinkwrap() || node.isInBundle()) {
+        // from npm 12.0.0 no node has a shrinkwrap, and what the root bundles is overridden as any other
+        // (node.inDepBundle alone)
+        if (truthy(node.getHasShrinkwrap()) || node.isInShrinkwrap() ||
+            node.isInBundle() && (node.isInDepBundle() || !release.overridesWhatTheRootBundles())) {
             return DepValid.depValid(node, getRawSpec(), accept, from);
         }
 
@@ -168,10 +171,47 @@ public final class Edge {
             }
             if (from != null) {
                 explanation.put("from", from.explain(null, seen));
+                // npm 12.0.0 notes an edge that a root packageExtensions rule, or a root .npm-extension, made or
+                // changed on the from node
+                String field = extendedField(from.getPackageExtensionsApplied(), "applied");
+                if (field != null) {
+                    Map<String, Object> packageExtensions = new LinkedHashMap<>();
+                    packageExtensions.put("selector", Js.get(from.getPackageExtensionsApplied(), "selector"));
+                    packageExtensions.put("field", field);
+                    explanation.put("packageExtensions", packageExtensions);
+                }
+                field = extendedField(from.getNpmExtensionApplied(), "transformed");
+                if (field != null) {
+                    Map<String, Object> npmExtension = new LinkedHashMap<>();
+                    npmExtension.put("extensionPoint", Js.get(from.getNpmExtensionApplied(), "extensionPoint"));
+                    npmExtension.put("field", field);
+                    explanation.put("npmExtension", npmExtension);
+                }
             }
             this.explanation = explanation;
         }
         return explanation;
+    }
+
+    // the first manifest field whose list of names an extension's record holds this edge's under:
+    // applied[field]?.includes(name), the record being arborist's variable of that name
+    private @Nullable String extendedField(@Nullable Object applied, String variable) {
+        if (!truthy(applied)) {
+            return null;
+        }
+        for (String field : PackageExtensions.EXTENSION_FIELDS) {
+            Object names = Js.get(applied, field);
+            if (names == null || names == Js.UNDEFINED) {
+                continue;
+            }
+            if (!(names instanceof List) && !(names instanceof String)) {
+                throw new IllegalArgumentException(variable + "[field]?.includes is not a function");
+            }
+            if (names instanceof List ? ((List<?>) names).contains(name) : ((String) names).contains(name)) {
+                return field;
+            }
+        }
+        return null;
     }
 
     public boolean isBundled() {

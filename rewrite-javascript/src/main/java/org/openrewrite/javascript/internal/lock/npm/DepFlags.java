@@ -61,6 +61,33 @@ public final class DepFlags {
                 if (target == null) {
                     continue;
                 }
+                if (tree.getRelease().linkOnlyUnsetsTargetFlags()) {
+                    boolean changed = false;
+                    if (target.isDev() && !node.isDev()) {
+                        target.setDev(false);
+                        changed = true;
+                    }
+                    if (target.isOptional() && !node.isOptional()) {
+                        target.setOptional(false);
+                        changed = true;
+                    }
+                    if (target.isDevOptional() && !node.isDevOptional()) {
+                        target.setDevOptional(false);
+                        changed = true;
+                    }
+                    if (target.isPeer() && !node.isPeer()) {
+                        target.setPeer(false);
+                        changed = true;
+                    }
+                    if (target.isExtraneous() && !node.isExtraneous()) {
+                        target.setExtraneous(false);
+                        changed = true;
+                    }
+                    if (changed || !seen.contains(target)) {
+                        queue.push(target);
+                    }
+                    continue;
+                }
                 target.setDev(node.isDev());
                 target.setOptional(node.isOptional());
                 target.setDevOptional(node.isDevOptional());

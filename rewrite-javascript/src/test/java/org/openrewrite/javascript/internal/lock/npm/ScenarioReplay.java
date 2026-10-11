@@ -190,7 +190,14 @@ final class ScenarioReplay {
     }
 
     static NpmOptions options(@Nullable String npmrc) {
-        return NpmOptions.fromNpmrc(NpmRelease.PORTED, null, npmrc);
+        return options(NpmRelease.PORTED, npmrc);
+    }
+
+    /**
+     * An .npmrc as the config of npm {@code release} reads it, as the release that recorded a scenario loads its locks.
+     */
+    static NpmOptions options(NpmRelease release, @Nullable String npmrc) {
+        return NpmOptions.fromNpmrc(release, null, npmrc);
     }
 
     static NpmLockRegenerator.Inputs inputs(NpmScenarios.Edit edit) {
@@ -215,7 +222,7 @@ final class ScenarioReplay {
     static IdealTreeBuilder builder(NpmScenarios.Edit edit, ScenarioRegistry http, String path, NpmOptions options) {
         NpmScenarios.Scenario scenario = edit.getScenario();
         VirtualTreeLoader.ProjectFiles files = NpmLockRegenerator.projectFiles(new LockFile(edit.getStart().getText()),
-          edit.getInputs().getYarnLock(), edit.manifests());
+          edit.getInputs().getYarnLock(), edit.manifests()).readBy(options.getRelease(), null);
         return new IdealTreeBuilder(path, files, options, registry(http), host(scenario), now(scenario));
     }
 
@@ -246,11 +253,12 @@ final class ScenarioReplay {
     }
 
     /**
-     * Arborist's {@code #initTree} and {@code #fixDepFlags} for an install that adds and removes nothing.
+     * Arborist's {@code #initTree} and {@code #fixDepFlags} for an install that adds and removes nothing, as the
+     * release the options are read by runs them.
      */
     static Node load(NpmScenarios.Lock lock, NpmOptions options, String path) {
         VirtualTreeLoader.ProjectFiles files = NpmLockRegenerator.projectFiles(new LockFile(lock.getText()),
-          lock.getYarnLock(), lock.manifests());
+          lock.getYarnLock(), lock.manifests()).readBy(options.getRelease(), null);
         PackageJson manifest;
         try {
             manifest = files.manifest("");
@@ -260,6 +268,7 @@ final class ScenarioReplay {
             manifest = null;
         }
         Node root = new Node(Node.options()
+          .release(options.getRelease())
           .path(path).realpath(path)
           .pkg(manifest != null ? manifest.getContent() : new LinkedHashMap<>())
           .extraneous(false).dev(false).devOptional(false).peer(false).optional(false)

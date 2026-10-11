@@ -121,6 +121,15 @@ class NpmInstallChecksTest {
           .doesNotThrowAnyException();
     }
 
+    // node-semver 7.8.5, which npm 11.18.0 bundles, reads ~22 down to 22.0.0-0 under includePrerelease
+    @Test
+    void tildeRangeAdmitsAPrereleaseOfItsLowerBoundFrom1118() {
+        assertThatThrownBy(() -> NpmInstallChecks.checkEngine(e(null, "~22"), "11.17.0", "v22.0.0-rc.1", false,
+          NpmRelease.of("11.17.0"))).isInstanceOf(NpmInstallChecks.UnsupportedEngine.class);
+        assertThatCode(() -> NpmInstallChecks.checkEngine(e(null, "~22"), "11.18.0", "v22.0.0-rc.1", false,
+          NpmRelease.of("11.18.0"))).doesNotThrowAnyException();
+    }
+
     private static void platform(String target) {
         platform(target, false, Host.UNKNOWN);
     }

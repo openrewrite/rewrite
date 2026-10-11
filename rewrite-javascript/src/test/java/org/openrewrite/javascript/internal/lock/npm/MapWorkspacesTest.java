@@ -17,6 +17,7 @@ package org.openrewrite.javascript.internal.lock.npm;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import org.jspecify.annotations.Nullable;
+import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.CsvSource;
@@ -29,6 +30,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.stream.Stream;
 
+import static java.util.Arrays.asList;
+import static java.util.Collections.singletonList;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.openrewrite.javascript.internal.lock.npm.NpmTreeSupport.fixture;
@@ -61,6 +64,24 @@ class MapWorkspacesTest {
         return VirtualTreeLoader.ProjectFiles.builder().manifests(manifests).build();
     }
 
+    // brace-expansion 5.0.9, which npm bundles from 11.19.1 and npm 12 from 12.1.0, combines the sets of a pattern
+    // left to right: {x,y}{a},} then also names x and y (5.0.6, 5.0.7 and 5.0.9 run on the pattern)
+    @Test
+    void patternExpandsAsTheBraceExpansionOfTheReleaseDoes() {
+        Map<String, Object> packages = obj(
+          "", obj("workspaces", new ArrayList<>(singletonList("packages/{x,y}{a},}"))),
+          "packages/x", obj("name", "x"),
+          "node_modules/x", obj("resolved", "packages/x", "link", true));
+        Map<String, Object> lockfile = obj("packages", packages);
+        for (String version : new String[]{"11.17.0", "11.18.0", "11.19.0", "12.0.0", "12.0.2"}) {
+            assertThat(MapWorkspaces.virtual(CWD, lockfile, NpmRelease.of(version))).as("npm %s", version).isEmpty();
+        }
+        for (String version : new String[]{"11.19.1", "11.21.0", "12.1.0", "12.2.0"}) {
+            assertThat(relative(MapWorkspaces.virtual(CWD, lockfile, NpmRelease.of(version)))).as("npm %s", version)
+              .containsExactly(asList("x", "packages/x"));
+        }
+    }
+
     private static List<List<String>> relative(Map<?, String> members) {
         List<List<String>> out = new ArrayList<>();
         for (Map.Entry<?, String> e : members.entrySet()) {
@@ -79,15 +100,15 @@ class MapWorkspacesTest {
         if (c.has("error")) {
             String message = c.get("error").get("message").asText().replace("{CWD}", CWD);
             if ("EJSONPARSE".equals(c.get("error").path("code").asText())) {
-                assertThatThrownBy(() -> MapWorkspaces.mapWorkspaces(CWD, pkg, manifests(declared)))
+                assertThatThrownBy(() -> MapWorkspaces.mapWorkspaces(CWD, pkg, manifests(declared), NpmRelease.PORTED))
                   .isInstanceOf(JsonParseEvenBetterErrors.JsonParseException.class)
                   .hasMessageStartingWith("Invalid package.json: ");
             } else {
-                assertThatThrownBy(() -> MapWorkspaces.mapWorkspaces(CWD, pkg, manifests(declared)))
+                assertThatThrownBy(() -> MapWorkspaces.mapWorkspaces(CWD, pkg, manifests(declared), NpmRelease.PORTED))
                   .hasMessage(message);
             }
         } else {
-            assertThat(relative(MapWorkspaces.mapWorkspaces(CWD, pkg, manifests(declared))))
+            assertThat(relative(MapWorkspaces.mapWorkspaces(CWD, pkg, manifests(declared), NpmRelease.PORTED)))
               .isEqualTo(json(c.get("members")));
         }
     }
@@ -108,10 +129,10 @@ class MapWorkspacesTest {
         });
         Map<String, Object> lockfile = obj("packages", packages);
         if (c.has("virtualError")) {
-            assertThatThrownBy(() -> MapWorkspaces.virtual(CWD, lockfile)).hasMessage(c.get("virtualError")
+            assertThatThrownBy(() -> MapWorkspaces.virtual(CWD, lockfile, NpmRelease.PORTED)).hasMessage(c.get("virtualError")
               .get("message").asText());
         } else {
-            assertThat(relative(MapWorkspaces.virtual(CWD, lockfile))).isEqualTo(json(c.get("virtual")));
+            assertThat(relative(MapWorkspaces.virtual(CWD, lockfile, NpmRelease.PORTED))).isEqualTo(json(c.get("virtual")));
         }
     }
 
@@ -179,9 +200,9 @@ class MapWorkspacesTest {
         manifests.put("packages/a/node_modules/n", "{\"name\":\"n\"}");
         VirtualTreeLoader.ProjectFiles files = VirtualTreeLoader.ProjectFiles.builder().manifests(manifests).build();
         Map<String, Object> pkg = obj("workspaces", json(workspaces));
-        assertThat(members(MapWorkspaces.mapWorkspaces(CWD, pkg, files, MapWorkspaces.Release.V3_0_4)))
+        assertThat(members(MapWorkspaces.mapWorkspaces(CWD, pkg, files, NpmRelease.of("10.5.1"))))
           .isEqualTo(onDisk3_0_4);
-        assertThat(members(MapWorkspaces.mapWorkspaces(CWD, pkg, files, MapWorkspaces.Release.V5_0_3)))
+        assertThat(members(MapWorkspaces.mapWorkspaces(CWD, pkg, files, NpmRelease.of("10.5.2"))))
           .isEqualTo(onDisk3_0_6 == null ? onDisk3_0_4 : onDisk3_0_6);
 
         Map<String, Object> packages = obj("", obj("workspaces", json(workspaces)));
@@ -192,9 +213,9 @@ class MapWorkspacesTest {
         packages.put("node_modules/a", obj("link", true));
         packages.put("packages/a/node_modules/n", obj());
         Map<String, Object> lockfile = obj("packages", packages);
-        assertThat(members(MapWorkspaces.virtual(CWD, lockfile, MapWorkspaces.Release.V3_0_4)))
+        assertThat(members(MapWorkspaces.virtual(CWD, lockfile, NpmRelease.of("10.5.1"))))
           .isEqualTo(virtual3_0_4);
-        assertThat(members(MapWorkspaces.virtual(CWD, lockfile, MapWorkspaces.Release.V5_0_3)))
+        assertThat(members(MapWorkspaces.virtual(CWD, lockfile, NpmRelease.of("10.5.2"))))
           .isEqualTo(virtual3_0_6 == null ? virtual3_0_4 : virtual3_0_6);
     }
 

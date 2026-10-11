@@ -310,14 +310,16 @@ final class NodeSemverRange {
             return token;
         }
         String mj = m.group(1), mn = m.group(2), p = m.group(3), pr = m.group(4);
+        // from 7.8.5 the lower bound of ~1 and ~1.2 is -0 under includePrerelease, as an x-range's and a caret's are
+        String z = options.includePrerelease && options.release.compareTo(Release.V7_8_5) >= 0 ? "-0" : "";
         if (isX(mj)) {
             return "";
         }
         if (isX(mn)) {
-            return ">=" + mj + ".0.0 <" + incr(mj) + ".0.0-0";
+            return ">=" + mj + ".0.0" + z + " <" + incr(mj) + ".0.0-0";
         }
         if (isX(p)) {
-            return ">=" + mj + "." + mn + ".0 <" + mj + "." + incr(mn) + ".0-0";
+            return ">=" + mj + "." + mn + ".0" + z + " <" + mj + "." + incr(mn) + ".0-0";
         }
         if (pr != null) {
             return ">=" + mj + "." + mn + "." + p + "-" + pr + " <" + mj + "." + incr(mn) + ".0-0";

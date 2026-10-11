@@ -110,8 +110,27 @@ public class Node {
         @Nullable
         OverrideSet overrides;
 
+        /**
+         * What a root {@code packageExtensions} rule added to the manifest, from npm 12.0.0: its selector and the
+         * names it added by field, as the lock holds it, whatever JSON type that has.
+         */
+        @Nullable
+        Object packageExtensionsApplied;
+
+        /**
+         * What a root .npm-extension changed in the manifest, from npm 12.0.0, as the lock holds it.
+         */
+        @Nullable
+        Object npmExtensionApplied;
+
         @Nullable
         Node parent;
+
+        /**
+         * The patch record of npm 12.0.0, {@code path} and {@code integrity}, as the lock holds it.
+         */
+        @Nullable
+        Object patched;
 
         @Nullable
         String path;
@@ -181,6 +200,20 @@ public class Node {
     @Getter
     @Setter
     private @Nullable Object hasShrinkwrap;
+
+    // patched, packageExtensionsApplied and npmExtensionApplied are npm 12.0.0's: set from a lock it reads them
+    // from, by its patchedDependencies and by its packageExtensions
+    @Getter
+    @Setter
+    private @Nullable Object patched;
+
+    @Getter
+    @Setter
+    private @Nullable Object packageExtensionsApplied;
+
+    @Getter
+    @Setter
+    private @Nullable Object npmExtensionApplied;
 
     @Getter
     @Setter
@@ -280,7 +313,7 @@ public class Node {
         } else {
             Map<String, Object> content = options.getPkg() instanceof Map ?
                     (Map<String, Object>) options.getPkg() : new LinkedHashMap<>();
-            this.pkg = PackageJson.syncNormalize(content);
+            this.pkg = PackageJson.syncNormalize(content, release);
         }
 
         String path = options.getPath();
@@ -301,7 +334,7 @@ public class Node {
 
         setResolved(truthy(options.getResolved()) ? options.getResolved() : null);
         if (!truthy(getResolved())) {
-            Object resolved = ConsistentResolve.consistentResolve(pkg.get("_resolved"));
+            Object resolved = ConsistentResolve.consistentResolve(pkg.get("_resolved"), release);
             if (truthy(resolved) && !(Js.string(resolved).startsWith("file:") && truthy(pkg.get("_where")))) {
                 setResolved(resolved);
             }
@@ -310,8 +343,13 @@ public class Node {
         this.integrity = truthy(options.getIntegrity()) ? options.getIntegrity() :
                 truthy(legacyIntegrity) ? legacyIntegrity : null;
         Object legacyHasShrinkwrap = pkg.get("_hasShrinkwrap");
-        this.hasShrinkwrap = truthy(options.getHasShrinkwrap()) ? options.getHasShrinkwrap() :
+        Object hasShrinkwrap = truthy(options.getHasShrinkwrap()) ? options.getHasShrinkwrap() :
                 truthy(legacyHasShrinkwrap) ? legacyHasShrinkwrap : false;
+        // a node has no hasShrinkwrap from npm 12.0.0: nothing below reads a dependency's npm-shrinkwrap.json
+        this.hasShrinkwrap = truthy(hasShrinkwrap) && !release.readsNpmShrinkwrap() ? false : hasShrinkwrap;
+        this.patched = truthy(options.getPatched()) ? options.getPatched() : null;
+        this.packageExtensionsApplied = options.getPackageExtensionsApplied();
+        this.npmExtensionApplied = options.getNpmExtensionApplied();
         this.installLinks = options.isInstallLinks();
         this.legacyPeerDeps = options.isLegacyPeerDeps();
 

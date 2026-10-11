@@ -19,11 +19,14 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
 import org.openrewrite.javascript.internal.LockFileRegeneration.Kind;
+import org.openrewrite.javascript.internal.LockFileRegeneration.Reason;
 import org.openrewrite.javascript.internal.LockFileRegeneration.Result;
 import org.openrewrite.javascript.internal.lock.Host;
 
 import java.time.Instant;
+import java.util.Arrays;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.Map;
 
 import static java.util.Collections.singletonMap;
@@ -232,5 +235,161 @@ class NpmLockRegeneratorTest {
             assertThat(result.getLockFileContent()).isEqualTo(license ? whole :
               whole.replace(isBuffer, isBuffer.replace(",\n      \"license\": \"MIT\"", "")));
         }
+    }
+
+    private static final String EMPTY_RULES_HASH =
+      "sha512-J8dGcK23UHX60FjVzq97IMTneGyDuuijL2Jvl4KvNMmjPCBG72D9Knh403jin+yFGAa72aZ4ePOp8c2kgwdj/Q==";
+    private static final String IS_ODD_RULE_HASH =
+      "sha512-h32ouO4a7osRa5vCtTHIhZJpFFdMwv+bf2ausl7cJUTBlfnzQ4bGMBVx6YuYFz3eHrroKgJyt0r/p+zjKT+M7w==";
+
+    private static String manifest(String version, String... fields) {
+        StringBuilder manifest = new StringBuilder("{\n  \"name\": \"a\",\n  \"version\": \"" + version + "\"");
+        for (String field : fields) {
+            manifest.append(",\n  ").append(field);
+        }
+        return manifest.append("\n}\n").toString();
+    }
+
+    private static String lock(String version, int lockfileVersion, String... rootFields) {
+        StringBuilder root = new StringBuilder();
+        for (String field : rootFields) {
+            root.append(",\n      ").append(field);
+        }
+        return "{\n  \"name\": \"a\",\n  \"version\": \"" + version + "\",\n  \"lockfileVersion\": " + lockfileVersion +
+               ",\n  \"requires\": true,\n  \"packages\": {\n    \"\": {\n      \"name\": \"a\",\n      \"version\": " +
+               "\"" + version + "\"" + root + "\n    }\n  }\n}\n";
+    }
+
+    private static Result regenerate(String release, String lock, String manifest) {
+        return regenerate(NpmLockRegenerator.Inputs.builder().release(NpmRelease.of(release)).lock(lock)
+          .manifest("", manifest));
+    }
+
+    private static Result regenerate(NpmLockRegenerator.Inputs.InputsBuilder inputs) {
+        return new NpmLockRegenerator(inputs.now(Instant.EPOCH).build(), NO_REGISTRY).regenerate();
+    }
+
+    // npm 12.2.0 over each of these projects, which have no dependency: the root's packageExtensions go into the
+    // lock as their digest, and a lock that holds one is lockfileVersion 4 whatever lockfile-version says ("manifest
+    // extensions require lockfileVersion 4; upgrading the lockfile from version 3"). npm 11.21.0 leaves the lock as
+    // it is, and writes lockfile-version's 3 over a 4.
+    @ParameterizedTest
+    @CsvSource(delimiter = '|', value = {
+      "{} | " + EMPTY_RULES_HASH,
+      "{\"is-odd@3\":{\"dependencies\":{\"isarray\":\"2.0.5\"}}} | " + IS_ODD_RULE_HASH
+    })
+    void theRootsPackageExtensionsAreRecordedInALockfileVersion4From12(String rules, String hash) {
+        String manifest = manifest("1.0.0", "\"packageExtensions\": " + rules);
+        String extended = lock("1.0.0", 4, "\"packageExtensionsHash\": \"" + hash + "\"");
+        for (String release : new String[]{"12.0.0", "12.2.0"}) {
+            assertThat(regenerate(release, LOCK, manifest).getLockFileContent()).isEqualTo(extended);
+            assertThat(regenerate(release, extended, manifest).getLockFileContent()).isEqualTo(extended);
+            assertThat(regenerate(NpmLockRegenerator.Inputs.builder().release(NpmRelease.of(release))
+              .lock(lock("1.0.0", 4)).manifest("", manifest).npmrc("lockfile-version=3\n")).getLockFileContent())
+              .isEqualTo(extended);
+        }
+        assertThat(regenerate("11.21.0", LOCK, manifest).getLockFileContent()).isEqualTo(LOCK);
+        assertThat(regenerate(NpmLockRegenerator.Inputs.builder().release(NpmRelease.of("11.21.0"))
+          .lock(lock("1.0.0", 4)).manifest("", manifest).npmrc("lockfile-version=3\n")).getLockFileContent())
+          .isEqualTo(LOCK);
+    }
+
+    // npm 12.2.0's own words over each manifest; npm 11.21.0 reads neither field and writes the lock
+    @ParameterizedTest
+    @CsvSource(delimiter = '|', value = {
+      "\"packageExtensions\": [] | EEXTENSIONROOT | packageExtensions must be an object",
+      "\"packageExtensions\": {\"is-odd\": {\"scripts\": {}}} | EEXTENSIONFIELD | packageExtensions[\"is-odd\"] has " +
+      "unsupported field \"scripts\". Supported fields: dependencies, optionalDependencies, peerDependencies, " +
+      "peerDependenciesMeta.",
+      "\"patchedDependencies\": {\"left-pad@1.3.0\": \"patches/left-pad.patch\"} | EPATCHUNUSED | The following " +
+      "patches were registered but matched no installed package:~  left-pad@1.3.0 -> patches/left-pad.patch~" +
+      "Use --allow-unused-patches to install anyway."
+    })
+    void npm12RefusesExtensionsAndPatchesItCannotApply(String field, String code, String message) {
+        for (String release : new String[]{"12.0.0", "12.2.0"}) {
+            Result result = regenerate(release, LOCK, manifest("1.0.0", field));
+            assertThat(result.getFailure()).isNotNull();
+            assertThat(result.getFailure().getKind()).isEqualTo(Kind.PM_REJECTS);
+            assertThat(result.getFailure().getReason()).isEqualTo(Reason.MALFORMED_MANIFEST);
+            assertThat(result.getFailure().getDetail()).contains(code).contains(message.replace('~', '\n'));
+        }
+        assertThat(regenerate("11.21.0", LOCK, manifest("1.0.0", field)).getLockFileContent()).isEqualTo(LOCK);
+    }
+
+    // npm 12.2.0: "Unsupported lockfileVersion 5. This npm only supports up to 4. Please upgrade npm."; it keeps a 4
+    // nothing needs, and an empty patchedDependencies changes nothing. npm 11.21.0 writes the 5 and the 4 back.
+    @Test
+    void npm12RefusesALockNewerThanLockfileVersion4() {
+        for (String release : new String[]{"12.0.0", "12.2.0"}) {
+            Result result = regenerate(release, lock("1.0.0", 5), MANIFEST);
+            assertThat(result.getFailure()).isNotNull();
+            assertThat(result.getFailure().getKind()).isEqualTo(Kind.PM_REJECTS);
+            assertThat(result.getFailure().getReason()).isEqualTo(Reason.UNSUPPORTED_LOCKFILE_VERSION);
+            assertThat(result.getFailure().getDetail()).contains("ELOCKFILEVERSION")
+              .contains("Unsupported lockfileVersion 5. This npm only supports up to 4. Please upgrade npm.");
+            assertThat(regenerate(release, lock("1.0.0", 4), MANIFEST).getLockFileContent())
+              .isEqualTo(lock("1.0.0", 4));
+            assertThat(regenerate(release, LOCK, manifest("1.0.0", "\"patchedDependencies\": {}"))
+              .getLockFileContent()).isEqualTo(LOCK);
+        }
+        assertThat(regenerate("11.21.0", lock("1.0.0", 5), MANIFEST).getLockFileContent())
+          .isEqualTo(lock("1.0.0", 5));
+        assertThat(regenerate("11.21.0", lock("1.0.0", 4), MANIFEST).getLockFileContent())
+          .isEqualTo(lock("1.0.0", 4));
+    }
+
+    // npm 12.2.0 over a project whose patchedDependencies names its directory dependency lib, with no patch file:
+    // "patch file not found: patches/lib.patch". The directory itself, which no edge names, is asked before the link
+    // to it, so npm reads the patch first; with the file there it goes on to the link, which is no registry
+    // dependency to patch. npm 11.21.0 writes the lock back.
+    @Test
+    void npm12ReadsThePatchOfADirectoryDependency() {
+        String lock = "{\n  \"name\": \"p\",\n  \"version\": \"1.0.0\",\n  \"lockfileVersion\": 3,\n  \"requires\": " +
+                      "true,\n  \"packages\": {\n    \"\": {\n      \"name\": \"p\",\n      \"version\": \"1.0.0\",\n" +
+                      "      \"dependencies\": {\n        \"lib\": \"file:lib\"\n      }\n    },\n    \"lib\": {\n" +
+                      "      \"version\": \"1.0.0\"\n    },\n    \"node_modules/lib\": {\n      \"resolved\": " +
+                      "\"lib\",\n      \"link\": true\n    }\n  }\n}\n";
+        NpmLockRegenerator.Inputs.InputsBuilder inputs = NpmLockRegenerator.Inputs.builder()
+          .lock(lock)
+          .manifest("", "{\n  \"name\": \"p\",\n  \"version\": \"1.0.0\",\n  \"dependencies\": {\n    \"lib\": " +
+                        "\"file:lib\"\n  },\n  \"patchedDependencies\": {\n    \"lib\": \"patches/lib.patch\"\n  }\n" +
+                        "}\n")
+          .manifest("lib", "{\n  \"name\": \"lib\",\n  \"version\": \"1.0.0\"\n}\n")
+          .paths(new LinkedHashSet<>(Arrays.asList("package.json", "package-lock.json", "lib/package.json")));
+
+        Result npm12 = regenerate(inputs.release(NpmRelease.of("12.2.0")));
+        assertThat(npm12.getFailure()).isNotNull();
+        assertThat(npm12.getFailure().getKind()).isEqualTo(Kind.PM_REJECTS);
+        assertThat(npm12.getFailure().getDetail()).contains("(EPATCHNOTFOUND)")
+          .contains("patch file not found: patches/lib.patch");
+
+        assertThat(regenerate(inputs.release(NpmRelease.of("11.21.0"))).getLockFileContent()).isEqualTo(lock);
+
+        // with the patch file there, npm 12.2.0 reads it for the directory and then refuses the link
+        Result held = regenerate(inputs.release(NpmRelease.of("12.2.0")).paths(new LinkedHashSet<>(Arrays.asList(
+          "package.json", "package-lock.json", "lib/package.json", "patches/lib.patch"))));
+        assertThat(held.getFailure()).isNotNull();
+        assertThat(held.getFailure().getKind()).isEqualTo(Kind.PM_REJECTS);
+        assertThat(held.getFailure().getDetail()).contains("(EPATCHNONREGISTRY)")
+          .contains("Cannot patch non-registry dependency lib@1.0.0 (selector \"lib\"). Only registry dependencies " +
+                    "can be patched.");
+    }
+
+    // a project that holds an npm-shrinkwrap.json beside its package-lock.json: npm 11.21.0 reads and writes the
+    // shrinkwrap in the lock's place, npm 12.2.0 leaves it alone and writes the package-lock.json
+    @Test
+    void npm12NoLongerReadsTheProjectsNpmShrinkwrap() {
+        NpmLockRegenerator.Inputs.InputsBuilder inputs = NpmLockRegenerator.Inputs.builder()
+          .lock(LOCK)
+          .manifest("", manifest("1.0.1"))
+          .paths(new LinkedHashSet<>(Arrays.asList("package.json", "package-lock.json", "npm-shrinkwrap.json")));
+
+        Result npm11 = regenerate(inputs.release(NpmRelease.of("11.21.0")));
+        assertThat(npm11.getFailure()).isNotNull();
+        assertThat(npm11.getFailure().getKind()).isEqualTo(Kind.CANNOT_KNOW);
+        assertThat(npm11.getFailure().getDetail()).contains("npm-shrinkwrap.json");
+
+        assertThat(regenerate(inputs.release(NpmRelease.of("12.0.0"))).getLockFileContent())
+          .isEqualTo(lock("1.0.1", 3));
     }
 }

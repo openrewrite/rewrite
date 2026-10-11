@@ -177,6 +177,7 @@ public final class IdealTreeBuilder {
     private final Set<Node> loadFailures = new LinkedHashSet<>();
     private final Map<String, Map<String, Object>> manifests = new LinkedHashMap<>();
     private boolean mutateTree;
+    private @Nullable PackageExtensions packageExtensions;
     private final Map<Node, Node> peerSetSource = new IdentityHashMap<>();
     private final Map<Node, Node> virtualRoots = new IdentityHashMap<>();
     private boolean flagsSuspect;
@@ -223,7 +224,8 @@ public final class IdealTreeBuilder {
 
     /**
      * Throws MalformedLock for no lock or one npm discards, CannotKnow where arborist reads what the engine lacks, and
-     * npm's rejections: ERESOLVE, E404, EALLOW*, ETARGET, EOVERRIDE, EUNSUPPORTEDPROTOCOL, EBADPLATFORM, EBADENGINE.
+     * npm's rejections: ERESOLVE, E404, EALLOW*, ETARGET, EOVERRIDE, EUNSUPPORTEDPROTOCOL, EBADPLATFORM, EBADENGINE,
+     * and from npm 12.0.0 ELOCKFILEVERSION, EEXTENSION* and EPATCH*.
      */
     public Node buildIdealTree() {
         if (idealTree != null) {
@@ -234,12 +236,14 @@ public final class IdealTreeBuilder {
         }
         try {
             initTree();
+            loadPackageExtensions();
             inflateAncientLockfile();
             applyUserRequests();
             buildDeps();
             fixDepFlags();
             pruneFailedOptional();
             checkEngineAndPlatform();
+            resolvePatchedDependencies();
         } catch (StackOverflowError e) {
             // arborist recurses the same way (some peer cycles nest placements without end): npm's RangeError
             throw new NpmRejection(null, "Maximum call stack size exceeded", null);
@@ -283,6 +287,46 @@ public final class IdealTreeBuilder {
         }
     }
 
+    // npm 12.0.0's #loadPackageExtensions. It follows #loadNpmExtension, which --ignore-scripts turns off
+    // (ignoreExtension): the lock's .npm-extension state is then left as it is
+    private void loadPackageExtensions() {
+        Node tree = Objects.requireNonNull(idealTree);
+        Shrinkwrap meta = Objects.requireNonNull(tree.getMeta());
+        Object raw = Js.get(Objects.requireNonNull(tree.getTarget()).getPackage(), "packageExtensions");
+        Object lockedHash = meta.getPackageExtensionsHash();
+        if (raw == Js.UNDEFINED && lockedHash == null || !options.getRelease().appliesPackageExtensions()) {
+            return;
+        }
+        packageExtensions = new PackageExtensions(raw, options.getRelease().semver());
+        meta.setPackageExtensionsHash(packageExtensions.getHash());
+
+        // a rule set that changed since the lock was written leaves the locked manifests of the packages it
+        // extends, or extended, stale: they are rebuilt from fresh manifests under the current rules
+        if (meta.isLoadedFromDisk() && !Js.strictEquals(lockedHash, packageExtensions.getHash())) {
+            for (Node node : new ArrayList<>(tree.getInventory().values())) {
+                if (node.isProjectRoot() || node.isWorkspace() || node.isTop()) {
+                    continue;
+                }
+                boolean affected = truthy(node.getPackageExtensionsApplied()) ||
+                                   packageExtensions.wouldMatch(node.getPackageName(), node.getVersion());
+                if (affected) {
+                    for (Edge edge : node.getEdgesIn()) {
+                        depsQueue.push(edge.getFrom());
+                    }
+                    node.setParent(null);
+                }
+            }
+        }
+    }
+
+    // npm 12.0.0's resolvePatchedDependencies, which does nothing a lock shows without a patch declared or recorded
+    private void resolvePatchedDependencies() {
+        Node tree = Objects.requireNonNull(idealTree);
+        if (PatchedDependencies.concerns(tree) && options.getRelease().resolvesPatchedDependencies()) {
+            PatchedDependencies.resolvePatchedDependencies(tree, path, files.getPaths());
+        }
+    }
+
     private void initTree() {
         Node root;
         try {
@@ -295,7 +339,7 @@ public final class IdealTreeBuilder {
             throw new MalformedManifest(err instanceof PackageJson.FieldError ?
                     ((PackageJson.FieldError) err).getField() + ": " + err.getMessage() : err.getMessage(), err);
         }
-        NpmLockRegenerator.setWorkspaces(root, files, options.getRelease());
+        NpmLockRegenerator.setWorkspaces(root, files);
 
         VirtualTreeLoader loader = new VirtualTreeLoader(path, options);
         Node tree = loader.loadVirtual(files, root);
@@ -489,6 +533,9 @@ public final class IdealTreeBuilder {
                                 (hasBundle || truthy(hasShrinkwrap)) &&
                                 !node.isInert();
             if (crackOpen) {
+                // pacote.extract(node.resolved, ...) reads the resolved value as a spec of its own, with the options as
+                // they are: no dependent makes it a root's
+                checkAllow(Spec.npa(node.getResolved(), null), null);
                 throw new CannotKnow((truthy(hasShrinkwrap) ? "npm-shrinkwrap.json of " : "bundled dependencies of ") +
                                      node.getPkgid());
             }
@@ -731,7 +778,7 @@ public final class IdealTreeBuilder {
         }
         if (options.getRelease().exemptsFromReleaseAge() &&
             ReleaseAgeExclude.isReleaseAgeExcluded(ReleaseAgeExclude.trustedSpecName(spec),
-                    options.getMinReleaseAgeExclude())) {
+                    options.getMinReleaseAgeExclude(), options.getRelease())) {
             return null;
         }
         if (before instanceof String) {
@@ -897,14 +944,21 @@ public final class IdealTreeBuilder {
             return failureNode(name, parent, new NpmRejection("EINCOMPLETEMANIFEST",
                     "incomplete manifest for " + name + ", missing version", null), edge);
         }
-        return new Node(Node.options()
-                .release(options.getRelease())
+        // npm 12.0.0 extends a copy of the manifest before the node reads its edges; a rule that does not apply
+        // fails the install, not the node
+        PackageExtensions.Extended extended = packageExtensions == null ? null : packageExtensions.apply(pkg);
+        Node node = new Node(Node.options()
                 .name(name)
-                .pkg(pkg)
+                .pkg(extended != null ? extended.getPkg() : pkg)
                 .parent(parent)
                 .installLinks(installLinks)
                 .legacyPeerDeps(options.isLegacyPeerDeps())
+                .release(options.getRelease())
                 .build());
+        if (extended != null) {
+            node.setPackageExtensionsApplied(extended.getApplied());
+        }
+        return node;
     }
 
     // PackageJson.normalize(realpath).catch(() => ({ content: {} })) over the project's files
@@ -952,6 +1006,13 @@ public final class IdealTreeBuilder {
 
             if (edge.getTo() == null) {
                 if (parentEdge == null) {
+                    if (edge.getType() == Edge.Type.PEER_OPTIONAL &&
+                        options.getRelease().peerSetHoldsOptionalPeerOnlyOnConflict()) {
+                        Node current = sourceReference.resolve(edge.getName());
+                        if (current == null || current.satisfies(edge)) {
+                            continue;
+                        }
+                    }
                     nodeFromEdge(edge, nodeParent, null, required);
                     continue;
                 } else {
@@ -964,6 +1025,10 @@ public final class IdealTreeBuilder {
                     if (conflictOK || !required.contains(dep)) {
                         edge.setPeerConflicted(true);
                         continue;
+                    }
+
+                    if (node.getParent() == null && options.getRelease().skipsPeerConflictOfDetachedNode()) {
+                        break;
                     }
 
                     throw failPeerConflict(edge, parentEdge);
@@ -1023,6 +1088,9 @@ public final class IdealTreeBuilder {
                                  !depsSeen.contains(target);
 
             if (unseenLink) {
+                if (link.getOverrides() != null && options.getRelease().forwardsLinkOverridesToSubtree()) {
+                    target.updateOverridesEdgeInAdded(link.getOverrides());
+                }
                 depsQueue.push(target);
             }
         }

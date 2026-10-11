@@ -167,7 +167,7 @@ final class Pacote {
                         "The \"paths[0]\" argument must be of type string. Received undefined", null);
             }
         }
-        PackageJson.syncNormalize(mani);
+        PackageJson.syncNormalize(mani, options.getRelease());
         PackageJson.normalizeBin(mani, options.getRelease().packageJson());
 
         Object time = truthy(packument.get("time")) ?
