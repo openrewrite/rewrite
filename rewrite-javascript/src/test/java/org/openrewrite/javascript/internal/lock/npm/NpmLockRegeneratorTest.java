@@ -712,6 +712,28 @@ class NpmLockRegeneratorTest {
         assertThat(http.requests).isNotEmpty().doesNotHaveDuplicates();
     }
 
+    // what the registry does not answer is the host's to report, whichever release was being installed
+    @Test
+    void aRegistryThatDoesNotAnswerEndsTheInstalls() {
+        RuntimeException unreachable = new org.openrewrite.javascript.internal.registry.NodeRegistryException(
+          org.openrewrite.javascript.internal.registry.NodeRegistryException.Reason.UNREACHABLE,
+          "https://registry.npmjs.org/", "the host could not fetch b");
+        NpmLockRegenerator regenerator = new NpmLockRegenerator(project(DEPENDENT).build(), new PackumentSource() {
+            @Override
+            public Map<String, Object> packument(String registry, String name, boolean fullMetadata) {
+                throw unreachable;
+            }
+
+            @Override
+            public Map<String, Object> manifest(String registry, String name, String version) {
+                throw unreachable;
+            }
+        });
+
+        assertThatThrownBy(() -> regenerator.regenerate(releases("12.2.0", "11.17.0"))).isSameAs(unreachable);
+        assertThatThrownBy(regenerator::regenerate).isSameAs(unreachable);
+    }
+
     // npm 11.17.0 writes an empty lock over this manifest (lock/npm/open-root-bin-dir-number-added): normalize's
     // TypeError, which the failure names with the field normalize read
     @Test
