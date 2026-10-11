@@ -1,1 +1,0 @@
-{"name":"p","version":"1.0.0","workspaces":{"packages":["packages/*"],"catalog":{"ms":"2.0.0"}},"dependencies":{"ms":"catalog:"}}

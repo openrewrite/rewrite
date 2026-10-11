@@ -1,1 +1,0 @@
-global true in pnpm-workspace.yaml: pnpm install is a global install, which pnpm refuses.

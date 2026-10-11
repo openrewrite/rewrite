@@ -1,1 +1,0 @@
-pnpm remove wrappy in member a, catalogMode manual: a is the only importer of the default catalog entry; is-number stays catalog:legacy.

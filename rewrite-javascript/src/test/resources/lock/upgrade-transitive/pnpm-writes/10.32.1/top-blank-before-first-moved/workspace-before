@@ -1,4 +1,0 @@
-strictPeerDependencies: false
-
-packages:
-  - packages/*

@@ -1,1 +1,0 @@
-Workspaces: member b changes its dependency on member zz-openrewrite-unpublished-member (a name the registry does not have) to "workspace:*": the registry answers 404.

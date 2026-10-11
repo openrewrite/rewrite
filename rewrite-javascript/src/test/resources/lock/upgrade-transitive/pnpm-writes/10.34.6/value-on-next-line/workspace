@@ -1,5 +1,0 @@
-packages:
-  - apps/*
-overrides:
-  is-number: 7.0.0
-zz-word: hello

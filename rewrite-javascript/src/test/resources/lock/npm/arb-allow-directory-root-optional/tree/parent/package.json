@@ -1,1 +1,0 @@
-{"name":"parent","version":"1.0.0","optionalDependencies":{"opt-child":"file:./opt-child"}}

@@ -1,4 +1,0 @@
-packages:
-  - .
-overrides:
-  is-number: '7'

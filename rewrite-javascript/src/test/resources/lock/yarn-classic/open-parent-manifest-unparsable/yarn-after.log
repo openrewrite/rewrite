@@ -1,9 +1,0 @@
-yarn install v1.22.22
-warning package.json: No license field
-error SyntaxError: <tmp>/repo/mid/package.json: Expected double-quoted property name in JSON at position 12 (line 1 column 13)
-    at JSON.parse (<anonymous>)
-    at <yarn>/lib/cli.js:1629:59
-    at Generator.next (<anonymous>)
-    at step (<yarn>/lib/cli.js:310:30)
-    at <yarn>/lib/cli.js:321:13
-info Visit https://yarnpkg.com/en/docs/cli/install for documentation about this command.

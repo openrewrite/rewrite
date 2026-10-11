@@ -1,1 +1,0 @@
-The project gains a postinstall script; no dependency changes (npmrc ignore-scripts: npm runs root lifecycle scripts even with --package-lock-only).

@@ -1,4 +1,0 @@
-[ERROR] The workspace manifest file should be named "pnpm-workspace.yaml". File found: <tmp>/project/pnpm-workspace.yml
-pnpm , node v24.19.0, 2026-10-09T15:33:19Z
-exit=1
-no lock written

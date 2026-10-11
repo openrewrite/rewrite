@@ -1,1 +1,0 @@
-{"name":"root","private":true,"workspaces":["packages\\a"],"dependencies":{"ms":"2.1.3"}}

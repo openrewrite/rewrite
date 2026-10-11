@@ -1,5 +1,0 @@
-packages:
-  - packages/*
-savePrefix:
-catalogs: {}
-catalog: {}

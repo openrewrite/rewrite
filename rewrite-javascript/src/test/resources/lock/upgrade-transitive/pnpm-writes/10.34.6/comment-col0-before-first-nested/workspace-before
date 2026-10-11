@@ -1,5 +1,0 @@
-packages:
-  - apps/*
-catalog:
-# about
-  ms: 2.1.3

@@ -1,5 +1,0 @@
-packages:
-  - packages/*
-cleanupUnusedCatalogs: true
-catalog:
-  wrappy: 1.0.1

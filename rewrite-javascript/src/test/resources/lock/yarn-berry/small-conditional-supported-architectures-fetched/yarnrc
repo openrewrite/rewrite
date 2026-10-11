@@ -1,7 +1,0 @@
-supportedArchitectures:
-  os:
-    - linux
-  cpu:
-    - x64
-  libc:
-    - glibc

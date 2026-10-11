@@ -1,6 +1,0 @@
-{
-  "name": "a",
-  "dependencies": {
-    "ms": "patch:ms@npm%3A2.1.3#./patches/ms.patch"
-  }
-}

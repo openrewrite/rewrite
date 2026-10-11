@@ -1,1 +1,0 @@
-virtualStoreOnly true with enableModulesDir false in pnpm-workspace.yaml; the root adds abbrev.

@@ -1,1 +1,0 @@
-A workspace member c whose manifest is package.json5 (comments, unquoted keys, single quotes, trailing commas, a hexadecimal number) joins packages/*; the root adds abbrev.

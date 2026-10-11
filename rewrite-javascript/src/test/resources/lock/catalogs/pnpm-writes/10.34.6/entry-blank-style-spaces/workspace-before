@@ -1,4 +1,0 @@
-packages:
-  - apps/*
-  
-minimumReleaseAge: 1440

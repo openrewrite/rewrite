@@ -1,1 +1,0 @@
-How pnpm 11.2.2 writes catalog values with `pnpm config set --location=project --json catalog`: the yaml library, singleQuote, core schema.

@@ -60,8 +60,9 @@ Three rules decide the result:
 The oracle is the package manager itself: what it does is settled by running it, or by its own test expectations,
 never by reading. A scenario is a directory: `pkg-before`, `before`, `pkg`, `after`, the package manager's config files,
 the registry responses under `http/`, the provenance logs and an `expect` line. The regenerator replays it offline and
-must reproduce `after` byte for byte, or the recorded failure. Small scenarios are committed under
-`src/test/resources/lock/<pm>/`; the rest is a corpus replayed when `REWRITE_LOCK_SCENARIOS` names it. Tests follow the
+must reproduce `after` byte for byte, or the recorded failure. Small scenarios live in
+openrewrite/rewrite-javascript-lock-fixtures, which the build puts on the test classpath; the rest is a corpus replayed
+when `REWRITE_LOCK_SCENARIOS` names it. Tests follow the
 components: one class per ported module from the package manager's own tests, a round trip of every lock, one
 parameterized scenario test per package manager. Adding a scenario is adding a directory, and a test expectation
 changes only when a recording says so.

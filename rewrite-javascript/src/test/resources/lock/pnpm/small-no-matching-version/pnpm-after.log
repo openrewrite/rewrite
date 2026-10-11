@@ -1,7 +1,0 @@
-[ERR_PNPM_NO_MATCHING_VERSION] No matching version found for wrappy@9.9.9 while fetching it from https://registry.npmjs.org/
-
-This error happened while installing a direct dependency of <tmp>/project
-
-The latest release of wrappy is "1.0.2".
-
-If you need the full list of all 4 published versions run "pnpm view wrappy versions".

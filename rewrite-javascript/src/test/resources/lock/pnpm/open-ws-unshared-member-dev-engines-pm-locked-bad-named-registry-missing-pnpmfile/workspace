@@ -1,6 +1,0 @@
-packages:
-  - 'packages/*'
-sharedWorkspaceLockfile: false
-namedRegistries:
-  foo: ftp://example.com/
-pnpmfile: missing.cjs

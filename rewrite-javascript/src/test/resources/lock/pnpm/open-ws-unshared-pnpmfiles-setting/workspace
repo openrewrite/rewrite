@@ -1,5 +1,0 @@
-packages:
-  - 'packages/*'
-sharedWorkspaceLockfile: false
-pnpmfiles:
-  - missing.cjs

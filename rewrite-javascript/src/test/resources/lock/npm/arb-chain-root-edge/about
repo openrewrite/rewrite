@@ -1,1 +1,0 @@
-Root is named chain-a@2.3.4 and depends on itself via file:.; adding chain-d@1 (peer set v1) conflicts on the root edge.

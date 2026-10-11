@@ -1,1 +1,0 @@
-bunfig.toml [install.lockfile] save = false: whether --lockfile-only still writes the lock.

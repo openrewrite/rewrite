@@ -1,1 +1,0 @@
-the user .npmrc names a registry for a scope: a package of that scope resolves there, the rest at npmjs

@@ -1,1 +1,0 @@
-Remove is-number from the root while is-odd still requires it.

@@ -1,6 +1,0 @@
-npm error code EDUPLICATEWORKSPACE
-npm error must not have multiple workspaces with the same name
-npm error package 'a' has conflicts in the following paths:
-npm error     <tmp>/packages/a
-npm error     <tmp>/packages/b
-npm error A complete log of this run can be found in: <home>/.npm/_logs/2026-10-05T12_08_44_636Z-debug-0.log

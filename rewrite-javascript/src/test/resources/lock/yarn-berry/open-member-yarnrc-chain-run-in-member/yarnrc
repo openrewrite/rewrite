@@ -1,4 +1,0 @@
-packageExtensions:
-  "is-number@*":
-    dependencies:
-      ms: "2.1.1"

@@ -1,2 +1,0 @@
-. -r update --latest is-number
-packages/a remove wrappy

@@ -1,9 +1,0 @@
-packages:
-  - apps/*
-catalogs:
-  tools:
-    ms: 2.1.3
-    # in tools
-  # in catalogs
-# top
-zz: 1

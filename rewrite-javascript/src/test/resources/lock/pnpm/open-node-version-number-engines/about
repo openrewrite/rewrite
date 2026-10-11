@@ -1,1 +1,0 @@
-pnpm-workspace.yaml sets nodeVersion to a YAML number and the edit adds a package with engines.node: semver throws on the number.

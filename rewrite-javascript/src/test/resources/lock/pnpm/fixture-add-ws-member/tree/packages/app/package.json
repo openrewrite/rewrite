@@ -1,8 +1,0 @@
-{
-  "name": "@ws/app",
-  "version": "1.0.0",
-  "dependencies": {
-    "ms": "2.1.2",
-    "object-assign": "4.1.1"
-  }
-}

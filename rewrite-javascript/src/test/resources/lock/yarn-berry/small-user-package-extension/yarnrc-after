@@ -1,4 +1,0 @@
-packageExtensions:
-  "once@*":
-    dependencies:
-      path-is-absolute: 1.0.1

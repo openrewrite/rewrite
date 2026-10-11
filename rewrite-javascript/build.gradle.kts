@@ -397,14 +397,12 @@ val generateTestClasspath by tasks.registering {
 extensions.configure<LicenseExtension> {
     header = file("${rootProject.projectDir}/gradle/msalLicenseHeader.txt")
     exclude("**/rewrite-javascript-version.txt")
-    // recorded package-manager scenarios (patterns are relative to the source root, src/test/resources)
-    exclude("lock/**")
 //    includePatterns.addAll(
 //        listOf("**/*.ts")
 //    )
 }
 
-// The lock regeneration test fixtures (recorded package-manager output, ~1000 files including binary
+// The lock regeneration test fixtures (recorded package-manager output, ~18000 files including binary
 // tarballs) live in openrewrite/rewrite-javascript-lock-fixtures. The latest main is fetched once into
 // build/lock-fixtures and joins the test classpath; `clean` picks up newer fixtures.
 val lockFixturesDir = layout.buildDirectory.dir("lock-fixtures")

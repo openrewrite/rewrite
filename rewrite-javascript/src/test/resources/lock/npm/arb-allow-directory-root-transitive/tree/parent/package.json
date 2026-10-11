@@ -1,1 +1,0 @@
-{"name":"parent","version":"1.0.0","dependencies":{"child":"file:./child"}}

@@ -1,6 +1,0 @@
-packages:
-  - a
-overrides:
-  is-number: 7.0.0
-
-# end

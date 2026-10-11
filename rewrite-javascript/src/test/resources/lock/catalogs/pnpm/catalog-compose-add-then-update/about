@@ -1,1 +1,0 @@
-catalogMode prefer: pnpm add is-number@6.0.0 -w at the root and in member a (the catalog gains is-number 6.0.0), then pnpm -r update --latest is-number.

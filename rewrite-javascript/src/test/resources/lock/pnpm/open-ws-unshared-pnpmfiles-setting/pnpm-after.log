@@ -1,2 +1,0 @@
-Scope: all 2 workspace projects
-[ERR_PNPM_PNPMFILE_NOT_FOUND] pnpmfile at "<tmp>/project/missing.cjs" is not found

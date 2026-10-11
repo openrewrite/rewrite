@@ -1,1 +1,0 @@
-npm 11.17.0 installing what its add of is-number@^7.0.0 left in package.json (devDependencies {} dropped) over the lock of the manifest that still held it: the lock a regeneration of that edit writes, which is also what npm writes installing again over the lock its add wrote.

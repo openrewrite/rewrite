@@ -1,1 +1,0 @@
-pm-fails TypeError: micromatch.matcher(): pattern should be a string, regex, or function.

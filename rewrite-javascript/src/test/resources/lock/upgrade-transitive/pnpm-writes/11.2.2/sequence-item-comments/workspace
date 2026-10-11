@@ -1,6 +1,0 @@
-packages:
-  - apps/* # apps
-  # libs below
-  - libs/*
-overrides:
-  is-number: 7.0.0

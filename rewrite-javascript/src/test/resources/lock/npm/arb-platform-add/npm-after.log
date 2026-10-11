@@ -1,5 +1,0 @@
-npm error code EBADPLATFORM
-npm error notsup Unsupported platform for platform-specifying-test-package@1.0.0: wanted {"os":"win32"} (current: {"os":"darwin"})
-npm error notsup Valid os:  win32
-npm error notsup Actual os: darwin
-npm error A complete log of this run can be found in: <home>/.npm/_logs/2026-10-05T12_06_37_964Z-debug-0.log

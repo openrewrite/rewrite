@@ -1,9 +1,0 @@
-packages:
-  - a
-# note
-
-catalog:
-  wrappy: 1.0.1
-
-onlyBuiltDependencies:
-  - x

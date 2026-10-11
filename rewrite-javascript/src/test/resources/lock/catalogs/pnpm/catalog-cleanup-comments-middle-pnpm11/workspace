@@ -1,8 +1,0 @@
-packages:
-  - packages/*
-cleanupUnusedCatalogs: true
-catalog:
-  # head
-  is-number: 7.0.0 # n
-  # before ms
-  ms: 2.1.3 # m

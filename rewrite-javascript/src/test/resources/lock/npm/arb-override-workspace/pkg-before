@@ -1,1 +1,0 @@
-{"name":"root","dependencies":{"foo":"1.0.1"},"workspaces":["packages/*"]}

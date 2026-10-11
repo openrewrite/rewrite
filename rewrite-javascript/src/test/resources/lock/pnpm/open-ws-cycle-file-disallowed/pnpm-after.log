@@ -1,2 +1,0 @@
-Scope: all 3 workspace projects
-[ERR_PNPM_DISALLOW_WORKSPACE_CYCLES] There are cyclic workspace dependencies: <tmp>/project/packages/a, <tmp>/project/packages/b

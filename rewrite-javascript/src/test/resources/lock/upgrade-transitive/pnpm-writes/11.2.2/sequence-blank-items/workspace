@@ -1,8 +1,0 @@
-packages:
-  - a
-
-  - b
-catalog:
-  ms: 2.1.3
-overrides:
-  is-number: 7.0.0

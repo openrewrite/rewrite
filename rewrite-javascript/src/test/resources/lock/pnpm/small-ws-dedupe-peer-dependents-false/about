@@ -1,1 +1,0 @@
-small-ws-dedupe-peer-dependents with dedupePeerDependents false: the same lock (the optional peer is hoisted either way). Small form of ws-dedupe-peer-dependents-false.

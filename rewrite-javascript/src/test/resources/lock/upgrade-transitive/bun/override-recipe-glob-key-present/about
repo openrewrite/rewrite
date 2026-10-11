@@ -1,1 +1,0 @@
-The root already resolves "**/is-number" to 6.0.0; a plain "is-number": "7.0.0" is added after it in resolutions (as UpgradeTransitiveDependencyVersion writes for a root with resolutions only).

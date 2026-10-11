@@ -1,7 +1,0 @@
-{
-  "name": "p",
-  "version": "1.0.0",
-  "dependencies": {
-    "is-number": "^99.0.0"
-  }
-}

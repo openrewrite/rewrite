@@ -1,4 +1,0 @@
-packages:
-  - packages/*
-catalog: # the catalog
-  ms: 2.1.3

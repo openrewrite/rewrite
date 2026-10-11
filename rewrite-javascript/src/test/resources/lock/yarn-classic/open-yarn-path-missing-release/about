@@ -1,1 +1,0 @@
-The project .yarnrc yarn-path names .yarn/releases/yarn-1.22.22.cjs, which the project does not hold: node cannot find the module and yarn exits 1.

@@ -1,4 +1,0 @@
-packageExtensions:
-  "ms@*":
-    dependencies:
-      lodash:

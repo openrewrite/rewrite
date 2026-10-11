@@ -1,7 +1,0 @@
-
-# workspace packages
-packages:
-  - a
-overrides:
-  is-number: 7.0.0
-strictPeerDependencies: false

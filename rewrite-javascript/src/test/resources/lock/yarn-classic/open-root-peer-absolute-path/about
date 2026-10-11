@@ -1,1 +1,0 @@
-The root manifest has an absolute path in peerDependencies, which yarn makes relative to the project and never writes into the lock; the edit adds a dependency.

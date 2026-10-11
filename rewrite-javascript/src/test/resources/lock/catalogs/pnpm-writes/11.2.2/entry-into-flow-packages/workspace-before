@@ -1,3 +1,0 @@
-packages: ['apps/*']
-catalog:
-  ms: 2.1.3

@@ -1,1 +1,0 @@
-Small form of remove-last: removing the only dependency leaves importers .: {} and no packages or snapshots sections.

@@ -1,1 +1,0 @@
-cleanupUnusedCatalogs: pnpm -r update --latest is-number (default catalog ^6.0.0), then pnpm remove wrappy in member a, its only importer.

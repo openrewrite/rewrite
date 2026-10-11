@@ -1,1 +1,0 @@
-Move a non-leaf (is-odd, with is-number) from dependencies to devDependencies; the only dependencies scope disappears.

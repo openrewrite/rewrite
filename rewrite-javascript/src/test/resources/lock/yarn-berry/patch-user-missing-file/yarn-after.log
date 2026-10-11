@@ -1,5 +1,0 @@
-➤ YN0000: · Yarn 4.10.3
-➤ YN0000: ┌ Resolution step
-➤ YN0001: │ Error: ms@patch:ms@npm%3A2.1.3#~/.yarn/patches/missing.patch: ENOENT: no such file or directory, open '<tmp>/project/.yarn/patches/missing.patch'
-➤ YN0000: └ Completed
-➤ YN0000: · Failed with errors in 0s 8ms

@@ -1,1 +1,0 @@
-The same os-restricted package as a required dependency fails the install on darwin; no lock is written.

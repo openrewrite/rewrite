@@ -1,2 +1,0 @@
-plugins:
-  - path: .yarn/plugins/plugin-noop.cjs

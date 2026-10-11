@@ -1,1 +1,0 @@
-The repository's workspaces object has nohoist and no packages: findWorkspaceRoot walks past it and yarn installs the project on its own.
