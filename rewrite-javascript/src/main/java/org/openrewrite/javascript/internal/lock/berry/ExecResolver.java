@@ -46,6 +46,13 @@ final class ExecResolver implements Resolver {
 
     @Override
     public Descriptor bindDescriptor(Descriptor descriptor, Locator fromLocator, ResolveOptions opts) {
+        if (opts.getProject().configuration.getRelease().limitsExecToWorkspaces() &&
+            opts.getProject().tryWorkspaceByLocator(fromLocator) == null) {
+            throw new ReportError(ReportError.INVALID_MANIFEST, StructUtils.stringifyLocator(fromLocator) + " lists " +
+                                                                StructUtils.stringifyDescriptor(descriptor) + " as " +
+                                                                "dependency, but only workspaces can depend on exec: " +
+                                                                "packages.");
+        }
         return StructUtils.bindDescriptor(descriptor,
                 Collections.singletonMap("locator", StructUtils.stringifyLocator(fromLocator)));
     }

@@ -17,7 +17,9 @@ package org.openrewrite.javascript.internal.lock.berry;
 
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.javascript.internal.lock.CannotKnow;
+import org.openrewrite.javascript.internal.lock.JsError;
 import org.openrewrite.javascript.internal.lock.Picomatch;
+import org.openrewrite.javascript.internal.lock.UriComponent;
 import org.openrewrite.javascript.internal.lock.RegistrySource;
 import org.openrewrite.javascript.internal.lock.V8Date;
 
@@ -51,6 +53,26 @@ final class NpmHttpUtils {
                 "/" + ident.name;
     }
 
+    /**
+     * {@code getIdentUrl} as the release builds it: the scope and name encoded from 4.15.0.
+     */
+    static String getIdentUrl(Ident ident, YarnRelease release) {
+        if (!release.encodesRegistryPaths()) {
+            return getIdentUrl(ident);
+        }
+        return ident.scope != null && !ident.scope.isEmpty() ?
+                "/@" + encodeURIComponent(ident.scope) + "%2f" + encodeURIComponent(ident.name) :
+                "/" + encodeURIComponent(ident.name);
+    }
+
+    private static String encodeURIComponent(String component) {
+        try {
+            return UriComponent.encodeURIComponent(component);
+        } catch (IllegalArgumentException e) {
+            throw new JsError(JsError.URI_ERROR, "URI malformed");
+        }
+    }
+
     static String normalizeRegistry(String registry) {
         return registry.replaceAll("/\\z", "");
     }
@@ -63,7 +85,7 @@ final class NpmHttpUtils {
         Configuration options = configuration;
         Object scopeConfiguration = scope == null ? null : options.getMap("npmScopes").get(scope);
         if (!(scopeConfiguration instanceof Map)) {
-            if ("jsr".equals(scope) && configuration.getRelease().isJsrScope()) {
+            if ("jsr".equals(scope) && configuration.getRelease().sendsJsrScopeToJsr()) {
                 return normalizeRegistry("https://npm.jsr.io/");
             }
             return normalizeRegistry(options.getString("npmRegistryServer"));
@@ -85,7 +107,8 @@ final class NpmHttpUtils {
                                  "only versions it offers");
         }
         String registryUrl = getScopeRegistry(ident.scope, project.configuration);
-        return project.packageMetadata.computeIfAbsent(registryUrl + getIdentUrl(ident), key -> {
+        return project.packageMetadata.computeIfAbsent(registryUrl + getIdentUrl(ident,
+                project.configuration.getRelease()), key -> {
             String packument = registry.packument(registryUrl, StructUtils.stringifyIdent(ident), true,
                     getAuthenticationHeader(registryUrl, ident.scope, project.configuration));
             if (packument == null) {
@@ -201,18 +224,25 @@ final class NpmHttpUtils {
      */
     static boolean isConventionalTarballUrl(Locator locator, @Nullable Object url, Configuration configuration) {
         String registry = getScopeRegistry(locator.scope, configuration);
-        String path = getLocatorUrl(locator);
+        String path = getLocatorUrl(locator, configuration.getRelease());
         String u = String.valueOf(url).replaceAll("^https?:(//(?:[^/]+\\.)?npmjs.org(?:\\z|/))", "https:$1");
         registry = registry.replaceAll("^https://registry\\.npmjs\\.org(\\z|/)", "https://registry.yarnpkg.com$1");
         u = u.replaceAll("^https://registry\\.npmjs\\.org(\\z|/)", "https://registry.yarnpkg.com$1");
         return u.equals(registry + path) || u.equals(registry + path.replace("%2f", "/"));
     }
 
-    static String getLocatorUrl(Locator locator) {
+    /**
+     * NpmSemverFetcher {@code getLocatorUrl}, the name and version encoded from 4.15.0.
+     */
+    static String getLocatorUrl(Locator locator, YarnRelease release) {
         String version = YarnpkgSemverUtils.clean(locator.reference.substring(PROTOCOL.length()));
         if (version == null) {
             throw new ReportError(ReportError.RESOLVER_NOT_FOUND, "The npm semver resolver got selected, but the " +
                                                                   "version isn't semver");
+        }
+        if (release.encodesRegistryPaths()) {
+            return getIdentUrl(locator, release) + "/-/" + encodeURIComponent(locator.name) + "-" +
+                   encodeURIComponent(version) + ".tgz";
         }
         return getIdentUrl(locator) + "/-/" + locator.name + "-" + version + ".tgz";
     }
@@ -226,9 +256,25 @@ final class NpmHttpUtils {
                isPreapproved(project.configuration, ident, version);
     }
 
+    /**
+     * npmConfigUtils {@code getMinimalAgeGate} (Yarn 4.17.0): a scoped package's {@code npmScopes} entry's gate, which
+     * the entry's own default fills, before the global one; the global one before 4.17.0.
+     */
+    static @Nullable Object getMinimalAgeGate(Ident ident, Configuration configuration) {
+        if (configuration.getRelease().gatesAgePerScope() && ident.scope != null && !ident.scope.isEmpty()) {
+            Object scopeConfiguration = configuration.getMap("npmScopes").get(ident.scope);
+            Object scopeGate = scopeConfiguration instanceof Map ?
+                    ((Map<?, ?>) scopeConfiguration).get("npmMinimalAgeGate") : null;
+            if (scopeGate instanceof Number) {
+                return scopeGate;
+            }
+        }
+        return configuration.get("npmMinimalAgeGate");
+    }
+
     private static boolean shouldBeQuarantined(Project project, Ident ident, @Nullable Object version,
                                                @Nullable Object publishTimes) {
-        Object minimalAgeGate = project.configuration.get("npmMinimalAgeGate");
+        Object minimalAgeGate = getMinimalAgeGate(ident, project.configuration);
         if (!Js.truthy(minimalAgeGate)) {
             return false;
         }

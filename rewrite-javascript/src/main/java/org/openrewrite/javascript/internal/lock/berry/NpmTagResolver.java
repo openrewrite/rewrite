@@ -80,7 +80,8 @@ final class NpmTagResolver implements Resolver {
             throw new ReportError(ReportError.REMOTE_NOT_FOUND, "Registry failed to return tag \"" + tag + "\"");
         }
         Object times = registryData.get("time");
-        if ("latest".equals(tag) && !NpmHttpUtils.isPackageApproved(project, descriptor, version, times)) {
+        if ("latest".equals(tag) && project.configuration.getRelease().approvesPackagesByAge() &&
+            !NpmHttpUtils.isPackageApproved(project, descriptor, version, times)) {
             if (!(version instanceof String)) {
                 throw new JsError(JsError.TYPE_ERROR, "version.includes is not a function");
             }

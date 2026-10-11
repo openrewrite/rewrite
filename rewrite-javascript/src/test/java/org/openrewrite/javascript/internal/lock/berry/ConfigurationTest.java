@@ -408,7 +408,10 @@ class ConfigurationTest {
                 .now(Instant.EPOCH)
                 .build(), BerryScenarios.NO_REGISTRY);
         YarnBerryLockRegenerator.Loaded first = regenerator.load(YarnRelease.of("4.5.3"), Collections.emptyMap());
-        assertThat(first.getProject().configuration.getMap("catalog")).isEmpty();
+        // 4.5.3 defines no catalog setting: the unknown key is set aside, and nothing of that name is there to read
+        assertThatThrownBy(() -> first.getProject().configuration.getMap("catalog"))
+                .isInstanceOf(Configuration.UsageError.class)
+                .hasMessage("Couldn't find a configuration settings named \"catalog\"");
         assertThat(first.getMigratedSettings()).containsOnlyKeys("enableGlobalCache", "compressionLevel");
 
         YarnBerryLockRegenerator.Loaded second = regenerator.load(YarnRelease.of("4.10.3"), Collections.emptyMap());

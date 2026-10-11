@@ -17,17 +17,22 @@ package org.openrewrite.javascript.internal.lock.berry;
 
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.javascript.internal.lock.JsError;
+import org.openrewrite.javascript.internal.lock.YarnpkgSemverUtils;
+import org.openrewrite.javascript.semver.NodeSemver;
 
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
-import org.openrewrite.javascript.internal.lock.YarnpkgSemverUtils;
+import java.util.Set;
+import java.util.function.Supplier;
 
 import static org.openrewrite.javascript.internal.lock.berry.NpmHttpUtils.PROTOCOL;
 
 /**
- * Port of @yarnpkg/plugin-npm sources/NpmSemverResolver.ts (Yarn 4.10.3).
+ * Port of @yarnpkg/plugin-npm sources/NpmSemverResolver.ts (Yarn 4.10.3), with each other release's change beside it
+ * ({@link YarnRelease}).
  */
 final class NpmSemverResolver implements Resolver {
 
@@ -73,18 +78,34 @@ final class NpmSemverResolver implements Resolver {
                                              descriptor.range.substring(PROTOCOL.length()));
         }
         Project project = opts.getProject();
+        YarnRelease release = project.configuration.getRelease();
         Map<String, @Nullable Object> registryData = NpmHttpUtils.getPackageMetadata(descriptor, project,
                 opts.getRegistry());
         Object versions = registryData.get("versions");
         List<String> candidates = new ArrayList<>();
-        for (Map.Entry<String, @Nullable Object> version : Js.entries(versions)) {
-            try {
-                if (YarnpkgSemverUtils.valid(version.getKey()) && range.test(version.getKey()) &&
-                    NpmHttpUtils.isPackageApproved(project, descriptor, version.getKey(), registryData.get("time"))) {
-                    candidates.add(version.getKey());
+        if (release.approvesCandidatesAfterTheRange()) {
+            List<String> semverCandidates = selectMatchingVersions(range, Js.keys(versions), () -> release);
+            for (String version : semverCandidates) {
+                if (NpmHttpUtils.isPackageApproved(project, descriptor, version, registryData.get("time"))) {
+                    candidates.add(version);
                 }
-            } catch (JsError ignored) {
-                // Yarn's candidate filter skips a version whose test throws
+            }
+            if (!semverCandidates.isEmpty() && candidates.isEmpty()) {
+                throw new ReportError(ReportError.REMOTE_NOT_FOUND, "All versions satisfying \"" +
+                                                                    descriptor.range.substring(PROTOCOL.length()) +
+                                                                    "\" are quarantined");
+            }
+        } else {
+            for (Map.Entry<String, @Nullable Object> version : Js.entries(versions)) {
+                try {
+                    if (YarnpkgSemverUtils.valid(version.getKey()) && range.test(version.getKey()) &&
+                        (!release.approvesPackagesByAge() || NpmHttpUtils.isPackageApproved(project, descriptor,
+                                version.getKey(), registryData.get("time")))) {
+                        candidates.add(version.getKey());
+                    }
+                } catch (JsError ignored) {
+                    // Yarn's candidate filter skips a version whose test throws
+                }
             }
         }
         List<String> noDeprecatedCandidates = new ArrayList<>();
@@ -131,11 +152,17 @@ final class NpmSemverResolver implements Resolver {
             if (!YarnpkgSemverUtils.valid(parsedRange.getSelector())) {
                 throw new JsError(JsError.TYPE_ERROR, "Invalid Version: " + parsedRange.getSelector());
             }
-            if (!range.test(parsedRange.getSelector())) {
-                continue;
-            }
             results.add(locator);
             versions.add(parsedRange.getSelector());
+        }
+        // through selectMatchingVersions as getCandidates from 4.18.0, the range alone before
+        Set<String> matching = new HashSet<>(selectMatchingVersions(range, versions,
+                () -> opts.getProject().configuration.getRelease()));
+        for (int i = results.size() - 1; i >= 0; i--) {
+            if (!matching.contains(versions.get(i))) {
+                results.remove(i);
+                versions.remove(i);
+            }
         }
         List<Integer> order = new ArrayList<>();
         for (int i = 0; i < results.size(); i++) {
@@ -147,6 +174,30 @@ final class NpmSemverResolver implements Resolver {
             sorted.add(results.get(index));
         }
         return new Satisfying(sorted, true);
+    }
+
+    /**
+     * {@code selectMatchingVersions} (Yarn 4.18.0): the versions the range matches, or where a {@code *} range matches
+     * none, the prereleases; before 4.18.0 the range alone.
+     */
+    private static List<String> selectMatchingVersions(YarnpkgSemverUtils.Range range, List<String> versions,
+                                                       Supplier<YarnRelease> release) {
+        List<String> matched = new ArrayList<>();
+        for (String version : versions) {
+            if (YarnpkgSemverUtils.valid(version) && range.test(version)) {
+                matched.add(version);
+            }
+        }
+        if (!matched.isEmpty() || !"*".equals(range.getRaw().trim()) || !release.get().resolvesStarToPrereleases()) {
+            return matched;
+        }
+        for (String version : versions) {
+            if (YarnpkgSemverUtils.valid(version) &&
+                NodeSemver.satisfies(version, "*", NodeSemver.Options.INCLUDE_PRERELEASE)) {
+                matched.add(version);
+            }
+        }
+        return matched;
     }
 
     @Override

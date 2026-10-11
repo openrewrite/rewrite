@@ -86,6 +86,10 @@ final class Catalogs {
         }
         Descriptor normalizedDescriptor = project.configuration.normalizeDependency(
                 StructUtils.makeDescriptor(dependency, (String) resolvedRange));
+        if (options.getRelease().keepsCatalogRangesNoResolverSupports() &&
+            !resolver.supportsDescriptor(normalizedDescriptor, opts)) {
+            return normalizedDescriptor;
+        }
         return resolver.bindDescriptor(normalizedDescriptor, project.getTopLevelWorkspace().getAnchoredLocator(),
                 opts);
     }
