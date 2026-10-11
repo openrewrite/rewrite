@@ -65,6 +65,16 @@ class NpmOptionsTest {
           .hasMessage("Invalid lockfileVersion config: " + reported);
     }
 
+    // npm 8.0.0's definitions have no lockfile-version: an unknown key, which no flatten reads and nothing checks;
+    // 8.1.0 defines it, and from 8.1.2 its type takes the string an npmrc file holds
+    @Test
+    void lockfileVersionIsNoConfigBefore8_1_0() {
+        assertThat(NpmOptions.fromNpmrc(NpmRelease.of("8.0.0"), null, "lockfile-version=3\n").getLockfileVersion())
+          .isNull();
+        assertThat(NpmOptions.fromNpmrc(NpmRelease.of("8.1.2"), null, "lockfile-version=3\n").getLockfileVersion())
+          .isEqualTo(3);
+    }
+
     @Test
     void bareKeyIsTrue() {
         assertThatThrownBy(() -> fromNpmrc("lockfile-version"))

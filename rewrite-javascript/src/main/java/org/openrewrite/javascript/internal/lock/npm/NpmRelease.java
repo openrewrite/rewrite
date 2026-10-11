@@ -719,6 +719,15 @@ public final class NpmRelease implements Comparable<NpmRelease> {
     }
 
     /**
+     * {@code load} writes the lock as the {@code lockfile-version} option, else as the greater of the version it reads
+     * and the default, from npm 8.1.0; before, every lock is written as version 2, with {@code packages} and {@code
+     * dependencies}.
+     */
+    boolean keepsNewerLockfileVersion() {
+        return atLeast(8, 1, 0);
+    }
+
+    /**
      * {@code libc} is one of the package fields an entry keeps, from npm 11.11.0.
      */
     boolean locksLibc() {
@@ -840,6 +849,13 @@ public final class NpmRelease implements Comparable<NpmRelease> {
      */
     boolean definesLinkedInstallStrategy() {
         return atLeast(9, 4, 0);
+    }
+
+    /**
+     * {@code lockfile-version} is a config from npm 8.1.0 (lib/utils/config/definitions.js).
+     */
+    boolean definesLockfileVersion() {
+        return atLeast(8, 1, 0);
     }
 
     /**

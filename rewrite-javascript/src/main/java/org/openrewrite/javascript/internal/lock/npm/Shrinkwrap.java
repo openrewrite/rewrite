@@ -409,7 +409,10 @@ public final class Shrinkwrap {
         if (Js.toNumber(fileVersion) > MAX_LOCKFILE_VERSION && release.refusesNewerLockfile()) {
             throw new UnsupportedLockfileVersion(fileVersion);
         }
-        if (truthy(this.lockfileVersion)) {
+        if (!release.keepsNewerLockfileVersion()) {
+            // before npm 8.1.0, `lockfileVersion` is the constant 2 for every lock read
+            lockfileVersion = release.defaultLockfileVersion();
+        } else if (truthy(this.lockfileVersion)) {
             lockfileVersion = this.lockfileVersion;
         } else if (!release.keepsLoadedLockfileVersion()) {
             // Math.max(lock.lockfileVersion || 0, defaultLockfileVersion)

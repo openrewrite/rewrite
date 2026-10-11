@@ -388,6 +388,9 @@ public class NpmOptions {
             Object value = entry.getValue();
             switch (key) {
                 case "lockfile-version":
+                    if (!release.definesLockfileVersion()) {
+                        break;
+                    }
                     Object lfv = parseField(value, Type.LITERAL, env);
                     if (validated && !(lfv == null ||
                                        release.typesLockfileVersionAsStrings() &&

@@ -489,6 +489,31 @@ class ShrinkwrapTest {
         assertThat(v3Data).as("v3 data does not have dependencies").doesNotContainKey("dependencies");
     }
 
+    // arborist 3.0.0 (npm 8.0.0) reads and writes every lock as its constant lockfileVersion 2, with the legacy
+    // dependencies beside the packages; arborist 4.0.1 (npm 8.1.0) keeps a newer version and writes packages alone
+    @Test
+    void writesEveryLockAsVersion2Before8_1_0() {
+        String dir = "/fixtures/v3";
+        String lock = "{\"name\": \"v3\", \"lockfileVersion\": 3, \"requires\": true, \"packages\": " +
+                      "{\"\": {\"name\": \"v3\"}, \"node_modules/a\": {\"version\": \"1.0.0\"}}}";
+        Map<String, Object> packages = obj("", obj("name", "v3"), "node_modules/a", obj("version", "1.0.0"));
+        for (String release : new String[]{"8.0.0", "8.1.0"}) {
+            NpmRelease npm = NpmRelease.of(release);
+            Shrinkwrap sw = new Shrinkwrap(dir, NpmOptions.builder().release(npm).build())
+              .load(projectFiles(lock, null, null));
+            assertThat(Js.toNumber(sw.getOriginalLockfileVersion())).as(release).isEqualTo(3.0);
+            Node root = node(opts().path(dir).realpath(dir).pkg(obj("name", "v3")).release(npm));
+            Node a = node(opts().pkg(obj("name", "a", "version", "1.0.0")).parent(root).release(npm));
+            root.unsetDepFlags();
+            a.unsetDepFlags();
+            sw.add(root);
+            assertThat(canonical(sw.commit())).as(release).isEqualTo(canonical("8.0.0".equals(release) ?
+              obj("name", "v3", "lockfileVersion", 2, "requires", true, "packages", packages,
+                "dependencies", obj("a", obj("version", "1.0.0"))) :
+              obj("name", "v3", "lockfileVersion", 3, "requires", true, "packages", packages)));
+        }
+    }
+
     @Test
     void loadingInEmptyDirGetsEmptyLockfile() {
         String dir = "/fixtures/empty";
