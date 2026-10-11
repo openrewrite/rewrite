@@ -42,11 +42,11 @@ import static org.openrewrite.javascript.internal.lock.npm.Js.truthy;
 public final class Shrinkwrap {
 
     /**
-     * load's filename: an npm-shrinkwrap.json the project holds is read and written in place of package-lock.json.
+     * The locks {@code load} reads, by {@code #filenameSet}'s priority. It reads and writes the npm-shrinkwrap.json
+     * when that is not empty, and leaves a package-lock.json beside it as it is.
      */
-    public static boolean readsShrinkwrap(Predicate<String> holds) {
-        return holds.test("npm-shrinkwrap.json");
-    }
+    public static final List<String> LOCK_FILES = Collections.unmodifiableList(Arrays.asList(
+            "npm-shrinkwrap.json", "package-lock.json"));
 
     /**
      * What save writes beside the lock it reads: the yarn.lock, which it rewrites from the tree.

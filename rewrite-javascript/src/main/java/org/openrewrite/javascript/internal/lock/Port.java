@@ -19,6 +19,9 @@ import org.openrewrite.javascript.internal.LockFileRegeneration.InstallRoot;
 import org.openrewrite.javascript.internal.LockFileRegeneration.Result;
 import org.openrewrite.javascript.internal.registry.NpmRegistryClient;
 
+import java.util.Collections;
+import java.util.List;
+
 /**
  * What a regeneration asks one package manager's port: its lock, the project files it reads, where it installs, its
  * install over the lock, and what it reads of the files the recipes edit.
@@ -26,6 +29,14 @@ import org.openrewrite.javascript.internal.registry.NpmRegistryClient;
 public interface Port {
 
     String lockFile();
+
+    /**
+     * The names the package manager reads its lock from, preferred first. It reads the first that is not empty, else
+     * {@link #lockFile()}.
+     */
+    default List<String> lockFiles() {
+        return Collections.singletonList(lockFile());
+    }
 
     /**
      * Whether the package manager reads the contents of a project file of this name.

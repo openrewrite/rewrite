@@ -114,9 +114,12 @@ public final class NodeDependencyScan {
     private static boolean readBesideOneOf(Path file, Set<Path> locks) {
         String name = String.valueOf(file.getFileName());
         for (LockFileRegeneration regeneration : LockFileRegeneration.ALL) {
-            if (regeneration.readsOnlyBesideLock(name) &&
-                locks.contains(file.resolveSibling(regeneration.getLockFile()))) {
-                return true;
+            if (regeneration.readsOnlyBesideLock(name)) {
+                for (String lock : regeneration.getLockFiles()) {
+                    if (locks.contains(file.resolveSibling(lock))) {
+                        return true;
+                    }
+                }
             }
         }
         return false;
@@ -269,16 +272,23 @@ public final class NodeDependencyScan {
 
     private static @Nullable Path lockBeside(Accumulator acc, Path packageJsonPath,
                                              @Nullable LockFileRegeneration regeneration) {
-        Path found = null;
+        Map<String, Path> beside = new HashMap<>();
         for (Map.Entry<Path, Path> lock : acc.lockToPackage.entrySet()) {
             Path name = lock.getKey().getFileName();
-            if (lock.getValue().equals(packageJsonPath) && name != null &&
-                (regeneration == null ? found == null || lock.getKey().compareTo(found) < 0 :
-                        regeneration.getLockFile().equals(name.toString()))) {
-                found = lock.getKey();
+            if (lock.getValue().equals(packageJsonPath) && name != null) {
+                beside.put(name.toString(), lock.getKey());
             }
         }
-        return found;
+        if (regeneration == null) {
+            return beside.values().stream().min(Path::compareTo).orElse(null);
+        }
+        for (String name : regeneration.getLockFiles()) {
+            Path lock = beside.get(name);
+            if (lock != null && !acc.locks.get(lock).isEmpty()) {
+                return lock;
+            }
+        }
+        return beside.get(regeneration.getLockFile());
     }
 
     // the package.json beside the lock lockFor names and every workspace member in the source set

@@ -17,6 +17,7 @@ package org.openrewrite.javascript.internal.lock.npm;
 
 import lombok.Getter;
 import org.jspecify.annotations.Nullable;
+import org.openrewrite.javascript.internal.lock.CannotKnow;
 import org.openrewrite.javascript.internal.lock.Host;
 import org.openrewrite.semver.NodeSemver;
 
@@ -28,8 +29,9 @@ import java.util.Map;
 import static org.openrewrite.javascript.internal.lock.npm.Js.truthy;
 
 /**
- * Port of npm-install-checks 8.0.0 ({@code checkEngine}, {@code checkPlatform}). The machine's own
- * values come from a {@link Host}; an unknown host satisfies every check.
+ * Port of npm-install-checks 8.0.0 ({@code checkEngine}, {@code checkPlatform}). The machine's own values come from a
+ * {@link Host}. A check that reads an unknown value passes or fails where it does so on every host, and raises
+ * {@link CannotKnow} where hosts differ.
  */
 final class NpmInstallChecks {
 
@@ -78,6 +80,12 @@ final class NpmInstallChecks {
         }
     }
 
+    /**
+     * The node releases that count as hosts. Below its own engines npm 11.17.0 warns and runs on (lib/cli/entry.js),
+     * as it does on node 18.20.8. No older release was tried.
+     */
+    static final String NODE_HOSTS = ">=18.0.0";
+
     private NpmInstallChecks() {
     }
 
@@ -88,7 +96,10 @@ final class NpmInstallChecks {
         if (!truthy(eng)) {
             return;
         }
-        boolean nodeFail = truthy(nodev) && truthy(Js.get(eng, "node")) && !satisfies(nodev, Js.get(eng, "node"));
+        Object node = Js.get(eng, "node");
+        Boolean everyNode = !force && nodeVer == null && truthy(node) ? everyHost(node) : Boolean.TRUE;
+        boolean nodeFail = truthy(nodev) && truthy(node) && !satisfies(nodev, node) ||
+                           Boolean.FALSE.equals(everyNode);
         boolean npmFail = truthy(npmVer) && truthy(Js.get(eng, "npm")) && !satisfies(npmVer, Js.get(eng, "npm"));
         if (nodeFail || npmFail) {
             Map<String, @Nullable String> current = new LinkedHashMap<>();
@@ -96,6 +107,23 @@ final class NpmInstallChecks {
             current.put("npm", npmVer);
             throw new UnsupportedEngine(Js.string(target.get("_id")), current, eng);
         }
+        if (everyNode == null) {
+            throw new CannotKnow("the node version npm runs on (" + Js.string(target.get("_id")) +
+                                 " requires node " + Js.string(node) + ")");
+        }
+    }
+
+    // TRUE when every node release in NODE_HOSTS satisfies the range, FALSE when none does, null when some do
+    private static @Nullable Boolean everyHost(Object range) {
+        String valid = range instanceof String ?
+                NodeSemver.validRange((String) range, NodeSemver.Options.DEFAULT) : null;
+        if (valid == null) {
+            return Boolean.FALSE;
+        }
+        if (NodeSemver.subset(NODE_HOSTS, valid, NodeSemver.Options.DEFAULT)) {
+            return Boolean.TRUE;
+        }
+        return NodeSemver.intersects(NODE_HOSTS, valid, NodeSemver.Options.DEFAULT) ? null : Boolean.FALSE;
     }
 
     private static boolean satisfies(String version, @Nullable Object range) {
@@ -116,13 +144,19 @@ final class NpmInstallChecks {
         String libc = truthy(environment.getLibc()) ? environment.getLibc() :
                 "linux".equals(os) ? current.getLibc() : null;
 
-        boolean osOk = os == null || !truthy(target.get("os")) || checkList(os, target.get("os"));
-        boolean cpuOk = cpu == null || !truthy(target.get("cpu")) || checkList(cpu, target.get("cpu"));
-        // a machine that reports an os but no libc has none; an unknown machine's libc is unknown
-        boolean libcOk = !truthy(target.get("libc")) ||
-                         (libc != null ? checkList(libc, target.get("libc")) : current.getOs() == null);
+        // a machine that reports an os but no libc has none
+        boolean libcUnknown = libc == null && current.getOs() == null && (os == null || "linux".equals(os));
 
-        if (!osOk || !cpuOk || !libcOk) {
+        Boolean osOk = truthy(target.get("os")) ? check(os, target.get("os")) : Boolean.TRUE;
+        Boolean cpuOk = truthy(target.get("cpu")) ? check(cpu, target.get("cpu")) : Boolean.TRUE;
+        Boolean libcOk = Boolean.TRUE;
+        if (truthy(target.get("libc"))) {
+            // checkList runs over an undefined libc too, which then fails whatever the list
+            boolean listed = checkList(libc == null ? "" : libc, target.get("libc"));
+            libcOk = libcUnknown ? null : libc != null && listed;
+        }
+
+        if (Boolean.FALSE.equals(osOk) || Boolean.FALSE.equals(cpuOk) || Boolean.FALSE.equals(libcOk)) {
             Map<String, @Nullable String> currentValues = new LinkedHashMap<>();
             currentValues.put("os", os);
             currentValues.put("cpu", cpu);
@@ -133,6 +167,21 @@ final class NpmInstallChecks {
             required.put("libc", target.get("libc"));
             throw new UnsupportedPlatform(Js.string(target.get("_id")), currentValues, required);
         }
+        if (osOk == null || cpuOk == null || libcOk == null) {
+            throw new CannotKnow("the platform npm runs on (" + Js.string(target.get("_id")) + " restricts it by " +
+                                 (osOk == null ? "os" : cpuOk == null ? "cpu" : "libc") + ")");
+        }
+    }
+
+    // an unknown value passes only ["any"], which checkList passes whatever the value
+    private static @Nullable Boolean check(@Nullable String value, Object list) {
+        if (value != null) {
+            return checkList(value, list);
+        }
+        boolean any = checkList("", list) && ("any".equals(list) ||
+                                               list instanceof List && ((List<?>) list).size() == 1 &&
+                                               "any".equals(((List<?>) list).get(0)));
+        return any ? Boolean.TRUE : null;
     }
 
     @SuppressWarnings("unchecked")
