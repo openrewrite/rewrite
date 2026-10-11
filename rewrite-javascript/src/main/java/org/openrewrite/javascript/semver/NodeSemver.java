@@ -1,11 +1,11 @@
 /*
  * Copyright 2026 the original author or authors.
  * <p>
- * Licensed under the Apache License, Version 2.0 (the "License");
+ * Licensed under the Moderne Source Available License (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  * <p>
- * https://www.apache.org/licenses/LICENSE-2.0
+ * https://docs.moderne.io/licensing/moderne-source-available-license
  * <p>
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.openrewrite.semver;
+package org.openrewrite.javascript.semver;
 
 import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;
@@ -29,8 +29,8 @@ import java.util.Map;
 import java.util.StringJoiner;
 
 /**
- * node-semver's functions with its {@code loose} and {@code includePrerelease} options, as npm evaluates them;
- * unlike {@link Semver.Ecosystem#NODE} validation, no {@code latest.*} selectors.
+ * Port of node-semver's functions with its {@code loose} and {@code includePrerelease} options: 7.8.4, which npm
+ * 11.17.0 bundles, and 5.5.0, which yarn 1.22.22 bundles.
  */
 @UtilityClass
 public class NodeSemver {
@@ -58,9 +58,9 @@ public class NodeSemver {
         public static final Options V5_5_0 = new Options(false, false, Release.V5_5_0);
         public static final Options V5_5_0_LOOSE = new Options(true, false, Release.V5_5_0);
 
-        private final boolean loose;
-        private final boolean includePrerelease;
-        private final Release release;
+        final boolean loose;
+        final boolean includePrerelease;
+        final Release release;
 
         public static Options of(boolean loose, boolean includePrerelease) {
             return loose ? (includePrerelease ? LOOSE_INCLUDE_PRERELEASE : LOOSE) :
@@ -72,7 +72,7 @@ public class NodeSemver {
      * @return the normalized version, or {@code null} when it does not parse.
      */
     public static @Nullable String valid(String version, Options options) {
-        ParsedVersion v = ParsedVersion.parseNode(version, options.loose);
+        NodeSemverVersion v = NodeSemverVersion.parse(version, options);
         return v.isStrictSemver() ? v.nodeVersion() : null;
     }
 
@@ -80,7 +80,7 @@ public class NodeSemver {
      * @return the range's canonical form ({@code *} for any version), or {@code null} when invalid.
      */
     public static @Nullable String validRange(String range, Options options) {
-        UnionRange r = UnionRange.parse(range, options.includePrerelease, options.loose, options.release);
+        NodeSemverRange r = NodeSemverRange.parse(range, options);
         if (r == null) {
             return null;
         }
@@ -93,20 +93,20 @@ public class NodeSemver {
      *                                  throws.
      */
     public static boolean satisfies(String version, String range, Options options) {
-        UnionRange r = UnionRange.parse(range, options.includePrerelease, options.loose, options.release);
+        NodeSemverRange r = NodeSemverRange.parse(range, options);
         return r != null && test(r, version, options);
     }
 
-    private static boolean test(UnionRange r, String version, Options options) {
+    private static boolean test(NodeSemverRange r, String version, Options options) {
         if (options.release == Release.V5_5_0 && !version.isEmpty()) {
             if (version.length() > MAX_LENGTH) {
                 throw new IllegalArgumentException(tooLong());
             }
-            if (!ParsedVersion.parseNode(version, options.loose).isStrictSemver()) {
+            if (!NodeSemverVersion.parse(version, options).isStrictSemver()) {
                 throw new IllegalArgumentException("Invalid Version: " + version);
             }
         }
-        return r.test(version, options.loose);
+        return r.test(version);
     }
 
     /**
@@ -125,14 +125,14 @@ public class NodeSemver {
         if (version instanceof String) {
             return satisfies((String) version, range, options);
         }
-        UnionRange r = UnionRange.parse(range, options.includePrerelease, options.loose, options.release);
+        NodeSemverRange r = NodeSemverRange.parse(range, options);
         if (r == null || !truthy(version)) {
             return false;
         }
         // Range.test hands the value to each set as it is: a comparator other than `*` makes a SemVer of it and
         // throws, and a set of `*` alone reads version.prerelease.length
-        for (List<NodeComparand> set : r.sets()) {
-            for (NodeComparand comparator : set) {
+        for (List<NodeSemverComparator> set : r.sets()) {
+            for (NodeSemverComparator comparator : set) {
                 if (!comparator.isAny()) {
                     throw new IllegalArgumentException(notASemVer(version, options));
                 }
@@ -192,7 +192,7 @@ public class NodeSemver {
      * has none or does not parse.
      */
     public static @Nullable List<Object> prerelease(String version, Options options) {
-        ParsedVersion v = ParsedVersion.parseNode(version, options.loose);
+        NodeSemverVersion v = NodeSemverVersion.parse(version, options);
         return v.isStrictSemver() && v.hasPrerelease() ? v.strictPrerelease() : null;
     }
 
@@ -200,15 +200,15 @@ public class NodeSemver {
      * @return the highest of the versions the range allows, the first of equal ones, or {@code null}.
      */
     public static @Nullable String maxSatisfying(Collection<String> versions, String range, Options options) {
-        UnionRange r = UnionRange.parse(range, options.includePrerelease, options.loose, options.release);
+        NodeSemverRange r = NodeSemverRange.parse(range, options);
         if (r == null) {
             return null;
         }
         String max = null;
-        ParsedVersion maxVersion = null;
+        NodeSemverVersion maxVersion = null;
         for (String version : versions) {
             if (test(r, version, options)) {
-                ParsedVersion v = ParsedVersion.parseNode(version, options.loose);
+                NodeSemverVersion v = NodeSemverVersion.parse(version, options);
                 if (maxVersion == null || maxVersion.comparePrecedence(v) < 0) {
                     max = version;
                     maxVersion = v;
@@ -223,15 +223,15 @@ public class NodeSemver {
      * when none does or the range is invalid.
      */
     public static @Nullable String minSatisfying(Collection<String> versions, String range, Options options) {
-        UnionRange r = UnionRange.parse(range, options.includePrerelease, options.loose, options.release);
+        NodeSemverRange r = NodeSemverRange.parse(range, options);
         if (r == null) {
             return null;
         }
         String min = null;
-        ParsedVersion minVersion = null;
+        NodeSemverVersion minVersion = null;
         for (String version : versions) {
             if (test(r, version, options)) {
-                ParsedVersion v = ParsedVersion.parseNode(version, options.loose);
+                NodeSemverVersion v = NodeSemverVersion.parse(version, options);
                 if (minVersion == null || minVersion.comparePrecedence(v) > 0) {
                     min = version;
                     minVersion = v;
@@ -246,30 +246,29 @@ public class NodeSemver {
      * @throws IllegalArgumentException when the range is invalid, as node-semver throws.
      */
     public static @Nullable String minVersion(String range, Options options) {
-        UnionRange r = UnionRange.parse(range, options.includePrerelease, options.loose, options.release);
+        NodeSemverRange r = NodeSemverRange.parse(range, options);
         if (r == null) {
-            throw new IllegalArgumentException(UnionRange.invalidRangeMessage(range, options.includePrerelease,
-                    options.loose));
+            throw new IllegalArgumentException(NodeSemverRange.invalidRangeMessage(range, options));
         }
         for (String lowest : new String[]{"0.0.0", "0.0.0-0"}) {
-            if (r.test(ParsedVersion.parseNode(lowest, false))) {
+            if (r.test(NodeSemverVersion.parse(lowest, Options.DEFAULT))) {
                 return lowest;
             }
         }
-        ParsedVersion minver = null;
-        for (List<NodeComparand> comparators : r.sets()) {
-            ParsedVersion setMin = null;
-            for (NodeComparand comparator : comparators) {
+        NodeSemverVersion minver = null;
+        for (List<NodeSemverComparator> comparators : r.sets()) {
+            NodeSemverVersion setMin = null;
+            for (NodeSemverComparator comparator : comparators) {
                 if (comparator.isAny()) {
                     continue;
                 }
-                ParsedVersion compver = comparator.getVersion();
+                NodeSemverVersion compver = comparator.getVersion();
                 String operator = comparator.operator();
                 if (">".equals(operator)) {
                     String base = compver.strictMajor() + "." + compver.strictMinor() + ".";
-                    compver = ParsedVersion.parseNode(compver.hasPrerelease() ?
+                    compver = NodeSemverVersion.parse(compver.hasPrerelease() ?
                             base + compver.strictPatch() + "-" + join(compver.strictPrerelease()) + ".0" :
-                            base + (compver.strictPatch() + 1), false);
+                            base + (compver.strictPatch() + 1), Options.DEFAULT);
                 } else if (!operator.isEmpty() && !">=".equals(operator)) {
                     continue;
                 }
@@ -296,8 +295,8 @@ public class NodeSemver {
      * @throws IllegalArgumentException when either range is invalid, as node-semver throws.
      */
     public static boolean intersects(String range1, String range2, Options options) {
-        UnionRange r1 = UnionRange.parse(range1, options.includePrerelease, options.loose, options.release);
-        UnionRange r2 = UnionRange.parse(range2, options.includePrerelease, options.loose, options.release);
+        NodeSemverRange r1 = NodeSemverRange.parse(range1, options);
+        NodeSemverRange r2 = NodeSemverRange.parse(range2, options);
         if (r1 == null || r2 == null) {
             throw new IllegalArgumentException("Invalid SemVer Range: " + (r1 == null ? range1 : range2));
         }
@@ -312,15 +311,15 @@ public class NodeSemver {
         if (sub.equals(dom)) {
             return true;
         }
-        UnionRange subRange = UnionRange.parse(sub, options.includePrerelease, options.loose, options.release);
-        UnionRange domRange = UnionRange.parse(dom, options.includePrerelease, options.loose, options.release);
+        NodeSemverRange subRange = NodeSemverRange.parse(sub, options);
+        NodeSemverRange domRange = NodeSemverRange.parse(dom, options);
         if (subRange == null || domRange == null) {
             throw new IllegalArgumentException("Invalid SemVer Range: " + (subRange == null ? sub : dom));
         }
         boolean sawNonNull = false;
         outer:
-        for (List<NodeComparand> simpleSub : subRange.sets()) {
-            for (List<NodeComparand> simpleDom : domRange.sets()) {
+        for (List<NodeSemverComparator> simpleSub : subRange.sets()) {
+            for (List<NodeSemverComparator> simpleDom : domRange.sets()) {
                 Boolean isSub = simpleSubset(simpleSub, simpleDom, options);
                 sawNonNull = sawNonNull || isSub != null;
                 if (Boolean.TRUE.equals(isSub)) {
@@ -335,23 +334,25 @@ public class NodeSemver {
     }
 
     // null is the null set
-    private static @Nullable Boolean simpleSubset(List<NodeComparand> sub, List<NodeComparand> dom, Options options) {
+    private static @Nullable Boolean simpleSubset(List<NodeSemverComparator> sub, List<NodeSemverComparator> dom,
+                                                  Options options) {
         if (sub.size() == 1 && sub.get(0).isAny()) {
             if (dom.size() == 1 && dom.get(0).isAny()) {
                 return true;
             }
-            sub = Collections.singletonList(NodeComparand.parse(options.includePrerelease ? ">=0.0.0-0" : ">=0.0.0"));
+            sub = Collections.singletonList(NodeSemverComparator.parse(
+                    options.includePrerelease ? ">=0.0.0-0" : ">=0.0.0", Options.DEFAULT));
         }
         if (dom.size() == 1 && dom.get(0).isAny()) {
             if (options.includePrerelease) {
                 return true;
             }
-            dom = Collections.singletonList(NodeComparand.GTE_ZERO);
+            dom = Collections.singletonList(NodeSemverComparator.GTE_ZERO);
         }
-        List<NodeComparand> eqSet = new ArrayList<>();
-        NodeComparand gt = null;
-        NodeComparand lt = null;
-        for (NodeComparand c : sub) {
+        List<NodeSemverComparator> eqSet = new ArrayList<>();
+        NodeSemverComparator gt = null;
+        NodeSemverComparator lt = null;
+        for (NodeSemverComparator c : sub) {
             if (c.operator().startsWith(">")) {
                 gt = higherGT(gt, c);
             } else if (c.operator().startsWith("<")) {
@@ -372,14 +373,14 @@ public class NodeSemver {
                 return null;
             }
         }
-        for (NodeComparand eq : eqSet) {
+        for (NodeSemverComparator eq : eqSet) {
             if (gt != null && !comparatorSatisfies(eq, gt, options)) {
                 return null;
             }
             if (lt != null && !comparatorSatisfies(eq, lt, options)) {
                 return null;
             }
-            for (NodeComparand c : dom) {
+            for (NodeSemverComparator c : dom) {
                 if (!comparatorSatisfies(eq, c, options)) {
                     return false;
                 }
@@ -388,15 +389,15 @@ public class NodeSemver {
         }
         boolean hasDomLT = false;
         boolean hasDomGT = false;
-        ParsedVersion needDomLTPre = lt != null && !options.includePrerelease && lt.getVersion().hasPrerelease() ?
+        NodeSemverVersion needDomLTPre = lt != null && !options.includePrerelease && lt.getVersion().hasPrerelease() ?
                 lt.getVersion() : null;
-        ParsedVersion needDomGTPre = gt != null && !options.includePrerelease && gt.getVersion().hasPrerelease() ?
+        NodeSemverVersion needDomGTPre = gt != null && !options.includePrerelease && gt.getVersion().hasPrerelease() ?
                 gt.getVersion() : null;
         if (needDomLTPre != null && needDomLTPre.strictPrerelease().size() == 1 && "<".equals(lt.operator()) &&
                 Long.valueOf(0).equals(needDomLTPre.strictPrerelease().get(0))) {
             needDomLTPre = null;
         }
-        for (NodeComparand c : dom) {
+        for (NodeSemverComparator c : dom) {
             hasDomGT = hasDomGT || c.operator().startsWith(">");
             hasDomLT = hasDomLT || c.operator().startsWith("<");
             if (gt != null) {
@@ -404,7 +405,7 @@ public class NodeSemver {
                     needDomGTPre = null;
                 }
                 if (c.operator().startsWith(">")) {
-                    NodeComparand higher = higherGT(gt, c);
+                    NodeSemverComparator higher = higherGT(gt, c);
                     if (higher == c && higher != gt) {
                         return false;
                     }
@@ -417,7 +418,7 @@ public class NodeSemver {
                     needDomLTPre = null;
                 }
                 if (c.operator().startsWith("<")) {
-                    NodeComparand lower = lowerLT(lt, c);
+                    NodeSemverComparator lower = lowerLT(lt, c);
                     if (lower == c && lower != lt) {
                         return false;
                     }
@@ -438,13 +439,13 @@ public class NodeSemver {
         return needDomGTPre == null && needDomLTPre == null;
     }
 
-    private static boolean comparatorSatisfies(NodeComparand version, NodeComparand comparator, Options options) {
-        UnionRange range = UnionRange.parse(comparator.value(), options.includePrerelease, options.loose,
-                options.release);
+    private static boolean comparatorSatisfies(NodeSemverComparator version, NodeSemverComparator comparator,
+                                               Options options) {
+        NodeSemverRange range = NodeSemverRange.parse(comparator.value(), options);
         return range != null && range.test(version.getVersion());
     }
 
-    private static boolean sameTupleWithPrerelease(NodeComparand c, ParsedVersion v) {
+    private static boolean sameTupleWithPrerelease(NodeSemverComparator c, NodeSemverVersion v) {
         return !c.isAny() && c.getVersion().hasPrerelease() &&
                c.getVersion().strictMajor() == v.strictMajor() &&
                c.getVersion().strictMinor() == v.strictMinor() &&
@@ -452,7 +453,7 @@ public class NodeSemver {
     }
 
     // >=1.2.3 is lower than >1.2.3
-    private static NodeComparand higherGT(@Nullable NodeComparand a, NodeComparand b) {
+    private static NodeSemverComparator higherGT(@Nullable NodeSemverComparator a, NodeSemverComparator b) {
         if (a == null) {
             return b;
         }
@@ -461,7 +462,7 @@ public class NodeSemver {
     }
 
     // <=1.2.3 is higher than <1.2.3
-    private static NodeComparand lowerLT(@Nullable NodeComparand a, NodeComparand b) {
+    private static NodeSemverComparator lowerLT(@Nullable NodeSemverComparator a, NodeSemverComparator b) {
         if (a == null) {
             return b;
         }
@@ -481,8 +482,8 @@ public class NodeSemver {
      * @throws IllegalArgumentException when either version is invalid or not a string, as node-semver throws.
      */
     public static int compare(@Nullable Object v1, @Nullable Object v2, Options options) {
-        ParsedVersion a = semver(v1, options);
-        ParsedVersion b = semver(v2, options);
+        NodeSemverVersion a = semver(v1, options);
+        NodeSemverVersion b = semver(v2, options);
         return a.comparePrecedence(b);
     }
 
@@ -491,8 +492,8 @@ public class NodeSemver {
      * @throws IllegalArgumentException when either version is invalid, as node-semver throws.
      */
     public static int compareBuild(String v1, String v2, Options options) {
-        ParsedVersion a = semver(v1, options);
-        ParsedVersion b = semver(v2, options);
+        NodeSemverVersion a = semver(v1, options);
+        NodeSemverVersion b = semver(v2, options);
         int c = a.comparePrecedence(b);
         return c != 0 ? c : a.compareBuild(b);
     }
@@ -505,14 +506,14 @@ public class NodeSemver {
         versions.sort((a, b) -> compareBuild(b, a, options));
     }
 
-    private static ParsedVersion semver(@Nullable Object version, Options options) {
+    private static NodeSemverVersion semver(@Nullable Object version, Options options) {
         if (!(version instanceof String)) {
             throw new IllegalArgumentException(notASemVer(version, options));
         }
         if (((String) version).length() > MAX_LENGTH) {
             throw new IllegalArgumentException(tooLong());
         }
-        ParsedVersion v = ParsedVersion.parseNode((String) version, options.loose);
+        NodeSemverVersion v = NodeSemverVersion.parse((String) version, options);
         if (!v.isStrictSemver()) {
             throw new IllegalArgumentException("Invalid Version: " + version);
         }

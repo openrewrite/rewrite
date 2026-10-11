@@ -21,7 +21,7 @@ import lombok.Value;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.javascript.internal.lock.Spec;
 import org.openrewrite.javascript.internal.lock.V8Date;
-import org.openrewrite.semver.NodeSemver;
+import org.openrewrite.javascript.semver.NodeSemver;
 
 import java.time.Instant;
 import java.util.ArrayList;
@@ -31,8 +31,8 @@ import java.util.List;
 import java.util.Map;
 
 import static org.openrewrite.javascript.internal.lock.npm.Js.truthy;
-import static org.openrewrite.semver.NodeSemver.Options.LOOSE;
-import static org.openrewrite.semver.NodeSemver.Options.LOOSE_INCLUDE_PRERELEASE;
+import static org.openrewrite.javascript.semver.NodeSemver.Options.LOOSE;
+import static org.openrewrite.javascript.semver.NodeSemver.Options.LOOSE_INCLUDE_PRERELEASE;
 
 /**
  * Port of npm-pick-manifest 11.0.3 (npm 11.17.0): the version of a packument a spec selects.

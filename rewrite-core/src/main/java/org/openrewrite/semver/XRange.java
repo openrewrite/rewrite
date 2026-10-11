@@ -25,12 +25,12 @@ import static java.util.Objects.requireNonNull;
 import static org.openrewrite.semver.Semver.isVersion;
 
 /**
- * Any of X, x, * or + stands in for a numeric value of the [major, minor, patch] tuple, + for Gradle's {@code 2.+}.
+ * Any of X, x, *, or + may be used to "stand in" for one of the numeric values in the [major, minor, patch] tuple.
  * <a href="https://github.com/npm/node-semver#x-ranges-12x-1x-12-">X-Ranges</a>.
+ * The + wildcard is supported for Gradle-style dynamic versions (e.g., "2.+").
  */
 public class XRange extends LatestRelease {
-    private static final Pattern X_RANGE_PATTERN = Pattern.compile("([*xX+]|\\d+)(?:\\.([*xX+]|\\d+)(?:\\.([*xX+]" +
-            "|\\d+))?(?:\\.([*xX+]|\\d+))?)?");
+    private static final Pattern X_RANGE_PATTERN = Pattern.compile("([*xX+]|\\d+)(?:\\.([*xX+]|\\d+)(?:\\.([*xX+]|\\d+))?(?:\\.([*xX+]|\\d+))?)?");
 
     static final String XRANGE_ID = ParsedVersion.NUMERIC_ID + "|x|X|\\*";
 
@@ -39,18 +39,8 @@ public class XRange extends LatestRelease {
             "[v=\\s]*(" + XRANGE_ID + ")(?:\\.(" + XRANGE_ID + ")(?:\\.(" + XRANGE_ID + ")" +
                     ParsedVersion.PRERELEASE_GROUP + "?" + ParsedVersion.BUILD + "?)?)?";
 
-    static final String XRANGE_ID_LOOSE = "\\d+|x|X|\\*";
-
-    // node-semver XRANGEPLAINLOOSE.
-    static final String XRANGE_PLAIN_LOOSE =
-            "[v=\\s]*(" + XRANGE_ID_LOOSE + ")(?:\\.(" + XRANGE_ID_LOOSE + ")(?:\\.(" + XRANGE_ID_LOOSE + ")" +
-                    ParsedVersion.PRERELEASE_GROUP_LOOSE + "?" + ParsedVersion.BUILD + "?)?)?";
-
     // The npm x-range grammar (no + wildcard, no 4th component); groups: operator, major, minor, patch, prerelease.
     private static final Pattern NODE_X_RANGE_PATTERN = Pattern.compile("^((?:<|>)?=?)\\s*" + XRANGE_PLAIN + "$");
-
-    private static final Pattern NODE_X_RANGE_PATTERN_LOOSE = Pattern.compile("^((?:<|>)?=?)\\s*" + XRANGE_PLAIN_LOOSE +
-            "$");
 
     private static final Pattern NODE_STAR_PATTERN = Pattern.compile("^(?:<|>)?=?\\s*\\*$");
 
@@ -116,8 +106,7 @@ public class XRange extends LatestRelease {
 
     public static Validated<XRange> build(String pattern, @Nullable String metadataPattern) {
         Matcher matcher = X_RANGE_PATTERN.matcher(pattern);
-        if (!matcher.matches() ||
-                !(pattern.contains("x") || pattern.contains("X") || pattern.contains("*") || pattern.contains("+"))) {
+        if (!matcher.matches() || !(pattern.contains("x") || pattern.contains("X") || pattern.contains("*") || pattern.contains("+"))) {
             return Validated.invalid("xRange", pattern, "not an x-range");
         }
 
@@ -170,20 +159,12 @@ public class XRange extends LatestRelease {
 
     // Port of node-semver range.js replaceXRange; tokens without wildcard or partial components pass through.
     static String replaceXRange(String token, boolean incPre) {
-        return replaceXRange(token, incPre, false);
-    }
-
-    static String replaceXRange(String token, boolean incPre, boolean loose) {
-        String comp = token.trim();
-        Matcher m = (loose ? NODE_X_RANGE_PATTERN_LOOSE : NODE_X_RANGE_PATTERN).matcher(comp);
+        Matcher m = NODE_X_RANGE_PATTERN.matcher(token.trim());
         if (!m.matches()) {
-            return comp;
+            return token;
         }
         String gtlt = m.group(1);
         String mj = m.group(2), mn = m.group(3), p = m.group(4);
-        if ((isX(mj) && !isX(mn)) || (isX(mn) && p != null && !isX(p))) {
-            return comp;
-        }
         boolean xM = isX(mj);
         boolean xm = xM || isX(mn);
         boolean xp = xm || isX(p);
@@ -230,7 +211,7 @@ public class XRange extends LatestRelease {
         if (xp) {
             return ">=" + mj + "." + mn + ".0" + pr + " <" + mj + "." + NodeComparand.incr(mn) + ".0-0";
         }
-        return comp;
+        return token;
     }
 
     // node-semver's star replacement: a bare or operator-prefixed * collapses to the ANY clause.

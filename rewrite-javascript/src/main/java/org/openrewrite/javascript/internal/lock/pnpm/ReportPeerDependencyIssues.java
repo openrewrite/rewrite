@@ -21,7 +21,7 @@ import org.openrewrite.javascript.internal.lock.pnpm.ResolvePeers.BadPeerIssue;
 import org.openrewrite.javascript.internal.lock.pnpm.ResolvePeers.MissingPeerIssue;
 import org.openrewrite.javascript.internal.lock.pnpm.ResolvePeers.ParentPackage;
 import org.openrewrite.javascript.internal.lock.pnpm.ResolvePeers.PeerDependencyIssues;
-import org.openrewrite.semver.NodeSemver;
+import org.openrewrite.javascript.semver.NodeSemver;
 
 import java.util.ArrayList;
 import java.util.Collections;

@@ -20,14 +20,14 @@ import org.jspecify.annotations.Nullable;
 import org.openrewrite.javascript.internal.lock.GitHost;
 import org.openrewrite.javascript.internal.lock.PosixPath;
 import org.openrewrite.javascript.internal.lock.Spec;
-import org.openrewrite.semver.NodeSemver;
+import org.openrewrite.javascript.semver.NodeSemver;
 
 import java.util.Map;
 import java.util.Objects;
 import java.util.regex.Pattern;
 
 import static org.openrewrite.javascript.internal.lock.npm.Js.truthy;
-import static org.openrewrite.semver.NodeSemver.Options.LOOSE;
+import static org.openrewrite.javascript.semver.NodeSemver.Options.LOOSE;
 
 /**
  * Port of @npmcli/arborist lib/dep-valid.js (npm 11.17.0): whether a node satisfies a spec.

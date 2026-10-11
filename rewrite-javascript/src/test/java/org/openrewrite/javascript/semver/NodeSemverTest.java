@@ -1,11 +1,11 @@
 /*
  * Copyright 2026 the original author or authors.
  * <p>
- * Licensed under the Apache License, Version 2.0 (the "License");
+ * Licensed under the Moderne Source Available License (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  * <p>
- * https://www.apache.org/licenses/LICENSE-2.0
+ * https://docs.moderne.io/licensing/moderne-source-available-license
  * <p>
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.openrewrite.semver;
+package org.openrewrite.javascript.semver;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -22,7 +22,7 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.params.provider.MethodSource;
-import org.openrewrite.semver.NodeSemver.Options;
+import org.openrewrite.javascript.semver.NodeSemver.Options;
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -38,14 +38,14 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 /**
- * node-semver 7.8.4's own fixtures (test/fixtures), dumped by node-semver/dump-fixtures.js.
+ * node-semver 7.8.4's own fixtures (test/fixtures), dumped by generate/dump-fixtures.js.
  */
 class NodeSemverTest {
 
     private static final JsonNode FIXTURES = load();
 
     private static JsonNode load() {
-        try (InputStream is = NodeSemverTest.class.getResourceAsStream("/node-semver/fixtures-7.8.4")) {
+        try (InputStream is = NodeSemverTest.class.getResourceAsStream("fixtures-7.8.4")) {
             return new ObjectMapper().readTree(is);
         } catch (IOException e) {
             throw new UncheckedIOException(e);

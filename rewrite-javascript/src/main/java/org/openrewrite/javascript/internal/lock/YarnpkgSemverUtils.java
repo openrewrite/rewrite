@@ -17,7 +17,7 @@ package org.openrewrite.javascript.internal.lock;
 
 import lombok.Getter;
 import org.jspecify.annotations.Nullable;
-import org.openrewrite.semver.NodeSemver;
+import org.openrewrite.javascript.semver.NodeSemver;
 
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;

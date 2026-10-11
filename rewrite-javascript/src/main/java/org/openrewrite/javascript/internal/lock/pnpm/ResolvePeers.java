@@ -25,7 +25,7 @@ import org.openrewrite.javascript.internal.lock.pnpm.ResolveDependencies.Missing
 import org.openrewrite.javascript.internal.lock.pnpm.ResolveDependencies.NodeId;
 import org.openrewrite.javascript.internal.lock.pnpm.ResolveDependencies.PeerDependency;
 import org.openrewrite.javascript.internal.lock.pnpm.ResolveDependencies.ResolvedPackage;
-import org.openrewrite.semver.NodeSemver;
+import org.openrewrite.javascript.semver.NodeSemver;
 
 import java.util.ArrayDeque;
 import java.util.ArrayList;
