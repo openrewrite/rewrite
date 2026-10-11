@@ -25,6 +25,7 @@ import org.openrewrite.javascript.internal.lock.JsError;
 import org.openrewrite.javascript.internal.lock.LocaleCompare;
 import org.openrewrite.javascript.internal.lock.Minimatch;
 import org.openrewrite.javascript.internal.lock.PosixPath;
+import org.openrewrite.javascript.internal.lock.UriComponent;
 import org.openrewrite.javascript.internal.lock.yarnclassic.YarnClassicLockRegenerator.Inputs;
 import org.openrewrite.semver.NodeSemver;
 
@@ -71,7 +72,6 @@ final class Config {
     private static final Pattern PREPENDED = Pattern.compile("^\\.*/|^(?!localhost)\\w+:");
     private static final Pattern PARSED_URL = Pattern.compile(
             "^([A-Za-z][A-Za-z0-9+.-]*:)//(?:[^@/?#]*@)?([^:/?#]*)(?::(\\d*))?(/[^?#]*)?([?#].*)?\\z");
-    private static final String URI_RESERVED = ";/?:@&=+$,#";
     private static final List<String> FALSY_STRINGS = Arrays.asList("0", "false");
 
     static {
@@ -803,27 +803,13 @@ final class Config {
         return new String[]{port == null ? hostname : hostname + ":" + port, path.isEmpty() ? "/" : path};
     }
 
-    // decodeURI of an ASCII path: an escape of a reserved character stays; null for one the engine does not decode
+    // decodeURI; null where it throws a URIError
     private static @Nullable String decodeUri(String path) {
-        StringBuilder out = new StringBuilder();
-        for (int i = 0; i < path.length(); i++) {
-            char c = path.charAt(i);
-            if (c != '%') {
-                out.append(c);
-                continue;
-            }
-            if (i + 2 >= path.length() || Character.digit(path.charAt(i + 1), 16) < 0 ||
-                Character.digit(path.charAt(i + 2), 16) < 0) {
-                return null;
-            }
-            int decoded = Integer.parseInt(path.substring(i + 1, i + 3), 16);
-            if (decoded >= 0x80) {
-                return null;
-            }
-            out.append(URI_RESERVED.indexOf(decoded) >= 0 ? path.substring(i, i + 3) : String.valueOf((char) decoded));
-            i += 2;
+        try {
+            return UriComponent.decodeURI(path);
+        } catch (IllegalArgumentException e) {
+            return null;
         }
-        return out.toString();
     }
 
     // base-registry.js getAvailableRegistries over npm's config

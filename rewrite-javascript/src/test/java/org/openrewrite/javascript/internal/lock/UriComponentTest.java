@@ -27,21 +27,22 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 /**
- * Node 24.19.0's {@code encodeURIComponent} and {@code decodeURIComponent} ({@code generate/node-builtins.js}), a
- * URIError being an IllegalArgumentException.
+ * Node 24.19.0's {@code encodeURIComponent}, {@code decodeURIComponent} and {@code decodeURI}
+ * ({@code generate/node-builtins.js}), a URIError being an IllegalArgumentException.
  */
 class UriComponentTest {
 
     static Stream<Call> calls() {
         return UpstreamCalls.read(EcmaScriptTest.BUILTINS).stream()
-          .filter(call -> call.getFn().endsWith("URIComponent"));
+          .filter(call -> call.getFn().endsWith("URIComponent") || "decodeURI".equals(call.getFn()));
     }
 
     @ParameterizedTest(name = "{0}")
     @MethodSource("calls")
     void answersAsNodeDoes(Call call) {
         Function<String, String> fn = "encodeURIComponent".equals(call.getFn()) ?
-          UriComponent::encodeURIComponent : UriComponent::decodeURIComponent;
+          UriComponent::encodeURIComponent : "decodeURI".equals(call.getFn()) ? UriComponent::decodeURI :
+          UriComponent::decodeURIComponent;
         String arg = (String) Objects.requireNonNull(call.arg(0));
         if (call.getThrew() != null) {
             assertThatThrownBy(() -> fn.apply(arg)).isInstanceOf(IllegalArgumentException.class)

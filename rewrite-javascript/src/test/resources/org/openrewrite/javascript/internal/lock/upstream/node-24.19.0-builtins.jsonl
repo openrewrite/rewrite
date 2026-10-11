@@ -897,6 +897,20 @@
 {"test":"decodeURIComponent","fn":"decodeURIComponent","args":["a%2fb"],"out":"a/b"}
 {"test":"decodeURIComponent","fn":"decodeURIComponent","args":["%3"],"threw":{"$":"error","name":"URIError","message":"URI malformed"}}
 {"test":"decodeURIComponent","fn":"decodeURIComponent","args":["%c3%a9"],"out":"é"}
+{"test":"decodeURI","fn":"decodeURI","args":["%2F%41"],"out":"%2FA"}
+{"test":"decodeURI","fn":"decodeURI","args":["/a%20b/%C3%A9"],"out":"/a b/é"}
+{"test":"decodeURI","fn":"decodeURI","args":["%E2%82%AC%23x"],"out":"€%23x"}
+{"test":"decodeURI","fn":"decodeURI","args":["%25"],"out":"%"}
+{"test":"decodeURI","fn":"decodeURI","args":["a%2Fb%3Fc%40d"],"out":"a%2Fb%3Fc%40d"}
+{"test":"decodeURI","fn":"decodeURI","args":["%F0%9F%98%80"],"out":"😀"}
+{"test":"decodeURI","fn":"decodeURI","args":["%"],"threw":{"$":"error","name":"URIError","message":"URI malformed"}}
+{"test":"decodeURI","fn":"decodeURI","args":["%C3"],"threw":{"$":"error","name":"URIError","message":"URI malformed"}}
+{"test":"decodeURI","fn":"decodeURI","args":["%C3%28"],"threw":{"$":"error","name":"URIError","message":"URI malformed"}}
+{"test":"decodeURI","fn":"decodeURI","args":["%ED%A0%80"],"threw":{"$":"error","name":"URIError","message":"URI malformed"}}
+{"test":"decodeURI","fn":"decodeURI","args":["%80"],"threw":{"$":"error","name":"URIError","message":"URI malformed"}}
+{"test":"decodeURI","fn":"decodeURI","args":["%41%2"],"threw":{"$":"error","name":"URIError","message":"URI malformed"}}
+{"test":"decodeURI","fn":"decodeURI","args":["%G1"],"threw":{"$":"error","name":"URIError","message":"URI malformed"}}
+{"test":"decodeURI","fn":"decodeURI","args":["%3B%2C%26%3D%2B%24"],"out":"%3B%2C%26%3D%2B%24"}
 {"test":"String.prototype.replace","fn":"replace","args":["abcabc","b",false,"[$&]"],"out":"a[b]cabc"}
 {"test":"String.prototype.replace","fn":"replace","args":["abcabc","b",true,"[$&]"],"out":"a[b]ca[b]c"}
 {"test":"String.prototype.replace","fn":"replace","args":["abc","(b)",false,"$1$1"],"out":"abbc"}

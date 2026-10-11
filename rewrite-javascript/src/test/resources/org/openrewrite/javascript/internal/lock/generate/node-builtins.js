@@ -166,6 +166,10 @@ for (const s of ['a b', "-_.!~*'()", '\u00e9', '\ud83d\ude00', '\ud83d', '\ude00
 for (const s of ['%20', '%E9', '%C3%A9', '%', '%zz', '%C3', '%F0%9F%98%80', '%ED%A0%80', 'a%2fb', '%3', '%c3%a9']) {
   ask('decodeURIComponent', 'decodeURIComponent', [s], x => decodeURIComponent(x))
 }
+for (const s of ['%2F%41', '/a%20b/%C3%A9', '%E2%82%AC%23x', '%25', 'a%2Fb%3Fc%40d', '%F0%9F%98%80', '%', '%C3',
+  '%C3%28', '%ED%A0%80', '%80', '%41%2', '%G1', '%3B%2C%26%3D%2B%24']) {
+  ask('decodeURI', 'decodeURI', [s], x => decodeURI(x))
+}
 
 // String.prototype.replace with a pattern and a replacement string (GetSubstitution)
 const replacements = [['abcabc', 'b', false, '[$&]'], ['abcabc', 'b', true, '[$&]'], ['abc', '(b)', false, '$1$1'],
