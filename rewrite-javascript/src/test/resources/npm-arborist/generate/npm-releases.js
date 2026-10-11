@@ -16,7 +16,8 @@
 // Writes the releases NpmReleases reads, npm-releases.txt beside it in the main resources: every stable release of
 // npm from 7.0.0, the first with @npmcli/arborist, one a line in ascending order. They come from the registry's
 // packument of npm, read from the file given or fetched.
-// Usage: node npm-releases.js [packument.json] > <main resources>/org/openrewrite/javascript/internal/lock/npm/npm-releases.txt
+// Usage: node npm-releases.js [packument.json] \
+//          > <main resources>/org/openrewrite/javascript/internal/lock/npm/npm-releases.txt
 const fs = require('fs')
 
 const FIRST = [7, 0, 0]
