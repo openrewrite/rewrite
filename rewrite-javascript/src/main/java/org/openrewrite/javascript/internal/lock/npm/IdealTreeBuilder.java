@@ -18,11 +18,14 @@ package org.openrewrite.javascript.internal.lock.npm;
 import lombok.Getter;
 import lombok.Value;
 import org.jspecify.annotations.Nullable;
+import org.openrewrite.javascript.internal.LockFileRegeneration.Reason;
 import org.openrewrite.javascript.internal.lock.CannotKnow;
 import org.openrewrite.javascript.internal.lock.Host;
 import org.openrewrite.javascript.internal.lock.LocaleCompare;
 import org.openrewrite.javascript.internal.lock.PosixPath;
+import org.openrewrite.javascript.internal.lock.Rejected;
 import org.openrewrite.javascript.internal.lock.Spec;
+import org.openrewrite.javascript.semver.NodeSemver;
 
 import java.time.Instant;
 import java.util.ArrayDeque;
@@ -56,11 +59,51 @@ public final class IdealTreeBuilder {
         private final List<Node> deps = new ArrayList<>();
         private boolean sorted = true;
 
+        // npm 10.4.0 until 10.8.0: [{ sorted, items }] indexed by depth
+        private final boolean byDepth;
+        private final List<@Nullable Depth> depths = new ArrayList<>();
+        private int minDepth;
+        private int length;
+
+        private static final class Depth {
+            boolean sorted = true;
+            final List<Node> items = new ArrayList<>();
+        }
+
+        DepsQueue(NpmRelease release) {
+            byDepth = release.queuesDepsByDepth();
+        }
+
         int length() {
-            return deps.size();
+            return byDepth ? length : deps.size();
         }
 
         void push(Node item) {
+            if (byDepth) {
+                int itemDepth = item.getDepth();
+                Depth depth = itemDepth < depths.size() ? depths.get(itemDepth) : null;
+                if (depth == null) {
+                    length++;
+                    depth = new Depth();
+                    depth.items.add(item);
+                    while (depths.size() <= itemDepth) {
+                        depths.add(null);
+                    }
+                    depths.set(itemDepth, depth);
+                    // upstream: "no minDepth check needed, this branch is only reached when we are in the middle of a
+                    // shallower depth and creating a new one"
+                    return;
+                }
+                if (!depth.items.contains(item)) {
+                    length++;
+                    depth.sorted = false;
+                    depth.items.add(item);
+                    if (itemDepth < minDepth) {
+                        minDepth = itemDepth;
+                    }
+                }
+                return;
+            }
             if (!deps.contains(item)) {
                 sorted = false;
                 deps.add(item);
@@ -68,6 +111,27 @@ public final class IdealTreeBuilder {
         }
 
         Node pop() {
+            if (byDepth) {
+                Depth depth = null;
+                while (depth == null || depth.items.isEmpty()) {
+                    if (minDepth >= depths.size()) {
+                        // a depth first queued while a deeper one was being worked on is never looked at again: the
+                        // loop counts minDepth up without end, and npm hangs
+                        throw Rejected.crashes(Reason.RESOLUTION_REQUIRED, null, "it never finishes: its queue of " +
+                                "dependencies to build no longer reaches " + stranded());
+                    }
+                    depth = depths.get(minDepth);
+                    if (depth == null || depth.items.isEmpty()) {
+                        minDepth++;
+                    }
+                }
+                if (!depth.sorted) {
+                    depth.items.sort((a, b) -> LocaleCompare.en(a.getPath(), b.getPath()));
+                    depth.sorted = true;
+                }
+                length--;
+                return depth.items.remove(0);
+            }
             if (!sorted) {
                 deps.sort((a, b) -> {
                     int byDepth = a.getDepth() - b.getDepth();
@@ -76,6 +140,16 @@ public final class IdealTreeBuilder {
                 sorted = true;
             }
             return deps.remove(0);
+        }
+
+        private String stranded() {
+            for (Depth depth : depths) {
+                if (depth != null && !depth.items.isEmpty()) {
+                    Node node = depth.items.get(0);
+                    return truthy(node.getLocation()) ? node.getLocation() : node.getName();
+                }
+            }
+            return "anything";
         }
     }
 
@@ -97,7 +171,7 @@ public final class IdealTreeBuilder {
     private final boolean strictPeerDeps;
 
     private @Nullable Node currentDep;
-    private final DepsQueue depsQueue = new DepsQueue();
+    private final DepsQueue depsQueue;
     private final Set<Node> depsSeen = new LinkedHashSet<>();
     private final Set<Node> linkNodes = new LinkedHashSet<>();
     private final Set<Node> loadFailures = new LinkedHashSet<>();
@@ -141,6 +215,7 @@ public final class IdealTreeBuilder {
         this.options = options;
         this.registry = registry;
         this.pacote = new Pacote(registry, options, files, this.path);
+        this.depsQueue = new DepsQueue(options.getRelease());
         this.host = host;
         this.now = now;
         this.strictPeerDeps = options.isStrictPeerDeps();
@@ -181,10 +256,12 @@ public final class IdealTreeBuilder {
         Set<String> omitSet = options.omitSet();
         Host environment = Host.builder().os(options.getOs()).cpu(options.getCpu()).libc(options.getLibc()).build();
 
+        NpmRelease release = options.getRelease();
         for (Node node : tree.getInventory().values()) {
-            if (!node.isOptional() && !node.shouldOmit(omitSet)) {
+            if (!node.isOptional() && !(release.skipsEngineCheckOfOmitted() && node.shouldOmit(omitSet))) {
                 try {
-                    if (!(node.isRoot() && truthy(node.getPackage().get("devEngines")))) {
+                    if (!(options.getRelease().devEnginesReplaceRootEngines() && node.isRoot() &&
+                          truthy(node.getPackage().get("devEngines")))) {
                         NpmInstallChecks.checkEngine(node.getPackage(), NPM_VERSION, host.getNodeVersion(),
                                 options.isForce(), options.getRelease());
                     }
@@ -196,7 +273,7 @@ public final class IdealTreeBuilder {
                 }
                 NpmInstallChecks.checkPlatform(node.getPackage(), options.isForce(), Host.UNKNOWN, host);
             }
-            if (node.isOptional() && !node.isInert()) {
+            if (release.marksUninstallableOptionalInert() && node.isOptional() && !node.isInert()) {
                 try {
                     NpmInstallChecks.checkEngine(node.getPackage(), NPM_VERSION, host.getNodeVersion(), false,
                             options.getRelease());
@@ -280,9 +357,41 @@ public final class IdealTreeBuilder {
         if (rootManifest != null) {
             meta.inferFormattingOptions(rootManifest);
         }
+        if (options.getRelease().appliesRootOverridesToWorkspaces()) {
+            applyRootOverridesToWorkspaces(tree);
+        }
 
         queueProblemNodes(tree, new LinkedHashSet<>());
         idealTree = tree;
+    }
+
+    // a workspace's edge to a package the root overrides is detached, with the workspace's own copy of it, when the
+    // root's copy does not satisfy the edge
+    private void applyRootOverridesToWorkspaces(Node tree) {
+        Object overrides = tree.getRoot().getPackage().get("overrides");
+        List<String> rootOverrides = truthy(overrides) ? Js.keys(overrides) : new ArrayList<>();
+
+        for (Node node : tree.getRoot().getInventory().values()) {
+            if (!node.isWorkspace()) {
+                continue;
+            }
+
+            for (String depName : rootOverrides) {
+                Edge edge = node.getEdgesOut().get(depName);
+                Node rootNode = tree.getRoot().getChildren().get(depName);
+
+                if (edge == null || rootNode == null) {
+                    continue;
+                }
+
+                Object resolvedRootVersion = Js.get(rootNode.getPackage(), "version");
+                if (!NodeSemver.satisfies(resolvedRootVersion == Js.UNDEFINED ? null : resolvedRootVersion,
+                        edge.getSpec(), NodeSemver.Options.DEFAULT.release(options.getRelease().semver()))) {
+                    edge.detach();
+                    node.getChildren().delete(depName);
+                }
+            }
+        }
     }
 
     // treeverse's depth: visit a node, then each edge's target in order, each once
@@ -290,9 +399,19 @@ public final class IdealTreeBuilder {
         if (!seen.add(node)) {
             return;
         }
+        NpmRelease release = options.getRelease();
         for (Edge edge : node.getEdgesOut().values()) {
-            boolean skipPeerOptional = edge.getType() == Edge.Type.PEER_OPTIONAL && !options.isSave();
-            if (!skipPeerOptional && (edge.getTo() == null || !edge.isValid())) {
+            boolean problem;
+            if (release.resolvesInvalidPeerOptionalBySave()) {
+                boolean skipPeerOptional = edge.getType() == Edge.Type.PEER_OPTIONAL && !options.isSave();
+                problem = !skipPeerOptional && (edge.getTo() == null || !edge.isValid());
+            } else if (release.queuesNodesMissingDependencies()) {
+                problem = edge.getTo() == null && (!release.leavesMissingPeerOptionalUnqueued() ||
+                                                   edge.getType() != Edge.Type.PEER_OPTIONAL) || !edge.isValid();
+            } else {
+                problem = !edge.isValid();
+            }
+            if (problem) {
                 depsQueue.push(node);
                 break;
             }
@@ -306,6 +425,7 @@ public final class IdealTreeBuilder {
 
     private Node rootNodeFromPackage(Map<String, Object> pkg) {
         return new Node(Node.options()
+                .release(options.getRelease())
                 .path(path)
                 .realpath(path)
                 .pkg(pkg)
@@ -316,7 +436,6 @@ public final class IdealTreeBuilder {
                 .optional(false)
                 .installLinks(options.isInstallLinks())
                 .legacyPeerDeps(options.isLegacyPeerDeps())
-                .release(options.getRelease())
                 .loadOverrides(true)
                 .build());
     }
@@ -368,7 +487,9 @@ public final class IdealTreeBuilder {
             }
         }
 
-        DepFlags.resetDepFlags(tree);
+        if (options.getRelease().resetsDepFlagsOfInflatedLock()) {
+            DepFlags.resetDepFlags(tree);
+        }
         DepFlags.calcDepFlags(tree);
 
         if (options.getLockfileVersion() == null) {
@@ -436,7 +557,8 @@ public final class IdealTreeBuilder {
                 Node parent = edge.isPeer() ? virtualRoot : null;
                 Node dep = vrDep != null && vrDep.satisfies(edge) ? vrDep : null;
 
-                if (dep == null && edge.getType() == Edge.Type.PEER_OPTIONAL) {
+                if (dep == null && edge.getType() == Edge.Type.PEER_OPTIONAL &&
+                    options.getRelease().findsHoistablePeerOptional()) {
                     Node from = Objects.requireNonNull(edge.getFrom());
                     dep = findHoistableNode(from.getResolveParent() != null ? from.getResolveParent() : from, edge);
                 }
@@ -498,7 +620,8 @@ public final class IdealTreeBuilder {
                     }
                     Node from = edgeIn.getFrom();
                     if (!edgeIn.isPeerConflicted() && !edgeIn.isValid()) {
-                        if (depsSeen.contains(from) && options.isSave()) {
+                        if (depsSeen.contains(from) && options.isSave() &&
+                            options.getRelease().resolvesInvalidPeerOptionalBySave()) {
                             depsSeen.remove(from);
                             depsQueue.push(from);
                         } else if (!depsSeen.contains(from)) {
@@ -528,7 +651,9 @@ public final class IdealTreeBuilder {
                 for (Edge e : problemEdges(placed)) {
                     promises.add(() -> {
                         try {
-                            fetchManifest(Spec.resolve(e.getName(), e.getSpec(), FromPath.fromPath(placed, e)), e);
+                            // arborist passes the parent placement here, which is no node
+                            fetchManifest(Spec.resolve(e.getName(), e.getSpec(), FromPath.fromPath(placed, e)), null,
+                                    e);
                         } catch (RuntimeException ignored) {
                         }
                     });
@@ -582,21 +707,21 @@ public final class IdealTreeBuilder {
         }
 
         Node vr = new Node(Node.options()
+                .release(options.getRelease())
                 .path(node.getRealpath())
                 .sourceReference(node)
                 .installLinks(options.isInstallLinks())
                 .legacyPeerDeps(options.isLegacyPeerDeps())
-                .release(options.getRelease())
                 .overrides(node.getOverrides())
                 .build());
 
         for (Node child : node.getChildren().values()) {
             if (child.isLink()) {
                 new Node(Node.options()
+                        .release(options.getRelease())
                         .path(child.getRealpath())
                         .sourceReference(child.getTarget())
                         .root(vr)
-                        .release(options.getRelease())
                         .build());
             }
         }
@@ -638,7 +763,8 @@ public final class IdealTreeBuilder {
                 continue;
             }
 
-            if (!edge.isValid() && (edge.getType() != Edge.Type.PEER_OPTIONAL || options.isSave())) {
+            if (!edge.isValid() && (edge.getType() != Edge.Type.PEER_OPTIONAL || options.isSave() ||
+                                    !options.getRelease().resolvesInvalidPeerOptionalBySave())) {
                 problems.add(edge);
             }
         }
@@ -650,8 +776,9 @@ public final class IdealTreeBuilder {
         if (before == null) {
             return null;
         }
-        if (ReleaseAgeExclude.isReleaseAgeExcluded(ReleaseAgeExclude.trustedSpecName(spec),
-                options.getMinReleaseAgeExclude(), options.getRelease())) {
+        if (options.getRelease().exemptsFromReleaseAge() &&
+            ReleaseAgeExclude.isReleaseAgeExcluded(ReleaseAgeExclude.trustedSpecName(spec),
+                    options.getMinReleaseAgeExclude(), options.getRelease())) {
             return null;
         }
         if (before instanceof String) {
@@ -660,15 +787,26 @@ public final class IdealTreeBuilder {
         return (Double) before;
     }
 
-    private Map<String, Object> fetchManifest(Spec spec, @Nullable Edge edge) {
-        checkAllow(spec, edge);
+    // parent: the node the manifest is fetched under, which is none for the pre-fetch of a placed node's problem edges
+    private Map<String, Object> fetchManifest(Spec spec, @Nullable Node parent, @Nullable Edge edge) {
+        NpmRelease release = options.getRelease();
+        boolean isRoot;
+        if (release.checksAllowedSpecTypes()) {
+            checkAllow(spec, edge);
+            Node from = edge == null ? null : edge.getFrom();
+            isRoot = from != null && (from.isProjectRoot() || from.isWorkspace());
+        } else {
+            isRoot = release.fetchesAsRootUnderRootParent() && parent != null &&
+                     (parent.isProjectRoot() || parent.isWorkspace());
+        }
         Map<String, Object> fetchOptions = new LinkedHashMap<>();
         Pacote.Options.OptionsBuilder pacoteOptions = Pacote.Options.builder()
-                .fullMetadata(true)
+                .fullMetadata(options.getRelease().fetchesFullMetadata())
                 .before(releaseAgeBefore(spec))
                 .defaultTag(options.getTag())
                 .nodeVersion(host.getNodeVersion())
-                .npmVersion(NPM_VERSION);
+                .npmVersion(NPM_VERSION)
+                .root(isRoot);
         spec = Objects.requireNonNull(Objects.requireNonNull(idealTree).getMeta()).checkYarnLock(spec, fetchOptions);
 
         Map<String, Object> cached = manifests.get(spec.getRaw());
@@ -677,6 +815,11 @@ public final class IdealTreeBuilder {
         }
         Map<String, Object> mani = pacote.manifest(spec,
                 pacoteOptions.integrity(fetchOptions.get("integrity")).build());
+        if (options.getRelease().dropsLicenseOfFetchedManifest()) {
+            // .then(({ license, ...mani }) => ...)
+            mani = new LinkedHashMap<>(mani);
+            mani.remove("license");
+        }
         manifests.put(spec.getRaw(), mani);
         return mani;
     }
@@ -719,30 +862,34 @@ public final class IdealTreeBuilder {
             ((NpmRejection) error).setRequiredBy(from != null && truthy(from.getLocation()) ? from.getLocation() : ".");
         }
         Node n = new Node(Node.options()
+                .release(options.getRelease())
                 .name(name)
                 .parent(parent)
                 .error(error)
                 .installLinks(options.isInstallLinks())
                 .legacyPeerDeps(options.isLegacyPeerDeps())
-                .release(options.getRelease())
                 .build());
         loadFailures.add(n);
         return n;
     }
 
     private Node nodeFromSpec(String name, Spec spec, Node parent, @Nullable Edge edge) {
-        try {
-            checkAllow(spec, edge);
-        } catch (NpmRejection error) {
-            return failureNode(name, parent, error, edge);
+        if (options.getRelease().checksAllowedSpecTypes()) {
+            try {
+                checkAllow(spec, edge);
+            } catch (NpmRejection error) {
+                return failureNode(name, parent, error, edge);
+            }
         }
 
         Node tree = Objects.requireNonNull(idealTree);
         boolean installLinks = options.isInstallLinks();
         boolean isWorkspace = tree.getWorkspaces() != null && tree.getWorkspaces().containsKey(spec.getName());
 
+        NpmRelease release = options.getRelease();
         boolean isProjectInternalFileSpec = false;
-        if (edge != null && (edge.getRawSpec().startsWith("file:../") || edge.getRawSpec().startsWith("file:./"))) {
+        if (release.linksProjectInternalFileSpecs() && edge != null &&
+            (edge.getRawSpec().startsWith("file:../") || edge.getRawSpec().startsWith("file:./"))) {
             String targetPath = PosixPath.resolve(parent.getRealpath(), edge.getRawSpec().substring(5));
             String resolvedProjectRoot = PosixPath.resolve(tree.getRealpath());
             isProjectInternalFileSpec = targetPath.startsWith(resolvedProjectRoot + "/") ||
@@ -751,19 +898,20 @@ public final class IdealTreeBuilder {
 
         boolean parentWasInstalled = !parent.isLink() && truthy(parent.getResolved()) &&
                                      Js.string(parent.getResolved()).startsWith("file:");
-        boolean isTransitiveFileDep = spec.getType() == Spec.Type.DIRECTORY && parentWasInstalled && installLinks;
+        boolean isTransitiveFileDep = release.installsTransitiveFileDependencies() &&
+                                      spec.getType() == Spec.Type.DIRECTORY && parentWasInstalled && installLinks;
 
         boolean shouldLink = (isWorkspace || isProjectInternalFileSpec || !installLinks) && !isTransitiveFileDep;
         if (spec.getType() == Spec.Type.DIRECTORY && shouldLink) {
             String realpath = Objects.requireNonNull(spec.getFetchSpec());
             Link link = new Link(Node.options()
+                    .release(options.getRelease())
                     .name(name)
                     .parent(parent)
                     .realpath(realpath)
                     .pkg(directoryManifest(realpath, spec))
                     .installLinks(installLinks)
                     .legacyPeerDeps(options.isLegacyPeerDeps())
-                    .release(options.getRelease())
                     .build());
             linkNodes.add(link);
             return link;
@@ -786,13 +934,13 @@ public final class IdealTreeBuilder {
 
         Map<String, Object> pkg;
         try {
-            pkg = fetchManifest(spec, edge);
+            pkg = fetchManifest(spec, parent, edge);
         } catch (CannotKnow | PackageJson.NeedsPackageFiles error) {
             throw error;
         } catch (RuntimeException error) {
             return failureNode(name, parent, error, edge);
         }
-        if (!truthy(pkg.get("version")) && spec.isRegistry()) {
+        if (options.getRelease().failsIncompleteManifests() && !truthy(pkg.get("version")) && spec.isRegistry()) {
             return failureNode(name, parent, new NpmRejection("EINCOMPLETEMANIFEST",
                     "incomplete manifest for " + name + ", missing version", null), edge);
         }
@@ -841,11 +989,14 @@ public final class IdealTreeBuilder {
 
         for (Edge edge : peerEdges) {
             Node nodeParent = node.getParent();
-            if (nodeParent == null) {
+            if (nodeParent == null && options.getRelease().stopsPeerSetOfDetachedNode()) {
                 break;
             }
             if (edge.isValid() && edge.getTo() != null) {
                 continue;
+            }
+            if (nodeParent == null) {
+                throw new IllegalArgumentException("Cannot read properties of null (reading 'edgesOut')");
             }
 
             Edge parentEdge = nodeParent.getEdgesOut().get(edge.getName());
@@ -876,7 +1027,7 @@ public final class IdealTreeBuilder {
                         continue;
                     }
 
-                    if (node.getParent() == null && options.getRelease().peerSetStopsAtDetachedNode()) {
+                    if (node.getParent() == null && options.getRelease().skipsPeerConflictOfDetachedNode()) {
                         break;
                     }
 
@@ -965,14 +1116,16 @@ public final class IdealTreeBuilder {
     }
 
     private void idealTreePrune() {
+        boolean prunesOptionalPeers = options.getRelease().prunesOptionalPeers();
         for (Node node : Objects.requireNonNull(idealTree).getInventory().values()) {
-            if (node.isExtraneous()) {
+            if (node.isExtraneous() || prunesOptionalPeers && node.isPeer() && node.isOptional()) {
                 node.setParent(null);
             }
         }
     }
 
     private void pruneFailedOptional() {
+        boolean keepsInert = options.getRelease().keepsFailedOptionalInert();
         for (Node node : loadFailures) {
             if (!node.isOptional()) {
                 Throwable error = node.getErrors().get(0);
@@ -980,7 +1133,11 @@ public final class IdealTreeBuilder {
             }
 
             for (Node n : OptionalSet.optionalSet(node)) {
-                n.setInert(true);
+                if (keepsInert) {
+                    n.setInert(true);
+                } else {
+                    n.setParent(null);
+                }
             }
         }
     }

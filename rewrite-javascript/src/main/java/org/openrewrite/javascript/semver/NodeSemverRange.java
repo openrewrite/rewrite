@@ -50,6 +50,7 @@ final class NodeSemverRange {
 
     // node-semver re.js fragments used by Range.parseRange.
     private static final Pattern BUILD_STRIP = Pattern.compile("\\+[0-9A-Za-z-]+(?:\\.[0-9A-Za-z-]+)*");
+    private static final Pattern SAFE_BUILD = Pattern.compile("\\+[0-9A-Za-z-]{1,250}(?:\\.[0-9A-Za-z-]{1,250})*");
     private static final Pattern COMPARATOR_TRIM = Pattern.compile(
             "(\\s*)((?:<|>)?=?)\\s*(" + NodeSemverVersion.LOOSE_PLAIN + "|" + XRANGE_PLAIN + ")");
     private static final Pattern TILDE_TRIM = Pattern.compile("(\\s*)(?:~>?)\\s+");
@@ -192,9 +193,28 @@ final class NodeSemverRange {
         return options.release == Release.V5_5_0;
     }
 
+    // 7.8.1 strips build metadata from the whole range before anything reads it
+    private static boolean stripsBuildFromRange(Options options) {
+        return options.release != Release.V7_7_2 && options.release != Release.V7_8_0;
+    }
+
+    // 7.7.3 strips the first build metadata of a comparator, by re.js's length-bounded BUILD
+    private static boolean stripsBuildFromComparator(Options options) {
+        return options.release != Release.V7_7_2;
+    }
+
+    // 7.8.2 leaves a caret range below 1.0.0 without the -0 includePrerelease adds to other lower bounds, and takes an
+    // x-range with a number after a wildcard for no x-range
+    private static boolean followsXRangeOrder(Options options) {
+        return options.release != Release.V7_7_2 && options.release != Release.V7_8_0 &&
+               options.release != Release.V7_8_1;
+    }
+
     // the comparator strings parseRange makes of one group, before it parses them
     private static List<String> comparators(String range, Options options) {
-        range = BUILD_STRIP.matcher(range).replaceAll("");
+        if (stripsBuildFromRange(options)) {
+            range = BUILD_STRIP.matcher(range).replaceAll("");
+        }
         range = derived(range, hyphenReplace(range, options), options);
         range = COMPARATOR_TRIM.matcher(range).replaceAll("$1$2$3");
         range = TILDE_TRIM.matcher(range).replaceAll("$1~");
@@ -220,7 +240,9 @@ final class NodeSemverRange {
     }
 
     private static String parseComparator(String comp, Options options) {
-        comp = BUILD_STRIP.matcher(comp).replaceFirst("");
+        if (stripsBuildFromComparator(options)) {
+            comp = (stripsBuildFromRange(options) ? BUILD_STRIP : SAFE_BUILD).matcher(comp).replaceFirst("");
+        }
         comp = mapTokens(comp.trim(), token -> derived(token, replaceCaret(token, options), options));
         comp = mapTokens(comp.trim(), token -> derived(token, replaceTilde(token, options), options));
         comp = mapTokens(comp, token -> derived(token, replaceXRange(token, options), options));
@@ -273,9 +295,10 @@ final class NodeSemverRange {
             return ">=" + mj + "." + mn + "." + p + "-" + pr + " <" + incr(mj) + ".0.0-0";
         }
         if ("0".equals(mj)) {
+            String z0 = followsXRangeOrder(options) ? "" : z;
             return "0".equals(mn) ?
-                    ">=" + mj + "." + mn + "." + p + " <" + mj + "." + mn + "." + incr(p) + "-0" :
-                    ">=" + mj + "." + mn + "." + p + " <" + mj + "." + incr(mn) + ".0-0";
+                    ">=" + mj + "." + mn + "." + p + z0 + " <" + mj + "." + mn + "." + incr(p) + "-0" :
+                    ">=" + mj + "." + mn + "." + p + z0 + " <" + mj + "." + incr(mn) + ".0-0";
         }
         return ">=" + mj + "." + mn + "." + p + " <" + incr(mj) + ".0.0-0";
     }
@@ -313,7 +336,7 @@ final class NodeSemverRange {
         }
         String gtlt = m.group(1);
         String mj = m.group(2), mn = m.group(3), p = m.group(4);
-        if ((isX(mj) && !isX(mn)) || (isX(mn) && p != null && !isX(p))) {
+        if (followsXRangeOrder(options) && ((isX(mj) && !isX(mn)) || (isX(mn) && p != null && !isX(p)))) {
             return comp;
         }
         boolean xM = isX(mj);

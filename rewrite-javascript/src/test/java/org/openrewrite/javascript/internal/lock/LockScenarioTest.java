@@ -52,7 +52,12 @@ public abstract class LockScenarioTest extends ScenarioTest {
         Failure failure = result.getFailure();
         String thrown = failure == null ? String.valueOf(result.getErrorMessage()) :
                 failure.getReason() + ": " + failure.getDetail();
-        if (expect.isExact() && expected != null) {
+        boolean exact = expect.isExact();
+        if (Expect.EXACT_OR.equals(expect.getKind())) {
+            exact = result.isSuccess();
+            expect = Expect.of(expect.getRest());
+        }
+        if (exact && expected != null) {
             if (!result.isSuccess()) {
                 failed(label, http, "failed", thrown, " expected " + packageManager +
                                                       "'s lock but regeneration failed: " + thrown);

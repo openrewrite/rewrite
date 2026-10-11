@@ -138,7 +138,18 @@ public class Link extends Node {
 
     @Override
     void recalculateOutEdgesOverrides() {
+        if (!getRelease().forwardsLinkOverridesToTarget()) {
+            // a link has no method of its own yet, and node.js's goes over the edges out a link never has
+            super.recalculateOutEdgesOverrides();
+            return;
+        }
         OverrideSet overrides = getOverrides();
+        if (!getRelease().forwardsLinkOverridesWithMatchingRule()) {
+            if (target != null) {
+                target.updateOverridesEdgeInAdded(overrides);
+            }
+            return;
+        }
         if (target == null || overrides == null) {
             return;
         }

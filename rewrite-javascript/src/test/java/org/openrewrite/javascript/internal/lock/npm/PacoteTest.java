@@ -17,6 +17,8 @@ package org.openrewrite.javascript.internal.lock.npm;
 
 import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 import org.openrewrite.javascript.internal.lock.CannotKnow;
 import org.openrewrite.javascript.internal.lock.Spec;
 
@@ -125,6 +127,77 @@ class PacoteTest {
           .hasMessage("Cannot read properties of undefined (reading 'signatures')");
         assertThatThrownBy(() -> manifest(noDist, "x@1.0.0", Pacote.Options.builder().integrity(5).build()))
           .hasMessage("Cannot read properties of undefined (reading 'signatures')");
+    }
+
+    // pacote's own answer for a directory whose manifest has only directories.bin: npm 10.5.2 and 11.6.1 return the
+    // bin of its files, npm 10.6.0 to 11.6.0 return none
+    @ParameterizedTest
+    @CsvSource({"10.5.2,true", "10.6.0,false", "10.9.9,false", "11.6.0,false", "11.6.1,true", "11.17.0,true"})
+    void directoryManifestReadsBinDirectory(String release, boolean readsFiles) {
+        VirtualTreeLoader.ProjectFiles files = VirtualTreeLoader.ProjectFiles.builder()
+          .manifest("vendor/x", "{\"name\":\"x\",\"version\":\"1.0.0\",\"directories\":{\"bin\":\"bin\"}}")
+          .build();
+        Pacote pacote = new Pacote(registry(LATEST_BELOW_HIGHEST),
+          NpmOptions.builder().release(NpmRelease.of(release)).build(), files, "/");
+        if (readsFiles) {
+            assertThatThrownBy(() -> pacote.manifest(Spec.npa("file:vendor/x", "/"), Pacote.Options.builder().build()))
+              .isInstanceOf(PackageJson.NeedsPackageFiles.class);
+        } else {
+            assertThat(pacote.manifest(Spec.npa("file:vendor/x", "/"), Pacote.Options.builder().build()))
+              .containsEntry("version", "1.0.0").containsKey("directories").doesNotContainKey("bin");
+        }
+    }
+
+    private static @Nullable Object bin(String release, String bin) {
+        String packument = "{\"name\":\"x\",\"dist-tags\":{\"latest\":\"1.0.0\"},\"versions\":{\"1.0.0\":" +
+                           "{\"name\":\"x\",\"version\":\"1.0.0\",\"bin\":" + bin + "}}}";
+        return new Pacote(registry(packument), NpmOptions.builder().release(NpmRelease.of(release)).build(),
+          VirtualTreeLoader.ProjectFiles.builder().build(), "/")
+          .manifest(Spec.npa("x@1.0.0", "/"), Pacote.Options.builder().build()).get("bin");
+    }
+
+    /**
+     * The {@code bin} of the lock entry npm 10.8.0, 10.8.1 and 10.9.0 each write for a manifest, asked of their own
+     * npm-pick-manifest, pacote and arborist: @npmcli/package-json 5.1.1 and 5.2.0 (npm 10.8.1 to 10.8.3) drop a name
+     * or a path that starts with a dot, and before them a colon in a path is kept.
+     */
+    @ParameterizedTest
+    @CsvSource(delimiter = '|', quoteCharacter = '`', value = {
+      "{\"x\":\".bin/x.js\"}|{\"x\":\".bin/x.js\"}||{\"x\":\".bin/x.js\"}",
+      "{\"x\":\"./.output/x.mjs\"}|{\"x\":\".output/x.mjs\"}||{\"x\":\".output/x.mjs\"}",
+      "{\"x\":\".x.js\",\"y\":\"y.js\"}|{\"x\":\".x.js\",\"y\":\"y.js\"}|{\"y\":\"y.js\"}|" +
+      "{\"x\":\".x.js\",\"y\":\"y.js\"}",
+      "{\".x\":\"x.js\",\"y\":\"y.js\"}|{\".x\":\"x.js\",\"y\":\"y.js\"}|{\"y\":\"y.js\"}|" +
+      "{\".x\":\"x.js\",\"y\":\"y.js\"}",
+      "{\"x\":\"...\",\"y\":\"..a\",\"z\":\".../z\"}|{\"x\":\"...\",\"y\":\"..a\",\"z\":\".../z\"}||" +
+      "{\"x\":\"...\",\"y\":\"..a\",\"z\":\".../z\"}",
+      "{\"x\":\"a:b/c.js\"}|{\"x\":\"a:b/c.js\"}|{\"x\":\"a/b/c.js\"}|{\"x\":\"a/b/c.js\"}",
+      "{\"x\":\"C:\\\\tools\\\\x.js\"}|{\"x\":\"C:/tools/x.js\"}|{\"x\":\"C/tools/x.js\"}|{\"x\":\"C/tools/x.js\"}",
+      "{\"a:x\":\"x.js\"}|{\"x\":\"x.js\"}|{\"x\":\"x.js\"}|{\"x\":\"x.js\"}",
+      "{\"../../etc/x\":\"x.js\",\"a/b\":\"b.js\",\"z\":\"z.js\"}|{\"x\":\"x.js\",\"b\":\"b.js\",\"z\":\"z.js\"}|" +
+      "{\"x\":\"x.js\",\"b\":\"b.js\",\"z\":\"z.js\"}|{\"x\":\"x.js\",\"b\":\"b.js\",\"z\":\"z.js\"}",
+      "{\"x\":\"../../x.js\",\"y\":\"/abs/y.js\",\"z\":\"./z.js\"}|" +
+      "{\"x\":\"x.js\",\"y\":\"abs/y.js\",\"z\":\"z.js\"}|" +
+      "{\"x\":\"x.js\",\"y\":\"abs/y.js\",\"z\":\"z.js\"}|{\"x\":\"x.js\",\"y\":\"abs/y.js\",\"z\":\"z.js\"}",
+      "{\"x\":\"bin\\\\x.js\"}|{\"x\":\"bin/x.js\"}|{\"x\":\"bin/x.js\"}|{\"x\":\"bin/x.js\"}",
+      "{\"x\":\"\",\"y\":\".\",\"z\":\"..\",\"w\":\"./\"}|||",
+      "{\"x\":1,\"y\":null,\"z\":\"z.js\"}|{\"z\":\"z.js\"}|{\"z\":\"z.js\"}|{\"z\":\"z.js\"}",
+      "{\"x\":\"dir/\",\"y/\":\"y.js\"}|{\"x\":\"dir/\",\"y\":\"y.js\"}|{\"x\":\"dir/\",\"y\":\"y.js\"}|" +
+      "{\"x\":\"dir/\",\"y\":\"y.js\"}",
+      "\"cli.js\"|{\"x\":\"cli.js\"}|{\"x\":\"cli.js\"}|{\"x\":\"cli.js\"}",
+      "[\"bin/a.js\",\"./b\"]|{\"a.js\":\"bin/a.js\",\"b\":\"b\"}|{\"a.js\":\"bin/a.js\",\"b\":\"b\"}|" +
+      "{\"a.js\":\"bin/a.js\",\"b\":\"b\"}",
+      "5|||",
+      "true|||"
+    })
+    void binAsEachReleasesPackageJsonLeavesIt(String bin, @Nullable String at10_8_0, @Nullable String at10_8_1,
+                                              @Nullable String at10_9_0) {
+        assertThat(bin("10.6.0", bin)).isEqualTo(at10_8_0 == null ? null : json(at10_8_0));
+        assertThat(bin("10.8.0", bin)).isEqualTo(at10_8_0 == null ? null : json(at10_8_0));
+        assertThat(bin("10.8.1", bin)).isEqualTo(at10_8_1 == null ? null : json(at10_8_1));
+        assertThat(bin("10.8.3", bin)).isEqualTo(at10_8_1 == null ? null : json(at10_8_1));
+        assertThat(bin("10.9.0", bin)).isEqualTo(at10_9_0 == null ? null : json(at10_9_0));
+        assertThat(bin("11.17.0", bin)).isEqualTo(at10_9_0 == null ? null : json(at10_9_0));
     }
 
     // DirFetcher.manifest(): the directory's package.json among the project's files, else nothing to read

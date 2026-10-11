@@ -361,6 +361,10 @@ public final class VirtualTreeLoader {
             Node target = nodes.get(targetLoc);
 
             if (target == null) {
+                if (!options.getRelease().rejectsLinkWithoutTarget()) {
+                    // #loadLink reads the flags of the target it was not given
+                    throw new IllegalArgumentException("Cannot read properties of undefined (reading 'extraneous')");
+                }
                 throw new MissingTargetException(targetLoc, location);
             }
 
@@ -369,6 +373,20 @@ public final class VirtualTreeLoader {
             nodes.put(targetLoc, Objects.requireNonNull(link.getTarget()));
 
             if (link.getTarget().getParent() == null) {
+                if (!options.getRelease().guardsLinkTargetPackage()) {
+                    // rpj(pj).catch(() => null): only the read is guarded, and assigning the package may throw
+                    PackageJson manifest = null;
+                    try {
+                        manifest = files.manifest(targetLoc);
+                    } catch (PackageJson.NeedsPackageFiles e) {
+                        throw e;
+                    } catch (RuntimeException ignored) {
+                    }
+                    if (manifest != null) {
+                        link.getTarget().setPackage(manifest.getContent());
+                    }
+                    continue;
+                }
                 try {
                     PackageJson manifest = files.manifest(targetLoc);
                     if (manifest != null) {
@@ -431,9 +449,9 @@ public final class VirtualTreeLoader {
                            truthy(sw.get("npmExtensionApplied"))) && release.recordsPatchesAndExtensions();
         boolean hasShrinkwrap = truthy(sw.get("hasShrinkwrap")) && release.readsNpmShrinkwrap();
         return new Node(Node.options()
+                .release(options.getRelease())
                 .installLinks(options.isInstallLinks())
                 .legacyPeerDeps(options.isLegacyPeerDeps())
-                .release(release)
                 .root(virtualTree)
                 .path(nodePath)
                 .realpath(nodePath)
@@ -456,9 +474,9 @@ public final class VirtualTreeLoader {
     private Link loadLink(String location, String targetLoc, Node target) {
         String linkPath = PosixPath.resolve(path, location);
         Link link = new Link(Node.options()
+                .release(options.getRelease())
                 .installLinks(options.isInstallLinks())
                 .legacyPeerDeps(options.isLegacyPeerDeps())
-                .release(options.getRelease())
                 .path(linkPath)
                 .realpath(PosixPath.resolve(path, targetLoc))
                 .target(target)

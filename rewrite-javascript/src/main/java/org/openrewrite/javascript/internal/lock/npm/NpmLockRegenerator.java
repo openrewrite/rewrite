@@ -143,7 +143,8 @@ public final class NpmLockRegenerator {
         String yarnLock;
         try {
             INSTALL.requireInstallsAt(NpmOptions.loadLocalPrefix(inputs.getRelease(),
-                    inputs.getManifests().get(inputs.getRunsIn()), inputs.getParentTrees()), inputs.getRunsIn(), "lock");
+                    inputs.getManifests().get(inputs.getRunsIn()), inputs.getParentTrees()), inputs.getRunsIn(),
+                    "lock");
             if (inputs.getPaths() != null &&
                 Shrinkwrap.readsShrinkwrap(inputs.getRelease(), inputs.getPaths()::contains)) {
                 throw new CannotKnow("the lock npm writes: it reads and writes the npm-shrinkwrap.json beside this " +
@@ -322,7 +323,7 @@ public final class NpmLockRegenerator {
             return Rejected.coded(Reason.PEER_CONFLICT, conflict.getEdge().getName(), "ERESOLVE",
                     ExplainEresolve.explain(conflict.getExplanation(), 4));
         }
-        if (e instanceof CannotKnow) {
+        if (e instanceof CannotKnow || e instanceof Rejected) {
             return e;
         }
         if (e instanceof PackageJson.NeedsPackageFiles) {

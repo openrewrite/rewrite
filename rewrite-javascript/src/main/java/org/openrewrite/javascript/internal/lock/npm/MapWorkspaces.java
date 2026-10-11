@@ -21,6 +21,7 @@ import org.openrewrite.javascript.internal.lock.LocaleCompare;
 import org.openrewrite.javascript.internal.lock.Minimatch;
 import org.openrewrite.javascript.internal.lock.PosixPath;
 
+import java.util.AbstractMap;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
@@ -35,6 +36,15 @@ import static org.openrewrite.javascript.internal.lock.npm.Js.truthy;
  * name, over the project's manifests in place of its directory tree, and over the lock.
  */
 final class MapWorkspaces {
+
+    /**
+     * The @npmcli/map-workspaces release whose answers these are: 5.0.3, which npm 11.17.0 bundles and every release
+     * from 3.0.6 reads as here; or 3.0.4, which applies the patterns one after another, a negated one taking away
+     * what the ones before it found.
+     */
+    enum Release {
+        V3_0_4, V5_0_3
+    }
 
     /**
      * The errors map-workspaces throws, with their codes.
@@ -57,9 +67,21 @@ final class MapWorkspaces {
     private MapWorkspaces() {
     }
 
+    // glob's ignore option as 3.0.4 passes it
+    private static final Minimatch.Options IGNORE_3_0_4 =
+            Minimatch.Options.builder(Minimatch.Release.V10_2_5).dot(true).nocomment(true).nonegate(true).build();
+
     // minimatch 10.2.5 with the brace-expansion the npm release bundles beside it
     private static Minimatch.Options.OptionsBuilder minimatch(NpmRelease release) {
         return Minimatch.Options.builder(Minimatch.Release.V10_2_5).braceExpansion(release::braceExpansion);
+    }
+
+    // a declaration without a pattern, for which no release of the library finds a member: the same reading of
+    // workspaces.packages that every release starts with
+    private static boolean declaresNone(@Nullable Object workspaces) {
+        Object packages = Js.get(workspaces, "packages");
+        Object declaration = packages instanceof List ? packages : workspaces;
+        return declaration instanceof List && ((List<?>) declaration).isEmpty();
     }
 
     private static final class Patterns {
@@ -123,6 +145,12 @@ final class MapWorkspaces {
     static Map<Object, String> mapWorkspaces(String cwd, Map<String, Object> pkg,
             VirtualTreeLoader.ProjectFiles files, NpmRelease release) {
         Object workspaces = pkg.containsKey("workspaces") ? pkg.get("workspaces") : new ArrayList<>();
+        if (declaresNone(workspaces)) {
+            return new LinkedHashMap<>();
+        }
+        if (release.mapWorkspaces() == Release.V3_0_4) {
+            return mapWorkspaces3_0_4(cwd, workspaces, files);
+        }
         Patterns p = getPatterns(workspaces, release);
         Map<Object, String> results = new LinkedHashMap<>();
         if (p.patterns.isEmpty() && p.negatedPatterns.isEmpty()) {
@@ -202,6 +230,142 @@ final class MapWorkspaces {
         return pattern.endsWith("/") ? pattern.substring(0, pattern.length() - 1) : pattern;
     }
 
+    // 3.0.4's appendNegatedPatterns: every pattern in its place, only a leading / stripped
+    private static List<Map.Entry<String, Boolean>> patterns3_0_4(@Nullable Object workspaces) {
+        Object packages = Js.get(workspaces, "packages");
+        Object declaration = packages instanceof List ? packages : workspaces;
+        if (!(declaration instanceof List)) {
+            throw new WorkspacesException("workspaces config expects an Array", "EWORKSPACESCONFIG");
+        }
+        List<Map.Entry<String, Boolean>> results = new ArrayList<>();
+        for (Object raw : (List<?>) declaration) {
+            if (!(raw instanceof String)) {
+                Js.get(raw, "match");
+                throw new IllegalArgumentException("pattern.match is not a function");
+            }
+            String pattern = (String) raw;
+            int excl = 0;
+            while (excl < pattern.length() && pattern.charAt(excl) == '!') {
+                excl++;
+            }
+            pattern = pattern.substring(excl).replaceFirst("^/+", "");
+            results.add(new AbstractMap.SimpleEntry<>(pattern, excl % 2 == 1));
+        }
+        return results;
+    }
+
+    // glob(getGlobPattern(pattern)): a leading ./ and a trailing / name nothing, and . and a lone ** find the
+    // directory itself
+    private static boolean globs3_0_4(String dir, String pattern) {
+        String glob = pattern.replace('\\', '/');
+        while (glob.startsWith("./")) {
+            glob = glob.substring(2);
+        }
+        while (glob.endsWith("/")) {
+            glob = glob.substring(0, glob.length() - 1);
+        }
+        if (".".equals(dir)) {
+            return glob.isEmpty() || ".".equals(glob) || "**".equals(glob);
+        }
+        return !glob.isEmpty() && Minimatch.minimatch(dir, glob, Minimatch.Release.V10_2_5);
+    }
+
+    private static Map<Object, String> mapWorkspaces3_0_4(String cwd, @Nullable Object workspaces,
+            VirtualTreeLoader.ProjectFiles files) {
+        List<Map.Entry<String, Boolean>> patterns = patterns3_0_4(workspaces);
+        Map<Object, String> results = new LinkedHashMap<>();
+        if (patterns.isEmpty()) {
+            return results;
+        }
+        List<String> ignore = new ArrayList<>();
+        ignore.add("**/node_modules/**");
+
+        Map<Object, Set<String>> seen = new LinkedHashMap<>();
+        for (Map.Entry<String, Boolean> item : patterns) {
+            List<String> matches = new ArrayList<>();
+            for (String location : files.manifestLocations()) {
+                String dir = location.isEmpty() ? "." : location;
+                if (!ignored(dir, ignore, IGNORE_3_0_4) && globs3_0_4(dir, item.getKey())) {
+                    matches.add(dir);
+                }
+            }
+            matches.sort(LocaleCompare::en);
+
+            for (String match : matches) {
+                String location = ".".equals(match) ? "" : match;
+                Map<String, Object> content;
+                try {
+                    PackageJson manifest = files.manifest(location);
+                    if (manifest == null) {
+                        continue;
+                    }
+                    content = manifest.getContent();
+                } catch (PackageJson.NeedsPackageFiles e) {
+                    // the bin npm reads from the files does not name the workspace
+                    content = e.getContent();
+                }
+                String path = PosixPath.join(cwd, match);
+                Object name = getPackageName(content, path);
+                Set<String> seenPackagePathnames = seen.computeIfAbsent(name, k -> new LinkedHashSet<>());
+                if (item.getValue()) {
+                    seenPackagePathnames.remove(path);
+                } else {
+                    seenPackagePathnames.add(path);
+                }
+            }
+        }
+
+        List<String> errors = new ArrayList<>();
+        errors.add("must not have multiple workspaces with the same name");
+        for (Map.Entry<Object, Set<String>> entry : seen.entrySet()) {
+            if (entry.getValue().isEmpty()) {
+                continue;
+            }
+            if (entry.getValue().size() > 1) {
+                errors.add("package '" + Js.string(entry.getKey()) + "' has conflicts in the following paths:");
+                for (String pathname : entry.getValue()) {
+                    errors.add("    " + pathname);
+                }
+            } else {
+                results.put(entry.getKey(), entry.getValue().iterator().next());
+            }
+        }
+        if (errors.size() > 1) {
+            throw new WorkspacesException(String.join("\n", errors), "EDUPLICATEWORKSPACE");
+        }
+        return results;
+    }
+
+    private static Map<String, String> virtual3_0_4(String cwd, Object packages, @Nullable Object workspaces) {
+        Map<String, String> results = new LinkedHashMap<>();
+        List<Map.Entry<String, Boolean>> patterns = patterns3_0_4(workspaces);
+        if (patterns.isEmpty()) {
+            return results;
+        }
+        patterns.add(new AbstractMap.SimpleEntry<>("**/node_modules/**", true));
+
+        Map<String, String> byPath = new LinkedHashMap<>();
+        for (String packageKey : Js.keys(packages)) {
+            if (packageKey.isEmpty()) {
+                continue;
+            }
+            for (Map.Entry<String, Boolean> item : patterns) {
+                if (Minimatch.minimatch(packageKey, item.getKey(), Minimatch.Release.V10_2_5)) {
+                    String pathname = PosixPath.join(cwd, packageKey);
+                    if (item.getValue()) {
+                        byPath.remove(pathname);
+                    } else {
+                        byPath.put(pathname, Js.string(getPackageName(Js.get(packages, packageKey), pathname)));
+                    }
+                }
+            }
+        }
+        for (Map.Entry<String, String> e : byPath.entrySet()) {
+            results.put(e.getValue(), e.getKey());
+        }
+        return results;
+    }
+
     // glob's Ignore: a pattern matches the directory or its trailing-slash form, and one ending in ** ignores children
     private static boolean ignored(String dir, List<String> ignore, Minimatch.Options options) {
         for (String pattern : ignore) {
@@ -231,6 +395,12 @@ final class MapWorkspaces {
         Object root = Js.get(packages, "");
         Object workspaces = root instanceof Map && ((Map<?, ?>) root).containsKey("workspaces") ?
                 ((Map<?, ?>) root).get("workspaces") : new ArrayList<>();
+        if (declaresNone(workspaces)) {
+            return new LinkedHashMap<>();
+        }
+        if (release.mapWorkspaces() == Release.V3_0_4) {
+            return virtual3_0_4(cwd, packages, workspaces);
+        }
         Map<String, String> results = new LinkedHashMap<>();
         Patterns p = getPatterns(workspaces, release);
         if (p.patterns.isEmpty() && p.negatedPatterns.isEmpty()) {

@@ -149,7 +149,7 @@ public class Node {
         String realpath;
 
         /**
-         * The npm release that builds the tree the node is in, which arborist's nodes have no need to carry.
+         * The npm release whose arborist the node belongs to; a tree's nodes share it.
          */
         @Builder.Default
         NpmRelease release = NpmRelease.PORTED;
@@ -284,7 +284,7 @@ public class Node {
     @Getter
     private final @Nullable Node sourceReference;
 
-    @Getter(AccessLevel.PACKAGE)
+    @Getter
     private final NpmRelease release;
 
     Map<String, Object> pkg;
@@ -373,7 +373,7 @@ public class Node {
         } else if (options.isLoadOverrides()) {
             Object overrides = pkg.get("overrides");
             if (truthy(overrides) && !Js.keys(overrides).isEmpty()) {
-                this.overrides = new OverrideSet(overrides);
+                this.overrides = new OverrideSet(overrides, release);
             }
         }
 
@@ -483,6 +483,9 @@ public class Node {
         }
         if (!Objects.equals(overrides.getName(), name)) {
             return false;
+        }
+        if (!release.propagatesOverrideSets()) {
+            return true;
         }
         for (Edge edge : edgesIn) {
             if (edge.getOverrides() != null && Objects.equals(edge.getOverrides().getName(), name) &&
@@ -601,12 +604,14 @@ public class Node {
     }
 
     public boolean shouldOmit(Set<String> omitSet) {
-        if (omitSet.isEmpty()) {
-            return false;
-        }
-        Node top = getTop();
-        if (!top.isProjectRoot() && !top.isWorkspace()) {
-            return false;
+        if (release.omitsUnderProjectTopsOnly()) {
+            if (omitSet.isEmpty()) {
+                return false;
+            }
+            Node top = getTop();
+            if (!top.isProjectRoot() && !top.isWorkspace()) {
+                return false;
+            }
         }
         return (peer && omitSet.contains("peer")) ||
                (dev && omitSet.contains("dev")) ||
@@ -915,6 +920,11 @@ public class Node {
         if (isLink() && target != null && getTarget() == null && root != this) {
             target.setRoot(root);
         }
+
+        if (!release.propagatesOverrideSets() && overrides == null && parent != null &&
+            parent.overrides != null) {
+            overrides = parent.overrides.getNodeRule(this);
+        }
     }
 
     public Node getRoot() {
@@ -1053,7 +1063,11 @@ public class Node {
             return false;
         }
 
-        if (edgesOut.size() > 0) {
+        if (!release.propagatesOverrideSets()) {
+            if (node.overrides != overrides) {
+                return false;
+            }
+        } else if (edgesOut.size() > 0) {
             if (node.overrides != null) {
                 if (!node.overrides.isEqual(overrides)) {
                     return false;
@@ -1121,6 +1135,10 @@ public class Node {
 
         if (!other.canReplace(this)) {
             return false;
+        }
+
+        if (!release.propagatesOverrideSets()) {
+            return preferDedupe || NodeSemver.compare(other.getVersion(), getVersion(), DEFAULT) >= 0;
         }
 
         if (preferDedupe || NodeSemver.compare(other.getVersion(), getVersion(), DEFAULT) == 0) {
@@ -1247,6 +1265,10 @@ public class Node {
 
         if (pathChange) {
             changePath(newPath);
+        }
+
+        if (!release.propagatesOverrideSets() && parent.overrides != null) {
+            overrides = parent.overrides.getNodeRule(this);
         }
 
         setRoot(parent.getRoot());
@@ -1403,7 +1425,11 @@ public class Node {
     }
 
     void addEdgeIn(Edge edge) {
-        if (overrides == null || !overrides.isEqual(edge.getOverrides())) {
+        if (!release.propagatesOverrideSets()) {
+            if (edge.getOverrides() != null) {
+                overrides = edge.getOverrides();
+            }
+        } else if (overrides == null || !overrides.isEqual(edge.getOverrides())) {
             updateOverridesEdgeInAdded(edge.getOverrides());
         }
         edgesIn.add(edge);

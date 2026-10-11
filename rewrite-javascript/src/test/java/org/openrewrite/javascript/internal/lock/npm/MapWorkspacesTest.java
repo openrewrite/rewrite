@@ -16,9 +16,11 @@
 package org.openrewrite.javascript.internal.lock.npm;
 
 import com.fasterxml.jackson.databind.JsonNode;
+import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.params.provider.MethodSource;
 import org.openrewrite.javascript.internal.lock.PosixPath;
 
@@ -132,6 +134,89 @@ class MapWorkspacesTest {
         } else {
             assertThat(relative(MapWorkspaces.virtual(CWD, lockfile, NpmRelease.PORTED))).isEqualTo(json(c.get("virtual")));
         }
+    }
+
+    private static String members(Map<?, String> members) {
+        StringBuilder out = new StringBuilder();
+        for (Map.Entry<?, String> e : members.entrySet()) {
+            String relative = Relpath.relpath(CWD, e.getValue());
+            out.append(out.length() == 0 ? "" : " ").append(e.getKey()).append('=')
+              .append(relative.isEmpty() ? "." : relative);
+        }
+        return out.toString();
+    }
+
+    /**
+     * What @npmcli/map-workspaces 3.0.4 (npm 10.5.1) answered for these patterns over this layout, on disk and over
+     * a lock of it; where 3.0.6 (npm 10.5.2) answered otherwise, its answer follows in the next two columns.
+     */
+    @ParameterizedTest
+    @CsvSource(delimiter = '|', quoteCharacter = '`', nullValues = "-", value = {
+      "[\"packages/*\"]|a=packages/a b=packages/b e=packages/e|a=packages/a b=packages/b|-|-",
+      "[\"./packages/*\"]|a=packages/a b=packages/b e=packages/e|``|-|a=packages/a b=packages/b",
+      "[\"packages/*\",\"!packages/b\"]|a=packages/a e=packages/e|a=packages/a|-|-",
+      "[\"!packages/b\",\"packages/*\"]|b=packages/b a=packages/a e=packages/e|a=packages/a b=packages/b|" +
+      "a=packages/a e=packages/e|a=packages/a",
+      "[\"packages/*\",\"!packages/b\",\"packages/b\"]|a=packages/a b=packages/b e=packages/e|" +
+      "a=packages/a b=packages/b|-|-",
+      "[\"packages/**\",\"!packages/c/**\"]|a=packages/a b=packages/b e=packages/e|a=packages/a b=packages/b|-|-",
+      "[\"!packages/c/**\",\"packages/**\"]|d=packages/c/d a=packages/a b=packages/b e=packages/e|" +
+      "a=packages/a b=packages/b d=packages/c/d|a=packages/a b=packages/b e=packages/e|a=packages/a b=packages/b",
+      "[\"packages/**\",\"!packages/c/**\",\"packages/c/d\"]|a=packages/a b=packages/b d=packages/c/d e=packages/e|" +
+      "a=packages/a b=packages/b d=packages/c/d|-|-",
+      "[\"packages/a\",\"packages/a\"]|a=packages/a|a=packages/a|-|-",
+      "[\"/packages/a\",\"tools/*\"]|a=packages/a t=tools/t|a=packages/a t=tools/t|-|-",
+      "[\"./packages/a/\",\"./tools/t\"]|a=packages/a t=tools/t|``|-|t=tools/t",
+      "[\"packages/*\",\"!!packages/b\",\"!!!packages/a\"]|b=packages/b e=packages/e|b=packages/b|-|-",
+      "[\"tools/*\",\"packages/*\"]|t=tools/t a=packages/a b=packages/b e=packages/e|" +
+      "a=packages/a b=packages/b t=tools/t|-|t=tools/t a=packages/a b=packages/b",
+      "[\"packages/b\",\"packages/a\"]|b=packages/b a=packages/a|a=packages/a b=packages/b|-|" +
+      "b=packages/b a=packages/a",
+      "[\"!packages/*\"]|``|``|-|-",
+      "[\"packages/*/\"]|a=packages/a b=packages/b e=packages/e|``|-|-",
+      "[\"**\"]|wsroot=. a=packages/a b=packages/b d=packages/c/d e=packages/e t=tools/t|" +
+      "a=packages/a b=packages/b d=packages/c/d t=tools/t|" +
+      "a=packages/a b=packages/b d=packages/c/d e=packages/e t=tools/t|" +
+      "project=. a=packages/a b=packages/b d=packages/c/d t=tools/t",
+      "[\"packages/[ab]\",\"!packages/{b,x}\"]|a=packages/a|a=packages/a|-|-",
+      "[\"packages/*\",\"!./packages/b\"]|a=packages/a e=packages/e|a=packages/a b=packages/b|-|a=packages/a",
+      "[\"packages/*\",\"!packages/b/\"]|a=packages/a e=packages/e|a=packages/a b=packages/b|-|-",
+      "[\".\"]|wsroot=.|``|-|-",
+      "[\"./\"]|wsroot=.|``|``|project=.",
+      "[\"packages/.h\"]|h=packages/.h|``|-|-",
+      "[\"packages/.*\"]|h=packages/.h|``|-|-",
+      "{\"packages\":[\"packages/a\"]}|a=packages/a|a=packages/a|-|-"
+    })
+    void membersBeforeAndFrom3_0_6(String workspaces, String onDisk3_0_4, String virtual3_0_4,
+                                   @Nullable String onDisk3_0_6, @Nullable String virtual3_0_6) {
+        Map<String, String> manifests = new LinkedHashMap<>();
+        manifests.put("", "{\"name\":\"wsroot\",\"version\":\"1.0.0\"}");
+        manifests.put("packages/a", "{\"name\":\"a\",\"version\":\"1.0.0\"}");
+        manifests.put("packages/b", "{\"name\":\"b\",\"version\":\"1.0.0\"}");
+        manifests.put("packages/c/d", "{\"name\":\"d\",\"version\":\"1.0.0\"}");
+        manifests.put("tools/t", "{\"name\":\"t\",\"version\":\"1.0.0\"}");
+        manifests.put("packages/.h", "{\"name\":\"h\",\"version\":\"1.0.0\"}");
+        manifests.put("packages/e", "{\"version\":\"1.0.0\"}");
+        manifests.put("packages/a/node_modules/n", "{\"name\":\"n\"}");
+        VirtualTreeLoader.ProjectFiles files = VirtualTreeLoader.ProjectFiles.builder().manifests(manifests).build();
+        Map<String, Object> pkg = obj("workspaces", json(workspaces));
+        assertThat(members(MapWorkspaces.mapWorkspaces(CWD, pkg, files, NpmRelease.of("10.5.1"))))
+          .isEqualTo(onDisk3_0_4);
+        assertThat(members(MapWorkspaces.mapWorkspaces(CWD, pkg, files, NpmRelease.of("10.5.2"))))
+          .isEqualTo(onDisk3_0_6 == null ? onDisk3_0_4 : onDisk3_0_6);
+
+        Map<String, Object> packages = obj("", obj("workspaces", json(workspaces)));
+        packages.put("packages/a", obj("name", "a"));
+        packages.put("packages/b", obj("name", "b"));
+        packages.put("packages/c/d", obj("name", "d"));
+        packages.put("tools/t", obj());
+        packages.put("node_modules/a", obj("link", true));
+        packages.put("packages/a/node_modules/n", obj());
+        Map<String, Object> lockfile = obj("packages", packages);
+        assertThat(members(MapWorkspaces.virtual(CWD, lockfile, NpmRelease.of("10.5.1"))))
+          .isEqualTo(virtual3_0_4);
+        assertThat(members(MapWorkspaces.virtual(CWD, lockfile, NpmRelease.of("10.5.2"))))
+          .isEqualTo(virtual3_0_6 == null ? virtual3_0_4 : virtual3_0_6);
     }
 
     private static Object parsed(String text) {
