@@ -59,7 +59,7 @@ class NodeSemverTest {
             for (int i = 0; i < row.size(); i++) {
                 JsonNode cell = row.get(i);
                 if (cell.isObject()) {
-                    args[i] = Options.of(cell.get("loose").asBoolean(), cell.get("includePrerelease").asBoolean());
+                    args[i] = options(cell.get("loose").asBoolean(), cell.get("includePrerelease").asBoolean());
                 } else if (cell.isBoolean()) {
                     args[i] = cell.asBoolean();
                 } else if (cell.isNull()) {
@@ -113,10 +113,10 @@ class NodeSemverTest {
     @ParameterizedTest
     @MethodSource("comparatorIntersection")
     void comparatorsIntersect(String c0, String c1, boolean expect, boolean includePrerelease) {
-        assertThat(NodeSemver.intersects(c0, c1, Options.of(false, includePrerelease))).isEqualTo(expect);
-        assertThat(NodeSemver.intersects(c1, c0, Options.of(false, includePrerelease))).isEqualTo(expect);
-        assertThat(NodeSemver.intersects(c0, c1, Options.of(true, includePrerelease))).isEqualTo(expect);
-        assertThat(NodeSemver.intersects(c1, c0, Options.of(true, includePrerelease))).isEqualTo(expect);
+        assertThat(NodeSemver.intersects(c0, c1, options(false, includePrerelease))).isEqualTo(expect);
+        assertThat(NodeSemver.intersects(c1, c0, options(false, includePrerelease))).isEqualTo(expect);
+        assertThat(NodeSemver.intersects(c0, c1, options(true, includePrerelease))).isEqualTo(expect);
+        assertThat(NodeSemver.intersects(c1, c0, options(true, includePrerelease))).isEqualTo(expect);
     }
 
     @Test
@@ -399,7 +399,7 @@ class NodeSemverTest {
     @ParameterizedTest
     @MethodSource("subsets")
     void subset(String sub, String dom, boolean expect, boolean includePrerelease) {
-        assertThat(NodeSemver.subset(sub, dom, Options.of(false, includePrerelease)))
+        assertThat(NodeSemver.subset(sub, dom, options(false, includePrerelease)))
           .as("%s subset of %s", sub, dom).isEqualTo(expect);
     }
 
@@ -495,5 +495,11 @@ class NodeSemverTest {
         assertThat(NodeSemver.satisfies("1.0.0", new HashMap<>(), Options.INCLUDE_PRERELEASE)).isFalse();
         assertThat(NodeSemver.satisfies("1.0.0", (Object) "", Options.DEFAULT)).isTrue();
         assertThat(NodeSemver.satisfies("1.0.0", (Object) "^1", Options.DEFAULT)).isTrue();
+    }
+
+    // the preset for the options a fixture row names
+    private static Options options(boolean loose, boolean includePrerelease) {
+        return loose ? (includePrerelease ? Options.LOOSE_INCLUDE_PRERELEASE : Options.LOOSE) :
+                (includePrerelease ? Options.INCLUDE_PRERELEASE : Options.DEFAULT);
     }
 }

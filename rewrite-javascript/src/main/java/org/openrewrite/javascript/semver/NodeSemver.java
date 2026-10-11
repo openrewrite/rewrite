@@ -61,11 +61,6 @@ public class NodeSemver {
         final boolean loose;
         final boolean includePrerelease;
         final Release release;
-
-        public static Options of(boolean loose, boolean includePrerelease) {
-            return loose ? (includePrerelease ? LOOSE_INCLUDE_PRERELEASE : LOOSE) :
-                    (includePrerelease ? INCLUDE_PRERELEASE : DEFAULT);
-        }
     }
 
     /**
