@@ -103,6 +103,7 @@ public final class IdealTreeBuilder {
     private final Set<Node> loadFailures = new LinkedHashSet<>();
     private final Map<String, Map<String, Object>> manifests = new LinkedHashMap<>();
     private boolean mutateTree;
+    private @Nullable PackageExtensions packageExtensions;
     private final Map<Node, Node> peerSetSource = new IdentityHashMap<>();
     private final Map<Node, Node> virtualRoots = new IdentityHashMap<>();
     private boolean flagsSuspect;
@@ -148,7 +149,8 @@ public final class IdealTreeBuilder {
 
     /**
      * Throws MalformedLock for no lock or one npm discards, CannotKnow where arborist reads what the engine lacks, and
-     * npm's rejections: ERESOLVE, E404, EALLOW*, ETARGET, EOVERRIDE, EUNSUPPORTEDPROTOCOL, EBADPLATFORM, EBADENGINE.
+     * npm's rejections: ERESOLVE, E404, EALLOW*, ETARGET, EOVERRIDE, EUNSUPPORTEDPROTOCOL, EBADPLATFORM, EBADENGINE,
+     * and from npm 12.0.0 ELOCKFILEVERSION, EEXTENSION* and EPATCH*.
      */
     public Node buildIdealTree() {
         if (idealTree != null) {
@@ -159,12 +161,14 @@ public final class IdealTreeBuilder {
         }
         try {
             initTree();
+            loadPackageExtensions();
             inflateAncientLockfile();
             applyUserRequests();
             buildDeps();
             fixDepFlags();
             pruneFailedOptional();
             checkEngineAndPlatform();
+            resolvePatchedDependencies();
         } catch (StackOverflowError e) {
             // arborist recurses the same way (some peer cycles nest placements without end): npm's RangeError
             throw new NpmRejection(null, "Maximum call stack size exceeded", null);
@@ -203,6 +207,46 @@ public final class IdealTreeBuilder {
                     }
                 }
             }
+        }
+    }
+
+    // npm 12.0.0's #loadPackageExtensions. It follows #loadNpmExtension, which --ignore-scripts turns off
+    // (ignoreExtension): the lock's .npm-extension state is then left as it is
+    private void loadPackageExtensions() {
+        Node tree = Objects.requireNonNull(idealTree);
+        Shrinkwrap meta = Objects.requireNonNull(tree.getMeta());
+        Object raw = Js.get(Objects.requireNonNull(tree.getTarget()).getPackage(), "packageExtensions");
+        Object lockedHash = meta.getPackageExtensionsHash();
+        if (raw == Js.UNDEFINED && lockedHash == null || !options.getRelease().appliesPackageExtensions()) {
+            return;
+        }
+        packageExtensions = new PackageExtensions(raw, options.getRelease().semver());
+        meta.setPackageExtensionsHash(packageExtensions.getHash());
+
+        // a rule set that changed since the lock was written leaves the locked manifests of the packages it
+        // extends, or extended, stale: they are rebuilt from fresh manifests under the current rules
+        if (meta.isLoadedFromDisk() && !Js.strictEquals(lockedHash, packageExtensions.getHash())) {
+            for (Node node : new ArrayList<>(tree.getInventory().values())) {
+                if (node.isProjectRoot() || node.isWorkspace() || node.isTop()) {
+                    continue;
+                }
+                boolean affected = truthy(node.getPackageExtensionsApplied()) ||
+                                   packageExtensions.wouldMatch(node.getPackageName(), node.getVersion());
+                if (affected) {
+                    for (Edge edge : node.getEdgesIn()) {
+                        depsQueue.push(edge.getFrom());
+                    }
+                    node.setParent(null);
+                }
+            }
+        }
+    }
+
+    // npm 12.0.0's resolvePatchedDependencies, which does nothing a lock shows without a patch declared or recorded
+    private void resolvePatchedDependencies() {
+        Node tree = Objects.requireNonNull(idealTree);
+        if (PatchedDependencies.concerns(tree) && options.getRelease().resolvesPatchedDependencies()) {
+            PatchedDependencies.resolvePatchedDependencies(tree, path, files.getPaths());
         }
     }
 
@@ -368,6 +412,9 @@ public final class IdealTreeBuilder {
                                 (hasBundle || truthy(hasShrinkwrap)) &&
                                 !node.isInert();
             if (crackOpen) {
+                // pacote.extract(node.resolved, ...) reads the resolved value as a spec of its own, with the options as
+                // they are: no dependent makes it a root's
+                checkAllow(Spec.npa(node.getResolved(), null), null);
                 throw new CannotKnow((truthy(hasShrinkwrap) ? "npm-shrinkwrap.json of " : "bundled dependencies of ") +
                                      node.getPkgid());
             }
@@ -749,14 +796,21 @@ public final class IdealTreeBuilder {
             return failureNode(name, parent, new NpmRejection("EINCOMPLETEMANIFEST",
                     "incomplete manifest for " + name + ", missing version", null), edge);
         }
-        return new Node(Node.options()
+        // npm 12.0.0 extends a copy of the manifest before the node reads its edges; a rule that does not apply
+        // fails the install, not the node
+        PackageExtensions.Extended extended = packageExtensions == null ? null : packageExtensions.apply(pkg);
+        Node node = new Node(Node.options()
                 .name(name)
-                .pkg(pkg)
+                .pkg(extended != null ? extended.getPkg() : pkg)
                 .parent(parent)
                 .installLinks(installLinks)
                 .legacyPeerDeps(options.isLegacyPeerDeps())
                 .release(options.getRelease())
                 .build());
+        if (extended != null) {
+            node.setPackageExtensionsApplied(extended.getApplied());
+        }
+        return node;
     }
 
     // PackageJson.normalize(realpath).catch(() => ({ content: {} })) over the project's files

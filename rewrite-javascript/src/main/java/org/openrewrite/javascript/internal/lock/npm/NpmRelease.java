@@ -67,6 +67,14 @@ public final class NpmRelease implements Comparable<NpmRelease> {
     // @npmcli/arborist build-ideal-tree.js
 
     /**
+     * The root's {@code packageExtensions} extend the manifests they select ({@code #loadPackageExtensions}, {@code
+     * #applyPackageExtension}, package-extensions.js), from npm 12.0.0.
+     */
+    boolean appliesPackageExtensions() {
+        return atLeast(12, 0, 0);
+    }
+
+    /**
      * {@code #resolveLinks} gives a link's overrides to its target before the target resolves, from npm 11.18.0
      * (npm/cli#9659).
      */
@@ -90,6 +98,14 @@ public final class NpmRelease implements Comparable<NpmRelease> {
         return atLeast(12, 0, 2) || atLeast(11, 19, 0) && !atLeast(12, 0, 0);
     }
 
+    /**
+     * The root's {@code patchedDependencies} are resolved against the tree once it is built
+     * (patched-dependencies.js), from npm 12.0.0.
+     */
+    boolean resolvesPatchedDependencies() {
+        return atLeast(12, 0, 0);
+    }
+
     // @npmcli/arborist calc-dep-flags.js
 
     /**
@@ -97,6 +113,26 @@ public final class NpmRelease implements Comparable<NpmRelease> {
      */
     boolean linkOnlyUnsetsTargetFlags() {
         return atLeast(11, 18, 0);
+    }
+
+    // @npmcli/arborist consistent-resolve.js
+
+    /**
+     * A hosted git URL written as https resolves to https ({@code hosted.default}), from npm 12.0.0; before, only one
+     * that carries credentials, and every other to ssh.
+     */
+    boolean keepsHostedGitHttps() {
+        return atLeast(12, 0, 0);
+    }
+
+    // @npmcli/arborist edge.js
+
+    /**
+     * {@code satisfiedBy} reads a dependency the root project bundles by the overridden spec, as any other ({@code
+     * inDepBundle} in place of {@code inBundle}), from npm 12.0.0.
+     */
+    boolean overridesWhatTheRootBundles() {
+        return atLeast(12, 0, 0);
     }
 
     // @npmcli/arborist link.js
@@ -107,6 +143,32 @@ public final class NpmRelease implements Comparable<NpmRelease> {
      */
     boolean linkOverridesMatchSubtree() {
         return atLeast(11, 18, 0);
+    }
+
+    // @npmcli/arborist shrinkwrap.js
+
+    /**
+     * An npm-shrinkwrap.json is read, the project's in place of its package-lock.json and a dependency's for the tree
+     * below it ({@code hasShrinkwrap}), until npm 12.0.0.
+     */
+    boolean readsNpmShrinkwrap() {
+        return !atLeast(12, 0, 0);
+    }
+
+    /**
+     * A node's {@code patched}, {@code packageExtensionsApplied} and {@code npmExtensionApplied} and the root's
+     * extension hashes are read from the lock (load-virtual.js) and written to it, from npm 12.0.0.
+     */
+    boolean recordsPatchesAndExtensions() {
+        return atLeast(12, 0, 0);
+    }
+
+    /**
+     * {@code load} refuses a lock whose {@code lockfileVersion} is above 4 ({@code ELOCKFILEVERSION}), from npm
+     * 12.0.0.
+     */
+    boolean refusesNewerLockfile() {
+        return atLeast(12, 0, 0);
     }
 
     // @npmcli/config definitions.js
@@ -125,6 +187,16 @@ public final class NpmRelease implements Comparable<NpmRelease> {
         return atLeast(12, 0, 0) ? "none" : "all";
     }
 
+    // @npmcli/package-json normalize.js
+
+    /**
+     * Normalizing removes an {@code overrides} that is not an object or is empty (the {@code overrides} step of
+     * @npmcli/package-json 8.0.0), from npm 12.0.0.
+     */
+    boolean normalizesOverrides() {
+        return atLeast(12, 0, 0);
+    }
+
     // brace-expansion
 
     /**
@@ -134,6 +206,16 @@ public final class NpmRelease implements Comparable<NpmRelease> {
     BraceExpansion.Release braceExpansion() {
         return atLeast(12, 1, 0) || atLeast(11, 19, 1) && !atLeast(12, 0, 0) ? BraceExpansion.Release.V5_0_9 :
                 BraceExpansion.Release.V5_0_6;
+    }
+
+    // npm base-cmd.js
+
+    /**
+     * {@code validateCli} fails the command when {@code strict-npmrc} is set and an npmrc file holds a key the config
+     * does not define ({@code EUNKNOWNCONFIG}), from npm 12.0.0; before, {@code strict-npmrc} is such a key itself.
+     */
+    boolean strictNpmrcRefusesUnknownKeys() {
+        return atLeast(12, 0, 0);
     }
 
     // semver

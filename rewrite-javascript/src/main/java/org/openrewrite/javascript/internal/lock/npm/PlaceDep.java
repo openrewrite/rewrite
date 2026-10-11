@@ -273,6 +273,13 @@ public final class PlaceDep {
                 .legacyPeerDeps(options.isLegacyPeerDeps())
                 .release(options.getRelease())
                 .error(dep.getErrors().isEmpty() ? null : dep.getErrors().get(0));
+        // npm 12.0.0 carries what a root manifest extension did to the dep, which only it records
+        if (Js.truthy(dep.getPackageExtensionsApplied())) {
+            placedOptions.packageExtensionsApplied(dep.getPackageExtensionsApplied());
+        }
+        if (Js.truthy(dep.getNpmExtensionApplied())) {
+            placedOptions.npmExtensionApplied(dep.getNpmExtensionApplied());
+        }
         if (dep.getOverrides() != null) {
             placedOptions.overrides(dep.getOverrides());
         }

@@ -144,7 +144,8 @@ public final class NpmLockRegenerator {
         try {
             INSTALL.requireInstallsAt(NpmOptions.loadLocalPrefix(inputs.getRelease(),
                     inputs.getManifests().get(inputs.getRunsIn()), inputs.getParentTrees()), inputs.getRunsIn(), "lock");
-            if (inputs.getPaths() != null && Shrinkwrap.readsShrinkwrap(inputs.getPaths()::contains)) {
+            if (inputs.getPaths() != null &&
+                Shrinkwrap.readsShrinkwrap(inputs.getRelease(), inputs.getPaths()::contains)) {
                 throw new CannotKnow("the lock npm writes: it reads and writes the npm-shrinkwrap.json beside this " +
                                      "lock in its place");
             }
@@ -212,7 +213,8 @@ public final class NpmLockRegenerator {
     }
 
     private VirtualTreeLoader.ProjectFiles projectFiles(@Nullable LockFile lock) {
-        return projectFiles(lock, inputs.getYarnLock(), inputs.getManifests());
+        return projectFiles(lock, inputs.getYarnLock(), inputs.getManifests())
+                .readBy(inputs.getRelease(), inputs.getPaths());
     }
 
     /**
@@ -351,6 +353,10 @@ public final class NpmLockRegenerator {
     }
 
     private static Reason reasonFor(String code) {
+        // npm 12's verdicts on the root's packageExtensions and patchedDependencies
+        if (code.startsWith("EEXTENSION") || code.startsWith("EPATCH")) {
+            return Reason.MALFORMED_MANIFEST;
+        }
         switch (code) {
             case "E404":
                 return SharedError.PACKAGE_NOT_FOUND.getReason();
@@ -363,6 +369,8 @@ public final class NpmLockRegenerator {
             case "ENOVERSIONS":
             case "E403":
                 return Reason.VERSION_NOT_FOUND;
+            case "ELOCKFILEVERSION":
+                return Reason.UNSUPPORTED_LOCKFILE_VERSION;
             case "EUNSUPPORTEDPROTOCOL":
             case "EALLOWGIT":
             case "EALLOWFILE":

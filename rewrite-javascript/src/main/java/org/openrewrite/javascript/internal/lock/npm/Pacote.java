@@ -114,7 +114,7 @@ final class Pacote {
         Map<String, Object> mani = full || !opts.isFullMetadata() ? picked :
                 withVersionDocument(picked, registry.manifest(options.registryFor(name), name,
                         versionKey(packument, picked)));
-        PackageJson.syncNormalize(mani);
+        PackageJson.syncNormalize(mani, options.getRelease());
         PackageJson.normalizeBin(mani);
 
         Object time = truthy(packument.get("time")) ?

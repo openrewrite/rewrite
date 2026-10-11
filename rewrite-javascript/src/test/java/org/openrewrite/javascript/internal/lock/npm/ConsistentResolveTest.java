@@ -27,7 +27,7 @@ class ConsistentResolveTest {
 
     private static @Nullable Object cr(@Nullable String resolved, @Nullable String fromPath, @Nullable String toPath,
                                        boolean rel) {
-        return ConsistentResolve.consistentResolve(resolved, fromPath, toPath, rel);
+        return ConsistentResolve.consistentResolve(resolved, fromPath, toPath, rel, NpmRelease.PORTED);
     }
 
     private static @Nullable Object cr(@Nullable String resolved) {
@@ -102,6 +102,42 @@ class ConsistentResolveTest {
         assertThat(cr("xyz@git+https://github.com/a/b.git" + hash)).isEqualTo(expect + hash);
         assertThat(cr("xyz@git://github.com/a/b.git" + hash)).isEqualTo(expect + hash);
         assertThat(cr("xyz@git+ssh://git@github.com/a/b.git" + hash)).isEqualTo(expect + hash);
+    }
+
+    // consistent-resolve.js of npm 11.21.0 and of npm 12.0.0, run on these: from 12.0.0 a hosted URL written as https
+    // stays https (hosted.default)
+    @Test
+    void hostedHttpsStaysHttpsFrom12() {
+        String[][] rows = {
+                {"git+https://github.com/user/repo.git#abc123", "git+ssh://git@github.com/user/repo.git#abc123",
+                        "git+https://github.com/user/repo.git#abc123"},
+                {"https://github.com/user/repo.git#abc123", "git+ssh://git@github.com/user/repo.git#abc123",
+                        "git+https://github.com/user/repo.git#abc123"},
+                {"git+https://gitlab.com/user/repo.git#abc123", "git+ssh://git@gitlab.com/user/repo.git#abc123",
+                        "git+https://gitlab.com/user/repo.git#abc123"},
+                {"git+https://github.com/user/repo.git#semver:^1.0.0",
+                        "git+ssh://git@github.com/user/repo.git#semver:^1.0.0",
+                        "git+https://github.com/user/repo.git#semver:^1.0.0"},
+                {"git+https://user:pass@github.com/user/repo.git#abc123",
+                        "git+https://user:pass@github.com/user/repo.git#abc123",
+                        "git+https://user:pass@github.com/user/repo.git#abc123"},
+                {"git+ssh://git@github.com/user/repo.git#abc123", "git+ssh://git@github.com/user/repo.git#abc123",
+                        "git+ssh://git@github.com/user/repo.git#abc123"},
+                {"github:user/repo#abc123", "git+ssh://git@github.com/user/repo.git#abc123",
+                        "git+ssh://git@github.com/user/repo.git#abc123"},
+                {"git://github.com/user/repo.git#abc123", "git+ssh://git@github.com/user/repo.git#abc123",
+                        "git+ssh://git@github.com/user/repo.git#abc123"},
+                {"gist:11081aaa281", "git+ssh://git@gist.github.com/11081aaa281.git",
+                        "git+ssh://git@gist.github.com/11081aaa281.git"},
+                {"https://github.com/user/repo/tarball/v1.0.0", "https://github.com/user/repo/tarball/v1.0.0",
+                        "https://github.com/user/repo/tarball/v1.0.0"},
+        };
+        for (String[] row : rows) {
+            assertThat(ConsistentResolve.consistentResolve(row[0], NpmRelease.of("11.21.0"))).as("11.21.0 %s", row[0])
+              .isEqualTo(row[1]);
+            assertThat(ConsistentResolve.consistentResolve(row[0], NpmRelease.of("12.0.0"))).as("12.0.0 %s", row[0])
+              .isEqualTo(row[2]);
+        }
     }
 
     @Test

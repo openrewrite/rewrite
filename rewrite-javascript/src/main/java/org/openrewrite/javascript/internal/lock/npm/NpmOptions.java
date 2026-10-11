@@ -61,6 +61,45 @@ public class NpmOptions {
             "scope");
     private static final Pattern SCOPED_REGISTRY = Pattern.compile("(@[^:]+):registry");
 
+    // @npmcli/config definitions.js: every key npm 12.0.0 defines, in its order, which no release to 12.2.0 changes
+    private static final Set<String> DEFINITIONS_12 = new LinkedHashSet<>(Arrays.asList(
+            "_auth", "access", "all", "allow-same-version", "allow-directory", "allow-file", "allow-git",
+            "allow-remote", "allow-scripts", "also", "audit", "audit-level", "auth-type", "before", "bin-links",
+            "browser", "bypass-2fa", "ca", "cache", "cache-max", "cache-min", "cafile", "call", "cert", "cidr",
+            "color", "commit-hooks", "cpu", "dangerously-allow-all-scripts", "depth", "description", "dev", "diff",
+            "diff-ignore-all-space", "diff-name-only", "diff-no-prefix", "diff-dst-prefix", "diff-src-prefix",
+            "diff-text", "diff-unified", "dry-run", "editor", "engine-strict", "expect-result-count",
+            "expect-results", "expires", "extension-file", "fetch-retries", "fetch-retry-factor",
+            "fetch-retry-maxtimeout", "fetch-retry-mintimeout", "fetch-timeout", "force", "foreground-scripts",
+            "format-package-lock", "fund", "git", "git-tag-version", "global", "globalconfig", "global-ignore-file",
+            "global-style", "heading", "https-proxy", "if-present", "ignore-extension", "ignore-scripts", "include",
+            "include-staged", "include-workspace-root", "include-attestations", "init-author-email",
+            "init-author-name", "init-author-url", "init-license", "init-module", "init-type", "init-version",
+            "init-private", "init.author.email", "init.author.name", "init.author.url", "init.license", "init.module",
+            "init.version", "install-links", "install-strategy", "json", "key", "legacy-bundling", "legacy-peer-deps",
+            "libc", "link", "local-address", "location", "lockfile-version", "loglevel", "logs-dir", "logs-max",
+            "long", "name", "maxsockets", "message", "min-release-age", "min-release-age-exclude", "node-gyp",
+            "node-options", "noproxy", "offline", "omit", "omit-lockfile-registry-resolved", "only", "orgs",
+            "optional", "os", "otp", "package", "package-lock", "package-lock-only", "pack-destination", "packages",
+            "patches-dir", "allow-unused-patches", "ignore-patch-failures", "edit-dir", "ignore-existing",
+            "keep-edit-dir", "parseable", "allow-scripts-pending", "allow-scripts-pin", "prefer-dedupe",
+            "prefer-offline", "prefer-online", "prefix", "preid", "production", "progress", "provenance",
+            "provenance-file", "proxy", "read-only", "rebuild-bundle", "registry", "replace-registry-host", "save",
+            "save-bundle", "save-dev", "save-exact", "save-optional", "save-peer", "save-prefix", "save-prod",
+            "sbom-format", "sbom-type", "scope", "scopes", "packages-all", "packages-and-scopes-permission",
+            "orgs-permission", "password", "token-description", "script-shell", "searchexclude", "searchlimit",
+            "searchopts", "searchstaleness", "shell", "sign-git-commit", "sign-git-tag", "strict-peer-deps",
+            "strict-allow-scripts", "strict-npmrc", "strict-ssl", "tag", "tag-version-prefix", "timing", "to",
+            "umask", "unicode", "update-notifier", "usage", "user-agent", "userconfig", "version", "versions",
+            "viewer", "which", "workspace", "workspaces", "workspaces-update", "yes"));
+    // definitions/index.js nerfDarts: what a key scoped to a registry may end in without a definition of its own
+    private static final List<String> NERF_DARTS = Arrays.asList("_auth", "_authToken", "_password", "certfile",
+            "email", "keyfile", "username");
+    // index.js internalEnv: what npm sets for an npm it runs
+    private static final List<String> INTERNAL_ENV = Arrays.asList("npm-version", "global-prefix", "local-prefix");
+    private static final String STRICT_NPMRC = "strict-npmrc";
+    private static final Object UNSET = new Object();
+
     // the definition's type, which npm's parseField reads from types[key]: Boolean, String, Number, or a
     // list of literal values
     private enum Type {
@@ -296,6 +335,8 @@ public class NpmOptions {
                 entries.addAll(Ini.decode(file, Ini.Release.V6_0_0).entrySet());
             }
         }
+        // what the command checks of its config before it reads any of it
+        validateCli(release, userNpmrc, npmrc, env);
         // global-style and legacy-bundling flatten by writing install-strategy into the config they come from,
         // which install-strategy's own flatten then reads, wherever it stands in the file
         String installStrategyWritten = null;
@@ -451,6 +492,112 @@ public class NpmOptions {
         options.omit(buildOmitList(omit, include, only, production, dev, optional, also));
         options.scopedRegistries(scopedRegistries);
         return options.build();
+    }
+
+    /**
+     * base-cmd.js {@code validateCli}, which npm 12.0.0 runs once its config is loaded and before the command reads
+     * it: under {@code strict-npmrc}, a key of an npmrc file that @npmcli/config's {@code checkUnknown} finds no
+     * definition for fails the install. Only the project's keys are asked: the user's file is the host's rendering of
+     * its registries, with keys of the host's own.
+     */
+    private static void validateCli(NpmRelease release, @Nullable String userNpmrc, @Nullable String npmrc,
+                                    HostEnvironment env) {
+        if (npmrc == null) {
+            return;
+        }
+        Map<String, @Nullable Object> project = Ini.decode(npmrc, Ini.Release.V6_0_0);
+        List<String> unknown = new ArrayList<>();
+        for (String key : project.keySet()) {
+            String shown = unknownConfig(key);
+            if (shown != null) {
+                unknown.add(shown);
+            }
+        }
+        if (unknown.isEmpty()) {
+            return;
+        }
+        // config.get('strict-npmrc'): the project's file over the user's
+        Object strict = UNSET;
+        CannotKnow unknowable = null;
+        try {
+            strict = setIn(project, STRICT_NPMRC, env);
+            if (strict == UNSET && userNpmrc != null) {
+                strict = setIn(Ini.decode(userNpmrc, Ini.Release.V6_0_0), STRICT_NPMRC, env);
+            }
+        } catch (CannotKnow e) {
+            unknowable = e;
+        }
+        if (strict == UNSET && unknowable == null || !release.strictNpmrcRefusesUnknownKeys()) {
+            return;
+        }
+        if (unknowable != null) {
+            throw unknowable;
+        }
+        if (cleanBoolean(parseField(strict, Type.BOOLEAN, env))) {
+            StringBuilder message = new StringBuilder("Unknown npm configuration key")
+                    .append(unknown.size() > 1 ? "s" : "").append(':');
+            for (String shown : unknown) {
+                // npm names the file by the path it read it from
+                message.append("\n  - project config ").append(shown).append(" from .npmrc");
+            }
+            throw new NpmRejection("EUNKNOWNCONFIG", message.append("\nSee `npm help npmrc` for supported config " +
+                                                                    "options.").toString(), null);
+        }
+    }
+
+    // @npmcli/config index.js checkUnknown: how validateCli shows a key without a definition, null for one that has
+    // one; a key scoped to a registry or a package scope is known by its last part, and `definitions` is a plain
+    // object, so what it inherits counts as defined
+    private static @Nullable String unknownConfig(String key) {
+        if (defines(key) || INTERNAL_ENV.contains(key)) {
+            return null;
+        }
+        String baseKey = key.contains(":") ? key.substring(key.lastIndexOf(':') + 1) : "";
+        if (key.contains(":") && (defines(baseKey) || NERF_DARTS.contains(baseKey))) {
+            return null;
+        }
+        return baseKey.isEmpty() ? '"' + key + '"' : '"' + baseKey + "\" (" + key + ")";
+    }
+
+    private static boolean defines(String key) {
+        return DEFINITIONS_12.contains(key) || Js.objectPrototypeMember(key) != null;
+    }
+
+    // what a file's entries leave under a key (conf.data[k] = v, in the file's order), UNSET without one; an entry
+    // whose key may expand to it is unknown unless a later one sets the key itself
+    private static @Nullable Object setIn(Map<String, @Nullable Object> file, String name, HostEnvironment env) {
+        Object value = UNSET;
+        CannotKnow unknowable = null;
+        for (Map.Entry<String, @Nullable Object> entry : file.entrySet()) {
+            String key;
+            try {
+                key = envReplace(entry.getKey(), env);
+            } catch (CannotKnow e) {
+                if (Objects.requireNonNull(expansions(entry.getKey())).matcher(name).matches()) {
+                    unknowable = e;
+                }
+                continue;
+            }
+            if (name.equals(key)) {
+                value = entry.getValue();
+                unknowable = null;
+            }
+        }
+        if (unknowable != null) {
+            throw unknowable;
+        }
+        return value;
+    }
+
+    // nopt's clean of a Boolean (type-defs.js validateBoolean), which the command's constructor runs over each file's
+    // values before validateCli reads the config: the flattened options arborist reads are from before it
+    private static boolean cleanBoolean(@Nullable Object value) {
+        if (!(value instanceof String)) {
+            return truthy(value);
+        }
+        String s = Js.trim((String) value);
+        double number = Js.toNumber(s);
+        return Double.isNaN(number) ? !"null".equals(s) && !"false".equals(s) : number != 0;
     }
 
     /**
@@ -647,7 +794,7 @@ public class NpmOptions {
             return 0;
         }
         for (Map.Entry<String, Map<String, @Nullable String>> parent : parentTrees.entrySet()) {
-            VirtualTreeLoader.ProjectFiles files = parentFiles(parent.getKey(), manifest, parent.getValue());
+            VirtualTreeLoader.ProjectFiles files = parentFiles(parent.getKey(), manifest, parent.getValue(), release);
             Map<String, Object> pkg;
             try {
                 PackageJson own = files.manifest("");
@@ -673,8 +820,9 @@ public class NpmOptions {
     }
 
     private static VirtualTreeLoader.ProjectFiles parentFiles(String runsIn, String manifest,
-                                                              Map<String, @Nullable String> tree) {
+                                                              Map<String, @Nullable String> tree, NpmRelease release) {
         VirtualTreeLoader.ProjectFiles.ProjectFilesBuilder files = VirtualTreeLoader.ProjectFiles.builder()
+                .release(release)
                 .manifest(runsIn, manifest);
         for (Map.Entry<String, @Nullable String> held : tree.entrySet()) {
             if (held.getKey().equals(runsIn)) {

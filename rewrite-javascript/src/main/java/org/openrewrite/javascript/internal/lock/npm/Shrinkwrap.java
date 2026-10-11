@@ -42,10 +42,26 @@ import static org.openrewrite.javascript.internal.lock.npm.Js.truthy;
 public final class Shrinkwrap {
 
     /**
-     * load's filename: an npm-shrinkwrap.json the project holds is read and written in place of package-lock.json.
+     * load's filename: an npm-shrinkwrap.json the project holds is read and written in place of package-lock.json,
+     * by an npm {@code release} before 12.0.0.
      */
-    public static boolean readsShrinkwrap(Predicate<String> holds) {
-        return holds.test("npm-shrinkwrap.json");
+    public static boolean readsShrinkwrap(NpmRelease release, Predicate<String> holds) {
+        return holds.test("npm-shrinkwrap.json") && release.readsNpmShrinkwrap();
+    }
+
+    /**
+     * {@code ELOCKFILEVERSION}: a lock newer than npm 12 reads.
+     */
+    public static final class UnsupportedLockfileVersion extends IllegalStateException implements NpmError {
+        UnsupportedLockfileVersion(@Nullable Object lockfileVersion) {
+            super("Unsupported lockfileVersion " + Js.string(lockfileVersion) + ". This npm only supports up to " +
+                  MAX_LOCKFILE_VERSION + ". Please upgrade npm.");
+        }
+
+        @Override
+        public String getCode() {
+            return "ELOCKFILEVERSION";
+        }
     }
 
     /**
@@ -56,6 +72,12 @@ public final class Shrinkwrap {
     }
 
     public static final int DEFAULT_LOCKFILE_VERSION = 3;
+
+    // npm 12.0.0: a node's patch record and a manifest extension's state each make the lock version 4, the newest
+    // version it reads
+    private static final int PATCHED_LOCKFILE_VERSION = 4;
+    private static final int PACKAGE_EXTENSIONS_LOCKFILE_VERSION = 4;
+    private static final int MAX_LOCKFILE_VERSION = 4;
 
     public static final List<String> KEY_ORDER = Collections.unmodifiableList(Arrays.asList(
             "name", "version", "lockfileVersion", "resolved", "integrity", "requires", "packages", "dependencies"));
@@ -139,6 +161,21 @@ public final class Shrinkwrap {
     @Setter
     private String newline = "\n";
 
+    /**
+     * The digest of the root's {@code packageExtensions} the lock's root entry records, from npm 12.0.0, whatever
+     * JSON type it has there; null without one.
+     */
+    @Getter
+    @Setter
+    private @Nullable Object packageExtensionsHash;
+
+    /**
+     * The digest of the root's .npm-extension file the lock's root entry records, from npm 12.0.0; null without one.
+     */
+    @Getter
+    @Setter
+    private @Nullable Object npmExtensionHash;
+
     public Shrinkwrap(String path, NpmOptions options) {
         this.path = PosixPath.resolve(path);
         this.resolveOptions = options;
@@ -155,7 +192,7 @@ public final class Shrinkwrap {
 
         for (String key : PKG_META_KEYS) {
             Object val = metaFieldFromPkg(node.getPackage(), key);
-            if (truthy(val)) {
+            if (truthy(val) && isPkgMetaKey(key, options.getRelease())) {
                 meta.put(key.startsWith("_") ? key.substring(1) : key, val);
             }
         }
@@ -182,8 +219,19 @@ public final class Shrinkwrap {
         if (node.hasInstallScript()) {
             meta.put("hasInstallScript", true);
         }
+        // npm 12.0.0's node keys, which only it sets
+        if (truthy(node.getPatched())) {
+            meta.put("patched", node.getPatched());
+        }
+        if (truthy(node.getPackageExtensionsApplied())) {
+            meta.put("packageExtensionsApplied", node.getPackageExtensionsApplied());
+        }
+        if (truthy(node.getNpmExtensionApplied())) {
+            meta.put("npmExtensionApplied", node.getNpmExtensionApplied());
+        }
 
-        Object resolved = ConsistentResolve.consistentResolve(node.getResolved(), node.getPath(), path, true);
+        Object resolved = ConsistentResolve.consistentResolve(node.getResolved(), node.getPath(), path, true,
+                options.getRelease());
         if (truthy(resolved)) {
             Object written = node.isRegistryDependency() ?
                     OverrideResolves.overrideResolves(resolved, options) : resolved;
@@ -209,6 +257,11 @@ public final class Shrinkwrap {
             }
         }
         return meta;
+    }
+
+    // pkgMetaKeys of the release: _hasShrinkwrap until npm 12.0.0
+    private static boolean isPkgMetaKey(String key, NpmRelease release) {
+        return !"_hasShrinkwrap".equals(key) || release.readsNpmShrinkwrap();
     }
 
     private static @Nullable Object metaFieldFromPkg(Map<String, Object> pkg, String key) {
@@ -276,6 +329,8 @@ public final class Shrinkwrap {
         tree = null;
         awaitingUpdate = new LinkedHashMap<>();
         packagesArray = null;
+        packageExtensionsHash = null;
+        npmExtensionHash = null;
         Object lockfileVersion = truthy(this.lockfileVersion) ? this.lockfileVersion : DEFAULT_LOCKFILE_VERSION;
         originalLockfileVersion = lockfileVersion;
 
@@ -335,6 +390,9 @@ public final class Shrinkwrap {
         }
         Object lockfileVersion = DEFAULT_LOCKFILE_VERSION;
         Object fileVersion = Js.get(data, "lockfileVersion");
+        if (Js.toNumber(fileVersion) > MAX_LOCKFILE_VERSION && resolveOptions.getRelease().refusesNewerLockfile()) {
+            throw new UnsupportedLockfileVersion(fileVersion);
+        }
         if (truthy(this.lockfileVersion)) {
             lockfileVersion = this.lockfileVersion;
         } else if (truthy(fileVersion) && !Js.strictEquals(fileVersion, 1)) {
@@ -354,6 +412,18 @@ public final class Shrinkwrap {
         this.data = merged;
 
         originalLockfileVersion = fileVersion;
+
+        // data.packages?.['']?.packageExtensionsHash || null, and the .npm-extension file's beside it
+        Object rootEntry = packages == null || packages == Js.UNDEFINED ? null : Js.get(packages, "");
+        if (rootEntry != null && rootEntry != Js.UNDEFINED) {
+            Object extensionsHash = Js.get(rootEntry, "packageExtensionsHash");
+            Object extensionHash = Js.get(rootEntry, "npmExtensionHash");
+            if ((truthy(extensionsHash) || truthy(extensionHash)) &&
+                resolveOptions.getRelease().recordsPatchesAndExtensions()) {
+                packageExtensionsHash = truthy(extensionsHash) ? extensionsHash : null;
+                npmExtensionHash = truthy(extensionHash) ? extensionHash : null;
+            }
+        }
 
         if (!truthy(this.lockfileVersion)) {
             this.lockfileVersion = lockfileVersion;
@@ -409,7 +479,7 @@ public final class Shrinkwrap {
         Map<String, Object> root = asObject(packages().get(""));
         for (String key : PKG_META_KEYS) {
             Object val = metaFieldFromPkg(pkg, key);
-            if (truthy(val)) {
+            if (truthy(val) && isPkgMetaKey(key, resolveOptions.getRelease())) {
                 root.put(key.startsWith("_") ? key.substring(1) : key, val);
             }
         }
@@ -596,7 +666,8 @@ public final class Shrinkwrap {
 
         if (truthy(lock.get("version")) && !truthy(lock.get("integrity"))) {
             if (spec != null && type == Spec.Type.GIT) {
-                meta.put("resolved", ConsistentResolve.consistentResolve(spec, path, path, false));
+                meta.put("resolved", ConsistentResolve.consistentResolve(spec, path, path, false,
+                        resolveOptions.getRelease()));
                 packages().put(location, meta);
                 return meta;
             } else if (spec != null && spec.isRegistry()) {
@@ -608,7 +679,8 @@ public final class Shrinkwrap {
             if (spec != null && spec.isRegistry()) {
                 meta.put("resolved", lock.get("resolved"));
             } else if (spec != null && type == Spec.Type.FILE) {
-                meta.put("resolved", ConsistentResolve.consistentResolve(spec, path, path, true));
+                meta.put("resolved", ConsistentResolve.consistentResolve(spec, path, path, true,
+                        resolveOptions.getRelease()));
             } else if (spec != null && truthy(spec.getFetchSpec())) {
                 meta.put("resolved", spec.getFetchSpec());
             }
@@ -688,8 +760,9 @@ public final class Shrinkwrap {
             }
             node.setResolved(truthy(node.getResolved()) ? node.getResolved() : truthy(pathFixed) ? pathFixed : null);
             node.setIntegrity(truthy(node.getIntegrity()) ? node.getIntegrity() : truthy(integrity) ? integrity : null);
+            // from npm 12.0.0 the lock's hasShrinkwrap is not read
             node.setHasShrinkwrap(truthy(node.getHasShrinkwrap()) ? node.getHasShrinkwrap() :
-                    truthy(hasShrinkwrap) ? hasShrinkwrap : false);
+                    truthy(hasShrinkwrap) && resolveOptions.getRelease().readsNpmShrinkwrap() ? hasShrinkwrap : false);
         }
         awaitingUpdate.put(loc, node);
     }
@@ -716,7 +789,8 @@ public final class Shrinkwrap {
             if (!Js.string(node.getResolved()).contains("file:")) {
                 pathFixed = node.getResolved();
             } else {
-                pathFixed = ConsistentResolve.consistentResolve(node.getResolved(), node.getPath(), path, true);
+                pathFixed = ConsistentResolve.consistentResolve(node.getResolved(), node.getPath(), path, true,
+                        resolveOptions.getRelease());
             }
         }
 
@@ -741,7 +815,8 @@ public final class Shrinkwrap {
         node.setIntegrity(truthy(node.getIntegrity()) ? node.getIntegrity() :
                 truthy(entryIntegrity) ? entryIntegrity : null);
         Object resolved = truthy(node.getResolved()) ? node.getResolved() :
-                ConsistentResolve.consistentResolve(entryResolved, path, node.getPath(), false);
+                ConsistentResolve.consistentResolve(entryResolved, path, node.getPath(), false,
+                        resolveOptions.getRelease());
         node.setResolved(truthy(resolved) ? resolved : null);
 
         awaitingUpdate.put(Relpath.relpath(path, node.getPath()), node);
@@ -776,6 +851,13 @@ public final class Shrinkwrap {
                 yarnLock.fromTree(tree);
             }
             Map<String, Object> root = metaFromNode(Objects.requireNonNull(tree.getTarget()), path, resolveOptions);
+            // npm 12.0.0 records the state of the root's manifest extensions on the root entry
+            if (truthy(packageExtensionsHash)) {
+                root.put("packageExtensionsHash", packageExtensionsHash);
+            }
+            if (truthy(npmExtensionHash)) {
+                root.put("npmExtensionHash", npmExtensionHash);
+            }
             Map<String, Object> packages = new LinkedHashMap<>();
             data.put("packages", packages);
             packagesArray = null;
@@ -805,6 +887,20 @@ public final class Shrinkwrap {
         if (!truthy(lockfileVersion)) {
             lockfileVersion = DEFAULT_LOCKFILE_VERSION;
         }
+        // only an object's values hold an entry to read
+        Map<String, Object> entries = asObject(data.get("packages"));
+        if (holdsPatchOrExtensionState(entries) && resolveOptions.getRelease().recordsPatchesAndExtensions()) {
+            // a patched node, and the state of a manifest extension, make the lock version 4, which an older npm
+            // refuses
+            if (some(entries, "patched") && Js.toNumber(lockfileVersion) < PATCHED_LOCKFILE_VERSION) {
+                lockfileVersion = PATCHED_LOCKFILE_VERSION;
+            }
+            boolean hasExtensionState = truthy(packageExtensionsHash) || truthy(npmExtensionHash) ||
+                                        some(entries, "packageExtensionsApplied", "npmExtensionApplied");
+            if (hasExtensionState && Js.toNumber(lockfileVersion) < PACKAGE_EXTENSIONS_LOCKFILE_VERSION) {
+                lockfileVersion = PACKAGE_EXTENSIONS_LOCKFILE_VERSION;
+            }
+        }
         data.put("lockfileVersion", lockfileVersion);
 
         double version = Js.toNumber(lockfileVersion);
@@ -822,6 +918,35 @@ public final class Shrinkwrap {
             out.remove("packages");
         }
         return out;
+    }
+
+    // whether commit has anything of npm 12.0.0's to read: a hash of the root's, or an entry that holds a patch or an
+    // extension record or that is no object to read one from
+    private boolean holdsPatchOrExtensionState(Map<String, Object> packages) {
+        if (truthy(packageExtensionsHash) || truthy(npmExtensionHash)) {
+            return true;
+        }
+        for (Object p : packages.values()) {
+            if (!(p instanceof Map) || truthy(((Map<?, ?>) p).get("patched")) ||
+                truthy(((Map<?, ?>) p).get("packageExtensionsApplied")) ||
+                truthy(((Map<?, ?>) p).get("npmExtensionApplied"))) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    // Object.values(this.data.packages).some(p => p[key] || ...)
+    private static boolean some(Map<String, Object> packages, String... keys) {
+        for (String location : Js.keys(packages)) {
+            Object p = packages.get(location);
+            for (String key : keys) {
+                if (truthy(Js.get(p, key))) {
+                    return true;
+                }
+            }
+        }
+        return false;
     }
 
     private Map<String, Object> buildLegacyLockfile(Node node, Map<String, Object> lock, List<String> path) {
@@ -851,7 +976,8 @@ public final class Shrinkwrap {
         });
         Edge edge = valid.isEmpty() ? null : valid.get(0);
 
-        Object res = ConsistentResolve.consistentResolve(node.getResolved(), this.path, this.path, true);
+        Object res = ConsistentResolve.consistentResolve(node.getResolved(), this.path, this.path, true,
+                resolveOptions.getRelease());
         Spec rSpec = specFromResolved(res);
 
         Spec spec = rSpec;

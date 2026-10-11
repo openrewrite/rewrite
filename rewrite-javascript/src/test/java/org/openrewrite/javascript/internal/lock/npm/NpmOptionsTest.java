@@ -392,4 +392,88 @@ class NpmOptionsTest {
         assertThat(fromNpmrc("allow-remote=\n").getAllowRemote()).isEmpty();
         assertThat(NpmOptions.DEFAULT.getAllowGit()).isEqualTo("all");
     }
+
+    // each .npmrc installed with npm 12.2.0, the first with 12.0.0 as well: validateCli names every key without a
+    // definition in its EUNKNOWNCONFIG, a scoped one by its last part, ahead of arborist's own reading of
+    // lockfile-version; nopt has cleaned strict-npmrc by then, so 1 and any word are true
+    @ParameterizedTest
+    @CsvSource(delimiter = '|', value = {
+      "strict-npmrc=true+foo=bar | \"foo\"",
+      "strict-npmrc=1+foo=bar | \"foo\"",
+      "strict-npmrc+foo=bar | \"foo\"",
+      "strict-npmrc=yes+foo=bar | \"foo\"",
+      "strict-npmrc=+foo=bar | \"foo\"",
+      "foo=bar+strict-npmrc=true+baz=1 | \"foo\";\"baz\"",
+      "strict-npmrc=true+//example.invalid/:always-auth=true | \"always-auth\" (//example.invalid/:always-auth)",
+      "strict-npmrc=true+[foo]+bar=1 | \"foo\"",
+      "strict-npmrc=true+foo[]=a+foo[]=b | \"foo\"",
+      "strict-npmrc=true+lockfile-version=7+foo=bar | \"foo\"",
+      "strict-npmrc=true+shrinkwrap=false | \"shrinkwrap\"",
+      "strict-npmrc=true+Foo=bar+legacy-peer-deps=true | \"Foo\""
+    })
+    void strictNpmrcRefusesKeysNpm12DoesNotDefine(String npmrc, String shown) {
+        String[] keys = shown.split(";");
+        StringBuilder message = new StringBuilder("Unknown npm configuration key" + (keys.length > 1 ? "s" : "") + ":");
+        for (String key : keys) {
+            message.append("\n  - project config ").append(key).append(" from .npmrc");
+        }
+        message.append("\nSee `npm help npmrc` for supported config options.");
+        String text = npmrc.replace('+', '\n') + "\n";
+        for (String release : new String[]{"12.0.0", "12.2.0"}) {
+            assertThatThrownBy(() -> NpmOptions.fromNpmrc(NpmRelease.of(release), null, text))
+              .isInstanceOfSatisfying(NpmRejection.class, e -> assertThat(e.getCode()).isEqualTo("EUNKNOWNCONFIG"))
+              .hasMessage(message.toString());
+        }
+        // npm 11.21.0 warns of strict-npmrc as of any other key it does not define, and installs
+        if (!npmrc.contains("lockfile-version")) {
+            assertThat(NpmOptions.fromNpmrc(NpmRelease.of("11.21.0"), null, text)).isNotNull();
+        }
+    }
+
+    // each .npmrc installed with npm 12.2.0, which writes the lock: strict-npmrc cleaned to false, or every key one
+    // npm defines, sets for the npm it runs (npm-version, global-prefix), or reads by its last part
+    @ParameterizedTest
+    @CsvSource(delimiter = '|', value = {
+      "strict-npmrc=0+foo=bar",
+      "strict-npmrc=false+foo=bar",
+      "strict-npmrc=null+foo=bar",
+      "strict-npmrc=undefined+foo=bar",
+      "strict-npmrc=true+strict-npmrc=false+foo=bar",
+      "strict-npmrc=true+legacy-peer-deps=true",
+      "strict-npmrc=true+@foo:registry=https://registry.npmjs.org/+//example.invalid/:_authToken=abc" +
+      "+//example.invalid/:username=u",
+      "strict-npmrc=true+npm-version=1.0.0+global-prefix=/tmp/gp",
+      "strict-npmrc=true+a:b:registry=x",
+      "foo=bar"
+    })
+    void strictNpmrcLeavesTheInstallBe(String npmrc) {
+        assertThat(NpmOptions.fromNpmrc(NpmRelease.of("12.2.0"), null, npmrc.replace('+', '\n') + "\n")).isNotNull();
+    }
+
+    // installed with npm 12.2.0 and a --userconfig: the user's strict-npmrc holds for the project's keys, and the
+    // project's own stands over it. A key of the user's own file fails it as well (`user config "foo"`), which is
+    // not ported: the user's file here is the host's rendering of its registries.
+    @Test
+    void strictNpmrcIsTheProjectsOverTheUsers() {
+        NpmRelease npm12 = NpmRelease.of("12.2.0");
+        assertThatThrownBy(() -> NpmOptions.fromNpmrc(npm12, "strict-npmrc=true\n", "foo=bar\n"))
+          .isInstanceOfSatisfying(NpmRejection.class, e -> assertThat(e.getCode()).isEqualTo("EUNKNOWNCONFIG"))
+          .hasMessageContaining("  - project config \"foo\" from .npmrc");
+        assertThat(NpmOptions.fromNpmrc(npm12, "strict-npmrc=true\n", "strict-npmrc=false\nfoo=bar\n")).isNotNull();
+        assertThat(NpmOptions.fromNpmrc(npm12, "//r.example/:always-auth=true\n", "strict-npmrc=true\n")).isNotNull();
+    }
+
+    // a key or a value that may turn strict-npmrc on is the environment's to say, where npm 12 asks; a later
+    // strict-npmrc of the file's own stands over the key
+    @Test
+    void strictNpmrcTheEnvironmentDecides() {
+        NpmRelease npm12 = NpmRelease.of("12.2.0");
+        assertThatThrownBy(() -> NpmOptions.fromNpmrc(npm12, null, "strict-npmrc=${STRICT}\nfoo=bar\n"))
+          .isInstanceOf(CannotKnow.class);
+        assertThatThrownBy(() -> NpmOptions.fromNpmrc(npm12, null, "strict-n${RC}=true\nfoo=bar\n"))
+          .isInstanceOf(CannotKnow.class);
+        assertThat(NpmOptions.fromNpmrc(npm12, null, "strict-n${RC}=true\nstrict-npmrc=false\nfoo=bar\n")).isNotNull();
+        assertThat(NpmOptions.fromNpmrc(NpmRelease.of("11.21.0"), null, "strict-n${RC}=true\nfoo=bar\n")).isNotNull();
+        assertThat(NpmOptions.fromNpmrc(npm12, null, "strict-npmrc=${STRICT}\nlegacy-peer-deps=true\n")).isNotNull();
+    }
 }

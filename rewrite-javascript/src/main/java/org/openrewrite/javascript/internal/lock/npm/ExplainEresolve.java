@@ -134,8 +134,17 @@ final class ExplainEresolve {
             dep = "overridden " + dep + " (was \"" + string(edge.get("rawSpec")) + "\")";
         }
         String fromMsg = " from " + explainFrom(from, depth, seen);
+        // npm 12.0.0 notes an edge a root packageExtensions rule added, or a root .npm-extension changed
+        Map<String, Object> packageExtensions = map(edge.get("packageExtensions"));
+        String extMsg = packageExtensions == null ? "" :
+                " (added by packageExtensions[\"" + string(packageExtensions.get("selector")) + "\"]." +
+                string(packageExtensions.get("field")) + "." + name + ")";
+        Map<String, Object> npmExtension = map(edge.get("npmExtension"));
+        String npmExtMsg = npmExtension == null ? "" :
+                " (changed by .npm-extension " + string(npmExtension.get("extensionPoint")) + " " +
+                string(npmExtension.get("field")) + "." + name + ")";
         return ("prod".equals(type) ? "" : type + " ") + (truthy(edge.get("bundled")) ? "bundled " : "") + dep +
-                fromMsg;
+                fromMsg + extMsg + npmExtMsg;
     }
 
     private static String explainFrom(@Nullable Map<String, Object> from, int depth, Set<String> seen) {
