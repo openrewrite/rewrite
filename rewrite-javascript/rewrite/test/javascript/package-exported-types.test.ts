@@ -352,6 +352,19 @@ describe("DependencyTypes.handle", () => {
         }, {unsafeCleanup: true});
     }, 60000);
 
+    test("resolves against the node_modules of the directory the request names, not the parsed project's", async () => {
+        await withDir(async (root) => {
+            const fetched = path.join(root.path, "fetched", "exported-types-fixture", "1.0.0");
+            writePackage(fetched);
+            // A project with no node_modules at all, so only the request's path can find the package.
+            setLastParsedProject(path.join(root.path, "empty-project"));
+
+            const data = await captureHandler(100000)({name: "exported-types-fixture", version: "1.0.0", path: fetched});
+            expect(data.some(d => d.value === "exported-types-fixture.Greeter")).toBe(true);
+            expect(data[data.length - 1].state).toBe(RpcObjectState.END_OF_OBJECT);
+        }, {unsafeCleanup: true});
+    }, 60000);
+
     test("resolves a scoped package directory", async () => {
         await withDir(async (root) => {
             writeFiles(root.path, "@scope/scoped-fixture", {
