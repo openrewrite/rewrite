@@ -143,6 +143,10 @@ public class Node {
          */
         @Nullable
         Node target;
+
+        // declared so that javadoc, which reads the source before Lombok, finds it
+        public static class OptionsBuilder {
+        }
     }
 
     public static Options.OptionsBuilder options() {

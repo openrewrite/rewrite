@@ -72,6 +72,10 @@ public final class Minimatch {
         public static Options of(Release release) {
             return builder(release).build();
         }
+
+        // declared so that javadoc, which reads the source before Lombok, finds it
+        public static class OptionsBuilder {
+        }
     }
 
     private static final Object GLOBSTAR = new Object() {

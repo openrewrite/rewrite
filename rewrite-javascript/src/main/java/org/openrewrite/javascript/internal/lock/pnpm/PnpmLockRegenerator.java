@@ -125,6 +125,10 @@ public final class PnpmLockRegenerator {
         boolean holds(String path) {
             return files.containsKey(path) || paths != null && paths.contains(path);
         }
+
+        // declared so that javadoc, which reads the source before Lombok, finds it
+        public static class InputsBuilder {
+        }
     }
 
     /**

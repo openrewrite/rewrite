@@ -171,6 +171,10 @@ public final class YarnClassicLockRegenerator {
             String[] segments = directory.split("/");
             return String.join("/", Arrays.asList(segments).subList(segments.length - depth, segments.length));
         }
+
+        // declared so that javadoc, which reads the source before Lombok, finds it
+        public static class InputsBuilder {
+        }
     }
 
     private final Inputs inputs;

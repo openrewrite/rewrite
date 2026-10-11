@@ -59,6 +59,10 @@ public final class Braces {
         public static OptionsBuilder builder(Release release) {
             return new OptionsBuilder().release(release);
         }
+
+        // declared so that javadoc, which reads the source before Lombok, finds it
+        public static class OptionsBuilder {
+        }
     }
 
     private static final Pattern PATTERN_RE = V8RegExp.of("\\${|( (?=[{,}])|(?=[{,}]) )|{}|{,}|\\\\,(?=.*[{}])|" +
