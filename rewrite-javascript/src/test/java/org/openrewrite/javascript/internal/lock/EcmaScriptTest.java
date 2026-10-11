@@ -121,8 +121,8 @@ class EcmaScriptTest {
     @Test
     void everyBuiltinRowIsReplayedSomewhere() {
         Map<String, Integer> cannotKnow = new LinkedHashMap<>();
-        List<String> elsewhere = Arrays.asList("encodeURIComponent", "decodeURIComponent", "replace", "match",
-          "toISOString", "utc", "timeClip");
+        List<String> elsewhere = Arrays.asList("encodeURIComponent", "decodeURIComponent", "decodeURI", "replace",
+          "match", "toISOString", "utc", "timeClip");
         for (Call call : UpstreamCalls.read(BUILTINS)) {
             if (elsewhere.contains(call.getFn())) {
                 continue;
