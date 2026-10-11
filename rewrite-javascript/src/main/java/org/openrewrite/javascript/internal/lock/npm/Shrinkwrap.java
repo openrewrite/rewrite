@@ -83,6 +83,9 @@ public final class Shrinkwrap {
     private static final Pattern NODE_MODULES = Pattern.compile("(?:^|/)node_modules/");
     private static final Pattern YARN_REGISTRY = Pattern.compile("^https?://registry\\.yarnpkg\\.com/");
     private static final Pattern NPM_REGISTRY = Pattern.compile("^https?://registry\\.npmjs\\.org/");
+    // before npm 8.5.2 a dot of the host matches any character
+    private static final Pattern YARN_REGISTRY_UNESCAPED = Pattern.compile("^https?://registry.yarnpkg.com/");
+    private static final Pattern NPM_REGISTRY_UNESCAPED = Pattern.compile("^https?://registry.npmjs.org/");
     private static final Pattern LAST_SEGMENT = Pattern.compile("(^|/)[^/]*$");
 
     private static final List<String> PKG_META_KEYS = Collections.unmodifiableList(Arrays.asList(
@@ -235,8 +238,9 @@ public final class Shrinkwrap {
         Object resolved = ConsistentResolve.consistentResolve(node.getResolved(), node.getPath(), path, true,
                 options.getRelease());
         if (truthy(resolved)) {
-            Object written = node.isRegistryDependency() ?
-                    OverrideResolves.overrideResolves(resolved, options) : resolved;
+            Object written = options.getRelease().definesOmitLockfileRegistryResolved() &&
+                             node.isRegistryDependency() ? OverrideResolves.overrideResolves(resolved, options) :
+                    resolved;
             if (written != null) {
                 meta.put("resolved", written);
             }
@@ -299,9 +303,9 @@ public final class Shrinkwrap {
             Object integrity = fromYarn.get("integrity");
             String resolvedString = resolved instanceof String ? (String) resolved : null;
             boolean isYarnReg = parsed.isRegistry() && resolvedString != null &&
-                                YARN_REGISTRY.matcher(resolvedString).find();
+                                yarnRegRe().matcher(resolvedString).find();
             boolean isnpmReg = parsed.isRegistry() && !isYarnReg && resolvedString != null &&
-                               NPM_REGISTRY.matcher(resolvedString).find();
+                               npmRegRe().matcher(resolvedString).find();
             boolean isReg = isnpmReg || isYarnReg;
             VersionFromTgz.NameVersion tgz =
                     isReg ? VersionFromTgz.versionFromTgz(parsed.getName(), resolvedString) : null;
@@ -314,12 +318,20 @@ public final class Shrinkwrap {
             }
             if (truthy(yspec)) {
                 options.put("resolved", resolvedString == null ? resolved :
-                        YARN_REGISTRY.matcher(resolvedString).replaceFirst("https://registry.npmjs.org/"));
+                        yarnRegRe().matcher(resolvedString).replaceFirst("https://registry.npmjs.org/"));
                 options.put("integrity", integrity);
                 return Spec.npa(parsed.getName() + "@" + yspec, null, resolveOptions.getRelease().npmPackageArg());
             }
         }
         return parsed;
+    }
+
+    private Pattern yarnRegRe() {
+        return resolveOptions.getRelease().escapesRegistryHostDots() ? YARN_REGISTRY : YARN_REGISTRY_UNESCAPED;
+    }
+
+    private Pattern npmRegRe() {
+        return resolveOptions.getRelease().escapesRegistryHostDots() ? NPM_REGISTRY : NPM_REGISTRY_UNESCAPED;
     }
 
     public void setData(@Nullable Map<String, Object> data) {
@@ -366,7 +378,7 @@ public final class Shrinkwrap {
             loadedFromDisk = lock != null && truthy(lock.getText());
 
             if (truthy(yarn)) {
-                yarnLock = new YarnLock();
+                yarnLock = new YarnLock(resolveOptions.getRelease());
                 try {
                     yarnLock.parse(yarn);
                 } catch (RuntimeException ignored) {
@@ -819,9 +831,9 @@ public final class Shrinkwrap {
         }
 
         Object entryResolved = entry.get("resolved");
-        if (entryResolved instanceof String && YARN_REGISTRY.matcher((String) entryResolved).find() &&
+        if (entryResolved instanceof String && yarnRegRe().matcher((String) entryResolved).find() &&
             spec.isRegistry()) {
-            entryResolved = YARN_REGISTRY.matcher((String) entryResolved).replaceFirst("https://registry.npmjs.org/");
+            entryResolved = yarnRegRe().matcher((String) entryResolved).replaceFirst("https://registry.npmjs.org/");
             entry.set("resolved", entryResolved);
         }
 

@@ -407,16 +407,22 @@ public final class Edge {
         }
     }
 
-    // reload before npm 11.2.0: the edge takes the rule of its dependent's overrides and tells its target nothing;
-    // before npm 9.6.6 its error is computed here, before the target hears of the edge
+    // reload before npm 11.2.0: the edge takes the rule of its dependent's overrides, from npm 8.7.0 (before, it keeps
+    // the one it was made with), and tells its target nothing; before npm 9.6.6 its error is computed here, before the
+    // target hears of the edge
     private void reloadWithDependentsRule(boolean hard) {
-        if (from == null) {
-            throw new IllegalArgumentException("Cannot read properties of null (reading 'overrides')");
+        if (release.recomputesOverridesOnReload()) {
+            if (from == null) {
+                throw new IllegalArgumentException("Cannot read properties of null (reading 'overrides')");
+            }
+            if (from.getOverrides() != null) {
+                overrides = from.getOverrides().getEdgeRule(this);
+            } else {
+                overrides = null;
+            }
         }
-        if (from.getOverrides() != null) {
-            overrides = from.getOverrides().getEdgeRule(this);
-        } else {
-            overrides = null;
+        if (from == null) {
+            throw new IllegalArgumentException("Cannot read properties of null (reading 'resolve')");
         }
         Node newTo = from.resolve(name);
         if (newTo != to) {

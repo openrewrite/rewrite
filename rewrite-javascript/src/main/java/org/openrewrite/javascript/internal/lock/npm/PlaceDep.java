@@ -365,8 +365,10 @@ public final class PlaceDep {
             for (Edge entryEdge : PeerEntrySets.peerEntrySets(edge.getFrom()).keySet()) {
                 Node entryNode = entryEdge.getTo();
                 Node deepestTarget = deepestNestingTarget(entryNode, null);
+                Node entryFrom = entryEdge.getFrom();
                 if (deepestTarget != target &&
-                    !(entryEdge.getFrom().isProjectRoot() || entryEdge.getFrom().isWorkspace())) {
+                    !(options.getRelease().leavesWorkspacePeerEntriesAlone() ?
+                            entryFrom.isProjectRoot() || entryFrom.isWorkspace() : entryFrom.isRoot())) {
                     prunePeerSets.addAll(gatherDepSet(singletonList(entryNode),
                             e -> e.getTo() != entryNode && !e.isPeerConflicted()));
                 } else {

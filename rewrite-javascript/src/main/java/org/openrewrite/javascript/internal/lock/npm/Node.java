@@ -370,7 +370,7 @@ public class Node {
 
         if (options.getOverrides() != null) {
             this.overrides = options.getOverrides();
-        } else if (options.isLoadOverrides()) {
+        } else if (options.isLoadOverrides() && release.readsOverrides()) {
             Object overrides = pkg.get("overrides");
             if (truthy(overrides) && !Js.keys(overrides).isEmpty()) {
                 this.overrides = new OverrideSet(overrides, release);
@@ -921,8 +921,8 @@ public class Node {
             target.setRoot(root);
         }
 
-        if (!release.propagatesOverrideSets() && overrides == null && parent != null &&
-            parent.overrides != null) {
+        if (!release.propagatesOverrideSets() && release.takesParentOverrideRuleWhenRooted() && overrides == null &&
+            parent != null && parent.overrides != null) {
             overrides = parent.overrides.getNodeRule(this);
         }
     }
@@ -1213,7 +1213,7 @@ public class Node {
             for (Node kid : node.getChildren().values()) {
                 kid.setParent(this);
             }
-            if (node.isLink() && node.getTarget() != null) {
+            if (node.isLink() && node.getTarget() != null && release.dropsTargetOfReplacedLink()) {
                 node.getTarget().setRoot(null);
             }
         }

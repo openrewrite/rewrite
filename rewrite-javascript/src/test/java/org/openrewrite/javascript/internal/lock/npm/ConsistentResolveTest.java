@@ -170,6 +170,20 @@ class ConsistentResolveTest {
         assertThat(cr("foo")).isEqualTo("foo");
     }
 
+    // npm 8.19.4's npm-package-arg 9.1.0 reads a bare name and a name with an empty spec as an empty spec, which
+    // arborist returns as written only without the '@'; npm 9.0.0's 10.0.0 reads both as '*', returned as written
+    @Test
+    void bareNameAndStarBefore9_0_0() {
+        NpmRelease older = NpmRelease.of("8.19.4");
+        NpmRelease newer = NpmRelease.of("9.0.0");
+        assertThat(ConsistentResolve.consistentResolve("foo", older)).isEqualTo("foo");
+        assertThat(ConsistentResolve.consistentResolve("foo", newer)).isEqualTo("foo");
+        assertThat(ConsistentResolve.consistentResolve("foo@", older)).isEqualTo("");
+        assertThat(ConsistentResolve.consistentResolve("foo@", newer)).isEqualTo("foo@");
+        assertThat(ConsistentResolve.consistentResolve("foo@*", older)).isEqualTo("*");
+        assertThat(ConsistentResolve.consistentResolve("foo@*", newer)).isEqualTo("foo@*");
+    }
+
     @Test
     void invalidResolvedReturnsAsIs() {
         assertThat(cr("not ! a : v@lid t*A*g")).isEqualTo("not ! a : v@lid t*A*g");

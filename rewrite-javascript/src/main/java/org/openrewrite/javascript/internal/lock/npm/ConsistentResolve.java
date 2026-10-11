@@ -86,6 +86,10 @@ final class ConsistentResolve {
         if (type == Spec.Type.GIT) {
             return spec.getSaveSpec();
         }
+        if (!release.returnsRawOfStarSpec()) {
+            // always return something.  'foo' is interpreted as 'foo@' otherwise.
+            return spec.getRawSpec().isEmpty() && !spec.getRaw().endsWith("@") ? spec.getRaw() : spec.getRawSpec();
+        }
         if ("*".equals(spec.getRawSpec())) {
             return spec.getRaw();
         }

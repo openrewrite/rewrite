@@ -197,6 +197,14 @@ public final class NpmRelease implements Comparable<NpmRelease> {
     }
 
     /**
+     * {@code #initTree}: the lock takes the newline and default indent of the root package.json ({@code
+     * inferFormattingOptions}), from npm 8.3.2; before, those of the lock it read.
+     */
+    boolean infersLockFormatFromManifest() {
+        return atLeast(8, 3, 2);
+    }
+
+    /**
      * {@code #nodeFromSpec}: under {@code install-links}, a directory dependency of an installed {@code file:} package
      * is installed from that package's source instead of linked, from npm 11.6.0.
      */
@@ -396,6 +404,16 @@ public final class NpmRelease implements Comparable<NpmRelease> {
         return atLeast(10, 8, 2);
     }
 
+    // @npmcli/arborist can-place-dep.js
+
+    /**
+     * {@code checkCanPlace}: a dependency the target's own edge of its name does not accept conflicts only where the
+     * target has no node of that name to dedupe against, from npm 8.1.1; before, there too.
+     */
+    boolean skipsTargetEdgeCheckWithCurrent() {
+        return atLeast(8, 1, 1);
+    }
+
     // @npmcli/arborist consistent-resolve.js
 
     /**
@@ -413,6 +431,14 @@ public final class NpmRelease implements Comparable<NpmRelease> {
      */
     boolean keepsHostedGitHttps() {
         return atLeast(12, 0, 0);
+    }
+
+    /**
+     * A resolved whose spec is {@code *}, as npm-package-arg 10 reads a bare name, is returned as written, from npm
+     * 9.0.0; before, a bare name, whose spec npm-package-arg 9 reads as empty, unless it ends in {@code @}.
+     */
+    boolean returnsRawOfStarSpec() {
+        return atLeast(9, 0, 0);
     }
 
     // @npmcli/arborist dep-valid.js
@@ -491,6 +517,14 @@ public final class NpmRelease implements Comparable<NpmRelease> {
     }
 
     /**
+     * {@code reload} takes the edge's rule from its dependent's overrides again, from npm 8.7.0; before, the edge keeps
+     * the overrides it was made with.
+     */
+    boolean recomputesOverridesOnReload() {
+        return atLeast(8, 7, 0);
+    }
+
+    /**
      * {@code spec}: a {@code $name} override the root does not declare is read from the edge's own package, from npm
      * 11.3.0.
      */
@@ -562,6 +596,14 @@ public final class NpmRelease implements Comparable<NpmRelease> {
     // @npmcli/arborist node.js
 
     /**
+     * {@code replace}: a link the node replaces takes its target out of the tree, from npm 8.8.0; before, the target
+     * stays.
+     */
+    boolean dropsTargetOfReplacedLink() {
+        return atLeast(8, 8, 0);
+    }
+
+    /**
      * {@code shouldOmit}: only a node under the project root or a workspace is omitted, from npm 11.6.1.
      */
     boolean omitsUnderProjectTopsOnly() {
@@ -575,6 +617,21 @@ public final class NpmRelease implements Comparable<NpmRelease> {
      */
     boolean propagatesOverrideSets() {
         return atLeast(11, 2, 0);
+    }
+
+    /**
+     * {@code loadOverrides}: the root reads the {@code overrides} of its package.json, from npm 8.3.0; before, npm has
+     * no overrides.
+     */
+    boolean readsOverrides() {
+        return atLeast(8, 3, 0);
+    }
+
+    /**
+     * The {@code root} setter gives a node without overrides its parent's rule for it, from npm 8.7.0.
+     */
+    boolean takesParentOverrideRuleWhenRooted() {
+        return atLeast(8, 7, 0);
     }
 
     // @npmcli/arborist optional-set.js
@@ -644,6 +701,16 @@ public final class NpmRelease implements Comparable<NpmRelease> {
         return atLeast(9, 3, 0);
     }
 
+    // @npmcli/arborist place-dep.js
+
+    /**
+     * {@code replaceOldDep}: the peer set a workspace's edge brings in is left in place, with a warning, as the project
+     * root's is, from npm 8.1.3; before, only the tree root's.
+     */
+    boolean leavesWorkspacePeerEntriesAlone() {
+        return atLeast(8, 1, 3);
+    }
+
     // @npmcli/arborist shrinkwrap.js
 
     /**
@@ -660,6 +727,14 @@ public final class NpmRelease implements Comparable<NpmRelease> {
      */
     boolean dropsExtraneousOutsideNodeModules() {
         return atLeast(11, 15, 0);
+    }
+
+    /**
+     * {@code yarnRegRe} and {@code npmRegRe}, which pick a yarn.lock's registry URLs, read the dots of the registry
+     * hosts as dots, from npm 8.5.2; before, as any character.
+     */
+    boolean escapesRegistryHostDots() {
+        return atLeast(8, 5, 2);
     }
 
     /**
@@ -723,6 +798,17 @@ public final class NpmRelease implements Comparable<NpmRelease> {
      */
     boolean skipsInertNodesWithoutVersion() {
         return atLeast(11, 15, 0);
+    }
+
+    // @npmcli/arborist yarn-lock.js
+
+    /**
+     * A yarn.lock is written with yarn's quoting ({@code quoteIfNeeded}), an entry's fields in yarn's order and its
+     * integrity unquoted, from npm 9.0.1; before, every key and value is JSON-quoted and an entry's scalar fields come
+     * before its objects, each in {@code localeCompare} order.
+     */
+    boolean quotesYarnLockAsYarnDoes() {
+        return atLeast(9, 0, 1);
     }
 
     // @npmcli/config definitions.js
@@ -806,7 +892,8 @@ public final class NpmRelease implements Comparable<NpmRelease> {
     }
 
     /**
-     * {@code omit-lockfile-registry-resolved} is a config from npm 8.10.0.
+     * {@code omit-lockfile-registry-resolved} is a config from npm 8.10.0, when shrinkwrap.js's {@code metaFromNode}
+     * begins to ask whether a node is a registry dependency.
      */
     boolean definesOmitLockfileRegistryResolved() {
         return atLeast(8, 10, 0);

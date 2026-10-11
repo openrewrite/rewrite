@@ -363,7 +363,7 @@ public final class IdealTreeBuilder {
             throw new MalformedLock("the lock's JSON root is not an object");
         }
         flagsSuspect = loader.isFlagsSuspect();
-        if (rootManifest != null) {
+        if (rootManifest != null && options.getRelease().infersLockFormatFromManifest()) {
             meta.inferFormattingOptions(rootManifest);
         }
         if (options.getRelease().appliesRootOverridesToWorkspaces()) {
