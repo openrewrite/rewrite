@@ -9,8 +9,8 @@ is how the ports are written and tested.
 | `npm` | `@npmcli/arborist` and its libraries, npm 11.17.0 |
 | `bun` | Bun 1.3.10 |
 | `yarnclassic` | Yarn 1.22.22 |
-| `berry` | Yarn 4.10.3, with each 4.x release's data as resources |
-| `pnpm` | pnpm 11.2.2 |
+| `berry` | Yarn 4.10.3; every 4.x release runs as it, with its own data and lockfile version |
+| `pnpm` | pnpm 11.2.2; releases from 11.0.6 to below 12 run as it (`Main.RUNS_AS_PORTED`) |
 | this package | what the ports share: JavaScript and Node behavior, never resolution |
 
 `NativeLockEngine` builds a package manager's inputs from the request and calls its `Port`. A result is the lock the

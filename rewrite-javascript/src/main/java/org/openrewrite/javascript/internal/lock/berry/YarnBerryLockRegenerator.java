@@ -242,7 +242,7 @@ public final class YarnBerryLockRegenerator {
 
     /**
      * {@code yarnPath}'s release unless {@code ignorePath}, else the packageManager corepack finds where Yarn runs;
-     * CannotKnow when neither names a version, the data lacks it, or it is later than the release ported.
+     * CannotKnow when neither names a version or the data lacks it (Yarn 2 and 3, a release after the data's).
      */
     YarnRelease release() {
         SpecUtils.Descriptor spec = SpecUtils.findProjectSpec(inputs.getRunsIn(), levelsAbove(), this::manifestText,
@@ -269,10 +269,6 @@ public final class YarnBerryLockRegenerator {
         YarnRelease release = YarnRelease.of(version);
         if (release == null) {
             throw new CannotKnow("the data of Yarn " + version);
-        }
-        if (YarnRelease.compareVersions(version, YarnRelease.PORTED) > 0) {
-            throw new CannotKnow("the lock Yarn " + version + " writes (this engine ports Yarn " +
-                                 YarnRelease.PORTED + ")");
         }
         return release;
     }
@@ -303,7 +299,7 @@ public final class YarnBerryLockRegenerator {
         Object lockfileLastVersion = project.lockfileLastVersion;
         if (lockfileLastVersion != null) {
             boolean legacy = Integer.valueOf(-1).equals(lockfileLastVersion);
-            boolean old = !legacy && Js.toNumber(lockfileLastVersion) < Project.LOCKFILE_VERSION;
+            boolean old = !legacy && Js.toNumber(lockfileLastVersion) < release.getLockfileVersion();
             if (legacy && options.useCompat("nodeLinker", "node-modules")) {
                 migratedSettings.put("nodeLinker", "node-modules");
             }

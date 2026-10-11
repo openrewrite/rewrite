@@ -36,8 +36,11 @@ class PnpmReleaseTest {
       10.34.6              | 10
       11.0.6               | 11
       11.2.2               | 11
+      11.3.0               | 11
+      11.28.5              | 11
       >=10.32.1 <=10.34.6  | 10
       11.0.6 - 11.2.2      | 11
+      ^11.0.6              | 11
       ~9.15.0              | -1
       ^10.32.1             | -1
       >=9                  | -1
@@ -45,14 +48,12 @@ class PnpmReleaseTest {
       10.31.0              | 10
       10.0.0               | 10
       11.0.5               | 11
-      11.3.0               | 11
       12.0.0               | 12
       """)
     void aReleaseIsWrittenForWhenEveryOneItCanBeIsRecorded(String version, int major) {
         PnpmRelease release = PnpmRelease.named(version);
         assertThat(release.getMajor()).isEqualTo(major);
-        boolean recorded = !version.matches("9\\.4\\.0|10\\.31\\.0|10\\.0\\.0|11\\.0\\.5|11\\.3\\.0|12\\.0\\.0") &&
-                           major > 0;
+        boolean recorded = !version.matches("9\\.4\\.0|10\\.31\\.0|10\\.0\\.0|11\\.0\\.5|12\\.0\\.0") && major > 0;
         assertThat(release.declined() == null).as(version).isEqualTo(recorded);
         assertThat(release.writer() == null).isEqualTo(!recorded || major == 9);
     }

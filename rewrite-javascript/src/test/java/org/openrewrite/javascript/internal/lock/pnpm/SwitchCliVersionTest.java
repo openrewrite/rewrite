@@ -76,12 +76,12 @@ class SwitchCliVersionTest {
     }
 
     /**
-     * The release pnpm 11.2.2 hands the install to, when it cannot be 11.2.2, is cannot-know before the registry is
-     * asked for it: an exact pin, a range without 11.2.2, a locked release the range admits, or a member's range.
+     * The release pnpm 11.2.2 hands the install to, when it is no pnpm 11 release, is cannot-know before the registry
+     * is asked for it: an exact pin, a range without 11.2.2, a locked release the range admits, or a member's range.
      */
     @ParameterizedTest
     @CsvSource(delimiter = '|', value = {"9.15.0|false||", "10.18.3|false||", "^10.0.0|true||", ">=12|true||",
-      "^11.0.0|true|11.3.0|", "^10.0.0|true|10.18.3|", "^10.0.0|true||packages/a", "^11.0.0|true||packages/a"})
+      "^10.0.0|true|10.18.3|", "^10.0.0|true||packages/a"})
     void anotherReleaseIsCannotKnowBeforeAnyResolution(String version, boolean fromDevEngines,
                                                        @Nullable String locked, @Nullable String lockDir) {
         assertThatThrownBy(() -> switchCliVersion(pm(version, fromDevEngines),
@@ -102,6 +102,25 @@ class SwitchCliVersionTest {
     @Test
     void thePortedReleaseNeedsNoSwitch() {
         switchCliVersion(pm("11.2.2", false), MAIN_DOCUMENT);
+    }
+
+    /**
+     * Another release from 11.0.6 runs as 11.2.2: a pin needs no switch, and a member's range of them none either.
+     */
+    @ParameterizedTest
+    @CsvSource(delimiter = '|', value = {"11.3.0|false|", "11.28.5|false|", "^11.0.6|true|packages/a"})
+    void aPnpm11ReleaseRunsAsThePortedOne(String version, boolean fromDevEngines, @Nullable String lockDir) {
+        assertThat(switchCliVersion(pm(version, fromDevEngines), MAIN_DOCUMENT, null, lockDir == null ? "" : lockDir))
+          .isNull();
+    }
+
+    /**
+     * A pnpm 11 release the range locks is resolved as 11.2.2 would be resolved: the registry decides.
+     */
+    @Test
+    void aLockedPnpm11ReleaseIsResolved() {
+        assertThatThrownBy(() -> switchCliVersion(pm("^11.0.0", true), envDocument("11.3.0")))
+          .hasMessageContaining("fetched https://registry.npmjs.org/pnpm");
     }
 
     private static final String BAD_NAMED_REGISTRY = "namedRegistries:\n  foo: ftp://example.com/\n";

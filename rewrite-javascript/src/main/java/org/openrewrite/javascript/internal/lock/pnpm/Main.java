@@ -48,6 +48,24 @@ public final class Main {
      */
     public static final String PNPM_VERSION = "11.2.2";
 
+    /**
+     * The releases the engine runs as the one ported: recorded writing what 11.2.2 writes from 11.0.6 (11.0.5 sorts
+     * what 11.0.6 appends), and 11.13.0 and 11.28.5 writing its locks.
+     */
+    public static final String RUNS_AS_PORTED = "11.0.6 - 11";
+
+    /**
+     * Whether {@code version}, a release or a range, names only releases in {@link #RUNS_AS_PORTED}.
+     */
+    public static boolean runsAsPorted(String version) {
+        String exact = NodeSemver.valid(version, NodeSemver.Options.DEFAULT);
+        if (exact != null) {
+            return NodeSemver.satisfies(exact, RUNS_AS_PORTED, NodeSemver.Options.DEFAULT);
+        }
+        return NodeSemver.validRange(version, NodeSemver.Options.DEFAULT) != null &&
+               NodeSemver.subset(version, RUNS_AS_PORTED, NodeSemver.Options.DEFAULT);
+    }
+
     // the inputs' root: workspaceDir, which is also rootProjectManifestDir, or the project's directory without one
     static final String WORKSPACE_DIR = "";
 
@@ -374,7 +392,7 @@ public final class Main {
 
     /**
      * The release pnpm installs with: the one it switches to or fails without, else this one; CannotKnow where corepack
-     * would start another or refuse the spec ({@code corepack}), as the host does not say whether it starts pnpm.
+     * would start one not {@link #runsAsPorted} or refuse the spec, as the host does not say whether it starts pnpm.
      */
     static String release(PnpmOptions.@Nullable WantedPackageManager wanted,
                                  Supplier<SpecUtils.@Nullable Descriptor> corepack) {
@@ -392,7 +410,8 @@ public final class Main {
                 return direct;
             }
             String version = SpecUtils.installVersion(spec);
-            if (version != null && version.equals(NodeSemver.valid(direct, NodeSemver.Options.DEFAULT))) {
+            if (version != null && version.equals(NodeSemver.valid(direct, NodeSemver.Options.DEFAULT)) ||
+                runsAsPorted(version == null ? spec.getRange() : version) && runsAsPorted(direct)) {
                 return direct;
             }
             starts = version == null ? "starts the release at " + spec.getRange() : "starts pnpm " + version;

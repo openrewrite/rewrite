@@ -83,19 +83,23 @@ class YarnBerryLockRegeneratorTest {
                 .hasMessageContaining("the Yarn release that runs");
     }
 
+    /**
+     * A release after 4.10.3 runs as it, with its own data and lockfile version (recorded: 8 through 4.13.0, 9 from
+     * 4.14.0, 10 from 4.15.0); a release the data lacks is unknown.
+     */
     @Test
-    void aReleaseAfterThePortedOneIsUnknown() {
-        for (String version : new String[]{"4.11.0", "4.13.0", "4.14.0", "4.18.1"}) {
-            assertThat(YarnRelease.of(version)).as(version).isNotNull();
-            assertThatThrownBy(() -> release("yarn@" + version, null, Collections.emptyMap())).as(version)
-                    .isInstanceOf(CannotKnow.class)
-                    .hasMessageContaining("Yarn " + version)
-                    .hasMessageContaining("ports Yarn 4.10.3");
+    void aLaterReleaseRunsWithItsDataAndLockfileVersion() {
+        for (String[] release : new String[][]{{"4.10.3", "8"}, {"4.11.0", "8"}, {"4.13.0", "8"}, {"4.14.0", "9"},
+                {"4.14.1", "9"}, {"4.15.0", "10"}, {"4.18.1", "10"}}) {
+            assertThat(release("yarn@" + release[0], null, Collections.emptyMap())).isEqualTo(release[0]);
+            assertThat(requireNonNull(YarnRelease.of(release[0])).getLockfileVersion()).as(release[0])
+                    .isEqualTo(Integer.parseInt(release[1]));
         }
-        assertThatThrownBy(() -> release("yarn@4.10.3", "yarnPath: .yarn/releases/yarn-4.14.0.cjs\n",
-                Collections.emptyMap()))
+        assertThat(release("yarn@4.10.3", "yarnPath: .yarn/releases/yarn-4.14.0.cjs\n", Collections.emptyMap()))
+                .isEqualTo("4.14.0");
+        assertThatThrownBy(() -> release("yarn@4.19.0", null, Collections.emptyMap()))
                 .isInstanceOf(CannotKnow.class)
-                .hasMessageContaining("Yarn 4.14.0");
+                .hasMessageContaining("the data of Yarn 4.19.0");
         assertThat(release("yarn@4.0.0", null, Collections.emptyMap())).isEqualTo("4.0.0");
     }
 

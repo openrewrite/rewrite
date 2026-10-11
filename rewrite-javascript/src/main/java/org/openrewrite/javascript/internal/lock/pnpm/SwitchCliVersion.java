@@ -21,7 +21,7 @@ import org.openrewrite.semver.NodeSemver;
 
 /**
  * Port of pnpm/src switchCliVersion.ts and shouldPersistLockfile.ts (pnpm 11.2.2): the release that installs, which
- * the engine follows only when it is the ported one.
+ * the engine follows only when it {@link Main#runsAsPorted runs as the ported one}.
  */
 final class SwitchCliVersion {
 
@@ -45,13 +45,13 @@ final class SwitchCliVersion {
         }
         String version = Js.string(pm.getVersion());
         boolean persistLockfile = shouldPersistLockfile(pm);
-        if (!persistLockfile && Main.PNPM_VERSION.equals(version)) {
+        if (!persistLockfile && Main.runsAsPorted(version)) {
             return null;
         }
         if (lockFile == null && persistLockfile &&
             NodeSemver.satisfies(Main.PNPM_VERSION, version, NodeSemver.Options.INCLUDE_PRERELEASE)) {
             PnpmError failure = stores.storeControllerFailure(options);
-            if (failure == null && !Main.PNPM_VERSION.equals(version)) {
+            if (failure == null && !Main.runsAsPorted(version)) {
                 throw new CannotKnow("which pnpm release the workspace's " + LockfileReader.WANTED_LOCKFILE +
                                      " pins for " + version + " (pnpm runs that release)");
             }
@@ -66,7 +66,8 @@ final class SwitchCliVersion {
         // the ported release, resolving it only names another
         if (!Js.truthy(pmVersion) || !NodeSemver.satisfies(pmVersion, version, NodeSemver.Options.INCLUDE_PRERELEASE)) {
             storeToUse = stores.createStoreController(options);
-            if (!NodeSemver.satisfies(Main.PNPM_VERSION, version, NodeSemver.Options.INCLUDE_PRERELEASE)) {
+            if (!NodeSemver.satisfies(Main.PNPM_VERSION, version, NodeSemver.Options.INCLUDE_PRERELEASE) &&
+                !Main.runsAsPorted(version)) {
                 throw switchesTo(version);
             }
             EnvLockfile resolved = envInstaller.resolvePackageManagerIntegrities(version, envLockfile,
@@ -78,13 +79,13 @@ final class SwitchCliVersion {
             }
         } else if (!EnvInstaller.isPackageManagerResolved(envLockfile, Js.string(pmVersion))) {
             storeToUse = stores.createStoreController(options);
-            if (!Main.PNPM_VERSION.equals(Js.string(pmVersion))) {
+            if (!Main.runsAsPorted(Js.string(pmVersion))) {
                 throw switchesTo(Js.string(pmVersion));
             }
             envInstaller.resolvePackageManagerIntegrities(Js.string(pmVersion), envLockfile, persistLockfile,
                     rootLockFile, storeToUse, options);
         }
-        if (Main.PNPM_VERSION.equals(Js.string(pmVersion))) {
+        if (Main.runsAsPorted(Js.string(pmVersion))) {
             return null;
         }
         if (storeToUse == null) {

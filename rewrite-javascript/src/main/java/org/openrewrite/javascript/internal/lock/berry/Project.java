@@ -45,7 +45,6 @@ import org.openrewrite.javascript.internal.lock.YarnpkgSemverUtils;
  */
 final class Project {
 
-    static final int LOCKFILE_VERSION = 8;
     static final String LOCKFILE = "yarn.lock";
 
     private static final Pattern MULTIPLE_KEYS_REGEXP = Pattern.compile(" *, *");
@@ -171,7 +170,7 @@ final class Project {
             Object lockfileVersion = Js.get(metadata, "version");
             Object cacheKey = Js.get(metadata, "cacheKey");
             lockfileLastVersion = lockfileVersion;
-            lockfileNeedsRefresh = Js.toNumber(lockfileVersion) < LOCKFILE_VERSION;
+            lockfileNeedsRefresh = Js.toNumber(lockfileVersion) < configuration.getRelease().getLockfileVersion();
 
             for (String key : Js.keys(parsed)) {
                 if ("__metadata".equals(key)) {
@@ -1110,7 +1109,7 @@ final class Project {
         Map<String, Object> optimizedLockfile = new LinkedHashMap<>();
         Map<String, Object> metadata = new LinkedHashMap<>();
         String cacheKey = Cache.getCacheKey(configuration);
-        metadata.put("version", LOCKFILE_VERSION);
+        metadata.put("version", configuration.getRelease().getLockfileVersion());
         metadata.put("cacheKey", cacheKey);
         optimizedLockfile.put("__metadata", metadata);
 

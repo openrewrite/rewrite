@@ -18,6 +18,7 @@ package org.openrewrite.javascript.internal;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.javascript.internal.lock.CannotKnow;
 import org.openrewrite.javascript.internal.lock.ManifestRules;
+import org.openrewrite.javascript.internal.lock.pnpm.Main;
 import org.openrewrite.javascript.internal.lock.pnpm.WorkspaceManifestWriter;
 import org.openrewrite.semver.NodeSemver;
 
@@ -33,9 +34,9 @@ import static java.util.Objects.requireNonNull;
  */
 public final class PnpmRelease {
 
-    // each range's first and last release recorded with the same writes
+    // each range's first and last release recorded with the same writes, and the pnpm 11 releases that run as 11.2.2
     private static final List<String> RECORDED = Arrays.asList("9.5.0 - 9.15.9", "10.32.1 - 10.34.6",
-            "11.0.6 - 11.2.2");
+            Main.RUNS_AS_PORTED);
 
     private final String version;
     private final int major;

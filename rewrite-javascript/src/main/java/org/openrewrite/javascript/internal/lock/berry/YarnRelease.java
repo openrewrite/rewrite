@@ -40,17 +40,17 @@ import java.util.zip.GZIPInputStream;
 @Getter
 final class YarnRelease {
 
-    /**
-     * The release whose code this package ports; a later one changes what reaches the lock (4.14.0 writes
-     * lockfile version 9).
-     */
-    static final String PORTED = "4.10.3";
-
     private static final String RESOURCE = "yarn-releases.json.gz";
 
     private static volatile @Nullable Map<String, @Nullable Object> data;
 
     private final String version;
+
+    /**
+     * Project.ts's LOCKFILE_VERSION: 8, 9 from 4.14.0, 10 from 4.15.0. Recordings with 4.11.0 through 4.18.1 write
+     * the entries 4.10.3, whose code this package ports, writes.
+     */
+    private final int lockfileVersion;
 
     /**
      * {@code [descriptor, extension data]} in the table's order.
@@ -88,6 +88,8 @@ final class YarnRelease {
                         boolean jsrScope, boolean checksumWithoutCacheKey, Set<String> settings,
                         String unknownSettingHint) {
         this.version = version;
+        this.lockfileVersion = compareVersions(version, "4.15.0") >= 0 ? 10 :
+                compareVersions(version, "4.14.0") >= 0 ? 9 : 8;
         this.packageExtensions = packageExtensions;
         this.patches = patches;
         this.nodeGypMatch = nodeGypMatch;
