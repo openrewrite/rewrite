@@ -315,6 +315,7 @@ final class Install {
         ctx.setLinkWorkspacePackagesDepth(options.getLinkWorkspacePackagesDepth());
         ctx.setPreferWorkspacePackages(options.isTrue("preferWorkspacePackages"));
         ctx.setReadPackageHook(opts.getReadPackageHook());
+        ctx.setPnpmVersion(options.getPackageManagerVersion());
         ctx.setRegistries(registries);
         ctx.setNamedRegistryPrefixes(options.getNamedRegistryPrefixes());
         Object resolutionMode = options.get("resolutionMode");

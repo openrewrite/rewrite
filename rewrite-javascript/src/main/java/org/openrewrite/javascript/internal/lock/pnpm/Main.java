@@ -39,7 +39,8 @@ import java.util.function.Supplier;
 
 /**
  * Port of pnpm/src main.ts and getConfig.ts (pnpm 11.2.2) up to the command: the workspace pnpm finds, its config,
- * the package manager check, the config dependencies, the pnpmfile hooks and the workspace's projects.
+ * the package manager check, which names the release that installs, the config dependencies, the pnpmfile hooks and
+ * the workspace's projects.
  */
 public final class Main {
 
@@ -49,8 +50,12 @@ public final class Main {
     public static final String PNPM_VERSION = "11.2.2";
 
     /**
-     * The releases the engine runs as the one ported: recorded writing what 11.2.2 writes from 11.0.6 (11.0.5 sorts
-     * what 11.0.6 appends), and 11.13.0 and 11.28.5 writing its locks.
+     * The releases the engine runs as the one ported: 11.2.2's modules, with the behavior a class here follows of a
+     * later release by the release that installs ({@link #releaseIn}), so far 11.5.1's
+     * {@code ResolveDependencies.LOCKED_OPTIONAL_PEER_CANDIDATES}. Recorded writing what 11.2.2 writes from 11.0.6
+     * (11.0.5 sorts what 11.0.6 appends), with 11.13.0 and 11.28.5 writing its locks for the scenarios recorded with
+     * them. The other changes of 11.3.0 to 11.28.5 that reach a lock are not ported: a project one of them applies
+     * to gets the port's lock, not its release's (ADR 0013 names the releases recorded writing another).
      */
     public static final String RUNS_AS_PORTED = "11.0.6 - 11";
 
@@ -64,6 +69,22 @@ public final class Main {
         }
         return NodeSemver.validRange(version, NodeSemver.Options.DEFAULT) != null &&
                NodeSemver.subset(version, RUNS_AS_PORTED, NodeSemver.Options.DEFAULT);
+    }
+
+    /**
+     * Whether the release that installs is one of {@code releases}, the range of a behavior a ported module took on
+     * after {@link #PNPM_VERSION}: {@code pnpmVersion} is that release, or a range where the inputs do not say which
+     * release of it installs; null when some of those are of {@code releases} and some are not.
+     */
+    static @Nullable Boolean releaseIn(String pnpmVersion, String releases) {
+        String exact = NodeSemver.valid(pnpmVersion, NodeSemver.Options.DEFAULT);
+        if (exact != null) {
+            return NodeSemver.satisfies(exact, releases, NodeSemver.Options.DEFAULT);
+        }
+        if (NodeSemver.subset(pnpmVersion, releases, NodeSemver.Options.DEFAULT)) {
+            return true;
+        }
+        return NodeSemver.intersects(pnpmVersion, releases, NodeSemver.Options.DEFAULT) ? null : false;
     }
 
     // the inputs' root: workspaceDir, which is also rootProjectManifestDir, or the project's directory without one
@@ -323,34 +344,46 @@ public final class Main {
 
     /**
      * The package manager check: switchCliVersion or checkPackageManager and syncEnvLockfile, which write pnpm's
-     * release into the env document of the lock in rootProjectManifestDir.
+     * release into the env document of the lock in rootProjectManifestDir. Returns the release that installs, the
+     * {@code packageManager.version} of the config its install reads ({@link PnpmOptions#getPackageManagerVersion()}):
+     * the one pnpm hands the install to, else this one. Where the inputs do not say which release that is (the one
+     * the root's lock pins of a range, the one corepack starts when the host does not say whether it runs pnpm), a
+     * range of them.
      */
-    void checkWantedPackageManager(PnpmOptions options) {
+    String checkWantedPackageManager(PnpmOptions options) {
         PnpmOptions.WantedPackageManager pm = options.getWantedPackageManager();
-        if (inputs.getEnv() == null) {
-            release(pm, this::corepackSpec);
-        }
+        String corepackStarts = inputs.getEnv() == null ? startedByCorepack(pm, this::corepackSpec) : null;
+        String installs = installsAfterCheck(pm, options);
+        return corepackStarts == null || corepackStarts.equals(installs) ? installs :
+                installs + " || " + corepackStarts;
+    }
+
+    // main.ts' package manager block where pnpm is run directly, or under corepack where the environment says so
+    private String installsAfterCheck(PnpmOptions.@Nullable WantedPackageManager pm, PnpmOptions options) {
         if (pm == null || "ignore".equals(pm.getOnFail())) {
-            return;
+            return PNPM_VERSION;
         }
         boolean underCorepack = inputs.getEnv() != null && inputs.getEnv().containsKey("COREPACK_ROOT");
         EnvLockfile.OnDisk rootLockFile = lockFileOf(WORKSPACE_DIR);
         if ("pnpm".equals(pm.getName()) && "download".equals(pm.getOnFail()) && !underCorepack) {
-            unlessLocked = new SwitchCliVersion(envInstaller, stores).switchCliVersion(pm, options, rootLockFile);
-            return;
+            SwitchCliVersion.Switched switched = new SwitchCliVersion(envInstaller, stores)
+                    .switchCliVersion(pm, options, rootLockFile);
+            unlessLocked = switched.getUnlessLocked();
+            return switched.getRelease();
         }
         checkPackageManager(pm, underCorepack);
         if (rootLockFile == null) {
             if (SyncEnvLockfile.syncEnvLockfile(pm, () -> null) != null) {
                 unlessLocked = stores.storeControllerFailure(options);
             }
-            return;
+            return PNPM_VERSION;
         }
         String version = SyncEnvLockfile.syncEnvLockfile(pm, rootLockFile::readEnvLockfile);
         if (version != null) {
             envInstaller.resolvePackageManagerIntegrities(version, rootLockFile.readEnvLockfile(), true, rootLockFile,
                     stores.createStoreController(options), options);
         }
+        return PNPM_VERSION;
     }
 
     /**
@@ -396,23 +429,46 @@ public final class Main {
      */
     static String release(PnpmOptions.@Nullable WantedPackageManager wanted,
                                  Supplier<SpecUtils.@Nullable Descriptor> corepack) {
-        boolean checks = wanted != null && ("download".equals(wanted.getOnFail()) ||
-                                            "error".equals(wanted.getOnFail()));
-        if (checks && !"pnpm".equals(wanted.getName())) {
-            return PNPM_VERSION;
+        startedByCorepack(wanted, corepack);
+        return runDirectly(wanted);
+    }
+
+    private static boolean checks(PnpmOptions.@Nullable WantedPackageManager wanted) {
+        return wanted != null && ("download".equals(wanted.getOnFail()) || "error".equals(wanted.getOnFail()));
+    }
+
+    // the release pnpm run directly installs with: the one the project names where pnpm switches to it or fails
+    // without it, else this one
+    private static String runDirectly(PnpmOptions.@Nullable WantedPackageManager wanted) {
+        return checks(wanted) && "pnpm".equals(wanted.getName()) && wanted.getVersion() instanceof String ?
+                (String) wanted.getVersion() : PNPM_VERSION;
+    }
+
+    /**
+     * The release corepack starts, a version or a range, where it is another than the one pnpm run directly installs
+     * with and both {@link #runsAsPorted}; null where it is the same one, where corepack finds no spec, and where
+     * pnpm fails for another package manager either way. CannotKnow where corepack would start a release that does
+     * not run as ported, or refuse the spec.
+     */
+    private static @Nullable String startedByCorepack(PnpmOptions.@Nullable WantedPackageManager wanted,
+                                                      Supplier<SpecUtils.@Nullable Descriptor> corepack) {
+        if (checks(wanted) && !"pnpm".equals(wanted.getName())) {
+            return null;
         }
-        String direct = checks && wanted.getVersion() instanceof String ? (String) wanted.getVersion() :
-                PNPM_VERSION;
+        String direct = runDirectly(wanted);
         String starts;
         try {
             SpecUtils.Descriptor spec = corepack.get();
             if (spec == null) {
-                return direct;
+                return null;
             }
             String version = SpecUtils.installVersion(spec);
-            if (version != null && version.equals(NodeSemver.valid(direct, NodeSemver.Options.DEFAULT)) ||
-                runsAsPorted(version == null ? spec.getRange() : version) && runsAsPorted(direct)) {
-                return direct;
+            if (version != null && version.equals(NodeSemver.valid(direct, NodeSemver.Options.DEFAULT))) {
+                return null;
+            }
+            String started = version == null ? spec.getRange() : version;
+            if (runsAsPorted(started) && runsAsPorted(direct)) {
+                return started;
             }
             starts = version == null ? "starts the release at " + spec.getRange() : "starts pnpm " + version;
         } catch (Rejected e) {

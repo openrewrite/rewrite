@@ -59,13 +59,13 @@ class SwitchCliVersionTest {
 
     private static final Instant NOW = Instant.parse("2026-10-08T00:00:00Z");
 
-    private static void switchCliVersion(PnpmOptions.WantedPackageManager pm, String lock) {
-        switchCliVersion(pm, lock, null, "");
+    private static SwitchCliVersion.Switched switchCliVersion(PnpmOptions.WantedPackageManager pm, String lock) {
+        return switchCliVersion(pm, lock, null, "");
     }
 
     // a member's lock (lockDir other than the root) reads the root's lock, which the inputs do not hold here
-    private static @Nullable PnpmError switchCliVersion(PnpmOptions.WantedPackageManager pm, String lock,
-                                                        @Nullable String workspaceManifest, String lockDir) {
+    private static SwitchCliVersion.Switched switchCliVersion(PnpmOptions.WantedPackageManager pm, String lock,
+                                                              @Nullable String workspaceManifest, String lockDir) {
         return new SwitchCliVersion(new EnvInstaller(NO_REGISTRY, NOW, Host.UNKNOWN),
           new CreateNewStoreController(NO_REGISTRY, NOW))
           .switchCliVersion(pm, options(workspaceManifest), lockDir.isEmpty() ? new EnvLockfile.OnDisk(lock) : null);
@@ -101,17 +101,51 @@ class SwitchCliVersionTest {
 
     @Test
     void thePortedReleaseNeedsNoSwitch() {
-        switchCliVersion(pm("11.2.2", false), MAIN_DOCUMENT);
+        assertThat(switchCliVersion(pm("11.2.2", false), MAIN_DOCUMENT))
+          .isEqualTo(new SwitchCliVersion.Switched("11.2.2", null));
     }
 
     /**
-     * Another release from 11.0.6 runs as 11.2.2: a pin needs no switch, and a member's range of them none either.
+     * Another release from 11.0.6 runs as the port: a pin needs no switch, and a member's range of them none either.
+     * The release that installs is the one pinned, or the range where the root's lock, which the inputs do not hold,
+     * pins one of it.
      */
     @ParameterizedTest
     @CsvSource(delimiter = '|', value = {"11.3.0|false|", "11.28.5|false|", "^11.0.6|true|packages/a"})
     void aPnpm11ReleaseRunsAsThePortedOne(String version, boolean fromDevEngines, @Nullable String lockDir) {
         assertThat(switchCliVersion(pm(version, fromDevEngines), MAIN_DOCUMENT, null, lockDir == null ? "" : lockDir))
-          .isNull();
+          .isEqualTo(new SwitchCliVersion.Switched(version, null));
+    }
+
+    /**
+     * Without a release to switch to, the one ported installs: another package manager's name, or no version.
+     */
+    @Test
+    void theReleaseThatInstallsIsThePortedOneWithoutASwitch() {
+        assertThat(switchCliVersion(new PnpmOptions.WantedPackageManager("yarn", "4.0.0", "download", false),
+          MAIN_DOCUMENT).getRelease()).isEqualTo(Main.PNPM_VERSION);
+        assertThat(switchCliVersion(pm(null, true), MAIN_DOCUMENT).getRelease()).isEqualTo(Main.PNPM_VERSION);
+    }
+
+    // an env document that locks pnpm and @pnpm/exe at the version, which is what isPackageManagerResolved reads
+    private static String resolvedEnvDocument(String pnpmVersion) {
+        return "---\nlockfileVersion: '9.0'\n\nimporters:\n\n  .:\n    configDependencies: {}\n" +
+               "    packageManagerDependencies:\n      '@pnpm/exe':\n        specifier: " + pnpmVersion + "\n" +
+               "        version: " + pnpmVersion + "\n      pnpm:\n        specifier: " + pnpmVersion + "\n" +
+               "        version: " + pnpmVersion + "\n\npackages: {}\n\nsnapshots: {}\n\n---\n" + MAIN_DOCUMENT;
+    }
+
+    /**
+     * A range installs with the release the root's lock pins of it, on whichever side of a release option that is;
+     * a member whose root lock the inputs do not hold installs with one of the range.
+     */
+    @ParameterizedTest
+    @CsvSource(delimiter = '|', value = {"^11.0.6|11.3.0", "^11.0.6|11.28.5", ">=11.5.1 <12|11.15.1"})
+    void aRangeInstallsWithTheReleaseTheRootsLockPins(String range, String locked) {
+        assertThat(switchCliVersion(pm(range, true), resolvedEnvDocument(locked)))
+          .isEqualTo(new SwitchCliVersion.Switched(locked, null));
+        assertThat(switchCliVersion(pm("^11.0.6", true), resolvedEnvDocument(locked), null, "packages/a"))
+          .isEqualTo(new SwitchCliVersion.Switched("^11.0.6", null));
     }
 
     /**
@@ -153,7 +187,8 @@ class SwitchCliVersionTest {
     @ParameterizedTest
     @ValueSource(strings = {"11.2.2", "^11.0.0"})
     void aMembersStoreControllerFailsAtTheNextOne(String version) {
-        PnpmError unlessLocked = switchCliVersion(pm(version, true), MAIN_DOCUMENT, BAD_NAMED_REGISTRY, "packages/a");
+        PnpmError unlessLocked = switchCliVersion(pm(version, true), MAIN_DOCUMENT, BAD_NAMED_REGISTRY, "packages/a")
+          .getUnlessLocked();
         assertThat(unlessLocked).isNotNull();
         assertThatThrownBy(() -> new CreateNewStoreController(NO_REGISTRY, NOW)
           .createStoreController(options(BAD_NAMED_REGISTRY)))

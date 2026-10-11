@@ -208,10 +208,11 @@ public final class PnpmLockRegenerator {
      */
     Install.Result install() {
         Main main = new Main(inputs, envInstaller, stores, lockFile);
-        PnpmOptions options = main.config();
-        boolean workspace = options.getWorkspacePackagePatterns() != null;
-        String lockfileDir = workspace ? options.getLockfileDir(inputs.getLockDir()) : null;
-        main.checkWantedPackageManager(options);
+        PnpmOptions config = main.config();
+        boolean workspace = config.getWorkspacePackagePatterns() != null;
+        String lockfileDir = workspace ? config.getLockfileDir(inputs.getLockDir()) : null;
+        // the release pnpm hands the install to reads the same files into its own config
+        PnpmOptions options = config.withPackageManagerVersion(main.checkWantedPackageManager(config));
         Main.FilterResults filterResults;
         try {
             main.installConfigDepsAndLoadHooks(options, lockfileDir);
