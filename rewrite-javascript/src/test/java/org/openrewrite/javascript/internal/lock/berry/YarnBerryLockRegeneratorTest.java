@@ -349,9 +349,9 @@ class YarnBerryLockRegeneratorTest {
                                          "::version=5.6.3&hash=8c6c40");
     }
 
-    // recorded: the .yarnrc.yml 4.15.0 rewrote over a version 8 lock beside nodeLinker
     @Test
     void migratesALockWithTheRulesOfTheReleaseThatRuns() {
+        // recorded: the .yarnrc.yml 4.15.0 rewrote over a version 8 lock beside nodeLinker
         Result result = new YarnBerryLockRegenerator(YarnBerryLockRegenerator.Inputs.builder()
                 .lock(LOCK_HEADER + "8\n  cacheKey: 10c0\n\n\"r@workspace:.\":\n  version: 0.0.0-use.local\n" +
                       "  resolution: \"r@workspace:.\"\n  languageName: unknown\n  linkType: soft\n")
@@ -363,9 +363,9 @@ class YarnBerryLockRegeneratorTest {
                 "enableScripts: true\n\nnodeLinker: node-modules\n\nnpmMinimalAgeGate: 0\n"));
     }
 
-    // recorded with 4.10.3 under YARN_RC_FILENAME=.yarnrc-custom.yml, which left no .yarnrc.yml
     @Test
     void writesTheMigratedSettingsToTheRcFileYarnRcFilenameNames() {
+        // recorded with 4.10.3 under YARN_RC_FILENAME=.yarnrc-custom.yml, which left no .yarnrc.yml
         String workspace = "\n\n\"p@workspace:.\":\n  version: 0.0.0-use.local\n  resolution: \"p@workspace:.\"\n" +
                            "  languageName: unknown\n  linkType: soft\n";
         Result result = new YarnBerryLockRegenerator(YarnBerryLockRegenerator.Inputs.builder()
@@ -380,17 +380,17 @@ class YarnBerryLockRegeneratorTest {
                 "compressionLevel: mixed\n\nenableGlobalCache: false\n\nnodeLinker: node-modules\n"));
     }
 
-    // recorded with 4.15.0 an hour after q-fresh@1.1.0 was published
     @Test
     void failsARangeTheAgeGateQuarantinesWhole() {
+        // recorded with 4.15.0 an hour after q-fresh@1.1.0 was published
         Result result = addFresh("4.15.0", "10", "", "q-fresh", "^1.1.0");
         assertThat(requireNonNull(result.getFailure()).getDetail())
                 .contains("YN0016 q-fresh@npm:^1.1.0: All versions satisfying \"^1.1.0\" are quarantined");
     }
 
-    // recorded with 4.18.1 and 4.15.0 under npmMinimalAgeGate: 0, an hour after 1.1.0 was published
     @Test
     void gatesAScopeByItsOwnSettingFrom4_17() {
+        // recorded with 4.18.1 and 4.15.0 under npmMinimalAgeGate: 0, an hour after 1.1.0 was published
         String yarnrc = "npmMinimalAgeGate: 0\nnpmScopes:\n  gs:\n    npmAlwaysAuth: false\n";
         assertThat(addFresh("4.18.1", "10", yarnrc, "@gs/q-fresh", "^1.0.0").getLockFileContent())
                 .contains("resolution: \"@gs/q-fresh@npm:1.0.0\"");
@@ -398,9 +398,9 @@ class YarnBerryLockRegeneratorTest {
                 .contains("resolution: \"@gs/q-fresh@npm:1.1.0\"");
     }
 
-    // recorded with 4.15.0 and 4.14.0 over an empty project
     @Test
     void ignoresYarn1sIgnoreScriptsFrom4_15() {
+        // recorded with 4.15.0 and 4.14.0 over an empty project
         Map<String, String> env = Collections.singletonMap("YARN_IGNORE_SCRIPTS", "1");
         Function<String, Result> install = release -> new YarnBerryLockRegenerator(
                 YarnBerryLockRegenerator.Inputs.builder()
@@ -416,15 +416,15 @@ class YarnBerryLockRegeneratorTest {
         assertThat(install.apply("4.15.0").isSuccess()).isTrue();
     }
 
-    // recorded with 4.15.0 an hour after q-fresh@1.1.0 was published
     @Test
     void appliesTheDefaultAgeGateOfTheReleaseThatRuns() {
+        // recorded with 4.15.0 an hour after q-fresh@1.1.0 was published
         assertThat(addFreshDependency("4.15.0", "10", "")).isEqualTo(lockWithFresh("10"));
     }
 
-    // recorded with 4.14.0 and npmMinimalAgeGate: "2h"
     @Test
     void readsTheAgeGateAsADurationFrom4_14() {
+        // recorded with 4.14.0 and npmMinimalAgeGate: "2h"
         assertThat(addFreshDependency("4.14.0", "9", "npmMinimalAgeGate: \"2h\"\n")).isEqualTo(lockWithFresh("9"));
     }
 

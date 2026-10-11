@@ -539,9 +539,9 @@ class NodeDependencyScanTest {
                                                                "bun writes: " + reported);
     }
 
-    // npm 11.17.0 reads an empty npm-shrinkwrap.json as none, and rewrites the package-lock.json beside it
     @Test
     void anEmptyNpmShrinkwrapLeavesNpmThePackageLock() {
+        // npm 11.17.0 reads an empty npm-shrinkwrap.json as none, and rewrites the package-lock.json beside it
         NodeDependencyScan.Accumulator acc = new NodeDependencyScan.Accumulator();
         captureFile(acc, "npm-shrinkwrap.json", "");
         captureFile(acc, "package-lock.json", "root lock");

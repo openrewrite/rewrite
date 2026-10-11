@@ -283,9 +283,9 @@ class NpmInstallChecksTest {
         assertThatThrownBy(() -> platform("{\"os\":[5]}")).hasMessage("entry.charAt is not a function");
     }
 
-    // NodeHosts.NPM counts node 18 and up
     @Test
     void anUnknownHostAnswersOnlyWhereEveryHostAnswersAlike() {
+        // NodeHosts.NPM counts node 18 and up
         assertThatCode(() -> NpmInstallChecks.checkPlatform(json("{\"os\":[\"any\"],\"cpu\":\"any\"}"), false,
           Host.UNKNOWN, Host.UNKNOWN)).doesNotThrowAnyException();
         assertThatThrownBy(() -> NpmInstallChecks.checkPlatform(json("{\"libc\":[\"any\"]}"), false, Host.UNKNOWN,

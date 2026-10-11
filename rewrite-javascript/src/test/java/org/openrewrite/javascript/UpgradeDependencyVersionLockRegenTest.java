@@ -128,9 +128,9 @@ class UpgradeDependencyVersionLockRegenTest implements RewriteTest {
         );
     }
 
-    // recorded with npm 11.17.0 in lock/npm/shrinkwrap-beside-package-lock
     @Test
     void aBumpBesideAnNpmShrinkwrapRegeneratesTheShrinkwrap() {
+        // recorded with npm 11.17.0 in lock/npm/shrinkwrap-beside-package-lock
         routes.put("https://registry.npmjs.org/is-odd", resource("lock/npm/v3/http/is-odd"));
         routes.put("https://registry.npmjs.org/is-odd/3.0.0", resource("lock/npm/v3/http/is-odd-3.0.0"));
         routes.put("https://registry.npmjs.org/is-odd/3.0.1", resource("lock/npm/v3/http/is-odd-3.0.1"));

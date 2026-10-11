@@ -102,9 +102,9 @@ class NodeSemverRelease550Test {
         assertThat(NodeSemver.satisfies("1.0", "^1.0.0", Options.DEFAULT)).isFalse();
     }
 
-    // 5.5.0 reads a wildcard before a number as a partial, which only 7.8.4 rejects
     @Test
     void wildcardBeforeANumberIsAnXRange() {
+        // 5.5.0 reads a wildcard before a number as a partial, which only 7.8.4 rejects
         assertThat(NodeSemver.validRange("5.x.1", Options.V5_5_0)).isEqualTo(">=5.0.0 <6.0.0");
         assertThat(NodeSemver.satisfies("5.7.2", "5.x.1", Options.V5_5_0)).isTrue();
     }

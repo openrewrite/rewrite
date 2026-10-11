@@ -130,9 +130,9 @@ class EditedPackageManagerFileLockRegenTest implements RewriteTest {
                 .isEqualTo(resource(SCENARIO + "after"));
     }
 
-    // recorded with 4.5.3 over the lock lock/yarn-berry/format-v6-migration wrote
     @Test
     void aMigrationThatWritesTheYarnrcIsRefused() {
+        // recorded with 4.5.3 over the lock lock/yarn-berry/format-v6-migration wrote
         rewriteRun(
                 spec -> spec.recipe(new RemoveDependency("debug", null)),
                 packageJson("{\"name\":\"p\",\"packageManager\":\"yarn@4.10.3\"," +

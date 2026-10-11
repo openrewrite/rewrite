@@ -230,9 +230,9 @@ class YarnClassicLockRegeneratorTest {
                                                  "\"yarn@4.10.3\". However the current global version of Yarn is " +
                                                  "1.22.22.";
 
-    // recorded in lock/yarn-classic/small-engines-node-18-incompatible-fails
     @Test
     void aProjectWhoseCompatibilityFollowsTheUnknownHostCannotBeKnown() {
+        // recorded in lock/yarn-classic/small-engines-node-18-incompatible-fails
         YarnClassicLockRegenerator.Inputs.InputsBuilder inputs = YarnClassicLockRegenerator.Inputs.builder()
                 .lock("# yarn lockfile v1\n\n\n");
         Result engine = new YarnClassicLockRegenerator(inputs.manifest("", "{\"name\":\"p\",\"version\":\"1.0.0\"," +

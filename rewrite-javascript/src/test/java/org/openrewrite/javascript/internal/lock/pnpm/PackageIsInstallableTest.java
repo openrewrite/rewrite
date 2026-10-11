@@ -250,9 +250,9 @@ class PackageIsInstallableTest {
           HOST)).isInstanceOf(PackageIsInstallable.UnsupportedEngineError.class);
     }
 
-    // pnpm 11.2.2 runs on Node 22.13 and up, so ">=20" holds on every host, ">=24" on some and "<10" on none
     @Test
     void anUnknownNodeVersionFailsEngineStrictOnlyWhereEveryHostDoes() {
+        // pnpm 11.2.2 runs on Node 22.13 and up, so ">=20" holds on every host, ">=24" on some and "<10" on none
         PackageIsInstallable.projectIsInstallable(".", obj("{'engines':{'node':'>=20'}}"), true, null, null,
           Host.UNKNOWN);
 
@@ -263,9 +263,9 @@ class PackageIsInstallableTest {
           true, null, null, Host.UNKNOWN)).isInstanceOf(PackageIsInstallable.UnsupportedEngineError.class);
     }
 
-    // pnpm 11.2.2's node-semver 7.8.0 reads "22.x.1" as "22.x", which 7.8.4 rejects
     @Test
     void anUnknownNodeVersionReadsTheRangeAsPnpmsSemverDoes() {
+        // pnpm 11.2.2's node-semver 7.8.0 reads "22.x.1" as "22.x", which 7.8.4 rejects
         PackageIsInstallable.projectIsInstallable(".", obj("{'engines':{'node':'>=22.x.1'}}"), true, null, null,
           Host.UNKNOWN);
     }

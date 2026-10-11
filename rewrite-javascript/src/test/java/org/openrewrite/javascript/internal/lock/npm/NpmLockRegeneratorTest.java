@@ -91,9 +91,9 @@ class NpmLockRegeneratorTest {
         }
     }
 
-    // npm 11.17.0: EBADPLATFORM on darwin and a lock on linux, EBADENGINE on node 18 (engine-strict) and a lock on 24
     @Test
     void anEditWhoseOutcomeFollowsTheUnknownHostCannotBeKnown() {
+        // npm 11.17.0 fails EBADPLATFORM on darwin, and EBADENGINE on node 18 under engine-strict where 24 locks
         Result platform = new NpmLockRegenerator(NpmLockRegenerator.Inputs.builder()
           .lock(LOCK)
           .manifest("", "{\n  \"name\": \"a\",\n  \"version\": \"1.0.0\",\n  \"dependencies\": {\n" +
@@ -111,9 +111,9 @@ class NpmLockRegeneratorTest {
         assertThat(Arrays.asList(kind(platform), kind(engine))).containsExactly(Kind.CANNOT_KNOW, Kind.CANNOT_KNOW);
     }
 
-    // npm 11.17.0 writes the same lock where it skips these optional packages as where it installs them
     @Test
     void anOptionalPackageForSomeHostsRegeneratesOnAnUnknownHost() {
+        // npm 11.17.0 writes the same lock where it skips these optional packages as where it installs them
         Map<String, String> packages = new LinkedHashMap<>();
         packages.put("linux-only", "\"os\": [\"linux\"]");
         packages.put("node-20-only", "\"engines\": {\"node\": \">=20\"}");
@@ -129,9 +129,9 @@ class NpmLockRegeneratorTest {
           .contains("\"node_modules/node-20-only\": {\n      \"version\": \"1.0.0\"");
     }
 
-    // npm 11.17.0 locks an optional file: dependency without a version on node 24 and leaves it out on node 18
     @Test
     void anOptionalPackageWithoutAVersionForSomeHostsCannotBeKnown() {
+        // npm 11.17.0 locks an optional file: dependency without a version on node 24 and leaves it out on node 18
         Result result = new NpmLockRegenerator(NpmLockRegenerator.Inputs.builder()
           .lock(LOCK)
           .manifest("", "{\n  \"name\": \"a\",\n  \"version\": \"1.0.0\",\n  \"optionalDependencies\": {\n" +

@@ -275,9 +275,9 @@ class PickManifestTest {
         assertThat(version(pack, "1.x", node("1.2.3"))).isEqualTo("1.5.0");
     }
 
-    // npm 11.17.0 on node 18.20.8 locks lru-cache@">=10" at 10.4.3, where node 24 locks 11.5.3
     @Test
     void anUnknownNodeVersionCannotKnowAPickOnlySomeHostsMake() {
+        // npm 11.17.0 on node 18.20.8 locks lru-cache@">=10" at 10.4.3, where node 24 locks 11.5.3
         Map<String, Object> pack = packument("{\"dist-tags\":{\"latest\":\"3.0.0\"},\"versions\":{" +
                                              "\"1.0.0\":{\"version\":\"1.0.0\"}," +
                                              "\"2.0.0\":{\"version\":\"2.0.0\",\"engines\":{\"node\":\">=16\"}}," +
@@ -289,10 +289,10 @@ class PickManifestTest {
         assertThat(version(pack, "3.0.0", unknown)).isEqualTo("3.0.0");
     }
 
-    // npm 11.17.0 locks eslint@^9 (^18.18.0 || ^20.9.0 || >=21.1.0) at 9.39.5 on node 18.20.8 and on node 24
     @Test
     @Timeout(5)
     void anUnknownNodeVersionKnowsAPickEveryHostMakes() {
+        // npm 11.17.0 locks eslint@^9 (^18.18.0 || ^20.9.0 || >=21.1.0) at 9.39.5 on node 18.20.8 and on node 24
         StringBuilder versions = new StringBuilder();
         for (int i = 0; i < 3000; i++) {
             versions.append(i == 0 ? "" : ",").append("\"1.").append(i).append(".0\":{\"version\":\"1.").append(i)

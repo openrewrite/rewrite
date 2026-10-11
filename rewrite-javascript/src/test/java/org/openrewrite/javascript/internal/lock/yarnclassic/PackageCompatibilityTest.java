@@ -52,7 +52,6 @@ class PackageCompatibilityTest {
         assertThat(PackageCompatibility.testEngine(name, range, actual, loose)).isEqualTo(satisfied);
     }
 
-    // over Node 18 and up, which also pass as 0.10 to 0.13: "<1" passes 18 as 0.10.18
     @ParameterizedTest(name = "{0}")
     @CsvSource(delimiter = ';', value = {
             ">=16;           true",
@@ -67,6 +66,7 @@ class PackageCompatibilityTest {
     })
     @Timeout(1)
     void anUnknownNodeVersionPassesWhereEveryHostDoes(String range, @Nullable Boolean every) {
+        // over Node 18 and up, which also pass as 0.10 to 0.13: "<1" passes 18 as 0.10.18
         assertThat(PackageCompatibility.everyHost(range, false)).isEqualTo(every);
     }
 

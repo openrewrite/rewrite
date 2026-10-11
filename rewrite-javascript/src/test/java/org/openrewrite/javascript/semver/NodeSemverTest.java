@@ -481,9 +481,9 @@ class NodeSemverTest {
           .isInstanceOf(IllegalArgumentException.class).hasMessage(message);
     }
 
-    // node-semver trims and splits with JavaScript's whitespace, which includes U+00A0 and U+FEFF
     @Test
     void javaScriptWhitespaceAroundAVersionOrRange() {
+        // node-semver trims and splits with JavaScript's whitespace, which includes U+00A0 and U+FEFF
         assertThat(NodeSemver.valid("\u00a01.2.3", Options.DEFAULT)).isEqualTo("1.2.3");
         assertThat(NodeSemver.validRange("\u00a0^1.2.3", Options.LOOSE)).isEqualTo(">=1.2.3 <2.0.0-0");
         assertThat(NodeSemver.satisfies("1.2.3", ">=\u00a01.2.3", Options.DEFAULT)).isTrue();
