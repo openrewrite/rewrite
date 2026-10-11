@@ -211,6 +211,29 @@ class NpmLockRegeneratorTest {
           .now(Instant.EPOCH);
     }
 
+    private static final String ENGINES_NPM_11 = "{\n  \"name\": \"a\",\n  \"version\": \"1.0.0\",\n  \"engines\": {\n" +
+                                                 "    \"npm\": \"^11.17.0\"\n  }\n}\n";
+    private static final String ENGINES_NPM_11_LOCK = LOCK.replace("\"version\": \"1.0.0\"\n    }",
+      "\"version\": \"1.0.0\",\n      \"engines\": {\n        \"npm\": \"^11.17.0\"\n      }\n    }");
+
+    // npm.js flatOptions.npmVersion: under engine-strict npm 11.17.0 rejects a root whose engines.npm it does not
+    // satisfy (lock/npm/open-root-engines-npm-strict-unsatisfied), and so does every other release by its own version
+    @ParameterizedTest
+    @CsvSource({"11.16.0,false", "11.17.0,true", "11.21.0,true", "12.0.0,false"})
+    void enginesNpmIsHeldToTheReleaseThatInstalls(String release, boolean satisfies) {
+        Result result = new NpmLockRegenerator(project(ENGINES_NPM_11)
+          .release(NpmRelease.of(release))
+          .npmrc("engine-strict=true\n")
+          .build(), NO_REGISTRY).regenerate();
+
+        if (satisfies) {
+            assertThat(result.getLockFileContent()).isEqualTo(ENGINES_NPM_11_LOCK);
+        } else {
+            assertThat(result.getErrorMessage()).isEqualTo("UNSUPPORTED_ENTRY_TYPE: npm rejects this edit " +
+              "(EBADENGINE): Unsupported engine");
+        }
+    }
+
     @Test
     void devEnginesAreCheckedBeforeTheInstall() {
         String manifest = devEngines("{\"runtime\":{\"name\":\"bun\"}}");

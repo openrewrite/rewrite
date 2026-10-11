@@ -47,11 +47,6 @@ import static org.openrewrite.javascript.internal.lock.npm.Js.truthy;
  */
 public final class IdealTreeBuilder {
 
-    /**
-     * The npm this is a port of: what {@code engines.npm} is checked against.
-     */
-    public static final String NPM_VERSION = "11.17.0";
-
     private static final class DepsQueue {
         private final List<Node> deps = new ArrayList<>();
         private boolean sorted = true;
@@ -175,13 +170,14 @@ public final class IdealTreeBuilder {
     private void checkEngineAndPlatform() {
         Node tree = Objects.requireNonNull(idealTree);
         Set<String> omitSet = options.omitSet();
+        String npmVersion = options.getNpmVersion();
         Host environment = Host.builder().os(options.getOs()).cpu(options.getCpu()).libc(options.getLibc()).build();
 
         for (Node node : tree.getInventory().values()) {
             if (!node.isOptional() && !node.shouldOmit(omitSet)) {
                 try {
                     if (!(node.isRoot() && truthy(node.getPackage().get("devEngines")))) {
-                        NpmInstallChecks.checkEngine(node.getPackage(), NPM_VERSION, host.getNodeVersion(),
+                        NpmInstallChecks.checkEngine(node.getPackage(), npmVersion, host.getNodeVersion(),
                                 options.isForce());
                     }
                 } catch (NpmInstallChecks.UnsupportedEngine err) {
@@ -194,7 +190,7 @@ public final class IdealTreeBuilder {
             }
             if (node.isOptional() && !node.isInert()) {
                 try {
-                    NpmInstallChecks.checkEngine(node.getPackage(), NPM_VERSION, host.getNodeVersion(), false);
+                    NpmInstallChecks.checkEngine(node.getPackage(), npmVersion, host.getNodeVersion(), false);
                     NpmInstallChecks.checkPlatform(node.getPackage(), false, environment, host);
                 } catch (RuntimeException error) {
                     for (Node n : OptionalSet.optionalSet(node)) {
@@ -308,7 +304,7 @@ public final class IdealTreeBuilder {
                         .before(releaseAgeBefore(spec))
                         .defaultTag(options.getTag())
                         .nodeVersion(host.getNodeVersion())
-                        .npmVersion(NPM_VERSION)
+                        .npmVersion(options.getNpmVersion())
                         .integrity(node.getIntegrity())
                         .build();
                 Map<String, Object> mani = pacote.manifest(spec, pacoteOptions);
@@ -617,7 +613,7 @@ public final class IdealTreeBuilder {
                 .before(releaseAgeBefore(spec))
                 .defaultTag(options.getTag())
                 .nodeVersion(host.getNodeVersion())
-                .npmVersion(NPM_VERSION);
+                .npmVersion(options.getNpmVersion());
         spec = Objects.requireNonNull(Objects.requireNonNull(idealTree).getMeta()).checkYarnLock(spec, fetchOptions);
 
         Map<String, Object> cached = manifests.get(spec.getRaw());
