@@ -78,6 +78,24 @@ class NodeDependencyEditsTest {
         assertThat(secondSees.specifier("legacy", "ms")).isEqualTo("2.1.2");
     }
 
+    @Test
+    void theWorkspaceIsLinkedOncePerScanThoughARunAsksForAVisitorPerFile() {
+        NodeDependencyEdits acc = pnpmWorkspace();
+        acc.decideAll(new InMemoryExecutionContext(), (decision, c) -> {
+        });
+        Path unlinked = Paths.get("not/linked/package.json");
+        acc.scan.installRoots.put(unlinked, LockFileRegeneration.InstallRoot.HERE);
+        acc.visitor((decision, c) -> {
+        });
+        acc.visitor((decision, c) -> {
+        });
+        assertThat(acc.scan.installRoots).containsKey(unlinked);
+        acc.scan(PNPM_MEMBER);
+        acc.visitor((decision, c) -> {
+        });
+        assertThat(acc.scan.installRoots).doesNotContainKey(unlinked).containsKey(MEMBER);
+    }
+
     /**
      * corepack 0.35.0's reading (recorded): packageManager over devEngines.packageManager, which must name an exact
      * version, no array; a spec it rejects is its Rejected; bun, which corepack does not run, by its name.

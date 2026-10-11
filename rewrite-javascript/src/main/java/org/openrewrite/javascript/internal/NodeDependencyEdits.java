@@ -84,6 +84,7 @@ public final class NodeDependencyEdits implements PackageJsonHelper.FileEditor {
     private final List<String> pending = new ArrayList<>();
     private @Nullable Decider decider;
     private int version;
+    private boolean linked;
 
     public NodeDependencyEdits(Rows rows) {
         this.rows = rows;
@@ -113,6 +114,7 @@ public final class NodeDependencyEdits implements PackageJsonHelper.FileEditor {
      * Note what a dependency recipe's scan reads from {@code sf}.
      */
     public void scan(SourceFile sf) {
+        linked = false;
         Path p = sf.getSourcePath();
         String basename = String.valueOf(p.getFileName());
         if (sf instanceof Yaml.Documents && readsCatalogsFrom(basename)) {
@@ -148,7 +150,7 @@ public final class NodeDependencyEdits implements PackageJsonHelper.FileEditor {
     public List<SourceFile> decideAll(ExecutionContext ctx, Decider decider) {
         this.decider = decider;
         PackageJsonHelper.addFileEditor(ctx, this);
-        NodeDependencyScan.linkWorkspaceMembers(scan);
+        linkWorkspaceMembers();
         for (Path project : new TreeMap<>(scan.projects).keySet()) {
             if (captured(project) != null) {
                 decide(ctx, project, null);
@@ -165,6 +167,14 @@ public final class NodeDependencyEdits implements PackageJsonHelper.FileEditor {
             }
         }
         return created;
+    }
+
+    // once per scan: a recipe run asks for a visitor for each source file, and linking maps every workspace
+    private void linkWorkspaceMembers() {
+        if (!linked) {
+            NodeDependencyScan.linkWorkspaceMembers(scan);
+            linked = true;
+        }
     }
 
     /**
@@ -217,7 +227,7 @@ public final class NodeDependencyEdits implements PackageJsonHelper.FileEditor {
      */
     public TreeVisitor<Tree, ExecutionContext> visitor(Decider decider) {
         this.decider = decider;
-        NodeDependencyScan.linkWorkspaceMembers(scan);
+        linkWorkspaceMembers();
         return new TreeVisitor<Tree, ExecutionContext>() {
             @Override
             public Tree preVisit(Tree tree, ExecutionContext ctx) {
