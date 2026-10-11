@@ -63,7 +63,8 @@ final class NpmScenarios {
     static final String EVERY_RELEASE_ENV = "REWRITE_LOCK_EVERY_RELEASE";
 
     /**
-     * When set to a node-semver range, only the releases in it are replayed.
+     * When set to a node-semver range, the releases in it are replayed, proven or not; unset, the releases
+     * {@code NpmReleases.PROVEN} names.
      */
     static final String RELEASES_ENV = "REWRITE_LOCK_RELEASES";
 
@@ -413,11 +414,12 @@ final class NpmScenarios {
             return endpoints;
         }
 
-        // REWRITE_LOCK_RELEASES, a node-semver range, limits the releases replayed
+        // the releases the engine claims to reproduce (NpmReleases.PROVEN), or the node-semver range
+        // REWRITE_LOCK_RELEASES names, which may ask for releases not proven yet
         private static boolean replays(NpmRelease release) {
             String range = System.getenv(RELEASES_ENV);
-            return range == null || range.isEmpty() ||
-                   NodeSemver.satisfies(release.toString(), range, NodeSemver.Options.DEFAULT);
+            return range == null || range.isEmpty() ? NpmReleases.isProven(release) :
+                    NodeSemver.satisfies(release.toString(), range, NodeSemver.Options.DEFAULT);
         }
 
         private Path where(String file) {
