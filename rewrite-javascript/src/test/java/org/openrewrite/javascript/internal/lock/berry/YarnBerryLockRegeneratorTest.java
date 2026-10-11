@@ -40,6 +40,7 @@ import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.function.Function;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Stream;
@@ -47,6 +48,7 @@ import java.util.stream.Stream;
 import static java.util.Objects.requireNonNull;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.assertj.core.api.Assertions.entry;
 
 /**
  * The release a project runs and the lockfile migration rules, against Yarn's own runs: {@code yarn --version} under
@@ -298,20 +300,64 @@ class YarnBerryLockRegeneratorTest {
     /**
      * install.ts's migration rules are the running release's: 4.15.0 over a version 8 lock (4.10.3 wrote it) writes
      * approvedGitRepositories, enableScripts and npmMinimalAgeGate to .yarnrc.yml, and compressionLevel and
-     * enableGlobalCache only below version 8. Recorded: the .yarnrc.yml 4.15.0 wrote beside {@code nodeLinker}.
+     * enableGlobalCache only below version 8. Recorded: the .yarnrc.yml 4.15.0 rewrote beside {@code nodeLinker}.
      */
     @Test
     void migratesALockWithTheRulesOfTheReleaseThatRuns() {
-        YarnBerryLockRegenerator regenerator = new YarnBerryLockRegenerator(YarnBerryLockRegenerator.Inputs.builder()
+        Result result = new YarnBerryLockRegenerator(YarnBerryLockRegenerator.Inputs.builder()
                 .lock(LOCK_HEADER + "8\n  cacheKey: 10c0\n\n\"r@workspace:.\":\n  version: 0.0.0-use.local\n" +
                       "  resolution: \"r@workspace:.\"\n  languageName: unknown\n  linkType: soft\n")
                 .manifest("", "{\"name\":\"r\",\"packageManager\":\"yarn@4.15.0\"}\n")
+                .configFile(".yarnrc.yml", "nodeLinker: node-modules\n")
                 .now(Instant.EPOCH)
-                .build(), BerryScenarios.NO_REGISTRY);
-        Map<String, Object> migrated = regenerator.load(regenerator.release(), Collections.emptyMap())
-                .getMigratedSettings();
-        assertThat(Syml.stringifySyml(new LinkedHashMap<>(migrated)))
-                .isEqualTo("approvedGitRepositories:\n  - \"**\"\n\nenableScripts: true\n\nnpmMinimalAgeGate: 0\n");
+                .build(), BerryScenarios.NO_REGISTRY).regenerate();
+        assertThat(result.getFiles()).containsExactly(entry(".yarnrc.yml", "approvedGitRepositories:\n  - \"**\"\n\n" +
+                "enableScripts: true\n\nnodeLinker: node-modules\n\nnpmMinimalAgeGate: 0\n"));
+    }
+
+    /**
+     * Yarn 4.13.0 fails a range whose every version the age gate quarantines. Recorded with 4.15.0 an hour after
+     * q-fresh@1.1.0 was published.
+     */
+    @Test
+    void failsARangeTheAgeGateQuarantinesWhole() {
+        Result result = addFresh("4.15.0", "10", "", "q-fresh", "^1.1.0");
+        assertThat(requireNonNull(result.getFailure()).getDetail())
+                .contains("YN0016 q-fresh@npm:^1.1.0: All versions satisfying \"^1.1.0\" are quarantined");
+    }
+
+    /**
+     * From 4.17.0 an {@code npmScopes} entry has its own {@code npmMinimalAgeGate}, a day unless set, whatever the
+     * project's. Recorded with 4.18.1 and 4.15.0 under {@code npmMinimalAgeGate: 0}, an hour after 1.1.0.
+     */
+    @Test
+    void gatesAScopeByItsOwnSettingFrom4_17() {
+        String yarnrc = "npmMinimalAgeGate: 0\nnpmScopes:\n  gs:\n    npmAlwaysAuth: false\n";
+        assertThat(addFresh("4.18.1", "10", yarnrc, "@gs/q-fresh", "^1.0.0").getLockFileContent())
+                .contains("resolution: \"@gs/q-fresh@npm:1.0.0\"");
+        assertThat(addFresh("4.15.0", "10", yarnrc, "@gs/q-fresh", "^1.0.0").getLockFileContent())
+                .contains("resolution: \"@gs/q-fresh@npm:1.1.0\"");
+    }
+
+    /**
+     * Yarn 4.15.0 ignores YARN_IGNORE_SCRIPTS, which Yarn 1 reads. Yarn 4.14.0 rejects it as an unknown setting.
+     * Recorded over an empty project.
+     */
+    @Test
+    void ignoresYarn1sIgnoreScriptsFrom4_15() {
+        Map<String, String> env = Collections.singletonMap("YARN_IGNORE_SCRIPTS", "1");
+        Function<String, Result> install = release -> new YarnBerryLockRegenerator(
+                YarnBerryLockRegenerator.Inputs.builder()
+                        .lock(LOCK_HEADER + "10\n  cacheKey: 10c0\n\n\"r@workspace:.\":\n" +
+                              "  version: 0.0.0-use.local\n  resolution: \"r@workspace:.\"\n" +
+                              "  languageName: unknown\n  linkType: soft\n")
+                        .manifest("", "{\"name\":\"r\",\"packageManager\":\"yarn@" + release + "\"}\n")
+                        .env(env)
+                        .now(Instant.EPOCH)
+                        .build(), BerryScenarios.NO_REGISTRY).regenerate();
+        assertThat(requireNonNull(install.apply("4.14.0").getFailure()).getDetail()).contains("Usage Error: " +
+                "Unrecognized or legacy configuration settings found: ignoreScripts - run \"yarn config\"");
+        assertThat(install.apply("4.15.0").isSuccess()).isTrue();
     }
 
     /**
@@ -350,6 +396,14 @@ class YarnBerryLockRegeneratorTest {
     }
 
     private static @Nullable String addFreshDependency(String release, String lockfileVersion, String yarnrc) {
+        Result result = addFresh(release, lockfileVersion, yarnrc, "q-fresh", "^1.0.0");
+        assertThat(result.isSuccess()).as(String.valueOf(result.getErrorMessage())).isTrue();
+        return result.getLockFileContent();
+    }
+
+    // adds `name` at `range` beside q-plain, an hour after its 1.1.0 was published
+    private static Result addFresh(String release, String lockfileVersion, String yarnrc, String name,
+                                   String range) {
         String before = LOCK_HEADER + lockfileVersion + "\n  cacheKey: 10c0\n\n" + Q_PLAIN +
                         "\"r@workspace:.\":\n  version: 0.0.0-use.local\n  resolution: \"r@workspace:.\"\n" +
                         "  dependencies:\n    q-plain: \"npm:1.0.0\"\n  languageName: unknown\n  linkType: soft\n";
@@ -360,37 +414,37 @@ class YarnBerryLockRegeneratorTest {
         tarballs.put("1.1.0", "H4sIAAAAAAACE+3TvQ6CMBhG4c5eRdNZodUqiYkXQ6Qq/gBSMCTGexfUycVFSdTzLG/ydeh0ini5i9cuLO4bbH2e" +
                               "iTfTrZm1t209r9Y2EsZOxzaKtO3uxswmRkgtelD7Ki6lFH/qrLL44NRcquNoVTq/UUOpTq70aZ51VxOYQKuL" +
                               "wG96dB+mWeKatv5P/PGy/7F57r97pv8eHPKk3rvANUVeVn5hBiQBAAAAAAAAAAAAAADwVa4gB032ACgAAA==");
-        String packument = "{\"name\":\"q-fresh\",\"dist-tags\":{\"latest\":\"1.1.0\"},\"versions\":{" +
-                           "\"1.0.0\":{\"name\":\"q-fresh\",\"version\":\"1.0.0\",\"dist\":{\"tarball\":" +
-                           "\"https://registry.yarnpkg.com/q-fresh/-/q-fresh-1.0.0.tgz\"}}," +
-                           "\"1.1.0\":{\"name\":\"q-fresh\",\"version\":\"1.1.0\",\"dist\":{\"tarball\":" +
-                           "\"https://registry.yarnpkg.com/q-fresh/-/q-fresh-1.1.0.tgz\"}}}," +
-                           "\"time\":{\"created\":\"2020-01-01T00:00:00.000Z\",\"modified\":\"" + FRESH_PUBLISHED +
-                           "\",\"1.0.0\":\"2020-01-01T00:00:00.000Z\",\"1.1.0\":\"" + FRESH_PUBLISHED + "\"}}";
+        String packument = ("{\"name\":\"q-fresh\",\"dist-tags\":{\"latest\":\"1.1.0\"},\"versions\":{" +
+                            "\"1.0.0\":{\"name\":\"q-fresh\",\"version\":\"1.0.0\",\"dist\":{\"tarball\":" +
+                            "\"https://registry.yarnpkg.com/q-fresh/-/fresh-1.0.0.tgz\"}}," +
+                            "\"1.1.0\":{\"name\":\"q-fresh\",\"version\":\"1.1.0\",\"dist\":{\"tarball\":" +
+                            "\"https://registry.yarnpkg.com/q-fresh/-/fresh-1.1.0.tgz\"}}}," +
+                            "\"time\":{\"created\":\"2020-01-01T00:00:00.000Z\",\"modified\":\"" + FRESH_PUBLISHED +
+                            "\",\"1.0.0\":\"2020-01-01T00:00:00.000Z\",\"1.1.0\":\"" + FRESH_PUBLISHED + "\"}}")
+                .replace("q-fresh", name).replace("/-/fresh-", "/-/" + name.replaceAll("^@[^/]+/", "") + "-");
+        String fresh = name;
         RegistrySource registry = new RegistrySource() {
             @Override
             public @Nullable String packument(String server, String name, boolean full,
                                               @Nullable String authorization) {
-                return "q-fresh".equals(name) ? packument : null;
+                return name.equals(fresh) ? packument : null;
             }
 
             @Override
             public byte @Nullable [] tarball(String url, String name, String version,
                                              @Nullable String authorization) {
-                String tgz = "q-fresh".equals(name) ? tarballs.get(version) : null;
+                String tgz = name.equals(fresh) ? tarballs.get(version) : null;
                 return tgz == null ? null : Base64.getDecoder().decode(tgz);
             }
         };
-        Result result = new YarnBerryLockRegenerator(YarnBerryLockRegenerator.Inputs.builder()
+        return new YarnBerryLockRegenerator(YarnBerryLockRegenerator.Inputs.builder()
                 .lock(before)
                 .manifest("", "{\"name\":\"r\",\"packageManager\":\"yarn@" + release + "\",\"dependencies\":" +
-                              "{\"q-plain\":\"1.0.0\",\"q-fresh\":\"^1.0.0\"}}\n")
+                              "{\"q-plain\":\"1.0.0\",\"" + name + "\":\"" + range + "\"}}\n")
                 .configFile(".yarnrc.yml", "nodeLinker: node-modules\n" + yarnrc)
                 .host(Host.builder().nodeVersion("v24.19.0").os("darwin").cpu("arm64").build())
                 .now(Instant.parse(FRESH_PUBLISHED).plus(Duration.ofHours(1)))
                 .build(), registry).regenerate();
-        assertThat(result.isSuccess()).as(String.valueOf(result.getErrorMessage())).isTrue();
-        return result.getLockFileContent();
     }
 
     private static String release(@Nullable String packageManager, @Nullable String yarnrc, Map<String, String> env) {

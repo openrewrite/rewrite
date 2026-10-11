@@ -39,6 +39,7 @@ import org.openrewrite.javascript.internal.lock.SpecUtils;
 
 import java.time.Instant;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -144,6 +145,9 @@ public final class YarnBerryLockRegenerator {
 
     private @Nullable Configuration options;
 
+    // the configuration as the release that runs reads it
+    private @Nullable Configuration configuration;
+
     // each manifest parsed once, with the same throw on every read
     private final Map<String, Object> manifests = new LinkedHashMap<>();
 
@@ -172,13 +176,37 @@ public final class YarnBerryLockRegenerator {
         }
         Map<String, Object> settings = new LinkedHashMap<>();
         String written;
+        String rcFile;
         try {
             written = install(lock, settings);
+            rcFile = settings.isEmpty() ? null : updateConfiguration(settings);
         } catch (RuntimeException e) {
             return Result.failure(failure(e));
         }
-        return INSTALL.verify(written, again -> new YarnBerryLockRegenerator(inputs.toBuilder().lock(again).build(),
-                registry).install(again, settings), YarnBerryLockRegenerator::failure);
+        Result verified = INSTALL.verify(written, again -> new YarnBerryLockRegenerator(
+                inputs.toBuilder().lock(again).build(), registry).install(again, settings),
+                YarnBerryLockRegenerator::failure);
+        return rcFile == null || !verified.isSuccess() ? verified :
+                Result.success(written, Collections.singletonMap(Configuration.DEFAULT_RC_FILENAME, rcFile));
+    }
+
+    /**
+     * Configuration.updateConfiguration of the project's .yarnrc.yml with the settings the migration rules set: the
+     * file as Yarn rewrites it, with its line endings.
+     */
+    private String updateConfiguration(Map<String, Object> settings) {
+        String rcFilename = Configuration.DEFAULT_RC_FILENAME;
+        String current = inputs.getConfigFiles().get(rcFilename);
+        if (current == null && inputs.getPaths() != null && inputs.getPaths().contains(rcFilename)) {
+            throw new CannotKnow("the " + rcFilename + " Yarn rewrites with the settings it migrates (the host did " +
+                                 "not read it)");
+        }
+        Map<String, @Nullable Object> replacement = current == null ? new LinkedHashMap<>() :
+                Syml.parseSyml(current);
+        replacement.putAll(settings);
+        String os = inputs.getHost().getOs();
+        return Project.normalizeLineEndings(current == null ? "" : current, Syml.stringifySyml(replacement),
+                "win32".equals(os) ? "\r\n" : "\n");
     }
 
     /**
@@ -187,13 +215,13 @@ public final class YarnBerryLockRegenerator {
      */
     String install(String lock, Map<String, Object> settings) {
         YarnRelease release = release();
-        options().checkShapeKeys(release);
-        if (options().getThirdPartyPlugin() != null) {
-            throw new CannotKnow("what the plugin " + options().getThirdPartyPlugin() + " does to the lock (Yarn " +
-                                 "runs its code)");
+        configuration(release).checkShapeKeys(release);
+        if (configuration(release).getThirdPartyPlugin() != null) {
+            throw new CannotKnow("what the plugin " + configuration(release).getThirdPartyPlugin() + " does to the " +
+                                 "lock (Yarn runs its code)");
         }
         // Configuration.find's plugin pass rejects a setting the release does not know before install reads the lock
-        options().copy().restrictTo(release);
+        configuration(release).copy().restrictTo(release);
         if (lock.contains(MERGE_CONFLICT_START)) {
             throw new CannotKnow("how Yarn repairs the lock's merge conflict (it asks git for each side)");
         }
@@ -278,7 +306,7 @@ public final class YarnBerryLockRegenerator {
      * an earlier install's migration); throws Configuration.UsageError where the configuration rejects a setting.
      */
     Loaded load(YarnRelease release, Map<String, Object> settings) {
-        Configuration options = options().copy();
+        Configuration options = configuration(release).copy();
         options.restrictTo(release);
         for (Map.Entry<String, Object> setting : settings.entrySet()) {
             options.useCompat(setting.getKey(), setting.getValue());
@@ -298,22 +326,32 @@ public final class YarnBerryLockRegenerator {
         Map<String, Object> migratedSettings = new LinkedHashMap<>();
         Object lockfileLastVersion = project.lockfileLastVersion;
         if (lockfileLastVersion != null) {
+            // install.ts's LOCKFILE_MIGRATION_RULES, as each release adds to them
             boolean legacy = Integer.valueOf(-1).equals(lockfileLastVersion);
-            boolean old = !legacy && Js.toNumber(lockfileLastVersion) < release.getLockfileVersion();
-            if (legacy && options.useCompat("nodeLinker", "node-modules")) {
-                migratedSettings.put("nodeLinker", "node-modules");
+            double v = Js.toNumber(lockfileLastVersion);
+            migrate(options, migratedSettings, legacy, "nodeLinker", "node-modules");
+            migrate(options, migratedSettings, !legacy && v < 8, "enableGlobalCache", false);
+            migrate(options, migratedSettings, !legacy && v < 8, "compressionLevel", "mixed");
+            if (YarnRelease.compareVersions(release.getVersion(), "4.14.0") >= 0) {
+                migrate(options, migratedSettings, v < 9, "approvedGitRepositories",
+                        Collections.singletonList("**"));
+                migrate(options, migratedSettings, v < 9, "enableScripts", true);
             }
-            if (old && options.useCompat("enableGlobalCache", false)) {
-                migratedSettings.put("enableGlobalCache", false);
-            }
-            if (old && options.useCompat("compressionLevel", "mixed")) {
-                migratedSettings.put("compressionLevel", "mixed");
+            if (YarnRelease.compareVersions(release.getVersion(), "4.15.0") >= 0) {
+                migrate(options, migratedSettings, v < 10, "npmMinimalAgeGate", "0");
             }
         }
 
         LegacyMigrationResolver legacyMigrationResolver = new LegacyMigrationResolver(configuration.makeResolver());
         legacyMigrationResolver.setup(project);
         return new Loaded(project, legacyMigrationResolver, migratedSettings);
+    }
+
+    private static void migrate(Configuration options, Map<String, Object> migratedSettings, boolean selected,
+                                String name, Object value) {
+        if (selected && options.useCompat(name, value)) {
+            migratedSettings.put(name, value);
+        }
     }
 
     /**
@@ -379,20 +417,32 @@ public final class YarnBerryLockRegenerator {
         }
     }
 
-    // an Error the configuration throws reaches the CLI outside any report, which prints it as an Internal Error
+    // the configuration that picks the release: yarnPath and ignorePath read alike in every release
     private Configuration options() {
         if (options == null) {
-            Map<String, String> rcFiles = new LinkedHashMap<>(inputs.getConfigFiles());
-            for (Map.Entry<String, String> file : inputs.getHomeFiles().entrySet()) {
-                rcFiles.put(Configuration.HOME + file.getKey(), file.getValue());
-            }
-            try {
-                options = Configuration.load(rcFiles, HostEnvironment.of(inputs.getEnv()));
-            } catch (JsError e) {
-                throw Rejected.crashes(Reason.RESOLUTION_REQUIRED, null, "Internal Error: " + e.getMessage());
-            }
+            options = read(null);
         }
         return options;
+    }
+
+    private Configuration configuration(YarnRelease release) {
+        if (configuration == null) {
+            configuration = read(release);
+        }
+        return configuration;
+    }
+
+    // an Error the configuration throws reaches the CLI outside any report, which prints it as an Internal Error
+    private Configuration read(@Nullable YarnRelease release) {
+        Map<String, String> rcFiles = new LinkedHashMap<>(inputs.getConfigFiles());
+        for (Map.Entry<String, String> file : inputs.getHomeFiles().entrySet()) {
+            rcFiles.put(Configuration.HOME + file.getKey(), file.getValue());
+        }
+        try {
+            return Configuration.load(rcFiles, HostEnvironment.of(inputs.getEnv()), release);
+        } catch (JsError e) {
+            throw Rejected.crashes(Reason.RESOLUTION_REQUIRED, null, "Internal Error: " + e.getMessage());
+        }
     }
 
     // how far above the project's directory the host's files reach, as far as corepack walks here

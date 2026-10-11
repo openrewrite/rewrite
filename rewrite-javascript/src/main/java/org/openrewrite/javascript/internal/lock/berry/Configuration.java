@@ -87,7 +87,7 @@ public final class Configuration {
             "@yarnpkg/plugin-workspace-tools"));
 
     private enum Type {
-        ANY, BOOLEAN, ABSOLUTE_PATH, NUMBER, STRING, SECRET, SHAPE, MAP
+        ANY, BOOLEAN, ABSOLUTE_PATH, NUMBER, STRING, SECRET, SHAPE, MAP, DURATION
     }
 
     /**
@@ -108,9 +108,14 @@ public final class Configuration {
         final @Nullable Definition valueDefinition;
         final @Nullable Function<String, String> normalizeKeys;
 
+        /**
+         * A duration's unit ({@code m}), which a number without one is in.
+         */
+        final @Nullable String unit;
+
         Definition(Type type, @Nullable Object defaultValue, @Nullable List<Object> values, boolean isArray,
                    boolean isNullable, Map<String, Definition> properties, @Nullable Definition valueDefinition,
-                   @Nullable Function<String, String> normalizeKeys) {
+                   @Nullable Function<String, String> normalizeKeys, @Nullable String unit) {
             this.type = type;
             this.defaultValue = defaultValue;
             this.values = values;
@@ -119,6 +124,13 @@ public final class Configuration {
             this.properties = properties;
             this.valueDefinition = valueDefinition;
             this.normalizeKeys = normalizeKeys;
+            this.unit = unit;
+        }
+
+        Definition(Type type, @Nullable Object defaultValue, @Nullable List<Object> values, boolean isArray,
+                   boolean isNullable, Map<String, Definition> properties, @Nullable Definition valueDefinition,
+                   @Nullable Function<String, String> normalizeKeys) {
+            this(type, defaultValue, values, isArray, isNullable, properties, valueDefinition, normalizeKeys, null);
         }
 
         Definition(Type type, @Nullable Object defaultValue, @Nullable List<Object> values, boolean isArray,
@@ -132,6 +144,11 @@ public final class Configuration {
 
         static Definition withoutDefault(Type type) {
             return of(type, Syml.UNDEFINED);
+        }
+
+        static Definition duration(String unit, String defaultValue) {
+            return new Definition(Type.DURATION, defaultValue, null, false, false, Collections.emptyMap(), null, null,
+                    unit);
         }
 
         static Definition map(Definition valueDefinition) {
@@ -198,6 +215,28 @@ public final class Configuration {
     }
 
     /**
+     * The definitions of the release that reads the sources, null for 4.10.3's. Per plugin-npm sources/index.ts,
+     * {@code npmMinimalAgeGate} is a duration in minutes from 4.11.0, defaults to a day from 4.15.0, and is a scope's
+     * setting too from 4.17.0.
+     */
+    private static Map<String, Definition> definitions(@Nullable YarnRelease release) {
+        if (release == null || YarnRelease.compareVersions(release.getVersion(), "4.11.0") < 0) {
+            return DEFINITIONS;
+        }
+        Map<String, Definition> definitions = new LinkedHashMap<>(DEFINITIONS);
+        Definition minimalAgeGate = Definition.duration("m",
+                YarnRelease.compareVersions(release.getVersion(), "4.15.0") < 0 ? "0m" : "1d");
+        definitions.put("npmMinimalAgeGate", minimalAgeGate);
+        if (YarnRelease.compareVersions(release.getVersion(), "4.17.0") >= 0) {
+            Map<String, Definition> scope = new LinkedHashMap<>(
+                    requireNonNull(DEFINITIONS.get("npmScopes").valueDefinition).properties);
+            scope.put("npmMinimalAgeGate", minimalAgeGate);
+            definitions.put("npmScopes", Definition.map(Definition.shape(scope)));
+        }
+        return definitions;
+    }
+
+    /**
      * Yarn's configuration error: a value its definition rejects, or a key no definition has.
      */
     public static final class UsageError extends RuntimeException {
@@ -230,6 +269,9 @@ public final class Configuration {
     private final HostEnvironment env;
 
     @Getter(AccessLevel.NONE)
+    private final Map<String, Definition> definitions;
+
+    @Getter(AccessLevel.NONE)
     private @Nullable YarnRelease release;
 
     @Getter(AccessLevel.NONE)
@@ -247,9 +289,11 @@ public final class Configuration {
     private @Nullable String unrecognizedShapeKey;
     private @Nullable String unrecognizedShapeKeySource;
 
-    private Configuration(HostEnvironment env) {
+    private Configuration(HostEnvironment env, @Nullable YarnRelease release) {
         this.env = env;
-        for (Map.Entry<String, Definition> definition : DEFINITIONS.entrySet()) {
+        this.release = release;
+        this.definitions = definitions(release);
+        for (Map.Entry<String, Definition> definition : definitions.entrySet()) {
             values.put(definition.getKey(), getDefaultValue(definition.getValue(), false));
         }
     }
@@ -258,7 +302,7 @@ public final class Configuration {
      * The configuration as the sources set it, for one install to restrict and to apply migration rules to.
      */
     Configuration copy() {
-        Configuration copy = new Configuration(env);
+        Configuration copy = new Configuration(env, release);
         copy.values.putAll(values);
         copy.sources.putAll(sources);
         copy.keySources.putAll(keySources);
@@ -272,7 +316,7 @@ public final class Configuration {
      * The defaults, as a project with no rc file and no environment has them.
      */
     public static Configuration defaults() {
-        return new Configuration(HostEnvironment.of(Collections.emptyMap()));
+        return new Configuration(HostEnvironment.of(Collections.emptyMap()), null);
     }
 
     /**
@@ -297,7 +341,14 @@ public final class Configuration {
      * home directory's under {@code ~/}, read first, under {@code env}; throws UsageError where Yarn rejects one.
      */
     public static Configuration load(Map<String, String> configFiles, HostEnvironment env) {
-        Configuration options = new Configuration(env);
+        return load(configFiles, env, null);
+    }
+
+    /**
+     * {@link #load(Map, HostEnvironment)} with the definitions of {@code release}, null for 4.10.3's.
+     */
+    static Configuration load(Map<String, String> configFiles, HostEnvironment env, @Nullable YarnRelease release) {
+        Configuration options = new Configuration(env, release);
         String rcFilename = getRcFilename(env.known());
         TreeMap<Integer, Object[]> byDepth = new TreeMap<>(Collections.reverseOrder());
         for (Map.Entry<String, String> file : configFiles.entrySet()) {
@@ -421,7 +472,7 @@ public final class Configuration {
         } catch (RuntimeException e) {
             throw new UsageError("Parse error when loading " + DEFAULT_RC_FILENAME + "; please check it's proper Yaml");
         }
-        Configuration options = new Configuration(env);
+        Configuration options = new Configuration(env, null);
         Map<String, Map<String, String>> catalogs = new LinkedHashMap<>();
         Map<String, @Nullable Object> settings = asMap(data);
         if (settings.get("catalog") != null) {
@@ -518,7 +569,9 @@ public final class Configuration {
             if (value == Syml.UNDEFINED || "plugins".equals(key)) {
                 continue;
             }
-            if ("<environment>".equals(source) && IGNORED_ENV_VARIABLES.contains(key)) {
+            if ("<environment>".equals(source) && (IGNORED_ENV_VARIABLES.contains(key) ||
+                                                   "ignoreScripts".equals(key) && release != null &&
+                                                   YarnRelease.compareVersions(release.getVersion(), "4.15.0") >= 0)) {
                 continue;
             }
             if ("rcFilename".equals(key)) {
@@ -527,7 +580,7 @@ public final class Configuration {
             if (!"enableStrictSettings".equals(key)) {
                 keySources.putIfAbsent(key, source);
             }
-            Definition definition = DEFINITIONS.get(key);
+            Definition definition = definitions.get(key);
             if (definition == null) {
                 continue;
             }
@@ -580,7 +633,7 @@ public final class Configuration {
                                      " - run \"" + release.getUnknownSettingHint() + "\" to see the list of " +
                                      "settings supported in Yarn (in " + key.getValue() + ")");
             }
-            Definition definition = DEFINITIONS.get(key.getKey());
+            Definition definition = definitions.get(key.getKey());
             if (definition != null) {
                 values.put(key.getKey(), getDefaultValue(definition, false));
                 sources.remove(key.getKey());
@@ -654,6 +707,9 @@ public final class Configuration {
                 case NUMBER:
                     interpreted = number(Js.parseInt(replaced, 0));
                     break;
+                case DURATION:
+                    interpreted = number(MiscUtils.parseDuration(replaced, requireNonNull(definition.unit)));
+                    break;
                 case BOOLEAN:
                     interpreted = MiscUtils.parseBoolean(replaced);
                     break;
@@ -723,6 +779,9 @@ public final class Configuration {
             }
             case MAP:
                 return definition.isArray && !ignoreArrays ? new ArrayList<>() : new LinkedHashMap<>();
+            case DURATION:
+                return number(MiscUtils.parseDuration((String) requireNonNull(definition.defaultValue),
+                        requireNonNull(definition.unit)));
             default:
                 return definition.defaultValue instanceof List ? new ArrayList<>((List<?>) definition.defaultValue) :
                         definition.defaultValue;
@@ -742,8 +801,9 @@ public final class Configuration {
         if (sources.containsKey(name) || keySources.containsKey(name)) {
             return false;
         }
-        if (DEFINITIONS.containsKey(name)) {
-            values.put(name, value);
+        Definition definition = definitions.get(name);
+        if (definition != null) {
+            values.put(name, parseValue(name, value, definition));
         }
         sources.put(name, "<compat>");
         return true;
@@ -771,7 +831,7 @@ public final class Configuration {
     }
 
     /**
-     * The release {@link #restrictTo} named.
+     * The release that reads the sources.
      */
     YarnRelease getRelease() {
         return requireNonNull(release, "the release the configuration is restricted to");

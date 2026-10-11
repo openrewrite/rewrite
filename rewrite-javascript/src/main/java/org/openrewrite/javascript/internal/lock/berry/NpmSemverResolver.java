@@ -27,7 +27,7 @@ import org.openrewrite.javascript.internal.lock.YarnpkgSemverUtils;
 import static org.openrewrite.javascript.internal.lock.berry.NpmHttpUtils.PROTOCOL;
 
 /**
- * Port of @yarnpkg/plugin-npm sources/NpmSemverResolver.ts (Yarn 4.10.3).
+ * Port of @yarnpkg/plugin-npm sources/NpmSemverResolver.ts (Yarn 4.10.3, and 4.13.0's age gate).
  */
 final class NpmSemverResolver implements Resolver {
 
@@ -76,15 +76,33 @@ final class NpmSemverResolver implements Resolver {
         Map<String, @Nullable Object> registryData = NpmHttpUtils.getPackageMetadata(descriptor, project,
                 opts.getRegistry());
         Object versions = registryData.get("versions");
-        List<String> candidates = new ArrayList<>();
+        // from Yarn 4.13.0 the age gate filters the matching versions outside the filter that skips a throw
+        boolean gateAfterMatching = YarnRelease.compareVersions(project.configuration.getRelease().getVersion(),
+                "4.13.0") >= 0;
+        List<String> semverCandidates = new ArrayList<>();
         for (Map.Entry<String, @Nullable Object> version : Js.entries(versions)) {
             try {
                 if (YarnpkgSemverUtils.valid(version.getKey()) && range.test(version.getKey()) &&
-                    NpmHttpUtils.isPackageApproved(project, descriptor, version.getKey(), registryData.get("time"))) {
-                    candidates.add(version.getKey());
+                    (gateAfterMatching ||
+                     NpmHttpUtils.isPackageApproved(project, descriptor, version.getKey(), registryData.get("time")))) {
+                    semverCandidates.add(version.getKey());
                 }
             } catch (JsError ignored) {
                 // Yarn's candidate filter skips a version whose test throws
+            }
+        }
+        List<String> candidates = semverCandidates;
+        if (gateAfterMatching) {
+            candidates = new ArrayList<>();
+            for (String version : semverCandidates) {
+                if (NpmHttpUtils.isPackageApproved(project, descriptor, version, registryData.get("time"))) {
+                    candidates.add(version);
+                }
+            }
+            if (!semverCandidates.isEmpty() && candidates.isEmpty()) {
+                throw new ReportError(ReportError.REMOTE_NOT_FOUND, "All versions satisfying \"" +
+                                                                    descriptor.range.substring(PROTOCOL.length()) +
+                                                                    "\" are quarantined");
             }
         }
         List<String> noDeprecatedCandidates = new ArrayList<>();
