@@ -33,9 +33,8 @@ import static org.openrewrite.semver.Semver.Ecosystem.MAVEN;
 import static org.openrewrite.semver.Semver.Ecosystem.NODE;
 
 /**
- * Drives the node-semver conformance corpus (transcribed from npm/node-semver's own test fixtures,
- * see {@code src/test/resources/node-semver}) against the {@link Semver.Ecosystem#NODE} selector
- * chain and its supporting internals.
+ * The node-semver conformance corpus (npm/node-semver's own fixtures, {@code src/test/resources/node-semver}) against
+ * the {@link Semver.Ecosystem#NODE} selector chain and its internals.
  */
 class NodeSemverConformanceTest {
 
@@ -158,8 +157,11 @@ class NodeSemverConformanceTest {
     @ParameterizedTest
     @MethodSource("include")
     void satisfies(String range, String version, String options) {
-        assumeTrue(!"loose".equals(options), "loose parsing is not supported");
-        if ("incPre".equals(options)) {
+        if ("loose".equals(options)) {
+            assertThat(NodeSemver.satisfies(version, range, NodeSemver.Options.LOOSE))
+              .as("%s satisfies %s (%s)", version, range, options)
+              .isTrue();
+        } else if ("incPre".equals(options)) {
             assertThat(UnionRange.satisfies(version, range, true))
               .as("%s satisfies %s (%s)", version, range, options)
               .isTrue();
@@ -177,8 +179,11 @@ class NodeSemverConformanceTest {
     @ParameterizedTest
     @MethodSource("exclude")
     void notSatisfies(String range, String version, String options) {
-        assumeTrue(!"loose".equals(options), "loose parsing is not supported");
-        if ("incPre".equals(options)) {
+        if ("loose".equals(options)) {
+            assertThat(NodeSemver.satisfies(version, range, NodeSemver.Options.LOOSE))
+              .as("%s does not satisfy %s (%s)", version, range, options)
+              .isFalse();
+        } else if ("incPre".equals(options)) {
             assertThat(UnionRange.satisfies(version, range, true))
               .as("%s does not satisfy %s (%s)", version, range, options)
               .isFalse();

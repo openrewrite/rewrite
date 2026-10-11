@@ -30,10 +30,14 @@ import static org.openrewrite.semver.Semver.isVersion;
  * <a href="https://github.com/npm/node-semver#caret-ranges-123-025-004">Caret ranges</a>.
  */
 public class CaretRange extends LatestRelease {
-    private static final Pattern CARET_RANGE_PATTERN = Pattern.compile("\\^(\\d+)(?:\\.([*xX]|\\d+))?(?:\\.([*xX]|\\d+))?(?:\\.([*xX]|\\d+))?");
+    private static final Pattern CARET_RANGE_PATTERN = Pattern.compile("\\^(\\d+)(?:\\.([*xX]|\\d+))?(?:\\.([*xX]" +
+            "|\\d+))?(?:\\.([*xX]|\\d+))?");
 
     // The npm caret grammar; unlike CARET_RANGE_PATTERN, no 4th component, wildcards allowed.
     private static final Pattern NODE_CARET_PATTERN = Pattern.compile("^(?:\\^)" + XRange.XRANGE_PLAIN + "$");
+
+    private static final Pattern NODE_CARET_PATTERN_LOOSE = Pattern.compile("^(?:\\^)" + XRange.XRANGE_PLAIN_LOOSE +
+            "$");
 
     private final String upperExclusive;
     private final String lower;
@@ -141,7 +145,11 @@ public class CaretRange extends LatestRelease {
 
     // Port of node-semver range.js replaceCaret; non-caret tokens pass through.
     static String replaceCaret(String token, boolean incPre) {
-        Matcher m = NODE_CARET_PATTERN.matcher(token);
+        return replaceCaret(token, incPre, false);
+    }
+
+    static String replaceCaret(String token, boolean incPre, boolean loose) {
+        Matcher m = (loose ? NODE_CARET_PATTERN_LOOSE : NODE_CARET_PATTERN).matcher(token);
         if (!m.matches()) {
             return token;
         }
@@ -161,17 +169,18 @@ public class CaretRange extends LatestRelease {
         if (pr != null) {
             if ("0".equals(mj)) {
                 return "0".equals(mn) ?
-                        ">=" + mj + "." + mn + "." + p + "-" + pr + " <" + mj + "." + mn + "." + NodeComparand.incr(p) + "-0" :
+                        ">=" + mj + "." + mn + "." + p + "-" + pr + " <" + mj + "." + mn + "." + NodeComparand.incr(p) +
+                                "-0" :
                         ">=" + mj + "." + mn + "." + p + "-" + pr + " <" + mj + "." + NodeComparand.incr(mn) + ".0-0";
             }
             return ">=" + mj + "." + mn + "." + p + "-" + pr + " <" + NodeComparand.incr(mj) + ".0.0-0";
         }
         if ("0".equals(mj)) {
             return "0".equals(mn) ?
-                    ">=" + mj + "." + mn + "." + p + z + " <" + mj + "." + mn + "." + NodeComparand.incr(p) + "-0" :
-                    ">=" + mj + "." + mn + "." + p + z + " <" + mj + "." + NodeComparand.incr(mn) + ".0-0";
+                    ">=" + mj + "." + mn + "." + p + " <" + mj + "." + mn + "." + NodeComparand.incr(p) + "-0" :
+                    ">=" + mj + "." + mn + "." + p + " <" + mj + "." + NodeComparand.incr(mn) + ".0-0";
         }
-        return ">=" + mj + "." + mn + "." + p + z + " <" + NodeComparand.incr(mj) + ".0.0-0";
+        return ">=" + mj + "." + mn + "." + p + " <" + NodeComparand.incr(mj) + ".0.0-0";
     }
 
     @Override

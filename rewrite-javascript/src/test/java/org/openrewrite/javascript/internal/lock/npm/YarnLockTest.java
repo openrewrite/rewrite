@@ -1,0 +1,140 @@
+/*
+ * Copyright 2026 the original author or authors.
+ * <p>
+ * Licensed under the Moderne Source Available License (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ * <p>
+ * https://docs.moderne.io/licensing/moderne-source-available-license
+ * <p>
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+package org.openrewrite.javascript.internal.lock.npm;
+
+import com.fasterxml.jackson.databind.JsonNode;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.MethodSource;
+
+import java.util.ArrayList;
+import java.util.List;
+import java.util.stream.Stream;
+
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.openrewrite.javascript.internal.lock.npm.NpmTreeSupport.fixture;
+import static org.openrewrite.javascript.internal.lock.npm.NpmTreeSupport.json;
+import static org.openrewrite.javascript.internal.lock.npm.NpmTreeSupport.node;
+import static org.openrewrite.javascript.internal.lock.npm.NpmTreeSupport.opts;
+
+/**
+ * Port of @npmcli/arborist test/yarn-lock.js. Its two yarn.lock fixtures, the trees and what arborist
+ * writes for them are in the yarn-lock-dumps fixture (npm-arborist/generate/yarn-lock-dumps.js).
+ */
+class YarnLockTest {
+
+    private static final JsonNode DUMPS = fixture("yarn-lock-dumps");
+
+    static Stream<Arguments> fixtures() {
+        List<Arguments> fixtures = new ArrayList<>();
+        for (JsonNode f : DUMPS.get("fixtures")) {
+            String[] output = f.get("input").asText().split("\n", -1);
+            for (JsonNode changed : f.get("changedLines")) {
+                output[changed.get(0).asInt()] = changed.get(1).asText();
+            }
+            fixtures.add(Arguments.of(f.get("name").asText(), f.get("input").asText(), String.join("\n", output),
+                    NpmTreeSupport.<List<String>>json(f.get("specs"))));
+        }
+        return fixtures.stream();
+    }
+
+    @ParameterizedTest(name = "{0}")
+    @MethodSource("fixtures")
+    void yarnLockFixture(String name, String input, String output, List<String> specs) {
+        YarnLock yarnLock = new YarnLock().parse(input);
+        String lockOutput = yarnLock.toString();
+        assertThat(lockOutput).as("generated output from input").isEqualTo(output);
+        assertThat(new ArrayList<>(yarnLock.getEntries().keySet())).isEqualTo(specs);
+
+        YarnLock yarnLock2 = new YarnLock().parse(lockOutput);
+        assertThat(yarnLock2.getEntries().keySet()).as("same parsed result from string output")
+          .containsExactlyInAnyOrderElementsOf(yarnLock.getEntries().keySet());
+        assertThat(yarnLock2.toString()).isEqualTo(lockOutput);
+    }
+
+    @Test
+    void invalidYarnLockfileDataThrows() {
+        assertThatThrownBy(() -> new YarnLock().parse("\n" +
+            "asdf@foo:\n" +
+            "  this !is not vlid\n" +
+            "            i mean\n" +
+            "what even is it??\n" +
+            "   not yarn lock, that's for sure\n" +
+            "      {\"maybe\":\"json\"}?\n" +
+            " - or: even\n" +
+            " - yaml?\n" +
+            " - NO\n"))
+          .as("just garbage")
+          .isInstanceOfSatisfying(YarnLock.InvalidYarnLock.class, e -> {
+              assertThat(e).hasMessage("invalid or corrupted yarn.lock file");
+              assertThat(e.getContent()).isEqualTo("  this !is not vlid\n");
+              assertThat(e.getLine()).isEqualTo(3);
+              assertThat(e.getPosition()).isEqualTo(11);
+          });
+
+        assertThatThrownBy(() -> new YarnLock().parse("\n" +
+            "asdf@foo:\n" +
+            "  dependencies:\n" +
+            "    foo bar baz blork\n"))
+          .as("invalid subkey")
+          .isInstanceOfSatisfying(YarnLock.InvalidYarnLock.class, e -> {
+              assertThat(e.getContent()).isEqualTo("    foo bar baz blork\n");
+              assertThat(e.getLine()).isEqualTo(4);
+          });
+    }
+
+    @Test
+    void omitsEmptyDependencyListOnToStringOutput() {
+        YarnLock y = new YarnLock().parse("\n" +
+            "foo@bar:\n" +
+            "  version \"1.2.3\"\n" +
+            "  resolved \"https://registry.local/foo/-/foo-1.2.3.tgz\"\n" +
+            "  dependencies:\n" +
+            "\n" +
+            "# Note: do not require a \\n at the end of the file, just add it if missing\n" +
+            "# Also: comments are not preserved.\n" +
+            "\n" +
+            "bar@foo:\n" +
+            "  version \"1.2.3\"");
+        assertThat(y.toString()).isEqualTo(
+          "# THIS IS AN AUTOGENERATED FILE. DO NOT EDIT THIS FILE DIRECTLY.\n" +
+          "# yarn lockfile v1\n" +
+          "\n" +
+          "\n" +
+          "bar@foo:\n" +
+          "  version \"1.2.3\"\n" +
+          "\n" +
+          "foo@bar:\n" +
+          "  version \"1.2.3\"\n" +
+          "  resolved \"https://registry.local/foo/-/foo-1.2.3.tgz\"\n");
+    }
+
+    static Stream<Arguments> trees() {
+        List<Arguments> trees = new ArrayList<>();
+        for (JsonNode t : DUMPS.get("trees")) {
+            trees.add(Arguments.of(t.get("name").asText(), t.get("tree"), t.get("expected").asText()));
+        }
+        return trees.stream();
+    }
+
+    @ParameterizedTest(name = "{0}")
+    @MethodSource("trees")
+    void fromTree(String name, JsonNode tree, String expected) {
+        assertThat(new YarnLock().fromTree(node(opts(tree))).toString()).isEqualTo(expected);
+    }
+}

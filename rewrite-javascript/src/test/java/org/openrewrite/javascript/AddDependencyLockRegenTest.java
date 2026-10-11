@@ -42,12 +42,11 @@ import static org.openrewrite.javascript.Assertions.nodeResolutionResult;
 import static org.openrewrite.javascript.Assertions.packageJson;
 import static org.openrewrite.javascript.Assertions.packageLock;
 import static org.openrewrite.javascript.Assertions.pnpmLock;
+import static org.openrewrite.test.SourceSpecs.text;
 
 /**
- * PM-free end-to-end tests for {@link AddDependency} lock regeneration: a scalar-only leaf add is
- * resolved and written into the lock byte-exactly, while a closure-changing add
- * (a package with transitives) still fails loud — the lock is left untouched, both files carry a
- * {@link Markup.Warn}, and a structured {@link NodeLockRegenerationFailures} row records the reason.
+ * {@link AddDependency} lock regeneration without a package manager: a leaf add is written into the lock byte for
+ * byte; a closure-changing add fails loud, both files warned and a {@link NodeLockRegenerationFailures} row written.
  */
 class AddDependencyLockRegenTest implements RewriteTest {
 
@@ -68,7 +67,8 @@ class AddDependencyLockRegenTest implements RewriteTest {
         });
         HttpSenderExecutionContextView.view(ctx).setHttpSender(http);
         NodeExecutionContextView.view(ctx).setRegistries(singletonList(
-                new NodeRegistry(null, "https://registry.npmjs.org/", null, null, null, null, false, null, true, false)));
+                new NodeRegistry(null, "https://registry.npmjs.org/", null, null, null, null, false, null, true,
+                        false)));
     }
 
     @Test
@@ -87,6 +87,46 @@ class AddDependencyLockRegenTest implements RewriteTest {
                         })),
                 packageLock(resource("lock/npm/add-leaf/before"), resource("lock/npm/add-leaf/after"),
                         s -> s.noTrim())
+        );
+    }
+
+    // recorded with bun 1.3.10 (lock/bun/open-env-registry): the scan keeps the .env beside bun.lock, and bun's
+    // install takes NPM_CONFIG_REGISTRY from it
+    @Test
+    void aBunProjectsEnvFileNamesTheRegistryItsLockIsWrittenFrom() {
+        String scenario = "lock/bun/open-env-registry/";
+        routes.put("https://registry.npmmirror.com/is-number", resource(scenario + "http/is-number"));
+
+        rewriteRun(
+                spec -> spec.recipe(new AddDependency("is-number", "7.0.0", "dependencies")).executionContext(ctx),
+                packageJson(resource(scenario + "pkg-before"), null,
+                        nodeResolutionResult(PackageManager.Bun, dependency("ms", "2.1.3")), s -> s.after(actual -> {
+                            assertThat(actual).contains("\"is-number\": \"7.0.0\"");
+                            return actual;
+                        })),
+                text(resource(scenario + "tree/.env"), s -> s.path(".env").noTrim()),
+                text(resource(scenario + "before"), resource(scenario + "after"), s -> s.path("bun.lock").noTrim())
+        );
+    }
+
+    // recorded with npm 11.17.0 (lock/npm/open-yarn-lock-incremental), which rewrites the yarn.lock beside its lock
+    @Test
+    void anNpmProjectsYarnLockIsRewrittenAsNpmRewritesIt() {
+        String scenario = "lock/npm/open-yarn-lock-incremental/";
+        routes.put("https://registry.npmjs.org/kind-of", resource(scenario + "http/kind-of"));
+        routes.put("https://registry.npmjs.org/kind-of/6.0.3", resource(scenario + "http/kind-of-6.0.3"));
+
+        rewriteRun(
+                spec -> spec.recipe(new AddDependency("kind-of", "^6.0.0", "dependencies")).executionContext(ctx),
+                packageJson(resource(scenario + "pkg-before"), null,
+                        nodeResolutionResult(PackageManager.Npm, dependency("is-odd", "3.0.1")),
+                                s -> s.after(actual -> {
+                            assertThat(actual).contains("kind-of").doesNotContain("lock regeneration failed");
+                            return actual;
+                        })),
+                packageLock(resource(scenario + "before"), resource(scenario + "after"), s -> s.noTrim()),
+                text(resource(scenario + "before-yarn"), resource(scenario + "after-yarn"),
+                        s -> s.path("yarn.lock").noTrim())
         );
     }
 
@@ -137,52 +177,49 @@ class AddDependencyLockRegenTest implements RewriteTest {
 
     @Test
     void pnpmLeafAddRegeneratesLockByteExact() {
-        // pnpm is content-addressed: is-number@7.0.0 (a scalar-only leaf) inserts one packages+snapshots entry
-        // plus the importer edge, byte-exact end-to-end.
-        routes.put("https://registry.npmjs.org/is-number", resource("lock/pnpm/add-leaf/http/is-number"));
-        routes.put("https://registry.npmjs.org/is-number/7.0.0", resource("lock/pnpm/add-leaf/http/is-number-7.0.0"));
+        String scenario = "lock/pnpm/fixture-add-leaf/";
+        routes.put("https://registry.npmjs.org/is-number", resource(scenario + "http/is-number"));
+        routes.put("https://registry.npmjs.org/ms", resource(scenario + "http/ms"));
 
         rewriteRun(
                 spec -> spec.recipe(new AddDependency("is-number", "^7.0.0", "dependencies"))
                         .executionContext(ctx),
-                packageJson(resource("lock/pnpm/add-leaf/pkg-before"), null,
+                packageJson(resource(scenario + "pkg-before"), null,
                         nodeResolutionResult(PackageManager.Pnpm, dependency("ms", "2.1.3")),
                         s -> s.after(actual -> {
                             assertThat(actual).contains("\"is-number\": \"^7.0.0\"");
                             return actual;
                         })),
-                pnpmLock(resource("lock/pnpm/add-leaf/before"), resource("lock/pnpm/add-leaf/after"),
+                pnpmLock(resource(scenario + "before"), resource(scenario + "after"),
                         s -> s.noTrim())
         );
     }
 
     @Test
     void pnpmCleanClosureAddRegeneratesLockByteExact() {
-        // is-odd@3.0.1 -> is-number@6.0.0: a clean closure with no peers, one packages+snapshots entry per
-        // member, snapshot referencing the resolved transitive — byte-exact end-to-end.
-        routes.put("https://registry.npmjs.org/is-odd", resource("lock/pnpm/add-closure/http/is-odd"));
-        routes.put("https://registry.npmjs.org/is-odd/3.0.1", resource("lock/pnpm/add-closure/http/is-odd-3.0.1"));
-        routes.put("https://registry.npmjs.org/is-number", resource("lock/pnpm/add-closure/http/is-number"));
-        routes.put("https://registry.npmjs.org/is-number/6.0.0", resource("lock/pnpm/add-closure/http/is-number-6.0.0"));
+        // is-odd@3.0.1 -> is-number@6.0.0: one packages and one snapshots entry per member
+        String scenario = "lock/pnpm/fixture-add-closure/";
+        routes.put("https://registry.npmjs.org/is-odd", resource(scenario + "http/is-odd"));
+        routes.put("https://registry.npmjs.org/is-number", resource(scenario + "http/is-number"));
+        routes.put("https://registry.npmjs.org/ms", resource(scenario + "http/ms"));
 
         rewriteRun(
                 spec -> spec.recipe(new AddDependency("is-odd", "^3.0.1", "dependencies"))
                         .executionContext(ctx),
-                packageJson(resource("lock/pnpm/add-closure/pkg-before"), null,
+                packageJson(resource(scenario + "pkg-before"), null,
                         nodeResolutionResult(PackageManager.Pnpm, dependency("ms", "2.1.3")),
                         s -> s.after(actual -> {
                             assertThat(actual).contains("\"is-odd\": \"^3.0.1\"");
                             return actual;
                         })),
-                pnpmLock(resource("lock/pnpm/add-closure/before"), resource("lock/pnpm/add-closure/after"),
+                pnpmLock(resource(scenario + "before"), resource(scenario + "after"),
                         s -> s.noTrim())
         );
     }
 
     @Test
     void closureAddFailsLoudWarnsAndRecordsDataTableRow() {
-        // A package declaring a peerDependency triggers npm's peer auto-install, which the greedy-forward
-        // resolver does not model — it defers rather than emit a maybe-wrong tree.
+        // The added package's peer is auto-installed, and the registry has no such package: npm's E404.
         routes.put("https://registry.npmjs.org/needs-transitive", "{\"versions\":{\"1.0.0\":{}}}");
         routes.put("https://registry.npmjs.org/needs-transitive/1.0.0",
                 "{\"name\":\"needs-transitive\",\"version\":\"1.0.0\",\"peerDependencies\":{\"react\":\">=17\"}}");
@@ -202,8 +239,8 @@ class AddDependencyLockRegenTest implements RewriteTest {
                         .dataTable(NodeLockRegenerationFailures.Row.class, rows -> {
                             assertThat(rows).hasSize(1);
                             assertThat(rows.get(0).getSourcePath()).isEqualTo("package.json");
-                            assertThat(rows.get(0).getPackageName()).isEqualTo("needs-transitive");
-                            assertThat(rows.get(0).getReason()).isEqualTo("RESOLUTION_REQUIRED");
+                            assertThat(rows.get(0).getPackageName()).isEqualTo("react");
+                            assertThat(rows.get(0).getReason()).isEqualTo("PACKAGE_NOT_FOUND");
                         }),
                 packageJson(pkgBefore, null,
                         nodeResolutionResult(PackageManager.Npm, dependency("is-odd", "3.0.0")),

@@ -15,6 +15,7 @@
  */
 package org.openrewrite.javascript.internal.lock;
 
+import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.ExecutionContext;
@@ -23,7 +24,9 @@ import org.openrewrite.InMemoryExecutionContext;
 import org.openrewrite.ipc.http.HttpSender;
 import org.openrewrite.javascript.NodeExecutionContextView;
 import org.openrewrite.javascript.NodeRegistry;
+import org.openrewrite.javascript.NodeRegistryCredentials;
 import org.openrewrite.javascript.internal.LockFileRegeneration.Reason;
+import org.openrewrite.javascript.internal.LockFileRegeneration.Request;
 import org.openrewrite.javascript.internal.LockFileRegeneration.Result;
 import org.openrewrite.javascript.marker.NodeResolutionResult;
 import org.openrewrite.javascript.marker.NodeResolutionResult.Npmrc;
@@ -36,14 +39,20 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.UncheckedIOException;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
+import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 import static java.util.Collections.emptyList;
 import static java.util.Collections.singletonList;
+import static java.util.Objects.requireNonNull;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.javascript.Assertions.nodeResolutionResult;
 
@@ -51,14 +60,19 @@ class NativeLockEngineTest {
 
     private ExecutionContext ctx;
     private final Map<String, String> routes = new HashMap<>();
+    private final Map<String, byte[]> binaryRoutes = new HashMap<>();
 
     @BeforeEach
     void setUp() {
         routes.clear();
+        binaryRoutes.clear();
         HttpSender http = request -> {
-            String body = routes.get(request.getUrl().toString());
-            return new HttpSender.Response(body == null ? 404 : 200,
-                    new ByteArrayInputStream((body == null ? "" : body).getBytes(StandardCharsets.UTF_8)), () -> {
+            String url = request.getUrl().toString();
+            String body = routes.get(url);
+            byte[] bytes = binaryRoutes.containsKey(url) ? binaryRoutes.get(url) :
+                    (body == null ? "" : body).getBytes(StandardCharsets.UTF_8);
+            return new HttpSender.Response(body == null && !binaryRoutes.containsKey(url) ? 404 : 200,
+                    new ByteArrayInputStream(bytes), () -> {
             });
         };
         ctx = new InMemoryExecutionContext(t -> {
@@ -67,11 +81,349 @@ class NativeLockEngineTest {
         HttpSenderExecutionContextView.view(ctx).setHttpSender(http);
         // Pin the registry so discovery is deterministic (never reads a real ~/.npmrc or env).
         NodeExecutionContextView.view(ctx).setRegistries(singletonList(
-                new NodeRegistry(null, "https://registry.npmjs.org/", null, null, null, null, false, null, true, false)));
+                new NodeRegistry(null, "https://registry.npmjs.org/", null, null, null, null, false, null, true,
+                        false)));
     }
 
-    private Result regen(PackageManager pm, String original, String edited, String lock) {
-        return NativeLockEngine.regenerate(pm, edited, original, lock, null, Paths.get("package.json"), ctx);
+    private Result regen(PackageManager pm, String edited, @Nullable String lock) {
+        return regen(pm, edited, lock, null);
+    }
+
+    private Result regen(PackageManager pm, String edited, @Nullable String lock,
+                         @Nullable NodeResolutionResult marker) {
+        return regenerate(pm, Request.builder()
+                .packageJson(edited)
+                .lock(lock)
+                .marker(marker)
+                .packageJsonPath(Paths.get("package.json"))
+                .build(), ctx);
+    }
+
+    private static NodeResolutionResult projectNpmrc(String... keysAndValues) {
+        Map<String, String> npmrc = new LinkedHashMap<>();
+        for (int i = 0; i < keysAndValues.length; i += 2) {
+            npmrc.put(keysAndValues[i], keysAndValues[i + 1]);
+        }
+        return nodeResolutionResult(PackageManager.Npm).withNpmrcConfigs(singletonList(
+                new Npmrc(NpmrcScope.Project, npmrc)));
+    }
+
+    @Test
+    void bunRegeneratesFromTheRegistryItsOwnNpmrcNames() {
+        String scenario = "lock/bun/small-registry-mirror/";
+        routes.put("https://registry.npmmirror.com/is-number", resource(scenario + "http/is-number"));
+
+        Result result = regenerate(PackageManager.Bun, Request.builder()
+                .packageJson(resource(scenario + "pkg"))
+                .lock(resource(scenario + "before"))
+                .packageJsonPath(Paths.get("app/package.json"))
+                .packageManagerFile(Paths.get("app/.npmrc"), resource(scenario + "npmrc"))
+                .build(), ctx);
+
+        assertThat(result.isSuccess()).as(String.valueOf(result.getErrorMessage())).isTrue();
+        assertThat(result.getLockFileContent()).isEqualTo(resource(scenario + "after"));
+    }
+
+    @Test
+    void bunReadsAFileDependencyFromTheProjectManifests() {
+        String scenario = "lock/bun/small-file-dep-add/";
+        routes.put("https://registry.npmjs.org/is-number", resource(scenario + "http/is-number"));
+        Request.RequestBuilder request = Request.builder()
+                .packageJson(resource(scenario + "pkg"))
+                .lock(resource(scenario + "before"))
+                .packageJsonPath(Paths.get("package.json"));
+
+        Result withoutDirectory = regenerate(PackageManager.Bun, request.build(), ctx);
+        Result result = regenerate(PackageManager.Bun,
+                request.manifest(Paths.get("local/package.json"), resource(scenario + "tree/local/package.json"))
+                        .build(),
+                ctx);
+
+        assertThat(withoutDirectory.getFailure()).isNotNull();
+        assertThat(withoutDirectory.getFailure().getDetail()).startsWith("the engine cannot know directory manifest " +
+                "of local");
+        assertThat(result.isSuccess()).as(String.valueOf(result.getErrorMessage())).isTrue();
+        assertThat(result.getLockFileContent()).isEqualTo(resource(scenario + "after"));
+    }
+
+    @Test
+    void bunFindsAPatchFileAmongThePathsTheHostHolds() {
+        String scenario = "lock/bun/open-patched-dot-slash/";
+        String patch = "patches/ms@2.1.3.patch";
+        Request.RequestBuilder request = Request.builder()
+                .packageJson(resource(scenario + "pkg"))
+                .lock(resource(scenario + "before"))
+                .packageJsonPath(Paths.get("app/package.json"));
+        Set<Path> withoutPatch = new HashSet<>(Arrays.asList(Paths.get("app/package.json"), Paths.get("app/bun.lock")));
+        Set<Path> withPatch = new HashSet<>(withoutPatch);
+        withPatch.add(Paths.get("app/" + patch));
+
+        Result noView = regenerate(PackageManager.Bun, request.build(), ctx);
+        Result unread = regenerate(PackageManager.Bun, request.projectPaths(withPatch).build(), ctx);
+        Result absent = regenerate(PackageManager.Bun, request.projectPaths(withoutPatch).build(),
+                ctx);
+        Result read = regenerate(PackageManager.Bun, request.projectPaths(withPatch)
+                .packageManagerFile(Paths.get("app/" + patch), resource(scenario + "tree/" + patch)).build(), ctx);
+
+        assertThat(noView.getFailure().getDetail()).startsWith("the engine cannot know patch file ./" + patch);
+        assertThat(unread.getFailure().getDetail()).startsWith("the engine cannot know patch file ./" + patch);
+        assertThat(absent.getFailure().getDetail())
+                .isEqualTo("bun rejects this edit: Couldn't find patch file: './" + patch + "'");
+        assertThat(read.isSuccess()).as(String.valueOf(read.getErrorMessage())).isTrue();
+        assertThat(read.getLockFileContent()).isEqualTo(resource(scenario + "after"));
+    }
+
+    @Test
+    void bunCannotKnowAConfigFileTheHostHoldsUnread() {
+        String scenario = "lock/bun/small-registry-mirror/";
+        routes.put("https://registry.npmmirror.com/is-number", resource(scenario + "http/is-number"));
+        Request.RequestBuilder request = Request.builder()
+                .packageJson(resource(scenario + "pkg"))
+                .lock(resource(scenario + "before"))
+                .packageJsonPath(Paths.get("app/package.json"))
+                .projectPaths(new HashSet<>(Arrays.asList(Paths.get("app/package.json"), Paths.get("app/.npmrc"))));
+
+        Result unread = regenerate(PackageManager.Bun, request.build(), ctx);
+        Result read = regenerate(PackageManager.Bun,
+                request.packageManagerFile(Paths.get("app/.npmrc"), resource(scenario + "npmrc")).build(), ctx);
+
+        assertThat(unread.getFailure().getDetail())
+                .isEqualTo("the engine cannot know .npmrc (its contents were not read)");
+        assertThat(read.isSuccess()).as(String.valueOf(read.getErrorMessage())).isTrue();
+        assertThat(read.getLockFileContent()).isEqualTo(resource(scenario + "after"));
+    }
+
+    @Test
+    void bunReadsTheProjectsEnvFileAndCannotKnowOneTheHostHoldsUnread() {
+        String scenario = "lock/bun/open-env-registry/";
+        routes.put("https://registry.npmmirror.com/is-number", resource(scenario + "http/is-number"));
+        Request.RequestBuilder request = Request.builder()
+                .packageJson(resource(scenario + "pkg"))
+                .lock(resource(scenario + "before"))
+                .packageJsonPath(Paths.get("app/package.json"))
+                .projectPaths(new HashSet<>(Arrays.asList(Paths.get("app/package.json"), Paths.get("app/.env"))));
+
+        Result unread = regenerate(PackageManager.Bun, request.build(), ctx);
+        Result read = regenerate(PackageManager.Bun,
+                request.packageManagerFile(Paths.get("app/.env"), resource(scenario + "tree/.env")).build(), ctx);
+
+        assertThat(unread.getFailure().getDetail())
+                .isEqualTo("the engine cannot know .env (its contents were not read)");
+        assertThat(read.isSuccess()).as(String.valueOf(read.getErrorMessage())).isTrue();
+        assertThat(read.getLockFileContent()).isEqualTo(resource(scenario + "after"));
+    }
+
+    @Test
+    void bunWithoutALockFailsLoud() {
+        Result result = regen(PackageManager.Bun, "{\"dependencies\":{\"ms\":\"2.0.0\"}}", null);
+
+        assertThat(result.isSuccess()).isFalse();
+        assertThat(result.getFailure().getReason()).isEqualTo(Reason.MALFORMED_LOCK);
+    }
+
+    @Test
+    void yarnClassicRegeneratesFromTheRegistryItsConfigNames() {
+        String scenario = "lock/yarn-classic/small-registry-yarnrc-npmjs/";
+        routes.put("https://registry.npmjs.org/which-module", resource(scenario + "http/which-module"));
+        binaryRoutes.put("https://registry.npmjs.org/which-module/-/which-module-2.0.1.tgz",
+                bytes(scenario + "http/which-module-2.0.1.tgz"));
+
+        Result result = regenerate(PackageManager.YarnClassic, Request.builder()
+                .packageJson(resource(scenario + "pkg"))
+                .lock(resource(scenario + "before"))
+                .packageJsonPath(Paths.get("app/package.json"))
+                .packageManagerFile(Paths.get("app/.yarnrc"), resource(scenario + "yarnrc"))
+                .build(), ctx);
+
+        assertThat(result.isSuccess()).as(String.valueOf(result.getErrorMessage())).isTrue();
+        assertThat(result.getLockFileContent()).isEqualTo(resource(scenario + "after"));
+    }
+
+    @Test
+    void yarnClassicReadsWorkspaceMembersFromTheProjectManifests() {
+        String scenario = "lock/yarn-classic/small-workspace-member-edit/";
+        Request request = Request.builder()
+                .packageJson(resource(scenario + "tree/packages/a/package.json"))
+                .lock(resource(scenario + "before"))
+                .packageJsonPath(Paths.get("packages/a/package.json"))
+                .manifest(Paths.get("package.json"), resource(scenario + "pkg"))
+                .manifest(Paths.get("packages/b/package.json"),
+                        resource(scenario + "tree-before/packages/b/package.json"))
+                .build();
+        // the host names npmjs, which yarn 1.22.22 asks over its own default and fetches from as its own (recorded)
+        routes.put("https://registry.npmjs.org/is-number", resource(scenario + "http/is-number"));
+        binaryRoutes.put("https://registry.yarnpkg.com/is-number/-/is-number-7.0.0.tgz",
+                bytes(scenario + "http/is-number-7.0.0.tgz"));
+
+        Result result = regenerate(PackageManager.YarnClassic, request, ctx);
+
+        assertThat(result.isSuccess()).as(String.valueOf(result.getErrorMessage())).isTrue();
+        assertThat(result.getLockFileContent()).isEqualTo(resource(scenario + "after"));
+    }
+
+    @Test
+    void yarnClassicWithoutALockFailsLoud() {
+        Result result = regen(PackageManager.YarnClassic, "{\"dependencies\":{\"ms\":\"2.0.0\"}}", null);
+
+        assertThat(result.isSuccess()).isFalse();
+        assertThat(result.getFailure().getReason()).isEqualTo(Reason.MALFORMED_LOCK);
+    }
+
+    @Test
+    void yarnBerryRegeneratesFromItsConfigurationFiles() {
+        String scenario = "lock/yarn-berry/small-catalog-default-edit/";
+        routes.put("https://registry.npmjs.org/path-is-absolute", resource(scenario + "http/path-is-absolute"));
+        binaryRoutes.put("https://registry.npmjs.org/path-is-absolute/-/path-is-absolute-1.0.1.tgz",
+                bytes(scenario + "http/path-is-absolute-1.0.1.tgz"));
+
+        Result result = regenerate(PackageManager.YarnBerry, Request.builder()
+                .packageJson(resource(scenario + "pkg"))
+                .lock(resource(scenario + "before"))
+                .packageJsonPath(Paths.get("app/package.json"))
+                .packageManagerFile(Paths.get("app/.yarnrc.yml"), resource(scenario + "yarnrc-after"))
+                .build(), ctx);
+
+        assertThat(result.isSuccess()).as(String.valueOf(result.getErrorMessage())).isTrue();
+        assertThat(result.getLockFileContent()).isEqualTo(resource(scenario + "after"));
+    }
+
+    @Test
+    void yarnBerryReadsWorkspaceMembersFromTheProjectManifests() {
+        String scenario = "lock/yarn-berry/ws-member-add/";
+        Result result = regenerate(PackageManager.YarnBerry, Request.builder()
+                .packageJson(resource(scenario + "tree/packages/app/package.json"))
+                .lock(resource(scenario + "before"))
+                .packageJsonPath(Paths.get("packages/app/package.json"))
+                .manifest(Paths.get("package.json"), resource(scenario + "pkg"))
+                .manifest(Paths.get("packages/lib/package.json"), resource(scenario + "tree/packages/lib/package.json"))
+                .build(), ctx);
+
+        assertThat(result.isSuccess()).as(String.valueOf(result.getErrorMessage())).isTrue();
+        assertThat(result.getLockFileContent()).isEqualTo(resource(scenario + "after"));
+    }
+
+    @Test
+    void yarnBerryWithoutALockFailsLoud() {
+        Result result = regen(PackageManager.YarnBerry,
+                "{\"packageManager\":\"yarn@4.10.3\",\"dependencies\":{\"ms\":\"2.0.0\"}}", null);
+
+        assertThat(result.isSuccess()).isFalse();
+        assertThat(result.getFailure().getReason()).isEqualTo(Reason.MALFORMED_LOCK);
+    }
+
+    /**
+     * The credentials the host holds for a registry the project's .npmrc names reach yarn's request for a scoped
+     * package there, as the home .npmrc's (Yarn Berry's as its npmRegistries entry).
+     */
+    @Test
+    void yarnSendsTheHostsCredentialsToARegistryTheProjectNames() {
+        NodeExecutionContextView.view(ctx).setRegistries(emptyList());
+        NodeExecutionContextView.view(ctx).setRegistryCredentials(Arrays.asList(
+                new NodeRegistryCredentials("corp.example", "corp-token", null, null),
+                new NodeRegistryCredentials("registry.npmjs.org", "npm-token", null, null)));
+        List<HttpSender.Request> requests = new ArrayList<>();
+        HttpSenderExecutionContextView.view(ctx).setHttpSender(request -> {
+            requests.add(request);
+            return new HttpSender.Response(404, new ByteArrayInputStream(new byte[0]), () -> {
+            });
+        });
+        Request.RequestBuilder request = Request.builder()
+                .lock("# yarn lockfile v1\n\n\n")
+                .packageJsonPath(Paths.get("package.json"))
+                .marker(projectNpmrc("@corp:registry", "https://corp.example/"));
+
+        regenerate(PackageManager.YarnClassic, request
+                .packageJson("{\"name\":\"p\",\"version\":\"1.0.0\",\"dependencies\":{\"@corp/a\":\"^1.0.0\"}}")
+                .build(), ctx);
+        regenerate(PackageManager.YarnBerry, request
+                .packageJson("{\"name\":\"p\",\"packageManager\":\"yarn@4.10.3\"," +
+                             "\"dependencies\":{\"@corp/a\":\"^1.0.0\"}}")
+                .lock("__metadata:\n  version: 8\n  cacheKey: 10c0\n\n\"p@workspace:.\":\n" +
+                      "  version: 0.0.0-use.local\n  resolution: \"p@workspace:.\"\n  languageName: unknown\n" +
+                      "  linkType: soft\n")
+                .packageManagerFile(Paths.get(".yarnrc.yml"),
+                        "npmScopes:\n  corp:\n    npmRegistryServer: \"https://corp.example\"\n")
+                .build(), ctx);
+
+        assertThat(requests).extracting(r -> r.getUrl().toString()).containsExactly(
+                "https://corp.example/@corp%2Fa", "https://corp.example/@corp%2Fa");
+        assertThat(requests).allSatisfy(r ->
+                assertThat(r.getRequestHeaders()).containsEntry("Authorization", "Bearer corp-token"));
+    }
+
+    /**
+     * An unscoped package from the private registry a project names gets the host's credentials too: the home file
+     * holds them with always-auth (Yarn Berry: its npmRegistries entry's npmAlwaysAuth).
+     */
+    @Test
+    void yarnSendsTheHostsCredentialsForAnUnscopedPackage() {
+        NodeExecutionContextView.view(ctx).setRegistries(emptyList());
+        NodeExecutionContextView.view(ctx).setRegistryCredentials(singletonList(
+                new NodeRegistryCredentials("corp.example", "corp-token", null, null)));
+        List<HttpSender.Request> requests = new ArrayList<>();
+        HttpSenderExecutionContextView.view(ctx).setHttpSender(request -> {
+            requests.add(request);
+            return new HttpSender.Response(404, new ByteArrayInputStream(new byte[0]), () -> {
+            });
+        });
+        Request.RequestBuilder request = Request.builder()
+                .lock("# yarn lockfile v1\n\n\n")
+                .packageJsonPath(Paths.get("package.json"))
+                .marker(projectNpmrc("registry", "https://corp.example/"));
+
+        regenerate(PackageManager.YarnClassic, request
+                .packageJson("{\"name\":\"p\",\"version\":\"1.0.0\",\"dependencies\":{\"a\":\"^1.0.0\"}}")
+                .build(), ctx);
+        regenerate(PackageManager.YarnBerry, request
+                .packageJson("{\"name\":\"p\",\"packageManager\":\"yarn@4.10.3\"," +
+                             "\"dependencies\":{\"a\":\"^1.0.0\"}}")
+                .lock("__metadata:\n  version: 8\n  cacheKey: 10c0\n\n\"p@workspace:.\":\n" +
+                      "  version: 0.0.0-use.local\n  resolution: \"p@workspace:.\"\n  languageName: unknown\n" +
+                      "  linkType: soft\n")
+                .packageManagerFile(Paths.get(".yarnrc.yml"), "npmRegistryServer: \"https://corp.example\"\n")
+                .build(), ctx);
+
+        assertThat(requests).extracting(r -> r.getUrl().toString())
+                .containsExactly("https://corp.example/a", "https://corp.example/a");
+        assertThat(requests).allSatisfy(r ->
+                assertThat(r.getRequestHeaders()).containsEntry("Authorization", "Bearer corp-token"));
+    }
+
+    /**
+     * A project's own token stays in its .npmrc: yarn sends it for an unscoped package only under always-auth, and
+     * Yarn Berry never reads that file.
+     */
+    @Test
+    void yarnLeavesTheProjectsOwnTokenInItsNpmrc() {
+        NodeExecutionContextView.view(ctx).setRegistries(emptyList());
+        NodeExecutionContextView.view(ctx).setRegistryCredentials(emptyList());
+        List<HttpSender.Request> requests = new ArrayList<>();
+        HttpSenderExecutionContextView.view(ctx).setHttpSender(request -> {
+            requests.add(request);
+            return new HttpSender.Response(404, new ByteArrayInputStream(new byte[0]), () -> {
+            });
+        });
+        Request.RequestBuilder request = Request.builder()
+                .lock("# yarn lockfile v1\n\n\n")
+                .packageJsonPath(Paths.get("package.json"))
+                .marker(projectNpmrc("registry", "https://corp.example/", "//corp.example/:_authToken",
+                        "project-token"));
+
+        regenerate(PackageManager.YarnClassic, request
+                .packageJson("{\"name\":\"p\",\"version\":\"1.0.0\",\"dependencies\":{\"a\":\"^1.0.0\"}}")
+                .build(), ctx);
+        regenerate(PackageManager.YarnBerry, request
+                .packageJson("{\"name\":\"p\",\"packageManager\":\"yarn@4.10.3\"," +
+                             "\"dependencies\":{\"a\":\"^1.0.0\"}}")
+                .lock("__metadata:\n  version: 8\n  cacheKey: 10c0\n\n\"p@workspace:.\":\n" +
+                      "  version: 0.0.0-use.local\n  resolution: \"p@workspace:.\"\n  languageName: unknown\n" +
+                      "  linkType: soft\n")
+                .packageManagerFile(Paths.get(".yarnrc.yml"), "npmRegistryServer: \"https://corp.example\"\n")
+                .build(), ctx);
+
+        assertThat(requests).extracting(r -> r.getUrl().toString())
+                .containsExactly("https://corp.example/a", "https://corp.example/a");
+        assertThat(requests).allSatisfy(r -> assertThat(r.getRequestHeaders()).doesNotContainKey("Authorization"));
     }
 
     private static String npmLock(String lockedVersion) {
@@ -89,11 +441,14 @@ class NativeLockEngineTest {
     void npmrcTokenWithExplicitDefaultPortRegeneratesLock() {
         String registry = "https://registry.example:443/npm/";
         NodeExecutionContextView.view(ctx).setRegistries(emptyList());
-        NodeResolutionResult marker = nodeResolutionResult(PackageManager.Npm).withNpmrcConfigs(List.of(
-                new Npmrc(NpmrcScope.User, Map.of(
-                        "registry", "https://registry.example/npm/",
-                        "//registry.example/npm/:_authToken", "s3cret")),
-                new Npmrc(NpmrcScope.Project, Map.of("registry", registry, "always-auth", "false"))));
+        Map<String, String> user = new LinkedHashMap<>();
+        user.put("registry", "https://registry.example/npm/");
+        user.put("//registry.example/npm/:_authToken", "s3cret");
+        Map<String, String> project = new LinkedHashMap<>();
+        project.put("registry", registry);
+        project.put("always-auth", "false");
+        NodeResolutionResult marker = nodeResolutionResult(PackageManager.Npm).withNpmrcConfigs(Arrays.asList(
+                new Npmrc(NpmrcScope.User, user), new Npmrc(NpmrcScope.Project, project)));
         routes.put(registry + "lodash", "{\"versions\":{\"4.17.20\":{},\"4.17.21\":{}}}");
         routes.put(registry + "lodash/4.17.20",
                 "{\"name\":\"lodash\",\"version\":\"4.17.20\",\"dependencies\":{}}");
@@ -114,9 +469,16 @@ class NativeLockEngineTest {
             });
         });
         String lock = "{\n" +
+                "  \"name\": \"x\",\n" +
                 "  \"lockfileVersion\": 3,\n" +
+                "  \"requires\": true,\n" +
                 "  \"packages\": {\n" +
-                "    \"\": {\"dependencies\": {\"lodash\": \"^4.17.20\"}},\n" +
+                "    \"\": {\n" +
+                "      \"name\": \"x\",\n" +
+                "      \"dependencies\": {\n" +
+                "        \"lodash\": \"^4.17.20\"\n" +
+                "      }\n" +
+                "    },\n" +
                 "    \"node_modules/lodash\": {\n" +
                 "      \"version\": \"4.17.20\",\n" +
                 "      \"resolved\": \"" + registry + "lodash/-/lodash-4.17.20.tgz\",\n" +
@@ -125,10 +487,8 @@ class NativeLockEngineTest {
                 "  }\n" +
                 "}\n";
 
-        Result result = NativeLockEngine.regenerate(PackageManager.Npm,
-                "{\"dependencies\":{\"lodash\":\"^4.17.21\"}}",
-                "{\"dependencies\":{\"lodash\":\"^4.17.20\"}}",
-                lock, marker, Paths.get("package.json"), ctx);
+        Result result = regen(PackageManager.Npm, "{\"name\":\"x\",\"dependencies\":{\"lodash\":\"^4.17.21\"}}", lock,
+                marker);
 
         assertThat(result.isSuccess()).as(String.valueOf(result.getErrorMessage())).isTrue();
         assertThat(result.getLockFileContent()).isEqualTo(
@@ -140,321 +500,55 @@ class NativeLockEngineTest {
     }
 
     @Test
-    void bumpIntroducingNewTransitiveWithPeerFailsLoud() {
-        // A clean single-leaf add-during-bump is now placed byte-exact (see NpmAddDuringBumpLockRegenTest); a NEW
-        // transitive that declares a non-optional peer (which npm auto-installs) is beyond the conservative slice,
-        // so it still defers rather than guess the peer placement.
-        routes.put("https://registry.npmjs.org/lodash",
-                "{\"versions\":{\"4.17.20\":{},\"4.18.0\":{}}}");
-        routes.put("https://registry.npmjs.org/lodash/4.17.20",
-                "{\"name\":\"lodash\",\"version\":\"4.17.20\",\"dependencies\":{}}");
-        routes.put("https://registry.npmjs.org/lodash/4.18.0",
-                "{\"name\":\"lodash\",\"version\":\"4.18.0\",\"dependencies\":{\"tslib\":\"^2.0.0\"}," +
-                        "\"dist\":{\"tarball\":\"https://registry.npmjs.org/lodash/-/lodash-4.18.0.tgz\"," +
-                        "\"integrity\":\"sha512-LODASH\"}}");
-        routes.put("https://registry.npmjs.org/tslib",
-                "{\"name\":\"tslib\",\"dist-tags\":{},\"versions\":{\"2.0.0\":{}}}");
-        routes.put("https://registry.npmjs.org/tslib/2.0.0",
-                "{\"name\":\"tslib\",\"version\":\"2.0.0\",\"peerDependencies\":{\"react\":\">=17\"}," +
-                        "\"dist\":{\"tarball\":\"https://registry.npmjs.org/tslib/-/tslib-2.0.0.tgz\"," +
-                        "\"integrity\":\"sha512-TSLIB\"}}");
-
-        Result result = regen(PackageManager.Npm,
-                "{\"dependencies\":{\"lodash\":\"^4.17.20\"}}",
-                "{\"dependencies\":{\"lodash\":\"^4.18.0\"}}",
-                npmLock("4.17.20"));
-
-        assertThat(result.isSuccess()).isFalse();
-        assertThat(result.getFailure()).isNotNull();
-        assertThat(result.getFailure().getReason()).isEqualTo(Reason.RESOLUTION_REQUIRED);
-        assertThat(result.getFailure().getPackageName()).isEqualTo("tslib");
-        // The resolver made the deeper attempt and defers: the new transitive's non-optional peer is unsatisfied,
-        // so npm would auto-install it (the harder tail). Its detail is preferred over the per-dependency message.
-        assertThat(result.getFailure().getDetail()).contains("peer react is not installed");
-    }
-
-    @Test
-    void bunVisitorThrownFailureDefersGracefully() {
-        // A bun bump whose new version gains a dependencies map throws EngineFailure from INSIDE the rewrite-json
-        // visitor, so it arrives wrapped in a RecipeRunException; regenerate must unwrap it into a graceful Failure
-        // rather than let the wrapper escape and crash the recipe run.
-        routes.put("https://registry.npmjs.org/foo",
-                "{\"name\":\"foo\",\"dist-tags\":{},\"versions\":{\"1.0.0\":{},\"2.0.0\":{}}}");
-        routes.put("https://registry.npmjs.org/foo/1.0.0",
-                "{\"name\":\"foo\",\"version\":\"1.0.0\",\"dependencies\":{}}");
-        routes.put("https://registry.npmjs.org/foo/2.0.0",
-                "{\"name\":\"foo\",\"version\":\"2.0.0\",\"dependencies\":{\"tslib\":\"^2.0.0\"}," +
-                        "\"dist\":{\"tarball\":\"https://registry.npmjs.org/foo/-/foo-2.0.0.tgz\",\"integrity\":\"sha512-FOO2\"}}");
-
-        String lock = "{\n  \"lockfileVersion\": 1,\n  \"configVersion\": 1,\n  \"workspaces\": {\n" +
-                "    \"\": {\n      \"name\": \"crash-test\",\n      \"dependencies\": {\n" +
-                "        \"foo\": \"^1.0.0\",\n      },\n    },\n  },\n  \"packages\": {\n" +
-                "    \"foo\": [\"foo@1.0.0\", \"\", {}, \"sha512-FOO\"],\n\n" +
-                "    \"tslib\": [\"tslib@2.0.0\", \"\", {}, \"sha512-TSLIB\"],\n  }\n}\n";
-
-        Result result = regen(PackageManager.Bun,
-                "{\"dependencies\":{\"foo\":\"^1.0.0\"}}",
-                "{\"dependencies\":{\"foo\":\"^2.0.0\"}}",
-                lock);
-
-        assertThat(result.isSuccess()).isFalse();
-        assertThat(result.getFailure().getReason()).isEqualTo(Reason.RESOLUTION_REQUIRED);
-        assertThat(result.getFailure().getDetail()).contains("gains a dependencies map");
-    }
-
-    @Test
-    void addedPeerDependencyFailsLoud() {
-        routes.put("https://registry.npmjs.org/lodash",
-                "{\"versions\":{\"4.17.20\":{},\"4.17.21\":{}}}");
-        routes.put("https://registry.npmjs.org/lodash/4.17.20",
-                "{\"name\":\"lodash\",\"version\":\"4.17.20\",\"dependencies\":{}}");
-        routes.put("https://registry.npmjs.org/lodash/4.17.21",
-                "{\"name\":\"lodash\",\"version\":\"4.17.21\",\"dependencies\":{}," +
-                        "\"peerDependencies\":{\"react\":\">=17\"}}");
-
-        Result result = regen(PackageManager.Npm,
-                "{\"dependencies\":{\"lodash\":\"^4.17.20\"}}",
-                "{\"dependencies\":{\"lodash\":\"^4.17.21\"}}",
-                npmLock("4.17.20"));
-
-        assertThat(result.isSuccess()).isFalse();
-        assertThat(result.getFailure().getReason()).isEqualTo(Reason.RESOLUTION_REQUIRED);
-        // The bumped version gains a non-optional peer nothing provides; the resolver defers on the auto-install.
-        assertThat(result.getFailure().getDetail()).contains("peer react is not installed");
-    }
-
-    @Test
-    void npmEnginesPatchedInPlace() {
-        // An engines-only delta is patched, not failed loud: the npm patcher rewrites the
-        // entry's `engines` object to the new value at npm's field position. (Byte-exact goldens for engines
-        // live in NpmOrphanPruneLockRegenTest#enginesChangeV3.)
-        routes.put("https://registry.npmjs.org/lodash",
-                "{\"versions\":{\"4.17.20\":{},\"4.17.21\":{}}}");
-        routes.put("https://registry.npmjs.org/lodash/4.17.20",
-                "{\"name\":\"lodash\",\"version\":\"4.17.20\",\"dependencies\":{},\"engines\":{\"node\":\">=12\"}}");
-        routes.put("https://registry.npmjs.org/lodash/4.17.21",
-                "{\"name\":\"lodash\",\"version\":\"4.17.21\",\"dependencies\":{},\"engines\":{\"node\":\">=14\"}," +
-                        "\"dist\":{\"tarball\":\"https://registry.npmjs.org/lodash/-/lodash-4.17.21.tgz\"," +
-                        "\"integrity\":\"sha512-NEW\",\"shasum\":\"abc\"}}");
-
-        String lock = "{\n" +
-                "  \"name\": \"x\",\n" +
-                "  \"lockfileVersion\": 3,\n" +
-                "  \"packages\": {\n" +
-                "    \"\": {\"name\": \"x\", \"dependencies\": {\"lodash\": \"^4.17.20\"}},\n" +
-                "    \"node_modules/lodash\": {\n" +
-                "      \"version\": \"4.17.20\",\n" +
-                "      \"resolved\": \"https://registry.npmjs.org/lodash/-/lodash-4.17.20.tgz\",\n" +
-                "      \"integrity\": \"sha512-OLD\",\n" +
-                "      \"engines\": {\"node\": \">=12\"}\n" +
-                "    }\n" +
-                "  }\n" +
-                "}\n";
-
-        Result result = regen(PackageManager.Npm,
-                "{\"dependencies\":{\"lodash\":\"^4.17.20\"}}",
-                "{\"dependencies\":{\"lodash\":\"^4.17.21\"}}",
-                lock);
-
-        assertThat(result.isSuccess()).as(String.valueOf(result.getErrorMessage())).isTrue();
-        assertThat(result.getLockFileContent()).contains("\"version\": \"4.17.21\"");
-        assertThat(result.getLockFileContent()).contains("\">=14\"");
-        assertThat(result.getLockFileContent()).doesNotContain("\">=12\"");
-    }
-
-    @Test
-    void npmBinChangeNotYetPatched() {
-        // A `bin` delta still fails loud (npm normalizes string/object bin; needs a real golden to pin bytes).
-        routes.put("https://registry.npmjs.org/lodash",
-                "{\"versions\":{\"4.17.20\":{},\"4.17.21\":{}}}");
-        routes.put("https://registry.npmjs.org/lodash/4.17.20",
-                "{\"name\":\"lodash\",\"version\":\"4.17.20\",\"dependencies\":{},\"bin\":{\"lodash\":\"old.js\"}}");
-        routes.put("https://registry.npmjs.org/lodash/4.17.21",
-                "{\"name\":\"lodash\",\"version\":\"4.17.21\",\"dependencies\":{},\"bin\":{\"lodash\":\"new.js\"}," +
-                        "\"dist\":{\"tarball\":\"https://registry.npmjs.org/lodash/-/lodash-4.17.21.tgz\"," +
-                        "\"integrity\":\"sha512-NEW\",\"shasum\":\"abc\"}}");
-
-        String lock = "{\n" +
-                "  \"name\": \"x\",\n" +
-                "  \"lockfileVersion\": 3,\n" +
-                "  \"packages\": {\n" +
-                "    \"\": {\"name\": \"x\", \"dependencies\": {\"lodash\": \"^4.17.20\"}},\n" +
-                "    \"node_modules/lodash\": {\n" +
-                "      \"version\": \"4.17.20\",\n" +
-                "      \"resolved\": \"https://registry.npmjs.org/lodash/-/lodash-4.17.20.tgz\",\n" +
-                "      \"integrity\": \"sha512-OLD\",\n" +
-                "      \"bin\": {\"lodash\": \"old.js\"}\n" +
-                "    }\n" +
-                "  }\n" +
-                "}\n";
-
-        Result result = regen(PackageManager.Npm,
-                "{\"dependencies\":{\"lodash\":\"^4.17.20\"}}",
-                "{\"dependencies\":{\"lodash\":\"^4.17.21\"}}",
-                lock);
-
-        assertThat(result.isSuccess()).isFalse();
-        assertThat(result.getFailure().getReason()).isEqualTo(Reason.RESOLUTION_REQUIRED);
-        // The deeper whole-closure attempt also defers on the bin entry shape (its detail is preferred).
-        assertThat(result.getFailure().getDetail()).contains("changed its bin");
-    }
-
-    @Test
-    void pnpmLegacyLockfileVersionUnsupported() {
-        Result result = regen(PackageManager.Pnpm,
-                "{\"dependencies\":{\"lodash\":\"^4.17.20\"}}",
-                "{\"dependencies\":{\"lodash\":\"^4.17.21\"}}",
+    void pnpmDiscardsALockOfAnotherMajor() {
+        Result result = regen(PackageManager.Pnpm, "{\"dependencies\":{\"lodash\":\"^4.17.21\"}}",
                 "lockfileVersion: 5.4\n");
 
         assertThat(result.isSuccess()).isFalse();
-        assertThat(result.getFailure().getReason()).isEqualTo(Reason.UNSUPPORTED_LOCKFILE_VERSION);
+        assertThat(result.getFailure().getReason()).isEqualTo(Reason.MALFORMED_LOCK);
     }
 
     @Test
-    void closureAddTransitiveConflictFailsLoud() {
-        // is-odd pulls is-number ^7.0.0, but is-number is locked at 6.0.0 top-level under a *ranged* pin
-        // (^6.0.0). Nesting requires proof the top slot is frozen (an exact pin); a ranged pin might move
-        // (cascade), so the resolver conservatively defers rather than fork. (Exact-pin nesting: I5 add-nest.)
-        routes.put("https://registry.npmjs.org/is-odd", "{\"versions\":{\"3.0.1\":{}}}");
-        routes.put("https://registry.npmjs.org/is-odd/3.0.1",
-                "{\"name\":\"is-odd\",\"version\":\"3.0.1\",\"dependencies\":{\"is-number\":\"^7.0.0\"}," +
-                        "\"dist\":{\"tarball\":\"https://registry.npmjs.org/is-odd/-/is-odd-3.0.1.tgz\"," +
-                        "\"integrity\":\"sha512-ODD\"}}");
+    void pnpmRegeneratesFromItsWorkspaceManifest() {
+        String scenario = "lock/pnpm/small-overrides-ws-direct/";
+        routes.put("https://registry.npmjs.org/wrappy", resource(scenario + "http/wrappy"));
 
-        String lock = "{\n" +
-                "  \"lockfileVersion\": 3,\n" +
-                "  \"packages\": {\n" +
-                "    \"\": {\"dependencies\": {\"is-number\": \"^6.0.0\"}},\n" +
-                "    \"node_modules/is-number\": {\"version\": \"6.0.0\"}\n" +
-                "  }\n" +
-                "}\n";
-
-        Result result = regen(PackageManager.Npm,
-                "{\"dependencies\":{\"is-number\":\"^6.0.0\"}}",
-                "{\"dependencies\":{\"is-number\":\"^6.0.0\",\"is-odd\":\"^3.0.1\"}}",
-                lock);
-
-        assertThat(result.isSuccess()).isFalse();
-        assertThat(result.getFailure().getReason()).isEqualTo(Reason.RESOLUTION_REQUIRED);
-        assertThat(result.getFailure().getPackageName()).isEqualTo("is-number");
-        assertThat(result.getFailure().getDetail()).contains("does not satisfy");
-    }
-
-    @Test
-    void addNestOfNonLeafMemberFailsLoud() {
-        // wrapper needs tool ^2.0.0, but root pins tool 1.0.0 exact (frozen top). tool@2.0.0 would nest under
-        // wrapper — but it carries its own dependency (sub), so nesting it would cascade further: deferred.
-        routes.put("https://registry.npmjs.org/wrapper", "{\"versions\":{\"1.0.0\":{}}}");
-        routes.put("https://registry.npmjs.org/wrapper/1.0.0",
-                "{\"name\":\"wrapper\",\"version\":\"1.0.0\",\"dependencies\":{\"tool\":\"^2.0.0\"}," +
-                        "\"dist\":{\"tarball\":\"https://registry.npmjs.org/wrapper/-/wrapper-1.0.0.tgz\",\"integrity\":\"sha512-W\"}}");
-        routes.put("https://registry.npmjs.org/tool", "{\"versions\":{\"1.0.0\":{},\"2.0.0\":{}}}");
-        routes.put("https://registry.npmjs.org/tool/2.0.0",
-                "{\"name\":\"tool\",\"version\":\"2.0.0\",\"dependencies\":{\"sub\":\"^1.0.0\"}," +
-                        "\"dist\":{\"tarball\":\"https://registry.npmjs.org/tool/-/tool-2.0.0.tgz\",\"integrity\":\"sha512-T\"}}");
-
-        String lock = "{\n" +
-                "  \"lockfileVersion\": 3,\n" +
-                "  \"packages\": {\n" +
-                "    \"\": {\"dependencies\": {\"tool\": \"1.0.0\"}},\n" +
-                "    \"node_modules/tool\": {\"version\": \"1.0.0\"}\n" +
-                "  }\n" +
-                "}\n";
-
-        Result result = regen(PackageManager.Npm,
-                "{\"dependencies\":{\"tool\":\"1.0.0\"}}",
-                "{\"dependencies\":{\"tool\":\"1.0.0\",\"wrapper\":\"^1.0.0\"}}",
-                lock);
-
-        assertThat(result.isSuccess()).isFalse();
-        assertThat(result.getFailure().getReason()).isEqualTo(Reason.RESOLUTION_REQUIRED);
-        assertThat(result.getFailure().getPackageName()).isEqualTo("tool");
-        assertThat(result.getFailure().getDetail()).contains("non-leaf");
-    }
-
-    @Test
-    void closureAddCascadeUpgradeFailsLoud() {
-        // Adding needy pulls color-name ~1.1.4, but color-name is locked at 1.1.3 top-level. Even though a
-        // ^-ranged reverse-dependent would accept 1.1.4, moving an already-placed package is a cascade —
-        // deferred to I3 rather than resolved greedily.
-        routes.put("https://registry.npmjs.org/needy", "{\"versions\":{\"1.0.0\":{}}}");
-        routes.put("https://registry.npmjs.org/needy/1.0.0",
-                "{\"name\":\"needy\",\"version\":\"1.0.0\",\"dependencies\":{\"color-name\":\"~1.1.4\"}," +
-                        "\"dist\":{\"tarball\":\"https://registry.npmjs.org/needy/-/needy-1.0.0.tgz\"," +
-                        "\"integrity\":\"sha512-NEEDY\"}}");
-
-        String lock = "{\n" +
-                "  \"lockfileVersion\": 3,\n" +
-                "  \"packages\": {\n" +
-                "    \"\": {\"dependencies\": {\"has-color\": \"1.0.0\"}},\n" +
-                "    \"node_modules/color-name\": {\"version\": \"1.1.3\"},\n" +
-                "    \"node_modules/has-color\": {\"version\": \"1.0.0\", \"dependencies\": {\"color-name\": \"^1.1.0\"}}\n" +
-                "  }\n" +
-                "}\n";
-
-        Result result = regen(PackageManager.Npm,
-                "{\"dependencies\":{\"has-color\":\"1.0.0\"}}",
-                "{\"dependencies\":{\"has-color\":\"1.0.0\",\"needy\":\"^1.0.0\"}}",
-                lock);
-
-        assertThat(result.isSuccess()).isFalse();
-        assertThat(result.getFailure().getReason()).isEqualTo(Reason.RESOLUTION_REQUIRED);
-        assertThat(result.getFailure().getPackageName()).isEqualTo("color-name");
-        assertThat(result.getFailure().getDetail()).contains("does not satisfy");
-    }
-
-    @Test
-    void enginesLeafAddByteExact() {
-        // A dependency-free package carrying object metadata (engines) now inserts byte-exact (I1-follow).
-        routes.put("https://registry.npmjs.org/is-number", resource("lock/npm/add-meta-engines/http/is-number"));
-        routes.put("https://registry.npmjs.org/is-number/7.0.0",
-                resource("lock/npm/add-meta-engines/http/is-number-7.0.0"));
-
-        Result result = NativeLockEngine.regenerate(PackageManager.Npm,
-                resource("lock/npm/add-meta-engines/pkg-after"),
-                resource("lock/npm/add-meta-engines/pkg-before"),
-                resource("lock/npm/add-meta-engines/before"),
-                null, Paths.get("package.json"), ctx);
+        Result result = regenerate(PackageManager.Pnpm, Request.builder()
+                .packageJson(resource(scenario + "pkg"))
+                .lock(resource(scenario + "before"))
+                .packageJsonPath(Paths.get("app/package.json"))
+                .packageManagerFile(Paths.get("app/pnpm-workspace.yaml"), resource(scenario + "workspace"))
+                .build(), ctx);
 
         assertThat(result.isSuccess()).as(String.valueOf(result.getErrorMessage())).isTrue();
-        assertThat(result.getLockFileContent()).isEqualTo(resource("lock/npm/add-meta-engines/after"));
+        assertThat(result.getLockFileContent()).isEqualTo(resource(scenario + "after"));
     }
 
     @Test
-    void richMetadataLeafAddByteExact() {
-        // os (array, groups with scalars) + a derived hasInstallScript + license, then engines (object,
-        // groups last) — the full value-kind partition, end-to-end through the engine.
-        routes.put("https://registry.npmjs.org/fsevents", resource("lock/npm/add-meta-rich/http/fsevents"));
-        routes.put("https://registry.npmjs.org/fsevents/2.3.3",
-                resource("lock/npm/add-meta-rich/http/fsevents-2.3.3"));
+    void pnpmReadsWorkspaceMembersFromTheProjectManifests() {
+        String scenario = "lock/pnpm/small-ws-member-bump/";
+        routes.put("https://registry.npmjs.org/wrappy", resource(scenario + "http/wrappy"));
 
-        Result result = NativeLockEngine.regenerate(PackageManager.Npm,
-                resource("lock/npm/add-meta-rich/pkg-after"),
-                resource("lock/npm/add-meta-rich/pkg-before"),
-                resource("lock/npm/add-meta-rich/before"),
-                null, Paths.get("package.json"), ctx);
+        Result result = regenerate(PackageManager.Pnpm, Request.builder()
+                .packageJson(resource(scenario + "tree/packages/a/package.json"))
+                .lock(resource(scenario + "before"))
+                .packageJsonPath(Paths.get("packages/a/package.json"))
+                .manifest(Paths.get("package.json"), resource(scenario + "pkg"))
+                .manifest(Paths.get("packages/b/package.json"),
+                        resource(scenario + "tree-before/packages/b/package.json"))
+                .packageManagerFile(Paths.get("pnpm-workspace.yaml"), resource(scenario + "workspace-before"))
+                .build(), ctx);
 
         assertThat(result.isSuccess()).as(String.valueOf(result.getErrorMessage())).isTrue();
-        assertThat(result.getLockFileContent()).isEqualTo(resource("lock/npm/add-meta-rich/after"));
+        assertThat(result.getLockFileContent()).isEqualTo(resource(scenario + "after"));
     }
 
     @Test
-    void unserializableMetadataLeafAddFailsLoud() {
-        // A dependency-free leaf whose only extra surface is one npm reshapes without a verified golden
-        // (bundleDependencies) defers rather than emit a maybe-wrong entry (exhaustive-or-fail).
-        routes.put("https://registry.npmjs.org/bundler", "{\"versions\":{\"1.0.0\":{}}}");
-        routes.put("https://registry.npmjs.org/bundler/1.0.0",
-                "{\"name\":\"bundler\",\"version\":\"1.0.0\",\"dependencies\":{},\"bundleDependencies\":[\"x\"]}");
-
-        Result result = regen(PackageManager.Npm,
-                "{\"dependencies\":{}}",
-                "{\"dependencies\":{\"bundler\":\"^1.0.0\"}}",
-                "{\"lockfileVersion\":3,\"packages\":{\"\":{}}}");
+    void pnpmWithoutALockFailsLoud() {
+        Result result = regen(PackageManager.Pnpm, "{\"dependencies\":{\"ms\":\"2.0.0\"}}", null);
 
         assertThat(result.isSuccess()).isFalse();
-        assertThat(result.getFailure().getReason()).isEqualTo(Reason.RESOLUTION_REQUIRED);
-        // The deeper whole-closure attempt also defers on the bundleDependencies shape (its detail is preferred).
-        assertThat(result.getFailure().getDetail()).contains("bundleDependencies").contains("entry shape not yet patched");
+        assertThat(result.getFailure().getReason()).isEqualTo(Reason.MALFORMED_LOCK);
     }
 
     @Test
@@ -462,363 +556,30 @@ class NativeLockEngineTest {
         routes.put("https://registry.npmjs.org/left-pad", resource("lock/npm/add-leaf/http/left-pad"));
         routes.put("https://registry.npmjs.org/left-pad/1.3.0", resource("lock/npm/add-leaf/http/left-pad-1.3.0"));
 
-        Result result = NativeLockEngine.regenerate(PackageManager.Npm,
-                resource("lock/npm/add-leaf/pkg-after"),
-                resource("lock/npm/add-leaf/pkg-before"),
-                resource("lock/npm/add-leaf/before"),
-                null, Paths.get("package.json"), ctx);
+        Result result = regen(PackageManager.Npm, resource("lock/npm/add-leaf/pkg-after"),
+                resource("lock/npm/add-leaf/before"));
 
         assertThat(result.isSuccess()).as(String.valueOf(result.getErrorMessage())).isTrue();
         assertThat(result.getLockFileContent()).isEqualTo(resource("lock/npm/add-leaf/after"));
     }
 
     @Test
-    void unsupportedEntryTypeFailsLoud() {
-        Result result = regen(PackageManager.Npm,
-                "{\"dependencies\":{\"lodash\":\"^4.17.20\"}}",
-                "{\"dependencies\":{\"lodash\":\"git+https://github.com/lodash/lodash.git\"}}",
-                npmLock("4.17.20"));
-
-        assertThat(result.isSuccess()).isFalse();
-        assertThat(result.getFailure().getReason()).isEqualTo(Reason.UNSUPPORTED_ENTRY_TYPE);
-    }
-
-    @Test
     void versionNotFoundFailsLoud() {
         routes.put("https://registry.npmjs.org/lodash", "{\"versions\":{\"4.17.20\":{},\"4.17.21\":{}}}");
 
-        Result result = regen(PackageManager.Npm,
-                "{\"dependencies\":{\"lodash\":\"^4.17.20\"}}",
-                "{\"dependencies\":{\"lodash\":\"^5.0.0\"}}",
-                npmLock("4.17.20"));
+        Result result = regen(PackageManager.Npm, "{\"dependencies\":{\"lodash\":\"^5.0.0\"}}", npmLock("4.17.20"));
 
         assertThat(result.isSuccess()).isFalse();
         assertThat(result.getFailure().getReason()).isEqualTo(Reason.VERSION_NOT_FOUND);
     }
 
-    // --- C1 / I5: reverse-dependent nesting ------------------------------
-
-    @Test
-    void singleReverseDependentExactPinNestsUnderDependent() {
-        // needs-exact pins lodash 4.17.20 (excludes the bumped 4.17.21) -> npm keeps 4.17.21 top-level and
-        // nests 4.17.20 under needs-exact (I5). The engine emits the nest; the patcher relocates it.
-        routes.put("https://registry.npmjs.org/lodash", "{\"versions\":{\"4.17.20\":{},\"4.17.21\":{}}}");
-        routes.put("https://registry.npmjs.org/lodash/4.17.20",
-                "{\"name\":\"lodash\",\"version\":\"4.17.20\",\"dependencies\":{}}");
-        routes.put("https://registry.npmjs.org/lodash/4.17.21",
-                "{\"name\":\"lodash\",\"version\":\"4.17.21\",\"dependencies\":{}," +
-                        "\"dist\":{\"tarball\":\"https://registry.npmjs.org/lodash/-/lodash-4.17.21.tgz\"," +
-                        "\"integrity\":\"sha512-NEW\",\"shasum\":\"abc\"}}");
-
-        String lock = "{\n" +
-                "  \"lockfileVersion\": 3,\n" +
-                "  \"packages\": {\n" +
-                "    \"\": {\"dependencies\": {\"lodash\": \"^4.17.20\"}},\n" +
-                "    \"node_modules/lodash\": {\n" +
-                "      \"version\": \"4.17.20\",\n" +
-                "      \"resolved\": \"https://registry.npmjs.org/lodash/-/lodash-4.17.20.tgz\",\n" +
-                "      \"integrity\": \"sha512-OLD\"\n" +
-                "    },\n" +
-                "    \"node_modules/needs-exact\": {\"version\": \"1.0.0\", \"dependencies\": {\"lodash\": \"4.17.20\"}}\n" +
-                "  }\n" +
-                "}\n";
-
-        Result result = regen(PackageManager.Npm,
-                "{\"dependencies\":{\"lodash\":\"^4.17.20\"}}",
-                "{\"dependencies\":{\"lodash\":\"^4.17.21\"}}",
-                lock);
-
-        assertThat(result.isSuccess()).as(String.valueOf(result.getErrorMessage())).isTrue();
-        assertThat(result.getLockFileContent())
-                .contains("\"node_modules/needs-exact/node_modules/lodash\"")
-                .contains("sha512-OLD")   // the nested copy keeps the old integrity
-                .contains("sha512-NEW");  // the top-level slot takes the bumped one
-    }
-
-    @Test
-    void multipleReverseDependentsExcludingTargetFailLoud() {
-        // Two locked packages each exclude the new version -> npm would nest a copy under each; nesting more
-        // than one reverse-dependent reshapes further and is deferred.
-        routes.put("https://registry.npmjs.org/lodash", "{\"versions\":{\"4.17.20\":{},\"4.17.21\":{}}}");
-
-        String lock = "{\n" +
-                "  \"lockfileVersion\": 3,\n" +
-                "  \"packages\": {\n" +
-                "    \"\": {\"dependencies\": {\"lodash\": \"^4.17.20\"}},\n" +
-                "    \"node_modules/lodash\": {\"version\": \"4.17.20\"},\n" +
-                "    \"node_modules/needs-exact\": {\"version\": \"1.0.0\", \"dependencies\": {\"lodash\": \"4.17.20\"}},\n" +
-                "    \"node_modules/also-exact\": {\"version\": \"1.0.0\", \"dependencies\": {\"lodash\": \"4.17.20\"}}\n" +
-                "  }\n" +
-                "}\n";
-
-        Result result = regen(PackageManager.Npm,
-                "{\"dependencies\":{\"lodash\":\"^4.17.20\"}}",
-                "{\"dependencies\":{\"lodash\":\"^4.17.21\"}}",
-                lock);
-
-        assertThat(result.isSuccess()).isFalse();
-        assertThat(result.getFailure().getReason()).isEqualTo(Reason.RESOLUTION_REQUIRED);
-        assertThat(result.getFailure().getPackageName()).isEqualTo("lodash");
-        assertThat(result.getFailure().getDetail())
-                .contains("more than one reverse-dependent");
-    }
-
-    @Test
-    void reverseDependentNestingANonLeafFailsLoud() {
-        // The excluded old version is not a leaf (its lock entry carries its own dependencies), so relocating
-        // it could force a further nest — deferred rather than guessed.
-        routes.put("https://registry.npmjs.org/lodash", "{\"versions\":{\"4.17.20\":{},\"4.17.21\":{}}}");
-
-        String lock = "{\n" +
-                "  \"lockfileVersion\": 3,\n" +
-                "  \"packages\": {\n" +
-                "    \"\": {\"dependencies\": {\"lodash\": \"^4.17.20\"}},\n" +
-                "    \"node_modules/lodash\": {\n" +
-                "      \"version\": \"4.17.20\",\n" +
-                "      \"resolved\": \"https://registry.npmjs.org/lodash/-/lodash-4.17.20.tgz\",\n" +
-                "      \"integrity\": \"sha512-OLD\",\n" +
-                "      \"dependencies\": {\"tiny\": \"^1.0.0\"}\n" +
-                "    },\n" +
-                "    \"node_modules/needs-exact\": {\"version\": \"1.0.0\", \"dependencies\": {\"lodash\": \"4.17.20\"}}\n" +
-                "  }\n" +
-                "}\n";
-
-        Result result = regen(PackageManager.Npm,
-                "{\"dependencies\":{\"lodash\":\"^4.17.20\"}}",
-                "{\"dependencies\":{\"lodash\":\"^4.17.21\"}}",
-                lock);
-
-        assertThat(result.isSuccess()).isFalse();
-        assertThat(result.getFailure().getReason()).isEqualTo(Reason.RESOLUTION_REQUIRED);
-        assertThat(result.getFailure().getDetail()).contains("non-leaf");
-    }
-
-    @Test
-    void reverseDependentConstraintAcceptingTargetSucceeds() {
-        routes.put("https://registry.npmjs.org/lodash", "{\"versions\":{\"4.17.20\":{},\"4.17.21\":{}}}");
-        routes.put("https://registry.npmjs.org/lodash/4.17.20",
-                "{\"name\":\"lodash\",\"version\":\"4.17.20\",\"dependencies\":{}}");
-        routes.put("https://registry.npmjs.org/lodash/4.17.21",
-                "{\"name\":\"lodash\",\"version\":\"4.17.21\",\"dependencies\":{}," +
-                        "\"dist\":{\"tarball\":\"https://registry.npmjs.org/lodash/-/lodash-4.17.21.tgz\"," +
-                        "\"integrity\":\"sha512-NEW\",\"shasum\":\"abc\"}}");
-
-        String lock = "{\n" +
-                "  \"lockfileVersion\": 3,\n" +
-                "  \"packages\": {\n" +
-                "    \"\": {\"dependencies\": {\"lodash\": \"^4.17.20\"}},\n" +
-                "    \"node_modules/lodash\": {\n" +
-                "      \"version\": \"4.17.20\",\n" +
-                "      \"resolved\": \"https://registry.npmjs.org/lodash/-/lodash-4.17.20.tgz\",\n" +
-                "      \"integrity\": \"sha512-OLD\"\n" +
-                "    },\n" +
-                "    \"node_modules/tolerant\": {\"version\": \"1.0.0\", \"dependencies\": {\"lodash\": \"^4.0.0\"}}\n" +
-                "  }\n" +
-                "}\n";
-
-        Result result = regen(PackageManager.Npm,
-                "{\"dependencies\":{\"lodash\":\"^4.17.20\"}}",
-                "{\"dependencies\":{\"lodash\":\"^4.17.21\"}}",
-                lock);
-
-        assertThat(result.isSuccess()).as(String.valueOf(result.getErrorMessage())).isTrue();
-        assertThat(result.getLockFileContent()).contains("4.17.21");
-    }
-
-    // --- closure surfaces (each fails loud individually) -----------------
-
-    // The expected detail is the deeper whole-closure deferral (preferred over the per-dependency message): a leaf
-    // surface it cannot yet reproduce reports "declares <field>".
-    @Test
-    void osChangeFailsLoud() {
-        assertClosureSurfaceFailsLoud(",\"os\":[\"linux\"]", ",\"os\":[\"darwin\"]", "changed its os");
-    }
-
-    @Test
-    void cpuChangeFailsLoud() {
-        assertClosureSurfaceFailsLoud(",\"cpu\":[\"x64\"]", ",\"cpu\":[\"arm64\"]", "changed its cpu");
-    }
-
-    @Test
-    void libcChangeFailsLoud() {
-        assertClosureSurfaceFailsLoud(",\"libc\":[\"glibc\"]", ",\"libc\":[\"musl\"]", "changed its libc");
-    }
-
-    @Test
-    void bundleDependenciesChangeFailsLoud() {
-        assertClosureSurfaceFailsLoud("", ",\"bundleDependencies\":[\"x\"]", "declares bundleDependencies");
-    }
-
-    @Test
-    void optionalDependenciesChangeFailsLoud() {
-        // The per-dependency patch defers on the optional-add; whole-closure resolution would resolve a real optional
-        // dependency, but here the added `x` is unresolvable (no route), so the per-dependency deferral stands.
-        assertClosureSurfaceFailsLoud("", ",\"optionalDependencies\":{\"x\":\"^1.0.0\"}", "optionalDependencies changed");
-    }
-
-    @Test
-    void peerDependenciesMetaChangeFailsLoud() {
-        assertClosureSurfaceFailsLoud("", ",\"peerDependenciesMeta\":{\"x\":{\"optional\":true}}",
-                "declares peerDependenciesMeta");
-    }
-
-    @Test
-    void hasInstallScriptChangeFailsLoud() {
-        assertClosureSurfaceFailsLoud("", ",\"hasInstallScript\":true", "hasInstallScript");
-    }
-
-    private void assertClosureSurfaceFailsLoud(String oldExtra, String newExtra, String expectedDetail) {
-        routes.put("https://registry.npmjs.org/lodash", "{\"versions\":{\"4.17.20\":{},\"4.17.21\":{}}}");
-        routes.put("https://registry.npmjs.org/lodash/4.17.20",
-                "{\"name\":\"lodash\",\"version\":\"4.17.20\",\"dependencies\":{}" + oldExtra + "}");
-        routes.put("https://registry.npmjs.org/lodash/4.17.21",
-                "{\"name\":\"lodash\",\"version\":\"4.17.21\",\"dependencies\":{}" + newExtra + "}");
-
-        Result result = regen(PackageManager.Npm,
-                "{\"dependencies\":{\"lodash\":\"^4.17.20\"}}",
-                "{\"dependencies\":{\"lodash\":\"^4.17.21\"}}",
-                npmLock("4.17.20"));
-
-        assertThat(result.isSuccess()).isFalse();
-        assertThat(result.getFailure().getReason()).isEqualTo(Reason.RESOLUTION_REQUIRED);
-        assertThat(result.getFailure().getDetail()).contains(expectedDetail);
-    }
-
-    // --- other fail-loud guards ------------------------------------------
-
-    @Test
-    void forkedTopLevelBumpRescopesLeavesNestUnchanged() {
-        // lodash is directly declared (hoisted to node_modules/lodash@4.17.20) while `wrapper` holds its own
-        // node_modules/wrapper/node_modules/lodash@3.10.1 fork. Bumping the direct lodash re-scopes to the
-        // top-level copy and moves only it; wrapper's nested fork stays byte-identical (see the byte-exact
-        // ajv/table golden in NpmBumpForkedLockRegenTest).
-        routes.put("https://registry.npmjs.org/lodash", "{\"versions\":{\"4.17.20\":{},\"4.17.21\":{}}}");
-        routes.put("https://registry.npmjs.org/lodash/4.17.20",
-                "{\"name\":\"lodash\",\"version\":\"4.17.20\",\"dependencies\":{}}");
-        routes.put("https://registry.npmjs.org/lodash/4.17.21",
-                "{\"name\":\"lodash\",\"version\":\"4.17.21\",\"dependencies\":{}," +
-                        "\"dist\":{\"tarball\":\"https://registry.npmjs.org/lodash/-/lodash-4.17.21.tgz\"," +
-                        "\"integrity\":\"sha512-NEW\",\"shasum\":\"abc\"}}");
-
-        String lock = "{\n" +
-                "  \"lockfileVersion\": 3,\n" +
-                "  \"packages\": {\n" +
-                "    \"\": {\"dependencies\": {\"lodash\": \"^4.17.20\"}},\n" +
-                "    \"node_modules/lodash\": {\n" +
-                "      \"version\": \"4.17.20\",\n" +
-                "      \"resolved\": \"https://registry.npmjs.org/lodash/-/lodash-4.17.20.tgz\",\n" +
-                "      \"integrity\": \"sha512-OLD\"\n" +
-                "    },\n" +
-                "    \"node_modules/wrapper\": {\"version\": \"1.0.0\", \"dependencies\": {\"lodash\": \"^3.0.0\"}},\n" +
-                "    \"node_modules/wrapper/node_modules/lodash\": {\"version\": \"3.10.1\", \"integrity\": \"sha512-OLD3\"}\n" +
-                "  }\n" +
-                "}\n";
-
-        Result result = regen(PackageManager.Npm,
-                "{\"dependencies\":{\"lodash\":\"^4.17.20\"}}",
-                "{\"dependencies\":{\"lodash\":\"^4.17.21\"}}",
-                lock);
-
-        assertThat(result.isSuccess()).as(String.valueOf(result.getErrorMessage())).isTrue();
-        assertThat(result.getLockFileContent())
-                .contains("\"version\": \"4.17.21\"")  // top-level copy bumped
-                .contains("sha512-NEW")
-                .contains("\"node_modules/wrapper/node_modules/lodash\"")
-                .contains("sha512-OLD3")               // the nested fork is byte-identical
-                .contains("\"version\": \"3.10.1\"");
-    }
-
-    @Test
-    void forkedBumpThatWouldDedupeNestFailsLoud() {
-        // `wrapper` pins lodash 4.17.21 exactly (excludes the current top-level 4.17.20, so it forks a nested
-        // copy). Bumping the direct lodash to 4.17.21 would let wrapper's requirement resolve to the new top-level
-        // and npm would dedupe the nest away — a reshape the per-dependency bump cannot express, so it defers.
-        routes.put("https://registry.npmjs.org/lodash", "{\"versions\":{\"4.17.20\":{},\"4.17.21\":{}}}");
-
-        String lock = "{\n" +
-                "  \"lockfileVersion\": 3,\n" +
-                "  \"packages\": {\n" +
-                "    \"\": {\"dependencies\": {\"lodash\": \"^4.17.20\"}},\n" +
-                "    \"node_modules/lodash\": {\"version\": \"4.17.20\"},\n" +
-                "    \"node_modules/wrapper\": {\"version\": \"1.0.0\", \"dependencies\": {\"lodash\": \"4.17.21\"}},\n" +
-                "    \"node_modules/wrapper/node_modules/lodash\": {\"version\": \"4.17.21\"}\n" +
-                "  }\n" +
-                "}\n";
-
-        Result result = regen(PackageManager.Npm,
-                "{\"dependencies\":{\"lodash\":\"^4.17.20\"}}",
-                "{\"dependencies\":{\"lodash\":\"^4.17.21\"}}",
-                lock);
-
-        assertThat(result.isSuccess()).isFalse();
-        assertThat(result.getFailure().getReason()).isEqualTo(Reason.RESOLUTION_REQUIRED);
-        assertThat(result.getFailure().getPackageName()).isEqualTo("lodash");
-        assertThat(result.getFailure().getDetail()).contains("dedupe");
-    }
-
-    @Test
-    void forkedMemberDeclaredDefersToMultipleVersions() {
-        // The forked lodash is declared by a workspace MEMBER (packages/foo), not the root importer. npm may nest
-        // the member's copy rather than hoist it, so the re-scope (which only owns a ROOT-declared top-level edge)
-        // does not apply and the bump stays fail-loud rather than guess which copy the member edge resolves.
-        String lock = "{\n" +
-                "  \"name\": \"root\",\n" +
-                "  \"lockfileVersion\": 3,\n" +
-                "  \"packages\": {\n" +
-                "    \"\": {\"name\": \"root\", \"workspaces\": [\"packages/foo\"]},\n" +
-                "    \"packages/foo\": {\"name\": \"foo\", \"version\": \"1.0.0\", \"dependencies\": {\"lodash\": \"^4.17.20\"}},\n" +
-                "    \"node_modules/foo\": {\"resolved\": \"packages/foo\", \"link\": true},\n" +
-                "    \"node_modules/lodash\": {\"version\": \"4.17.20\"},\n" +
-                "    \"node_modules/legacy\": {\"version\": \"1.0.0\", \"dependencies\": {\"lodash\": \"^3.0.0\"}},\n" +
-                "    \"node_modules/legacy/node_modules/lodash\": {\"version\": \"3.10.1\"}\n" +
-                "  }\n" +
-                "}\n";
-
-        Result result = NativeLockEngine.regenerate(PackageManager.Npm,
-                "{\"name\":\"foo\",\"version\":\"1.0.0\",\"dependencies\":{\"lodash\":\"^4.17.21\"}}",
-                "{\"name\":\"foo\",\"version\":\"1.0.0\",\"dependencies\":{\"lodash\":\"^4.17.20\"}}",
-                lock, null, Paths.get("packages/foo/package.json"), ctx);
-
-        assertThat(result.isSuccess()).isFalse();
-        assertThat(result.getFailure().getReason()).isEqualTo(Reason.RESOLUTION_REQUIRED);
-        assertThat(result.getFailure().getDetail()).contains("multiple versions");
-    }
-
-    @Test
-    void overridesOutsideDeclaredDependenciesFailsLoud() {
-        Result result = regen(PackageManager.Npm,
-                "{\"dependencies\":{\"lodash\":\"^4.17.20\"},\"overrides\":{\"a\":\"1.0.0\"}}",
-                "{\"dependencies\":{\"lodash\":\"^4.17.20\"},\"overrides\":{\"a\":\"2.0.0\"}}",
-                npmLock("4.17.20"));
-
-        assertThat(result.isSuccess()).isFalse();
-        assertThat(result.getFailure().getReason()).isEqualTo(Reason.RESOLUTION_REQUIRED);
-        assertThat(result.getFailure().getDetail()).contains("outside declared dependencies");
-    }
-
     @Test
     void nullLockFailsLoud() {
-        Result result = NativeLockEngine.regenerate(PackageManager.Npm,
-                "{\"dependencies\":{\"lodash\":\"^4.17.21\"}}",
-                "{\"dependencies\":{\"lodash\":\"^4.17.20\"}}",
-                null, null, Paths.get("package.json"), ctx);
+        Result result = regen(PackageManager.Npm, "{\"dependencies\":{\"lodash\":\"^4.17.21\"}}", null);
 
         assertThat(result.isSuccess()).isFalse();
         assertThat(result.getFailure().getReason()).isEqualTo(Reason.MALFORMED_LOCK);
     }
-
-    @Test
-    void nullOriginalManifestFailsLoud() {
-        Result result = NativeLockEngine.regenerate(PackageManager.Npm,
-                "{\"dependencies\":{\"lodash\":\"^4.17.21\"}}",
-                null, npmLock("4.17.20"), null, Paths.get("package.json"), ctx);
-
-        assertThat(result.isSuccess()).isFalse();
-        assertThat(result.getFailure().getReason()).isEqualTo(Reason.RESOLUTION_REQUIRED);
-        assertThat(result.getFailure().getDetail()).contains("pre-edit package.json");
-    }
-
-    // --- C7: workspace importer targeting --------------------------------
 
     @Test
     void workspaceMemberBumpTargetsMemberImporterByteExact() {
@@ -826,27 +587,97 @@ class NativeLockEngineTest {
         routes.put("https://registry.npmjs.org/is-odd/3.0.0", resource("lock/npm/v3/http/is-odd-3.0.0"));
         routes.put("https://registry.npmjs.org/is-odd/3.0.1", resource("lock/npm/v3/http/is-odd-3.0.1"));
 
-        Result result = NativeLockEngine.regenerate(PackageManager.Npm,
-                resource("lock/npm/workspace/pkg-after"),
-                resource("lock/npm/workspace/pkg-before"),
-                resource("lock/npm/workspace/before"),
-                null, Paths.get("packages/foo/package.json"), ctx);
+        Result result = regenerate(PackageManager.Npm, Request.builder()
+                .packageJson(resource("lock/npm/workspace/pkg-after"))
+                .lock(resource("lock/npm/workspace/before"))
+                .packageJsonPath(Paths.get("packages/foo/package.json"))
+                .manifest(Paths.get("package.json"), "{\n  \"name\": \"npm-lock-ws\",\n  \"version\": \"1.0.0\",\n" +
+                                                     "  \"workspaces\": [\n    \"packages/*\"\n  ]\n}\n")
+                .build(), ctx);
 
         assertThat(result.isSuccess()).as(String.valueOf(result.getErrorMessage())).isTrue();
         assertThat(result.getLockFileContent()).isEqualTo(resource("lock/npm/workspace/after"));
     }
 
-    // --- C4: credentials never leak into a failure detail ----------------
+    @Test
+    void rootManifestWithoutNameAtTheRepositoryRootKeepsTheLockName() {
+        String before = "{\n  \"dependencies\": {\n    \"lodash\": \"^4.17.20\"\n  }\n}\n";
+        String after = "{\n  \"dependencies\": {}\n}\n";
+
+        Result result = regenerate(PackageManager.Npm, Request.builder()
+                .packageJson(after)
+                .lock(npmLock("4.17.20"))
+                .packageJsonPath(Paths.get("package.json"))
+                .manifest(Paths.get("package.json"), before)
+                .build(), ctx);
+
+        assertThat(result.isSuccess()).as(String.valueOf(result.getErrorMessage())).isTrue();
+        assertThat(result.getLockFileContent()).startsWith("{\n  \"name\": \"x\",\n").doesNotContain("null");
+    }
+
+    @Test
+    void npmrcValueNpmRejectsFailsLoud() {
+        Result result = regen(PackageManager.Npm, "{\"dependencies\":{\"lodash\":\"^4.17.21\"}}", npmLock("4.17.20"),
+                projectNpmrc("lockfile-version", "abc"));
+
+        assertThat(result.isSuccess()).isFalse();
+        assertThat(result.getFailure().getDetail()).startsWith("npm fails on this edit: Invalid lockfileVersion " +
+                "config: NaN");
+    }
+
+    @Test
+    void npmrcReadingTheEnvironmentFailsLoud() {
+        Result result = regen(PackageManager.Npm, "{\"dependencies\":{\"lodash\":\"^4.17.21\"}}", npmLock("4.17.20"),
+                projectNpmrc("legacy-peer-deps", "${LPD}"));
+
+        assertThat(result.isSuccess()).isFalse();
+        assertThat(result.getFailure().getReason()).isEqualTo(Reason.RESOLUTION_REQUIRED);
+        assertThat(result.getFailure().getDetail()).startsWith("the engine cannot know the environment variable LPD ");
+    }
+
+    @Test
+    void npmrcDryRunLeavesTheLockUnchanged() {
+        routes.put("https://registry.npmjs.org/lodash", "{\"versions\":{\"4.17.20\":{},\"4.17.21\":{}}}");
+        routes.put("https://registry.npmjs.org/lodash/4.17.21",
+                "{\"name\":\"lodash\",\"version\":\"4.17.21\",\"dependencies\":{}," +
+                        "\"dist\":{\"tarball\":\"https://registry.npmjs.org/lodash/-/lodash-4.17.21.tgz\"," +
+                        "\"integrity\":\"sha512-NEW\"}}");
+
+        Result result = regen(PackageManager.Npm, "{\"dependencies\":{\"lodash\":\"^4.17.21\"}}", npmLock("4.17.20"),
+                projectNpmrc("dry-run", "true"));
+
+        assertThat(result.isSuccess()).as(String.valueOf(result.getErrorMessage())).isTrue();
+        assertThat(result.getLockFileContent()).isEqualTo(npmLock("4.17.20"));
+    }
+
+    @Test
+    void npmrcGlobalFailsLoud() {
+        Result result = regen(PackageManager.Npm, "{\"dependencies\":{\"lodash\":\"^4.17.21\"}}", npmLock("4.17.20"),
+                projectNpmrc("global", "true"));
+
+        assertThat(result.isSuccess()).isFalse();
+        assertThat(result.getFailure().getDetail())
+                .startsWith("npm rejects this edit (ESHRINKWRAPGLOBAL): cannot generate lockfile for global packages");
+    }
+
+    // npm 11.17.0: location=global is global mode, even beside global=false written before it
+    @Test
+    void npmrcLocationGlobalFailsLoud() {
+        Result result = regen(PackageManager.Npm, "{\"dependencies\":{\"lodash\":\"^4.17.21\"}}", npmLock("4.17.20"),
+                projectNpmrc("global", "false", "location", "global"));
+
+        assertThat(result.isSuccess()).isFalse();
+        assertThat(result.getFailure().getDetail())
+                .startsWith("npm rejects this edit (ESHRINKWRAPGLOBAL): cannot generate lockfile for global packages");
+    }
 
     @Test
     void registryTokenInUrlNeverAppearsInFailureDetail() {
         NodeExecutionContextView.view(ctx).setRegistries(singletonList(new NodeRegistry(
-                null, "https://user:s3cr3ttoken@registry.example.com/", null, null, null, null, false, null, true, false)));
+                null, "https://user:s3cr3ttoken@registry.example.com/", null, null, null, null, false, null, true,
+                        false)));
 
-        Result result = regen(PackageManager.Npm,
-                "{\"dependencies\":{\"lodash\":\"^4.17.20\"}}",
-                "{\"dependencies\":{\"lodash\":\"^4.17.21\"}}",
-                npmLock("4.17.20"));
+        Result result = regen(PackageManager.Npm, "{\"dependencies\":{\"lodash\":\"^4.17.21\"}}", npmLock("4.17.20"));
 
         assertThat(result.isSuccess()).isFalse();
         assertThat(result.getFailure().getDetail()).doesNotContain("s3cr3ttoken");
@@ -854,6 +685,10 @@ class NativeLockEngineTest {
     }
 
     private static String resource(String path) {
+        return new String(bytes(path), StandardCharsets.UTF_8);
+    }
+
+    private static byte[] bytes(String path) {
         try (InputStream in = NativeLockEngineTest.class.getClassLoader().getResourceAsStream(path)) {
             if (in == null) {
                 throw new IllegalStateException("missing test resource " + path);
@@ -864,9 +699,17 @@ class NativeLockEngineTest {
             while ((n = in.read(buf)) >= 0) {
                 out.write(buf, 0, n);
             }
-            return new String(out.toByteArray(), StandardCharsets.UTF_8);
+            return out.toByteArray();
         } catch (IOException e) {
             throw new UncheckedIOException(e);
         }
+    }
+
+    private static Result regenerate(PackageManager pm, Request request, ExecutionContext ctx) {
+        return NativeLockEngine.regenerate(port(pm), request, ctx);
+    }
+
+    private static Port port(PackageManager pm) {
+        return requireNonNull(NativeLockEngine.port(pm));
     }
 }
