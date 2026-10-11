@@ -349,11 +349,7 @@ class YarnBerryLockRegeneratorTest {
                                          "::version=5.6.3&hash=8c6c40");
     }
 
-    /**
-     * install.ts's migration rules are the running release's: 4.15.0 over a version 8 lock (4.10.3 wrote it) writes
-     * approvedGitRepositories, enableScripts and npmMinimalAgeGate to .yarnrc.yml, and compressionLevel and
-     * enableGlobalCache only below version 8. Recorded: the .yarnrc.yml 4.15.0 rewrote beside {@code nodeLinker}.
-     */
+    // recorded: the .yarnrc.yml 4.15.0 rewrote over a version 8 lock beside nodeLinker
     @Test
     void migratesALockWithTheRulesOfTheReleaseThatRuns() {
         Result result = new YarnBerryLockRegenerator(YarnBerryLockRegenerator.Inputs.builder()
@@ -384,10 +380,7 @@ class YarnBerryLockRegeneratorTest {
                 "compressionLevel: mixed\n\nenableGlobalCache: false\n\nnodeLinker: node-modules\n"));
     }
 
-    /**
-     * Yarn 4.13.0 fails a range whose every version the age gate quarantines. Recorded with 4.15.0 an hour after
-     * q-fresh@1.1.0 was published.
-     */
+    // recorded with 4.15.0 an hour after q-fresh@1.1.0 was published
     @Test
     void failsARangeTheAgeGateQuarantinesWhole() {
         Result result = addFresh("4.15.0", "10", "", "q-fresh", "^1.1.0");
@@ -395,10 +388,7 @@ class YarnBerryLockRegeneratorTest {
                 .contains("YN0016 q-fresh@npm:^1.1.0: All versions satisfying \"^1.1.0\" are quarantined");
     }
 
-    /**
-     * From 4.17.0 an {@code npmScopes} entry has its own {@code npmMinimalAgeGate}, a day unless set, whatever the
-     * project's. Recorded with 4.18.1 and 4.15.0 under {@code npmMinimalAgeGate: 0}, an hour after 1.1.0.
-     */
+    // recorded with 4.18.1 and 4.15.0 under npmMinimalAgeGate: 0, an hour after 1.1.0 was published
     @Test
     void gatesAScopeByItsOwnSettingFrom4_17() {
         String yarnrc = "npmMinimalAgeGate: 0\nnpmScopes:\n  gs:\n    npmAlwaysAuth: false\n";
@@ -408,10 +398,7 @@ class YarnBerryLockRegeneratorTest {
                 .contains("resolution: \"@gs/q-fresh@npm:1.1.0\"");
     }
 
-    /**
-     * Yarn 4.15.0 ignores YARN_IGNORE_SCRIPTS, which Yarn 1 reads. Yarn 4.14.0 rejects it as an unknown setting.
-     * Recorded over an empty project.
-     */
+    // recorded with 4.15.0 and 4.14.0 over an empty project
     @Test
     void ignoresYarn1sIgnoreScriptsFrom4_15() {
         Map<String, String> env = Collections.singletonMap("YARN_IGNORE_SCRIPTS", "1");
@@ -429,18 +416,13 @@ class YarnBerryLockRegeneratorTest {
         assertThat(install.apply("4.15.0").isSuccess()).isTrue();
     }
 
-    /**
-     * Yarn 4.15.0 holds a version back that was published under a day ago ({@code npmMinimalAgeGate} defaults to
-     * {@code "1d"} from 4.15.0). Recorded with 4.15.0 an hour after q-fresh@1.1.0 was published: it locks 1.0.0.
-     */
+    // recorded with 4.15.0 an hour after q-fresh@1.1.0 was published
     @Test
     void appliesTheDefaultAgeGateOfTheReleaseThatRuns() {
         assertThat(addFreshDependency("4.15.0", "10", "")).isEqualTo(lockWithFresh("10"));
     }
 
-    /**
-     * From 4.14.0 {@code npmMinimalAgeGate} is a duration. Recorded with 4.14.0 and {@code "2h"}: it locks 1.0.0.
-     */
+    // recorded with 4.14.0 and npmMinimalAgeGate: "2h"
     @Test
     void readsTheAgeGateAsADurationFrom4_14() {
         assertThat(addFreshDependency("4.14.0", "9", "npmMinimalAgeGate: \"2h\"\n")).isEqualTo(lockWithFresh("9"));

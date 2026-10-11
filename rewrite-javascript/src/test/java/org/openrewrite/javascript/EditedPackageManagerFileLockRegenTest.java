@@ -130,11 +130,7 @@ class EditedPackageManagerFileLockRegenTest implements RewriteTest {
                 .isEqualTo(resource(SCENARIO + "after"));
     }
 
-    /**
-     * Yarn 4 migrates a version 6 lock with settings it writes to .yarnrc.yml, which the recipes do not write.
-     * Without them Yarn's next install rewrites the lock's cacheKey. Recorded with 4.5.3 over the lock
-     * lock/yarn-berry/format-v6-migration wrote.
-     */
+    // recorded with 4.5.3 over the lock lock/yarn-berry/format-v6-migration wrote
     @Test
     void aMigrationThatWritesTheYarnrcIsRefused() {
         rewriteRun(
