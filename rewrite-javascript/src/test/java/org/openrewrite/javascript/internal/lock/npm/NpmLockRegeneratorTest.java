@@ -18,9 +18,7 @@ package org.openrewrite.javascript.internal.lock.npm;
 import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
-import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.CsvSource;
-import org.junit.jupiter.params.provider.MethodSource;
 import org.openrewrite.javascript.internal.LockFileRegeneration.Failure;
 import org.openrewrite.javascript.internal.LockFileRegeneration.Kind;
 import org.openrewrite.javascript.internal.LockFileRegeneration.Reason;
@@ -35,7 +33,6 @@ import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
-import java.util.stream.Stream;
 
 import static java.util.Arrays.asList;
 import static java.util.Collections.emptyList;
@@ -686,24 +683,5 @@ class NpmLockRegeneratorTest {
         assertThat(installs.get(0).getResult().isSuccess()).isTrue();
         assertThat(installs.get(1).getResult()).isEqualTo(installs.get(0).getResult());
         assertThat(http.requests).isNotEmpty().doesNotHaveDuplicates();
-    }
-
-    static Stream<Arguments> edits() {
-        return ScenarioReplay.edits();
-    }
-
-    /**
-     * Where several releases are candidates each install reads its own copy of the registry's documents; a lone one
-     * reads the registry's own, as every scenario replay does.
-     */
-    @ParameterizedTest(name = "{0}")
-    @MethodSource("edits")
-    void anInstallOverItsOwnCopyOfTheDocumentsComesToWhatALoneOneDoes(String name, NpmScenarios.Edit edit) {
-        NpmRelease release = edit.getScenario().release();
-
-        Result alone = recorded(edit).regenerate(singletonList(release));
-        Result amongOthers = recorded(edit).regenerate(asList(release, release));
-
-        assertThat(amongOthers).isEqualTo(alone);
     }
 }

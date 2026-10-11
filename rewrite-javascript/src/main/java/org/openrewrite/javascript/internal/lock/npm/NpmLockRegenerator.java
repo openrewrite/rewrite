@@ -304,16 +304,12 @@ public final class NpmLockRegenerator {
      * The installs share the registry's documents, each fetched once.
      */
     List<Install> installs(List<NpmRelease> candidates) {
-        // a lone candidate stands for no other: its install reads the registry's documents as they are
-        boolean alone = candidates.size() == 1;
         Set<String> projectRanges = new LinkedHashSet<>();
-        if (!alone) {
-            for (String manifest : inputs.getManifests().values()) {
-                noteNpmRanges(parsed(manifest), projectRanges);
-            }
-            noteNpmRanges(parsed(inputs.getLock()), projectRanges);
+        for (String manifest : inputs.getManifests().values()) {
+            noteNpmRanges(parsed(manifest), projectRanges);
         }
-        Object devEngines = alone ? null : localPackage(inputs.getManifests().get("")).get("devEngines");
+        noteNpmRanges(parsed(inputs.getLock()), projectRanges);
+        Object devEngines = localPackage(inputs.getManifests().get("")).get("devEngines");
 
         List<Install> installs = new ArrayList<>();
         for (NpmRelease candidate : candidates) {
@@ -328,7 +324,7 @@ public final class NpmLockRegenerator {
                 NpmRelease release = candidate.followed();
                 Set<String> npmRanges = new LinkedHashSet<>(projectRanges);
                 NpmLockRegenerator install = new NpmLockRegenerator(inputs.withRelease(release),
-                        alone ? registry : new InstallRegistry(registry, npmRanges));
+                        new InstallRegistry(registry, npmRanges));
                 Result result = install.install();
                 standing = new Install(release, result, install.refusesItsOwnVersion(), install.code(), npmRanges,
                         devEngines);
