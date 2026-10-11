@@ -91,6 +91,7 @@ class WorkspaceManifestWriterTest {
         assertThat(blankBeforeNew(11, separated, "nodeLinker")).isTrue();
         assertThat(blankBeforeNew(11, packed, "nodeLinker")).isTrue();
         assertThat(blankBeforeNew(11, packed, "allowBuilds")).isFalse();
+        assertThat(blankBeforeNew(11, packed, "publicHoistPattern")).isTrue();
         assertThat(blankBeforeNew(11, "packages:\n  - a\ncatalog:\n  x: 1.0.0\n", "nodeLinker")).isFalse();
         assertThat(blankBeforeNew(10, separated, "nodeLinker")).isFalse();
     }

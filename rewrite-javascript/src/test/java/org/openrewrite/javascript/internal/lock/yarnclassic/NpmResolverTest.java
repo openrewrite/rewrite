@@ -42,7 +42,8 @@ class NpmResolverTest {
                                            "\"1.2.0\": {\"name\": \"p\", \"version\": \"1.2.0\"}}";
 
     /**
-     * {@code open-dist-tag-latest-missing}: yarn locked {@code left-pad@latest} at 1.2.0, the last version key.
+     * A packument without a latest tag, recorded with yarn 1.22.22: it locked {@code left-pad@latest} at 1.2.0, the
+     * last version key.
      */
     @ParameterizedTest(name = "{0}")
     @CsvSource({

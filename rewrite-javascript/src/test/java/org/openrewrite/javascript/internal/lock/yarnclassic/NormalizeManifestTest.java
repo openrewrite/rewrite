@@ -123,8 +123,8 @@ class NormalizeManifestTest {
     }
 
     /**
-     * What yarn 1.22.22 printed for these dependency values ({@code open-manifest-dep-number}, and the same probe
-     * with the other values): {@code path.isAbsolute} rejects each, before anything resolves.
+     * What yarn 1.22.22 printed for these dependency values, a number among them (recorded): {@code path.isAbsolute}
+     * rejects each, before anything resolves.
      */
     @ParameterizedTest(name = "{0}")
     @CsvSource(delimiter = '|', quoteCharacter = '`', value = {

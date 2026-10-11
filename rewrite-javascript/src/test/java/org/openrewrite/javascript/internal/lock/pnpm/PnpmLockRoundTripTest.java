@@ -96,7 +96,7 @@ class PnpmLockRoundTripTest {
             String readingLog = lock.getPhase() == Phase.BEFORE ? lock.getScenario().file("pnpm-after.log") :
               log;
             if (readingLog == null) {
-                // a downloaded fixture without logs: lock-v54-no-edit and lock-v6-* record pnpm ignoring such a lock
+                // a downloaded fixture without logs: pnpm 11.2.2 ignores a v5.4 or v6 lock (recorded)
                 assertThat(e.getMessage()).isEqualTo("Lockfile pnpm-lock.yaml not compatible with current pnpm");
                 return;
             }
@@ -161,7 +161,7 @@ class PnpmLockRoundTripTest {
             if (log != null) {
                 assertThat(log).as("pnpm ignores the lock").contains("Ignoring broken lockfile");
             } else {
-                // a downloaded fixture without logs: lock-v54-no-edit and lock-v6-* record pnpm ignoring such a lock
+                // a downloaded fixture without logs: pnpm 11.2.2 ignores a v5.4 or v6 lock (recorded)
                 assertThat(e.getMessage()).isEqualTo("Lockfile pnpm-lock.yaml not compatible with current pnpm");
             }
             return;

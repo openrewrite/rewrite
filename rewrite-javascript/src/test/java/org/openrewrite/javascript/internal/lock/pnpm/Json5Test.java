@@ -75,7 +75,9 @@ class Json5Test {
               });
             return;
         }
-        assertThat(Json5.parse(text)).isEqualTo(decode(row.get("value")));
+        Object parsed = Json5.parse(text);
+        assertThat(parsed).isEqualTo(decode(row.get("value")));
+        assertThat(keyOrder(parsed)).isEqualTo(keyOrder(decode(row.get("value"))));
     }
 
     @Test
@@ -87,6 +89,26 @@ class Json5Test {
               assertThat(e.getCode()).isEqualTo("ERR_PNPM_JSON5_PARSE");
               assertThat(e.getMessage()).isEqualTo("JSON5: invalid character '.' at 1:14 in c/package.json5");
           });
+    }
+
+    // each object's keys in the order JavaScript enumerates them, which Map.equals ignores
+    @SuppressWarnings("unchecked")
+    private static @Nullable Object keyOrder(@Nullable Object value) {
+        List<@Nullable Object> order = new ArrayList<>();
+        if (value instanceof Map) {
+            for (String key : EcmaScript.keys((Map<String, ?>) value)) {
+                order.add(key);
+                order.add(keyOrder(((Map<String, ?>) value).get(key)));
+            }
+            return order;
+        }
+        if (value instanceof List) {
+            for (Object item : (List<Object>) value) {
+                order.add(keyOrder(item));
+            }
+            return order;
+        }
+        return null;
     }
 
     // the generator writes a number JSON cannot hold as {"$number": "NaN" | "Infinity" | "-Infinity" | "-0"}

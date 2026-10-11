@@ -115,7 +115,7 @@ class NpmOptionsTest {
         assertThat(fromNpmrc("global=null").isGlobal()).isFalse();
     }
 
-    // each value installed with npm 11.17.0: the peer chain of arb-legacy-peer-deps-add stays out when legacy
+    // each value installed with npm 11.17.0: an added package's peer chain stays out of the lock where it is true
     @ParameterizedTest
     @CsvSource({
       "true, true", "false, false", "0, true", "FALSE, true", "True, true", "yes, true", "00, true", "2, true",

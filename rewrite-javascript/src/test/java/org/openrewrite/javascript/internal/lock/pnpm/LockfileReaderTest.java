@@ -113,7 +113,7 @@ class LockfileReaderTest {
     }
 
     /**
-     * The conflict {@code open-lock-merge-conflict} records: pnpm merges both sides and resolves.
+     * A lock with merge conflict markers, recorded with pnpm 11.2.2: pnpm merges both sides and resolves.
      */
     @Test
     void autofixesMergeConflicts() {

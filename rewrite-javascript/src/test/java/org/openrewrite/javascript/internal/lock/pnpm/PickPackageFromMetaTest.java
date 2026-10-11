@@ -152,8 +152,8 @@ class PickPackageFromMetaTest {
     }
 
     /**
-     * The release-age choice {@code open-release-age-range-mixed} records: the newest version published before the
-     * cutoff, not {@code latest}.
+     * The release-age choice recorded with pnpm 11.2.2 for a range whose versions straddle the cutoff: the newest
+     * version published before it, not {@code latest}.
      */
     @Test
     void theNewestMatureVersionUnderMinimumReleaseAge() {

@@ -107,8 +107,8 @@ class SwitchCliVersionTest {
     private static final String BAD_NAMED_REGISTRY = "namedRegistries:\n  foo: ftp://example.com/\n";
 
     /**
-     * open-pm-pin-other-release-bad-named-registry, open-dev-engines-pm-other-range-bad-named-registry and a member's
-     * open-ws-unshared-member-dev-engines-pm-other-range-bad-named-registry: every way to another release checks first.
+     * Recorded with pnpm 11.2.2 for a pinned other release, a devEngines range and a member's devEngines range, each
+     * beside a bad named registry: every way to another release checks first.
      */
     @ParameterizedTest
     @CsvSource(delimiter = '|', value = {"10.18.3|false||", "^10.0.0|true||", "^11.0.0|true|11.3.0|",
@@ -139,7 +139,8 @@ class SwitchCliVersionTest {
         assertThatThrownBy(() -> new CreateNewStoreController(NO_REGISTRY, NOW)
           .createStoreController(options(BAD_NAMED_REGISTRY)))
           .isInstanceOfSatisfying(PnpmError.class, next -> {
-              assertThat(next.getCode()).isEqualTo(unlessLocked.getCode());
+              assertThat(next.getCode()).isEqualTo(unlessLocked.getCode())
+                .isEqualTo("ERR_PNPM_INVALID_NAMED_REGISTRY_URL");
               assertThat(member(BAD_NAMED_REGISTRY, null).beforeNextStoreController(next)).isSameAs(next);
           });
     }

@@ -256,7 +256,7 @@ class ReadPackageHookTest {
 
     /**
      * The compatibility database is applied unless ignored: {@code debug@<4.2.0} gains {@code supports-color} as an
-     * optional peer, as {@code open-compat-db-debug} records.
+     * optional peer, as pnpm 11.2.2 installed it (recorded).
      */
     @Test
     void createReadPackageHookAppliesTheCompatibilityDatabase() {
