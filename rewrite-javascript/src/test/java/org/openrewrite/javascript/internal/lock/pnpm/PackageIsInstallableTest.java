@@ -270,7 +270,6 @@ class PackageIsInstallableTest {
           Host.UNKNOWN);
     }
 
-    // pnpm skips an optional package where it does not fit, and fails engine-strict on a required one
     @Test
     void anUnknownPlatformFailsOnlyARequiredPackageUnderEngineStrict() {
         Map<String, @Nullable Object> linuxOnly = obj("{'os':['linux'],'cpu':['x64']}");
