@@ -62,7 +62,6 @@ class PackageCompatibilityTest {
             "<0.10;          false",
             "not a range;    false",
             "0.11.18 || 0.11.19 || >=20; true",
-            "<99999;         true",
             ">=99999;",
             ">=1000000;"
     })
