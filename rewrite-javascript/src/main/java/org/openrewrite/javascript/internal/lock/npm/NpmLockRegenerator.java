@@ -353,9 +353,10 @@ public final class NpmLockRegenerator {
         }
     }
 
+    // a manifest or a lock as an install reads it; null where it does not parse, and names no range
     private static @Nullable Object parsed(@Nullable String json) {
         try {
-            return json == null ? null : JsonParseEvenBetterErrors.jsonParse(json);
+            return json == null ? null : JsonParseEvenBetterErrors.parse(json).getValue();
         } catch (JsonParseEvenBetterErrors.JsonParseException e) {
             return null;
         }
@@ -467,8 +468,9 @@ public final class NpmLockRegenerator {
         }
     }
 
-    // one install as the release of the inputs, and the second install over the lock it writes
+    // one install as the release of the inputs, which installs() names, and the second install over the lock it writes
     private Result install() {
+        Objects.requireNonNull(inputs.getRelease(), "an install runs as a release");
         NpmOptions options;
         String path;
         String written;
@@ -482,8 +484,7 @@ public final class NpmLockRegenerator {
             }
             CannotKnow.requireRead(inputs.getNpmrc(), inputs.getPaths(), ".npmrc");
             CannotKnow.requireRead(inputs.getYarnLock(), inputs.getPaths(), "yarn.lock");
-            options = NpmOptions.fromNpmrc(Objects.requireNonNull(inputs.getRelease()), inputs.getUserNpmrc(),
-                    inputs.getNpmrc());
+            options = NpmOptions.fromNpmrc(inputs.getRelease(), inputs.getUserNpmrc(), inputs.getNpmrc());
             if (!options.isGlobal()) {
                 checkDevEngines(inputs.getManifests().get(""), options, inputs.getHost());
             }

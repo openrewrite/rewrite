@@ -453,6 +453,17 @@ class NpmLockRegeneratorTest {
         assertThat(regenerator.regenerate(candidates).getLockFileContent()).isEqualTo(DEPENDENT_LOCK);
     }
 
+    // the ranges are read from a manifest as npm reads it, its byte order mark stripped
+    @Test
+    void theRangesOfAManifestWithAByteOrderMarkAreRead() {
+        NpmLockRegenerator regenerator = regenerator(project("\uFEFF" + ENGINES_NPM_11));
+        List<NpmRelease> candidates = releases("12.2.0", "11.17.0");
+
+        assertThat(regenerator.installs(candidates)).extracting(NpmLockRegeneratorTest::standsFor)
+          .containsExactly(singletonList("12.2.0"), singletonList("11.17.0"));
+        assertThat(regenerator.regenerate(candidates).getLockFileContent()).isEqualTo(ENGINES_NPM_11_LOCK);
+    }
+
     /**
      * b's latest, 1.1.0, holds npm to {@code >=12}: npm-pick-manifest gives a release it excludes 1.0.0. The same
      * documents are handed to every install, as {@code NpmRegistryPackuments} does.
