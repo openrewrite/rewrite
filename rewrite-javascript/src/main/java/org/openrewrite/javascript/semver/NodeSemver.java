@@ -30,7 +30,7 @@ import java.util.StringJoiner;
 
 /**
  * Port of node-semver's functions with its {@code loose} and {@code includePrerelease} options: 7.8.4, which npm
- * 11.17.0 bundles, and 5.5.0, which yarn 1.22.22 bundles.
+ * 11.17.0 bundles, 7.8.5, which npm 11.18.0 bundles, and 5.5.0, which yarn 1.22.22 bundles.
  */
 @UtilityClass
 public class NodeSemver {
@@ -38,11 +38,11 @@ public class NodeSemver {
     private static final int MAX_LENGTH = 256;
 
     /**
-     * The node-semver release whose answers the functions give: 7.8.4, which npm bundles, or 5.5.0, which yarn
-     * 1.22.22 bundles.
+     * The node-semver release whose answers the functions give, oldest first: 7.8.4 and 7.8.5, which npm bundles, or
+     * 5.5.0, which yarn 1.22.22 bundles.
      */
     public enum Release {
-        V5_5_0, V7_8_4
+        V5_5_0, V7_8_4, V7_8_5
     }
 
     @RequiredArgsConstructor(access = AccessLevel.PRIVATE)
@@ -61,6 +61,13 @@ public class NodeSemver {
         final boolean loose;
         final boolean includePrerelease;
         final Release release;
+
+        /**
+         * These options as another release of node-semver reads them.
+         */
+        public Options release(Release release) {
+            return release == this.release ? this : new Options(loose, includePrerelease, release);
+        }
     }
 
     /**

@@ -109,6 +109,7 @@ final class Pacote {
                         .before(opts.getBefore())
                         .nodeVersion(opts.getNodeVersion())
                         .npmVersion(opts.getNpmVersion())
+                        .release(options.getRelease())
                         .build());
         Map<String, Object> mani = full || !opts.isFullMetadata() ? picked :
                 withVersionDocument(picked, registry.manifest(options.registryFor(name), name,

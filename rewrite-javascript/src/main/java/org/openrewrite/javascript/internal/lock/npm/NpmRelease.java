@@ -17,6 +17,7 @@ package org.openrewrite.javascript.internal.lock.npm;
 
 import lombok.EqualsAndHashCode;
 import lombok.Getter;
+import org.openrewrite.javascript.semver.NodeSemver;
 
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -62,6 +63,35 @@ public final class NpmRelease implements Comparable<NpmRelease> {
         return compareTo(new NpmRelease(major, minor, patch)) >= 0;
     }
 
+    // @npmcli/arborist build-ideal-tree.js
+
+    /**
+     * {@code #resolveLinks} gives a link's overrides to its target before the target resolves, from npm 11.18.0
+     * (npm/cli#9659).
+     */
+    boolean forwardsLinkOverridesToSubtree() {
+        return atLeast(11, 18, 0);
+    }
+
+    // @npmcli/arborist calc-dep-flags.js
+
+    /**
+     * A link only unsets its target's flags, as an edge does, from npm 11.18.0; before, it assigns its own.
+     */
+    boolean linkOnlyUnsetsTargetFlags() {
+        return atLeast(11, 18, 0);
+    }
+
+    // @npmcli/arborist link.js
+
+    /**
+     * A link forwards its overrides when a rule applies anywhere under its target ({@code overrideMatchesSubtree}),
+     * from npm 11.18.0 (npm/cli#9619); before, when a rule names a dependency the target declares.
+     */
+    boolean linkOverridesMatchSubtree() {
+        return atLeast(11, 18, 0);
+    }
+
     // @npmcli/config definitions.js
 
     /**
@@ -76,6 +106,16 @@ public final class NpmRelease implements Comparable<NpmRelease> {
      */
     String allowRemoteDefault() {
         return atLeast(12, 0, 0) ? "none" : "all";
+    }
+
+    // semver
+
+    /**
+     * The node-semver npm bundles: 7.8.5 from npm 11.18.0, whose {@code ~1.2} reaches down to {@code 1.2.0-0} under
+     * {@code includePrerelease} (classes/range.js).
+     */
+    NodeSemver.Release semver() {
+        return atLeast(11, 18, 0) ? NodeSemver.Release.V7_8_5 : NodeSemver.Release.V7_8_4;
     }
 
     @Override

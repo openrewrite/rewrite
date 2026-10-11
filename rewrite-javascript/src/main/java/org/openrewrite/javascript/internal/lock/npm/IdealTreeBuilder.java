@@ -182,7 +182,7 @@ public final class IdealTreeBuilder {
                 try {
                     if (!(node.isRoot() && truthy(node.getPackage().get("devEngines")))) {
                         NpmInstallChecks.checkEngine(node.getPackage(), NPM_VERSION, host.getNodeVersion(),
-                                options.isForce());
+                                options.isForce(), options.getRelease());
                     }
                 } catch (NpmInstallChecks.UnsupportedEngine err) {
                     if (options.isEngineStrict()) {
@@ -194,7 +194,8 @@ public final class IdealTreeBuilder {
             }
             if (node.isOptional() && !node.isInert()) {
                 try {
-                    NpmInstallChecks.checkEngine(node.getPackage(), NPM_VERSION, host.getNodeVersion(), false);
+                    NpmInstallChecks.checkEngine(node.getPackage(), NPM_VERSION, host.getNodeVersion(), false,
+                            options.getRelease());
                     NpmInstallChecks.checkPlatform(node.getPackage(), false, environment, host);
                 } catch (RuntimeException error) {
                     for (Node n : OptionalSet.optionalSet(node)) {
@@ -271,6 +272,7 @@ public final class IdealTreeBuilder {
                 .optional(false)
                 .installLinks(options.isInstallLinks())
                 .legacyPeerDeps(options.isLegacyPeerDeps())
+                .release(options.getRelease())
                 .loadOverrides(true)
                 .build());
     }
@@ -537,6 +539,7 @@ public final class IdealTreeBuilder {
                 .sourceReference(node)
                 .installLinks(options.isInstallLinks())
                 .legacyPeerDeps(options.isLegacyPeerDeps())
+                .release(options.getRelease())
                 .overrides(node.getOverrides())
                 .build());
 
@@ -546,6 +549,7 @@ public final class IdealTreeBuilder {
                         .path(child.getRealpath())
                         .sourceReference(child.getTarget())
                         .root(vr)
+                        .release(options.getRelease())
                         .build());
             }
         }
@@ -673,6 +677,7 @@ public final class IdealTreeBuilder {
                 .error(error)
                 .installLinks(options.isInstallLinks())
                 .legacyPeerDeps(options.isLegacyPeerDeps())
+                .release(options.getRelease())
                 .build());
         loadFailures.add(n);
         return n;
@@ -711,6 +716,7 @@ public final class IdealTreeBuilder {
                     .pkg(directoryManifest(realpath, spec))
                     .installLinks(installLinks)
                     .legacyPeerDeps(options.isLegacyPeerDeps())
+                    .release(options.getRelease())
                     .build());
             linkNodes.add(link);
             return link;
@@ -749,6 +755,7 @@ public final class IdealTreeBuilder {
                 .parent(parent)
                 .installLinks(installLinks)
                 .legacyPeerDeps(options.isLegacyPeerDeps())
+                .release(options.getRelease())
                 .build());
     }
 
@@ -865,6 +872,9 @@ public final class IdealTreeBuilder {
                                  !depsSeen.contains(target);
 
             if (unseenLink) {
+                if (link.getOverrides() != null && options.getRelease().forwardsLinkOverridesToSubtree()) {
+                    target.updateOverridesEdgeInAdded(link.getOverrides());
+                }
                 depsQueue.push(target);
             }
         }

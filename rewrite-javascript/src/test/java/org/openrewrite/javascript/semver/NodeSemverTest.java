@@ -283,6 +283,35 @@ class NodeSemverTest {
         assertThat(NodeSemver.minSatisfying(emptyList(), "some frogs and sneks-v2.5.6", Options.DEFAULT)).isNull();
     }
 
+    // classes/range.js replaceTilde, which 7.8.5 changed: what 7.8.4 (npm 11.17.0) and 7.8.5 (npm 11.18.0) answer
+    @Test
+    void tildeReachesDownToPrereleasesFrom785() {
+        Options v784 = Options.INCLUDE_PRERELEASE;
+        Options v785 = Options.INCLUDE_PRERELEASE.release(NodeSemver.Release.V7_8_5);
+        // version, range, the range as 7.8.4 and as 7.8.5 read it, whether each is satisfied
+        String[][] rows = {
+                {"22.0.0-rc.1", "~22", ">=22.0.0 <23.0.0-0", ">=22.0.0-0 <23.0.0-0", "false", "true"},
+                {"22.0.0", "~22", ">=22.0.0 <23.0.0-0", ">=22.0.0-0 <23.0.0-0", "true", "true"},
+                {"1.2.0-pre", "~1.2", ">=1.2.0 <1.3.0-0", ">=1.2.0-0 <1.3.0-0", "false", "true"},
+                {"1.2.3-pre", "~1.2.3", ">=1.2.3 <1.3.0-0", ">=1.2.3 <1.3.0-0", "false", "false"},
+                {"1.2.3-pre", "~1.2", ">=1.2.0 <1.3.0-0", ">=1.2.0-0 <1.3.0-0", "true", "true"},
+                {"1.0.0-0", "~1.x", ">=1.0.0 <2.0.0-0", ">=1.0.0-0 <2.0.0-0", "false", "true"},
+                {"1.2.0-pre", "~>1.2", ">=1.2.0 <1.3.0-0", ">=1.2.0-0 <1.3.0-0", "false", "true"},
+                {"0.0.0-0", "~0", ">=0.0.0 <1.0.0-0", "<1.0.0-0", "false", "true"},
+        };
+        for (String[] row : rows) {
+            assertThat(NodeSemver.validRange(row[1], v784)).as("7.8.4 %s", row[1]).isEqualTo(row[2]);
+            assertThat(NodeSemver.validRange(row[1], v785)).as("7.8.5 %s", row[1]).isEqualTo(row[3]);
+            assertThat(NodeSemver.satisfies(row[0], row[1], v784)).as("7.8.4 %s in %s", row[0], row[1])
+                    .isEqualTo(Boolean.parseBoolean(row[4]));
+            assertThat(NodeSemver.satisfies(row[0], row[1], v785)).as("7.8.5 %s in %s", row[0], row[1])
+                    .isEqualTo(Boolean.parseBoolean(row[5]));
+        }
+        // without includePrerelease the releases agree
+        assertThat(NodeSemver.validRange("~1.2", Options.DEFAULT.release(NodeSemver.Release.V7_8_5)))
+                .isEqualTo(">=1.2.0 <1.3.0-0");
+    }
+
     // test/functions/compare-build.js
     @Test
     void compareBuild() {

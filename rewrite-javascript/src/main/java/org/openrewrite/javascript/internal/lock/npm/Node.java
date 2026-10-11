@@ -129,6 +129,12 @@ public class Node {
         @Nullable
         String realpath;
 
+        /**
+         * The npm release that builds the tree the node is in, which arborist's nodes have no need to carry.
+         */
+        @Builder.Default
+        NpmRelease release = NpmRelease.PORTED;
+
         @Nullable
         Object resolved;
 
@@ -245,6 +251,9 @@ public class Node {
     @Getter
     private final @Nullable Node sourceReference;
 
+    @Getter(AccessLevel.PACKAGE)
+    private final NpmRelease release;
+
     Map<String, Object> pkg;
     private @Nullable Node parent;
     private @Nullable Node fsParent;
@@ -259,6 +268,7 @@ public class Node {
 
     @SuppressWarnings("unchecked")
     public Node(Options options) {
+        this.release = options.getRelease();
         this.errors = new ArrayList<>();
         if (options.getError() != null) {
             this.errors.add(options.getError());
@@ -341,10 +351,10 @@ public class Node {
         }
 
         for (Options c : options.getChildren()) {
-            new Node(c.toBuilder().parent(this).build());
+            new Node(c.toBuilder().parent(this).release(release).build());
         }
         for (Options c : options.getFsChildren()) {
-            new Node(c.toBuilder().fsParent(this).build());
+            new Node(c.toBuilder().fsParent(this).release(release).build());
         }
 
         loadDeps();
@@ -1094,7 +1104,7 @@ public class Node {
         Spec parsed = Spec.npa(requested);
         String name = parsed.getName() != null ? parsed.getName() : this.name;
         return Objects.equals(this.name, name) && satisfies(new Edge(
-                new Node(options().path(getRoot().realpath).build()),
+                new Node(options().path(getRoot().realpath).release(release).build()),
                 Edge.Type.PROD, name, parsed.getRawSpec()));
     }
 

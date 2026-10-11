@@ -258,7 +258,7 @@ public final class PlaceDep {
 
         for (Node p = target; p != null; p = p.getResolveParent()) {
             if (p.matches(dep) && !p.isTop()) {
-                placed = new Link(Node.options().parent(target).target(p).build());
+                placed = new Link(Node.options().parent(target).target(p).release(options.getRelease()).build());
                 return;
             }
         }
@@ -271,6 +271,7 @@ public final class PlaceDep {
                 .integrity(dep.getIntegrity())
                 .installLinks(options.isInstallLinks())
                 .legacyPeerDeps(options.isLegacyPeerDeps())
+                .release(options.getRelease())
                 .error(dep.getErrors().isEmpty() ? null : dep.getErrors().get(0));
         if (dep.getOverrides() != null) {
             placedOptions.overrides(dep.getOverrides());

@@ -81,15 +81,20 @@ final class NpmInstallChecks {
     private NpmInstallChecks() {
     }
 
+    /**
+     * @param release the npm that bundles the library, for the node-semver it reads an engine's range with
+     */
     static void checkEngine(Map<String, Object> target, @Nullable String npmVer, @Nullable String nodeVer,
-                            boolean force) {
+                            boolean force, NpmRelease release) {
         String nodev = force ? null : nodeVer;
         Object eng = target.get("engines");
         if (!truthy(eng)) {
             return;
         }
-        boolean nodeFail = truthy(nodev) && truthy(Js.get(eng, "node")) && !satisfies(nodev, Js.get(eng, "node"));
-        boolean npmFail = truthy(npmVer) && truthy(Js.get(eng, "npm")) && !satisfies(npmVer, Js.get(eng, "npm"));
+        boolean nodeFail = truthy(nodev) && truthy(Js.get(eng, "node")) &&
+                           !satisfies(nodev, Js.get(eng, "node"), release);
+        boolean npmFail = truthy(npmVer) && truthy(Js.get(eng, "npm")) &&
+                          !satisfies(npmVer, Js.get(eng, "npm"), release);
         if (nodeFail || npmFail) {
             Map<String, @Nullable String> current = new LinkedHashMap<>();
             current.put("node", nodeVer);
@@ -98,8 +103,8 @@ final class NpmInstallChecks {
         }
     }
 
-    private static boolean satisfies(String version, @Nullable Object range) {
-        return NodeSemver.satisfies(version, range, NodeSemver.Options.INCLUDE_PRERELEASE);
+    private static boolean satisfies(String version, @Nullable Object range, NpmRelease release) {
+        return NodeSemver.satisfies(version, range, NodeSemver.Options.INCLUDE_PRERELEASE.release(release.semver()));
     }
 
     /**
