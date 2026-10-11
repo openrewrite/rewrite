@@ -17,8 +17,6 @@ package org.openrewrite.javascript.internal.lock.npm;
 
 import org.jspecify.annotations.Nullable;
 
-import java.util.LinkedHashSet;
-import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -27,18 +25,15 @@ import java.util.regex.Pattern;
  * asked here, one question per upstream change, named for what npm does and answered by the release that changed it.
  * The ported modules read as 11.17.0's source with each other release's branch beside it.
  * <p>
- * Every question is answered through {@link #atLeast}, and nothing else reads the version: a release that is
- * {@linkplain #followed() followed} notes each release it was compared with, so that another release giving the same
- * answers ({@link #answersAs}) is known to install the project the same way without installing it again. The one
- * exception is the version's text, npm's own version ({@link NpmOptions#getNpmVersion()}), which an install holds
- * ranges to: {@link NpmLockRegenerator} holds the releases an install stands for to those ranges as well.
+ * Every question is answered through {@link #atLeast}, and nothing else reads the version but npm's own version
+ * ({@link NpmOptions#getNpmVersion()}), which {@code engines.npm} and {@code devEngines.packageManager} hold npm to.
  */
 public final class NpmRelease implements Comparable<NpmRelease> {
 
     /**
      * The release the port follows, and the one an install runs as when nothing names another.
      */
-    public static final NpmRelease PORTED = new NpmRelease(11, 17, 0, null);
+    public static final NpmRelease PORTED = new NpmRelease(11, 17, 0);
 
     private static final Pattern VERSION = Pattern.compile("(\\d+)\\.(\\d+)\\.(\\d+)");
 
@@ -46,14 +41,10 @@ public final class NpmRelease implements Comparable<NpmRelease> {
     private final int minor;
     private final int patch;
 
-    // the releases an install compared this one with; null when its answers are not being noted
-    private final @Nullable Set<NpmRelease> asked;
-
-    private NpmRelease(int major, int minor, int patch, @Nullable Set<NpmRelease> asked) {
+    private NpmRelease(int major, int minor, int patch) {
         this.major = major;
         this.minor = minor;
         this.patch = patch;
-        this.asked = asked;
     }
 
     /**
@@ -64,42 +55,14 @@ public final class NpmRelease implements Comparable<NpmRelease> {
         if (!m.matches()) {
             throw new IllegalArgumentException("not an npm release: " + version);
         }
-        return new NpmRelease(Integer.parseInt(m.group(1)), Integer.parseInt(m.group(2)), Integer.parseInt(m.group(3)),
-                null);
-    }
-
-    /**
-     * This release, noting from here on every release an install compares it with.
-     */
-    public NpmRelease followed() {
-        return new NpmRelease(major, minor, patch, new LinkedHashSet<>());
-    }
-
-    /**
-     * Whether this release answers every question {@code followed} was asked as it did: an install that asked
-     * nothing else of its release runs the same under both.
-     */
-    public boolean answersAs(NpmRelease followed) {
-        if (followed.asked == null) {
-            return equals(followed);
-        }
-        for (NpmRelease threshold : followed.asked) {
-            if (compareTo(threshold) >= 0 != followed.compareTo(threshold) >= 0) {
-                return false;
-            }
-        }
-        return true;
+        return new NpmRelease(Integer.parseInt(m.group(1)), Integer.parseInt(m.group(2)), Integer.parseInt(m.group(3)));
     }
 
     /**
      * Whether this is the given release or a later one: the one way a ported module asks about its release.
      */
     public boolean atLeast(int major, int minor, int patch) {
-        NpmRelease threshold = new NpmRelease(major, minor, patch, null);
-        if (asked != null) {
-            asked.add(threshold);
-        }
-        return compareTo(threshold) >= 0;
+        return compareTo(new NpmRelease(major, minor, patch)) >= 0;
     }
 
     // @npmcli/config definitions.js

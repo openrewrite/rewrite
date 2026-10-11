@@ -304,20 +304,6 @@ class NpmInstallChecksTest {
           .doesNotThrowAnyException();
     }
 
-    // an engines.npm as checkEngine reads it, for the release an install runs as and the ones it stands for
-    @Test
-    void anNpmReleaseIsHeldToARangeOfEnginesNpm() {
-        NpmRelease npm = NpmRelease.of("11.17.0");
-
-        assertThat(NpmInstallChecks.npmSatisfies(npm, "^11.17.0")).isTrue();
-        assertThat(NpmInstallChecks.npmSatisfies(npm, ">=12 || 11.17")).isTrue();
-        assertThat(NpmInstallChecks.npmSatisfies(npm, "")).isTrue();
-        assertThat(NpmInstallChecks.npmSatisfies(npm, "^11.17.1")).isFalse();
-        // no range, which checkEngine reports as an engine the release does not satisfy
-        assertThat(NpmInstallChecks.npmSatisfies(npm, "eleven")).isFalse();
-        assertThat(NpmInstallChecks.npmSatisfies(npm, true)).isFalse();
-    }
-
     // test/check-dev-engines.js, whose environment is a plain object by engine
 
     private static List<NpmInstallChecks.InvalidDevEngine> devEngines(@Nullable Object wanted, String current) {

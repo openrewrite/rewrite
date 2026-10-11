@@ -152,14 +152,6 @@ final class NpmInstallChecks {
     }
 
     /**
-     * Whether npm {@code release} is in the range an {@code engines.npm} holds npm to, as {@link #checkEngine}
-     * compares the two.
-     */
-    static boolean npmSatisfies(NpmRelease release, @Nullable Object range) {
-        return satisfies(release.toString(), range);
-    }
-
-    /**
      * @param environment the {@code os}, {@code cpu} and {@code libc} the caller overrides, if any
      * @param current     the machine's own
      */

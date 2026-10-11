@@ -75,8 +75,7 @@ public class NpmOptions {
 
     /**
      * {@code npmVersion}, npm's own version: what {@code engines.npm} and {@code devEngines.packageManager} are held
-     * to. It is the one text of the release an install reads, and the thresholds a followed release notes say nothing
-     * of the ranges compared with it.
+     * to, and the one place an install reads the release's text.
      */
     public String getNpmVersion() {
         return release.toString();

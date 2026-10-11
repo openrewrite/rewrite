@@ -20,11 +20,9 @@ import lombok.Getter;
 import lombok.NonNull;
 import lombok.Singular;
 import lombok.Value;
-import lombok.With;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.javascript.internal.LockFileRegeneration.Failure;
 import org.openrewrite.javascript.internal.LockFileRegeneration.InstallRoot;
-import org.openrewrite.javascript.internal.LockFileRegeneration.Kind;
 import org.openrewrite.javascript.internal.LockFileRegeneration.Reason;
 import org.openrewrite.javascript.internal.LockFileRegeneration.Result;
 import org.openrewrite.javascript.internal.lock.CannotKnow;
@@ -40,7 +38,6 @@ import org.openrewrite.javascript.internal.registry.NodeRegistryException;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Collections;
-import java.util.IdentityHashMap;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -54,10 +51,6 @@ import static org.openrewrite.javascript.internal.lock.npm.Js.truthy;
  * Port of @npmcli/arborist lib/arborist/index.js and reify.js (npm 11.17.0) for {@code npm install
  * --package-lock-only}, after the {@code devEngines} check of npm's lib/base-cmd.js; the lock written must come back
  * unchanged from a second install, or that install is reported.
- * <p>
- * A project is installed as the npm release it names. One that names none is installed as every release the engine
- * reproduces that its package.json allows, once for the releases that answer alike whatever an install asks of its
- * release: the result is the lock they all write, or that the release which installs the project cannot be known.
  */
 public final class NpmLockRegenerator {
 
@@ -68,12 +61,10 @@ public final class NpmLockRegenerator {
     @Builder
     public static class Inputs {
         /**
-         * The npm release that installs the project, when the caller knows it; null to install it as each release its
-         * package.json allows ({@link NpmReleases#candidates}), which must agree.
+         * The npm release that installs the project: the one that built its LST ({@link NpmReleases#installedAs}).
          */
-        @Nullable
-        @With
-        NpmRelease release;
+        @Builder.Default
+        NpmRelease release = NpmRelease.PORTED;
 
         /**
          * The package-lock.json; null when the project has none.
@@ -162,317 +153,17 @@ public final class NpmLockRegenerator {
         }
     }
 
-    /**
-     * One install of the project as a release, and the candidates it stands for: each of them answers what the install
-     * asked of its release as that release did ({@link NpmRelease#answersAs}), and satisfies alike every range the
-     * install could have held npm's version to, so it installs the project the same way.
-     */
-    @Getter
-    static final class Install {
-        /**
-         * The release installed as, {@linkplain NpmRelease#followed() followed}.
-         */
-        private final NpmRelease release;
-
-        private final Result result;
-
-        /**
-         * Whether npm rejects the project because of the release itself: {@code EBADDEVENGINES} for the package
-         * manager, or {@code EBADENGINE} on the root package for its range of npm.
-         */
-        private final boolean refusing;
-
-        /**
-         * npm's code for the error that ended the install; null without one.
-         */
-        private final @Nullable String code;
-
-        /**
-         * The ranges the install could have held npm's version to: every {@code engines.npm} of the project's
-         * manifests, of the lock it started from and of the registry documents it read. More than it compared, which
-         * can only cost another install.
-         */
-        private final Set<String> npmRanges;
-
-        /**
-         * The {@code devEngines} of the package.json where npm installs, whose check reads npm's version too.
-         */
-        private final @Nullable Object devEngines;
-
-        private final List<NpmRelease> candidates = new ArrayList<>();
-
-        Install(NpmRelease release, Result result, boolean refusing, @Nullable String code, Set<String> npmRanges,
-                @Nullable Object devEngines) {
-            this.release = release;
-            this.result = result;
-            this.refusing = refusing;
-            this.code = code;
-            this.npmRanges = npmRanges;
-            this.devEngines = devEngines;
-        }
-
-        boolean standsFor(NpmRelease candidate) {
-            if (!candidate.answersAs(release)) {
-                return false;
-            }
-            // the install is over: comparing its release from here on notes nothing more of it
-            NpmRelease installed = NpmRelease.of(release.toString());
-            for (String range : npmRanges) {
-                if (NpmInstallChecks.npmSatisfies(candidate, range) !=
-                    NpmInstallChecks.npmSatisfies(installed, range)) {
-                    return false;
-                }
-            }
-            return NpmReleases.devEnginesRefuse(devEngines, candidate) ==
-                   NpmReleases.devEnginesRefuse(devEngines, installed);
-        }
-    }
-
-    /**
-     * The registry as one install reads it. Each document is the install's own copy, since an install normalizes what
-     * it reads in place and the next one, as another release, reads the registry's own; the ranges of npm a document
-     * names are noted as it is first read.
-     */
-    private static final class InstallRegistry implements PackumentSource {
-        private final PackumentSource source;
-        private final Set<String> npmRanges;
-        private final Map<Map<String, Object>, Map<String, Object>> read = new IdentityHashMap<>();
-
-        InstallRegistry(PackumentSource source, Set<String> npmRanges) {
-            this.source = source;
-            this.npmRanges = npmRanges;
-        }
-
-        @Override
-        public Map<String, Object> packument(String registry, String name, boolean fullMetadata) {
-            return own(source.packument(registry, name, fullMetadata));
-        }
-
-        @Override
-        public Map<String, Object> manifest(String registry, String name, String version) {
-            return own(source.manifest(registry, name, version));
-        }
-
-        @SuppressWarnings("unchecked")
-        private Map<String, Object> own(Map<String, Object> document) {
-            Map<String, Object> own = read.get(document);
-            if (own == null) {
-                own = (Map<String, Object>) Objects.requireNonNull(Js.jsonValue(document));
-                read.put(document, own);
-                noteNpmRanges(own, npmRanges);
-            }
-            return own;
-        }
-    }
-
     private static final LockOnlyInstall INSTALL = LockOnlyInstall.NPM;
 
     private final Inputs inputs;
     private final PackumentSource registry;
-
-    // of an install as one release: its first build and what ended it, which tell an npm refusing its own version
-    private @Nullable IdealTreeBuilder built;
-    private @Nullable RuntimeException ended;
 
     public NpmLockRegenerator(Inputs inputs, PackumentSource registry) {
         this.inputs = inputs;
         this.registry = registry;
     }
 
-    /**
-     * The lock npm writes for the project, or why there is none: installed as the release the inputs name, else as
-     * each release its package.json allows that the engine reproduces, for one result ({@link #result}).
-     */
     public Result regenerate() {
-        List<NpmRelease> candidates;
-        try {
-            candidates = inputs.getRelease() != null ? Collections.singletonList(inputs.getRelease()) :
-                    NpmReleases.candidates(localPackage(inputs.getManifests().get("")));
-        } catch (CannotKnow e) {
-            return Result.failure(failure(e));
-        }
-        return regenerate(candidates);
-    }
-
-    /**
-     * {@link #regenerate()} for a project installed as {@code candidates}, newest first.
-     */
-    Result regenerate(List<NpmRelease> candidates) {
-        return result(installs(candidates));
-    }
-
-    /**
-     * Installs the project as each of {@code candidates} that no install already done stands for, in their order.
-     * The installs share the registry's documents, each fetched once.
-     */
-    List<Install> installs(List<NpmRelease> candidates) {
-        Set<String> projectRanges = new LinkedHashSet<>();
-        for (String manifest : inputs.getManifests().values()) {
-            noteNpmRanges(parsed(manifest), projectRanges);
-        }
-        noteNpmRanges(parsed(inputs.getLock()), projectRanges);
-        Object devEngines = localPackage(inputs.getManifests().get("")).get("devEngines");
-
-        List<Install> installs = new ArrayList<>();
-        for (NpmRelease candidate : candidates) {
-            Install standing = null;
-            for (Install install : installs) {
-                if (install.standsFor(candidate)) {
-                    standing = install;
-                    break;
-                }
-            }
-            if (standing == null) {
-                NpmRelease release = candidate.followed();
-                Set<String> npmRanges = new LinkedHashSet<>(projectRanges);
-                NpmLockRegenerator install = new NpmLockRegenerator(inputs.withRelease(release),
-                        new InstallRegistry(registry, npmRanges));
-                Result result = install.install();
-                standing = new Install(release, result, install.refusesItsOwnVersion(), install.code(), npmRanges,
-                        devEngines);
-                installs.add(standing);
-            }
-            standing.getCandidates().add(candidate);
-        }
-        return installs;
-    }
-
-    // every range a document holds npm's version to: the engines.npm of each object in it
-    private static void noteNpmRanges(@Nullable Object document, Set<String> npmRanges) {
-        if (document instanceof Map) {
-            Object engines = ((Map<?, ?>) document).get("engines");
-            Object npm = engines instanceof Map ? ((Map<?, ?>) engines).get("npm") : null;
-            if (npm instanceof String) {
-                npmRanges.add((String) npm);
-            }
-            for (Object value : ((Map<?, ?>) document).values()) {
-                noteNpmRanges(value, npmRanges);
-            }
-        } else if (document instanceof List) {
-            for (Object element : (List<?>) document) {
-                noteNpmRanges(element, npmRanges);
-            }
-        }
-    }
-
-    // a manifest or a lock as an install reads it; null where it does not parse, and names no range
-    private static @Nullable Object parsed(@Nullable String json) {
-        try {
-            return json == null ? null : JsonParseEvenBetterErrors.parse(json).getValue();
-        } catch (JsonParseEvenBetterErrors.JsonParseException e) {
-            return null;
-        }
-    }
-
-    // EBADDEVENGINES whose engine is the package manager, or EBADENGINE on the root package where the range of npm is
-    // what the release does not satisfy
-    private boolean refusesItsOwnVersion() {
-        if (ended instanceof BadDevEngines) {
-            return "packageManager".equals(((BadDevEngines) ended).getEngine());
-        }
-        Node root = built == null ? null : built.getIdealTree();
-        NpmRelease release = inputs.getRelease();
-        if (ended instanceof NpmInstallChecks.UnsupportedEngine && root != null && release != null) {
-            Object engines = ((NpmInstallChecks.UnsupportedEngine) ended).getRequired();
-            return engines == root.getPackage().get("engines") && truthy(Js.get(engines, "npm")) &&
-                   !NpmInstallChecks.npmSatisfies(release, Js.get(engines, "npm"));
-        }
-        return false;
-    }
-
-    // npm's code for the error that ended the install
-    private @Nullable String code() {
-        RuntimeException outcome = ended == null ? null : outcome(ended);
-        return outcome instanceof Rejected ? ((Rejected) outcome).getCode() : null;
-    }
-
-    /**
-     * The one result of the installs, the newest release's first. An npm that refuses the project for its own version
-     * is not the npm that installs it: those are left out, unless every one refuses, when the newest one's rejection
-     * is the result. Of the rest, the result is the newest one's failure when every one fails and the lock when every
-     * one writes the same; otherwise the release that installs the project cannot be known.
-     */
-    static Result result(List<Install> installs) {
-        if (installs.isEmpty()) {
-            throw new IllegalArgumentException("no npm release to install as");
-        }
-        List<Install> rest = new ArrayList<>();
-        for (Install install : installs) {
-            if (!install.isRefusing()) {
-                rest.add(install);
-            }
-        }
-        if (rest.isEmpty()) {
-            return installs.get(0).getResult();
-        }
-        Result newest = rest.get(0).getResult();
-        boolean anyInstalls = false;
-        boolean same = true;
-        for (Install install : rest) {
-            anyInstalls |= install.getResult().isSuccess();
-            same &= install.getResult().equals(newest);
-        }
-        if (!anyInstalls || same) {
-            return newest;
-        }
-        // "no single release": a devEngines.packageManager whose range holds releases that differ names several
-        return Result.failure(failure(new CannotKnow("the npm release that installs the project: " +
-                differences(rest) + "; package.json names no single release in packageManager or " +
-                "devEngines.packageManager")));
-    }
-
-    // which releases come to which outcome, each outcome's releases as ranges: "npm 12.0.0 - 12.2.0 rejects it
-    // (EALLOWGIT) and npm 11.17.0 installs it", or "npm 10.8.0 - 12.2.0 writes one lock and npm 10.0.0 - 10.7.0
-    // another"
-    private static String differences(List<Install> installs) {
-        // the installs by outcome: the lock and files written, or a failure's kind and code
-        Map<Object, List<Install>> outcomes = new LinkedHashMap<>();
-        boolean anyFails = false;
-        for (Install install : installs) {
-            Failure failure = install.getResult().getFailure();
-            anyFails |= failure != null;
-            outcomes.computeIfAbsent(failure == null ? install.getResult() :
-                    failure.getKind() + " " + install.getCode(), outcome -> new ArrayList<>()).add(install);
-        }
-        List<String> differences = new ArrayList<>();
-        int locks = 0;
-        for (List<Install> alike : outcomes.values()) {
-            List<NpmRelease> releases = new ArrayList<>();
-            for (Install install : alike) {
-                releases.addAll(install.getCandidates());
-            }
-            String npm = "npm " + NpmReleases.ranges(releases);
-            Failure failure = alike.get(0).getResult().getFailure();
-            if (failure != null) {
-                differences.add(failed(npm, failure.getKind(), alike.get(0).getCode()));
-            } else if (anyFails) {
-                differences.add(npm + (locks++ == 0 ? " installs it" : " installs it with another lock"));
-            } else {
-                differences.add(npm + (locks++ == 0 ? " writes one lock" : " another"));
-            }
-        }
-        String last = differences.remove(differences.size() - 1);
-        return String.join(", ", differences) + " and " + last;
-    }
-
-    // how a failure reads beside the other outcomes
-    private static String failed(String npm, Kind kind, @Nullable String code) {
-        switch (kind) {
-            case PM_REJECTS:
-                return npm + " rejects it" + (code == null ? "" : " (" + code + ")");
-            case PM_FAILS:
-                return npm + " fails on it";
-            case SECOND_INSTALL:
-                return npm + " writes a lock its second install does not keep";
-            case CANNOT_KNOW:
-            default:
-                return "what " + npm + " writes cannot be known";
-        }
-    }
-
-    // one install as the release of the inputs, which installs() names, and the second install over the lock it writes
-    private Result install() {
-        Objects.requireNonNull(inputs.getRelease(), "an install runs as a release");
         NpmOptions options;
         String path;
         String written;
@@ -506,7 +197,6 @@ public final class NpmLockRegenerator {
         } catch (NodeRegistryException e) {
             throw e;
         } catch (RuntimeException e) {
-            ended = e;
             return Result.failure(failure(e));
         }
         Result verified = INSTALL.verify(written, lock -> {
@@ -670,11 +360,7 @@ public final class NpmLockRegenerator {
     }
 
     private IdealTreeBuilder arborist(String path, VirtualTreeLoader.ProjectFiles files, NpmOptions options) {
-        IdealTreeBuilder arb = new IdealTreeBuilder(path, files, options, registry, inputs.getHost(), inputs.getNow());
-        if (built == null) {
-            built = arb;
-        }
-        return arb;
+        return new IdealTreeBuilder(path, files, options, registry, inputs.getHost(), inputs.getNow());
     }
 
     // reify.js #saveIdealTree: the lock takes the indent of the root package.json, two spaces when it has none

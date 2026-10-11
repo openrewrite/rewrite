@@ -24,6 +24,7 @@ import org.openrewrite.marker.Markers;
 import org.openrewrite.marker.Markup;
 import org.openrewrite.javascript.marker.NodeResolutionResult;
 import org.openrewrite.javascript.marker.NodeResolutionResult.Dependency;
+import org.openrewrite.javascript.marker.NodeRuntime;
 import org.openrewrite.json.JsonParser;
 import org.openrewrite.json.tree.Json;
 import org.openrewrite.json.tree.JsonRightPadded;
@@ -1012,6 +1013,7 @@ public class PackageJsonHelper {
                 .packageJson(content)
                 .lock(capturedLockContent)
                 .marker(marker)
+                .runtime(packageJson.getMarkers().findFirst(NodeRuntime.class).orElse(null))
                 .packageJsonPath(packageJson.getSourcePath())
                 .manifests(projectFiles.getManifests())
                 .packageManagerFiles(projectFiles.getPackageManagerFiles())
