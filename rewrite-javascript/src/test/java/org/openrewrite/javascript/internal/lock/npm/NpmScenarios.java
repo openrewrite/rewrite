@@ -32,6 +32,7 @@ import java.nio.file.Path;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
@@ -46,12 +47,15 @@ import java.util.stream.Stream;
 /**
  * The recorded npm scenarios under {@code lock/npm/} on the test classpath and under the directory {@code
  * REWRITE_LOCK_SCENARIOS} names, in the recorder's layout; {@code REWRITE_LOCK_HTTP_CACHE} is the registry fallback.
+ * A scenario's {@code releases} file names the npm releases that write its recorded outcome, and each {@code
+ * release/<first>/} holds another outcome with the releases that write it.
  */
 final class NpmScenarios {
 
     private static final Pattern LOCK = Pattern.compile("^(?:before|after|fresh)(?:-(.+))?$");
     private static final Pattern LOCK_FILE = Pattern.compile("^(before|after|fresh|again)(?:-(.+))?$");
     private static final Set<String> NOT_LOCKS = new HashSet<>(Arrays.asList("yarn", "npm", "npmrc"));
+    private static final Pattern NPM_VERSION = Pattern.compile("npm (\\d+\\.\\d+\\.\\d+)");
     private static final Pattern NODE_VERSION = Pattern.compile("node (v[0-9.]+)");
     private static final Pattern RECORDED_AT = Pattern.compile("after exit=-?\\d+ at ([^,\\s]+)");
     private static final Pattern PLATFORM = Pattern.compile("platform os=(\\S+) cpu=(\\S+) libc=(\\S*)");
@@ -160,7 +164,8 @@ final class NpmScenarios {
             if (scenario.has(fileName + "-again")) {
                 return scenario.file(fileName + "-again");
             }
-            return resource("lock/npm-again/" + scenario.getName() + "/" + fileName);
+            return scenario.isRecordedOutcome() ? resource("lock/npm-again/" + scenario.getName() + "/" + fileName) :
+              null;
         }
 
         /**
@@ -214,12 +219,28 @@ final class NpmScenarios {
         private final String startFile;
         private final @Nullable String resultFile;
         private final String manifestFile;
+        private final String expectFile;
 
         Edit(Scenario scenario, String startFile, @Nullable String resultFile, String manifestFile) {
+            this(scenario, startFile, resultFile, manifestFile, "expect");
+        }
+
+        Edit(Scenario scenario, String startFile, @Nullable String resultFile, String manifestFile,
+             String expectFile) {
             this.scenario = scenario;
             this.startFile = startFile;
             this.resultFile = resultFile;
             this.manifestFile = manifestFile;
+            this.expectFile = expectFile;
+        }
+
+        /**
+         * The edit's own {@code expect} line, trimmed; null for a lock byte for byte.
+         */
+        @Nullable
+        String expect() {
+            String expect = scenario.file(expectFile);
+            return expect == null ? null : expect.trim();
         }
 
         // the locks are read on demand: holding every corpus edit's text at once does not fit a test JVM
@@ -265,24 +286,162 @@ final class NpmScenarios {
     static final class Scenario extends LockScenario {
 
         /**
+         * The start of a release's edit over the lock the recording release wrote: the scenario's own {@code before}.
+         */
+        static final String RECORDED_BEFORE = "before@recorded";
+
+        // what a scenario is given; every other file is what a release wrote for it
+        private static final Set<String> INPUTS = new HashSet<>(Arrays.asList("pkg-before", "pkg", "pkg-after", "npmrc",
+          "npmrc-before", "args-before", "args-after", "about", "user-npmrc", "user-npmrc-before", "before-input",
+          "supersedes"));
+
+        /**
          * Every root scenarios are discovered under: a scenario's registry responses may sit under its name in
          * another root ({@code <root>/<name>/http/}) when its own directory is read-only.
          */
         @Getter
         private final List<Path> roots;
 
+        /**
+         * The release this replay runs as; null for the scenario as it was recorded.
+         */
+        private final @Nullable NpmRelease replayedAs;
+
+        /**
+         * Where the outcome that release writes is kept: the scenario's own directory, or its {@code
+         * release/<first>/}, which holds what the release wrote and none of the scenario's inputs.
+         */
+        private final Path outcome;
+
         Scenario(String name, String label, Path dir, @Nullable Path httpCache, List<Path> roots) {
+            this(name, label, dir, httpCache, roots, null, dir);
+        }
+
+        private Scenario(String name, String label, Path dir, @Nullable Path httpCache, List<Path> roots,
+                         @Nullable NpmRelease replayedAs, Path outcome) {
             super(name, label, dir, httpCache);
             this.roots = roots;
+            this.replayedAs = replayedAs;
+            this.outcome = outcome;
+        }
+
+        /**
+         * The npm release that installs the scenario: the one this replay runs as, else the one that recorded it.
+         */
+        NpmRelease release() {
+            if (replayedAs != null) {
+                return replayedAs;
+            }
+            String recordedWith = recordedWith();
+            Matcher m = recordedWith == null ? null : NPM_VERSION.matcher(recordedWith);
+            return m != null && m.find() ? NpmRelease.of(m.group(1)) : NpmRelease.PORTED;
+        }
+
+        /**
+         * Whether the outcome is the scenario's own recording rather than another release's.
+         */
+        boolean isRecordedOutcome() {
+            return outcome.equals(getDir());
+        }
+
+        /**
+         * This scenario replayed as each release its {@code releases} files name: the first and last of every range
+         * of the scenario's own outcome, and of each other outcome under {@code release/}.
+         */
+        List<Scenario> releases() {
+            List<Scenario> replays = new ArrayList<>();
+            NpmRelease recorded = release();
+            for (NpmRelease release : endpoints(getDir().resolve("releases"))) {
+                if (!release.equals(recorded)) {
+                    replays.add(replay(release, getDir()));
+                }
+            }
+            Path others = getDir().resolve("release");
+            if (Files.isDirectory(others)) {
+                try (Stream<Path> list = Files.list(others)) {
+                    list.filter(Files::isDirectory).sorted().forEach(dir -> {
+                        for (NpmRelease release : endpoints(dir.resolve("releases"))) {
+                            replays.add(replay(release, dir));
+                        }
+                    });
+                } catch (IOException e) {
+                    throw new UncheckedIOException(e);
+                }
+            }
+            return replays;
+        }
+
+        private Scenario replay(NpmRelease release, Path outcome) {
+            return new Scenario(getName(), getLabel() + "@" + release, getDir(), getHttpCache(), roots, release,
+              outcome);
+        }
+
+        // "10.0.0 - 10.9.9" or "12.0.0", one range a line
+        private static List<NpmRelease> endpoints(Path releases) {
+            List<NpmRelease> endpoints = new ArrayList<>();
+            if (Files.isRegularFile(releases)) {
+                for (String line : read(releases).split("\n")) {
+                    for (String release : line.trim().split("\\s+-\\s+")) {
+                        if (!release.isEmpty() && !endpoints.contains(NpmRelease.of(release))) {
+                            endpoints.add(NpmRelease.of(release));
+                        }
+                    }
+                }
+            }
+            return endpoints;
+        }
+
+        private Path where(String file) {
+            return isRecordedOutcome() || INPUTS.contains(file) ? getDir() : outcome;
+        }
+
+        @Override
+        public boolean has(String file) {
+            return RECORDED_BEFORE.equals(file) ? Files.isRegularFile(getDir().resolve("before")) :
+              Files.isRegularFile(where(file).resolve(file));
+        }
+
+        @Override
+        public @Nullable String file(String file) {
+            if (!has(file)) {
+                return null;
+            }
+            return read(RECORDED_BEFORE.equals(file) ? getDir().resolve("before") : where(file).resolve(file));
+        }
+
+        @Override
+        public List<String> files() {
+            List<String> own = super.files();
+            if (isRecordedOutcome()) {
+                return own;
+            }
+            List<String> names = new ArrayList<>();
+            for (String name : own) {
+                if (INPUTS.contains(name)) {
+                    names.add(name);
+                }
+            }
+            try (Stream<Path> list = Files.list(outcome)) {
+                list.filter(Files::isRegularFile).forEach(p -> names.add(p.getFileName().toString()));
+            } catch (IOException e) {
+                throw new UncheckedIOException(e);
+            }
+            Collections.sort(names);
+            return names;
         }
 
         /**
          * The edits the scenario records: one per {@code before} lock (and its {@code -v2} and similar
-         * variants), or from {@code before-input} when that is the only start.
+         * variants), or from {@code before-input} when that is the only start; for another release's outcome, also
+         * its edit over the scenario's own {@code before} ({@code cross}).
          */
         List<Edit> edits() {
             List<Edit> edits = new ArrayList<>();
             List<String> files = files();
+            if (!isRecordedOutcome() && (has("cross") || has("expect-cross")) && has(RECORDED_BEFORE)) {
+                edits.add(new Edit(this, RECORDED_BEFORE, has("cross") ? "cross" : null, pkgFile(""),
+                  "expect-cross"));
+            }
             for (String start : files) {
                 Matcher m = LOCK_FILE.matcher(start);
                 if (!m.matches() || !"before".equals(m.group(1)) || "before-again".equals(start) ||
@@ -505,6 +664,17 @@ final class NpmScenarios {
             LockScenario.collect(corpus, Integer.MAX_VALUE, NpmScenarios::isScenario, httpCache, factory, found);
         }
         return new ArrayList<>(found.values());
+    }
+
+    /**
+     * Every scenario replayed as each other release its {@code releases} files name.
+     */
+    static List<Scenario> discoverReleases() {
+        List<Scenario> replays = new ArrayList<>();
+        for (Scenario scenario : discover()) {
+            replays.addAll(scenario.releases());
+        }
+        return replays;
     }
 
     private static @Nullable Object parse(String json) {

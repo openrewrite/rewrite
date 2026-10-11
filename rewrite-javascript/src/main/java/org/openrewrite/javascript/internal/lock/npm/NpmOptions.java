@@ -68,6 +68,12 @@ public class NpmOptions {
     }
 
     /**
+     * The npm release that reads the configuration: its defaults, and what its arborist does with each option.
+     */
+    @Builder.Default
+    NpmRelease release = NpmRelease.PORTED;
+
+    /**
      * {@code lockfile-version}: the version to write, or null to keep the lock's own (v1 is upgraded).
      */
     @Nullable
@@ -146,10 +152,10 @@ public class NpmOptions {
     List<String> omit = Collections.emptyList();
 
     /**
-     * {@code allow-git}: {@code all}, {@code none} or {@code root}.
+     * {@code allow-git}: {@code all}, {@code none} or {@code root}; null for the release's default.
      */
-    @Builder.Default
-    String allowGit = "all";
+    @Nullable
+    String allowGit;
 
     @Builder.Default
     String allowFile = "all";
@@ -157,8 +163,19 @@ public class NpmOptions {
     @Builder.Default
     String allowDirectory = "all";
 
-    @Builder.Default
-    String allowRemote = "all";
+    /**
+     * {@code allow-remote}; null for the release's default.
+     */
+    @Nullable
+    String allowRemote;
+
+    public String getAllowGit() {
+        return allowGit != null ? allowGit : release.allowGitDefault();
+    }
+
+    public String getAllowRemote() {
+        return allowRemote != null ? allowRemote : release.allowRemoteDefault();
+    }
 
     /**
      * {@code registry}, {@code @scope:registry} and {@code scope}: where npm asks for a package's documents.
@@ -259,12 +276,12 @@ public class NpmOptions {
 
     /**
      * The options of the user's .npmrc (the host's registries) and a project's over it, each null without one, as
-     * npm's config loads them; a {@code ${VAR}} in a key read, or one it could expand to, is cannot-know.
+     * {@code release}'s config loads them; a {@code ${VAR}} in a key read, or one it could expand to, is cannot-know.
      */
-    public static NpmOptions fromNpmrc(@Nullable String userNpmrc, @Nullable String npmrc) {
+    public static NpmOptions fromNpmrc(NpmRelease release, @Nullable String userNpmrc, @Nullable String npmrc) {
         // npm reads no file that sets a variable, and the host does not know the environment npm runs in
         HostEnvironment env = HostEnvironment.UNKNOWN;
-        NpmOptionsBuilder options = builder();
+        NpmOptionsBuilder options = builder().release(release);
         Map<String, String> scopedRegistries = new LinkedHashMap<>();
         Object omit = null;
         Object include = null;

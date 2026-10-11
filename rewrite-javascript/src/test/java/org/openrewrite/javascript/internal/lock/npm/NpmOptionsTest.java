@@ -36,7 +36,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 class NpmOptionsTest {
 
     private static NpmOptions fromNpmrc(@Nullable String npmrc) {
-        return NpmOptions.fromNpmrc(null, npmrc);
+        return NpmOptions.fromNpmrc(NpmRelease.PORTED, null, npmrc);
     }
 
     @Test
@@ -91,11 +91,11 @@ class NpmOptionsTest {
     void theHostsRegistriesAreTheUserConfigUnderTheProjectsNpmrc() {
         String user = "registry=https://registry.npmmirror.com/\n@types:registry=https://registry.npmmirror.com/\n";
 
-        NpmOptions userOnly = NpmOptions.fromNpmrc(user, null);
+        NpmOptions userOnly = NpmOptions.fromNpmrc(NpmRelease.PORTED, user, null);
         assertThat(userOnly.registryFor("ms")).isEqualTo("https://registry.npmmirror.com/");
         assertThat(userOnly.registryFor("@types/ms")).isEqualTo("https://registry.npmmirror.com/");
 
-        NpmOptions project = NpmOptions.fromNpmrc(user, "registry=https://registry.yarnpkg.com/\n");
+        NpmOptions project = NpmOptions.fromNpmrc(NpmRelease.PORTED, user, "registry=https://registry.yarnpkg.com/\n");
         assertThat(project.registryFor("ms")).isEqualTo("https://registry.yarnpkg.com/");
         assertThat(project.registryFor("@types/ms")).isEqualTo("https://registry.npmmirror.com/");
         assertThat(fromNpmrc("registry=https://registry.yarnpkg.com/\n").registryFor("@types/ms"))

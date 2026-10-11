@@ -56,6 +56,12 @@ public final class NpmLockRegenerator {
     @Builder
     public static class Inputs {
         /**
+         * The npm release that installs the project.
+         */
+        @Builder.Default
+        NpmRelease release = NpmRelease.PORTED;
+
+        /**
          * The package-lock.json; null when the project has none.
          */
         @Nullable
@@ -144,7 +150,7 @@ public final class NpmLockRegenerator {
             }
             CannotKnow.requireRead(inputs.getNpmrc(), inputs.getPaths(), ".npmrc");
             CannotKnow.requireRead(inputs.getYarnLock(), inputs.getPaths(), "yarn.lock");
-            options = NpmOptions.fromNpmrc(inputs.getUserNpmrc(), inputs.getNpmrc());
+            options = NpmOptions.fromNpmrc(inputs.getRelease(), inputs.getUserNpmrc(), inputs.getNpmrc());
             if (options.isGlobal()) {
                 throw new NpmRejection("ESHRINKWRAPGLOBAL", "cannot generate lockfile for global packages", null);
             }

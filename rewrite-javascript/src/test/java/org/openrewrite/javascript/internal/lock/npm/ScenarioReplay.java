@@ -56,8 +56,19 @@ final class ScenarioReplay {
     }
 
     static Stream<Arguments> edits() {
+        return edits(NpmScenarios.discover());
+    }
+
+    /**
+     * The edits of every scenario replayed as another release than the one that recorded it.
+     */
+    static Stream<Arguments> releaseEdits() {
+        return edits(NpmScenarios.discoverReleases());
+    }
+
+    private static Stream<Arguments> edits(List<NpmScenarios.Scenario> scenarios) {
         List<Arguments> out = new ArrayList<>();
-        for (NpmScenarios.Scenario scenario : NpmScenarios.discover()) {
+        for (NpmScenarios.Scenario scenario : scenarios) {
             for (NpmScenarios.Edit edit : scenario.edits()) {
                 out.add(Arguments.of(edit.toString(), edit));
             }
@@ -174,18 +185,19 @@ final class ScenarioReplay {
 
     static NpmOptions options(NpmScenarios.Scenario scenario) {
         String npmrc = scenario.npmrc() == null ? "" : scenario.npmrc() + "\n";
-        return NpmOptions.fromNpmrc(scenario.host().userNpmrc(HostInputs.GLOBAL_AND_USER),
+        return NpmOptions.fromNpmrc(scenario.release(), scenario.host().userNpmrc(HostInputs.GLOBAL_AND_USER),
                 npmrc + scenario.argsAfter());
     }
 
     static NpmOptions options(@Nullable String npmrc) {
-        return NpmOptions.fromNpmrc(null, npmrc);
+        return NpmOptions.fromNpmrc(NpmRelease.PORTED, null, npmrc);
     }
 
     static NpmLockRegenerator.Inputs inputs(NpmScenarios.Edit edit) {
         NpmScenarios.Scenario scenario = edit.getScenario();
         String npmrc = scenario.npmrc() == null ? "" : scenario.npmrc() + "\n";
         return NpmLockRegenerator.Inputs.builder()
+          .release(scenario.release())
           .lock(edit.getStart().getText())
           .yarnLock(edit.getInputs().getYarnLock())
           .manifests(edit.manifests())
