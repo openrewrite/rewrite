@@ -93,7 +93,7 @@ public final class OverrideSet {
         }
 
         if (parent != null) {
-            Spec spec = Spec.npa(key);
+            Spec spec = Spec.npa(key, null, release.npmPackageArg());
             if (spec.getName() == null || spec.getName().isEmpty()) {
                 throw new IllegalArgumentException("Override without name: " + key);
             }
@@ -172,7 +172,7 @@ public final class OverrideSet {
                 return rule;
             }
 
-            Spec spec = Spec.npa(edgeName + "@" + edgeSpec.get());
+            Spec spec = Spec.npa(edgeName + "@" + edgeSpec.get(), null, release.npmPackageArg());
             if (spec.getType() == Spec.Type.ALIAS) {
                 spec = spec.getSubSpec();
             }
@@ -324,8 +324,9 @@ public final class OverrideSet {
             }
 
             try {
-                Spec firstSpec = Spec.npa(firstRule.name + "@" + firstRule.value);
-                Spec secondSpec = Spec.npa(secondRule.name + "@" + secondRule.value);
+                Spec.Options npa = first.release.npmPackageArg();
+                Spec firstSpec = Spec.npa(firstRule.name + "@" + firstRule.value, null, npa);
+                Spec secondSpec = Spec.npa(secondRule.name + "@" + secondRule.value, null, npa);
                 if ((firstSpec.getType() == Spec.Type.RANGE || firstSpec.getType() == Spec.Type.VERSION) &&
                     (secondSpec.getType() == Spec.Type.RANGE || secondSpec.getType() == Spec.Type.VERSION)) {
                     if (!NodeSemver.intersects(firstSpec.getFetchSpec(), secondSpec.getFetchSpec(),

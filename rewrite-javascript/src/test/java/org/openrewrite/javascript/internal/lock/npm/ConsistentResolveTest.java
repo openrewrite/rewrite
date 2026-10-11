@@ -179,4 +179,30 @@ class ConsistentResolveTest {
     void relpath() {
         assertThat(Relpath.relpath("/a/b/c", "/a/b/c/d/e")).isEqualTo("d/e");
     }
+
+    // arborist 9.0.0 (npm 11.1.0) with its npm-package-arg 12.0.1 against arborist 9.0.1 (npm 11.2.0) with 12.0.2, and
+    // arborist 8.0.0 (npm 10.9.2) with 12.0.0 against arborist 8.0.1 (npm 10.9.3) with 12.0.2: the older of each pair
+    // reads a '#' as written for a fragment and writes one it was given escaped as %23
+    @Test
+    void hashInFilePathBeforeNpm11_2_0And10_9_3() {
+        String[][] pairs = {{"11.1.0", "11.2.0"}, {"10.9.2", "10.9.3"}};
+        for (String[] pair : pairs) {
+            NpmRelease older = NpmRelease.of(pair[0]);
+            NpmRelease newer = NpmRelease.of(pair[1]);
+            assertThat(ConsistentResolve.consistentResolve("file:a#b", "/from", "/to", true, older))
+              .as(pair[0]).isEqualTo("file:../from/a");
+            assertThat(ConsistentResolve.consistentResolve("file:a#b", "/from", "/to", true, newer))
+              .as(pair[1]).isEqualTo("file:../from/a#b");
+            assertThat(ConsistentResolve.consistentResolve("file:/abs/c#x", "/from", "/to", false, older))
+              .as(pair[0]).isEqualTo("file:/abs/c");
+            assertThat(ConsistentResolve.consistentResolve("file:/abs/c#x", "/from", "/to", false, newer))
+              .as(pair[1]).isEqualTo("file:/abs/c#x");
+            for (NpmRelease release : new NpmRelease[]{older, newer}) {
+                assertThat(ConsistentResolve.consistentResolve("file:a%23b", "/from", "/to", true, release))
+                  .isEqualTo("file:../from/a%23b");
+                assertThat(ConsistentResolve.consistentResolve("file:/abs/c%23x", "/from", "/from", true, release))
+                  .isEqualTo("file:../abs/c%23x");
+            }
+        }
+    }
 }

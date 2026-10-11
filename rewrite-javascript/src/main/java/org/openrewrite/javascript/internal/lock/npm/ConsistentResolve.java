@@ -42,7 +42,8 @@ final class ConsistentResolve {
             return null;
         }
         try {
-            return consistentResolve(Spec.npa(resolved, fromPath), toPath, relPaths, release);
+            return consistentResolve(Spec.npa(resolved, fromPath, release.npmPackageArg()), toPath, relPaths,
+                    release);
         } catch (RuntimeException e) {
             return resolved;
         }
@@ -51,20 +52,30 @@ final class ConsistentResolve {
     static @Nullable String consistentResolve(Spec resolved, @Nullable String fromPath,
                                               @Nullable String toPath, boolean relPaths, NpmRelease release) {
         try {
-            return consistentResolve(Spec.npa(resolved, fromPath), toPath, relPaths, release);
+            return consistentResolve(Spec.npa(resolved, fromPath, release.npmPackageArg()), toPath, relPaths,
+                    release);
         } catch (RuntimeException e) {
             return resolved.toString();
         }
+    }
+
+    /**
+     * Arborist 9.0.0's {@code path.replace(/#/g, '%23')} wherever a path becomes a {@code file:} spec, which the
+     * npm-package-arg beside it needs to read the path whole.
+     */
+    static String escapeHash(String path, NpmRelease release) {
+        return release.escapesHashOfFilePaths() ? path.replace("#", "%23") : path;
     }
 
     private static @Nullable String consistentResolve(Spec spec, @Nullable String toPath, boolean relPaths,
                                                       NpmRelease release) {
         Spec.Type type = spec.getType();
         if (type == Spec.Type.FILE || type == Spec.Type.DIRECTORY) {
+            String cleanFetchSpec = spec.getFetchSpec() == null ? null : escapeHash(spec.getFetchSpec(), release);
             if (relPaths && toPath != null && !toPath.isEmpty()) {
-                return "file:" + Relpath.relpath(toPath, spec.getFetchSpec());
+                return "file:" + Relpath.relpath(toPath, cleanFetchSpec);
             }
-            return "file:" + spec.getFetchSpec();
+            return "file:" + cleanFetchSpec;
         }
         GitHost hosted = spec.getHosted();
         if (hosted != null) {

@@ -17,7 +17,10 @@ package org.openrewrite.javascript.internal.lock.npm;
 
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.javascript.internal.lock.BraceExpansion;
+import org.openrewrite.javascript.internal.lock.GitHost;
+import org.openrewrite.javascript.internal.lock.Spec;
 import org.openrewrite.javascript.internal.lock.Ssri;
+import org.openrewrite.javascript.internal.lock.ValidateNpmPackageName;
 import org.openrewrite.javascript.semver.NodeSemver;
 
 import java.util.LinkedHashSet;
@@ -346,6 +349,15 @@ public final class NpmRelease implements Comparable<NpmRelease> {
     }
 
     // @npmcli/arborist consistent-resolve.js
+
+    /**
+     * A {@code #} in a path that becomes a {@code file:} spec is written {@code %23} (also link.js, load-virtual.js,
+     * node.js and shrinkwrap.js), from npm 8.15.1 until 10.9.3 and 11.2.0, whose npm-package-arg escapes a path
+     * before the URL parser reads it.
+     */
+    boolean escapesHashOfFilePaths() {
+        return atLeast(8, 15, 1) && !atLeast(10, 9, 3) || atLeast(11, 0, 0) && !atLeast(11, 2, 0);
+    }
 
     /**
      * A hosted git URL written as https resolves to https ({@code hosted.default}), from npm 12.0.0; before, only one
@@ -707,6 +719,16 @@ public final class NpmRelease implements Comparable<NpmRelease> {
                 BraceExpansion.Release.V5_0_6;
     }
 
+    // hosted-git-info
+
+    /**
+     * The hosted-git-info npm bundles: 9.0.3 from npm 11.15.0, whose https URL of a sourcehut repository ends in no
+     * {@code .git}; before, 9.0.2 and the releases back to 8.0.2 that answer as it does.
+     */
+    GitHost.Release hostedGitInfo() {
+        return atLeast(11, 15, 0) ? GitHost.Release.V9_0_3 : GitHost.Release.V9_0_2;
+    }
+
     // npm base-cmd.js
 
     /**
@@ -715,6 +737,21 @@ public final class NpmRelease implements Comparable<NpmRelease> {
      */
     boolean strictNpmrcRefusesUnknownKeys() {
         return atLeast(12, 0, 0);
+    }
+
+    // npm-package-arg
+
+    /**
+     * The npm-package-arg npm bundles, with the libraries it calls: 13.0.1 from npm 11.6.2, which takes {@code .tar.gz}
+     * and no other character between the two for a tarball's ending; 12.0.2 from npm 11.2.0 and, of npm 10, from
+     * 10.9.3, which escapes a file path before the URL parser reads it; before, 12.0.1.
+     */
+    Spec.Options npmPackageArg() {
+        return Spec.Options.of(
+                atLeast(11, 6, 2) ? Spec.Release.V13_0_2 :
+                        atLeast(11, 2, 0) || atLeast(10, 9, 3) && !atLeast(11, 0, 0) ? Spec.Release.V13_0_0 :
+                                Spec.Release.V12_0_1,
+                validateNpmPackageName(), hostedGitInfo(), semver());
     }
 
     // npm-pick-manifest
@@ -772,6 +809,21 @@ public final class NpmRelease implements Comparable<NpmRelease> {
      */
     Ssri.Release ssri() {
         return atLeast(11, 10, 0) ? Ssri.Release.V13_0_1 : Ssri.Release.V13_0_0;
+    }
+
+    // validate-npm-package-name
+
+    /**
+     * The validate-npm-package-name npm bundles: 7.0.2 from npm 11.8.0, which refuses a name that starts with a hyphen;
+     * 6.0.2 from npm 11.5.0 and 10.9.5, which rewords the excluded names, as 7.0.0 does; 6.0.1 from npm 11.4.2 and
+     * 10.9.3, which refuses a scoped name whose own part starts with a period; before, 6.0.0.
+     */
+    ValidateNpmPackageName.Release validateNpmPackageName() {
+        return atLeast(11, 8, 0) ? ValidateNpmPackageName.Release.V7_0_2 :
+                atLeast(11, 5, 0) || atLeast(10, 9, 5) && !atLeast(11, 0, 0) ?
+                        ValidateNpmPackageName.Release.V6_0_2 :
+                        atLeast(11, 4, 2) || atLeast(10, 9, 3) && !atLeast(11, 0, 0) ?
+                                ValidateNpmPackageName.Release.V6_0_1 : ValidateNpmPackageName.Release.V6_0_0;
     }
 
     @Override

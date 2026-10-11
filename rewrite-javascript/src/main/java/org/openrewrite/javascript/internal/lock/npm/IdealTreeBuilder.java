@@ -466,7 +466,8 @@ public final class IdealTreeBuilder {
             Object version = node.getVersion();
             boolean useResolved = truthy(resolved) && (!truthy(version) || Js.string(resolved).startsWith("file:"));
             Object id = useResolved ? resolved : version;
-            Spec spec = Spec.resolve(node.getName(), Js.string(id), PosixPath.dirname(node.getPath()));
+            Spec spec = Spec.resolve(node.getName(), Js.string(id), PosixPath.dirname(node.getPath()),
+                    options.getRelease().npmPackageArg());
             try {
                 Pacote.Options pacoteOptions = Pacote.Options.builder()
                         .fullMetadata(false)
@@ -535,7 +536,7 @@ public final class IdealTreeBuilder {
             if (crackOpen) {
                 // pacote.extract(node.resolved, ...) reads the resolved value as a spec of its own, with the options as
                 // they are: no dependent makes it a root's
-                checkAllow(Spec.npa(node.getResolved(), null), null);
+                checkAllow(Spec.npa(node.getResolved(), null, options.getRelease().npmPackageArg()), null);
                 throw new CannotKnow((truthy(hasShrinkwrap) ? "npm-shrinkwrap.json of " : "bundled dependencies of ") +
                                      node.getPkgid());
             }
@@ -652,8 +653,8 @@ public final class IdealTreeBuilder {
                     promises.add(() -> {
                         try {
                             // arborist passes the parent placement here, which is no node
-                            fetchManifest(Spec.resolve(e.getName(), e.getSpec(), FromPath.fromPath(placed, e)), null,
-                                    e);
+                            fetchManifest(Spec.resolve(e.getName(), e.getSpec(), FromPath.fromPath(placed, e),
+                                    options.getRelease().npmPackageArg()), null, e);
                         } catch (RuntimeException ignored) {
                         }
                     });
@@ -678,11 +679,12 @@ public final class IdealTreeBuilder {
         Node from = Objects.requireNonNull(edge.getFrom());
         Node parent = parentOption != null ? parentOption : virtualRoot(from, false);
 
-        Spec spec = Spec.resolve(edge.getName(), edge.getSpec(), from.getPath());
+        Spec.Options npa = options.getRelease().npmPackageArg();
+        Spec spec = Spec.resolve(edge.getName(), edge.getSpec(), from.getPath(), npa);
         Node first = nodeFromSpec(edge.getName(), spec, parent, edge);
 
         Spec spec2 = secondEdge != null ? Spec.resolve(edge.getName(), secondEdge.getSpec(),
-                Objects.requireNonNull(secondEdge.getFrom()).getPath()) : null;
+                Objects.requireNonNull(secondEdge.getFrom()).getPath(), npa) : null;
         Node second = secondEdge != null && !secondEdge.isValid() ?
                 nodeFromSpec(edge.getName(), spec2, parent, secondEdge) : null;
 
@@ -929,7 +931,7 @@ public final class IdealTreeBuilder {
             String parentOriginalPath = Js.string(parent.getResolved()).substring(5);
             String relativePath = edge.getRawSpec().substring(5);
             String absolutePath = PosixPath.resolve(parentOriginalPath, relativePath);
-            spec = Spec.resolve(name, "file:" + absolutePath, null);
+            spec = Spec.resolve(name, "file:" + absolutePath, null, options.getRelease().npmPackageArg());
         }
 
         Map<String, Object> pkg;

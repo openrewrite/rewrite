@@ -312,7 +312,7 @@ public final class VirtualTreeLoader {
         Map<String, String> workspaces = MapWorkspaces.virtual(path, Objects.requireNonNull(s.getData()),
                 options.getRelease());
         for (Map.Entry<String, String> ws : workspaces.entrySet()) {
-            lockWS.put(ws.getKey(), "file:" + ws.getValue());
+            lockWS.put(ws.getKey(), "file:" + ConsistentResolve.escapeHash(ws.getValue(), options.getRelease()));
         }
 
         Set<String> rootNames = new LinkedHashSet<>(root.getEdgesOut().keys());

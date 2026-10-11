@@ -288,7 +288,7 @@ public final class Shrinkwrap {
      * loaded, with {@code resolved} and {@code integrity} added to {@code options} for the fetch.
      */
     public Spec checkYarnLock(String spec, Map<String, Object> options) {
-        return checkYarnLock(Spec.npa(spec), options);
+        return checkYarnLock(Spec.npa(spec, null, resolveOptions.getRelease().npmPackageArg()), options);
     }
 
     public Spec checkYarnLock(Spec parsed, Map<String, Object> options) {
@@ -318,7 +318,7 @@ public final class Shrinkwrap {
                 options.put("resolved", resolvedString == null ? resolved :
                         YARN_REGISTRY.matcher(resolvedString).replaceFirst("https://registry.npmjs.org/"));
                 options.put("integrity", integrity);
-                return Spec.npa(parsed.getName() + "@" + yspec);
+                return Spec.npa(parsed.getName() + "@" + yspec, null, resolveOptions.getRelease().npmPackageArg());
             }
         }
         return parsed;
@@ -633,7 +633,7 @@ public final class Shrinkwrap {
         }
         Map<String, Object> lock = asObject(entry);
 
-        Spec spec = SpecFromLock.specFromLock(name, lock, path);
+        Spec spec = SpecFromLock.specFromLock(name, lock, path, resolveOptions.getRelease().npmPackageArg());
         Spec.Type type = spec == null ? null : spec.getType();
 
         if (spec != null && type == Spec.Type.DIRECTORY) {
@@ -741,7 +741,8 @@ public final class Shrinkwrap {
                 if (!Js.string(resolved).startsWith("file:")) {
                     pathFixed = resolved;
                 } else if (resolved instanceof String) {
-                    pathFixed = "file:" + PosixPath.resolve(path, ((String) resolved).substring(5));
+                    pathFixed = "file:" + ConsistentResolve.escapeHash(
+                            PosixPath.resolve(path, ((String) resolved).substring(5)), resolveOptions.getRelease());
                 } else {
                     // only an array reads as a file: string, and Array.prototype.slice hands path.resolve an array
                     throw new IllegalArgumentException(
@@ -801,7 +802,8 @@ public final class Shrinkwrap {
             }
         }
 
-        Spec spec = Spec.npa(node.getName() + "@" + edge.getSpec());
+        Spec spec = Spec.npa(node.getName() + "@" + edge.getSpec(), null,
+                resolveOptions.getRelease().npmPackageArg());
         YarnLock.Entry entry = entries.get(node.getName() + "@" + edge.getSpec());
 
         if (entry == null ||
@@ -992,17 +994,19 @@ public final class Shrinkwrap {
 
         Object res = ConsistentResolve.consistentResolve(node.getResolved(), this.path, this.path, true,
                 resolveOptions.getRelease());
-        Spec rSpec = specFromResolved(res);
+        Spec rSpec = specFromResolved(res, resolveOptions.getRelease());
 
         Spec spec = rSpec;
         if (edge != null) {
-            spec = Spec.resolve(node.getName(), edge.getSpec(), edge.getFrom().getRealpath());
+            spec = Spec.resolve(node.getName(), edge.getSpec(), edge.getFrom().getRealpath(),
+                    resolveOptions.getRelease().npmPackageArg());
         }
 
         Spec.Type specType = spec == null ? null : spec.getType();
         Spec.Type rType = rSpec == null ? null : rSpec.getType();
         if (node.isLink()) {
-            lock.put("version", "file:" + Relpath.relpath(this.path, node.getRealpath()));
+            lock.put("version", "file:" + ConsistentResolve.escapeHash(
+                    Relpath.relpath(this.path, node.getRealpath()), resolveOptions.getRelease()));
         } else if (specType == Spec.Type.FILE || specType == Spec.Type.REMOTE) {
             lock.put("version", spec.getSaveSpec());
         } else if (specType == Spec.Type.GIT || rType == Spec.Type.GIT) {
@@ -1064,7 +1068,8 @@ public final class Shrinkwrap {
                     String edgeSpec = v.getSpec();
                     if (edgeSpec.startsWith("file:")) {
                         String p = PosixPath.resolve(node.getRealpath(), edgeSpec.substring("file:".length()));
-                        requires.put(entry.getKey(), "file:" + Relpath.relpath(node.getRealpath(), p));
+                        requires.put(entry.getKey(), "file:" + ConsistentResolve.escapeHash(
+                                Relpath.relpath(node.getRealpath(), p), resolveOptions.getRelease()));
                     } else {
                         requires.put(entry.getKey(), edgeSpec);
                     }
@@ -1098,9 +1103,9 @@ public final class Shrinkwrap {
         return lock;
     }
 
-    private static @Nullable Spec specFromResolved(@Nullable Object resolved) {
+    private static @Nullable Spec specFromResolved(@Nullable Object resolved, NpmRelease release) {
         try {
-            return Spec.npa(resolved, null);
+            return Spec.npa(resolved, null, release.npmPackageArg());
         } catch (RuntimeException er) {
             return null;
         }

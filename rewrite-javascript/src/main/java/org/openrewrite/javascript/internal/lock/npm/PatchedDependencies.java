@@ -206,7 +206,8 @@ final class PatchedDependencies {
 
             // a consumer edge that is no registry spec leaves no registry tarball to patch; an npm: alias stays one
             for (Edge e : node.getEdgesIn()) {
-                if (truthy(e.getSpec()) && !Spec.npa(e.getSpec()).isRegistry()) {
+                if (truthy(e.getSpec()) &&
+                    !Spec.npa(e.getSpec(), null, node.getRelease().npmPackageArg()).isRegistry()) {
                     throw new PatchError("Cannot patch non-registry dependency " + node.getName() + "@" +
                                          Js.string(node.getVersion()) + " (selector \"" + selector.getKey() +
                                          "\"). Only registry dependencies can be patched.", "EPATCHNONREGISTRY");

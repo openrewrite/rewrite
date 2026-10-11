@@ -39,7 +39,7 @@ final class FromPath {
         }
 
         if (truthy(node.getResolved())) {
-            Spec spec = Spec.npa(node.getResolved(), null);
+            Spec spec = Spec.npa(node.getResolved(), null, node.getRelease().npmPackageArg());
             if (spec.getType() == Spec.Type.FILE) {
                 return PosixPath.dirname(spec.getFetchSpec());
             }

@@ -125,7 +125,8 @@ public class Link extends Node {
     public @Nullable String getResolved() {
         String path = getPath();
         String realpath = getRealpath();
-        return path != null && realpath != null ? "file:" + Relpath.relpath(PosixPath.dirname(path), realpath) : null;
+        return path != null && realpath != null ? "file:" + ConsistentResolve.escapeHash(
+                Relpath.relpath(PosixPath.dirname(path), realpath), getRelease()) : null;
     }
 
     @Override

@@ -86,7 +86,9 @@ public final class Edge {
         if (spec == null) {
             throw new IllegalArgumentException("must provide string spec");
         }
-        if (type == Type.WORKSPACE && Spec.npa(spec).getType() != Spec.Type.DIRECTORY) {
+        if (type == Type.WORKSPACE && Spec.npa(spec, null,
+                (from != null ? from.getRelease() : NpmRelease.PORTED).npmPackageArg()).getType() !=
+                                      Spec.Type.DIRECTORY) {
             throw new IllegalArgumentException("workspace edges must be a symlink");
         }
         if (name == null) {
