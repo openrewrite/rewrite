@@ -263,6 +263,13 @@ class PackageIsInstallableTest {
           true, null, null, Host.UNKNOWN)).isInstanceOf(PackageIsInstallable.UnsupportedEngineError.class);
     }
 
+    // pnpm 11.2.2's node-semver 7.8.0 reads "22.x.1" as "22.x", which 7.8.4 rejects
+    @Test
+    void anUnknownNodeVersionReadsTheRangeAsPnpmsSemverDoes() {
+        PackageIsInstallable.projectIsInstallable(".", obj("{'engines':{'node':'>=22.x.1'}}"), true, null, null,
+          Host.UNKNOWN);
+    }
+
     // pnpm skips an optional package where it does not fit, and fails engine-strict on a required one
     @Test
     void anUnknownPlatformFailsOnlyARequiredPackageUnderEngineStrict() {
