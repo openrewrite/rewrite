@@ -29,6 +29,7 @@ import org.openrewrite.json.JsonParser;
 import org.openrewrite.marker.Markers;
 import org.openrewrite.quark.Quark;
 import org.openrewrite.text.PlainText;
+import org.openrewrite.tree.ParseError;
 
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -42,6 +43,7 @@ import static java.util.Collections.emptyMap;
 import static java.util.Collections.singletonList;
 import static java.util.Collections.singletonMap;
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.entry;
 import static org.openrewrite.javascript.Assertions.nodeResolutionResult;
 
 class NodeDependencyScanTest {
@@ -67,6 +69,27 @@ class NodeDependencyScanTest {
         assertThat(sourceKept).isFalse();
         assertThat(acc.paths).containsExactlyInAnyOrder(read, unread, source);
         assertThat(acc.packageManagerFiles).containsOnlyKeys(read);
+    }
+
+    /**
+     * A file the host's parser gave up on is a parse error holding its text, which the package manager's own reader
+     * judges; one the host could not read either, as when its parser process died first, holds none and is unread.
+     */
+    @Test
+    void aParseErrorHasTheContentsItHolds() {
+        NodeDependencyScan.Accumulator acc = new NodeDependencyScan.Accumulator();
+        Path withText = Paths.get("pnpm-workspace.yaml");
+        Path withoutText = Paths.get("examples/pnpm-workspace.yaml");
+
+        NodeDependencyScan.capturePackageManagerFile(acc, parseError(withText, "packages:\n  - &a 'packages/*'\n"));
+        NodeDependencyScan.capturePackageManagerFile(acc, parseError(withoutText, ""));
+
+        assertThat(acc.paths).containsExactlyInAnyOrder(withText, withoutText);
+        assertThat(acc.packageManagerFiles).containsOnly(entry(withText, "packages:\n  - &a 'packages/*'\n"));
+    }
+
+    private static ParseError parseError(Path path, String text) {
+        return new ParseError(Tree.randomId(), Markers.EMPTY, path, null, null, false, null, text, null);
     }
 
     /**

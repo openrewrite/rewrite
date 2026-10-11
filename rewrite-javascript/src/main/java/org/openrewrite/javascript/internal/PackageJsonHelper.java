@@ -34,7 +34,6 @@ import org.openrewrite.yaml.YamlParser;
 import org.openrewrite.yaml.tree.Yaml;
 
 import java.nio.file.Path;
-import java.nio.file.Paths;
 import java.util.*;
 import java.util.function.Function;
 import java.util.regex.Pattern;
@@ -60,24 +59,6 @@ public class PackageJsonHelper {
     /** Map a lock file path to the sibling {@code package.json}. */
     public static Path correspondingPackageJsonPath(Path lockFilePath) {
         return lockFilePath.resolveSibling("package.json");
-    }
-
-    /**
-     * A workspace root's member {@code package.json} paths, from its
-     * {@code workspacePackagePaths}; empty when not a workspace root.
-     */
-    public static List<Path> workspaceMemberPaths(SourceFile rootPackageJson) {
-        NodeResolutionResult marker = rootPackageJson.getMarkers()
-                .findFirst(NodeResolutionResult.class).orElse(null);
-        if (marker == null || marker.getWorkspacePackagePaths() == null) {
-            return emptyList();
-        }
-        Path base = rootPackageJson.getSourcePath().getParent();
-        List<Path> members = new ArrayList<>();
-        for (String rel : marker.getWorkspacePackagePaths()) {
-            members.add((base == null ? Paths.get(rel) : base.resolve(rel)).normalize());
-        }
-        return members;
     }
 
     /**

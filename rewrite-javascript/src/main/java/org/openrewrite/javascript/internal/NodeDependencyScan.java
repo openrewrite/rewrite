@@ -23,6 +23,7 @@ import org.openrewrite.javascript.internal.lock.Spec;
 import org.openrewrite.javascript.marker.NodeResolutionResult;
 import org.openrewrite.javascript.marker.NodeResolutionResult.PackageManager;
 import org.openrewrite.quark.Quark;
+import org.openrewrite.tree.ParseError;
 
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -97,7 +98,8 @@ public final class NodeDependencyScan {
 
     /**
      * Note a file the scan visits and keep its contents when a package manager reads it: true when {@code sf} is
-     * such a file. One read only beside a lock is kept when the scan ends; a {@link Quark} has no contents.
+     * such a file. One read only beside a lock is kept when the scan ends; a {@link Quark} has no contents, nor has
+     * a {@link ParseError} without text.
      */
     public static boolean capturePackageManagerFile(Accumulator acc, SourceFile sf) {
         Path path = sf.getSourcePath();
@@ -106,7 +108,8 @@ public final class NodeDependencyScan {
         if (name == null || !readByAny(name.toString())) {
             return false;
         }
-        if (!(sf instanceof Quark)) {
+        // a parse error holds no text where the host could not read the file either
+        if (!(sf instanceof Quark) && !(sf instanceof ParseError && ((ParseError) sf).getText().isEmpty())) {
             if (readAwayFromLock(name.toString())) {
                 acc.packageManagerFiles.put(path, sf.printAll());
             } else {
