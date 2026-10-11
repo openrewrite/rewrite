@@ -108,7 +108,8 @@ class NpmReleasesTest {
           .hasSameSizeAs(NpmReleases.proven());
 
         for (String manifest : new String[]{"{}", "{\"name\":\"p\",\"version\":\"1.0.0\"}",
-          "{\"devEngines\":{\"runtime\":{\"name\":\"node\",\"version\":\">=20\"}}}", "{\"engines\":{\"npm\":\"^10\"}}"}) {
+          "{\"devEngines\":{\"runtime\":{\"name\":\"node\",\"version\":\">=20\"}}}",
+          "{\"engines\":{\"npm\":\"^10\"}}"}) {
             assertThat(NpmReleases.allowed(pkg(manifest))).as(manifest).isNull();
             assertThat(NpmReleases.candidates(pkg(manifest))).as(manifest).isEqualTo(NpmReleases.undeclared());
         }

@@ -28,6 +28,7 @@ import org.openrewrite.javascript.internal.LockFileRegeneration.Result;
 import org.openrewrite.javascript.internal.lock.npm.NpmLockRegenerator;
 import org.openrewrite.javascript.internal.lock.npm.NpmLockRegenerator.Inputs;
 import org.openrewrite.javascript.internal.lock.npm.NpmOptions;
+import org.openrewrite.javascript.internal.lock.npm.NpmRelease;
 import org.openrewrite.javascript.internal.lock.npm.PackumentSource;
 import org.openrewrite.javascript.marker.NodeResolutionResult.Npmrc;
 import org.openrewrite.javascript.marker.NodeResolutionResult.NpmrcScope;
@@ -275,7 +276,7 @@ class NpmInputsTest {
         HostInputs host = HostInputs.builder().now(Instant.EPOCH).npmrc(Arrays.asList(marker))
           .system(HostRegistries.environment(home)).build();
         Inputs inputs = NpmInputs.from(LockDirectory.of(request), host);
-        return NpmOptions.fromNpmrc(inputs.getRelease(), inputs.getUserNpmrc(), inputs.getNpmrc())
+        return NpmOptions.fromNpmrc(NpmRelease.PORTED, inputs.getUserNpmrc(), inputs.getNpmrc())
           .registryFor("is-number");
     }
 

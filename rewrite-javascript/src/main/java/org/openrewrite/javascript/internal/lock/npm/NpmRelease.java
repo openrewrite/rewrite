@@ -29,7 +29,9 @@ import java.util.regex.Pattern;
  * <p>
  * Every question is answered through {@link #atLeast}, and nothing else reads the version: a release that is
  * {@linkplain #followed() followed} notes each release it was compared with, so that another release giving the same
- * answers ({@link #answersAs}) is known to install the project the same way without installing it again.
+ * answers ({@link #answersAs}) is known to install the project the same way without installing it again. The one
+ * exception is the version's text, npm's own version ({@link NpmOptions#getNpmVersion()}), which an install holds
+ * ranges to: {@link NpmLockRegenerator} holds the releases an install stands for to those ranges as well.
  */
 public final class NpmRelease implements Comparable<NpmRelease> {
 
@@ -116,7 +118,7 @@ public final class NpmRelease implements Comparable<NpmRelease> {
         return atLeast(12, 0, 0) ? "none" : "all";
     }
 
-    // npm lib/base-cmd.js
+    // npm base-cmd.js
 
     /**
      * Whether a command checks the root's {@code devEngines} before it runs ({@code checkDevEngines}): from npm 10.9.0.
@@ -125,7 +127,7 @@ public final class NpmRelease implements Comparable<NpmRelease> {
         return atLeast(10, 9, 0);
     }
 
-    // npm-install-checks lib/dev-engines.js
+    // npm-install-checks dev-engines.js
 
     /**
      * Whether a {@code devEngines} failure names the property ({@code Invalid devEngines.runtime}) where earlier
