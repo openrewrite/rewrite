@@ -81,6 +81,8 @@ public final class NodeDependencyEdits implements PackageJsonHelper.FileEditor {
     private final Set<Path> warnedStale = new HashSet<>();
     private final Set<Path> generated = new HashSet<>();
     private final Map<SourceFile, String> prints = new IdentityHashMap<>();
+    private final Map<SourceFile, SourceFile> editedManifests = new IdentityHashMap<>();
+    private int editedManifestsAt = -1;
     private final List<String> pending = new ArrayList<>();
     private @Nullable Decider decider;
     private int version;
@@ -373,6 +375,7 @@ public final class NodeDependencyEdits implements PackageJsonHelper.FileEditor {
         if (cleanupDeclined != null) {
             decision.manifestEdit = null;
             decision.fileEdits.clear();
+            version++;
             decision.warn(cleanupDeclined);
             decision.decline(cleanupDeclined);
         }
@@ -576,11 +579,23 @@ public final class NodeDependencyEdits implements PackageJsonHelper.FileEditor {
                 PackageJsonHelper.reparseLock(at, output.print());
     }
 
+    // a manifest with this cycle's edits, the same document for the same revision until a decision changes: every
+    // regeneration asks for each manifest of its project
     private SourceFile editedManifest(SourceFile file) {
+        if (editedManifestsAt != version) {
+            editedManifests.clear();
+            editedManifestsAt = version;
+        }
+        SourceFile known = editedManifests.get(file);
+        if (known != null) {
+            return known;
+        }
         Decision decision = decisions.get(file.getSourcePath());
         SourceFile edited = decision == null || decision.withdrawn || decision.manifestEdit == null ||
                             !(file instanceof Json.Document) ? file : decision.manifestEdit.apply((Json.Document) file);
-        return edited instanceof Json.Document ? withCatalogEdits((Json.Document) edited) : edited;
+        edited = edited instanceof Json.Document ? withCatalogEdits((Json.Document) edited) : edited;
+        editedManifests.put(file, edited);
+        return edited;
     }
 
     private void failure(ExecutionContext ctx, Path packageJson, LockFileRegeneration.Failure failure) {
@@ -755,14 +770,13 @@ public final class NodeDependencyEdits implements PackageJsonHelper.FileEditor {
         return null;
     }
 
-    // the marker's package manager, else the one corepack finds named from the manifest's directory up, else the
-    // one whose catalog files it lies under; throws Rejected for a spec corepack rejects
+    // the package manager that installs the manifest by the scan, its marker's or its workspace's; else the one
+    // corepack finds named from the manifest's directory up, else the one whose catalog files it lies under; throws
+    // Rejected for a spec corepack rejects
     private @Nullable PackageManager packageManager(Path packageJson) {
-        NodeDependencyScan.ProjectState ps = scan.projects.get(packageJson);
-        NodeResolutionResult marker = ps == null || ps.capturedPackageJson == null ? null :
-                ps.capturedPackageJson.getMarkers().findFirst(NodeResolutionResult.class).orElse(null);
-        if (marker != null && marker.getPackageManager() != null) {
-            return marker.getPackageManager();
+        PackageManager installs = NodeDependencyScan.packageManager(scan, packageJson);
+        if (installs != null) {
+            return installs;
         }
         PackageManager named = named(packageJson.getParent());
         if (named != null) {

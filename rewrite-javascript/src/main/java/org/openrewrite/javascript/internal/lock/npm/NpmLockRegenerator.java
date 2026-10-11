@@ -30,6 +30,7 @@ import org.openrewrite.javascript.internal.lock.JsError;
 import org.openrewrite.javascript.internal.lock.LocaleCompare;
 import org.openrewrite.javascript.internal.lock.LockOnlyInstall;
 import org.openrewrite.javascript.internal.lock.Rejected;
+import org.openrewrite.javascript.internal.lock.RootRelativePath;
 import org.openrewrite.javascript.internal.lock.SharedError;
 import org.openrewrite.javascript.internal.lock.Spec;
 import org.openrewrite.javascript.internal.registry.NodeRegistryException;
@@ -37,6 +38,7 @@ import org.openrewrite.javascript.internal.registry.NodeRegistryException;
 import java.time.Instant;
 import java.util.Collections;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
@@ -65,8 +67,9 @@ public final class NpmLockRegenerator {
         String yarnLock;
 
         /**
-         * The project's manifests as edited, by location: {@code ""} the root, {@code packages/a} a workspace
-         * member. A member the host did not supply keeps its lock entry.
+         * The package.json files the host read, as edited, by location from the lock's directory: {@code ""} the
+         * root, {@code packages/a} a workspace member, {@code ../lib} a link target above it. A location where the
+         * host holds no package.json keeps its lock entry.
          */
         @Singular
         Map<String, String> manifests;
@@ -84,11 +87,18 @@ public final class NpmLockRegenerator {
         String userNpmrc;
 
         /**
-         * The files the project holds relative to the lock's directory, when the host says; an .npmrc among them the
-         * host did not read is unknown.
+         * The files the host holds, by path from the lock's directory ({@code ../lib/package.json} above it), when it
+         * says; an .npmrc or a package.json among them that it did not read is unknown.
          */
         @Nullable
         Set<String> paths;
+
+        /**
+         * The lock's directory from the root of what the host holds ({@code apps/web}, {@code ""} at the root), when
+         * it says: a link target above that root is one the engine is not given.
+         */
+        @Nullable
+        String directory;
 
         @Builder.Default
         Host host = Host.UNKNOWN;
@@ -121,6 +131,9 @@ public final class NpmLockRegenerator {
     }
 
     private static final LockOnlyInstall INSTALL = LockOnlyInstall.NPM;
+
+    // the repository's own directory, whose name the host does not know: one that names no package
+    private static final String REPOSITORY = ". repository";
 
     private final Inputs inputs;
     private final PackumentSource registry;
@@ -206,20 +219,46 @@ public final class NpmLockRegenerator {
     }
 
     private VirtualTreeLoader.ProjectFiles projectFiles(@Nullable LockFile lock) {
-        return projectFiles(lock, inputs.getYarnLock(), inputs.getManifests());
+        return projectFiles(lock, inputs.getYarnLock(), inputs.getManifests(), inputs.getPaths(),
+                inputs.getDirectory());
     }
 
     /**
-     * The project's files, the lock's own entries standing in for the root and for link targets outside node_modules
-     * the host did not supply, as arborist reads a project without a package.json.
+     * The files of a project whose host has not said what it holds.
+     */
+    static VirtualTreeLoader.ProjectFiles projectFiles(@Nullable LockFile lock, @Nullable String yarnLock,
+                                                       Map<String, String> manifests) {
+        return projectFiles(lock, yarnLock, manifests, null, null);
+    }
+
+    /**
+     * The project's files. A package.json among {@code paths} that the host did not read is unread. Where the host
+     * holds none, or has not said what it holds, the lock's own entry stands in for the root and for a link target
+     * outside node_modules, as arborist reads a project without that package.json. The package.json above
+     * {@code directory}'s root is one the engine is not given, and the one at that root is read only where the lock
+     * shows how npm named it.
      */
     @SuppressWarnings("unchecked")
     static VirtualTreeLoader.ProjectFiles projectFiles(@Nullable LockFile lock, @Nullable String yarnLock,
-                                                       Map<String, String> manifests) {
+                                                       Map<String, String> manifests, @Nullable Set<String> paths,
+                                                       @Nullable String directory) {
         VirtualTreeLoader.ProjectFiles.ProjectFilesBuilder files = VirtualTreeLoader.ProjectFiles.builder()
                 .lock(lock)
                 .yarnLock(yarnLock)
-                .manifests(manifests);
+                .manifests(manifests)
+                .depth(directory == null ? null : directory.isEmpty() ? 0 : directory.split("/").length);
+        Set<String> unread = new LinkedHashSet<>();
+        if (paths != null) {
+            for (String path : paths) {
+                String location = "package.json".equals(path) ? "" : path.endsWith("/package.json") ?
+                        path.substring(0, path.length() - "/package.json".length()) : null;
+                if (location != null && !manifests.containsKey(location) && unread.add(location)) {
+                    files.unread(location);
+                }
+            }
+        }
+        String top = directory == null || directory.isEmpty() ? null : directory.replaceAll("[^/]+", "..");
+        boolean topNamedAsLocked = false;
         Object data = lockData(lock);
         Object packages = data instanceof Map ? Js.get(data, "packages") : null;
         if (packages instanceof Map) {
@@ -230,19 +269,47 @@ public final class NpmLockRegenerator {
                 }
                 Object resolved = Js.get(meta, "resolved");
                 if (entry.getKey().isEmpty()) {
-                    if (!manifests.containsKey("")) {
+                    if (!manifests.containsKey("") && !unread.contains("")) {
                         files.parsedManifest("", (Map<String, Object>) meta);
                     }
                 } else if (Js.strictEquals(Js.get(meta, "link"), true) && resolved instanceof String &&
-                           !((String) resolved).contains("node_modules/") && !manifests.containsKey(resolved)) {
+                           !((String) resolved).contains("node_modules/")) {
+                    String location = RootRelativePath.normalize((String) resolved);
                     Object target = Js.get(packages, (String) resolved);
-                    if (target instanceof Map) {
+                    if (location.equals(top) && target instanceof Map) {
+                        topNamedAsLocked = namedAsLocked((Map<String, Object>) target, manifests.get(location));
+                    }
+                    if (target instanceof Map && !manifests.containsKey(resolved) &&
+                        !manifests.containsKey(location) && !unread.contains(location)) {
                         files.parsedManifest((String) resolved, (Map<String, Object>) target);
                     }
                 }
             }
         }
+        if (top != null && manifests.containsKey(top) && !topNamedAsLocked) {
+            files.unknown(top, new CannotKnow("the name of the repository's directory, which npm compares with " +
+                                              "the name of the package there (" + top + ") to write its lock entry"));
+        }
         return files.build();
+    }
+
+    /**
+     * Whether the lock shows how npm writes the name of the package in the repository's own directory, whose name
+     * the host does not know: npm writes a package's name only where its directory is named otherwise, so an entry
+     * that holds the name the package.json still declares was written from a directory named otherwise.
+     */
+    private static boolean namedAsLocked(Map<String, Object> entry, @Nullable String manifest) {
+        if (manifest == null) {
+            return true;
+        }
+        Object declared;
+        try {
+            declared = PackageJson.normalize(manifest).getContent().get("name");
+        } catch (RuntimeException e) {
+            // a package.json npm does not read is refused where it is read
+            return true;
+        }
+        return declared instanceof String && declared.equals(entry.get("name"));
     }
 
     private IdealTreeBuilder arborist(String path, VirtualTreeLoader.ProjectFiles files, NpmOptions options) {
@@ -263,6 +330,11 @@ public final class NpmLockRegenerator {
      * host's word, the lock's own top-level name stands in: npm wrote it from that directory.
      */
     private String projectPath(VirtualTreeLoader.ProjectFiles files) {
+        String directory = inputs.getDirectory();
+        if (directory != null && !directory.isEmpty()) {
+            // under the directories above it, which a link target that climbs out of the project is read through
+            return "/" + REPOSITORY + "/" + directory;
+        }
         String directoryName = inputs.getDirectoryName();
         if (directoryName == null) {
             Object data = lockData(files.getLock());

@@ -23,6 +23,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Objects;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -92,6 +93,7 @@ public final class Spec {
     private static final Pattern IS_PORT_NUMBER_PNPM = V8RegExp.of(":[0-9]+\\/?.*$");
     private static final Pattern FILE_PROTOCOL = Pattern.compile("^file:", Pattern.CASE_INSENSITIVE);
     private static final Pattern ABSOLUTE_PATH = Pattern.compile("^[/]|^[A-Za-z]:");
+    private static final Pattern RELATIVE_AFTER_SLASHES = Pattern.compile("^/{1,3}\\.\\.?(/|$)");
     private static final Pattern IS_POSIX_FILE = Pattern.compile("^(?:[.]|~[/]|[/]|[a-zA-Z]:)");
     private static final Pattern GIT_SSH = Pattern.compile("^git\\+ssh://([^:#]+:[^#]+(?:\\.git)?)(?:#(.*))?$",
             Pattern.CASE_INSENSITIVE | Pattern.DOTALL);
@@ -348,6 +350,26 @@ public final class Spec {
     public boolean isLocation() {
         return type == Type.GIT || type == Type.FILE || type == Type.DIRECTORY || type == Type.REMOTE ||
                type == Type.LINK || type == Type.PORTAL;
+    }
+
+    /**
+     * The directory a path, {@code file:}, {@code link:} or {@code portal:} dependency names, from its manifest's
+     * ({@code ../lib}); null for any other value, and for a path from the filesystem's root or the home directory.
+     */
+    public @Nullable String getDirectory() {
+        String path;
+        if (type == Type.DIRECTORY) {
+            // fetchSpec is resolved against where, which a path that climbs above it is clamped to
+            path = FILE_PROTOCOL.matcher(rawSpec).replaceFirst("");
+            if (path.length() < rawSpec.length() && RELATIVE_AFTER_SLASHES.matcher(path).find()) {
+                path = path.replaceFirst("^/{1,3}", "");
+            }
+        } else if (type == Type.LINK || type == Type.PORTAL) {
+            path = rawSpec.substring(Objects.requireNonNull(type.prefix).length());
+        } else {
+            return null;
+        }
+        return path.isEmpty() || ABSOLUTE_PATH.matcher(path).find() || path.startsWith("~") ? null : path;
     }
 
     private static Spec resolve(@Nullable String name, @Nullable String spec, @Nullable String where,

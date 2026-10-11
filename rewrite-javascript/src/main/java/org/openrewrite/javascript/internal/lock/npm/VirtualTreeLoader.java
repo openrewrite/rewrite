@@ -59,7 +59,7 @@ public final class VirtualTreeLoader {
         private final Map<String, String> manifests;
 
         /**
-         * Manifests held parsed already: the lock's own entries, standing in for files the host did not supply.
+         * Manifests held parsed already: the lock's own entries, standing in where the host holds no package.json.
          */
         private final Map<String, Map<String, Object>> parsedManifests;
 
@@ -68,22 +68,36 @@ public final class VirtualTreeLoader {
          */
         private final Set<String> unread;
 
+        /**
+         * Locations whose package npm reads with something the engine is not given, each with what that is.
+         */
+        private final Map<String, CannotKnow> unknown;
+
+        /**
+         * How many directories the project's is below the root of what the host holds; null when it has not said.
+         */
+        private final @Nullable Integer depth;
+
         private final Map<String, Object> read = new HashMap<>();
 
         @Builder
         ProjectFiles(@Nullable LockFile lock, @Nullable String yarnLock, @Singular Map<String, String> manifests,
                      @Singular Map<String, Map<String, Object>> parsedManifests,
-                     @Singular("unread") Set<String> unread) {
+                     @Singular("unread") Set<String> unread, @Singular("unknown") Map<String, CannotKnow> unknown,
+                     @Nullable Integer depth) {
             this.lock = lock;
             this.yarnLock = yarnLock;
             this.manifests = manifests;
             this.parsedManifests = parsedManifests;
             this.unread = unread;
+            this.unknown = unknown;
+            this.depth = depth;
         }
 
         /**
          * The manifest at a location, normalized as arborist reads one from disk, or as it was given parsed;
-         * null where there is none. A text that does not normalize throws the same error on every read.
+         * null where there is none. A text that does not normalize throws the same error on every read, and
+         * {@link CannotKnow} is thrown for a package.json the host holds unread or one above the root of what it holds.
          */
         public @Nullable PackageJson manifest(String location) {
             Object value = read.get(location);
@@ -91,6 +105,12 @@ public final class VirtualTreeLoader {
                 String text = manifests.get(location);
                 Map<String, Object> parsed = parsedManifests.get(location);
                 try {
+                    if (unknown.containsKey(location)) {
+                        throw unknown.get(location);
+                    }
+                    if (depth != null && climbs(location) > depth) {
+                        throw new CannotKnow("the package.json of " + location + ", which is outside the repository");
+                    }
                     if (text == null && parsed == null && unread.contains(location)) {
                         throw CannotKnow.unread((location.isEmpty() ? "" : location + "/") + "package.json");
                     }
@@ -115,6 +135,18 @@ public final class VirtualTreeLoader {
             locations.addAll(parsedManifests.keySet());
             locations.addAll(unread);
             return locations;
+        }
+
+        // the directories a location from the project's climbs above it
+        static int climbs(String location) {
+            int up = 0;
+            for (String segment : location.split("/")) {
+                if (!"..".equals(segment)) {
+                    break;
+                }
+                up++;
+            }
+            return up;
         }
     }
 
@@ -209,7 +241,7 @@ public final class VirtualTreeLoader {
             if (manifest != null) {
                 return manifest.getContent();
             }
-        } catch (PackageJson.NeedsPackageFiles e) {
+        } catch (PackageJson.NeedsPackageFiles | CannotKnow e) {
             throw e;
         } catch (RuntimeException ignored) {
         }
@@ -350,7 +382,7 @@ public final class VirtualTreeLoader {
                     if (manifest != null) {
                         link.getTarget().setPackage(manifest.getContent());
                     }
-                } catch (PackageJson.NeedsPackageFiles e) {
+                } catch (PackageJson.NeedsPackageFiles | CannotKnow e) {
                     throw e;
                 } catch (RuntimeException ignored) {
                     // arborist's .catch(() => null): the package stays assigned, its edges loaded up to the failure

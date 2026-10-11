@@ -957,7 +957,8 @@ public class PackageJsonHelper {
         SourceFile refreshed = refreshMarker(after);
         LockFileRegeneration.Result regen = capturedLockContent == null ? null
                 : regenerateLockContent(refreshed, capturedLockContent, projectFiles, changed, ctx);
-        return new EditAndRegenerateResult(after == before ? null : withResolvedDeps(refreshed, regen), regen, changed);
+        return new EditAndRegenerateResult(after == before ? null :
+                withResolvedDeps(refreshed, regen, projectFiles.getPackageManager()), regen, changed);
     }
 
     private static Map<Path, String> changedFiles(Map<Path, String> editedFiles,
@@ -975,17 +976,21 @@ public class PackageJsonHelper {
         return changed;
     }
 
-    private static SourceFile withResolvedDeps(SourceFile refreshed, LockFileRegeneration.@Nullable Result regen) {
+    // installs: the package manager that installs the manifest where its marker names another; null for the marker's
+    private static SourceFile withResolvedDeps(SourceFile refreshed, LockFileRegeneration.@Nullable Result regen,
+                                               NodeResolutionResult.@Nullable PackageManager installs) {
         if (regen == null || !regen.isSuccess()) {
             return refreshed;
         }
         NodeResolutionResult marker = refreshed.getMarkers()
                 .findFirst(NodeResolutionResult.class).orElse(null);
-        if (marker == null || !isOverlaySupported(marker.getPackageManager())) {
+        NodeResolutionResult.PackageManager pm = installs != null || marker == null ? installs :
+                marker.getPackageManager();
+        if (marker == null || pm == null || !isOverlaySupported(pm)) {
             return refreshed;
         }
         try {
-            return overlayResolvedDeps(refreshed, regen.getLockFileContent(), marker.getPackageManager());
+            return overlayResolvedDeps(refreshed, regen.getLockFileContent(), pm);
         } catch (RuntimeException e) {
             return Markup.markup(refreshed,
                     new Markup.Warn(Tree.randomId(), "lock parse failed: " + e.getMessage(), null));
@@ -1000,10 +1005,11 @@ public class PackageJsonHelper {
             ExecutionContext ctx) {
         NodeResolutionResult marker = packageJson.getMarkers()
                 .findFirst(NodeResolutionResult.class).orElse(null);
-        if (marker == null || marker.getPackageManager() == null) {
+        if (marker == null) {
             return null;
         }
-        LockFileRegeneration regen = LockFileRegeneration.forPackageManager(marker.getPackageManager());
+        LockFileRegeneration regen = LockFileRegeneration.forPackageManager(projectFiles.getPackageManager() != null ?
+                projectFiles.getPackageManager() : marker.getPackageManager());
         if (regen == null) {
             return null;
         }

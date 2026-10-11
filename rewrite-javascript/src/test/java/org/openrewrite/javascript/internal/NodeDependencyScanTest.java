@@ -25,6 +25,7 @@ import org.openrewrite.SourceFile;
 import org.openrewrite.Tree;
 import org.openrewrite.javascript.marker.NodeResolutionResult;
 import org.openrewrite.javascript.marker.NodeResolutionResult.PackageManager;
+import org.openrewrite.json.JsonParser;
 import org.openrewrite.marker.Markers;
 import org.openrewrite.quark.Quark;
 import org.openrewrite.text.PlainText;
@@ -95,30 +96,69 @@ class NodeDependencyScanTest {
     }
 
     /**
-     * Yarn classic reads the packageManager of the nearest package.json from the project's directory up.
+     * A package manager maps its project's workspaces over the package.json files under the project, and those of each
+     * package.json above it over the ones under that; Yarn classic also reads the packageManager of the nearest.
      */
     @Test
-    void thePackageJsonOfEachDirectoryAboveTheProjectIsKept() {
+    void everyPackageJsonUnderTheProjectAndUnderAPackageJsonAboveItIsKept() {
         NodeDependencyScan.Accumulator acc = new NodeDependencyScan.Accumulator();
         Path manifest = Paths.get("repo/app/package.json");
         acc.lockToPackage.put(Paths.get("repo/app/yarn.lock"), manifest);
         Path parent = Paths.get("repo/package.json");
         Path top = Paths.get("package.json");
+        Path other = Paths.get("repo/other/package.json");
+        Path nested = Paths.get("repo/app/lib/package.json");
         String[] names = {"app", "repo", "top", "other", "lib"};
-        Path[] paths = {manifest, parent, top, Paths.get("repo/other/package.json"),
-          Paths.get("repo/app/lib/package.json")};
+        Path[] paths = {manifest, parent, top, other, nested};
         for (int i = 0; i < paths.length; i++) {
             NodeDependencyScan.ProjectState ps = new NodeDependencyScan.ProjectState();
             ps.capturedPackageJson = PlainText.builder().sourcePath(paths[i]).text("{\"name\":\"" + names[i] + "\"}")
               .build();
             acc.projects.put(paths[i], ps);
+            acc.paths.add(paths[i]);
         }
 
         NodeDependencyScan.ProjectFiles files = NodeDependencyScan.projectFiles(acc, SCANNED, manifest);
 
-        assertThat(files.getManifests()).containsOnlyKeys(manifest);
-        assertThat(files.getPackageManagerFiles()).containsOnlyKeys(parent, top);
+        assertThat(files.getManifests()).containsOnlyKeys(manifest, nested);
+        assertThat(files.getPackageManagerFiles()).containsOnlyKeys(parent, top, other);
         assertThat(files.getPackageManagerFiles().get(parent)).isEqualTo("{\"name\":\"repo\"}");
+    }
+
+    /**
+     * A file:, link: or portal: dependency, and a bare path, make the package manager read the package.json of the
+     * directory it names, and that one's in turn, wherever the repository holds them.
+     */
+    @Test
+    void thePackageJsonOfADirectoryADependencyNamesIsKeptWhereverItIs() {
+        NodeDependencyScan.Accumulator acc = new NodeDependencyScan.Accumulator();
+        Path manifest = Paths.get("apps/web/package.json");
+        acc.lockToPackage.put(Paths.get("apps/web/package-lock.json"), manifest);
+        Path lib = Paths.get("libs/ui/package.json");
+        Path theme = Paths.get("libs/theme/package.json");
+        Path linked = Paths.get("tools/lint/package.json");
+        Path unread = Paths.get("libs/icons/package.json");
+        Path unrelated = Paths.get("libs/unrelated/package.json");
+        String[] texts = {
+          "{\"name\":\"web\",\"dependencies\":{\"ui\":\"file:../../libs/ui\",\"lint\":\"link:../../tools/lint\"," +
+          "\"icons\":\"../../libs/icons\",\"outside\":\"file:../../../elsewhere\",\"left-pad\":\"^1.3.0\"}}",
+          "{\"name\":\"ui\",\"dependencies\":{\"theme\":\"file:../theme\"}}",
+          "{\"name\":\"theme\"}", "{\"name\":\"lint\"}", "{\"name\":\"unrelated\"}"};
+        Path[] paths = {manifest, lib, theme, linked, unrelated};
+        for (int i = 0; i < paths.length; i++) {
+            NodeDependencyScan.ProjectState ps = new NodeDependencyScan.ProjectState();
+            ps.capturedPackageJson = new JsonParser().parse(texts[i]).findFirst().orElseThrow()
+              .withSourcePath(paths[i]);
+            acc.projects.put(paths[i], ps);
+            acc.paths.add(paths[i]);
+        }
+        acc.paths.add(unread);
+
+        NodeDependencyScan.ProjectFiles files = NodeDependencyScan.projectFiles(acc, SCANNED, manifest);
+
+        assertThat(files.getManifests()).containsOnlyKeys(manifest);
+        assertThat(files.getPackageManagerFiles()).containsOnlyKeys(lib, theme, linked);
+        assertThat(files.getPaths()).containsExactlyInAnyOrder(manifest, lib, theme, linked, unread);
     }
 
     /**
@@ -144,6 +184,49 @@ class NodeDependencyScanTest {
         assertThat(acc.projects.get(MEMBER).capturedLockContent).isEqualTo("root lock");
         assertThat(NodeDependencyScan.lockImporters(acc, rootLock)).containsExactly(ROOT, MEMBER);
         assertThat(NodeDependencyScan.lockImporters(acc, memberLock)).isEmpty();
+    }
+
+    /**
+     * A host that parses a manifest beside its installed node_modules, with no lock there, marks it as npm's. Under
+     * a pnpm workspace it is pnpm's where pnpm, run in its directory, installs at the workspace root or stops on the
+     * way (a workspace manifest held without its contents); npm's where pnpm installs it on its own, or where it
+     * holds a package-lock.json.
+     */
+    @ParameterizedTest
+    @CsvSource(delimiter = '|', value = {
+      "packages/* | false | Pnpm | pnpm-lock.yaml",
+      "unread     | false | Pnpm | pnpm-lock.yaml",
+      "apps/*     | false | Npm  |",
+      "packages/* | true  | Npm  | packages/a/package-lock.json"
+    })
+    void aManifestMarkedAsNpmsIsInstalledByTheWorkspaceWhoseWalkLeadsThere(String listed, boolean ownLock,
+                                                                         PackageManager installs,
+                                                                         @Nullable String lock) {
+        NodeDependencyScan.Accumulator acc = new NodeDependencyScan.Accumulator();
+        NodeDependencyScan.captureLock(acc,
+          PlainText.builder().sourcePath(Paths.get("pnpm-lock.yaml")).text("root lock").build());
+        if (ownLock) {
+            NodeDependencyScan.captureLock(acc, PlainText.builder()
+              .sourcePath(Paths.get("packages/a/package-lock.json")).text("member lock").build());
+        }
+        acc.projects.computeIfAbsent(ROOT, k -> new NodeDependencyScan.ProjectState()).capturedPackageJson =
+          PlainText.builder().sourcePath(ROOT).text("{\"name\":\"root\",\"private\":true}")
+            .markers(Markers.build(singletonList(nodeResolutionResult(PackageManager.Pnpm)))).build();
+        acc.projects.computeIfAbsent(MEMBER, k -> new NodeDependencyScan.ProjectState()).capturedPackageJson =
+          PlainText.builder().sourcePath(MEMBER).text("{\"name\":\"a\"}")
+            .markers(Markers.build(singletonList(nodeResolutionResult(PackageManager.Npm)))).build();
+        acc.paths.addAll(Arrays.asList(ROOT, MEMBER));
+        Path workspace = Paths.get("pnpm-workspace.yaml");
+        NodeDependencyScan.capturePackageManagerFile(acc, "unread".equals(listed) ?
+          new Quark(Tree.randomId(), workspace, Markers.EMPTY, null, null) :
+          PlainText.builder().sourcePath(workspace).text("packages:\n  - '" + listed + "'\n").build());
+
+        NodeDependencyScan.linkWorkspaceMembers(acc);
+
+        assertThat(NodeDependencyScan.packageManager(acc, MEMBER)).isEqualTo(installs);
+        assertThat(NodeDependencyScan.lockFor(acc, MEMBER)).isEqualTo(lock == null ? null : Paths.get(lock));
+        assertThat(NodeDependencyScan.projectFiles(acc, SCANNED, MEMBER).getPackageManager()).isEqualTo(installs);
+        assertThat(NodeDependencyScan.packageManager(acc, ROOT)).isEqualTo(PackageManager.Pnpm);
     }
 
     /**

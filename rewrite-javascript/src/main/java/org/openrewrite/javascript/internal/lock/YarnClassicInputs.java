@@ -94,21 +94,38 @@ final class YarnClassicInputs implements Port {
                 configFiles.put(path, file.getValue());
             }
         }
+        // every package.json the host read, by location from the lock's directory: a file: or link: dependency leads
+        // to one outside it too
+        Map<String, String> manifests = new LinkedHashMap<>();
+        for (Map.Entry<String, String> file : dir.getFiles().entrySet()) {
+            String path = file.getKey();
+            if ("package.json".equals(path)) {
+                manifests.put("", file.getValue());
+            } else if (path.endsWith("/package.json")) {
+                manifests.put(path.substring(0, path.length() - "/package.json".length()), file.getValue());
+            }
+        }
+        manifests.putAll(dir.getManifests());
         return Inputs.builder()
                 .lock(dir.getLock())
-                .manifests(dir.getManifests())
+                .manifests(manifests)
                 .configFiles(configFiles)
                 .paths(paths(dir))
                 .directory(dir.getPath())
                 .cwd(dir.getRunsIn());
     }
 
-    // the paths under the lock's directory and those directly in a directory above it
+    // the paths under the lock's directory, those directly in a directory above it, and each package.json elsewhere
     private static @Nullable Set<String> paths(LockDirectory dir) {
         Set<String> paths = dir.pathsUnder("");
         Set<String> above = dir.pathsAbove("");
-        if (paths != null && above != null) {
+        if (paths != null && above != null && dir.getPaths() != null) {
             paths.addAll(above);
+            for (String held : dir.getPaths()) {
+                if (held.endsWith("/package.json")) {
+                    paths.add(held);
+                }
+            }
         }
         return paths;
     }

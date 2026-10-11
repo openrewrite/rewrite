@@ -39,7 +39,7 @@ final class LinkResolver {
 
     Promise<Manifest> resolve() {
         PackageResolver resolver = request.resolver;
-        String location = FileResolver.location(loc, LINK_PROTOCOL_PREFIX);
+        String location = FileResolver.location(resolver.files, loc, LINK_PROTOCOL_PREFIX);
         String name = PosixPath.basename(location.isEmpty() ? "." : location);
         Io<@Nullable String> read = Io.issue(resolver.loop, request.io, () -> resolver.files.manifest(location));
         request.awaited(read);

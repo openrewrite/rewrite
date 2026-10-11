@@ -277,6 +277,10 @@ public final class LockFileRegeneration {
         this.port = requireNonNull(NativeLockEngine.port(pm));
     }
 
+    public PackageManager getPackageManager() {
+        return pm;
+    }
+
     public String getLockFile() {
         return port.lockFile();
     }

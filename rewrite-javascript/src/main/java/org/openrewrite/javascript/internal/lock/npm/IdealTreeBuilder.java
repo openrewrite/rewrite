@@ -758,7 +758,7 @@ public final class IdealTreeBuilder {
         PackageJson manifest;
         try {
             manifest = files.manifest(location);
-        } catch (PackageJson.NeedsPackageFiles e) {
+        } catch (PackageJson.NeedsPackageFiles | CannotKnow e) {
             throw e;
         } catch (RuntimeException e) {
             return new LinkedHashMap<>();

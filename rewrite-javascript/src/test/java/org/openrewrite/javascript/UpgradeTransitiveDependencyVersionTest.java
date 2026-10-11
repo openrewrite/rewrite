@@ -488,6 +488,41 @@ class UpgradeTransitiveDependencyVersionTest implements RewriteTest {
         golden("yarn-berry/override-recipe-member", PackageManager.YarnBerry, "7.0.0", null);
     }
 
+    /**
+     * A host that parses a workspace member beside its installed node_modules marks it as npm's. It is still its
+     * workspace's member: the override is the root's, where that package manager reads it, and the member gets none
+     * of npm's.
+     */
+    @ParameterizedTest
+    @CsvSource({"pnpm, Pnpm", "bun, Bun", "yarn-classic, YarnClassic", "yarn-berry, YarnBerry"})
+    void aMemberMarkedAsNpmsIsStillItsWorkspacesMember(String family, PackageManager pm) {
+        golden(family + "/override-recipe-member", pm, PackageManager.Npm, "7.0.0", null, null);
+    }
+
+    /**
+     * urql's shape: the workspace manifest is a parse error and the members are marked as npm's. No member is edited
+     * as a root of its own, and the root reports what it cannot know.
+     */
+    @Test
+    void membersOfAWorkspaceWhoseManifestIsUnreadAreNotEditedAsRootsOfTheirOwn() {
+        Scenario s = new Scenario("pnpm/override-recipe-member");
+        String member = requireNonNull(s.file("tree-before/" + MEMBER));
+        rewriteRun(
+          spec -> s.spec(spec, "7.0.0", null)
+            .dataTable(NodeLockRegenerationFailures.Row.class, rows -> assertThat(rows).singleElement()
+              .satisfies(row -> {
+                  assertThat(row.getSourcePath()).isEqualTo("package.json");
+                  assertThat(row.getDetail())
+                    .isEqualTo("the engine cannot know pnpm-workspace.yaml (its contents were not read)");
+              })),
+          s.root(PackageManager.Pnpm, s.file("pkg-before")),
+          packageJson(member, null, nodeResolutionResult(PackageManager.Npm, dependencies(member)),
+            spec -> spec.path(MEMBER).noTrim()),
+          SourceSpecs.other(s.file("workspace-before"), spec -> spec.path("pnpm-workspace.yaml")),
+          s.lock(PackageManager.Pnpm, null)
+        );
+    }
+
     @Test
     void pnpm10WritesTheWorkspaceManifestAndTheLockIsCannotKnow() {
         otherPnpmRelease("pnpm/override-pnpm10-recipe-workspace", "is-odd", "10.34.6");
@@ -679,12 +714,18 @@ class UpgradeTransitiveDependencyVersionTest implements RewriteTest {
 
     private void golden(String scenario, PackageManager pm, String version, @Nullable String path,
                         @Nullable String declined) {
+        golden(scenario, pm, pm, version, path, declined);
+    }
+
+    // memberPm: the package manager the member's marker names
+    private void golden(String scenario, PackageManager pm, PackageManager memberPm, String version,
+                        @Nullable String path, @Nullable String declined) {
         Scenario s = new Scenario(scenario);
         List<SourceSpecs> sources = new ArrayList<>();
         sources.add(s.root(pm, s.file("pkg")));
         String member = s.file("tree-before/" + MEMBER);
         if (member != null) {
-            sources.add(packageJson(member, null, nodeResolutionResult(pm, dependencies(member)),
+            sources.add(packageJson(member, null, nodeResolutionResult(memberPm, dependencies(member)),
               spec -> spec.path(MEMBER).noTrim()));
         }
         if (s.file("workspace") != null) {
