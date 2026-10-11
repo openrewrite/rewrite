@@ -25,6 +25,7 @@ import org.openrewrite.javascript.semver.NodeSemver;
 
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -167,7 +168,8 @@ final class PatchedDependencies {
      * @param path the project directory, which a patch path resolves against and may not leave
      * @param held the files the project holds, relative to {@code path}, when the host says
      * @throws PatchError where npm rejects the patch set
-     * @throws CannotKnow for a patch file the project holds, whose integrity the node's record is
+     * @throws CannotKnow for a patch file the project holds, whose integrity the node's record is, once npm has nothing
+     *                    left to refuse; and for one it may hold, where the host does not say
      */
     static void resolvePatchedDependencies(Node tree, String path, @Nullable Set<String> held) {
         Object declared = tree.getPackage().get("patchedDependencies");
@@ -177,6 +179,10 @@ final class PatchedDependencies {
             selectors.add(parseSelector(entry.getKey(), entry.getValue()));
         }
 
+        // npm reads a patch file that is there and goes on to the next node, so what it refuses after is its answer
+        // whatever the file holds; the integrity it records of the file is what the engine is not given
+        CannotKnow unread = null;
+        Set<String> usedKeys = new LinkedHashSet<>();
         for (Node node : tree.getInventory().values()) {
             // patchedDependencies is honoured only in the root manifest
             if (node.isWorkspace()) {
@@ -208,19 +214,30 @@ final class PatchedDependencies {
             }
 
             // node.patched = { path, integrity }: the integrity is the patch file's, so no node is given a record
-            throw readPatch(selector.getPatchPath(), path, held);
+            RuntimeException refusal = readPatch(selector.getPatchPath(), path, held);
+            if (held == null || !(refusal instanceof CannotKnow)) {
+                throw refusal;
+            }
+            if (unread == null) {
+                unread = (CannotKnow) refusal;
+            }
+            usedKeys.add(selector.getKey());
         }
 
-        if (!selectors.isEmpty()) {
-            // no selector was used; allow-unused-patches is read from the command line only, where the install has
-            // none
-            List<String> unused = new ArrayList<>();
-            for (Selector s : selectors) {
+        // allow-unused-patches is read from the command line only, where the install has none
+        List<String> unused = new ArrayList<>();
+        for (Selector s : selectors) {
+            if (!usedKeys.contains(s.getKey())) {
                 unused.add("  " + s.getKey() + " -> " + Js.string(s.getPatchPath()));
             }
+        }
+        if (!unused.isEmpty()) {
             throw new PatchError("The following patches were registered but matched no installed package:\n" +
                                  String.join("\n", unused) + "\nUse --allow-unused-patches to install anyway.",
                     "EPATCHUNUSED");
+        }
+        if (unread != null) {
+            throw unread;
         }
     }
 

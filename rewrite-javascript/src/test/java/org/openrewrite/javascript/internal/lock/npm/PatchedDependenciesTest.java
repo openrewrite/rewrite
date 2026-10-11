@@ -116,6 +116,28 @@ class PatchedDependenciesTest {
           .hasMessageContaining("patch file patches/is-odd.patch");
     }
 
+    // npm reads a patch file that is there and goes on: over a project that holds patches/is-odd.patch, whatever is
+    // in it, its answer is what it refuses of the entries after
+    @ParameterizedTest
+    @CsvSource(delimiter = '|', value = {
+      "{\"is-odd@3.0.1\":\"patches/is-odd.patch\",\"left-pad\":\"x.patch\"} | EPATCHUNUSED | The following patches " +
+      "were registered but matched no installed package:~  left-pad -> x.patch~Use --allow-unused-patches to " +
+      "install anyway.",
+      "{\"is-odd\":\"patches/is-odd.patch\",\"is-number\":\"patches/none.patch\"} | EPATCHNOTFOUND | " +
+      "patch file not found: patches/none.patch"
+    })
+    void aPatchFileThatIsThereLeavesNpmsLaterRefusals(String patchedDependencies, String code, String message) {
+        Set<String> held = new LinkedHashSet<>(Arrays.asList("package.json", "patches/is-odd.patch"));
+        assertThatThrownBy(() -> PatchedDependencies.resolvePatchedDependencies(project(patchedDependencies), "/p",
+          held))
+          .isInstanceOfSatisfying(NpmError.class, e -> assertThat(e.getCode()).isEqualTo(code))
+          .hasMessage(message.replace('~', '\n'));
+        // where the host does not say what the project holds, the first patch file may be the one npm misses
+        assertThatThrownBy(() -> PatchedDependencies.resolvePatchedDependencies(project(patchedDependencies), "/p",
+          null))
+          .isInstanceOf(CannotKnow.class);
+    }
+
     // a record the lock holds for a package no entry names any more is dropped, and a project without either has
     // nothing for npm to resolve
     @Test

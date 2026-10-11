@@ -213,8 +213,8 @@ class NpmLockRegeneratorTest {
 
     // npm 12.2.0 over a project whose patchedDependencies names its directory dependency lib, with no patch file:
     // "patch file not found: patches/lib.patch". The directory itself, which no edge names, is asked before the link
-    // to it, so npm reads the patch where the link alone would be no registry dependency to patch. npm 11.21.0
-    // writes the lock back.
+    // to it, so npm reads the patch first; with the file there it goes on to the link, which is no registry
+    // dependency to patch. npm 11.21.0 writes the lock back.
     @Test
     void npm12ReadsThePatchOfADirectoryDependency() {
         String lock = "{\n  \"name\": \"p\",\n  \"version\": \"1.0.0\",\n  \"lockfileVersion\": 3,\n  \"requires\": " +
@@ -237,6 +237,15 @@ class NpmLockRegeneratorTest {
           .contains("patch file not found: patches/lib.patch");
 
         assertThat(regenerate(inputs.release(NpmRelease.of("11.21.0"))).getLockFileContent()).isEqualTo(lock);
+
+        // with the patch file there, npm 12.2.0 reads it for the directory and then refuses the link
+        Result held = regenerate(inputs.release(NpmRelease.of("12.2.0")).paths(new LinkedHashSet<>(Arrays.asList(
+          "package.json", "package-lock.json", "lib/package.json", "patches/lib.patch"))));
+        assertThat(held.getFailure()).isNotNull();
+        assertThat(held.getFailure().getKind()).isEqualTo(Kind.PM_REJECTS);
+        assertThat(held.getFailure().getDetail()).contains("(EPATCHNONREGISTRY)")
+          .contains("Cannot patch non-registry dependency lib@1.0.0 (selector \"lib\"). Only registry dependencies " +
+                    "can be patched.");
     }
 
     // a project that holds an npm-shrinkwrap.json beside its package-lock.json: npm 11.21.0 reads and writes the
