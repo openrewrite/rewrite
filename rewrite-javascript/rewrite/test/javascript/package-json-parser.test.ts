@@ -530,4 +530,29 @@ empty-value=
         }, {unsafeCleanup: true});
     });
 
+    test("a workspace listed by its path is a member, as one a glob matches is", async () => {
+        await withDir(async (rootDir) => {
+            const write = (rel: string, content: object) => {
+                fs.mkdirSync(path.join(rootDir.path, path.dirname(rel)), {recursive: true});
+                fs.writeFileSync(path.join(rootDir.path, rel), JSON.stringify(content));
+            };
+            write("package.json", {name: "root", workspaces: ["packages/ui", "apps/*", "apps/web"]});
+            write("packages/ui/package.json", {name: "ui"});
+            write("packages/ui/src/package.json", {name: "not-a-member"});
+            write("apps/web/package.json", {name: "web"});
+
+            const parser = new PackageJsonParser({relativeTo: rootDir.path});
+            const results: Json.Document[] = [];
+            for await (const result of parser.parse(path.join(rootDir.path, "package.json"))) {
+                results.push(result as Json.Document);
+            }
+
+            const marker = findNodeResolutionResult(results[0]);
+            expect([...marker!.workspacePackagePaths!].sort()).toEqual([
+                path.normalize("apps/web/package.json"),
+                path.normalize("packages/ui/package.json")
+            ]);
+        }, {unsafeCleanup: true});
+    });
+
 });
