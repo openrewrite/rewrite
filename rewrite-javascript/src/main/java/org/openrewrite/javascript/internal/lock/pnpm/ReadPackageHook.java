@@ -19,7 +19,7 @@ import lombok.Value;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.javascript.internal.lock.RootRelativePath;
 import org.openrewrite.javascript.internal.lock.V8Sort;
-import org.openrewrite.semver.NodeSemver;
+import org.openrewrite.javascript.semver.NodeSemver;
 
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;

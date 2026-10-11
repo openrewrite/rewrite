@@ -18,7 +18,7 @@ package org.openrewrite.javascript.internal.lock.npm;
 import lombok.Getter;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.javascript.internal.lock.Host;
-import org.openrewrite.semver.NodeSemver;
+import org.openrewrite.javascript.semver.NodeSemver;
 
 import java.util.Collections;
 import java.util.LinkedHashMap;

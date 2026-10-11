@@ -30,14 +30,10 @@ import static org.openrewrite.semver.Semver.isVersion;
  * <a href="https://github.com/npm/node-semver#tilde-ranges-123-12-1">Tilde ranges</a>.
  */
 public class TildeRange extends LatestRelease {
-    private static final Pattern TILDE_RANGE_PATTERN = Pattern.compile("~(\\d+)(?:\\.(\\d+))?(?:\\.(\\d+))?(?:" +
-            "\\.(\\d+))?");
+    private static final Pattern TILDE_RANGE_PATTERN = Pattern.compile("~(\\d+)(?:\\.(\\d+))?(?:\\.(\\d+))?(?:\\.(\\d+))?");
 
     // The npm tilde grammar; unlike TILDE_RANGE_PATTERN, no 4th component, wildcards allowed.
     private static final Pattern NODE_TILDE_PATTERN = Pattern.compile("^(?:~>?)" + XRange.XRANGE_PLAIN + "$");
-
-    private static final Pattern NODE_TILDE_PATTERN_LOOSE = Pattern.compile("^(?:~>?)" + XRange.XRANGE_PLAIN_LOOSE +
-            "$");
 
     private final String upperExclusive;
     private final String lower;
@@ -75,8 +71,7 @@ public class TildeRange extends LatestRelease {
     public static Validated<TildeRange> build(String pattern, @Nullable String metadataPattern) {
         return build(pattern, metadataPattern, false);
     }
-    public static Validated<TildeRange> build(String pattern, @Nullable String metadataPattern,
-            boolean requireRelease) {
+    public static Validated<TildeRange> build(String pattern, @Nullable String metadataPattern, boolean requireRelease) {
         Matcher matcher = TILDE_RANGE_PATTERN.matcher(pattern);
         if (!matcher.matches()) {
             return Validated.invalid("tildeRange", pattern, "not a tilde range");
@@ -120,28 +115,25 @@ public class TildeRange extends LatestRelease {
 
     // Port of node-semver range.js replaceTilde; non-tilde tokens pass through.
     static String replaceTilde(String token, boolean incPre) {
-        return replaceTilde(token, incPre, false);
-    }
-
-    static String replaceTilde(String token, boolean incPre, boolean loose) {
-        Matcher m = (loose ? NODE_TILDE_PATTERN_LOOSE : NODE_TILDE_PATTERN).matcher(token);
+        Matcher m = NODE_TILDE_PATTERN.matcher(token);
         if (!m.matches()) {
             return token;
         }
         String mj = m.group(1), mn = m.group(2), p = m.group(3), pr = m.group(4);
+        String z = incPre ? "-0" : "";
         if (XRange.isX(mj)) {
             return "";
         }
         if (XRange.isX(mn)) {
-            return ">=" + mj + ".0.0 <" + NodeComparand.incr(mj) + ".0.0-0";
+            return ">=" + mj + ".0.0" + z + " <" + NodeComparand.incr(mj) + ".0.0-0";
         }
         if (XRange.isX(p)) {
-            return ">=" + mj + "." + mn + ".0 <" + mj + "." + NodeComparand.incr(mn) + ".0-0";
+            return ">=" + mj + "." + mn + ".0" + z + " <" + mj + "." + NodeComparand.incr(mn) + ".0-0";
         }
         if (pr != null) {
             return ">=" + mj + "." + mn + "." + p + "-" + pr + " <" + mj + "." + NodeComparand.incr(mn) + ".0-0";
         }
-        return ">=" + mj + "." + mn + "." + p + " <" + mj + "." + NodeComparand.incr(mn) + ".0-0";
+        return ">=" + mj + "." + mn + "." + p + z + " <" + mj + "." + NodeComparand.incr(mn) + ".0-0";
     }
 
     @Override

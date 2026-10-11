@@ -33,7 +33,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.function.Consumer;
-import org.openrewrite.semver.NodeSemver;
+import org.openrewrite.javascript.semver.NodeSemver;
 
 /**
  * Port of @pnpm/installing.deps-installer src/install/index.ts (pnpm 11.2.2) for one lock: install, mutateModules,

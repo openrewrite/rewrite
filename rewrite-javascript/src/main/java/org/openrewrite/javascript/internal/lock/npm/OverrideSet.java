@@ -19,7 +19,7 @@ import lombok.Getter;
 import lombok.Setter;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.javascript.internal.lock.Spec;
-import org.openrewrite.semver.NodeSemver;
+import org.openrewrite.javascript.semver.NodeSemver;
 
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
@@ -29,7 +29,7 @@ import java.util.Objects;
 import java.util.function.Supplier;
 
 import static org.openrewrite.javascript.internal.lock.npm.Js.truthy;
-import static org.openrewrite.semver.NodeSemver.Options.DEFAULT;
+import static org.openrewrite.javascript.semver.NodeSemver.Options.DEFAULT;
 
 /**
  * Port of @npmcli/arborist lib/override-set.js (npm 11.17.0).

@@ -18,7 +18,7 @@ package org.openrewrite.javascript.internal.lock;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
-import org.openrewrite.semver.NodeSemver;
+import org.openrewrite.javascript.semver.NodeSemver;
 
 import static org.assertj.core.api.Assertions.assertThat;
 

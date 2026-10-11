@@ -24,7 +24,8 @@ package manager writes, byte for byte, or a failure of a `LockFileRegeneration.K
   `V8Sort`, `WhatwgUrl`, `PosixPath`, `LocaleCompare`. Never substitute Java's equivalent: `Number()`, property
   order, sort stability, UTF-16 comparison and promise ordering all reach the lock.
 - A library several package managers use is ported once here, with its release as an option (`Minimatch`, `Ssri`,
-  `Ini`, `JsYaml`, `Picomatch`, ...).
+  `Ini`, `JsYaml`, `Picomatch`, ...). node-semver is `NodeSemver` in `org.openrewrite.javascript.semver`, outside
+  rewrite-core's `org.openrewrite.semver`, which the host shares with every recipe jar.
 - The package manager decides. When its source does not settle a question, record it before porting. An unported
   part of the package manager is a work item, never a failure.
 - A failure says what the engine cannot know or what the package manager rejects, with the package manager's own

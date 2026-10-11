@@ -20,7 +20,7 @@ import org.openrewrite.javascript.internal.lock.CannotKnow;
 import org.openrewrite.javascript.internal.lock.ManifestRules;
 import org.openrewrite.javascript.internal.lock.pnpm.Main;
 import org.openrewrite.javascript.internal.lock.pnpm.WorkspaceManifestWriter;
-import org.openrewrite.semver.NodeSemver;
+import org.openrewrite.javascript.semver.NodeSemver;
 
 import java.util.Arrays;
 import java.util.List;

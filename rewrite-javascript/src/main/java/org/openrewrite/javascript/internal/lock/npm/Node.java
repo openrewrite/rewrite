@@ -24,7 +24,7 @@ import lombok.Value;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.javascript.internal.lock.PosixPath;
 import org.openrewrite.javascript.internal.lock.Spec;
-import org.openrewrite.semver.NodeSemver;
+import org.openrewrite.javascript.semver.NodeSemver;
 
 import java.util.ArrayList;
 import java.util.Collection;
@@ -41,7 +41,7 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 import static org.openrewrite.javascript.internal.lock.npm.Js.truthy;
-import static org.openrewrite.semver.NodeSemver.Options.DEFAULT;
+import static org.openrewrite.javascript.semver.NodeSemver.Options.DEFAULT;
 
 /**
  * Port of @npmcli/arborist lib/node.js (npm 11.17.0): a package at a location in the tree, with
