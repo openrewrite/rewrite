@@ -226,9 +226,25 @@ final class NpmHttpUtils {
                isPreapproved(project.configuration, ident, version);
     }
 
+    /**
+     * npmConfigUtils {@code getMinimalAgeGate} (Yarn 4.17.0): the {@code npmScopes} entry's gate of a scoped package,
+     * else the project's. Before 4.17.0 a scope has no gate of its own.
+     */
+    private static @Nullable Object getMinimalAgeGate(Ident ident, Configuration configuration) {
+        if (ident.scope != null && !ident.scope.isEmpty()) {
+            Object scopeConfiguration = configuration.getMap("npmScopes").get(ident.scope);
+            Object scopeGate = scopeConfiguration instanceof Map ? ((Map<?, ?>) scopeConfiguration)
+                    .get("npmMinimalAgeGate") : null;
+            if (scopeGate instanceof Number) {
+                return scopeGate;
+            }
+        }
+        return configuration.get("npmMinimalAgeGate");
+    }
+
     private static boolean shouldBeQuarantined(Project project, Ident ident, @Nullable Object version,
                                                @Nullable Object publishTimes) {
-        Object minimalAgeGate = project.configuration.get("npmMinimalAgeGate");
+        Object minimalAgeGate = getMinimalAgeGate(ident, project.configuration);
         if (!Js.truthy(minimalAgeGate)) {
             return false;
         }

@@ -15,7 +15,10 @@
  */
 package org.openrewrite.javascript.internal.lock;
 
+import org.openrewrite.javascript.internal.LockFileRegeneration.Failure;
 import org.openrewrite.javascript.internal.LockFileRegeneration.InstallRoot;
+import org.openrewrite.javascript.internal.LockFileRegeneration.Kind;
+import org.openrewrite.javascript.internal.LockFileRegeneration.Reason;
 import org.openrewrite.javascript.internal.LockFileRegeneration.Result;
 import org.openrewrite.javascript.internal.lock.berry.BerryManifestRules;
 import org.openrewrite.javascript.internal.lock.berry.Configuration;
@@ -66,8 +69,16 @@ final class YarnBerryInputs implements Port {
 
     @Override
     public Result regenerate(LockDirectory dir, HostInputs host, NpmRegistryClient client) {
-        return new YarnBerryLockRegenerator(from(dir, host), new HostRegistrySource(host.transport(), client))
+        Result result = new YarnBerryLockRegenerator(from(dir, host), new HostRegistrySource(host.transport(), client))
                 .regenerate();
+        String rcFile = result.getFiles().get(DEFAULT_RC_FILENAME);
+        if (rcFile == null) {
+            return result;
+        }
+        // the lock's cacheKey and checksums follow the migrated settings, which the next install reads from the file
+        return Result.failure(new Failure(Kind.SECOND_INSTALL, Reason.RESOLUTION_REQUIRED, null,
+                "yarn install would rewrite it without the " + DEFAULT_RC_FILENAME + " Yarn writes with the settings " +
+                "it migrates, which the recipes do not write:\n" + rcFile, result.getLockFileContent()));
     }
 
     /**

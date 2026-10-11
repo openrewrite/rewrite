@@ -34,6 +34,7 @@ import java.time.LocalDate;
 import java.time.ZoneOffset;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -192,8 +193,19 @@ final class BerryScenarios {
          * environment, the machine and the day, and after the edit the home's {@code user-yarnrc-yml}.
          */
         YarnBerryLockRegenerator.Inputs inputs(Phase phase, @Nullable String lock) {
+            return inputs(phase, lock, yarnrc(phase));
+        }
+
+        /**
+         * {@link #inputs} of the phase's edit, which Yarn started with the {@code .yarnrc.yml} it had before writing
+         * its own.
+         */
+        YarnBerryLockRegenerator.Inputs editInputs(Phase phase, @Nullable String lock) {
+            return inputs(phase, lock, yarnrcBefore(phase));
+        }
+
+        private YarnBerryLockRegenerator.Inputs inputs(Phase phase, @Nullable String lock, @Nullable String yarnrc) {
             Map<String, String> configFiles = new LinkedHashMap<>();
-            String yarnrc = yarnrc(phase);
             if (yarnrc != null) {
                 configFiles.put(Configuration.DEFAULT_RC_FILENAME, yarnrc);
             }
@@ -278,10 +290,16 @@ final class BerryScenarios {
          */
         @Nullable
         String yarnrc(Phase phase) {
-            List<String> order = phase == Phase.BEFORE ? Arrays.asList("yarnrc-before.written", "yarnrc") :
-                    phase == Phase.REFRESH ?
-                            Arrays.asList("yarnrc-refresh.written", "yarnrc-before.written", "yarnrc") :
-                            Arrays.asList("yarnrc.written", "yarnrc-after", "yarnrc-before.written", "yarnrc");
+            String written = file(phase == Phase.BEFORE ? "yarnrc-before.written" : phase == Phase.REFRESH ?
+                    "yarnrc-refresh.written" : "yarnrc.written");
+            return written != null ? written : yarnrcBefore(phase);
+        }
+
+        // the .yarnrc.yml the phase was given
+        private @Nullable String yarnrcBefore(Phase phase) {
+            List<String> order = phase == Phase.BEFORE ? Collections.singletonList("yarnrc") :
+                    phase == Phase.REFRESH ? Arrays.asList("yarnrc-before.written", "yarnrc") :
+                            Arrays.asList("yarnrc-after", "yarnrc-before.written", "yarnrc");
             for (String f : order) {
                 if (has(f)) {
                     return file(f);

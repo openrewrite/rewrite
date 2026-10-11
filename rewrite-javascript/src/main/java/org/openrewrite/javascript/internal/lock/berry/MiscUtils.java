@@ -20,6 +20,7 @@ import org.jspecify.annotations.Nullable;
 import org.openrewrite.javascript.internal.lock.JsError;
 
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.function.Function;
@@ -33,6 +34,20 @@ final class MiscUtils {
 
     private static final Pattern ENV_VARIABLE =
             Pattern.compile("\\$\\{(?<variableName>[\\d\\w_]+)(?<colon>:)?(?:-(?<fallback>[^}]*))?}");
+
+    private static final Map<String, Double> DURATION_UNITS = new LinkedHashMap<>();
+
+    static {
+        DURATION_UNITS.put("ms", 1.0);
+        DURATION_UNITS.put("s", 1000.0);
+        DURATION_UNITS.put("m", 60.0 * 1000);
+        DURATION_UNITS.put("h", 60.0 * 60 * 1000);
+        DURATION_UNITS.put("d", 24.0 * 60 * 60 * 1000);
+        DURATION_UNITS.put("w", 7.0 * 24 * 60 * 60 * 1000);
+    }
+
+    private static final Pattern DURATION = Pattern.compile("(?<num>\\d*\\.?\\d+)(?<unit>" +
+                                                            String.join("|", DURATION_UNITS.keySet()) + ")?");
 
     private MiscUtils() {
     }
@@ -128,5 +143,22 @@ final class MiscUtils {
         }
         m.appendTail(out);
         return out.toString();
+    }
+
+    /**
+     * {@code parseDuration} (Yarn 4.11.0): a number of {@code unit}s, or a number with its own unit converted to
+     * {@code unit}s.
+     * @throws JsError when the value is no duration.
+     */
+    static double parseDuration(String value, String unit) {
+        Matcher match = DURATION.matcher(value);
+        if (!match.matches()) {
+            throw new JsError(JsError.ERROR, "Couldn't parse \"" + value + "\" as a duration");
+        }
+        double num = Double.parseDouble(match.group("num"));
+        if (match.group("unit") == null) {
+            return num;
+        }
+        return num * DURATION_UNITS.get(match.group("unit")) / DURATION_UNITS.get(unit);
     }
 }
