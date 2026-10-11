@@ -29,6 +29,10 @@ final class OptionalSet {
     }
 
     static Set<Node> optionalSet(Node node) {
+        NpmRelease release = node.getRelease();
+        if (!release.gathersOptionalSetOfAnyNode() && !node.isOptional()) {
+            return new LinkedHashSet<>();
+        }
         Set<Node> set = new LinkedHashSet<>();
         set.add(node);
         List<Node> walk = new ArrayList<>(set);
@@ -39,7 +43,10 @@ final class OptionalSet {
                 }
             }
         }
-        if (!node.getRelease().leavesInertDependentsOutOfOptionalSet()) {
+        if (!release.boundsOptionalSetByMembership()) {
+            return GatherDepSet.gatherDepSet(set, edge -> !edge.isOptional());
+        }
+        if (!release.leavesInertDependentsOutOfOptionalSet()) {
             return GatherDepSet.gatherDepSet(set, edge -> !set.contains(edge.getTo()));
         }
         return GatherDepSet.gatherDepSet(set, edge ->

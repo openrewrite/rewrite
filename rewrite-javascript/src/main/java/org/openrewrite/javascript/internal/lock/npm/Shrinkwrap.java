@@ -154,6 +154,9 @@ public final class Shrinkwrap {
         }
 
         for (String key : PKG_META_KEYS) {
+            if ("libc".equals(key) && !options.getRelease().locksLibc()) {
+                continue;
+            }
             Object val = metaFieldFromPkg(node.getPackage(), key);
             if (truthy(val)) {
                 meta.put(key.startsWith("_") ? key.substring(1) : key, val);
@@ -408,6 +411,9 @@ public final class Shrinkwrap {
     private void fixDependencies(Map<String, Object> pkg) {
         Map<String, Object> root = asObject(packages().get(""));
         for (String key : PKG_META_KEYS) {
+            if ("libc".equals(key) && !resolveOptions.getRelease().locksLibc()) {
+                continue;
+            }
             Object val = metaFieldFromPkg(pkg, key);
             if (truthy(val)) {
                 root.put(key.startsWith("_") ? key.substring(1) : key, val);

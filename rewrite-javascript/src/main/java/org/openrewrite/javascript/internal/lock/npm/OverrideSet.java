@@ -56,16 +56,31 @@ public final class OverrideSet {
     private @Nullable Object value;
 
     /**
+     * The npm release whose arborist reads the overrides.
+     */
+    private final NpmRelease release;
+
+    /**
      * @param overrides a package's {@code overrides}: a spec string or a map of keys to nested overrides.
      * @throws IllegalArgumentException for an override that is {@code null}, as arborist throws.
      */
     public OverrideSet(@Nullable Object overrides) {
-        this(overrides, null, null);
+        this(overrides, NpmRelease.PORTED);
+    }
+
+    public OverrideSet(@Nullable Object overrides, NpmRelease release) {
+        this(overrides, null, null, release);
+    }
+
+    OverrideSet(@Nullable Object overrides, @Nullable String key, @Nullable OverrideSet parent) {
+        this(overrides, key, parent, parent != null ? parent.release : NpmRelease.PORTED);
     }
 
     @SuppressWarnings("unchecked")
-    OverrideSet(@Nullable Object overrides, @Nullable String key, @Nullable OverrideSet parent) {
+    private OverrideSet(@Nullable Object overrides, @Nullable String key, @Nullable OverrideSet parent,
+                        NpmRelease release) {
         this.parent = parent;
+        this.release = release;
 
         if (overrides instanceof String) {
             Map<String, Object> rule = new LinkedHashMap<>();
@@ -136,6 +151,9 @@ public final class OverrideSet {
     }
 
     public OverrideSet getEdgeRule(Edge edge) {
+        if (!release.matchesEdgeRuleByRawSpec()) {
+            return getEdgeRule(edge.getName(), edge::getSpec);
+        }
         return getEdgeRule(edge.getName(), () -> edge.getRawSpec().isEmpty() ? edge.getSpec() : edge.getRawSpec());
     }
 
@@ -238,10 +256,17 @@ public final class OverrideSet {
         if (contains(first, second)) {
             return first;
         }
+        if (!release(first, second).fallsBackToCommonOverrideAncestor()) {
+            return null;
+        }
         if (haveConflictingRules(first, second)) {
             return null;
         }
         return findCommonAncestor(first, second);
+    }
+
+    private static NpmRelease release(@Nullable OverrideSet first, @Nullable OverrideSet second) {
+        return first != null ? first.release : second != null ? second.release : NpmRelease.PORTED;
     }
 
     private static boolean contains(@Nullable OverrideSet set, @Nullable OverrideSet ancestor) {
@@ -266,14 +291,20 @@ public final class OverrideSet {
     }
 
     // findSpecificOverrideSet's undefined (conflicting rules) and null (no common ancestor) are one value here.
-    public static boolean doOverrideSetsConflict(OverrideSet first, OverrideSet second) {
+    public static boolean doOverrideSetsConflict(OverrideSet first, @Nullable OverrideSet second) {
         if (contains(second, first) || contains(first, second)) {
             return false;
+        }
+        if (!first.release.comparesOverrideRulesForConflict()) {
+            return true;
         }
         return haveConflictingRules(first, second);
     }
 
-    public static boolean haveConflictingRules(OverrideSet first, OverrideSet second) {
+    public static boolean haveConflictingRules(OverrideSet first, @Nullable OverrideSet second) {
+        if (second == null) {
+            throw new IllegalArgumentException("Cannot read properties of undefined (reading 'ruleset')");
+        }
         Map<String, OverrideSet> firstRules = first.getRuleset();
         Map<String, OverrideSet> secondRules = second.getRuleset();
 

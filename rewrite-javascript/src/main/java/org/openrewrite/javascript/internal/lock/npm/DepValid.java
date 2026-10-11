@@ -35,6 +35,7 @@ import static org.openrewrite.javascript.semver.NodeSemver.Options.LOOSE;
 final class DepValid {
 
     private static final Pattern COMMIT = Pattern.compile("^[a-fA-F0-9]{40,64}$");
+    private static final Pattern SHA1_COMMIT = Pattern.compile("^[a-fA-F0-9]{40}$");
 
     /**
      * An error dep-valid records on the requesting node, for a spec nothing could satisfy.
@@ -141,7 +142,8 @@ final class DepValid {
                 GitHost resHost = resRepo.getHosted();
                 GitHost reqHost = requested.getHosted();
                 String reqCommittish = requested.getGitCommittish() == null ? "" : requested.getGitCommittish();
-                boolean reqCommit = COMMIT.matcher(reqCommittish).matches();
+                boolean reqCommit = (requestor.getRelease().readsSha256Commits() ? COMMIT : SHA1_COMMIT)
+                        .matcher(reqCommittish).matches();
                 GitHost.Opts nc = GitHost.Opts.of(null, !reqCommit);
                 if (resHost == null) {
                     if (!Objects.equals(resRepo.getFetchSpec(), requested.getFetchSpec())) {

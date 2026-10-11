@@ -152,6 +152,18 @@ final class Pacote {
         Map<String, Object> mani = full || !opts.isFullMetadata() ? picked :
                 withVersionDocument(picked, registry.manifest(options.registryFor(name), name,
                         versionKey(packument, picked)));
+        if (options.getRelease().expandsBinDirOfRegistryManifests()) {
+            // normalize.js binDir resolves the directory against the path a manifest from the registry lacks
+            Object directories = mani.get("directories");
+            Object binDir = directories == null ? null : Js.get(directories, "bin");
+            if (truthy(binDir) && !truthy(mani.get("bin"))) {
+                if (!(binDir instanceof String)) {
+                    throw new IllegalArgumentException("ref.replace is not a function");
+                }
+                throw new NpmRejection("ERR_INVALID_ARG_TYPE",
+                        "The \"paths[0]\" argument must be of type string. Received undefined", null);
+            }
+        }
         PackageJson.syncNormalize(mani);
         PackageJson.normalizeBin(mani);
 

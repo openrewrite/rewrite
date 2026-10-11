@@ -178,8 +178,9 @@ public final class IdealTreeBuilder {
         Set<String> omitSet = options.omitSet();
         Host environment = Host.builder().os(options.getOs()).cpu(options.getCpu()).libc(options.getLibc()).build();
 
+        NpmRelease release = options.getRelease();
         for (Node node : tree.getInventory().values()) {
-            if (!node.isOptional() && !node.shouldOmit(omitSet)) {
+            if (!node.isOptional() && !(release.skipsEngineCheckOfOmitted() && node.shouldOmit(omitSet))) {
                 try {
                     if (!(node.isRoot() && truthy(node.getPackage().get("devEngines")))) {
                         NpmInstallChecks.checkEngine(node.getPackage(), NPM_VERSION, host.getNodeVersion(),
@@ -193,7 +194,7 @@ public final class IdealTreeBuilder {
                 }
                 NpmInstallChecks.checkPlatform(node.getPackage(), options.isForce(), Host.UNKNOWN, host);
             }
-            if (node.isOptional() && !node.isInert()) {
+            if (release.marksUninstallableOptionalInert() && node.isOptional() && !node.isInert()) {
                 try {
                     NpmInstallChecks.checkEngine(node.getPackage(), NPM_VERSION, host.getNodeVersion(), false);
                     NpmInstallChecks.checkPlatform(node.getPackage(), false, environment, host);
@@ -278,9 +279,19 @@ public final class IdealTreeBuilder {
         if (!seen.add(node)) {
             return;
         }
+        NpmRelease release = options.getRelease();
         for (Edge edge : node.getEdgesOut().values()) {
-            boolean skipPeerOptional = edge.getType() == Edge.Type.PEER_OPTIONAL && !options.isSave();
-            if (!skipPeerOptional && (edge.getTo() == null || !edge.isValid())) {
+            boolean problem;
+            if (release.resolvesInvalidPeerOptionalBySave()) {
+                boolean skipPeerOptional = edge.getType() == Edge.Type.PEER_OPTIONAL && !options.isSave();
+                problem = !skipPeerOptional && (edge.getTo() == null || !edge.isValid());
+            } else if (release.queuesNodesMissingDependencies()) {
+                problem = edge.getTo() == null && (!release.leavesMissingPeerOptionalUnqueued() ||
+                                                   edge.getType() != Edge.Type.PEER_OPTIONAL) || !edge.isValid();
+            } else {
+                problem = !edge.isValid();
+            }
+            if (problem) {
                 depsQueue.push(node);
                 break;
             }
@@ -356,7 +367,9 @@ public final class IdealTreeBuilder {
             }
         }
 
-        DepFlags.resetDepFlags(tree);
+        if (options.getRelease().resetsDepFlagsOfInflatedLock()) {
+            DepFlags.resetDepFlags(tree);
+        }
         DepFlags.calcDepFlags(tree);
 
         if (options.getLockfileVersion() == null) {
@@ -484,7 +497,8 @@ public final class IdealTreeBuilder {
                     }
                     Node from = edgeIn.getFrom();
                     if (!edgeIn.isPeerConflicted() && !edgeIn.isValid()) {
-                        if (depsSeen.contains(from) && options.isSave()) {
+                        if (depsSeen.contains(from) && options.isSave() &&
+                            options.getRelease().resolvesInvalidPeerOptionalBySave()) {
                             depsSeen.remove(from);
                             depsQueue.push(from);
                         } else if (!depsSeen.contains(from)) {
@@ -626,7 +640,8 @@ public final class IdealTreeBuilder {
                 continue;
             }
 
-            if (!edge.isValid() && (edge.getType() != Edge.Type.PEER_OPTIONAL || options.isSave())) {
+            if (!edge.isValid() && (edge.getType() != Edge.Type.PEER_OPTIONAL || options.isSave() ||
+                                    !options.getRelease().resolvesInvalidPeerOptionalBySave())) {
                 problems.add(edge);
             }
         }
@@ -743,8 +758,10 @@ public final class IdealTreeBuilder {
         boolean installLinks = options.isInstallLinks();
         boolean isWorkspace = tree.getWorkspaces() != null && tree.getWorkspaces().containsKey(spec.getName());
 
+        NpmRelease release = options.getRelease();
         boolean isProjectInternalFileSpec = false;
-        if (edge != null && (edge.getRawSpec().startsWith("file:../") || edge.getRawSpec().startsWith("file:./"))) {
+        if (release.linksProjectInternalFileSpecs() && edge != null &&
+            (edge.getRawSpec().startsWith("file:../") || edge.getRawSpec().startsWith("file:./"))) {
             String targetPath = PosixPath.resolve(parent.getRealpath(), edge.getRawSpec().substring(5));
             String resolvedProjectRoot = PosixPath.resolve(tree.getRealpath());
             isProjectInternalFileSpec = targetPath.startsWith(resolvedProjectRoot + "/") ||
@@ -753,7 +770,8 @@ public final class IdealTreeBuilder {
 
         boolean parentWasInstalled = !parent.isLink() && truthy(parent.getResolved()) &&
                                      Js.string(parent.getResolved()).startsWith("file:");
-        boolean isTransitiveFileDep = spec.getType() == Spec.Type.DIRECTORY && parentWasInstalled && installLinks;
+        boolean isTransitiveFileDep = release.installsTransitiveFileDependencies() &&
+                                      spec.getType() == Spec.Type.DIRECTORY && parentWasInstalled && installLinks;
 
         boolean shouldLink = (isWorkspace || isProjectInternalFileSpec || !installLinks) && !isTransitiveFileDep;
         if (spec.getType() == Spec.Type.DIRECTORY && shouldLink) {
@@ -836,11 +854,14 @@ public final class IdealTreeBuilder {
 
         for (Edge edge : peerEdges) {
             Node nodeParent = node.getParent();
-            if (nodeParent == null) {
+            if (nodeParent == null && options.getRelease().stopsPeerSetOfDetachedNode()) {
                 break;
             }
             if (edge.isValid() && edge.getTo() != null) {
                 continue;
+            }
+            if (nodeParent == null) {
+                throw new IllegalArgumentException("Cannot read properties of null (reading 'edgesOut')");
             }
 
             Edge parentEdge = nodeParent.getEdgesOut().get(edge.getName());
@@ -946,14 +967,16 @@ public final class IdealTreeBuilder {
     }
 
     private void idealTreePrune() {
+        boolean prunesOptionalPeers = options.getRelease().prunesOptionalPeers();
         for (Node node : Objects.requireNonNull(idealTree).getInventory().values()) {
-            if (node.isExtraneous()) {
+            if (node.isExtraneous() || prunesOptionalPeers && node.isPeer() && node.isOptional()) {
                 node.setParent(null);
             }
         }
     }
 
     private void pruneFailedOptional() {
+        boolean keepsInert = options.getRelease().keepsFailedOptionalInert();
         for (Node node : loadFailures) {
             if (!node.isOptional()) {
                 Throwable error = node.getErrors().get(0);
@@ -961,7 +984,11 @@ public final class IdealTreeBuilder {
             }
 
             for (Node n : OptionalSet.optionalSet(node)) {
-                n.setInert(true);
+                if (keepsInert) {
+                    n.setInert(true);
+                } else {
+                    n.setParent(null);
+                }
             }
         }
     }
