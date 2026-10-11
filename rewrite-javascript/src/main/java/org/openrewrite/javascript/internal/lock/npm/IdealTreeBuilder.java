@@ -23,6 +23,7 @@ import org.openrewrite.javascript.internal.lock.Host;
 import org.openrewrite.javascript.internal.lock.LocaleCompare;
 import org.openrewrite.javascript.internal.lock.PosixPath;
 import org.openrewrite.javascript.internal.lock.Spec;
+import org.openrewrite.javascript.semver.NodeSemver;
 
 import java.time.Instant;
 import java.util.ArrayDeque;
@@ -235,9 +236,41 @@ public final class IdealTreeBuilder {
         if (rootManifest != null) {
             meta.inferFormattingOptions(rootManifest);
         }
+        if (options.getRelease().appliesRootOverridesToWorkspaces()) {
+            applyRootOverridesToWorkspaces(tree);
+        }
 
         queueProblemNodes(tree, new LinkedHashSet<>());
         idealTree = tree;
+    }
+
+    // a workspace's edge to a package the root overrides is detached, with the workspace's own copy of it, when the
+    // root's copy does not satisfy the edge
+    private void applyRootOverridesToWorkspaces(Node tree) {
+        Object overrides = tree.getRoot().getPackage().get("overrides");
+        List<String> rootOverrides = truthy(overrides) ? Js.keys(overrides) : new ArrayList<>();
+
+        for (Node node : tree.getRoot().getInventory().values()) {
+            if (!node.isWorkspace()) {
+                continue;
+            }
+
+            for (String depName : rootOverrides) {
+                Edge edge = node.getEdgesOut().get(depName);
+                Node rootNode = tree.getRoot().getChildren().get(depName);
+
+                if (edge == null || rootNode == null) {
+                    continue;
+                }
+
+                Object resolvedRootVersion = Js.get(rootNode.getPackage(), "version");
+                if (!NodeSemver.satisfies(resolvedRootVersion == Js.UNDEFINED ? null : resolvedRootVersion,
+                        edge.getSpec(), NodeSemver.Options.DEFAULT)) {
+                    edge.detach();
+                    node.getChildren().delete(depName);
+                }
+            }
+        }
     }
 
     // treeverse's depth: visit a node, then each edge's target in order, each once
@@ -388,7 +421,8 @@ public final class IdealTreeBuilder {
                 Node parent = edge.isPeer() ? virtualRoot : null;
                 Node dep = vrDep != null && vrDep.satisfies(edge) ? vrDep : null;
 
-                if (dep == null && edge.getType() == Edge.Type.PEER_OPTIONAL) {
+                if (dep == null && edge.getType() == Edge.Type.PEER_OPTIONAL &&
+                    options.getRelease().findsHoistablePeerOptional()) {
                     Node from = Objects.requireNonNull(edge.getFrom());
                     dep = findHoistableNode(from.getResolveParent() != null ? from.getResolveParent() : from, edge);
                 }
@@ -480,7 +514,9 @@ public final class IdealTreeBuilder {
                 for (Edge e : problemEdges(placed)) {
                     promises.add(() -> {
                         try {
-                            fetchManifest(Spec.resolve(e.getName(), e.getSpec(), FromPath.fromPath(placed, e)), e);
+                            // arborist passes the parent placement here, which is no node
+                            fetchManifest(Spec.resolve(e.getName(), e.getSpec(), FromPath.fromPath(placed, e)), null,
+                                    e);
                         } catch (RuntimeException ignored) {
                         }
                     });
@@ -613,15 +649,26 @@ public final class IdealTreeBuilder {
         return (Double) before;
     }
 
-    private Map<String, Object> fetchManifest(Spec spec, @Nullable Edge edge) {
-        checkAllow(spec, edge);
+    // parent: the node the manifest is fetched under, which is none for the pre-fetch of a placed node's problem edges
+    private Map<String, Object> fetchManifest(Spec spec, @Nullable Node parent, @Nullable Edge edge) {
+        NpmRelease release = options.getRelease();
+        boolean isRoot;
+        if (release.checksAllowedSpecTypes()) {
+            checkAllow(spec, edge);
+            Node from = edge == null ? null : edge.getFrom();
+            isRoot = from != null && (from.isProjectRoot() || from.isWorkspace());
+        } else {
+            isRoot = release.fetchesAsRootUnderRootParent() && parent != null &&
+                     (parent.isProjectRoot() || parent.isWorkspace());
+        }
         Map<String, Object> fetchOptions = new LinkedHashMap<>();
         Pacote.Options.OptionsBuilder pacoteOptions = Pacote.Options.builder()
                 .fullMetadata(true)
                 .before(releaseAgeBefore(spec))
                 .defaultTag(options.getTag())
                 .nodeVersion(host.getNodeVersion())
-                .npmVersion(NPM_VERSION);
+                .npmVersion(NPM_VERSION)
+                .root(isRoot);
         spec = Objects.requireNonNull(Objects.requireNonNull(idealTree).getMeta()).checkYarnLock(spec, fetchOptions);
 
         Map<String, Object> cached = manifests.get(spec.getRaw());
@@ -684,10 +731,12 @@ public final class IdealTreeBuilder {
     }
 
     private Node nodeFromSpec(String name, Spec spec, Node parent, @Nullable Edge edge) {
-        try {
-            checkAllow(spec, edge);
-        } catch (NpmRejection error) {
-            return failureNode(name, parent, error, edge);
+        if (options.getRelease().checksAllowedSpecTypes()) {
+            try {
+                checkAllow(spec, edge);
+            } catch (NpmRejection error) {
+                return failureNode(name, parent, error, edge);
+            }
         }
 
         Node tree = Objects.requireNonNull(idealTree);
@@ -739,13 +788,13 @@ public final class IdealTreeBuilder {
 
         Map<String, Object> pkg;
         try {
-            pkg = fetchManifest(spec, edge);
+            pkg = fetchManifest(spec, parent, edge);
         } catch (CannotKnow | PackageJson.NeedsPackageFiles error) {
             throw error;
         } catch (RuntimeException error) {
             return failureNode(name, parent, error, edge);
         }
-        if (!truthy(pkg.get("version")) && spec.isRegistry()) {
+        if (options.getRelease().failsIncompleteManifests() && !truthy(pkg.get("version")) && spec.isRegistry()) {
             return failureNode(name, parent, new NpmRejection("EINCOMPLETEMANIFEST",
                     "incomplete manifest for " + name + ", missing version", null), edge);
         }

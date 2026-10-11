@@ -761,6 +761,9 @@ public final class Shrinkwrap {
      * target: a workspace or {@code file:} dependency the manifest no longer names gets no entry.
      */
     static boolean isStaleTopLevelEntry(Node node, String loc) {
+        if (!node.getRelease().dropsExtraneousOutsideNodeModules()) {
+            return false;
+        }
         if (!node.getRelease().keepsNestedExtraneousFsChildren()) {
             return node.isExtraneous() && !NODE_MODULES.matcher(loc).find() && !"node_modules".equals(loc);
         }
@@ -794,7 +797,8 @@ public final class Shrinkwrap {
                     continue;
                 }
                 Map<String, Object> meta = metaFromNode(node, path, resolveOptions);
-                if (node.isInert() && !truthy(node.getPackage().get("version"))) {
+                if (resolveOptions.getRelease().skipsInertNodesWithoutVersion() && node.isInert() &&
+                    !truthy(node.getPackage().get("version"))) {
                     continue;
                 }
                 packages.put(loc, meta);

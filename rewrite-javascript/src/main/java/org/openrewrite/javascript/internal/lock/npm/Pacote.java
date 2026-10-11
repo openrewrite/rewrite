@@ -60,6 +60,12 @@ final class Pacote {
          */
         @Nullable
         Object integrity;
+
+        /**
+         * {@code _isRoot}: whether the project root or a workspace asks for the package; false where arborist says
+         * nothing.
+         */
+        boolean root;
     }
 
     private final PackumentSource registry;
@@ -84,7 +90,40 @@ final class Pacote {
         }
     }
 
+    // fetcher.js canUse, which FetcherBase.get asks before it makes the fetcher of a git, remote, file or directory spec
+    private void canUse(Spec spec, Options opts) {
+        String allow;
+        switch (Objects.requireNonNull(spec.getType())) {
+            case GIT:
+                allow = options.getAllowGit();
+                break;
+            case REMOTE:
+                allow = options.getAllowRemote();
+                break;
+            case FILE:
+                allow = options.getAllowFile();
+                break;
+            case DIRECTORY:
+                allow = options.getAllowDirectory();
+                break;
+            default:
+                return;
+        }
+        if ("all".equals(allow)) {
+            return;
+        }
+        if (!"none".equals(allow) && opts.isRoot()) {
+            return;
+        }
+        String type = spec.getType().toString();
+        String nonRoot = "root".equals(allow) ? " non-root" : "";
+        throw new NpmRejection("EALLOW" + type.toUpperCase(), options.getRelease().namesTypeInAllowRejection() ?
+                "Fetching" + nonRoot + " packages of type \"" + type + "\" have been disabled" :
+                "Fetching" + nonRoot + " packages from git has been disabled", spec.toString());
+    }
+
     Map<String, Object> manifest(Spec spec, Options opts) {
+        canUse(spec, opts);
         checkBefore(opts);
         Spec fetched = spec.getType() == Spec.Type.ALIAS && spec.getSubSpec() != null ? spec.getSubSpec() : spec;
         switch (Objects.requireNonNull(fetched.getType())) {

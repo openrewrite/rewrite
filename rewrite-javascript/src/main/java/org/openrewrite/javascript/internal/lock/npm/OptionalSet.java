@@ -39,6 +39,9 @@ final class OptionalSet {
                 }
             }
         }
+        if (!node.getRelease().leavesInertDependentsOutOfOptionalSet()) {
+            return GatherDepSet.gatherDepSet(set, edge -> !set.contains(edge.getTo()));
+        }
         return GatherDepSet.gatherDepSet(set, edge ->
                 !set.contains(edge.getTo()) && !(edge.getFrom() != null && edge.getFrom().isInert()));
     }
