@@ -1860,9 +1860,9 @@ final class ResolveDependencies {
                         nonVersions.add(selector.getKey());
                     }
                 }
-                boolean isExactVersion = NodeSemver.valid(range, NodeSemver.Options.V7_8_0) != null;
+                boolean isExactVersion = NodeSemver.valid(range, Main.SEMVER) != null;
                 String satisfyingVersion = isExactVersion ?
-                        NodeSemver.maxSatisfying(versions, range, NodeSemver.Options.V7_8_0_INCLUDE_PRERELEASE) : null;
+                        NodeSemver.maxSatisfying(versions, range, Main.SEMVER_INCLUDE_PRERELEASE) : null;
                 List<String> specs = new ArrayList<>();
                 if (satisfyingVersion != null) {
                     specs.add(satisfyingVersion);
@@ -1872,7 +1872,7 @@ final class ResolveDependencies {
                     dependencies.put(peerName, range);
                 } else {
                     String highest = NodeSemver.maxSatisfying(versions, "*",
-                            NodeSemver.Options.V7_8_0_INCLUDE_PRERELEASE);
+                            Main.SEMVER_INCLUDE_PRERELEASE);
                     if (highest != null) {
                         specs.add(highest);
                     }
@@ -1910,7 +1910,7 @@ final class ResolveDependencies {
                     all &= satisfies(version, range);
                 }
                 if (all && (maxSatisfyingVersion == null ||
-                            NodeSemver.compare(version, maxSatisfyingVersion, NodeSemver.Options.V7_8_0) > 0)) {
+                            NodeSemver.compare(version, maxSatisfyingVersion, Main.SEMVER) > 0)) {
                     maxSatisfyingVersion = version;
                 }
             }
@@ -1996,12 +1996,12 @@ final class ResolveDependencies {
         List<String> localVersions = new ArrayList<>(workspacePackages.get(spec.getName()).keySet());
         switch (spec.getType()) {
             case "tag":
-                return NodeSemver.maxSatisfying(localVersions, "*", NodeSemver.Options.V7_8_0) != null;
+                return NodeSemver.maxSatisfying(localVersions, "*", Main.SEMVER) != null;
             case "version":
                 return localVersions.contains(spec.getFetchSpec());
             case "range":
                 return NodeSemver.maxSatisfying(localVersions, spec.getFetchSpec(),
-                        NodeSemver.Options.V7_8_0_LOOSE) != null;
+                        Main.LOOSE_SEMVER) != null;
             default:
                 return false;
         }
@@ -2009,7 +2009,7 @@ final class ResolveDependencies {
 
     static @Nullable String validRange(String range) {
         try {
-            return NodeSemver.validRange(range, NodeSemver.Options.V7_8_0);
+            return NodeSemver.validRange(range, Main.SEMVER);
         } catch (IllegalArgumentException e) {
             return null;
         }
@@ -2020,7 +2020,7 @@ final class ResolveDependencies {
             return false;
         }
         try {
-            return NodeSemver.satisfies(version, range, NodeSemver.Options.V7_8_0_LOOSE);
+            return NodeSemver.satisfies(version, range, Main.LOOSE_SEMVER);
         } catch (IllegalArgumentException e) {
             return false;
         }
@@ -2028,7 +2028,7 @@ final class ResolveDependencies {
 
     private static boolean satisfies(String version, String range) {
         try {
-            return NodeSemver.satisfies(version, range, NodeSemver.Options.V7_8_0);
+            return NodeSemver.satisfies(version, range, Main.SEMVER);
         } catch (IllegalArgumentException e) {
             return false;
         }

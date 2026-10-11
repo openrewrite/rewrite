@@ -24,6 +24,7 @@ import org.openrewrite.javascript.internal.lock.NodeHosts;
 import org.openrewrite.javascript.semver.NodeSemver;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -175,7 +176,7 @@ final class PackageIsInstallable {
             unsatisfiedWanted.put("node", wantedNode);
         }
         if (node != null && Js.truthy(wantedNode) && !satisfies(node, wantedNode)) {
-            if (!(node instanceof String) || NodeSemver.valid((String) node, NodeSemver.Options.V7_8_0) == null) {
+            if (!(node instanceof String) || NodeSemver.valid((String) node, Main.SEMVER) == null) {
                 throw new PnpmError("INVALID_NODE_VERSION", "The nodeVersion setting is \"" + Js.string(node) +
                                                             "\", which is not exact semver version");
             }
@@ -183,7 +184,7 @@ final class PackageIsInstallable {
         }
         Object wantedPnpm = property(wantedEngine, "pnpm");
         if (Js.truthy(pnpm) && Js.truthy(wantedPnpm) &&
-            !NodeSemver.satisfies(pnpm, wantedPnpm, NodeSemver.Options.V7_8_0_INCLUDE_PRERELEASE)) {
+            !NodeSemver.satisfies(pnpm, wantedPnpm, Main.SEMVER_INCLUDE_PRERELEASE)) {
             unsatisfiedWanted.put("pnpm", wantedPnpm);
         }
         if (unsatisfiedWanted.isEmpty()) {
@@ -203,7 +204,7 @@ final class PackageIsInstallable {
             return false;
         }
         try {
-            return NodeSemver.satisfies(version, (String) range, NodeSemver.Options.V7_8_0_INCLUDE_PRERELEASE);
+            return NodeSemver.satisfies(version, (String) range, Main.SEMVER_INCLUDE_PRERELEASE);
         } catch (IllegalArgumentException e) {
             throw new JsError(JsError.ERROR, e.getMessage());
         }
@@ -235,10 +236,15 @@ final class PackageIsInstallable {
             cpuOk = cpu == null ? passesAny("cpu", wanted.get("cpu"), unknown) : checkList(cpu, wanted.get("cpu"));
         }
         if (Js.truthy(wanted.get("libc")) && host.getOs() == null) {
-            // detect-libc finds none off linux, which skips the check
-            if (!(libc != null && checkList(libc, wanted.get("libc"))) && unknown != null &&
-                !isAny(wanted.get("libc"))) {
-                unknown.add("libc");
+            // detect-libc finds none off linux, which skips the check, and glibc or musl on it
+            List<String> families = host.getLibc() == null ? Arrays.asList("glibc", "musl") :
+                    Collections.singletonList(host.getLibc());
+            for (String family : families) {
+                List<@Nullable Object> current = dedupeCurrent(family, property(supportedArchitectures, "libc"));
+                if (unknown != null && !checkList(current, wanted.get("libc"))) {
+                    unknown.add("libc");
+                    break;
+                }
             }
         } else if (Js.truthy(wanted.get("libc")) && !"unknown".equals(currentLibc)) {
             libcOk = libc == null || checkList(libc, wanted.get("libc"));

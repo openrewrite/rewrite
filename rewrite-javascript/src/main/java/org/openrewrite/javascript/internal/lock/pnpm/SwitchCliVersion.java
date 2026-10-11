@@ -49,7 +49,7 @@ final class SwitchCliVersion {
             return null;
         }
         if (lockFile == null && persistLockfile &&
-            NodeSemver.satisfies(Main.PNPM_VERSION, version, NodeSemver.Options.V7_8_0_INCLUDE_PRERELEASE)) {
+            NodeSemver.satisfies(Main.PNPM_VERSION, version, Main.SEMVER_INCLUDE_PRERELEASE)) {
             PnpmError failure = stores.storeControllerFailure(options);
             if (failure == null && !Main.runsAsPorted(version)) {
                 throw new CannotKnow("which pnpm release the workspace's " + LockfileReader.WANTED_LOCKFILE +
@@ -65,9 +65,9 @@ final class SwitchCliVersion {
         // the release pnpm hands over to is the locked one, else one the registry has in range: when that cannot be
         // the ported release, resolving it only names another
         if (!Js.truthy(pmVersion) ||
-            !NodeSemver.satisfies(pmVersion, version, NodeSemver.Options.V7_8_0_INCLUDE_PRERELEASE)) {
+            !NodeSemver.satisfies(pmVersion, version, Main.SEMVER_INCLUDE_PRERELEASE)) {
             storeToUse = stores.createStoreController(options);
-            if (!NodeSemver.satisfies(Main.PNPM_VERSION, version, NodeSemver.Options.V7_8_0_INCLUDE_PRERELEASE) &&
+            if (!NodeSemver.satisfies(Main.PNPM_VERSION, version, Main.SEMVER_INCLUDE_PRERELEASE) &&
                 !Main.runsAsPorted(version)) {
                 throw switchesTo(version);
             }
@@ -107,7 +107,7 @@ final class SwitchCliVersion {
         if (pm.getVersion() == null) {
             return false;
         }
-        String valid = NodeSemver.valid(Js.string(pm.getVersion()), NodeSemver.Options.V7_8_0);
+        String valid = NodeSemver.valid(Js.string(pm.getVersion()), Main.SEMVER);
         return valid != null && Long.parseLong(valid.substring(0, valid.indexOf('.'))) >= 12;
     }
 }

@@ -70,7 +70,7 @@ final class TrustChecks {
                                                     Js.string(meta.get("name")) + " in metadata");
         }
         String strongestEvidencePriorToRequestedVersion = detectStrongestTrustEvidenceBeforeDate(meta, versionDate,
-                NodeSemver.prerelease(version, NodeSemver.Options.V7_8_0_LOOSE) == null);
+                NodeSemver.prerelease(version, Main.LOOSE_SEMVER) == null);
         if (strongestEvidencePriorToRequestedVersion == null) {
             return;
         }
@@ -112,7 +112,7 @@ final class TrustChecks {
             return null;
         }
         for (String version : Js.keys((Map<String, @Nullable Object>) versions)) {
-            if (excludePrerelease && NodeSemver.prerelease(version, NodeSemver.Options.V7_8_0_LOOSE) != null) {
+            if (excludePrerelease && NodeSemver.prerelease(version, Main.LOOSE_SEMVER) != null) {
                 continue;
             }
             Object ts = property(meta.get("time"), version);

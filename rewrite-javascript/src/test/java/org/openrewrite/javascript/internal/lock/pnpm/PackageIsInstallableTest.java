@@ -263,7 +263,13 @@ class PackageIsInstallableTest {
           true, null, null, Host.UNKNOWN)).isInstanceOf(PackageIsInstallable.UnsupportedEngineError.class);
     }
 
-    // pnpm skips an optional package where it does not fit, and fails engine-strict on a required one
+    // pnpm 11.2.2's node-semver 7.8.0 reads "22.x.1" as "22.x", which 7.8.4 rejects
+    @Test
+    void anUnknownNodeVersionReadsTheRangeAsPnpmsSemverDoes() {
+        PackageIsInstallable.projectIsInstallable(".", obj("{'engines':{'node':'>=22.x.1'}}"), true, null, null,
+          Host.UNKNOWN);
+    }
+
     @Test
     void anUnknownPlatformFailsOnlyARequiredPackageUnderEngineStrict() {
         Map<String, @Nullable Object> linuxOnly = obj("{'os':['linux'],'cpu':['x64']}");
@@ -275,5 +281,14 @@ class PackageIsInstallableTest {
           Host.UNKNOWN)).isTrue();
         assertThat(PackageIsInstallable.packageIsInstallable("p@1.0.0", linuxOnly, false, null, false, null,
           Host.UNKNOWN)).isTrue();
+    }
+
+    @Test
+    void anUnknownLibcFailsEngineStrictWhereSomeLinuxHostDoes() {
+        assertThatThrownBy(() -> PackageIsInstallable.packageIsInstallable("p@1.0.0", obj("{'libc':['!musl']}"),
+          true, null, false, null, Host.UNKNOWN)).isInstanceOf(CannotKnow.class).hasMessageContaining("the libc pnpm");
+
+        assertThat(PackageIsInstallable.packageIsInstallable("p@1.0.0", obj("{'libc':['!enten-libc']}"), true,
+          null, false, null, Host.UNKNOWN)).isTrue();
     }
 }

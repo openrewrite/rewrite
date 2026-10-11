@@ -107,8 +107,8 @@ final class LockfileReader {
      * node-semver's {@code major}; an IllegalArgumentException where node-semver throws its TypeError.
      */
     static long semverMajor(String version) {
-        NodeSemver.compare(version, version, NodeSemver.Options.V7_8_0);
-        String valid = NodeSemver.valid(version, NodeSemver.Options.V7_8_0);
+        NodeSemver.compare(version, version, Main.SEMVER);
+        String valid = NodeSemver.valid(version, Main.SEMVER);
         if (valid == null) {
             throw new IllegalArgumentException("Invalid Version: " + version);
         }

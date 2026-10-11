@@ -16,11 +16,13 @@
 package org.openrewrite.javascript.internal.lock;
 
 import org.jspecify.annotations.Nullable;
+import org.openrewrite.javascript.internal.lock.pnpm.Main;
 import org.openrewrite.javascript.semver.NodeSemver;
 
 /**
- * The Node releases a package manager runs on, which stand for the host when its own version is unknown. A check that
- * reads the unknown version answers only where every release answers alike.
+ * The Node releases a package manager runs on, which stand for the host when its own version is unknown, and the
+ * node-semver options its engine check reads an engines.node range with. A check that reads the unknown version
+ * answers only where every release answers alike.
  */
 public enum NodeHosts {
 
@@ -28,23 +30,25 @@ public enum NodeHosts {
      * Below its own engines npm 11.17.0 warns and runs on (lib/cli/entry.js), as it does on node 18.20.8. No older
      * release was tried.
      */
-    NPM(">=18.0.0"),
+    NPM(">=18.0.0", NodeSemver.Options.INCLUDE_PRERELEASE),
 
     /**
      * pnpm 11.2.2's bin/pnpm.mjs exits below Node 22.13. On Node 20 it warns, then fails to load its bundle.
      */
-    PNPM(">=22.13.0"),
+    PNPM(">=22.13.0", NodeSemver.Options.of(false, true, Main.SEMVER_RELEASE)),
 
     /**
      * Node 18 and up is our assumption of the releases still in use. Yarn 1.22.22 itself runs from Node 4
-     * (bin/yarn.js exits below that).
+     * (bin/yarn.js exits below that). Its semver is loose unless strict-semver is set.
      */
-    YARN_CLASSIC(">=18.0.0");
+    YARN_CLASSIC(">=18.0.0", NodeSemver.Options.V5_5_0_LOOSE);
 
     private final String releases;
+    private final NodeSemver.Options semver;
 
-    NodeHosts(String releases) {
+    NodeHosts(String releases, NodeSemver.Options semver) {
         this.releases = releases;
+        this.semver = semver;
     }
 
     public String releases() {
@@ -57,13 +61,13 @@ public enum NodeHosts {
      */
     public @Nullable Boolean satisfiedBy(@Nullable Object range) {
         String valid = range instanceof String ?
-                NodeSemver.validRange((String) range, NodeSemver.Options.DEFAULT) : null;
+                NodeSemver.validRange((String) range, semver) : null;
         if (valid == null) {
             return Boolean.FALSE;
         }
-        if (NodeSemver.subset(releases, valid, NodeSemver.Options.DEFAULT)) {
+        if (NodeSemver.subset(releases, valid, semver)) {
             return Boolean.TRUE;
         }
-        return NodeSemver.intersects(releases, valid, NodeSemver.Options.DEFAULT) ? null : Boolean.FALSE;
+        return NodeSemver.intersects(releases, valid, semver) ? null : Boolean.FALSE;
     }
 }

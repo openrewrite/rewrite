@@ -321,7 +321,7 @@ public final class PnpmOptions {
             }
             String minVersion;
             try {
-                minVersion = NodeSemver.minVersion((String) version, NodeSemver.Options.V7_8_0);
+                minVersion = NodeSemver.minVersion((String) version, Main.SEMVER);
             } catch (IllegalArgumentException e) {
                 throw new JsError(JsError.ERROR, e.getMessage());
             }
@@ -346,7 +346,7 @@ public final class PnpmOptions {
         if (pmFromDevEngines != null) {
             Object version = pmFromDevEngines.getVersion();
             if (version != null && !(version instanceof String &&
-                                     NodeSemver.validRange((String) version, NodeSemver.Options.V7_8_0) != null)) {
+                                     NodeSemver.validRange((String) version, Main.SEMVER) != null)) {
                 pmFromDevEngines = pmFromDevEngines.withVersion(null);
             }
             return pmFromDevEngines.withFromDevEngines(true);
@@ -362,7 +362,7 @@ public final class PnpmOptions {
         String[] pm = parsePackageManager((String) packageManager);
         String version = pm[1];
         if (version != null) {
-            String cleanVersion = NodeSemver.valid(version, NodeSemver.Options.V7_8_0);
+            String cleanVersion = NodeSemver.valid(version, Main.SEMVER);
             if (cleanVersion == null || !cleanVersion.equals(version)) {
                 version = null;
             }

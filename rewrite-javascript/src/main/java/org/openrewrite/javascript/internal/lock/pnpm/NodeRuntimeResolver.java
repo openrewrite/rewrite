@@ -184,7 +184,7 @@ final class NodeRuntimeResolver {
         } else {
             versions.addAll(all);
         }
-        return NodeSemver.maxSatisfying(versions, versionRange, NodeSemver.Options.V7_8_0_LOOSE_INCLUDE_PRERELEASE);
+        return NodeSemver.maxSatisfying(versions, versionRange, Main.LOOSE_SEMVER_INCLUDE_PRERELEASE);
     }
 
     // {releaseChannel, versionSpecifier}

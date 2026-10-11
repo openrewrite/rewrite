@@ -23,6 +23,7 @@ import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.params.provider.MethodSource;
 import org.openrewrite.javascript.semver.NodeSemver.Options;
+import org.openrewrite.javascript.semver.NodeSemver.Release;
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -490,20 +491,22 @@ class NodeSemverTest {
 
     @Test
     void releasesBeforeSevenEightFour() {
-        assertThat(NodeSemver.validRange("^0.2.3", Options.V7_8_0_INCLUDE_PRERELEASE))
-          .isEqualTo(">=0.2.3-0 <0.3.0-0");
+        Options v760 = Options.of(false, false, Release.V7_6_0);
+        Options v780 = Options.of(false, false, Release.V7_8_0);
+        Options v780IncludePrerelease = Options.of(false, true, Release.V7_8_0);
+
+        assertThat(NodeSemver.validRange("^0.2.3", v780IncludePrerelease)).isEqualTo(">=0.2.3-0 <0.3.0-0");
         assertThat(NodeSemver.validRange("^0.2.3", Options.INCLUDE_PRERELEASE)).isEqualTo(">=0.2.3 <0.3.0-0");
 
-        assertThat(NodeSemver.validRange("1.2.3+build - 2.0.0", Options.V7_8_0_INCLUDE_PRERELEASE))
-          .isEqualTo(">=1.2.3 <2.0.1-0");
+        assertThat(NodeSemver.validRange("1.2.3+build - 2.0.0", v780IncludePrerelease)).isEqualTo(">=1.2.3 <2.0.1-0");
         assertThat(NodeSemver.validRange("1.2.3+build - 2.0.0", Options.INCLUDE_PRERELEASE))
           .isEqualTo(">=1.2.3-0 <2.0.1-0");
 
-        assertThat(NodeSemver.subset("~1.0.0-rc.1", "^1.0.0-rc.1", Options.V7_8_0)).isFalse();
+        assertThat(NodeSemver.subset("~1.0.0-rc.1", "^1.0.0-rc.1", v780)).isFalse();
         assertThat(NodeSemver.subset("~1.0.0-rc.1", "^1.0.0-rc.1", Options.DEFAULT)).isTrue();
 
-        assertThat(NodeSemver.validRange("^10+build", Options.V7_6_0)).isNull();
-        assertThat(NodeSemver.validRange("^10+build", Options.V7_8_0)).isEqualTo(">=10.0.0 <11.0.0-0");
+        assertThat(NodeSemver.validRange("^10+build", v760)).isNull();
+        assertThat(NodeSemver.validRange("^10+build", v780)).isEqualTo(">=10.0.0 <11.0.0-0");
     }
 
     @Test

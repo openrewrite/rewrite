@@ -230,12 +230,7 @@ class YarnClassicLockRegeneratorTest {
                                                  "\"yarn@4.10.3\". However the current global version of Yarn is " +
                                                  "1.22.22.";
 
-    /**
-     * A range that is not semver and names a directory holding a package.json is a {@code file:} dependency
-     * (package-request.js {@code normalizeRange}; {@code open-implicit-file-range}), whether or not the host read it.
-     */
-    // yarn 1.22.22 fails "Found incompatible module" over the first on Node 18 and over the second on darwin, and
-    // installs both on Node 24 linux (lock/yarn-classic/small-engines-node-18-incompatible-fails)
+    // recorded in lock/yarn-classic/small-engines-node-18-incompatible-fails
     @Test
     void aProjectWhoseCompatibilityFollowsTheUnknownHostCannotBeKnown() {
         YarnClassicLockRegenerator.Inputs.InputsBuilder inputs = YarnClassicLockRegenerator.Inputs.builder()
@@ -251,6 +246,10 @@ class YarnClassicLockRegeneratorTest {
                                                          "yarn runs on, which p@1.0.0 restricts");
     }
 
+    /**
+     * A range that is not semver and names a directory holding a package.json is a {@code file:} dependency
+     * (package-request.js {@code normalizeRange}; {@code open-implicit-file-range}), whether or not the host read it.
+     */
     @Test
     void aRangeNamingADirectoryTheProjectHoldsIsAFileDependency() {
         YarnClassicLockRegenerator.Inputs.InputsBuilder inputs = YarnClassicLockRegenerator.Inputs.builder()

@@ -54,7 +54,7 @@ final class SemverRangeIntersect {
                 i++;
             }
             String operator = value.substring(0, i);
-            String version = NodeSemver.valid(value.substring(i), NodeSemver.Options.V7_8_0);
+            String version = NodeSemver.valid(value.substring(i), Main.SEMVER);
             return new Comparator("=".equals(operator) ? "" : operator, version);
         }
 
@@ -71,7 +71,7 @@ final class SemverRangeIntersect {
         }
 
         boolean intersects(Comparator other) {
-            return NodeSemver.intersects(rangeString(), other.rangeString(), NodeSemver.Options.V7_8_0);
+            return NodeSemver.intersects(rangeString(), other.rangeString(), Main.SEMVER);
         }
     }
 
@@ -217,7 +217,7 @@ final class SemverRangeIntersect {
         List<String> formatted = new ArrayList<>();
         try {
             for (String range : ranges) {
-                String valid = NodeSemver.validRange(range, NodeSemver.Options.V7_8_0);
+                String valid = NodeSemver.validRange(range, Main.SEMVER);
                 if (valid == null) {
                     return null;
                 }
@@ -228,7 +228,7 @@ final class SemverRangeIntersect {
         }
         for (int i = 0; i < formatted.size(); i++) {
             for (int j = i + 1; j < formatted.size(); j++) {
-                if (!NodeSemver.intersects(formatted.get(i), formatted.get(j), NodeSemver.Options.V7_8_0)) {
+                if (!NodeSemver.intersects(formatted.get(i), formatted.get(j), Main.SEMVER)) {
                     return null;
                 }
             }
@@ -474,7 +474,7 @@ final class SemverRangeIntersect {
     }
 
     private static boolean semverIntersects(String a, String b) {
-        return NodeSemver.intersects(a.isEmpty() ? "*" : a, b.isEmpty() ? "*" : b, NodeSemver.Options.V7_8_0);
+        return NodeSemver.intersects(a.isEmpty() ? "*" : a, b.isEmpty() ? "*" : b, Main.SEMVER);
     }
 
     private static boolean isPrerelease(Comparator c) {
@@ -492,10 +492,10 @@ final class SemverRangeIntersect {
     }
 
     private static int compare(@Nullable String a, @Nullable String b) {
-        return NodeSemver.compare(a, b, NodeSemver.Options.V7_8_0);
+        return NodeSemver.compare(a, b, Main.SEMVER);
     }
 
     private static int compareMain(@Nullable String a, @Nullable String b) {
-        return NodeSemver.compare(stripPrerelease(a), stripPrerelease(b), NodeSemver.Options.V7_8_0);
+        return NodeSemver.compare(stripPrerelease(a), stripPrerelease(b), Main.SEMVER);
     }
 }

@@ -23,8 +23,13 @@ import org.openrewrite.javascript.semver.NodeSemver;
 
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
+import java.util.SortedSet;
+import java.util.TreeSet;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 /**
  * Port of yarn src/package-compatibility.js (yarn 1.22.22): the os, cpu and engines a package declares, checked
@@ -39,6 +44,11 @@ final class PackageCompatibility {
             "cldr", "icu", "llhttp", "merve", "modules", "napi", "nbytes", "ncrypto", "nghttp2", "nghttp3", "ngtcp2",
             "openssl", "simdjson", "simdutf", "sqlite", "tz", "undici", "unicode", "uv", "uvwasi", "v8", "zlib",
             "zstd");
+
+    private static final Pattern COMPARATOR_VERSION = Pattern.compile("^[<>=]*(\\d+)\\.(\\d+)\\.(\\d+)");
+
+    // Number.MAX_SAFE_INTEGER - 1, the highest major whose next one is still a version
+    private static final long MAX_MAJOR = 9007199254740990L;
 
     private final Config config;
     private final Host host;
@@ -179,17 +189,24 @@ final class PackageCompatibility {
             return Boolean.FALSE;
         }
         String hosts = NodeHosts.YARN_CLASSIC.releases();
-        int first = Integer.parseInt(NodeSemver.minVersion(hosts, options).split("\\.", -1)[0]);
-        // past every number the range names, each major answers as the first one past them does
-        int last = first;
-        for (String number : valid.split("[^0-9]+")) {
-            if (!number.isEmpty() && number.length() < 6) {
-                last = Math.max(last, Integer.parseInt(number) + 1);
+        long first = Long.parseLong(NodeSemver.minVersion(hosts, options).split("\\.", -1)[0]);
+        // a major answers as its neighbours do unless a comparator's major, or its patch where the fake 0.1x
+        // versions cross a bound, is within one of it
+        SortedSet<Long> majors = new TreeSet<>(Collections.singleton(first));
+        for (String comparator : valid.split("\\s+")) {
+            Matcher version = COMPARATOR_VERSION.matcher(comparator);
+            if (version.find()) {
+                for (String number : Arrays.asList(version.group(1), version.group(3))) {
+                    long n = Long.parseLong(number);
+                    for (long major = Math.max(first, n - 1); major <= Math.min(n + 1, MAX_MAJOR); major++) {
+                        majors.add(major);
+                    }
+                }
             }
         }
         boolean all = true;
         boolean none = true;
-        for (int major = first; major <= last; major++) {
+        for (long major : majors) {
             String releases = hosts + " >=" + major + ".0.0 <" + (major + 1) + ".0.0";
             boolean fake = fakeSatisfies(range, major, options);
             all &= fake || NodeSemver.subset(releases, valid, options);
@@ -198,7 +215,7 @@ final class PackageCompatibility {
         return all ? Boolean.TRUE : none ? Boolean.FALSE : null;
     }
 
-    private static boolean fakeSatisfies(@Nullable Object range, int major, NodeSemver.Options options) {
+    private static boolean fakeSatisfies(@Nullable Object range, long major, NodeSemver.Options options) {
         for (String fake : Arrays.asList("0.10." + major, "0.11." + major, "0.12." + major, "0.13." + major)) {
             if (NodeSemver.satisfies(fake, range, options)) {
                 return true;

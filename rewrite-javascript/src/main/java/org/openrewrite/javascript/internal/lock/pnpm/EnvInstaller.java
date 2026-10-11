@@ -173,7 +173,7 @@ final class EnvInstaller {
         Map<String, @Nullable Object> resolved = new LinkedHashMap<>();
         for (String subdepName : Js.keys(optionalDeps)) {
             String subdepSpec = Js.string(optionalDeps.get(subdepName));
-            if (NodeSemver.valid(subdepSpec, NodeSemver.Options.V7_8_0) == null) {
+            if (NodeSemver.valid(subdepSpec, Main.SEMVER) == null) {
                 throw new PnpmError("CONFIG_DEP_OPTIONAL_NOT_EXACT", "Cannot install \"" + subdepName + "@" +
                         subdepSpec + "\" as an optionalDependency of config dependency \"" + parentName +
                         "\": only exact versions are supported (got \"" + subdepSpec + "\")");
