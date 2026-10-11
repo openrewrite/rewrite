@@ -202,7 +202,15 @@ public final class IdealTreeBuilder {
                     NpmInstallChecks.checkEngine(node.getPackage(), NPM_VERSION, host.getNodeVersion(), false);
                     NpmInstallChecks.checkPlatform(node.getPackage(), false, environment, host);
                 } catch (RuntimeException error) {
-                    for (Node n : OptionalSet.optionalSet(node)) {
+                    Set<Node> set = OptionalSet.optionalSet(node);
+                    for (Node n : set) {
+                        // hosts that differ here differ only in inert, which Shrinkwrap.commit reads only for a node
+                        // without a version
+                        if (error instanceof CannotKnow && !truthy(n.getPackage().get("version"))) {
+                            throw error;
+                        }
+                    }
+                    for (Node n : set) {
                         n.setInert(true);
                     }
                 }

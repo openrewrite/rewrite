@@ -113,18 +113,36 @@ class NpmLockRegeneratorTest {
         assertThat(Arrays.asList(kind(platform), kind(engine))).containsExactly(Kind.CANNOT_KNOW, Kind.CANNOT_KNOW);
     }
 
-    // npm locks an optional package the same on a host it skips there (lock/npm/arb-platform-optional)
+    // npm 11.17.0 locks an optional package the same on a host it skips there (lock/npm/arb-platform-optional)
     @Test
     void anOptionalPackageForSomeHostsRegeneratesOnAnUnknownHost() {
+        Map<String, String> packages = new LinkedHashMap<>();
+        packages.put("linux-only", "\"os\": [\"linux\"]");
+        packages.put("node-20-only", "\"engines\": {\"node\": \">=20\"}");
         Result result = new NpmLockRegenerator(NpmLockRegenerator.Inputs.builder()
           .lock(LOCK)
           .manifest("", "{\n  \"name\": \"a\",\n  \"version\": \"1.0.0\",\n  \"optionalDependencies\": {\n" +
-                        "    \"linux-only\": \"1.0.0\"\n  }\n}\n")
+                        "    \"linux-only\": \"1.0.0\",\n    \"node-20-only\": \"1.0.0\"\n  }\n}\n")
           .now(Instant.EPOCH)
-          .build(), oneVersion("linux-only", "\"os\": [\"linux\"], \"engines\": {\"node\": \">=99\"}")).regenerate();
+          .build(), oneVersionEach(packages)).regenerate();
 
-        assertThat(result.getLockFileContent()).contains("\"node_modules/linux-only\": {\n      \"version\": " +
-                                                         "\"1.0.0\"").contains("\"optional\": true");
+        assertThat(result.getLockFileContent())
+          .contains("\"node_modules/linux-only\": {\n      \"version\": \"1.0.0\"")
+          .contains("\"node_modules/node-20-only\": {\n      \"version\": \"1.0.0\"");
+    }
+
+    // npm 11.17.0 locks an optional file: dependency without a version on node 24 and leaves it out on node 18
+    @Test
+    void anOptionalPackageWithoutAVersionForSomeHostsCannotBeKnown() {
+        Result result = new NpmLockRegenerator(NpmLockRegenerator.Inputs.builder()
+          .lock(LOCK)
+          .manifest("", "{\n  \"name\": \"a\",\n  \"version\": \"1.0.0\",\n  \"optionalDependencies\": {\n" +
+                        "    \"x\": \"file:x\"\n  }\n}\n")
+          .manifest("x", "{\"name\": \"x\", \"engines\": {\"node\": \">=20\"}}")
+          .now(Instant.EPOCH)
+          .build(), NO_REGISTRY).regenerate();
+
+        assertThat(kind(result)).isEqualTo(Kind.CANNOT_KNOW);
     }
 
     private static @Nullable Kind kind(Result result) {
@@ -132,22 +150,30 @@ class NpmLockRegeneratorTest {
     }
 
     private static PackumentSource oneVersion(String name, String fields) {
-        String manifest = "{\"name\": \"" + name + "\", \"version\": \"1.0.0\", " + fields + ", \"dist\": {" +
-                          "\"tarball\": \"https://registry.npmjs.org/" + name + "/-/" + name + "-1.0.0.tgz\", " +
-                          "\"integrity\": \"sha512-vbutsFqQ+foy3wSSbmjBXXIJ6PL3scghJoM8zCL142cGaZKAdCZHyf+Bpu/" +
-                          "MmX9zT9Q0zFBVKb36Ma5Fzfa8xA==\"}}";
+        return oneVersionEach(singletonMap(name, fields));
+    }
+
+    private static PackumentSource oneVersionEach(Map<String, String> fieldsByName) {
         return new PackumentSource() {
             @Override
             @SuppressWarnings("unchecked")
-            public Map<String, Object> packument(String registry, String n, boolean fullMetadata) {
+            public Map<String, Object> packument(String registry, String name, boolean fullMetadata) {
                 return (Map<String, Object>) JsonParseEvenBetterErrors.jsonParse("{\"name\": \"" + name +
-                  "\", \"dist-tags\": {\"latest\": \"1.0.0\"}, \"versions\": {\"1.0.0\": " + manifest + "}}");
+                  "\", \"dist-tags\": {\"latest\": \"1.0.0\"}, \"versions\": {\"1.0.0\": " +
+                  manifest(name) + "}}");
             }
 
             @Override
             @SuppressWarnings("unchecked")
-            public Map<String, Object> manifest(String registry, String n, String version) {
-                return (Map<String, Object>) JsonParseEvenBetterErrors.jsonParse(manifest);
+            public Map<String, Object> manifest(String registry, String name, String version) {
+                return (Map<String, Object>) JsonParseEvenBetterErrors.jsonParse(manifest(name));
+            }
+
+            private String manifest(String name) {
+                return "{\"name\": \"" + name + "\", \"version\": \"1.0.0\", " + fieldsByName.get(name) +
+                       ", \"dist\": {\"tarball\": \"https://registry.npmjs.org/" + name + "/-/" + name +
+                       "-1.0.0.tgz\", \"integrity\": \"sha512-vbutsFqQ+foy3wSSbmjBXXIJ6PL3scghJoM8zCL142cGaZKAdCZ" +
+                       "Hyf+Bpu/MmX9zT9Q0zFBVKb36Ma5Fzfa8xA==\"}}";
             }
         };
     }
