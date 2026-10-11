@@ -262,6 +262,11 @@ public class NpmOptions {
      * {@code min-release-age} opens, as npm flattens the two.
      */
     public @Nullable Object before(Instant now) {
+        if (!release.yieldsMinReleaseAgeToBefore()) {
+            // min-release-age's flatten sets before whenever it is not null, and a config naming both is refused
+            return minReleaseAge != null ?
+                    (Object) V8Date.timeClip(now.toEpochMilli() - 86400000d * Js.toNumber(minReleaseAge)) : before;
+        }
         if (beforeConfigured) {
             return before;
         }
@@ -295,6 +300,9 @@ public class NpmOptions {
             if (file != null) {
                 entries.addAll(Ini.decode(file, Ini.Release.V6_0_0).entrySet());
             }
+        }
+        if (release.definesMinReleaseAge() && !release.yieldsMinReleaseAgeToBefore()) {
+            checkExclusive(npmrc, userNpmrc);
         }
         // global-style and legacy-bundling flatten by writing install-strategy into the config they come from,
         // which install-strategy's own flatten then reads, wherever it stands in the file
@@ -379,10 +387,14 @@ public class NpmOptions {
                             before instanceof String ? dateField((String) before) : Double.NaN);
                     break;
                 case "min-release-age":
-                    options.minReleaseAge(parseField(value, Type.NUMBER, env));
+                    if (release.definesMinReleaseAge()) {
+                        options.minReleaseAge(parseField(value, Type.NUMBER, env));
+                    }
                     break;
                 case "min-release-age-exclude":
-                    options.minReleaseAgeExclude(parseListField(value, Type.STRING, env));
+                    if (release.definesMinReleaseAgeExclude()) {
+                        options.minReleaseAgeExclude(parseListField(value, Type.STRING, env));
+                    }
                     break;
                 case "omit":
                     omit = parseListField(value, Type.LITERAL, env);
@@ -406,16 +418,24 @@ public class NpmOptions {
                     also = parseField(value, Type.LITERAL, env);
                     break;
                 case "allow-git":
-                    options.allowGit(allowField(value, env));
+                    if (release.definesAllowGit()) {
+                        options.allowGit(allowField(value, env));
+                    }
                     break;
                 case "allow-file":
-                    options.allowFile(allowField(value, env));
+                    if (release.definesAllowFile()) {
+                        options.allowFile(allowField(value, env));
+                    }
                     break;
                 case "allow-directory":
-                    options.allowDirectory(allowField(value, env));
+                    if (release.definesAllowDirectory()) {
+                        options.allowDirectory(allowField(value, env));
+                    }
                     break;
                 case "allow-remote":
-                    options.allowRemote(allowField(value, env));
+                    if (release.definesAllowRemote()) {
+                        options.allowRemote(allowField(value, env));
+                    }
                     break;
                 case "os":
                     options.os(platformField(value, env));
@@ -451,6 +471,29 @@ public class NpmOptions {
         options.omit(buildOmitList(omit, include, only, production, dev, optional, also));
         options.scopedRegistries(scopedRegistries);
         return options.build();
+    }
+
+    // config index.js #loadObject while before and min-release-age are `exclusive` of each other: a key is refused
+    // once its sibling is loaded, the project's file loading before the user's
+    private static void checkExclusive(@Nullable String npmrc, @Nullable String userNpmrc) {
+        Set<String> loaded = new LinkedHashSet<>();
+        for (String file : Arrays.asList(npmrc, userNpmrc)) {
+            if (file == null) {
+                continue;
+            }
+            for (String key : Ini.decode(file, Ini.Release.V6_0_0).keySet()) {
+                String exclusive = "before".equals(key) ? "min-release-age" :
+                        "min-release-age".equals(key) ? "before" : null;
+                if (exclusive != null && loaded.contains(exclusive)) {
+                    throw new IllegalArgumentException("--" + key + " cannot be provided when using --" + exclusive);
+                }
+                try {
+                    loaded.add(envReplace(key, HostEnvironment.UNKNOWN));
+                } catch (CannotKnow e) {
+                    // the loop over the keys read decides what an unknown variable costs
+                }
+            }
+        }
     }
 
     /**

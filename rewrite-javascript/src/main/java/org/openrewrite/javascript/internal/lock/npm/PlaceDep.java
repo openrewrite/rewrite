@@ -258,13 +258,14 @@ public final class PlaceDep {
 
         for (Node p = target; p != null; p = p.getResolveParent()) {
             if (p.matches(dep) && !p.isTop()) {
-                placed = new Link(Node.options().parent(target).target(p).build());
+                placed = new Link(Node.options().release(options.getRelease()).parent(target).target(p).build());
                 return;
             }
         }
 
         Node virtualRoot = dep.getParent();
         Node.Options.OptionsBuilder placedOptions = Node.options()
+                .release(options.getRelease())
                 .name(dep.getName())
                 .pkg(dep.getPackage())
                 .resolved(dep.getResolved())

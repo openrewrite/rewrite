@@ -154,6 +154,9 @@ public final class Shrinkwrap {
         }
 
         for (String key : PKG_META_KEYS) {
+            if ("libc".equals(key) && !options.getRelease().locksLibc()) {
+                continue;
+            }
             Object val = metaFieldFromPkg(node.getPackage(), key);
             if (truthy(val)) {
                 meta.put(key.startsWith("_") ? key.substring(1) : key, val);
@@ -409,6 +412,9 @@ public final class Shrinkwrap {
     private void fixDependencies(Map<String, Object> pkg) {
         Map<String, Object> root = asObject(packages().get(""));
         for (String key : PKG_META_KEYS) {
+            if ("libc".equals(key) && !resolveOptions.getRelease().locksLibc()) {
+                continue;
+            }
             Object val = metaFieldFromPkg(pkg, key);
             if (truthy(val)) {
                 root.put(key.startsWith("_") ? key.substring(1) : key, val);
@@ -762,6 +768,12 @@ public final class Shrinkwrap {
      * target: a workspace or {@code file:} dependency the manifest no longer names gets no entry.
      */
     static boolean isStaleTopLevelEntry(Node node, String loc) {
+        if (!node.getRelease().dropsExtraneousOutsideNodeModules()) {
+            return false;
+        }
+        if (!node.getRelease().keepsNestedExtraneousFsChildren()) {
+            return node.isExtraneous() && !NODE_MODULES.matcher(loc).find() && !"node_modules".equals(loc);
+        }
         return node.isExtraneous() && !NODE_MODULES.matcher(loc).find() && !"node_modules".equals(loc) &&
                (node.getFsParent() == null || node.getFsParent().isRoot());
     }
@@ -792,7 +804,8 @@ public final class Shrinkwrap {
                     continue;
                 }
                 Map<String, Object> meta = metaFromNode(node, path, resolveOptions);
-                if (node.isInert() && !truthy(node.getPackage().get("version"))) {
+                if (resolveOptions.getRelease().skipsInertNodesWithoutVersion() && node.isInert() &&
+                    !truthy(node.getPackage().get("version"))) {
                     continue;
                 }
                 packages.put(loc, meta);

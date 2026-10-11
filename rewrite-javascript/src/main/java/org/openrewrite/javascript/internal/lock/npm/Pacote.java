@@ -60,6 +60,12 @@ final class Pacote {
          */
         @Nullable
         Object integrity;
+
+        /**
+         * {@code _isRoot}: whether the project root or a workspace asks for the package; false where arborist says
+         * nothing.
+         */
+        boolean root;
     }
 
     private final PackumentSource registry;
@@ -84,7 +90,40 @@ final class Pacote {
         }
     }
 
+    // fetcher.js canUse, which FetcherBase.get asks before it makes the fetcher of a git, remote, file or directory spec
+    private void canUse(Spec spec, Options opts) {
+        String allow;
+        switch (Objects.requireNonNull(spec.getType())) {
+            case GIT:
+                allow = options.getAllowGit();
+                break;
+            case REMOTE:
+                allow = options.getAllowRemote();
+                break;
+            case FILE:
+                allow = options.getAllowFile();
+                break;
+            case DIRECTORY:
+                allow = options.getAllowDirectory();
+                break;
+            default:
+                return;
+        }
+        if ("all".equals(allow)) {
+            return;
+        }
+        if (!"none".equals(allow) && opts.isRoot()) {
+            return;
+        }
+        String type = spec.getType().toString();
+        String nonRoot = "root".equals(allow) ? " non-root" : "";
+        throw new NpmRejection("EALLOW" + type.toUpperCase(), options.getRelease().namesTypeInAllowRejection() ?
+                "Fetching" + nonRoot + " packages of type \"" + type + "\" have been disabled" :
+                "Fetching" + nonRoot + " packages from git has been disabled", spec.toString());
+    }
+
     Map<String, Object> manifest(Spec spec, Options opts) {
+        canUse(spec, opts);
         checkBefore(opts);
         Spec fetched = spec.getType() == Spec.Type.ALIAS && spec.getSubSpec() != null ? spec.getSubSpec() : spec;
         switch (Objects.requireNonNull(fetched.getType())) {
@@ -111,10 +150,23 @@ final class Pacote {
                         .before(opts.getBefore())
                         .nodeVersion(opts.getNodeVersion())
                         .npmVersion(opts.getNpmVersion())
+                        .npm(options.getRelease())
                         .build());
         Map<String, Object> mani = full || !opts.isFullMetadata() ? picked :
                 withVersionDocument(picked, registry.manifest(options.registryFor(name), name,
                         versionKey(packument, picked)));
+        if (options.getRelease().expandsBinDirOfRegistryManifests()) {
+            // normalize.js binDir resolves the directory against the path a manifest from the registry lacks
+            Object directories = mani.get("directories");
+            Object binDir = directories == null ? null : Js.get(directories, "bin");
+            if (truthy(binDir) && !truthy(mani.get("bin"))) {
+                if (!(binDir instanceof String)) {
+                    throw new IllegalArgumentException("ref.replace is not a function");
+                }
+                throw new NpmRejection("ERR_INVALID_ARG_TYPE",
+                        "The \"paths[0]\" argument must be of type string. Received undefined", null);
+            }
+        }
         PackageJson.syncNormalize(mani);
         PackageJson.normalizeBin(mani, options.getRelease().packageJson());
 
@@ -126,7 +178,8 @@ final class Pacote {
 
         // the fetcher's constructor parses a string integrity; a value of another type is kept as it is
         Object held = opts.getIntegrity();
-        Ssri.Integrity integrity = held instanceof String ? Ssri.parse(held, Ssri.Release.V13_0_1) : null;
+        Ssri.Release ssri = options.getRelease().ssri();
+        Ssri.Integrity integrity = held instanceof String ? Ssri.parse(held, ssri) : null;
         boolean heldRaw = !(held instanceof String) && truthy(held);
         Object dist = mani.get("dist");
         if (truthy(dist)) {
@@ -138,8 +191,8 @@ final class Pacote {
                     fetched.getSaveSpec());
             Object distIntegrity = Js.get(dist, "integrity");
             Object shasum = Js.get(dist, "shasum");
-            Ssri.Integrity parsed = truthy(distIntegrity) ? Ssri.parse(Js.string(distIntegrity), Ssri.Release.V13_0_1) :
-                    truthy(shasum) ? Ssri.fromHex(Js.string(shasum), "sha1", Ssri.Release.V13_0_1) : null;
+            Ssri.Integrity parsed = truthy(distIntegrity) ? Ssri.parse(Js.string(distIntegrity), ssri) :
+                    truthy(shasum) ? Ssri.fromHex(Js.string(shasum), "sha1", ssri) : null;
             if (parsed != null) {
                 if (heldRaw) {
                     throw new IllegalArgumentException("this.integrity.match is not a function");
