@@ -24,6 +24,7 @@ import org.openrewrite.javascript.internal.lock.EventLoop;
 import org.openrewrite.javascript.internal.lock.EventLoop.Promise;
 import org.openrewrite.javascript.internal.lock.JsError;
 import org.openrewrite.javascript.internal.lock.RootRelativePath;
+import org.openrewrite.javascript.internal.lock.V8Date;
 import org.openrewrite.semver.NodeSemver;
 
 import java.time.Instant;
@@ -782,7 +783,7 @@ final class ResolveDependencies {
             }
             double latest = Double.NaN;
             for (String publishedAt : newTime.values()) {
-                double t = Js.dateParse(publishedAt);
+                double t = V8Date.dateParse(publishedAt);
                 if (Double.isNaN(latest) || t > latest) {
                     latest = t;
                 }

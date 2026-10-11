@@ -20,6 +20,7 @@ import lombok.Value;
 import lombok.With;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.javascript.internal.lock.CannotKnow;
+import org.openrewrite.javascript.internal.lock.V8Date;
 import org.openrewrite.semver.NodeSemver;
 
 import java.time.Instant;
@@ -225,7 +226,7 @@ final class PickPackage {
         if (!Js.truthy(modified)) {
             return null;
         }
-        double time = Js.dateParse(Js.string(modified));
+        double time = V8Date.dateParse(Js.string(modified));
         return Double.isNaN(time) ? null : Instant.ofEpochMilli((long) time);
     }
 

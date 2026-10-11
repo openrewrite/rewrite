@@ -16,6 +16,7 @@
 package org.openrewrite.javascript.internal.lock.npm;
 
 import org.junit.jupiter.api.Test;
+import org.openrewrite.javascript.internal.lock.V8Date;
 
 import java.time.Instant;
 import java.util.Map;
@@ -240,7 +241,7 @@ class PickManifestTest {
         assertThat(version(metadata, "*", before0102)).isEqualTo("2.0.0");
         assertThat(version(metadata, "latest", before0102)).isEqualTo("2.0.0");
         assertThat(version(metadata, "*", PickManifest.Options.builder()
-          .before(Js.dateParse("2018-01-03T00:00:00.000Z")).build())).isEqualTo("2.0.1");
+          .before(V8Date.dateParse("2018-01-03T00:00:00.000Z")).build())).isEqualTo("2.0.1");
         assertThat(version(metadata, "*", PickManifest.Options.builder()
           .before(Instant.parse("2018-01-03T00:00:00.000Z")).build())).isEqualTo("2.0.1");
         assertThatThrownBy(() -> PickManifest.pickManifest(metadata, "3.0.0", before0102))

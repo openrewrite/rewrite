@@ -643,7 +643,7 @@ final class NpmResolver {
         if (excludeResult instanceof List && ((List<?>) excludeResult).contains(version)) {
             return null;
         }
-        double ts = Js.dateParse(publishedAt);
+        double ts = V8Date.dateParse(publishedAt);
         if (Double.isNaN(ts) || ts <= publishedBy.toEpochMilli()) {
             return null;
         }

@@ -530,7 +530,7 @@ public class NpmOptions {
 
     // new Date(text): the date-time string format, else V8's legacy parser, which never reads a digit-less string
     private static Object dateField(String text) {
-        double time = Js.dateParse(text);
+        double time = V8Date.dateParse(text);
         return !Double.isNaN(time) || !DIGIT.matcher(text).find() ? (Object) time : text;
     }
 

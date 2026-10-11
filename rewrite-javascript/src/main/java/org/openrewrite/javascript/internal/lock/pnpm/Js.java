@@ -16,11 +16,9 @@
 package org.openrewrite.javascript.internal.lock.pnpm;
 
 import org.jspecify.annotations.Nullable;
-import org.openrewrite.javascript.internal.lock.CannotKnow;
 import org.openrewrite.javascript.internal.lock.EcmaScript;
 import org.openrewrite.javascript.internal.lock.JsError;
 import org.openrewrite.javascript.internal.lock.JsYaml;
-import org.openrewrite.javascript.internal.lock.V8Date;
 
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
@@ -144,17 +142,5 @@ final class Js extends EcmaScript {
             return value;
         }
         return new LinkedHashMap<>();
-    }
-
-    /**
-     * {@code new Date(text).getTime()}: NaN for an invalid date; cannot-know for a date-time without an offset, which
-     * JavaScript reads in the host's time zone.
-     */
-    static double dateParse(String text) {
-        Double time = V8Date.parse(text);
-        if (time == null) {
-            throw new CannotKnow("the time \"" + text + "\" (JavaScript reads it in the host's time zone)");
-        }
-        return time;
     }
 }

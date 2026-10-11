@@ -60,6 +60,18 @@ public final class V8Date {
     }
 
     /**
+     * {@code Date.parse(text)}: NaN for text V8 reads otherwise; cannot-know for a date-time without an offset, which
+     * JavaScript reads in the host's time zone.
+     */
+    public static double dateParse(String text) {
+        Double time = parse(text);
+        if (time == null) {
+            throw new CannotKnow("the host's time zone (\"" + text + "\" names no offset)");
+        }
+        return time;
+    }
+
+    /**
      * The time value in milliseconds; NaN for text V8 reads otherwise; null for a date-time without an offset, which
      * JavaScript reads in the host's time zone. A date-only form is UTC.
      */

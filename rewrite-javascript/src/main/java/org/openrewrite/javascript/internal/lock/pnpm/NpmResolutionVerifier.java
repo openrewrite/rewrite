@@ -212,7 +212,7 @@ final class NpmResolutionVerifier implements ResolutionVerifier {
         if (value instanceof Number) {
             return V8Date.timeClip(((Number) value).doubleValue());
         }
-        return Js.dateParse(Js.string(value));
+        return V8Date.dateParse(Js.string(value));
     }
 
     private @Nullable Result runTrustCheck(String registry, String name, String version) {
@@ -260,7 +260,7 @@ final class NpmResolutionVerifier implements ResolutionVerifier {
         if (!(modified instanceof String)) {
             return null;
         }
-        double modifiedMs = Js.dateParse((String) modified);
+        double modifiedMs = V8Date.dateParse((String) modified);
         if (Double.isNaN(modifiedMs)) {
             return null;
         }

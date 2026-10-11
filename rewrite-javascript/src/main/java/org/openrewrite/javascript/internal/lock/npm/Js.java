@@ -16,9 +16,7 @@
 package org.openrewrite.javascript.internal.lock.npm;
 
 import org.jspecify.annotations.Nullable;
-import org.openrewrite.javascript.internal.lock.CannotKnow;
 import org.openrewrite.javascript.internal.lock.EcmaScript;
-import org.openrewrite.javascript.internal.lock.V8Date;
 
 import java.util.Arrays;
 import java.util.HashSet;
@@ -161,17 +159,5 @@ final class Js extends EcmaScript {
             return "type string ('" + value + "')";
         }
         return "an instance of " + (value instanceof List ? "Array" : "Object");
-    }
-
-    /**
-     * {@code Date.parse(text)}, as {@link V8Date#parse}.
-     * @throws CannotKnow for a date-time without an offset, which JavaScript reads in the host's time zone
-     */
-    static double dateParse(String text) {
-        Double time = V8Date.parse(text);
-        if (time == null) {
-            throw new CannotKnow("the host's time zone (\"" + text + "\" names no offset)");
-        }
-        return time;
     }
 }

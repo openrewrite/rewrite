@@ -20,6 +20,7 @@ import org.jspecify.annotations.Nullable;
 import org.openrewrite.javascript.internal.lock.CannotKnow;
 import org.openrewrite.javascript.internal.lock.JsError;
 import org.openrewrite.javascript.internal.lock.UriComponent;
+import org.openrewrite.javascript.internal.lock.V8Date;
 import org.openrewrite.javascript.internal.lock.WhatwgUrl;
 import org.openrewrite.semver.NodeSemver;
 
@@ -306,7 +307,7 @@ final class PickPackageFromMeta {
         if (!Js.truthy(modified)) {
             return null;
         }
-        double time = Js.dateParse(Js.string(modified));
+        double time = V8Date.dateParse(Js.string(modified));
         return Double.isNaN(time) ? null : Instant.ofEpochMilli((long) time);
     }
 
@@ -474,8 +475,8 @@ final class PickPackageFromMeta {
         Map<String, @Nullable Object> versionsWithinDate = new LinkedHashMap<>();
         for (String version : Js.keys(versions)) {
             Object timeStr = time.get(version);
-            boolean withinDate = Js.truthy(timeStr) && !Double.isNaN(Js.dateParse(Js.string(timeStr))) &&
-                                 Js.dateParse(Js.string(timeStr)) <= publishedBy.toEpochMilli();
+            boolean withinDate = Js.truthy(timeStr) && !Double.isNaN(V8Date.dateParse(Js.string(timeStr))) &&
+                                 V8Date.dateParse(Js.string(timeStr)) <= publishedBy.toEpochMilli();
             if (withinDate || trustedVersions != null && trustedVersions.contains(version)) {
                 versionsWithinDate.put(version, versions.get(version));
             }

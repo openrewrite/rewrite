@@ -15,6 +15,7 @@
  */
 package org.openrewrite.javascript.internal.lock.pnpm;
 
+import org.openrewrite.javascript.internal.lock.V8Date;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.semver.NodeSemver;
 
@@ -56,7 +57,7 @@ final class TrustChecks {
             throw new PnpmError("TRUST_CHECK_FAIL", "Missing time for version " + version + " of " +
                                                     Js.string(meta.get("name")) + " in metadata");
         }
-        double versionDate = Js.dateParse(Js.string(versionPublishedAt));
+        double versionDate = V8Date.dateParse(Js.string(versionPublishedAt));
         if (trustPolicyIgnoreAfter != null && trustPolicyIgnoreAfter != 0 && !trustPolicyIgnoreAfter.isNaN()) {
             double minutesSincePublish = (now.toEpochMilli() - versionDate) / (1000 * 60);
             if (minutesSincePublish > trustPolicyIgnoreAfter) {
@@ -118,7 +119,7 @@ final class TrustChecks {
             if (!Js.truthy(ts)) {
                 continue;
             }
-            double publishedAt = Js.dateParse(Js.string(ts));
+            double publishedAt = V8Date.dateParse(Js.string(ts));
             if (!(publishedAt < beforeDate)) {
                 continue;
             }

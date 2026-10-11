@@ -20,6 +20,7 @@ import lombok.Getter;
 import lombok.Value;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.javascript.internal.lock.Spec;
+import org.openrewrite.javascript.internal.lock.V8Date;
 import org.openrewrite.semver.NodeSemver;
 
 import java.time.Instant;
@@ -109,7 +110,7 @@ public final class PickManifest {
 
     private static boolean isBefore(@Nullable Object verTimes, @Nullable Object ver, double time) {
         Object verTime = truthy(verTimes) ? Js.get(verTimes, Js.string(ver)) : null;
-        return !truthy(verTimes) || !truthy(verTime) || Js.dateParse(Js.string(verTime)) <= time;
+        return !truthy(verTimes) || !truthy(verTime) || V8Date.dateParse(Js.string(verTime)) <= time;
     }
 
     private static boolean shouldAvoid(@Nullable Object ver, @Nullable String avoid) {
@@ -158,7 +159,7 @@ public final class PickManifest {
         if (before instanceof Boolean) {
             return (Boolean) before ? 1 : 0;
         }
-        return Js.dateParse(Js.string(before));
+        return V8Date.dateParse(Js.string(before));
     }
 
     private static @Nullable Object pick(Map<String, Object> packument, @Nullable String wanted, Options opts) {
