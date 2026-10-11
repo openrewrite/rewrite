@@ -30,6 +30,7 @@ final class ZipArchive {
     private static final int DOS_TIME = 44608;
     private static final int DOS_DATE = 2262;
     private static final int VERSION_MADE_BY = 0x033f;
+    private static final int GPBF_ENCODING_UTF_8 = 0x0800;
     private static final int S_IFDIR = 0040000;
     private static final int S_IFREG = 0100000;
     private static final int S_IFLNK = 0120000;
@@ -108,10 +109,12 @@ final class ZipArchive {
             crc.update(data, 0, data.length);
             long checksum = directory ? 0 : crc.getValue();
             int versionNeeded = directory ? 20 : 10;
+            // _zip_set_name turns a guessed UTF-8 name into a known one, which _zip_dirent_write flags
+            int flags = guessEncoding(nameBytes) == Encoding.UTF8_GUESSED ? GPBF_ENCODING_UTF_8 : 0;
 
             u32(local, 0x04034b50);
             u16(local, versionNeeded);
-            u16(local, 0);
+            u16(local, flags);
             u16(local, 0);
             u16(local, DOS_TIME);
             u16(local, DOS_DATE);
@@ -126,7 +129,7 @@ final class ZipArchive {
             u32(central, 0x02014b50);
             u16(central, VERSION_MADE_BY);
             u16(central, versionNeeded);
-            u16(central, 0);
+            u16(central, flags);
             u16(central, 0);
             u16(central, DOS_TIME);
             u16(central, DOS_DATE);
@@ -158,6 +161,46 @@ final class ZipArchive {
         u32(out, localBytes.length);
         u16(out, 0);
         return out.toByteArray();
+    }
+
+    private enum Encoding {
+        ASCII,
+        UTF8_GUESSED,
+        CP437
+    }
+
+    /**
+     * {@code _zip_guess_encoding} from libzip's zip_utf-8.c, at the arcanis/libzip commit @yarnpkg/libzip builds.
+     */
+    private static Encoding guessEncoding(byte[] name) {
+        Encoding enc = Encoding.ASCII;
+        for (int i = 0; i < name.length; i++) {
+            int c = name[i] & 0xff;
+            if ((c > 31 && c < 128) || c == '\r' || c == '\n' || c == '\t') {
+                continue;
+            }
+            enc = Encoding.UTF8_GUESSED;
+            int ulen;
+            if ((c & 0xe0) == 0xc0) {
+                ulen = 1;
+            } else if ((c & 0xf0) == 0xe0) {
+                ulen = 2;
+            } else if ((c & 0xf8) == 0xf0) {
+                ulen = 3;
+            } else {
+                return Encoding.CP437;
+            }
+            if (i + ulen >= name.length) {
+                return Encoding.CP437;
+            }
+            for (int j = 1; j <= ulen; j++) {
+                if ((name[i + j] & 0xc0) != 0x80) {
+                    return Encoding.CP437;
+                }
+            }
+            i += ulen;
+        }
+        return enc;
     }
 
     private static void u16(ByteArrayOutputStream out, int v) {
