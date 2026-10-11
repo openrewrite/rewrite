@@ -99,7 +99,9 @@ public final class OverrideSet {
             }
             this.name = spec.getName();
             this.key = key;
-            this.keySpec = spec.withoutName().toString();
+            // before npm 9.0.0, spec.rawSpec === '' ? '' : spec.toString()
+            this.keySpec = release.keepsEmptyOverrideKeySpec() && spec.getRawSpec().isEmpty() ? "" :
+                    spec.withoutName().toString();
             Object dot = Js.get(overrides, ".");
             this.value = truthy(dot) ? dot : this.keySpec;
         }
@@ -163,6 +165,9 @@ public final class OverrideSet {
 
     // the spec is read only for a rule that compares it: reading an edge's can throw on an unresolvable $reference
     private OverrideSet getEdgeRule(String edgeName, Supplier<String> edgeSpec) {
+        if (!release.matchesEdgeRuleBySpecType()) {
+            return getEdgeRuleBySemver(edgeName, edgeSpec);
+        }
         for (OverrideSet rule : getRuleset().values()) {
             if (!Objects.equals(rule.name, edgeName)) {
                 continue;
@@ -197,6 +202,22 @@ public final class OverrideSet {
         return this;
     }
 
+    // getEdgeRule before npm 9.3.0: semver.intersects(edge.spec, rule.keySpec), which throws on a spec that is no
+    // range; before npm 9.0.0 a rule whose key names no spec applies first
+    private OverrideSet getEdgeRuleBySemver(String edgeName, Supplier<String> edgeSpec) {
+        for (OverrideSet rule : getRuleset().values()) {
+            if (!Objects.equals(rule.name, edgeName)) {
+                continue;
+            }
+            if (release.keepsEmptyOverrideKeySpec() && "".equals(rule.keySpec) ||
+                NodeSemver.intersects(edgeSpec.get(), Objects.requireNonNull(rule.keySpec),
+                        DEFAULT.release(release.semver()))) {
+                return rule;
+            }
+        }
+        return this;
+    }
+
     public OverrideSet getNodeRule(Node node) {
         return getNodeRule(node.getName(), node.getVersion());
     }
@@ -216,7 +237,8 @@ public final class OverrideSet {
                 continue;
             }
             NodeSemver.Options semver = DEFAULT.release(release.semver());
-            if (NodeSemver.satisfies(version, rule.keySpec, semver) ||
+            if (release.keepsEmptyOverrideKeySpec() && "".equals(rule.keySpec) ||
+                NodeSemver.satisfies(version, rule.keySpec, semver) ||
                 rule.value instanceof String && NodeSemver.satisfies(version, (String) rule.value, semver)) {
                 return rule;
             }

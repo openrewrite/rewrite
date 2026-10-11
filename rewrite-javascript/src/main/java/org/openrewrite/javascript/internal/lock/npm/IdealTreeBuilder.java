@@ -21,6 +21,7 @@ import org.jspecify.annotations.Nullable;
 import org.openrewrite.javascript.internal.LockFileRegeneration.Reason;
 import org.openrewrite.javascript.internal.lock.CannotKnow;
 import org.openrewrite.javascript.internal.lock.Host;
+import org.openrewrite.javascript.internal.lock.JsError;
 import org.openrewrite.javascript.internal.lock.LocaleCompare;
 import org.openrewrite.javascript.internal.lock.PosixPath;
 import org.openrewrite.javascript.internal.lock.Rejected;
@@ -65,6 +66,9 @@ public final class IdealTreeBuilder {
         private int minDepth;
         private int length;
 
+        // before npm 9.6.6: this[_depsQueue], an array pushed to as it is and sorted at every #buildDepStep
+        private final boolean everyStep;
+
         private static final class Depth {
             boolean sorted = true;
             final List<Node> items = new ArrayList<>();
@@ -72,6 +76,7 @@ public final class IdealTreeBuilder {
 
         DepsQueue(NpmRelease release) {
             byDepth = release.queuesDepsByDepth();
+            everyStep = release.sortsDepsQueueAtEveryStep();
         }
 
         int length() {
@@ -104,6 +109,10 @@ public final class IdealTreeBuilder {
                 }
                 return;
             }
+            if (everyStep) {
+                deps.add(item);
+                return;
+            }
             if (!deps.contains(item)) {
                 sorted = false;
                 deps.add(item);
@@ -132,7 +141,7 @@ public final class IdealTreeBuilder {
                 length--;
                 return depth.items.remove(0);
             }
-            if (!sorted) {
+            if (!sorted || everyStep) {
                 deps.sort((a, b) -> {
                     int byDepth = a.getDepth() - b.getDepth();
                     return byDepth != 0 ? byDepth : LocaleCompare.en(a.getPath(), b.getPath());
@@ -361,7 +370,9 @@ public final class IdealTreeBuilder {
             applyRootOverridesToWorkspaces(tree);
         }
 
-        queueProblemNodes(tree, new LinkedHashSet<>());
+        if (options.getRelease().queuesProblemNodesOfLock()) {
+            queueProblemNodes(tree, new LinkedHashSet<>());
+        }
         idealTree = tree;
     }
 
@@ -459,13 +470,16 @@ public final class IdealTreeBuilder {
             if (node.isProjectRoot()) {
                 continue;
             }
-            if (!Objects.requireNonNull(node.getLocation()).startsWith("node_modules")) {
+            boolean skipsLinkTargets = options.getRelease().skipsLinkTargetsWhenInflating();
+            if (skipsLinkTargets && !Objects.requireNonNull(node.getLocation()).startsWith("node_modules")) {
                 continue;
             }
             Object resolved = node.getResolved();
             Object version = node.getVersion();
             boolean useResolved = truthy(resolved) && (!truthy(version) || Js.string(resolved).startsWith("file:"));
-            Object id = useResolved ? resolved : version;
+            // before npm 8.6.0, version || `file:${node.path}`
+            Object id = useResolved ? resolved :
+                    skipsLinkTargets || truthy(version) ? version : "file:" + node.getPath();
             Spec spec = Spec.resolve(node.getName(), Js.string(id), PosixPath.dirname(node.getPath()),
                     options.getRelease().npmPackageArg());
             try {
@@ -494,7 +508,7 @@ public final class IdealTreeBuilder {
         DepFlags.calcDepFlags(tree);
 
         if (options.getLockfileVersion() == null) {
-            meta.setOriginalLockfileVersion(Shrinkwrap.DEFAULT_LOCKFILE_VERSION);
+            meta.setOriginalLockfileVersion(options.getRelease().defaultLockfileVersion());
         }
     }
 
@@ -573,10 +587,23 @@ public final class IdealTreeBuilder {
             tasks.sort((a, b) -> LocaleCompare.en(a.getEdge().getName(), b.getEdge().getName()));
 
             List<Runnable> promises = new ArrayList<>();
-            for (Task task : tasks) {
-                PlaceDep pd = new PlaceDep(task.getEdge(), task.getDep(), options);
-                warnings.addAll(pd.getWarnings());
-                visitPlacements(pd, promises);
+            if (options.getRelease().placesWholeStepBeforeVisiting()) {
+                // tasks.sort(...).map(({ edge, dep }) => new PlaceDep(...)), then the visits
+                List<PlaceDep> placeDeps = new ArrayList<>();
+                for (Task task : tasks) {
+                    PlaceDep pd = new PlaceDep(task.getEdge(), task.getDep(), options);
+                    warnings.addAll(pd.getWarnings());
+                    placeDeps.add(pd);
+                }
+                for (PlaceDep pd : placeDeps) {
+                    visitPlacements(pd, promises);
+                }
+            } else {
+                for (Task task : tasks) {
+                    PlaceDep pd = new PlaceDep(task.getEdge(), task.getDep(), options);
+                    warnings.addAll(pd.getWarnings());
+                    visitPlacements(pd, promises);
+                }
             }
 
             for (Edge edge : node.getEdgesOut().values()) {
@@ -689,6 +716,10 @@ public final class IdealTreeBuilder {
                 nodeFromSpec(edge.getName(), spec2, parent, secondEdge) : null;
 
         Node node = second != null && edge.isValid() ? second : first;
+        if (node == null) {
+            // a satisfying workspace was taken for an edge to nothing, before npm 9.6.0
+            throw new JsError(JsError.TYPE_ERROR, "Cannot set properties of null (setting 'parent')");
+        }
         node.setParent(parent);
 
         if (required.contains(from) && edge.getType() != Edge.Type.PEER_OPTIONAL ||
@@ -775,7 +806,8 @@ public final class IdealTreeBuilder {
 
     private @Nullable Double releaseAgeBefore(Spec spec) {
         Object before = options.before(now);
-        if (before == null) {
+        if (before == null || options.getRelease().keepsNpmrcBeforeAString()) {
+            // the string such a release keeps fails the fetcher before any date is read (Pacote#manifest)
             return null;
         }
         if (options.getRelease().exemptsFromReleaseAge() &&
@@ -875,7 +907,7 @@ public final class IdealTreeBuilder {
         return n;
     }
 
-    private Node nodeFromSpec(String name, Spec spec, Node parent, @Nullable Edge edge) {
+    private @Nullable Node nodeFromSpec(String name, Spec spec, Node parent, @Nullable Edge edge) {
         if (options.getRelease().checksAllowedSpecTypes()) {
             try {
                 checkAllow(spec, edge);
@@ -919,11 +951,12 @@ public final class IdealTreeBuilder {
             return link;
         }
 
-        if (isWorkspace) {
+        if (isWorkspace && release.prefersSatisfyingWorkspace()) {
             Edge rootEdge = tree.getEdgesOut().get(spec.getName());
             Node existingNode = rootEdge == null ? null : rootEdge.getTo();
             if (existingNode != null && existingNode.isWorkspace() && edge != null && existingNode.satisfies(edge)) {
-                return existingNode;
+                // before npm 9.6.0, edge.to: what the edge resolves to now, which may be nothing
+                return release.returnsSatisfyingWorkspace() ? existingNode : edge.getTo();
             }
         }
 

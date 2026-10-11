@@ -124,6 +124,10 @@ final class Pacote {
 
     Map<String, Object> manifest(Spec spec, Options opts) {
         canUse(spec, opts);
+        if (options.getRelease().keepsNpmrcBeforeAString() && options.getBefore() != null) {
+            // the fetcher renders --before from the string an npmrc file wrote
+            throw new JsError(JsError.TYPE_ERROR, "this.before.toISOString is not a function");
+        }
         checkBefore(opts);
         Spec fetched = spec.getType() == Spec.Type.ALIAS && spec.getSubSpec() != null ? spec.getSubSpec() : spec;
         switch (Objects.requireNonNull(fetched.getType())) {

@@ -71,8 +71,6 @@ public final class Shrinkwrap {
         return holds.test("yarn.lock");
     }
 
-    public static final int DEFAULT_LOCKFILE_VERSION = 3;
-
     // npm 12.0.0: a node's patch record and a manifest extension's state each make the lock version 4, the newest
     // version it reads
     private static final int PATCHED_LOCKFILE_VERSION = 4;
@@ -335,7 +333,8 @@ public final class Shrinkwrap {
         packagesArray = null;
         packageExtensionsHash = null;
         npmExtensionHash = null;
-        Object lockfileVersion = truthy(this.lockfileVersion) ? this.lockfileVersion : DEFAULT_LOCKFILE_VERSION;
+        Object lockfileVersion = truthy(this.lockfileVersion) ? this.lockfileVersion :
+                resolveOptions.getRelease().defaultLockfileVersion();
         originalLockfileVersion = lockfileVersion;
 
         Map<String, Object> data = new LinkedHashMap<>();
@@ -392,13 +391,19 @@ public final class Shrinkwrap {
             ancientLockfile = false;
             data = new LinkedHashMap<>();
         }
-        Object lockfileVersion = DEFAULT_LOCKFILE_VERSION;
+        NpmRelease release = resolveOptions.getRelease();
+        Object lockfileVersion = release.defaultLockfileVersion();
         Object fileVersion = Js.get(data, "lockfileVersion");
-        if (Js.toNumber(fileVersion) > MAX_LOCKFILE_VERSION && resolveOptions.getRelease().refusesNewerLockfile()) {
+        if (Js.toNumber(fileVersion) > MAX_LOCKFILE_VERSION && release.refusesNewerLockfile()) {
             throw new UnsupportedLockfileVersion(fileVersion);
         }
         if (truthy(this.lockfileVersion)) {
             lockfileVersion = this.lockfileVersion;
+        } else if (!release.keepsLoadedLockfileVersion()) {
+            // Math.max(lock.lockfileVersion || 0, defaultLockfileVersion)
+            double version = Js.toNumber(truthy(fileVersion) ? fileVersion : 0);
+            lockfileVersion = Double.isNaN(version) ? Double.NaN :
+                    (Object) Math.max(version, release.defaultLockfileVersion());
         } else if (truthy(fileVersion) && !Js.strictEquals(fileVersion, 1)) {
             lockfileVersion = fileVersion;
         }
@@ -901,7 +906,7 @@ public final class Shrinkwrap {
         }
 
         if (!truthy(lockfileVersion)) {
-            lockfileVersion = DEFAULT_LOCKFILE_VERSION;
+            lockfileVersion = resolveOptions.getRelease().defaultLockfileVersion();
         }
         // only an object's values hold an entry to read
         Map<String, Object> entries = asObject(data.get("packages"));

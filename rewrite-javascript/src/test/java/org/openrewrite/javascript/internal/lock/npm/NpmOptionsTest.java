@@ -324,6 +324,96 @@ class NpmOptionsTest {
         assertThat(fromNpmrc(npmrc.replace('+', '\n') + "\n").getInstallStrategy()).isEqualTo(expected);
     }
 
+    private static NpmOptions fromNpmrc(String release, String npmrc) {
+        return NpmOptions.fromNpmrc(NpmRelease.of(release), null, npmrc.replace('+', '\n') + "\n");
+    }
+
+    // lib/utils/config/definitions.js of each release: a key it does not define never reaches arborist
+    @Test
+    void aKeyCountsFromTheReleaseThatDefinesIt() {
+        assertThat(fromNpmrc("9.6.7", "prefer-dedupe=true").isPreferDedupe()).isFalse();
+        assertThat(fromNpmrc("9.7.0", "prefer-dedupe=true").isPreferDedupe()).isTrue();
+        assertThat(fromNpmrc("8.7.0", "install-links=true").isInstallLinks()).isFalse();
+        assertThat(fromNpmrc("8.8.0", "install-links=true").isInstallLinks()).isTrue();
+        assertThat(fromNpmrc("8.9.0", "omit-lockfile-registry-resolved=true").isOmitLockfileRegistryResolved())
+          .isFalse();
+        assertThat(fromNpmrc("8.10.0", "omit-lockfile-registry-resolved=true").isOmitLockfileRegistryResolved())
+          .isTrue();
+    }
+
+    // install-links defaults to true in npm 9.0.0 until 9.4.2
+    @Test
+    void installLinksDefault() {
+        assertThat(fromNpmrc("8.19.4", "").isInstallLinks()).isFalse();
+        assertThat(fromNpmrc("9.0.0", "").isInstallLinks()).isTrue();
+        assertThat(fromNpmrc("9.4.1", "").isInstallLinks()).isTrue();
+        assertThat(fromNpmrc("9.4.1", "install-links=false").isInstallLinks()).isFalse();
+        assertThat(fromNpmrc("9.4.2", "").isInstallLinks()).isFalse();
+    }
+
+    // install-strategy is a config from npm 9.0.0 and takes linked from 9.4.0; before 9.0.0 global-style and
+    // legacy-bundling are arborist's own options, legacyBundling read first; 9.1.0 and 9.2.0 flatten the validated
+    // config, which drops a value of none of the type's
+    @ParameterizedTest
+    @CsvSource(delimiter = '|', value = {
+      "8.19.4|install-strategy=nested|HOISTED",
+      "8.19.4|global-style=true|SHALLOW",
+      "8.19.4|global-style=true+legacy-bundling=true|NESTED",
+      "8.19.4|legacy-bundling=true+global-style=true|NESTED",
+      "8.19.4|legacy-bundling=true+legacy-bundling=false|HOISTED",
+      "9.0.0|install-strategy=nested|NESTED",
+      "9.3.1|install-strategy=linked|HOISTED",
+      "9.2.0|install-strategy=linked|HOISTED",
+      "9.4.0|install-strategy=linked|LINKED"
+    })
+    void installStrategyOfTheRelease(String release, String npmrc, NpmOptions.InstallStrategy expected) {
+        assertThat(fromNpmrc(release, npmrc).getInstallStrategy()).isEqualTo(expected);
+    }
+
+    // nopt's clean drops the project's invalid value, so the user's own counts
+    @Test
+    void aValueValidationDropsLeavesTheUsersFileIts() {
+        assertThat(NpmOptions.fromNpmrc(NpmRelease.of("9.2.0"), "install-strategy=shallow\n",
+          "install-strategy=linked\n").getInstallStrategy()).isEqualTo(NpmOptions.InstallStrategy.SHALLOW);
+        assertThat(NpmOptions.fromNpmrc(NpmRelease.of("8.19.4"), "lockfile-version=2\n", "lockfile-version=4\n")
+          .getLockfileVersion()).isEqualTo(2);
+    }
+
+    // before npm 8.1.2 lockfile-version's type is [null, 1, 2, 3], which no string an npmrc file holds is; npm 8
+    // validates the config before flattening it and drops such a value, as do 9.1.0 and 9.2.0, while the others
+    // flatten it as written and arborist refuses it
+    @Test
+    void lockfileVersionOfTheRelease() {
+        assertThat(fromNpmrc("8.1.1", "lockfile-version=1").getLockfileVersion()).isNull();
+        assertThat(fromNpmrc("8.1.2", "lockfile-version=1").getLockfileVersion()).isEqualTo(1);
+        assertThat(fromNpmrc("8.19.4", "lockfile-version=4").getLockfileVersion()).isNull();
+        assertThat(fromNpmrc("9.1.0", "lockfile-version=4").getLockfileVersion()).isNull();
+        assertThatThrownBy(() -> fromNpmrc("9.0.0", "lockfile-version=4"))
+          .hasMessage("Invalid lockfileVersion config: 4");
+    }
+
+    // nopt's validateBoolean makes a number of a string, where the config is validated before it is flattened
+    @Test
+    void booleansOfAValidatedConfig() {
+        assertThat(fromNpmrc("8.19.4", "legacy-peer-deps=0").isLegacyPeerDeps()).isFalse();
+        assertThat(fromNpmrc("8.19.4", "legacy-peer-deps=00").isLegacyPeerDeps()).isFalse();
+        assertThat(fromNpmrc("8.19.4", "legacy-peer-deps=2").isLegacyPeerDeps()).isTrue();
+        assertThat(fromNpmrc("8.19.4", "legacy-peer-deps=yes").isLegacyPeerDeps()).isTrue();
+        assertThat(fromNpmrc("9.2.0", "legacy-peer-deps=0").isLegacyPeerDeps()).isFalse();
+        assertThat(fromNpmrc("9.0.0", "legacy-peer-deps=0").isLegacyPeerDeps()).isTrue();
+    }
+
+    // nopt's validateDate drops a date Date.parse cannot read, where the config is validated before it is flattened
+    @Test
+    void beforeOfAValidatedConfig() {
+        Instant now = Instant.parse("2026-10-06T12:00:00Z");
+        assertThat(fromNpmrc("8.19.4", "before=abc").before(now)).isNull();
+        assertThat(fromNpmrc("8.19.4", "before=2021-04-23").before(now))
+          .isEqualTo((double) Instant.parse("2021-04-23T00:00:00Z").toEpochMilli());
+        assertThat(fromNpmrc("9.0.0", "before=abc").before(now)).isEqualTo(Double.NaN);
+        assertThat(fromNpmrc("9.0.0", "before=").before(now)).isNull();
+    }
+
     // installed with npm 11.17.0: before=abc exits 1 with "Invalid time value" at the first fetch, since nopt
     // rejects the value only after the options are flattened; min-release-age is npm's `age ? new Date(...) : null`
     @Test

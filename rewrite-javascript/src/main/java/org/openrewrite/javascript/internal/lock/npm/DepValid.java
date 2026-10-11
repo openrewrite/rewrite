@@ -180,7 +180,7 @@ final class DepValid {
 
     private static boolean linkValid(Node child, Spec requested, Node requestor) {
         boolean isLink = child.isLink();
-        if (requestor.isInstallLinks() && !child.isWorkspace()) {
+        if (requestor.isInstallLinks() && (!child.isWorkspace() || !requestor.getRelease().keepsWorkspaceLinksValid())) {
             return !isLink;
         }
         return isLink && child.getRealpath() != null &&

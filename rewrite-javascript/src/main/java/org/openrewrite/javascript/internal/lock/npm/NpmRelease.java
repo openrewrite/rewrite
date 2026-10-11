@@ -244,6 +244,22 @@ public final class NpmRelease implements Comparable<NpmRelease> {
     }
 
     /**
+     * {@code #buildDepStep} places every dependency of a step before it visits any placement, until npm 9.6.6; from
+     * then, each placement is visited as soon as it is made.
+     */
+    boolean placesWholeStepBeforeVisiting() {
+        return !atLeast(9, 6, 6);
+    }
+
+    /**
+     * {@code #nodeFromSpec}: a spec naming a workspace that satisfies the edge takes the workspace instead of a
+     * registry manifest, from npm 8.5.0.
+     */
+    boolean prefersSatisfyingWorkspace() {
+        return atLeast(8, 5, 0);
+    }
+
+    /**
      * {@code #idealTreePrune}: a node flagged both peer and optional is pruned like an extraneous one, from npm 11.5.0
      * until 11.6.3.
      */
@@ -264,6 +280,14 @@ public final class NpmRelease implements Comparable<NpmRelease> {
      */
     boolean queuesNodesMissingDependencies() {
         return atLeast(11, 6, 2);
+    }
+
+    /**
+     * {@code #initTree} queues each node of the loaded tree that has an invalid edge, from npm 8.6.0; before, only the
+     * root is queued.
+     */
+    boolean queuesProblemNodesOfLock() {
+        return atLeast(8, 6, 0);
     }
 
     /**
@@ -291,10 +315,26 @@ public final class NpmRelease implements Comparable<NpmRelease> {
     }
 
     /**
+     * {@code #nodeFromSpec}: a workspace that satisfies the edge is returned for it, from npm 9.6.0; before, the edge's
+     * current target.
+     */
+    boolean returnsSatisfyingWorkspace() {
+        return atLeast(9, 6, 0);
+    }
+
+    /**
      * {@code #checkEngineAndPlatform}: a node {@code omit} leaves out is not checked, from npm 11.5.0.
      */
     boolean skipsEngineCheckOfOmitted() {
         return atLeast(11, 5, 0);
+    }
+
+    /**
+     * {@code #inflateAncientLockfile} leaves out a node outside node_modules, a link target the link brings in, from
+     * npm 8.6.0; before, it fetches its manifest too, as {@code file:} of its path when it has no version.
+     */
+    boolean skipsLinkTargetsWhenInflating() {
+        return atLeast(8, 6, 0);
     }
 
     /**
@@ -305,6 +345,14 @@ public final class NpmRelease implements Comparable<NpmRelease> {
      */
     boolean skipsPeerConflictOfDetachedNode() {
         return atLeast(12, 0, 2) || atLeast(11, 19, 0) && !atLeast(12, 0, 0);
+    }
+
+    /**
+     * The queue of nodes to build is a plain array, duplicates and all, sorted by depth and path at every step, until
+     * npm 9.6.6; from then, {@code DepsQueue} keeps each node once and sorts only after a push.
+     */
+    boolean sortsDepsQueueAtEveryStep() {
+        return !atLeast(9, 6, 6);
     }
 
     /**
@@ -378,6 +426,14 @@ public final class NpmRelease implements Comparable<NpmRelease> {
     }
 
     /**
+     * {@code linkValid}: a workspace's link stays valid under {@code install-links}, from npm 9.0.0; before, every link
+     * is invalid there.
+     */
+    boolean keepsWorkspaceLinksValid() {
+        return atLeast(9, 0, 0);
+    }
+
+    /**
      * A git committish of up to 64 hex digits is a commit, from npm 11.10.0; before, 40 exactly.
      */
     boolean readsSha256Commits() {
@@ -395,6 +451,22 @@ public final class NpmRelease implements Comparable<NpmRelease> {
     }
 
     /**
+     * {@code error} is computed when it is first read after the edge is made or reloaded, from npm 9.6.6; before, when
+     * the edge is made and whenever its target changes or it is reloaded hard ({@code #loadError}).
+     */
+    boolean computesEdgeErrorWhenRead() {
+        return atLeast(9, 6, 6);
+    }
+
+    /**
+     * {@code spec}: an override whose value is {@code *} leaves the edge's spec as declared, from npm 9.0.0; before,
+     * the edge reads {@code *}.
+     */
+    boolean ignoresStarOverride() {
+        return atLeast(9, 0, 0);
+    }
+
+    /**
      * {@code satisfiedBy} reads a dependency the root project bundles by the overridden spec, as any other ({@code
      * inDepBundle} in place of {@code inBundle}), from npm 12.0.0.
      */
@@ -403,11 +475,45 @@ public final class NpmRelease implements Comparable<NpmRelease> {
     }
 
     /**
+     * {@code satisfiedBy} reads a node that is bundled or shrinkwrapped by the spec as declared, from npm 8.12.0;
+     * before, through the override as any other.
+     */
+    boolean readsRawSpecOfBundled() {
+        return atLeast(8, 12, 0);
+    }
+
+    /**
+     * {@code spec}: a {@code $name} override read by an edge of a virtual root resolves against the real root's
+     * package, from npm 8.16.0; before, against the virtual root's.
+     */
+    boolean readsReferenceFromRealRoot() {
+        return atLeast(8, 16, 0);
+    }
+
+    /**
      * {@code spec}: a {@code $name} override the root does not declare is read from the edge's own package, from npm
      * 11.3.0.
      */
     boolean resolvesOverrideReferenceInOwnPackage() {
         return atLeast(11, 3, 0);
+    }
+
+    // @npmcli/arborist from-path.js
+
+    /**
+     * A node's {@code resolved} is read with npm-package-arg only once no override answers, from npm 9.6.6; before,
+     * first, so that one npa refuses fails the dependent's edge even where an override answers.
+     */
+    boolean parsesResolvedAfterOverride() {
+        return atLeast(9, 6, 6);
+    }
+
+    /**
+     * An edge an override replaces resolves its spec from the project root's directory, from npm 8.16.0; before, from
+     * the node's own, as any other.
+     */
+    boolean resolvesOverriddenSpecFromRoot() {
+        return atLeast(8, 16, 0);
     }
 
     // @npmcli/arborist link.js
@@ -514,6 +620,14 @@ public final class NpmRelease implements Comparable<NpmRelease> {
     }
 
     /**
+     * A rule whose key names no spec ({@code npa(key).rawSpec === ''}, as npm-package-arg before 10.0.0 reads a bare
+     * name) has the key spec {@code ''}, which every edge and node of its name matches, until npm 9.0.0.
+     */
+    boolean keepsEmptyOverrideKeySpec() {
+        return !atLeast(9, 0, 0);
+    }
+
+    /**
      * {@code getEdgeRule}: a rule's key is matched against the spec the edge declares, from npm 11.2.0; before, against
      * the spec with the edge's override applied.
      */
@@ -521,7 +635,24 @@ public final class NpmRelease implements Comparable<NpmRelease> {
         return atLeast(11, 2, 0);
     }
 
+    /**
+     * {@code getEdgeRule} reads the edge's spec with npm-package-arg: a range or version (a git spec's range) is
+     * compared with the rule's key, any other kind of spec takes the rule, from npm 9.3.0; before,
+     * {@code semver.intersects(edge.spec, rule.keySpec)}, which throws on a spec that is no range.
+     */
+    boolean matchesEdgeRuleBySpecType() {
+        return atLeast(9, 3, 0);
+    }
+
     // @npmcli/arborist shrinkwrap.js
+
+    /**
+     * {@code defaultLockfileVersion}, what a lock is written as when neither the config nor the lock says: 3 from npm
+     * 9.0.0; 2 before.
+     */
+    int defaultLockfileVersion() {
+        return atLeast(9, 0, 0) ? 3 : 2;
+    }
 
     /**
      * {@code commit}: an extraneous node outside node_modules, a workspace or {@code file:} dependency the manifest no
@@ -529,6 +660,14 @@ public final class NpmRelease implements Comparable<NpmRelease> {
      */
     boolean dropsExtraneousOutsideNodeModules() {
         return atLeast(11, 15, 0);
+    }
+
+    /**
+     * {@code load} keeps the version of the lock it reads unless it is 1, which it upgrades to the default, from npm
+     * 9.0.0; before, it takes the greater of that version and the default ({@code Math.max}).
+     */
+    boolean keepsLoadedLockfileVersion() {
+        return atLeast(9, 0, 0);
     }
 
     /**
@@ -631,6 +770,28 @@ public final class NpmRelease implements Comparable<NpmRelease> {
     }
 
     /**
+     * {@code install-links} is a config from npm 8.8.0 (lib/utils/config/definitions.js until npm 9.7.2).
+     */
+    boolean definesInstallLinks() {
+        return atLeast(8, 8, 0);
+    }
+
+    /**
+     * {@code install-strategy} is a config from npm 9.0.0; before, {@code global-style} and {@code legacy-bundling}
+     * are arborist's own options, {@code legacyBundling} read first.
+     */
+    boolean definesInstallStrategy() {
+        return atLeast(9, 0, 0);
+    }
+
+    /**
+     * {@code install-strategy} takes {@code linked} from npm 9.4.0; before, arborist hoists it.
+     */
+    boolean definesLinkedInstallStrategy() {
+        return atLeast(9, 4, 0);
+    }
+
+    /**
      * {@code min-release-age} is a config from npm 11.10.0.
      */
     boolean definesMinReleaseAge() {
@@ -645,6 +806,35 @@ public final class NpmRelease implements Comparable<NpmRelease> {
     }
 
     /**
+     * {@code omit-lockfile-registry-resolved} is a config from npm 8.10.0.
+     */
+    boolean definesOmitLockfileRegistryResolved() {
+        return atLeast(8, 10, 0);
+    }
+
+    /**
+     * {@code prefer-dedupe} is a config from npm 9.7.0.
+     */
+    boolean definesPreferDedupe() {
+        return atLeast(9, 7, 0);
+    }
+
+    /**
+     * The default of {@code install-links}: {@code true} from npm 9.0.0 until 9.4.2.
+     */
+    boolean installLinksDefault() {
+        return atLeast(9, 0, 0) && !atLeast(9, 4, 2);
+    }
+
+    /**
+     * {@code lockfile-version}'s type takes the strings {@code 1}, {@code 2} and {@code 3} an npmrc file holds, from
+     * npm 8.1.2; before, only the numbers.
+     */
+    boolean typesLockfileVersionAsStrings() {
+        return atLeast(8, 1, 2);
+    }
+
+    /**
      * {@code min-release-age}'s flatten: {@code before} wins over it within one source and a falsy age filters nothing,
      * from npm 11.15.0; before, the two exclude each other and any age sets {@code before}.
      */
@@ -653,6 +843,16 @@ public final class NpmRelease implements Comparable<NpmRelease> {
     }
 
     // @npmcli/config index.js
+
+    /**
+     * The options npm installs with are flattened from the config as {@code validate} leaves it (nopt's clean drops a
+     * value of none of its definition's types and makes a date a Date): before npm 9.0.0, where {@code load}
+     * validates, and in 9.1.0 and 9.2.0, whose npm.js sets {@code location} between loading and the command's
+     * validation; otherwise npm.js flattens them while it loads, before the command validates.
+     */
+    boolean flattensValidatedConfig() {
+        return !atLeast(9, 0, 0) || atLeast(9, 1, 0) && !atLeast(9, 3, 0);
+    }
 
     /**
      * {@code validate} refuses an auth key outside a registry's scope in an npmrc file ({@code ERR_INVALID_AUTH}), and
@@ -668,6 +868,18 @@ public final class NpmRelease implements Comparable<NpmRelease> {
      */
     boolean refusesUnscopedEmailAndCertificate() {
         return atLeast(12, 0, 0);
+    }
+
+    // @npmcli/config parse-field.js
+
+    /**
+     * A {@code before} an npmrc file sets reaches pacote as the string it is written as, whose fetchers fail on it
+     * ({@code this.before.toISOString is not a function}): npm 9.0.0 and 9.0.1, and 9.3.0 until 9.6.2, whose
+     * parseField reads a date into a Date; the other releases flatten the validated config
+     * ({@link #flattensValidatedConfig()}).
+     */
+    boolean keepsNpmrcBeforeAString() {
+        return !flattensValidatedConfig() && !atLeast(9, 6, 2);
     }
 
     // @npmcli/map-workspaces

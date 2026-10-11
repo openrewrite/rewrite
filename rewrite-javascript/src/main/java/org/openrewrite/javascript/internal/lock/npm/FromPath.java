@@ -30,8 +30,13 @@ final class FromPath {
     }
 
     static @Nullable String fromPath(Node node, @Nullable Edge edge) {
-        if (edge != null && edge.getOverrides() != null && edge.getName().equals(edge.getOverrides().getName()) &&
-            truthy(edge.getOverrides().getValue())) {
+        NpmRelease release = node.getRelease();
+        // before npm 9.6.6, (node, edge) => fromPath(node, node.resolved && npa(node.resolved), edge)
+        Spec resolved = !release.parsesResolvedAfterOverride() && truthy(node.getResolved()) ?
+                Spec.npa(node.getResolved(), null, release.npmPackageArg()) : null;
+
+        if (release.resolvesOverriddenSpecFromRoot() && edge != null && edge.getOverrides() != null &&
+            edge.getName().equals(edge.getOverrides().getName()) && truthy(edge.getOverrides().getValue())) {
             if (node.getSourceReference() != null) {
                 return node.getSourceReference().getRoot().getRealpath();
             }
@@ -39,7 +44,7 @@ final class FromPath {
         }
 
         if (truthy(node.getResolved())) {
-            Spec spec = Spec.npa(node.getResolved(), null, node.getRelease().npmPackageArg());
+            Spec spec = resolved != null ? resolved : Spec.npa(node.getResolved(), null, release.npmPackageArg());
             if (spec.getType() == Spec.Type.FILE) {
                 return PosixPath.dirname(spec.getFetchSpec());
             }
