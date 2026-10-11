@@ -15,13 +15,14 @@
  */
 package org.openrewrite.javascript.internal.lock.berry;
 
+import org.openrewrite.javascript.internal.lock.CannotKnow;
 import org.openrewrite.javascript.internal.lock.RegistrySource;
 
 import lombok.Value;
 import org.jspecify.annotations.Nullable;
 
 /**
- * Port of @yarnpkg/core sources/Fetcher.ts (Yarn 4.10.3), down to what the lockfile keeps of a fetch: its checksum.
+ * Port of @yarnpkg/core sources/Fetcher.ts (Yarn 4.10.3), down to a fetch's checksum and the files a patch applies to.
  */
 interface Fetcher {
 
@@ -42,4 +43,11 @@ interface Fetcher {
      */
     @Nullable
     String fetch(Locator locator, FetchOptions opts);
+
+    /**
+     * The fetch's {@code packageFs}: the archive with the package under {@code getIdentVendorPath}.
+     */
+    default ZipArchive fetchPackageFs(Locator locator, FetchOptions opts) {
+        throw new CannotKnow("the files of " + StructUtils.stringifyLocator(locator) + ", which a patch applies to");
+    }
 }

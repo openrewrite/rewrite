@@ -29,6 +29,7 @@ final class ReportError extends RuntimeException {
     static final int FETCHER_NOT_FOUND = 11;
     static final int REMOTE_INVALID = 15;
     static final int REMOTE_NOT_FOUND = 16;
+    static final int PATCH_HUNK_FAILED = 66;
     static final int AUTHENTICATION_NOT_FOUND = 33;
     static final int NETWORK_ERROR = 35;
     static final int STACK_OVERFLOW_RESOLUTION = 45;

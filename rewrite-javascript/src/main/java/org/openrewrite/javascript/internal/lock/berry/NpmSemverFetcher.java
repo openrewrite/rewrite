@@ -47,6 +47,11 @@ final class NpmSemverFetcher implements Fetcher {
         }, project);
     }
 
+    @Override
+    public ZipArchive fetchPackageFs(Locator locator, FetchOptions opts) {
+        return Cache.packageFs(fetchFromNetwork(locator, opts), locator);
+    }
+
     private static byte[] fetchFromNetwork(Locator locator, FetchOptions opts) {
         String version = YarnpkgSemverUtils.clean(locator.reference.substring(NpmHttpUtils.PROTOCOL.length()));
         String url = NpmHttpUtils.getLocatorUrl(locator);

@@ -43,15 +43,24 @@ final class NpmHttpFetcher implements Fetcher {
     public @Nullable String fetch(Locator locator, FetchOptions opts) {
         Project project = opts.getProject();
         return Cache.fetchPackageFromCache(locator, () -> {
-            StructUtils.Range range = StructUtils.parseRange(locator.reference);
-            Object archiveUrl = range.getParams() == null ? null : range.getParams().get("__archiveUrl");
-            if (!(archiveUrl instanceof String)) {
-                throw new JsError(JsError.ERROR, "Assertion failed: The archiveUrl querystring parameter should " +
-                                                 "have been available");
-            }
-            byte[] tgz = NpmHttpUtils.get((String) archiveUrl, locator, range.getSelector(), project,
-                    opts.getRegistry());
+            byte[] tgz = fetchFromNetwork(locator, opts);
             return () -> Cache.checksum(tgz, locator, project.configuration);
         }, project);
+    }
+
+    @Override
+    public ZipArchive fetchPackageFs(Locator locator, FetchOptions opts) {
+        return Cache.packageFs(fetchFromNetwork(locator, opts), locator);
+    }
+
+    private static byte[] fetchFromNetwork(Locator locator, FetchOptions opts) {
+        StructUtils.Range range = StructUtils.parseRange(locator.reference);
+        Object archiveUrl = range.getParams() == null ? null : range.getParams().get("__archiveUrl");
+        if (!(archiveUrl instanceof String)) {
+            throw new JsError(JsError.ERROR, "Assertion failed: The archiveUrl querystring parameter should " +
+                                             "have been available");
+        }
+        return NpmHttpUtils.get((String) archiveUrl, locator, range.getSelector(), opts.getProject(),
+                opts.getRegistry());
     }
 }

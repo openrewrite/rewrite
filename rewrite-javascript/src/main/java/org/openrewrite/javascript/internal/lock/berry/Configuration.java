@@ -939,6 +939,15 @@ public final class Configuration {
     }
 
     /**
+     * {@code firstHook(hooks => hooks.getBuiltinPatch, project, name)}, null when no bundled plugin has the patch.
+     */
+    @Nullable
+    String getBuiltinPatch(String name) {
+        return getRelease().hasPlugin("@yarnpkg/plugin-compat") ? CompatPatches.getBuiltinPatch(name, getRelease()) :
+                null;
+    }
+
+    /**
      * {@code reduceHook(hooks => hooks.reduceDependency, ...)} over the core plugin, then the bundled ones in order.
      */
     Descriptor reduceDependency(Descriptor dependency, Project project, Locator locator, Resolver resolver,

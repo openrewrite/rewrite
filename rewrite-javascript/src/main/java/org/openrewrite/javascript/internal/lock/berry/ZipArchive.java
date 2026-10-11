@@ -15,10 +15,17 @@
  */
 package org.openrewrite.javascript.internal.lock.berry;
 
+import org.jspecify.annotations.Nullable;
+import org.openrewrite.javascript.internal.lock.JsError;
+
 import java.io.ByteArrayOutputStream;
 import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
+import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.zip.CRC32;
 
 /**
@@ -31,6 +38,7 @@ final class ZipArchive {
     private static final int DOS_DATE = 2262;
     private static final int VERSION_MADE_BY = 0x033f;
     private static final int GPBF_ENCODING_UTF_8 = 0x0800;
+    private static final int S_IFMT = 0170000;
     private static final int S_IFDIR = 0040000;
     private static final int S_IFREG = 0100000;
     private static final int S_IFLNK = 0120000;
@@ -94,6 +102,88 @@ final class ZipArchive {
             throw new AlreadyExists("symlink '" + target + "' -> '/" + path + "'");
         }
         entries.put(path, new Entry(S_IFLNK | 0777, target.getBytes(StandardCharsets.UTF_8)));
+    }
+
+    /**
+     * {@code lstat}'s mode, null for no such path. A directory only named by deeper entries is {@code 0755}.
+     */
+    @Nullable
+    Integer lstatMode(String path) {
+        Entry file = entries.get(path);
+        if (file != null) {
+            return file.mode;
+        }
+        Entry dir = entries.get(path + "/");
+        if (dir != null) {
+            return dir.mode;
+        }
+        String prefix = path + "/";
+        for (String key : entries.keySet()) {
+            if (key.startsWith(prefix)) {
+                return S_IFDIR | 0755;
+            }
+        }
+        return null;
+    }
+
+    static boolean isDirectory(int mode) {
+        return (mode & S_IFMT) == S_IFDIR;
+    }
+
+    static boolean isSymbolicLink(int mode) {
+        return (mode & S_IFMT) == S_IFLNK;
+    }
+
+    /**
+     * {@code readdirSync}: the names directly under the directory.
+     */
+    List<String> readdir(String dir) {
+        String prefix = dir + "/";
+        Set<String> names = new LinkedHashSet<>();
+        for (String key : entries.keySet()) {
+            if (key.startsWith(prefix) && key.length() > prefix.length()) {
+                String rest = key.substring(prefix.length());
+                int slash = rest.indexOf('/');
+                names.add(slash == -1 ? rest : rest.substring(0, slash));
+            }
+        }
+        return new ArrayList<>(names);
+    }
+
+    /**
+     * A file's content, a symbolic link's target.
+     */
+    byte[] readFile(String path) {
+        Entry entry = entries.get(path);
+        if (entry == null) {
+            throw new JsError(JsError.ERROR, "ENOENT: no such file or directory, open '/" + path + "'", "ENOENT");
+        }
+        return entry.data;
+    }
+
+    /**
+     * {@code chmodSync}, which keeps entries from being group or world writable.
+     */
+    void chmod(String path, int mask) {
+        Entry entry = entries.containsKey(path) ? entries.get(path) : entries.get(path + "/");
+        if (entry == null) {
+            throw new JsError(JsError.ERROR, "ENOENT: no such file or directory, chmod '/" + path + "'", "ENOENT");
+        }
+        entry.mode = entry.mode & ~0777 | (mask & 0755);
+    }
+
+    void unlink(String path) {
+        if (entries.remove(path) == null) {
+            throw new JsError(JsError.ERROR, "ENOENT: no such file or directory, unlink '/" + path + "'", "ENOENT");
+        }
+    }
+
+    ZipArchive copy() {
+        ZipArchive copy = new ZipArchive();
+        for (Map.Entry<String, Entry> e : entries.entrySet()) {
+            copy.entries.put(e.getKey(), new Entry(e.getValue().mode, e.getValue().data));
+        }
+        return copy;
     }
 
     byte[] toByteArray() {
