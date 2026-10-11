@@ -36,7 +36,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 /**
  * What {@code pnpm add} saves for a new dependency; the scenarios are pnpm 11.2.2's recordings of {@code pnpm add}.
  */
-class InstallSomeTest {
+class InstallTest {
 
     @ParameterizedTest
     @CsvSource(nullValues = "unset", textBlock = """
@@ -52,27 +52,27 @@ class InstallSomeTest {
       """)
     void settingsAsPnpmReadsThem(String scenario, String mode, @Nullable String saveCatalogName) {
         Map<String, @Nullable Object> workspace = workspace(scenario);
-        assertThat(InstallSome.catalogMode(workspace)).isEqualTo(mode);
-        assertThat(InstallSome.saveCatalogName(workspace)).isEqualTo(saveCatalogName);
+        assertThat(Install.catalogMode(workspace)).isEqualTo(mode);
+        assertThat(Install.saveCatalogName(workspace)).isEqualTo(saveCatalogName);
     }
 
     @Test
     void theDefaultCatalogsEntryOfTheSameSpecifierIsSavedAsCatalog() {
-        assertThat(InstallSome.add("wrappy", "1.0.1", workspace("catalog-entry-one-importer")))
-          .isEqualTo(new InstallSome.Saved("catalog:", null));
-        assertThat(InstallSome.add("wrappy", "1.0.2", workspace("catalog-entry-one-importer")))
-          .isEqualTo(new InstallSome.Saved("1.0.2", null));
+        assertThat(Install.installSome("wrappy", "1.0.1", workspace("catalog-entry-one-importer")))
+          .isEqualTo(new Install.Saved("catalog:", null));
+        assertThat(Install.installSome("wrappy", "1.0.2", workspace("catalog-entry-one-importer")))
+          .isEqualTo(new Install.Saved("1.0.2", null));
     }
 
     @Test
     void aNewDependencyIsSavedInTheCatalogSaveCatalogNameNames() {
-        assertThat(InstallSome.add("wrappy", "1.0.2", workspace("catalog-add-save-name-manual")))
-          .isEqualTo(new InstallSome.Saved("catalog:tools", "tools"));
+        assertThat(Install.installSome("wrappy", "1.0.2", workspace("catalog-add-save-name-manual")))
+          .isEqualTo(new Install.Saved("catalog:tools", "tools"));
     }
 
     @Test
     void strictRejectsAVersionOutsideTheCatalogAndARangeFailsTheComparison() {
-        assertThatThrownBy(() -> InstallSome.add("wrappy", "1.0.1",
+        assertThatThrownBy(() -> Install.installSome("wrappy", "1.0.1",
           workspace("catalog-add-root-declares-mismatch-strict")))
           .isInstanceOfSatisfying(Rejected.class, e -> assertThat(LockOnlyInstall.PNPM.failure(e))
             .satisfies(failure -> {
@@ -80,7 +80,7 @@ class InstallSomeTest {
                 assertThat(failure.getDetail()).isEqualTo("pnpm rejects this edit: " +
                   "[ERR_PNPM_CATALOG_VERSION_MISMATCH] Wanted dependency outside the version range defined in catalog");
             }));
-        assertThatThrownBy(() -> InstallSome.add("wrappy", "^1.0.0", workspace("catalog-add-prefer-range")))
+        assertThatThrownBy(() -> Install.installSome("wrappy", "^1.0.0", workspace("catalog-add-prefer-range")))
           .isInstanceOfSatisfying(Rejected.class, e -> assertThat(LockOnlyInstall.PNPM.failure(e).getKind())
             .isEqualTo(Kind.PM_FAILS));
     }
@@ -90,7 +90,7 @@ class InstallSomeTest {
     }
 
     private static String file(String path) {
-        try (InputStream in = InstallSomeTest.class.getResourceAsStream(path)) {
+        try (InputStream in = InstallTest.class.getResourceAsStream(path)) {
             if (in == null) {
                 throw new IllegalArgumentException(path);
             }

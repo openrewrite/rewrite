@@ -137,7 +137,7 @@ tree and whose pnpm settings come from pnpm's own reader. A recipe that changes 
 in place, quoting kept, and the regeneration reads the edited file. ChangeDependency renames the key and gives the
 catalog the new name's entry; RemoveDependency does what `pnpm remove` does under `cleanupUnusedCatalogs`, the cleanup
 counting the projects the workspace's `packages` match; AddDependency saves what `pnpm add` saves (`lock.pnpm.
-ParseWantedDependencies`, `InstallSome`'s `catalogMode` check, `ResolveDependencyTree`'s catalog lookup for
+ParseWantedDependencies`, `Install.installSome`'s `catalogMode` check, `ResolveDependencyTree`'s catalog lookup for
 `saveCatalogName`), the version for pnpm 9, and the member's dependencies sorted, as pnpm writes them; a release range
 open between majors is declined. pnpm's cleanup is the port's (`WorkspaceManifestWriter.cleanupUnusedCatalogs`, the
 recipes removing from the tree what it removed). pnpm-workspace.yaml has one editor, the YAML tree, placing a new key

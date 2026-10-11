@@ -209,9 +209,9 @@ public final class PnpmManifestRules implements ManifestRules {
 
     @Override
     public Saved added(String alias, String specifier, @Nullable Map<String, @Nullable Object> workspace) {
-        InstallSome.Saved saved;
+        Install.Saved saved;
         try {
-            saved = InstallSome.add(alias, specifier, workspace);
+            saved = Install.installSome(alias, specifier, workspace);
         } catch (Rejected e) {
             throw Rejected.rejects(e.getReason(), e.getPackageName(), LockOnlyInstall.PNPM.failure(e).getDetail());
         }

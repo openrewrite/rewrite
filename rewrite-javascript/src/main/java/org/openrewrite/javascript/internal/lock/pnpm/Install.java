@@ -17,8 +17,10 @@ package org.openrewrite.javascript.internal.lock.pnpm;
 
 import lombok.Value;
 import org.jspecify.annotations.Nullable;
+import org.openrewrite.javascript.internal.LockFileRegeneration.Reason;
 import org.openrewrite.javascript.internal.lock.CannotKnow;
 import org.openrewrite.javascript.internal.lock.JsError;
+import org.openrewrite.javascript.internal.lock.Rejected;
 import org.openrewrite.javascript.internal.lock.pnpm.ExtendInstallOptions.InstallOptions;
 import org.openrewrite.javascript.internal.lock.pnpm.ExtendInstallOptions.StrictInstallOptions;
 
@@ -31,12 +33,16 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.function.Consumer;
+import org.openrewrite.semver.NodeSemver;
 
 /**
  * Port of @pnpm/installing.deps-installer src/install/index.ts (pnpm 11.2.2) for one lock: install, mutateModules,
- * _install up to its resolution, and _installInContext's resolution and write.
+ * _install up to its resolution, _installInContext's resolution and write, and installSome's catalogMode check.
  */
 final class Install {
+
+    private static final String CATALOG_PROTOCOL = "catalog:";
+    private static final String DEFAULT_CATALOG = "default";
 
     /**
      * @pnpm/installing.context's PnpmContext as a lock-only install reads it.
@@ -492,5 +498,76 @@ final class Install {
             hashes.put(entry.getKey(), Js.string(entry.getValue()));
         }
         return hashes;
+    }
+
+    /**
+     * The specifier pnpm writes into the manifest, and the catalog it adds {@code alias: specifier} to (null for
+     * none).
+     */
+    @Value
+    static class Saved {
+        String bareSpecifier;
+
+        @Nullable
+        String catalogName;
+    }
+
+    /**
+     * installSome's catalogMode check for {@code pnpm add <alias>@<specifier>}, between ParseWantedDependencies and
+     * ResolveDependencyTree: what it saves, under the workspace manifest as its reader reads it (null without one).
+     */
+    static Saved installSome(String alias, String bareSpecifier, @Nullable Map<String, @Nullable Object> workspace) {
+        Map<String, @Nullable Map<String, @Nullable Object>> catalogs;
+        try {
+            catalogs = Catalogs.getCatalogsFromWorkspaceManifest(workspace);
+        } catch (PnpmError e) {
+            throw Rejected.rejects(Reason.RESOLUTION_REQUIRED, alias, "[" + e.getCode() + "] " + e.getMessage());
+        }
+        Map<String, @Nullable Object> defaultCatalog = catalogs.get(DEFAULT_CATALOG);
+        String wanted = ParseWantedDependencies.bareSpecifier(alias, bareSpecifier, defaultCatalog);
+        String saveCatalogName = saveCatalogName(workspace);
+        if (!"manual".equals(catalogMode(workspace))) {
+            String perDepCatalogName = saveCatalogName == null ? DEFAULT_CATALOG : saveCatalogName;
+            String catalogBareSpecifier = CATALOG_PROTOCOL + (DEFAULT_CATALOG.equals(perDepCatalogName) ? "" :
+                    perDepCatalogName);
+            Catalogs.Resolution catalog = Catalogs.resolveFromCatalog(catalogs, alias, catalogBareSpecifier);
+            String catalogDepSpecifier = "found".equals(catalog.getType()) ? catalog.getSpecifier() : null;
+            if (catalogDepSpecifier == null || wanted.equals(catalogBareSpecifier) || eq(alias, wanted,
+                    catalogDepSpecifier)) {
+                saveCatalogName = perDepCatalogName;
+            } else if ("strict".equals(catalogMode(workspace))) {
+                throw Rejected.rejects(Reason.RESOLUTION_REQUIRED, alias, "[ERR_PNPM_CATALOG_VERSION_MISMATCH] " +
+                                                                          "Wanted dependency outside the version " +
+                                                                          "range defined in catalog");
+            }
+        }
+        String lookup = CATALOG_PROTOCOL.equals(wanted) ? null :
+                ResolveDependencyTree.catalogLookup(alias, saveCatalogName, defaultCatalog);
+        return lookup == null ? new Saved(wanted, null) : new Saved(lookup, saveCatalogName);
+    }
+
+    // semver.validRange of both, then semver.eq, which takes versions only
+    private static boolean eq(String alias, String wanted, String catalogDepSpecifier) {
+        if (NodeSemver.validRange(wanted, NodeSemver.Options.DEFAULT) == null ||
+            NodeSemver.validRange(catalogDepSpecifier, NodeSemver.Options.DEFAULT) == null) {
+            return false;
+        }
+        try {
+            return NodeSemver.compare(wanted, catalogDepSpecifier, NodeSemver.Options.DEFAULT) == 0;
+        } catch (IllegalArgumentException e) {
+            throw Rejected.crashes(Reason.RESOLUTION_REQUIRED, alias, "TypeError: " + e.getMessage());
+        }
+    }
+
+    // getConfig's catalogMode: manual when unset
+    static String catalogMode(@Nullable Map<String, @Nullable Object> workspace) {
+        Object mode = workspace == null || !workspace.containsKey("catalogMode") ? "manual" :
+                workspace.get("catalogMode");
+        return mode == null ? "null" : Js.string(mode);
+    }
+
+    static @Nullable String saveCatalogName(@Nullable Map<String, @Nullable Object> workspace) {
+        Object value = workspace == null ? null : workspace.get("saveCatalogName");
+        return value == null || value instanceof Map || value instanceof List ? null : Js.string(value);
     }
 }
