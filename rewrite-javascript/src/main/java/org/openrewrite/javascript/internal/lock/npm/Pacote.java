@@ -176,7 +176,8 @@ final class Pacote {
 
         // the fetcher's constructor parses a string integrity; a value of another type is kept as it is
         Object held = opts.getIntegrity();
-        Ssri.Integrity integrity = held instanceof String ? Ssri.parse(held, Ssri.Release.V13_0_1) : null;
+        Ssri.Release ssri = options.getRelease().ssri();
+        Ssri.Integrity integrity = held instanceof String ? Ssri.parse(held, ssri) : null;
         boolean heldRaw = !(held instanceof String) && truthy(held);
         Object dist = mani.get("dist");
         if (truthy(dist)) {
@@ -188,8 +189,8 @@ final class Pacote {
                     fetched.getSaveSpec());
             Object distIntegrity = Js.get(dist, "integrity");
             Object shasum = Js.get(dist, "shasum");
-            Ssri.Integrity parsed = truthy(distIntegrity) ? Ssri.parse(Js.string(distIntegrity), Ssri.Release.V13_0_1) :
-                    truthy(shasum) ? Ssri.fromHex(Js.string(shasum), "sha1", Ssri.Release.V13_0_1) : null;
+            Ssri.Integrity parsed = truthy(distIntegrity) ? Ssri.parse(Js.string(distIntegrity), ssri) :
+                    truthy(shasum) ? Ssri.fromHex(Js.string(shasum), "sha1", ssri) : null;
             if (parsed != null) {
                 if (heldRaw) {
                     throw new IllegalArgumentException("this.integrity.match is not a function");

@@ -17,6 +17,7 @@ package org.openrewrite.javascript.internal.lock.npm;
 
 import lombok.EqualsAndHashCode;
 import lombok.Getter;
+import org.openrewrite.javascript.internal.lock.Ssri;
 import org.openrewrite.javascript.semver.NodeSemver;
 
 import java.util.regex.Matcher;
@@ -496,6 +497,16 @@ public final class NpmRelease implements Comparable<NpmRelease> {
                 atLeast(11, 16, 0) ? NodeSemver.Release.V7_8_1 :
                         atLeast(11, 6, 2) || atLeast(10, 9, 5) && !atLeast(11, 0, 0) ? NodeSemver.Release.V7_8_0 :
                                 NodeSemver.Release.V7_7_2;
+    }
+
+    // ssri
+
+    /**
+     * The ssri npm bundles: 13.0.1 from npm 11.10.0, which drops a hash whose algorithm Node cannot hash with; before,
+     * 13.0.0, which keeps it, as every release from 10.0.5 (npm 10.0.0) answers.
+     */
+    Ssri.Release ssri() {
+        return atLeast(11, 10, 0) ? Ssri.Release.V13_0_1 : Ssri.Release.V13_0_0;
     }
 
     @Override

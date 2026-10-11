@@ -38,12 +38,14 @@ import java.util.regex.Pattern;
 
 /**
  * Port of ssri ({@code parse}, {@code stringify}, {@code fromHex}, {@code checkData}, {@code Hash}, {@code Integrity},
- * without options): 5.3.0, which yarn 1.22.22 bundles, and 13.0.1, which npm 11.17.0 and pnpm 11.2.2 bundle.
+ * without options): 5.3.0, which yarn 1.22.22 bundles, 13.0.1, which npm 11.17.0 and pnpm 11.2.2 bundle, and 13.0.0,
+ * which npm 11.6.3 to 11.9.0 bundle and whose answers 10.0.5 to 12.0.0 (npm 10.0.0 to 11.6.2) give too.
  */
 public final class Ssri {
 
     public enum Release {
         V5_3_0,
+        V13_0_0,
         V13_0_1
     }
 
@@ -62,6 +64,10 @@ public final class Ssri {
     private static final List<String> PRIORITY_13_0_1 = Arrays.asList("md5", "sha1", "sha224", "sha256", "sha384",
             "sha512", "sha3-256", "sha3-384", "sha3-512");
 
+    // the members an Integrity inherits whose names 13.0.0's algorithm pattern can match
+    private static final Set<String> INHERITED_13_0_0 = new HashSet<>(Arrays.asList("constructor", "concat", "merge",
+            "match"));
+
     private static final Set<String> JAVA_DIGESTS = new HashSet<>(Arrays.asList("md5", "sha1", "sha224", "sha256",
             "sha384", "sha512"));
 
@@ -73,7 +79,7 @@ public final class Ssri {
         private final String source;
 
         /**
-         * Null where 5.3.0 leaves it undefined; 13.0.1 starts from the empty string.
+         * Null where 5.3.0 leaves it undefined; 13.0.0 and 13.0.1 start from the empty string.
          */
         private @Nullable String algorithm;
 
@@ -82,13 +88,14 @@ public final class Ssri {
 
         Hash(String hash, Release release) {
             this.source = EcmaScript.trim(hash);
-            boolean v13 = release == Release.V13_0_1;
+            boolean v13 = release != Release.V5_3_0;
             if (v13) {
                 algorithm = "";
                 digest = "";
             }
             Matcher match = (v13 ? SRI_13_0_1 : SRI_5_3_0).matcher(source);
-            if (!match.find() || v13 && !NODE_HASHES.contains(match.group(1))) {
+            // 13.0.1 takes no algorithm Node cannot hash with
+            if (!match.find() || release == Release.V13_0_1 && !NODE_HASHES.contains(match.group(1))) {
                 return;
             }
             this.algorithm = match.group(1);
@@ -224,13 +231,13 @@ public final class Ssri {
     }
 
     /**
-     * {@code ssri.parse(sri)}: 13.0.1 answers null for a falsy value and for one with no hash, 5.3.0 an empty
-     * {@link Integrity}; another object is read through the port's template literal, {@code `${value}`}.
+     * {@code ssri.parse(sri)}: 13.0.0 and 13.0.1 answer null for a falsy value and for one with no hash, 5.3.0 an
+     * empty {@link Integrity}; another object is read through the port's template literal, {@code `${value}`}.
      */
     public static @Nullable Integrity parse(@Nullable Object sri, Release release,
                                             Function<@Nullable Object, String> template) {
         Integrity parsed;
-        if (release == Release.V13_0_1 && !EcmaScript.truthy(sri)) {
+        if (release != Release.V5_3_0 && !EcmaScript.truthy(sri)) {
             return null;
         }
         if (sri instanceof String) {
@@ -245,7 +252,7 @@ public final class Ssri {
             parsed = parseString(EcmaScript.truthy(get(sri, "algorithm")) && EcmaScript.truthy(get(sri, "digest")) ?
                     hashString(sri, template) : integrityString(sri, template), release);
         }
-        return release == Release.V13_0_1 && parsed.isEmpty() ? null : parsed;
+        return release != Release.V5_3_0 && parsed.isEmpty() ? null : parsed;
     }
 
     private static Integrity parseString(String integrity, Release release) {
@@ -253,6 +260,10 @@ public final class Ssri {
         for (String string : WHITESPACE.split(EcmaScript.trim(integrity), -1)) {
             Hash hash = new Hash(string, release);
             if (EcmaScript.truthy(hash.algorithm) && EcmaScript.truthy(hash.digest)) {
+                // 13.0.0 asks the Integrity itself for the algorithm's hashes and finds a member it inherits
+                if (release == Release.V13_0_0 && INHERITED_13_0_0.contains(hash.algorithm)) {
+                    throw new JsError(JsError.TYPE_ERROR, "acc[algo].push is not a function");
+                }
                 acc.hashes.computeIfAbsent(hash.algorithm, k -> new ArrayList<>()).add(hash);
             }
         }
