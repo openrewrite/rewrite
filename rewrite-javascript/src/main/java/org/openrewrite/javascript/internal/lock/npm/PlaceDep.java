@@ -355,7 +355,9 @@ public final class PlaceDep {
         }
 
         List<Node> prunePeerSets = new ArrayList<>();
-        for (Edge edge : oldDep.getEdgesIn()) {
+        // before npm 7.24.2 the peer sets the replacement no longer satisfies are left as they are
+        for (Edge edge : options.getRelease().prunesConflictedPeerSets() ? oldDep.getEdgesIn() :
+                Collections.<Edge>emptySet()) {
             if (placed.satisfies(edge) ||
                 !edge.isPeer() ||
                 edge.getFrom().getParent() != target ||

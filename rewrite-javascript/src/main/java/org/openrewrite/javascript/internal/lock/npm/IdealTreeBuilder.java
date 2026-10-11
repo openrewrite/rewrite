@@ -31,7 +31,9 @@ import org.openrewrite.javascript.semver.NodeSemver;
 import java.time.Instant;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Deque;
+import java.util.HashMap;
 import java.util.IdentityHashMap;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
@@ -39,6 +41,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
+import java.util.TreeMap;
+import java.util.TreeSet;
 
 import static org.openrewrite.javascript.internal.lock.npm.CanPlaceDep.Result.CONFLICT;
 import static org.openrewrite.javascript.internal.lock.npm.CanPlaceDep.Result.OK;
@@ -155,6 +159,19 @@ public final class IdealTreeBuilder {
             }
             return "anything";
         }
+
+        /**
+         * Every node waiting, in no particular order.
+         */
+        List<Node> items() {
+            List<Node> items = new ArrayList<>(deps);
+            for (Depth depth : depths) {
+                if (depth != null) {
+                    items.addAll(depth.items);
+                }
+            }
+            return items;
+        }
     }
 
     @Value
@@ -185,6 +202,11 @@ public final class IdealTreeBuilder {
     private final Map<Node, Node> peerSetSource = new IdentityHashMap<>();
     private final Map<Node, Node> virtualRoots = new IdentityHashMap<>();
     private boolean flagsSuspect;
+
+    // before npm 7.24.2: what the last step replaced, and the state the loop was in after each step that replaced
+    // something, with that replacement
+    private @Nullable String replaced;
+    private final Map<List<Object>, String> statesAfterReplace = new HashMap<>();
 
     @Getter
     private @Nullable Node idealTree;
@@ -520,6 +542,17 @@ public final class IdealTreeBuilder {
         while (true) {
             currentDep = null;
 
+            if (replaced != null) {
+                // before npm 7.24.2 the peer set a replacement no longer satisfies stays where it is, and building it
+                // again can replace the replacement in turn: a loop that comes back to where it was never ends
+                String earlier = statesAfterReplace.putIfAbsent(loopState(), replaced);
+                if (earlier != null) {
+                    throw Rejected.crashes(Reason.RESOLUTION_REQUIRED, null, "it never finishes: its tree and its " +
+                            "queue of dependencies to build come back to where they were when " + earlier);
+                }
+                replaced = null;
+            }
+
             if (depsQueue.length() == 0) {
                 resolveLinks();
                 if (depsQueue.length() == 0) {
@@ -654,6 +687,10 @@ public final class IdealTreeBuilder {
                     }
                 }
             } else if (cpd.getCanPlaceSelf() == REPLACE) {
+                if (!options.getRelease().prunesConflictedPeerSets()) {
+                    replaced = placed.getName() + "@" + Js.string(placed.getVersion()) + " replaced the one at " +
+                               placed.getLocation();
+                }
                 for (Edge edgeIn : placed.getEdgesIn()) {
                     if (edgeIn == edge) {
                         continue;
@@ -1153,6 +1190,70 @@ public final class IdealTreeBuilder {
                 node.setParent(null);
             }
         }
+    }
+
+    /**
+     * Everything the rest of the loop reads, as values: the tree with its edges, which of its nodes were built and
+     * which wait to be, the virtual roots kept to place peers from, the links and load failures, and what the lock
+     * gives a node placed at a location. A node no longer in the tree is skipped when its turn comes, and a node
+     * already built is built again only when it is queued again, so the queue counts by the nodes of the tree it
+     * holds that are not built yet.
+     */
+    private List<Object> loopState() {
+        Node tree = Objects.requireNonNull(idealTree);
+        List<Object> state = new ArrayList<>();
+        state.add(treeState(tree));
+        state.add(locations(depsSeen, tree));
+        List<Node> waiting = new ArrayList<>();
+        for (Node node : depsQueue.items()) {
+            if (!depsSeen.contains(node)) {
+                waiting.add(node);
+            }
+        }
+        state.add(locations(waiting, tree));
+        Map<String, Object> roots = new LinkedHashMap<>();
+        for (Map.Entry<Node, Node> vr : virtualRoots.entrySet()) {
+            if (vr.getKey().getRoot() == tree) {
+                roots.put(vr.getKey().getLocation(), treeState(vr.getValue()));
+            }
+        }
+        state.add(roots);
+        state.add(locations(linkNodes, tree));
+        state.add(locations(loadFailures, tree));
+        state.add(Objects.requireNonNull(tree.getMeta()).placementState());
+        return state;
+    }
+
+    private static Set<String> locations(Iterable<Node> nodes, Node tree) {
+        Set<String> locations = new TreeSet<>();
+        for (Node node : nodes) {
+            if (node.getRoot() == tree) {
+                locations.add(node.getLocation());
+            }
+        }
+        return locations;
+    }
+
+    // each node of a tree by location, with what placement reads of it
+    private static Map<String, List<Object>> treeState(Node root) {
+        Map<String, List<Object>> nodes = new TreeMap<>();
+        for (Node node : root.getInventory().values()) {
+            List<Object> edges = new ArrayList<>();
+            for (Edge edge : node.getEdgesOut().values()) {
+                Node to = edge.getTo();
+                edges.add(Arrays.asList(edge.getName(), edge.getType(), edge.getRawSpec(), edge.getSpec(),
+                        to == null ? null : to.getLocation(), edge.getError(), edge.isPeerConflicted()));
+            }
+            List<String> errors = new ArrayList<>();
+            for (Throwable error : node.getErrors()) {
+                errors.add(String.valueOf(error.getMessage()));
+            }
+            Node target = node.isLink() ? node.getTarget() : null;
+            nodes.put(node.getLocation(), Arrays.asList(node.getName(), node.isLink(),
+                    target == null ? null : target.getLocation(), node.getPackage(), node.getResolved(),
+                    node.getIntegrity(), errors, edges));
+        }
+        return nodes;
     }
 
     private void pruneFailedOptional() {

@@ -676,6 +676,15 @@ public final class NpmRelease implements Comparable<NpmRelease> {
         return atLeast(8, 1, 3);
     }
 
+    /**
+     * {@code replaceOldDep}: a peer set at the target that the replacing node no longer satisfies is pruned, its
+     * dependents evaluated again ({@code needEvaluation}), or its edge warned about when it cannot go deeper, from npm
+     * 7.24.2; before, it stays in place with its peer edge invalid.
+     */
+    boolean prunesConflictedPeerSets() {
+        return atLeast(7, 24, 2);
+    }
+
     // @npmcli/arborist shrinkwrap.js
 
     /**

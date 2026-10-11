@@ -855,6 +855,46 @@ public final class Shrinkwrap {
         return truthy(a) && truthy(b) && !Js.strictEquals(a, b);
     }
 
+    /**
+     * What {@link #get} would give a node placed at each location, as values: the entries of {@code packages}, with
+     * those of the nodes awaiting an update as they would be written, and the legacy {@code dependencies} it falls back
+     * on.
+     */
+    List<Object> placementState() {
+        Map<String, Object> awaiting = new LinkedHashMap<>();
+        for (Map.Entry<String, Node> entry : awaitingUpdate.entrySet()) {
+            Object meta;
+            try {
+                meta = metaFromNode(entry.getValue(), path, resolveOptions);
+            } catch (RuntimeException e) {
+                // what writing it would throw, which this state leaves to the write
+                meta = e.toString();
+            }
+            awaiting.put(entry.getKey(), meta);
+        }
+        Map<String, Object> data = loadedData();
+        return Arrays.asList(copy(data.get("packages")), awaiting, copy(data.get("dependencies")));
+    }
+
+    // a copy of a JSON value that later changes to the value leave alone
+    private static @Nullable Object copy(@Nullable Object value) {
+        if (value instanceof Map) {
+            Map<Object, Object> copy = new LinkedHashMap<>();
+            for (Map.Entry<?, ?> entry : ((Map<?, ?>) value).entrySet()) {
+                copy.put(entry.getKey(), copy(entry.getValue()));
+            }
+            return copy;
+        }
+        if (value instanceof List) {
+            List<Object> copy = new ArrayList<>();
+            for (Object element : (List<?>) value) {
+                copy.add(copy(element));
+            }
+            return copy;
+        }
+        return value;
+    }
+
     private void updateWaitingNode(String loc) {
         Node node = awaitingUpdate.remove(loc);
         packages().put(loc, metaFromNode(node, path, resolveOptions));
