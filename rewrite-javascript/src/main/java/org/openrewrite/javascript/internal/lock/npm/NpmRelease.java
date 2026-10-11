@@ -62,6 +62,30 @@ public final class NpmRelease implements Comparable<NpmRelease> {
         return compareTo(new NpmRelease(major, minor, patch)) >= 0;
     }
 
+    // @npmcli/arborist build-ideal-tree.js
+
+    /**
+     * {@code #fetchManifest} drops {@code license} from the manifest pacote returns: npm 10.4.0 until 10.8.0.
+     */
+    boolean dropsLicenseOfFetchedManifest() {
+        return atLeast(10, 4, 0) && !atLeast(10, 8, 0);
+    }
+
+    /**
+     * {@code #fetchManifest} asks pacote for the full packument ({@code fullMetadata: true}): from npm 10.4.0.
+     */
+    boolean fetchesFullMetadata() {
+        return atLeast(10, 4, 0);
+    }
+
+    /**
+     * {@code DepsQueue} keeps one list per depth, each sorted by path alone, in place of one list sorted when it is
+     * popped: npm 10.4.0 until 10.8.0.
+     */
+    boolean queuesDepsByDepth() {
+        return atLeast(10, 4, 0) && !atLeast(10, 8, 0);
+    }
+
     // @npmcli/config definitions.js
 
     /**
@@ -76,6 +100,15 @@ public final class NpmRelease implements Comparable<NpmRelease> {
      */
     String allowRemoteDefault() {
         return atLeast(12, 0, 0) ? "none" : "all";
+    }
+
+    // npm-pick-manifest
+
+    /**
+     * The npm-pick-manifest npm bundles: 9.1.0 from npm 10.8.2, which picks as 11.0.3 does; 9.0.1 and older before.
+     */
+    PickManifest.Release pickManifest() {
+        return atLeast(10, 8, 2) ? PickManifest.Release.V11_0_3 : PickManifest.Release.V9_0_1;
     }
 
     @Override

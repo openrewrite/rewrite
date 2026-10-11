@@ -39,10 +39,21 @@ import static org.openrewrite.javascript.semver.NodeSemver.Options.LOOSE_INCLUDE
  */
 public final class PickManifest {
 
+    /**
+     * The npm-pick-manifest release whose answers the pick gives: 11.0.3, which npm 11.17.0 bundles and 9.1.0 already
+     * reads as, or 9.0.1, before the dist-tag's version had to pass the checks every other version is ranked by.
+     */
+    public enum Release {
+        V9_0_1, V11_0_3
+    }
+
     @Value
     @Builder(toBuilder = true)
     public static class Options {
         public static final Options DEFAULT = Options.builder().build();
+
+        @Builder.Default
+        Release release = Release.V11_0_3;
 
         @Builder.Default
         String defaultTag = "latest";
@@ -236,7 +247,16 @@ public final class PickManifest {
         String range = type == Spec.Type.RANGE ? wanted : "*";
 
         Object defaultVer = Js.get(distTags, defaultTag);
-        if (truthy(defaultVer) &&
+        if (opts.getRelease() == Release.V9_0_1) {
+            if (truthy(defaultVer) &&
+                ("*".equals(range) || NodeSemver.satisfies(defaultVer, range, LOOSE)) &&
+                !shouldAvoid(defaultVer, avoid)) {
+                Object mani = Js.get(versions, Js.string(defaultVer));
+                if (truthy(mani) && isBefore(verTimes, defaultVer, time)) {
+                    return mani;
+                }
+            }
+        } else if (truthy(defaultVer) &&
             ("*".equals(range) || NodeSemver.satisfies(defaultVer, range, LOOSE)) &&
             !truthy(Js.get(restricted, Js.string(defaultVer))) &&
             !shouldAvoid(defaultVer, avoid)) {
@@ -272,17 +292,21 @@ public final class PickManifest {
         }
         String npmVersion = opts.getNpmVersion();
         String nodeVersion = opts.getNodeVersion();
+        // 9.0.1 reads restricted[a] and staged[a] with the [ver, mani] entry itself as the key
+        boolean keyedByEntry = opts.getRelease() == Release.V9_0_1;
         entries.sort((a, b) -> {
             String vera = a.getKey();
             Object mania = a.getValue();
             String verb = b.getKey();
             Object manib = b.getValue();
+            String keya = keyedByEntry ? entryKey(a) : vera;
+            String keyb = keyedByEntry ? entryKey(b) : verb;
             int notavoida = shouldAvoid(vera, avoid) ? 0 : 1;
             int notavoidb = shouldAvoid(verb, avoid) ? 0 : 1;
-            int notrestra = truthy(Js.get(restricted, vera)) ? 0 : 1;
-            int notrestrb = truthy(Js.get(restricted, verb)) ? 0 : 1;
-            int notstagea = truthy(Js.get(staged, vera)) ? 0 : 1;
-            int notstageb = truthy(Js.get(staged, verb)) ? 0 : 1;
+            int notrestra = truthy(Js.get(restricted, keya)) ? 0 : 1;
+            int notrestrb = truthy(Js.get(restricted, keyb)) ? 0 : 1;
+            int notstagea = truthy(Js.get(staged, keya)) ? 0 : 1;
+            int notstageb = truthy(Js.get(staged, keyb)) ? 0 : 1;
             int notdepra = truthy(Js.get(mania, "deprecated")) ? 0 : 1;
             int notdeprb = truthy(Js.get(manib, "deprecated")) ? 0 : 1;
             int enginea = engineOk(mania, npmVersion, nodeVersion) ? 1 : 0;
@@ -310,6 +334,12 @@ public final class PickManifest {
         });
 
         return decorateAvoid(entries.isEmpty() ? null : entries.get(0).getValue(), avoid);
+    }
+
+    // String([ver, mani]): the property key an entry array is read as
+    private static String entryKey(Map.Entry<String, @Nullable Object> entry) {
+        Object mani = entry.getValue();
+        return entry.getKey() + "," + (mani == null || mani == Js.UNDEFINED ? "" : Js.string(mani));
     }
 
     // semver.clean(version, { loose: true })

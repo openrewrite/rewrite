@@ -320,7 +320,7 @@ public final class NpmLockRegenerator {
             return Rejected.coded(Reason.PEER_CONFLICT, conflict.getEdge().getName(), "ERESOLVE",
                     ExplainEresolve.explain(conflict.getExplanation(), 4));
         }
-        if (e instanceof CannotKnow) {
+        if (e instanceof CannotKnow || e instanceof Rejected) {
             return e;
         }
         if (e instanceof PackageJson.NeedsPackageFiles) {

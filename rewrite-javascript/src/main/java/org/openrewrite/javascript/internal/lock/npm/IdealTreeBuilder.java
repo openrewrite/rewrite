@@ -18,10 +18,12 @@ package org.openrewrite.javascript.internal.lock.npm;
 import lombok.Getter;
 import lombok.Value;
 import org.jspecify.annotations.Nullable;
+import org.openrewrite.javascript.internal.LockFileRegeneration.Reason;
 import org.openrewrite.javascript.internal.lock.CannotKnow;
 import org.openrewrite.javascript.internal.lock.Host;
 import org.openrewrite.javascript.internal.lock.LocaleCompare;
 import org.openrewrite.javascript.internal.lock.PosixPath;
+import org.openrewrite.javascript.internal.lock.Rejected;
 import org.openrewrite.javascript.internal.lock.Spec;
 
 import java.time.Instant;
@@ -56,11 +58,51 @@ public final class IdealTreeBuilder {
         private final List<Node> deps = new ArrayList<>();
         private boolean sorted = true;
 
+        // npm 10.4.0 until 10.8.0: [{ sorted, items }] indexed by depth
+        private final boolean byDepth;
+        private final List<@Nullable Depth> depths = new ArrayList<>();
+        private int minDepth;
+        private int length;
+
+        private static final class Depth {
+            boolean sorted = true;
+            final List<Node> items = new ArrayList<>();
+        }
+
+        DepsQueue(NpmRelease release) {
+            byDepth = release.queuesDepsByDepth();
+        }
+
         int length() {
-            return deps.size();
+            return byDepth ? length : deps.size();
         }
 
         void push(Node item) {
+            if (byDepth) {
+                int itemDepth = item.getDepth();
+                Depth depth = itemDepth < depths.size() ? depths.get(itemDepth) : null;
+                if (depth == null) {
+                    length++;
+                    depth = new Depth();
+                    depth.items.add(item);
+                    while (depths.size() <= itemDepth) {
+                        depths.add(null);
+                    }
+                    depths.set(itemDepth, depth);
+                    // upstream: "no minDepth check needed, this branch is only reached when we are in the middle of a
+                    // shallower depth and creating a new one"
+                    return;
+                }
+                if (!depth.items.contains(item)) {
+                    length++;
+                    depth.sorted = false;
+                    depth.items.add(item);
+                    if (itemDepth < minDepth) {
+                        minDepth = itemDepth;
+                    }
+                }
+                return;
+            }
             if (!deps.contains(item)) {
                 sorted = false;
                 deps.add(item);
@@ -68,6 +110,27 @@ public final class IdealTreeBuilder {
         }
 
         Node pop() {
+            if (byDepth) {
+                Depth depth = null;
+                while (depth == null || depth.items.isEmpty()) {
+                    if (minDepth >= depths.size()) {
+                        // a depth first queued while a deeper one was being worked on is never looked at again: the
+                        // loop counts minDepth up without end, and npm hangs
+                        throw Rejected.crashes(Reason.RESOLUTION_REQUIRED, null, "it never finishes: its queue of " +
+                                "dependencies to build no longer reaches " + stranded());
+                    }
+                    depth = depths.get(minDepth);
+                    if (depth == null || depth.items.isEmpty()) {
+                        minDepth++;
+                    }
+                }
+                if (!depth.sorted) {
+                    depth.items.sort((a, b) -> LocaleCompare.en(a.getPath(), b.getPath()));
+                    depth.sorted = true;
+                }
+                length--;
+                return depth.items.remove(0);
+            }
             if (!sorted) {
                 deps.sort((a, b) -> {
                     int byDepth = a.getDepth() - b.getDepth();
@@ -76,6 +139,16 @@ public final class IdealTreeBuilder {
                 sorted = true;
             }
             return deps.remove(0);
+        }
+
+        private String stranded() {
+            for (Depth depth : depths) {
+                if (depth != null && !depth.items.isEmpty()) {
+                    Node node = depth.items.get(0);
+                    return truthy(node.getLocation()) ? node.getLocation() : node.getName();
+                }
+            }
+            return "anything";
         }
     }
 
@@ -97,7 +170,7 @@ public final class IdealTreeBuilder {
     private final boolean strictPeerDeps;
 
     private @Nullable Node currentDep;
-    private final DepsQueue depsQueue = new DepsQueue();
+    private final DepsQueue depsQueue;
     private final Set<Node> depsSeen = new LinkedHashSet<>();
     private final Set<Node> linkNodes = new LinkedHashSet<>();
     private final Set<Node> loadFailures = new LinkedHashSet<>();
@@ -140,6 +213,7 @@ public final class IdealTreeBuilder {
         this.options = options;
         this.registry = registry;
         this.pacote = new Pacote(registry, options, files, this.path);
+        this.depsQueue = new DepsQueue(options.getRelease());
         this.host = host;
         this.now = now;
         this.strictPeerDeps = options.isStrictPeerDeps();
@@ -613,7 +687,7 @@ public final class IdealTreeBuilder {
         checkAllow(spec, edge);
         Map<String, Object> fetchOptions = new LinkedHashMap<>();
         Pacote.Options.OptionsBuilder pacoteOptions = Pacote.Options.builder()
-                .fullMetadata(true)
+                .fullMetadata(options.getRelease().fetchesFullMetadata())
                 .before(releaseAgeBefore(spec))
                 .defaultTag(options.getTag())
                 .nodeVersion(host.getNodeVersion())
@@ -626,6 +700,11 @@ public final class IdealTreeBuilder {
         }
         Map<String, Object> mani = pacote.manifest(spec,
                 pacoteOptions.integrity(fetchOptions.get("integrity")).build());
+        if (options.getRelease().dropsLicenseOfFetchedManifest()) {
+            // .then(({ license, ...mani }) => ...)
+            mani = new LinkedHashMap<>(mani);
+            mani.remove("license");
+        }
         manifests.put(spec.getRaw(), mani);
         return mani;
     }

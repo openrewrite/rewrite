@@ -105,6 +105,7 @@ final class Pacote {
         Map<String, Object> packument = packument(name, full);
         Map<String, Object> picked = PickManifest.pickManifest(packument, fetched.getFetchSpec(),
                 PickManifest.Options.builder()
+                        .release(options.getRelease().pickManifest())
                         .defaultTag(truthy(opts.getDefaultTag()) ? opts.getDefaultTag() : "latest")
                         .before(opts.getBefore())
                         .nodeVersion(opts.getNodeVersion())

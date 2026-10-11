@@ -106,4 +106,35 @@ class NpmLockRegeneratorTest {
         assertThat(result.getErrorMessage()).isEqualTo("MALFORMED_MANIFEST: npm fails on this edit: it cannot apply " +
           "the manifest: directories.bin: ref.replace is not a function");
     }
+
+    // lock/npm/gap-orphan-prune-duplicate-name's lock without is-buffer, which the kind-of nested under is-number
+    // requires and npm places at the top. Run over it, npm 10.4.0 and 10.7.0 never exit (killed after three
+    // minutes); 10.3.0, 10.8.0 and 11.17.0 write the lock: their DepsQueue sorts by depth when it is popped, where
+    // the one of 10.4.0 to 10.7.x files a node under its depth and never looks above the depth it has reached.
+    @ParameterizedTest
+    @CsvSource({"10.3.0,false,false", "10.4.0,true,false", "10.7.0,true,false", "10.8.0,false,true",
+      "11.17.0,false,true"})
+    void aPlacementAboveTheDepthBeingBuiltIsNeverReached(String release, boolean hangs, boolean license) {
+        NpmScenarios.Scenario scenario = ScenarioReplay.edit("gap-orphan-prune-duplicate-name").getScenario();
+        String whole = scenario.before();
+        String isBuffer = whole.substring(whole.indexOf("    \"node_modules/is-buffer\": {"),
+          whole.indexOf("    \"node_modules/is-number\": {"));
+        Result result = new NpmLockRegenerator(NpmLockRegenerator.Inputs.builder()
+          .release(NpmRelease.of(release))
+          .lock(whole.replace(isBuffer, ""))
+          .manifest("", scenario.pkgBefore())
+          .host(ScenarioReplay.host(scenario))
+          .now(ScenarioReplay.now(scenario))
+          .build(), ScenarioReplay.registry(new ScenarioReplay.ScenarioRegistry(scenario))).regenerate();
+
+        if (hangs) {
+            assertThat(result.getFailure()).isNotNull();
+            assertThat(result.getFailure().getKind()).isEqualTo(Kind.PM_FAILS);
+            assertThat(result.getErrorMessage()).isEqualTo("RESOLUTION_REQUIRED: npm fails on this edit: it never " +
+              "finishes: its queue of dependencies to build no longer reaches node_modules/is-buffer");
+        } else {
+            assertThat(result.getLockFileContent()).isEqualTo(license ? whole :
+              whole.replace(isBuffer, isBuffer.replace(",\n      \"license\": \"MIT\"", "")));
+        }
+    }
 }
