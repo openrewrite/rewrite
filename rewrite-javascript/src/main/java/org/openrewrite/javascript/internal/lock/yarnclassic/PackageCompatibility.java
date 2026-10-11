@@ -18,6 +18,7 @@ package org.openrewrite.javascript.internal.lock.yarnclassic;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.javascript.internal.lock.CannotKnow;
 import org.openrewrite.javascript.internal.lock.Host;
+import org.openrewrite.javascript.internal.lock.NodeHosts;
 import org.openrewrite.javascript.semver.NodeSemver;
 
 import java.util.ArrayList;
@@ -79,15 +80,8 @@ final class PackageCompatibility {
         if (NodeSemver.satisfies(actual, range, options)) {
             return true;
         }
-        if ("node".equals(name) && NodeSemver.compare(actual, "1.0.0", options) > 0) {
-            String major = NodeSemver.valid(actual, options).split("\\.", -1)[0];
-            for (String fake : Arrays.asList("0.10." + major, "0.11." + major, "0.12." + major, "0.13." + major)) {
-                if (NodeSemver.satisfies(fake, range, options)) {
-                    return true;
-                }
-            }
-        }
-        return false;
+        return "node".equals(name) && NodeSemver.compare(actual, "1.0.0", options) > 0 &&
+               fakeSatisfies(range, Integer.parseInt(NodeSemver.valid(actual, options).split("\\.", -1)[0]), options);
     }
 
     /**
@@ -118,13 +112,21 @@ final class PackageCompatibility {
         Object os = info.get("os");
         Object cpu = info.get("cpu");
         Object engines = info.get("engines");
-        if (shouldCheckPlatform(os, config.isIgnorePlatform()) && host.getOs() != null &&
-            !isValid((List<?>) os, host.getOs())) {
-            pushed.add(Lang.format("The platform $0 is incompatible with this module.", host.getOs()));
+        // the checks that read what the host does not report and whose answer differs between hosts
+        List<String> unknown = new ArrayList<>();
+        if (shouldCheckPlatform(os, config.isIgnorePlatform())) {
+            if (host.getOs() == null) {
+                unknown.add("platform");
+            } else if (!isValid((List<?>) os, host.getOs())) {
+                pushed.add(Lang.format("The platform $0 is incompatible with this module.", host.getOs()));
+            }
         }
-        if (shouldCheckCpu(cpu, config.isIgnorePlatform()) && host.getCpu() != null &&
-            !isValid((List<?>) cpu, host.getCpu())) {
-            pushed.add(Lang.format("The CPU architecture $0 is incompatible with this module.", host.getCpu()));
+        if (shouldCheckCpu(cpu, config.isIgnorePlatform())) {
+            if (host.getCpu() == null) {
+                unknown.add("CPU architecture");
+            } else if (!isValid((List<?>) cpu, host.getCpu())) {
+                pushed.add(Lang.format("The CPU architecture $0 is incompatible with this module.", host.getCpu()));
+            }
         }
         if (shouldCheckEngines(engines, ignoreEngines)) {
             for (String key : Js.keys(engines)) {
@@ -132,6 +134,13 @@ final class PackageCompatibility {
                 Object range = Js.get(engines, key);
                 String actual = version(name);
                 if (actual == null) {
+                    Boolean every = "node".equals(name) ? everyHost(range, config.isLooseSemver()) : null;
+                    if (every == null) {
+                        unknown.add("engine " + name);
+                    } else if (!every) {
+                        pushed.add(Lang.format("The engine $0 is incompatible with this module. Expected version " +
+                                               "$1.", name, range));
+                    }
                     continue;
                 }
                 if (!actual.isEmpty() && !testEngine(name, range, actual, config.isLooseSemver())) {
@@ -152,6 +161,50 @@ final class PackageCompatibility {
         if (didError) {
             throw new MessageError("Found incompatible module.");
         }
+        PackageReference ref = info.reference;
+        if (!unknown.isEmpty() && !(ref != null && Boolean.TRUE.equals(ref.optional))) {
+            throw new CannotKnow("the " + String.join(" and ", unknown) + " yarn runs on, which " + human +
+                                 " restricts");
+        }
+    }
+
+    /**
+     * Whether {@link #testEngine} passes for every Node release in {@link NodeHosts#YARN_CLASSIC} (TRUE), for none
+     * (FALSE) or for some (null).
+     */
+    static @Nullable Boolean everyHost(@Nullable Object range, boolean looseSemver) {
+        NodeSemver.Options options = looseSemver ? Config.LOOSE_SEMVER : Config.SEMVER;
+        String valid = range instanceof String ? NodeSemver.validRange((String) range, options) : null;
+        if (valid == null) {
+            return Boolean.FALSE;
+        }
+        String hosts = NodeHosts.YARN_CLASSIC.releases();
+        int first = Integer.parseInt(NodeSemver.minVersion(hosts, options).split("\\.", -1)[0]);
+        // past every number the range names, each major answers as the first one past them does
+        int last = first;
+        for (String number : valid.split("[^0-9]+")) {
+            if (!number.isEmpty() && number.length() < 6) {
+                last = Math.max(last, Integer.parseInt(number) + 1);
+            }
+        }
+        boolean all = true;
+        boolean none = true;
+        for (int major = first; major <= last; major++) {
+            String releases = hosts + " >=" + major + ".0.0 <" + (major + 1) + ".0.0";
+            boolean fake = fakeSatisfies(range, major, options);
+            all &= fake || NodeSemver.subset(releases, valid, options);
+            none &= !fake && !NodeSemver.intersects(releases, valid, options);
+        }
+        return all ? Boolean.TRUE : none ? Boolean.FALSE : null;
+    }
+
+    private static boolean fakeSatisfies(@Nullable Object range, int major, NodeSemver.Options options) {
+        for (String fake : Arrays.asList("0.10." + major, "0.11." + major, "0.12." + major, "0.13." + major)) {
+            if (NodeSemver.satisfies(fake, range, options)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     void check(List<Manifest> infos, boolean ignoreEngines) {

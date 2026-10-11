@@ -25,6 +25,7 @@ import org.openrewrite.javascript.internal.lock.npm.Shrinkwrap;
 import org.openrewrite.javascript.internal.registry.NpmRegistryClient;
 
 import java.util.Arrays;
+import java.util.List;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Set;
@@ -44,6 +45,11 @@ final class NpmInputs implements Port {
     @Override
     public String lockFile() {
         return "package-lock.json";
+    }
+
+    @Override
+    public List<String> lockFiles() {
+        return Shrinkwrap.LOCK_FILES;
     }
 
     @Override
@@ -129,8 +135,8 @@ final class NpmInputs implements Port {
     }
 
     /**
-     * npm's walk from where it runs; it stops where npm writes a file no regeneration writes (Shrinkwrap's rules): its
-     * lock as an npm-shrinkwrap.json, or the yarn.lock beside a lock the host does not hold.
+     * npm's walk from where it runs; it stops where npm writes a file no regeneration writes (Shrinkwrap's rules): the
+     * yarn.lock beside a lock the host does not hold.
      */
     @Override
     public ManifestRules manifestRules() {
@@ -142,8 +148,7 @@ final class NpmInputs implements Port {
         InstallRoot walked = NpmLockRegenerator.installRoot(dir.getRunsIn(), dir.getManifests(), parentTrees(dir));
         String root = dir.aboveRunsIn(walked.getDepth());
         Predicate<String> holds = name -> dir.holds(RootRelativePath.join(root, name));
-        boolean another = Shrinkwrap.readsShrinkwrap(holds) || Shrinkwrap.writesBesideLock(holds) &&
-                                                                !holds.test("package-lock.json");
+        boolean another = Shrinkwrap.writesBesideLock(holds) && Shrinkwrap.LOCK_FILES.stream().noneMatch(holds);
         return walked.isStopped() || !another ? walked :
                 InstallRoot.stops(walked.getDepth(), InstallRoot.Stop.WRITES_ANOTHER_FILE);
     }

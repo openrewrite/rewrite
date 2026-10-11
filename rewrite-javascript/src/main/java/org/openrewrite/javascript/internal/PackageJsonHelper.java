@@ -50,7 +50,7 @@ import static java.util.Collections.singletonList;
 public class PackageJsonHelper {
 
     private static final Set<String> LOCK_FILE_NAMES = new LinkedHashSet<>(Arrays.asList(
-            "package-lock.json", "pnpm-lock.yaml", "yarn.lock", "bun.lock"));
+            "package-lock.json", "npm-shrinkwrap.json", "pnpm-lock.yaml", "yarn.lock", "bun.lock"));
 
     /** True when the basename matches one of the recognised npm-ecosystem lock files. */
     public static boolean isLockFile(String basename) {

@@ -281,6 +281,10 @@ public final class LockFileRegeneration {
         return port.lockFile();
     }
 
+    public List<String> getLockFiles() {
+        return port.lockFiles();
+    }
+
     /**
      * Whether the package manager reads the contents of a project file of this name.
      */

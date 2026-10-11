@@ -138,10 +138,6 @@ public final class NpmLockRegenerator {
         try {
             INSTALL.requireInstallsAt(NpmOptions.loadLocalPrefix(inputs.getManifests().get(inputs.getRunsIn()),
                     inputs.getParentTrees()), inputs.getRunsIn(), "lock");
-            if (inputs.getPaths() != null && Shrinkwrap.readsShrinkwrap(inputs.getPaths()::contains)) {
-                throw new CannotKnow("the lock npm writes: it reads and writes the npm-shrinkwrap.json beside this " +
-                                     "lock in its place");
-            }
             CannotKnow.requireRead(inputs.getNpmrc(), inputs.getPaths(), ".npmrc");
             CannotKnow.requireRead(inputs.getYarnLock(), inputs.getPaths(), "yarn.lock");
             options = NpmOptions.fromNpmrc(inputs.getUserNpmrc(), inputs.getNpmrc());

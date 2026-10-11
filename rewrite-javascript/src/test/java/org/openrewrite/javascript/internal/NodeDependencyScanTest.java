@@ -493,23 +493,23 @@ class NodeDependencyScanTest {
     }
 
     /**
-     * Recorded in a member with its own lock under a root that lists it: npm rewrites the root's npm-shrinkwrap.json,
-     * bun a bun.lockb; bun migrates a package-lock.json or yarn.lock before a pnpm-lock.yaml.
+     * Recorded in a member with its own lock under a root that lists it: npm rewrites the root's npm-shrinkwrap.json
+     * and leaves the package-lock.json beside it, bun a bun.lockb; bun migrates a package-lock.json or yarn.lock before
+     * a pnpm-lock.yaml.
      */
     @ParameterizedTest
     @CsvSource(delimiter = '|', value = {
-      "Npm | npm-shrinkwrap.json                   | member | it installs at the workspace root ../..",
-      "Npm | npm-shrinkwrap.json package-lock.json | root   | it reads and writes the npm-shrinkwrap.json beside",
-      "Bun | bun.lockb                             | member | it installs at the workspace root ../..",
-      "Bun | pnpm-lock.yaml package-lock.json      |        |",
-      "Bun | pnpm-lock.yaml yarn.lock              |        |"
+      "Npm | npm-shrinkwrap.json package-lock.json | npm-shrinkwrap.json |",
+      "Bun | bun.lockb                             | member              | it installs at the workspace root ../..",
+      "Bun | pnpm-lock.yaml package-lock.json      |                     |",
+      "Bun | pnpm-lock.yaml yarn.lock              |                     |"
     })
     void aMemberWhoseRootHoldsFilesItsPackageManagerReadsThere(PackageManager pm, String held,
                                                                @Nullable String written, @Nullable String reported) {
         String lockName = LockFileRegeneration.forPackageManager(pm).getLockFile();
         NodeDependencyScan.Accumulator acc = new NodeDependencyScan.Accumulator();
         for (String file : held.split(" ")) {
-            if (file.equals("npm-shrinkwrap.json") || file.equals("bun.lockb")) {
+            if (file.equals("bun.lockb")) {
                 capture(acc, file, "unread");
             } else {
                 captureFile(acc, file, "root lock");
@@ -527,7 +527,7 @@ class NodeDependencyScanTest {
 
         NodeDependencyScan.linkWorkspaceMembers(acc);
 
-        Path lock = written == null ? null : Paths.get("member".equals(written) ? "packages/a/" + lockName : lockName);
+        Path lock = written == null ? null : Paths.get("member".equals(written) ? "packages/a/" + lockName : written);
         assertThat(NodeDependencyScan.lockFor(acc, MEMBER)).isEqualTo(lock);
         if (reported == null) {
             return;
@@ -540,8 +540,20 @@ class NodeDependencyScanTest {
         assertThat(result.getFailure()).isNotNull();
         assertThat(result.getFailure().getKind()).isEqualTo(LockFileRegeneration.Kind.CANNOT_KNOW);
         assertThat(result.getFailure().getDetail()).startsWith("the engine cannot know the lock " +
-                                                               (pm == PackageManager.Npm ? "npm" : "bun") +
-                                                               " writes: " + reported);
+                                                               "bun writes: " + reported);
+    }
+
+    // npm 11.17.0 reads an empty npm-shrinkwrap.json as none, and rewrites the package-lock.json beside it
+    @Test
+    void anEmptyNpmShrinkwrapLeavesNpmThePackageLock() {
+        NodeDependencyScan.Accumulator acc = new NodeDependencyScan.Accumulator();
+        captureFile(acc, "npm-shrinkwrap.json", "");
+        captureFile(acc, "package-lock.json", "root lock");
+        project(acc, ROOT, "{\"name\":\"root\"}", nodeResolutionResult(PackageManager.Npm));
+
+        NodeDependencyScan.linkWorkspaceMembers(acc);
+
+        assertThat(NodeDependencyScan.lockFor(acc, ROOT)).isEqualTo(Paths.get("package-lock.json"));
     }
 
     /**

@@ -131,7 +131,7 @@ public final class IdealTreeBuilder {
 
     /**
      * {@code path}: the project directory the lock's locations resolve against; {@code host}: what npm reads from the
-     * machine ({@link Host#UNKNOWN} satisfies every check); {@code now}: the clock {@code min-release-age} counts from.
+     * machine; {@code now}: the clock {@code min-release-age} counts from.
      */
     public IdealTreeBuilder(String path, VirtualTreeLoader.ProjectFiles files, NpmOptions options,
                             PackumentSource registry, Host host, Instant now) {
@@ -189,6 +189,11 @@ public final class IdealTreeBuilder {
                         throw err;
                     }
                     engineWarnings.add(err);
+                } catch (CannotKnow err) {
+                    // without engine-strict, only the warnings differ between hosts
+                    if (options.isEngineStrict()) {
+                        throw err;
+                    }
                 }
                 NpmInstallChecks.checkPlatform(node.getPackage(), options.isForce(), Host.UNKNOWN, host);
             }

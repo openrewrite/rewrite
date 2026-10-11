@@ -17,6 +17,7 @@ package org.openrewrite.javascript.internal.lock.npm;
 
 import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.Test;
+import org.openrewrite.javascript.internal.lock.CannotKnow;
 import org.openrewrite.javascript.internal.lock.Host;
 
 import java.util.LinkedHashMap;
@@ -238,8 +239,8 @@ class NpmInstallChecksTest {
           .matches(NpmInstallChecksTest::badPlatform);
         assertThatCode(() -> NpmInstallChecks.checkPlatform(json("{\"libc\":[\"glibc\"]}"), false, glibc, Host.UNKNOWN))
           .doesNotThrowAnyException();
-        assertThatCode(() -> NpmInstallChecks.checkPlatform(json("{\"libc\":\"musl\"}"), false,
-          Host.builder().os("linux").build(), Host.UNKNOWN)).doesNotThrowAnyException();
+        assertThatThrownBy(() -> NpmInstallChecks.checkPlatform(json("{\"libc\":\"musl\"}"), false,
+          Host.builder().os("linux").build(), Host.UNKNOWN)).isInstanceOf(CannotKnow.class);
     }
 
     // currentEnv.libc(os) answers for the effective os: a configured os other than linux has no libc
@@ -282,12 +283,18 @@ class NpmInstallChecksTest {
         assertThatThrownBy(() -> platform("{\"os\":[5]}")).hasMessage("entry.charAt is not a function");
     }
 
+    // ["any"] passes every os and cpu, but no libc list passes a host without one. Node 18 is the oldest host
+    // counted, so ">=16" holds on every host and "<1" on none.
     @Test
-    void unknownHostSatisfiesEveryCheck() {
-        assertThatCode(() -> NpmInstallChecks.checkPlatform(json("{\"cpu\":\"enten-cpu\",\"os\":\"enten-os\"," +
-                "\"libc\":\"musl\"}"),
-          false, Host.UNKNOWN, Host.UNKNOWN)).doesNotThrowAnyException();
-        assertThatCode(() -> NpmInstallChecks.checkEngine(e(null, ">=99"), "11.17.0", null, false))
+    void anUnknownHostAnswersOnlyWhereEveryHostAnswersAlike() {
+        assertThatCode(() -> NpmInstallChecks.checkPlatform(json("{\"os\":[\"any\"],\"cpu\":\"any\"}"), false,
+          Host.UNKNOWN, Host.UNKNOWN)).doesNotThrowAnyException();
+        assertThatThrownBy(() -> NpmInstallChecks.checkPlatform(json("{\"libc\":[\"any\"]}"), false, Host.UNKNOWN,
+          Host.UNKNOWN)).isInstanceOf(CannotKnow.class);
+
+        assertThatCode(() -> NpmInstallChecks.checkEngine(e(null, ">=16"), "11.17.0", null, false))
           .doesNotThrowAnyException();
+        assertThatThrownBy(() -> NpmInstallChecks.checkEngine(e(null, "<1"), "11.17.0", null, false))
+          .isInstanceOf(NpmInstallChecks.UnsupportedEngine.class);
     }
 }

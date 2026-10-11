@@ -128,6 +128,27 @@ class UpgradeDependencyVersionLockRegenTest implements RewriteTest {
         );
     }
 
+    // npm 11.17.0 reads and rewrites an npm-shrinkwrap.json in place of the package-lock.json beside it
+    // (lock/npm/shrinkwrap-beside-package-lock)
+    @Test
+    void aBumpBesideAnNpmShrinkwrapRegeneratesTheShrinkwrap() {
+        routes.put("https://registry.npmjs.org/is-odd", resource("lock/npm/v3/http/is-odd"));
+        routes.put("https://registry.npmjs.org/is-odd/3.0.0", resource("lock/npm/v3/http/is-odd-3.0.0"));
+        routes.put("https://registry.npmjs.org/is-odd/3.0.1", resource("lock/npm/v3/http/is-odd-3.0.1"));
+
+        rewriteRun(
+                spec -> spec.recipe(new UpgradeDependencyVersion("is-odd", null, "3.0.1")).executionContext(ctx),
+                packageJson("{\n  \"name\": \"npm-lock-v3\",\n  \"version\": \"1.0.0\",\n  \"dependencies\": {\n" +
+                            "    \"is-odd\": \"3.0.0\"\n  }\n}\n",
+                        "{\n  \"name\": \"npm-lock-v3\",\n  \"version\": \"1.0.0\",\n  \"dependencies\": {\n" +
+                        "    \"is-odd\": \"3.0.1\"\n  }\n}\n",
+                        nodeResolutionResult(PackageManager.Npm, dependency("is-odd", "3.0.0"))),
+                packageLock(resource("lock/npm/v3/before"), resource("lock/npm/v3/after"),
+                        s -> s.path("npm-shrinkwrap.json").noTrim()),
+                packageLock(resource("lock/npm/v3/before"), null, s -> s.noTrim())
+        );
+    }
+
     @Test
     void npmWorkspaceMemberBumpRegeneratesRootLockByteExact() {
         routes.put("https://registry.npmjs.org/is-odd", resource("lock/npm/v3/http/is-odd"));

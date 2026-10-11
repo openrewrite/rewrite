@@ -16,6 +16,7 @@
 package org.openrewrite.javascript.internal.lock.npm;
 
 import org.junit.jupiter.api.Test;
+import org.openrewrite.javascript.internal.lock.CannotKnow;
 import org.openrewrite.javascript.internal.lock.V8Date;
 
 import java.time.Instant;
@@ -271,6 +272,20 @@ class PickManifestTest {
         assertThat(version(pack, "1.x", node("6.0.0"))).isEqualTo("1.1.0");
         assertThat(version(pack, "1.x", node("4.0.0"))).isEqualTo("1.0.0");
         assertThat(version(pack, "1.x", node("1.2.3"))).isEqualTo("1.5.0");
+    }
+
+    // npm 11.17.0 on node 18.20.8 locks lru-cache@">=10" at 10.4.3, where node 24 locks 11.5.3
+    @Test
+    void anUnknownNodeVersionCannotKnowAPickOnlySomeHostsMake() {
+        Map<String, Object> pack = packument("{\"dist-tags\":{\"latest\":\"3.0.0\"},\"versions\":{" +
+                                             "\"1.0.0\":{\"version\":\"1.0.0\"}," +
+                                             "\"2.0.0\":{\"version\":\"2.0.0\",\"engines\":{\"node\":\">=16\"}}," +
+                                             "\"3.0.0\":{\"version\":\"3.0.0\",\"engines\":{\"node\":\"20 || >=22\"}}}}");
+        PickManifest.Options unknown = PickManifest.Options.builder().npmVersion("11.17.0").build();
+
+        assertThatThrownBy(() -> PickManifest.pickManifest(pack, ">=1", unknown)).isInstanceOf(CannotKnow.class);
+
+        assertThat(version(pack, "3.0.0", unknown)).isEqualTo("3.0.0");
     }
 
     private static PickManifest.Options node(String nodeVersion) {

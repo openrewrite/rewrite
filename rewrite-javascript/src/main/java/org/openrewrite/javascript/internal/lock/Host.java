@@ -21,7 +21,9 @@ import org.jspecify.annotations.Nullable;
 
 /**
  * What npm reads from the machine it runs on: {@code process.version}, {@code process.platform}, {@code process.arch}
- * and the libc it detects; a null member is unknown, and the checks that read it count as satisfied.
+ * and the libc it detects. A null member is unknown. A check that reads it answers only where every host gives the same
+ * answer, with {@link NodeHosts} standing for the Node versions. Elsewhere it is cannot-know where the answer reaches
+ * the lock or the install's outcome.
  */
 @Value
 @Builder(toBuilder = true)

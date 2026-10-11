@@ -15,6 +15,7 @@
  */
 package org.openrewrite.javascript.internal.lock.npm;
 
+import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
@@ -22,6 +23,7 @@ import org.openrewrite.javascript.internal.LockFileRegeneration.Kind;
 import org.openrewrite.javascript.internal.LockFileRegeneration.Result;
 
 import java.time.Instant;
+import java.util.Arrays;
 import java.util.LinkedHashMap;
 import java.util.Map;
 
@@ -87,6 +89,67 @@ class NpmLockRegeneratorTest {
               "writes: it installs at the workspace root " + installsAt + ", whose workspaces list this project, " +
               "and writes that root's lock");
         }
+    }
+
+    // npm 11.17.0 rejects the first edit on darwin-arm64 (EBADPLATFORM) and writes its lock on linux-x64. It rejects
+    // the second under engine-strict on node 18 (EBADENGINE) and writes its lock on node 24. The recipes leave the
+    // host unknown.
+    @Test
+    void anEditWhoseOutcomeFollowsTheUnknownHostCannotBeKnown() {
+        Result platform = new NpmLockRegenerator(NpmLockRegenerator.Inputs.builder()
+          .lock(LOCK)
+          .manifest("", "{\n  \"name\": \"a\",\n  \"version\": \"1.0.0\",\n  \"dependencies\": {\n" +
+                        "    \"linux-only\": \"1.0.0\"\n  }\n}\n")
+          .now(Instant.EPOCH)
+          .build(), oneVersion("linux-only", "\"os\": [\"linux\"], \"cpu\": [\"x64\"]")).regenerate();
+        Result engine = new NpmLockRegenerator(NpmLockRegenerator.Inputs.builder()
+          .lock(LOCK)
+          .manifest("", "{\n  \"name\": \"a\",\n  \"version\": \"1.0.0\",\n  \"dependencies\": {\n" +
+                        "    \"node-20-only\": \"1.0.0\"\n  }\n}\n")
+          .npmrc("engine-strict=true\n")
+          .now(Instant.EPOCH)
+          .build(), oneVersion("node-20-only", "\"engines\": {\"node\": \">=20.18.1\"}")).regenerate();
+
+        assertThat(Arrays.asList(kind(platform), kind(engine))).containsExactly(Kind.CANNOT_KNOW, Kind.CANNOT_KNOW);
+    }
+
+    // npm locks an optional package the same on a host it skips there (lock/npm/arb-platform-optional)
+    @Test
+    void anOptionalPackageForSomeHostsRegeneratesOnAnUnknownHost() {
+        Result result = new NpmLockRegenerator(NpmLockRegenerator.Inputs.builder()
+          .lock(LOCK)
+          .manifest("", "{\n  \"name\": \"a\",\n  \"version\": \"1.0.0\",\n  \"optionalDependencies\": {\n" +
+                        "    \"linux-only\": \"1.0.0\"\n  }\n}\n")
+          .now(Instant.EPOCH)
+          .build(), oneVersion("linux-only", "\"os\": [\"linux\"], \"engines\": {\"node\": \">=99\"}")).regenerate();
+
+        assertThat(result.getLockFileContent()).contains("\"node_modules/linux-only\": {\n      \"version\": " +
+                                                         "\"1.0.0\"").contains("\"optional\": true");
+    }
+
+    private static @Nullable Kind kind(Result result) {
+        return result.getFailure() == null ? null : result.getFailure().getKind();
+    }
+
+    private static PackumentSource oneVersion(String name, String fields) {
+        String manifest = "{\"name\": \"" + name + "\", \"version\": \"1.0.0\", " + fields + ", \"dist\": {" +
+                          "\"tarball\": \"https://registry.npmjs.org/" + name + "/-/" + name + "-1.0.0.tgz\", " +
+                          "\"integrity\": \"sha512-vbutsFqQ+foy3wSSbmjBXXIJ6PL3scghJoM8zCL142cGaZKAdCZHyf+Bpu/" +
+                          "MmX9zT9Q0zFBVKb36Ma5Fzfa8xA==\"}}";
+        return new PackumentSource() {
+            @Override
+            @SuppressWarnings("unchecked")
+            public Map<String, Object> packument(String registry, String n, boolean fullMetadata) {
+                return (Map<String, Object>) JsonParseEvenBetterErrors.jsonParse("{\"name\": \"" + name +
+                  "\", \"dist-tags\": {\"latest\": \"1.0.0\"}, \"versions\": {\"1.0.0\": " + manifest + "}}");
+            }
+
+            @Override
+            @SuppressWarnings("unchecked")
+            public Map<String, Object> manifest(String registry, String n, String version) {
+                return (Map<String, Object>) JsonParseEvenBetterErrors.jsonParse(manifest);
+            }
+        };
     }
 
     // npm 11.17.0 writes an empty lock over this manifest (lock/npm/open-root-bin-dir-number-added): normalize's
