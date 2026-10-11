@@ -21,8 +21,7 @@ import org.openrewrite.javascript.semver.NodeSemver;
 
 /**
  * The Node releases a package manager runs on, which stand for the host when its own version is unknown, and the
- * node-semver options its engine check reads an engines.node range with. A check that reads the unknown version
- * answers only where every release answers alike.
+ * node-semver options its engine check reads an engines.node range with.
  */
 public enum NodeHosts {
 

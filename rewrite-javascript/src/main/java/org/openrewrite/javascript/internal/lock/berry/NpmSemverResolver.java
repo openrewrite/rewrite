@@ -76,7 +76,7 @@ final class NpmSemverResolver implements Resolver {
         Map<String, @Nullable Object> registryData = NpmHttpUtils.getPackageMetadata(descriptor, project,
                 opts.getRegistry());
         Object versions = registryData.get("versions");
-        // from Yarn 4.13.0 the age gate filters the matching versions outside the filter that skips a throw
+        // from Yarn 4.13.0 the age gate runs after this loop, where an error it throws fails the resolution
         boolean gateAfterMatching = YarnRelease.compareVersions(project.configuration.getRelease().getVersion(),
                 "4.13.0") >= 0;
         List<String> semverCandidates = new ArrayList<>();
