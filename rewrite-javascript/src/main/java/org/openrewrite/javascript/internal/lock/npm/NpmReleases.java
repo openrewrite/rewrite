@@ -37,9 +37,10 @@ public final class NpmReleases {
 
     /**
      * The releases the engine reproduces, a node-semver range: every recorded scenario replays as each of them and
-     * gives what that release wrote. It widens as the releases around the ported one are ported and replayed.
+     * gives what that release wrote ({@code REWRITE_LOCK_EVERY_RELEASE} replays every release of a range, not only
+     * its first and last). It widens as the releases around the ported one are ported and replayed.
      */
-    public static final String PROVEN = "11.17.0";
+    public static final String PROVEN = "10.0.0 - 12.2.0";
 
     private static final List<NpmRelease> ALL = load();
 

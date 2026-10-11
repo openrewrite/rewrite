@@ -18,7 +18,7 @@ package org.openrewrite.javascript;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
-import org.junit.jupiter.params.provider.CsvSource;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.HttpSenderExecutionContextView;
 import org.openrewrite.InMemoryExecutionContext;
@@ -34,14 +34,18 @@ import org.openrewrite.test.RewriteTest;
 
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
+import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.UncheckedIOException;
+import java.net.URISyntaxException;
+import java.net.URL;
 import java.nio.charset.StandardCharsets;
 import java.util.HashMap;
 import java.util.Map;
 
 import static java.util.Collections.singletonList;
+import static java.util.Objects.requireNonNull;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assumptions.assumeTrue;
 import static org.openrewrite.javascript.Assertions.dependency;
@@ -98,14 +102,15 @@ class AddDependencyLockRegenTest implements RewriteTest {
     }
 
     /**
-     * npm before 10.8.0 writes the new entry without its license (lock/npm/add-leaf, whose release/9.0.1 is what npm
-     * 9.0.1 to 10.7.0 write): the lock is the one the npm that built the LST writes, as its {@link NodeRuntime} names
-     * it. A release the engine does not reproduce yet is cannot-know, so each case runs once {@code PROVEN} holds it.
+     * npm before 10.8.0 writes the new entry without its license (lock/npm/add-leaf): the lock is the one the npm that
+     * built the LST writes, as its {@link NodeRuntime} names it. A release the engine does not reproduce yet is
+     * cannot-know, so each case runs once {@code PROVEN} holds it.
      */
     @ParameterizedTest
-    @CsvSource({"10.7.0, lock/npm/add-leaf/release/9.0.1/cross", "10.8.0, lock/npm/add-leaf/after"})
-    void theNpmReleaseThatBuiltTheLstWritesTheLock(String release, String lock) {
+    @ValueSource(strings = {"10.7.0", "10.8.0"})
+    void theNpmReleaseThatBuiltTheLstWritesTheLock(String release) {
         assumeTrue(NpmReleases.isProven(NpmRelease.of(release)), "npm " + release + " is not reproduced yet");
+        String lock = editOverOwnBefore("add-leaf", NpmRelease.of(release));
         routes.put("https://registry.npmjs.org/left-pad", resource("lock/npm/add-leaf/http/left-pad"));
         routes.put("https://registry.npmjs.org/left-pad/1.3.0", resource("lock/npm/add-leaf/http/left-pad-1.3.0"));
 
@@ -120,6 +125,39 @@ class AddDependencyLockRegenTest implements RewriteTest {
                         })),
                 packageLock(resource("lock/npm/add-leaf/before"), resource(lock), s -> s.noTrim())
         );
+    }
+
+    // the lock npm `release` wrote for an npm scenario's edit over the scenario's own before lock, by the scenario's
+    // releases files: its after for the releases of its recorded outcome, else a release/<first>/ outcome's cross
+    private static String editOverOwnBefore(String scenario, NpmRelease release) {
+        String root = "lock/npm/" + scenario + "/";
+        if (inRanges(resource(root + "releases"), release)) {
+            return root + "after";
+        }
+        try {
+            URL outcomes = requireNonNull(AddDependencyLockRegenTest.class.getClassLoader().getResource(root + "release"));
+            for (File outcome : requireNonNull(new File(outcomes.toURI()).listFiles(File::isDirectory))) {
+                String dir = root + "release/" + outcome.getName() + "/";
+                if (inRanges(resource(dir + "releases"), release)) {
+                    return dir + "cross";
+                }
+            }
+        } catch (URISyntaxException e) {
+            throw new IllegalStateException(e);
+        }
+        throw new IllegalStateException(scenario + " records no outcome of npm " + release);
+    }
+
+    // "10.0.0 - 10.9.9" or "12.0.0", one a line
+    private static boolean inRanges(String releases, NpmRelease release) {
+        for (String line : releases.split("\n")) {
+            String[] range = line.trim().split("\\s+-\\s+");
+            if (!range[0].isEmpty() && release.compareTo(NpmRelease.of(range[0])) >= 0 &&
+                release.compareTo(NpmRelease.of(range[range.length - 1])) <= 0) {
+                return true;
+            }
+        }
+        return false;
     }
 
     // recorded with bun 1.3.10 (lock/bun/open-env-registry): the scan keeps the .env beside bun.lock, and bun's
