@@ -39,11 +39,12 @@ final class MapWorkspaces {
 
     /**
      * The @npmcli/map-workspaces release whose answers these are: 5.0.3, which npm 11.17.0 bundles and every release
-     * from 3.0.6 reads as here; or 3.0.4, which applies the patterns one after another, a negated one taking away
-     * what the ones before it found.
+     * from 3.0.6 reads as here; 3.0.4, which applies the patterns one after another, a negated one taking away what
+     * the ones before it found, as every release from 2.0.2 does; 2.0.1, which refuses a name two paths share as soon
+     * as a pattern finds the second; or 2.0.0, which also reads a backslash in a pattern as glob's escape.
      */
     enum Release {
-        V3_0_4, V5_0_3
+        V2_0_0, V2_0_1, V3_0_4, V5_0_3
     }
 
     /**
@@ -148,8 +149,8 @@ final class MapWorkspaces {
         if (declaresNone(workspaces)) {
             return new LinkedHashMap<>();
         }
-        if (release.mapWorkspaces() == Release.V3_0_4) {
-            return mapWorkspaces3_0_4(cwd, workspaces, files);
+        if (release.mapWorkspaces() != Release.V5_0_3) {
+            return mapWorkspaces3_0_4(cwd, workspaces, files, release.mapWorkspaces());
         }
         Patterns p = getPatterns(workspaces, release);
         Map<Object, String> results = new LinkedHashMap<>();
@@ -255,9 +256,9 @@ final class MapWorkspaces {
     }
 
     // glob(getGlobPattern(pattern)): a leading ./ and a trailing / name nothing, and . and a lone ** find the
-    // directory itself
-    private static boolean globs3_0_4(String dir, String pattern) {
-        String glob = pattern.replace('\\', '/');
+    // directory itself; before 2.0.1 a backslash stays glob's escape
+    private static boolean globs3_0_4(String dir, String pattern, Release release) {
+        String glob = release == Release.V2_0_0 ? pattern : pattern.replace('\\', '/');
         while (glob.startsWith("./")) {
             glob = glob.substring(2);
         }
@@ -271,7 +272,7 @@ final class MapWorkspaces {
     }
 
     private static Map<Object, String> mapWorkspaces3_0_4(String cwd, @Nullable Object workspaces,
-            VirtualTreeLoader.ProjectFiles files) {
+            VirtualTreeLoader.ProjectFiles files, Release release) {
         List<Map.Entry<String, Boolean>> patterns = patterns3_0_4(workspaces);
         Map<Object, String> results = new LinkedHashMap<>();
         if (patterns.isEmpty()) {
@@ -281,11 +282,15 @@ final class MapWorkspaces {
         ignore.add("**/node_modules/**");
 
         Map<Object, Set<String>> seen = new LinkedHashMap<>();
+        // before 2.0.2: the pathname each name was first found at, and the results by pathname
+        Map<Object, String> firstSeen = new LinkedHashMap<>();
+        Map<String, Object> byPathname = new LinkedHashMap<>();
+        boolean refusesAtOnce = release == Release.V2_0_0 || release == Release.V2_0_1;
         for (Map.Entry<String, Boolean> item : patterns) {
             List<String> matches = new ArrayList<>();
             for (String location : files.manifestLocations()) {
                 String dir = location.isEmpty() ? "." : location;
-                if (!ignored(dir, ignore, IGNORE_3_0_4) && globs3_0_4(dir, item.getKey())) {
+                if (!ignored(dir, ignore, IGNORE_3_0_4) && globs3_0_4(dir, item.getKey(), release)) {
                     matches.add(dir);
                 }
             }
@@ -306,6 +311,22 @@ final class MapWorkspaces {
                 }
                 String path = PosixPath.join(cwd, match);
                 Object name = getPackageName(content, path);
+                if (refusesAtOnce) {
+                    if (item.getValue()) {
+                        byPathname.remove(path);
+                        continue;
+                    }
+                    String prior = firstSeen.get(name);
+                    if (prior != null && !prior.equals(path)) {
+                        throw new WorkspacesException(String.join("\n",
+                                "must not have multiple workspaces with the same name",
+                                "package '" + Js.string(name) + "' has conflicts in the following paths:",
+                                "    " + prior, "    " + path), "EDUPLICATEWORKSPACE");
+                    }
+                    firstSeen.put(name, path);
+                    byPathname.put(path, name);
+                    continue;
+                }
                 Set<String> seenPackagePathnames = seen.computeIfAbsent(name, k -> new LinkedHashSet<>());
                 if (item.getValue()) {
                     seenPackagePathnames.remove(path);
@@ -313,6 +334,14 @@ final class MapWorkspaces {
                     seenPackagePathnames.add(path);
                 }
             }
+        }
+
+        if (refusesAtOnce) {
+            // reverseResultMap
+            for (Map.Entry<String, Object> entry : byPathname.entrySet()) {
+                results.put(entry.getValue(), entry.getKey());
+            }
+            return results;
         }
 
         List<String> errors = new ArrayList<>();
@@ -398,7 +427,8 @@ final class MapWorkspaces {
         if (declaresNone(workspaces)) {
             return new LinkedHashMap<>();
         }
-        if (release.mapWorkspaces() == Release.V3_0_4) {
+        if (release.mapWorkspaces() != Release.V5_0_3) {
+            // virtual reads alike from 2.0.0 to 3.0.4
             return virtual3_0_4(cwd, packages, workspaces);
         }
         Map<String, String> results = new LinkedHashMap<>();

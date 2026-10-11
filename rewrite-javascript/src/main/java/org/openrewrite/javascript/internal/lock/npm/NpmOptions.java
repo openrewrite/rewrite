@@ -138,9 +138,14 @@ public class NpmOptions {
     boolean legacyPeerDeps;
 
     /**
-     * {@code install-links}
+     * {@code install-links}; null for the release's default.
      */
-    boolean installLinks;
+    @Nullable
+    Boolean installLinks;
+
+    public boolean isInstallLinks() {
+        return installLinks != null ? installLinks : release.installLinksDefault();
+    }
 
     /**
      * {@code omit-lockfile-registry-resolved}
@@ -363,6 +368,10 @@ public class NpmOptions {
         // global-style and legacy-bundling flatten by writing install-strategy into the config they come from,
         // which install-strategy's own flatten then reads, wherever it stands in the file
         String installStrategyWritten = null;
+        // before npm 9.0.0 they are arborist's own options, legacyBundling read first
+        boolean globalStyle = false;
+        boolean legacyBundling = false;
+        boolean validated = release.flattensValidatedConfig();
         for (Map.Entry<String, @Nullable Object> entry : entries) {
             String key;
             try {
@@ -379,40 +388,53 @@ public class NpmOptions {
             Object value = entry.getValue();
             switch (key) {
                 case "lockfile-version":
-                    options.lockfileVersion(lockfileVersion(parseField(value, Type.LITERAL, env)));
+                    Object lfv = parseField(value, Type.LITERAL, env);
+                    if (validated && !(lfv == null ||
+                                       release.typesLockfileVersionAsStrings() &&
+                                       ("1".equals(lfv) || "2".equals(lfv) || "3".equals(lfv)))) {
+                        // nopt's clean drops a value of none of the definition's types
+                        break;
+                    }
+                    options.lockfileVersion(lockfileVersion(lfv));
                     break;
                 case "legacy-peer-deps":
-                    options.legacyPeerDeps(truthy(parseField(value, Type.BOOLEAN, env)));
+                    options.legacyPeerDeps(booleanField(value, env, validated));
                     break;
                 case "install-links":
-                    options.installLinks(truthy(parseField(value, Type.BOOLEAN, env)));
+                    if (release.definesInstallLinks()) {
+                        options.installLinks(booleanField(value, env, validated));
+                    }
                     break;
                 case "omit-lockfile-registry-resolved":
-                    options.omitLockfileRegistryResolved(truthy(parseField(value, Type.BOOLEAN, env)));
+                    if (release.definesOmitLockfileRegistryResolved()) {
+                        options.omitLockfileRegistryResolved(booleanField(value, env, validated));
+                    }
                     break;
                 case "prefer-dedupe":
-                    options.preferDedupe(truthy(parseField(value, Type.BOOLEAN, env)));
+                    if (release.definesPreferDedupe()) {
+                        options.preferDedupe(booleanField(value, env, validated));
+                    }
                     break;
                 case "strict-peer-deps":
-                    options.strictPeerDeps(truthy(parseField(value, Type.BOOLEAN, env)));
+                    options.strictPeerDeps(booleanField(value, env, validated));
                     break;
                 case "force":
-                    options.force(truthy(parseField(value, Type.BOOLEAN, env)));
+                    options.force(booleanField(value, env, validated));
                     break;
                 case "engine-strict":
-                    options.engineStrict(truthy(parseField(value, Type.BOOLEAN, env)));
+                    options.engineStrict(booleanField(value, env, validated));
                     break;
                 case "save":
-                    options.save(truthy(parseField(value, Type.BOOLEAN, env)));
+                    options.save(booleanField(value, env, validated));
                     break;
                 case "format-package-lock":
-                    options.formatPackageLock(truthy(parseField(value, Type.BOOLEAN, env)));
+                    options.formatPackageLock(booleanField(value, env, validated));
                     break;
                 case "dry-run":
-                    options.dryRun(truthy(parseField(value, Type.BOOLEAN, env)));
+                    options.dryRun(booleanField(value, env, validated));
                     break;
                 case "global":
-                    options.global(truthy(parseField(value, Type.BOOLEAN, env)));
+                    options.global(booleanField(value, env, validated));
                     break;
                 case "location":
                     // location's flatten turns global on, in the file's own order with global's
@@ -421,26 +443,52 @@ public class NpmOptions {
                     }
                     break;
                 case "install-strategy":
-                    options.installStrategy(InstallStrategy.of(installStrategyWritten != null ? installStrategyWritten :
-                            parseField(value, Type.LITERAL, env)));
+                    if (!release.definesInstallStrategy()) {
+                        break;
+                    }
+                    Object strategy = installStrategyWritten != null ? installStrategyWritten :
+                            parseField(value, Type.LITERAL, env);
+                    boolean known = "hoisted".equals(strategy) || "nested".equals(strategy) ||
+                                    "shallow".equals(strategy) ||
+                                    "linked".equals(strategy) && release.definesLinkedInstallStrategy();
+                    if (validated && !known) {
+                        break;
+                    }
+                    // arborist before npm 9.4.0 knows no linked strategy, and hoists it
+                    options.installStrategy("linked".equals(strategy) && !release.definesLinkedInstallStrategy() ?
+                            InstallStrategy.HOISTED : InstallStrategy.of(strategy));
                     break;
                 case "global-style":
-                    if (truthy(parseField(value, Type.BOOLEAN, env))) {
+                    if (!release.definesInstallStrategy()) {
+                        globalStyle = booleanField(value, env, validated);
+                    } else if (truthy(parseField(value, Type.BOOLEAN, env))) {
                         installStrategyWritten = "shallow";
                         options.installStrategy(InstallStrategy.SHALLOW);
                     }
                     break;
                 case "legacy-bundling":
-                    if (truthy(parseField(value, Type.BOOLEAN, env))) {
+                    if (!release.definesInstallStrategy()) {
+                        legacyBundling = booleanField(value, env, validated);
+                    } else if (truthy(parseField(value, Type.BOOLEAN, env))) {
                         installStrategyWritten = "nested";
                         options.installStrategy(InstallStrategy.NESTED);
                     }
                     break;
                 case "before":
                     Object before = parseField(value, Type.LITERAL, env);
+                    Object date = before instanceof String ? dateField((String) before) : null;
+                    if (validated && date instanceof Double && Double.isNaN((Double) date)) {
+                        // nopt's validateDate drops what Date.parse cannot read, and makes the rest a Date
+                        break;
+                    }
                     options.beforeConfigured(true);
+                    if (release.keepsNpmrcBeforeAString() && "".equals(before)) {
+                        // an empty string is no before to pacote
+                        options.before(null);
+                        break;
+                    }
                     options.before(before == null || before == Js.UNDEFINED || Boolean.FALSE.equals(before) ? null :
-                            before instanceof String ? dateField((String) before) : Double.NaN);
+                            before instanceof String ? date : Double.NaN);
                     break;
                 case "min-release-age":
                     if (release.definesMinReleaseAge()) {
@@ -524,9 +572,24 @@ public class NpmOptions {
                     break;
             }
         }
+        if (!release.definesInstallStrategy()) {
+            options.installStrategy(legacyBundling ? InstallStrategy.NESTED :
+                    globalStyle ? InstallStrategy.SHALLOW : InstallStrategy.HOISTED);
+        }
         options.omit(buildOmitList(omit, include, only, production, dev, optional, also));
         options.scopedRegistries(scopedRegistries);
         return options.build();
+    }
+
+    // a Boolean definition's value as arborist reads it: where the flat options are built from the validated config,
+    // nopt's validateBoolean has made a string that is a number the boolean of that number (0 is false)
+    private static boolean booleanField(@Nullable Object f, HostEnvironment env, boolean validated) {
+        Object value = parseField(f, Type.BOOLEAN, env);
+        if (validated && value instanceof String) {
+            double number = Js.toNumber((String) value);
+            return Double.isNaN(number) || number != 0;
+        }
+        return truthy(value);
     }
 
     // config index.js #loadObject while before and min-release-age are `exclusive` of each other: a key is refused

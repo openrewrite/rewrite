@@ -254,7 +254,7 @@ class ShrinkwrapTest {
     }
 
     private static YarnLock.Entry entry(String integrity, String resolved, String version, String... specs) {
-        YarnLock.Entry entry = new YarnLock.Entry(Arrays.asList(specs));
+        YarnLock.Entry entry = new YarnLock.Entry(Arrays.asList(specs), NpmRelease.PORTED);
         entry.set("integrity", integrity);
         entry.set("resolved", resolved);
         entry.set("version", version);

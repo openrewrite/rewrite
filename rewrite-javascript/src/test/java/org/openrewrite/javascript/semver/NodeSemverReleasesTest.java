@@ -39,9 +39,9 @@ import java.util.stream.Stream;
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**
- * The node-semver releases npm 11 bundled before 7.8.4: each one's own fixtures (test/fixtures at its tag, dumped by
- * generate/dump-fixtures.js), and every question of 7.8.4's fixtures it answers another way
- * (generate/release-differences.js).
+ * The node-semver releases npm 11 bundled before 7.8.4, and 7.5.2 (npm 9.7.2 to 9.8.0): each one's own fixtures
+ * (test/fixtures at its tag, dumped by generate/dump-fixtures.js), and every question of 7.8.4's fixtures it answers
+ * another way (generate/release-differences.js).
  */
 class NodeSemverReleasesTest {
 
@@ -71,7 +71,7 @@ class NodeSemverReleasesTest {
 
     static Stream<Arguments> ownFixtures() {
         List<Arguments> rows = new ArrayList<>();
-        for (Release release : new Release[]{Release.V7_7_2, Release.V7_8_0, Release.V7_8_1}) {
+        for (Release release : new Release[]{Release.V7_5_2, Release.V7_7_2, Release.V7_8_0, Release.V7_8_1}) {
             JsonNode fixtures = fixtures(release);
             for (String kind : new String[]{"rangeInclude", "rangeExclude", "rangeIntersection",
                     "comparatorIntersection", "rangeParse", "validVersions", "invalidVersions", "comparisons",
@@ -162,7 +162,7 @@ class NodeSemverReleasesTest {
 
     @Test
     void namesTheDifferencesItDoesNotAnswer() {
-        assertThat(differenceRows(true)).as("ranges with a build identifier longer than re.js's bound").hasSize(152);
+        assertThat(differenceRows(true)).as("ranges with a build identifier longer than re.js's bound").hasSize(220);
     }
 
     @ParameterizedTest(name = "{0} {1}")

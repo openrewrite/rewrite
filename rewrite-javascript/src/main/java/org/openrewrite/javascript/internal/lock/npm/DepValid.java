@@ -79,7 +79,8 @@ final class DepValid {
             return null;
         }
         try {
-            Spec parsed = Spec.resolve(child.getName(), (String) spec, requestor.getRealpath());
+            Spec parsed = Spec.resolve(child.getName(), (String) spec, requestor.getRealpath(),
+                    requestor.getRelease().npmPackageArg());
             if (parsed.getType() != Spec.Type.GIT) {
                 return null;
             }
@@ -104,7 +105,8 @@ final class DepValid {
         Spec spec;
         try {
             spec = Spec.resolve(child.getName(), requested.isEmpty() ? "*" : requested,
-                    FromPath.fromPath(requestor, requestor.getEdgesOut().get(child.getName())));
+                    FromPath.fromPath(requestor, requestor.getEdgesOut().get(child.getName())),
+                    requestor.getRelease().npmPackageArg());
         } catch (IllegalArgumentException er) {
             requestor.getErrors().add(new DependencyError(er.getMessage(), child.getName(), requested, er));
             return false;
@@ -119,6 +121,7 @@ final class DepValid {
         }
 
         NodeSemver.Options loose = LOOSE.release(requestor.getRelease().semver());
+        Spec.Options npa = requestor.getRelease().npmPackageArg();
         switch (requested.getType()) {
             case RANGE:
                 if ("*".equals(requested.getFetchSpec())) {
@@ -134,12 +137,13 @@ final class DepValid {
             case ALIAS:
                 return depValid(child, requested.getSubSpec(), requestor);
             case TAG:
-                return truthy(child.getResolved()) && Spec.npa(child.getResolved(), null).getType() == Spec.Type.REMOTE;
+                return truthy(child.getResolved()) &&
+                       Spec.npa(child.getResolved(), null, npa).getType() == Spec.Type.REMOTE;
             case REMOTE:
                 return requested.getFetchSpec() != null && Js.strictEquals(child.getResolved(),
                         requested.getFetchSpec());
             case GIT: {
-                Spec resRepo = Spec.npa(truthy(child.getResolved()) ? child.getResolved() : "", null);
+                Spec resRepo = Spec.npa(truthy(child.getResolved()) ? child.getResolved() : "", null, npa);
                 GitHost resHost = resRepo.getHosted();
                 GitHost reqHost = requested.getHosted();
                 String reqCommittish = requested.getGitCommittish() == null ? "" : requested.getGitCommittish();
@@ -176,7 +180,7 @@ final class DepValid {
 
     private static boolean linkValid(Node child, Spec requested, Node requestor) {
         boolean isLink = child.isLink();
-        if (requestor.isInstallLinks() && !child.isWorkspace()) {
+        if (requestor.isInstallLinks() && (!child.isWorkspace() || !requestor.getRelease().keepsWorkspaceLinksValid())) {
             return !isLink;
         }
         return isLink && child.getRealpath() != null &&

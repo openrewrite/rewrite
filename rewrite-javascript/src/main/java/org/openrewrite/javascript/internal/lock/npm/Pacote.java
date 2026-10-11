@@ -124,6 +124,10 @@ final class Pacote {
 
     Map<String, Object> manifest(Spec spec, Options opts) {
         canUse(spec, opts);
+        if (options.getRelease().keepsNpmrcBeforeAString() && options.getBefore() != null) {
+            // the fetcher renders --before from the string an npmrc file wrote
+            throw new JsError(JsError.TYPE_ERROR, "this.before.toISOString is not a function");
+        }
         checkBefore(opts);
         Spec fetched = spec.getType() == Spec.Type.ALIAS && spec.getSubSpec() != null ? spec.getSubSpec() : spec;
         switch (Objects.requireNonNull(fetched.getType())) {
@@ -140,13 +144,20 @@ final class Pacote {
                 break;
         }
         String name = Objects.requireNonNull(fetched.getName());
+        String defaultTag = truthy(opts.getDefaultTag()) ? opts.getDefaultTag() : "latest";
+        String wanted = fetched.getFetchSpec();
+        if (options.getRelease().takesDefaultTagForEmptySpec() && fetched.getType() == Spec.Type.TAG &&
+            fetched.getRawSpec().isEmpty() && !"latest".equals(defaultTag)) {
+            // registry.js: handle case when npm-package-arg guesses wrong
+            wanted = Spec.npa(name + "@" + defaultTag, null, options.getRelease().npmPackageArg()).getFetchSpec();
+        }
         boolean full = opts.getBefore() != null;
         Map<String, Object> packument = packument(name, full);
-        Map<String, Object> picked = PickManifest.pickManifest(packument, fetched.getFetchSpec(),
+        Map<String, Object> picked = PickManifest.pickManifest(packument, wanted,
                 PickManifest.Options.builder()
                         .release(options.getRelease().pickManifest())
                         .packageJson(options.getRelease().packageJson())
-                        .defaultTag(truthy(opts.getDefaultTag()) ? opts.getDefaultTag() : "latest")
+                        .defaultTag(defaultTag)
                         .before(opts.getBefore())
                         .nodeVersion(opts.getNodeVersion())
                         .npmVersion(opts.getNpmVersion())

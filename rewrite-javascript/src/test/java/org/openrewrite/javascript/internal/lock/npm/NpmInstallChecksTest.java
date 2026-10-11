@@ -148,7 +148,7 @@ class NpmInstallChecksTest {
     }
 
     private static void platform(String target, boolean force, Host environment) {
-        NpmInstallChecks.checkPlatform(json(target), force, environment, DARWIN);
+        NpmInstallChecks.checkPlatform(json(target), force, environment, DARWIN, NpmRelease.PORTED);
     }
 
     private static boolean badPlatform(Throwable t) {
@@ -256,32 +256,57 @@ class NpmInstallChecksTest {
         assertThatThrownBy(() -> platform("{\"libc\":\"musl\"}")).matches(NpmInstallChecksTest::badPlatform);
     }
 
+    // npm-install-checks 6.0.0 (npm 9.6.2) checks os and cpu alone; 6.1.0 (npm 9.6.3) adds libc
+    @Test
+    void libcUncheckedBefore9_6_3() {
+        assertThatCode(() -> NpmInstallChecks.checkPlatform(json("{\"libc\":\"glibc\"}"), false, Host.UNKNOWN, DARWIN,
+          NpmRelease.of("9.6.2"))).doesNotThrowAnyException();
+        assertThatThrownBy(() -> NpmInstallChecks.checkPlatform(json("{\"libc\":\"glibc\"}"), false, Host.UNKNOWN,
+          DARWIN, NpmRelease.of("9.6.3"))).matches(NpmInstallChecksTest::badPlatform);
+        assertThatThrownBy(() -> NpmInstallChecks.checkPlatform(json("{\"os\":\"linux\",\"libc\":\"glibc\"}"), false,
+          Host.UNKNOWN, DARWIN, NpmRelease.of("9.6.2"))).matches(NpmInstallChecksTest::badPlatform);
+    }
+
+    // npm-install-checks 6.1.0 (npm 9.6.3 and 9.6.4) looks for glibc under a report field that does not exist, so a
+    // glibc machine fails every libc; musl is found by its shared objects
+    @Test
+    void glibcUndetectedIn9_6_3And9_6_4() {
+        Host glibc = Host.builder().os("linux").cpu("x64").libc("glibc").build();
+        Host musl = Host.builder().os("linux").cpu("x64").libc("musl").build();
+        assertThatThrownBy(() -> NpmInstallChecks.checkPlatform(json("{\"libc\":[\"glibc\"]}"), false, Host.UNKNOWN,
+          glibc, NpmRelease.of("9.6.4"))).matches(NpmInstallChecksTest::badPlatform);
+        assertThatCode(() -> NpmInstallChecks.checkPlatform(json("{\"libc\":[\"glibc\"]}"), false, Host.UNKNOWN,
+          glibc, NpmRelease.of("9.6.5"))).doesNotThrowAnyException();
+        assertThatCode(() -> NpmInstallChecks.checkPlatform(json("{\"libc\":[\"musl\"]}"), false, Host.UNKNOWN,
+          musl, NpmRelease.of("9.6.3"))).doesNotThrowAnyException();
+    }
+
     // environment.libc || currentEnv.libc(os): a configured libc is checked whatever the machine reports
     @Test
     void configuredLibcIsCheckedOnAnUnknownMachine() {
         Host glibc = Host.builder().libc("glibc").build();
-        assertThatThrownBy(() ->
-          NpmInstallChecks.checkPlatform(json("{\"libc\":\"musl\"}"), false, glibc, Host.UNKNOWN))
-          .matches(NpmInstallChecksTest::badPlatform);
-        assertThatCode(() -> NpmInstallChecks.checkPlatform(json("{\"libc\":[\"glibc\"]}"), false, glibc, Host.UNKNOWN))
-          .doesNotThrowAnyException();
+        assertThatThrownBy(() -> NpmInstallChecks.checkPlatform(json("{\"libc\":\"musl\"}"), false, glibc,
+          Host.UNKNOWN, NpmRelease.PORTED)).matches(NpmInstallChecksTest::badPlatform);
+        assertThatCode(() -> NpmInstallChecks.checkPlatform(json("{\"libc\":[\"glibc\"]}"), false, glibc,
+          Host.UNKNOWN, NpmRelease.PORTED)).doesNotThrowAnyException();
         assertThatCode(() -> NpmInstallChecks.checkPlatform(json("{\"libc\":\"musl\"}"), false,
-          Host.builder().os("linux").build(), Host.UNKNOWN)).doesNotThrowAnyException();
+          Host.builder().os("linux").build(), Host.UNKNOWN, NpmRelease.PORTED)).doesNotThrowAnyException();
     }
 
     // currentEnv.libc(os) answers for the effective os: a configured os other than linux has no libc
     @Test
     void configuredOsDropsTheMachinesLibc() {
         Host linuxGlibc = Host.builder().os("linux").cpu("x64").libc("glibc").build();
+        NpmRelease release = NpmRelease.PORTED;
         assertThatCode(() ->
-          NpmInstallChecks.checkPlatform(json("{\"libc\":[\"glibc\"]}"), false, Host.UNKNOWN, linuxGlibc))
+          NpmInstallChecks.checkPlatform(json("{\"libc\":[\"glibc\"]}"), false, Host.UNKNOWN, linuxGlibc, release))
           .doesNotThrowAnyException();
         assertThatThrownBy(() -> NpmInstallChecks.checkPlatform(json("{\"libc\":[\"glibc\"]}"), false,
-          Host.builder().os("darwin").build(), linuxGlibc)).matches(NpmInstallChecksTest::badPlatform);
+          Host.builder().os("darwin").build(), linuxGlibc, release)).matches(NpmInstallChecksTest::badPlatform);
         assertThatThrownBy(() -> NpmInstallChecks.checkPlatform(json("{\"libc\":[\"glibc\"]}"), false,
-          Host.builder().os("win32").build(), linuxGlibc)).matches(NpmInstallChecksTest::badPlatform);
+          Host.builder().os("win32").build(), linuxGlibc, release)).matches(NpmInstallChecksTest::badPlatform);
         assertThatCode(() -> NpmInstallChecks.checkPlatform(json("{\"libc\":[\"glibc\"]}"), false,
-          Host.builder().os("linux").build(), linuxGlibc)).doesNotThrowAnyException();
+          Host.builder().os("linux").build(), linuxGlibc, release)).doesNotThrowAnyException();
     }
 
     // node-semver's satisfies answers false where the Range constructor throws, so npm reports EBADENGINE;
@@ -313,7 +338,7 @@ class NpmInstallChecksTest {
     void unknownHostSatisfiesEveryCheck() {
         assertThatCode(() -> NpmInstallChecks.checkPlatform(json("{\"cpu\":\"enten-cpu\",\"os\":\"enten-os\"," +
                 "\"libc\":\"musl\"}"),
-          false, Host.UNKNOWN, Host.UNKNOWN)).doesNotThrowAnyException();
+          false, Host.UNKNOWN, Host.UNKNOWN, NpmRelease.PORTED)).doesNotThrowAnyException();
         assertThatCode(() -> checkEngine(e(null, ">=99"), "11.17.0", null, false))
           .doesNotThrowAnyException();
     }

@@ -370,7 +370,7 @@ public class Node {
 
         if (options.getOverrides() != null) {
             this.overrides = options.getOverrides();
-        } else if (options.isLoadOverrides()) {
+        } else if (options.isLoadOverrides() && release.readsOverrides()) {
             Object overrides = pkg.get("overrides");
             if (truthy(overrides) && !Js.keys(overrides).isEmpty()) {
                 this.overrides = new OverrideSet(overrides, release);
@@ -691,7 +691,7 @@ public class Node {
             return false;
         }
         for (Edge edge : edgesIn) {
-            if (!Spec.npa(edge.getSpec()).isRegistry()) {
+            if (!Spec.npa(edge.getSpec(), null, release.npmPackageArg()).isRegistry()) {
                 return false;
             }
         }
@@ -921,8 +921,8 @@ public class Node {
             target.setRoot(root);
         }
 
-        if (!release.propagatesOverrideSets() && overrides == null && parent != null &&
-            parent.overrides != null) {
+        if (!release.propagatesOverrideSets() && release.takesParentOverrideRuleWhenRooted() && overrides == null &&
+            parent != null && parent.overrides != null) {
             overrides = parent.overrides.getNodeRule(this);
         }
     }
@@ -936,7 +936,8 @@ public class Node {
             return;
         }
         for (Map.Entry<String, String> ws : workspaces.entrySet()) {
-            new Edge(this, Edge.Type.WORKSPACE, ws.getKey(), "file:" + ws.getValue());
+            new Edge(this, Edge.Type.WORKSPACE, ws.getKey(),
+                    "file:" + ConsistentResolve.escapeHash(ws.getValue(), release));
         }
     }
 
@@ -1157,7 +1158,7 @@ public class Node {
     }
 
     public boolean satisfies(String requested) {
-        Spec parsed = Spec.npa(requested);
+        Spec parsed = Spec.npa(requested, null, release.npmPackageArg());
         String name = parsed.getName() != null ? parsed.getName() : this.name;
         return Objects.equals(this.name, name) && satisfies(new Edge(
                 new Node(options().path(getRoot().realpath).release(release).build()),
@@ -1212,7 +1213,7 @@ public class Node {
             for (Node kid : node.getChildren().values()) {
                 kid.setParent(this);
             }
-            if (node.isLink() && node.getTarget() != null) {
+            if (node.isLink() && node.getTarget() != null && release.dropsTargetOfReplacedLink()) {
                 node.getTarget().setRoot(null);
             }
         }

@@ -219,6 +219,33 @@ class MapWorkspacesTest {
           .isEqualTo(virtual3_0_6 == null ? virtual3_0_4 : virtual3_0_6);
     }
 
+    // what @npmcli/map-workspaces 2.0.0 (npm 8.5.2), 2.0.1 (npm 8.5.3) and 2.0.2 (npm 8.5.4) answered over this
+    // layout on disk: before 2.0.2 a name two paths share is refused as soon as the second is found, though a pattern
+    // before took the first away; before 2.0.1 a backslash is glob's escape
+    @Test
+    void duplicateNamesAndBackslashesBefore8_5_4() {
+        Map<String, String> manifests = new LinkedHashMap<>();
+        manifests.put("", "{\"name\":\"wsroot\"}");
+        manifests.put("packages/a", "{\"name\":\"x\"}");
+        manifests.put("packages/b", "{\"name\":\"b\"}");
+        manifests.put("tools/a", "{\"name\":\"x\"}");
+        VirtualTreeLoader.ProjectFiles files = VirtualTreeLoader.ProjectFiles.builder().manifests(manifests).build();
+        Map<String, Object> negated = obj("workspaces", json("[\"packages/*\",\"!packages/a\",\"tools/*\"]"));
+        for (String release : new String[]{"8.5.2", "8.5.3"}) {
+            assertThatThrownBy(() -> MapWorkspaces.mapWorkspaces(CWD, negated, files, NpmRelease.of(release)))
+              .hasMessage("must not have multiple workspaces with the same name\n" +
+                          "package 'x' has conflicts in the following paths:\n" +
+                          "    /project/packages/a\n" +
+                          "    /project/tools/a");
+        }
+        assertThat(members(MapWorkspaces.mapWorkspaces(CWD, negated, files, NpmRelease.of("8.5.4"))))
+          .isEqualTo("x=tools/a b=packages/b");
+        Map<String, Object> backslash = obj("workspaces", json("[\"packages\\\\*\"]"));
+        assertThat(members(MapWorkspaces.mapWorkspaces(CWD, backslash, files, NpmRelease.of("8.5.2")))).isEmpty();
+        assertThat(members(MapWorkspaces.mapWorkspaces(CWD, backslash, files, NpmRelease.of("8.5.3"))))
+          .isEqualTo("x=packages/a b=packages/b");
+    }
+
     private static Object parsed(String text) {
         try {
             return JsonParseEvenBetterErrors.parse(text).getValue();

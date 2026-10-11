@@ -88,7 +88,7 @@ public final class PickManifest {
         boolean avoidStrict;
 
         /**
-         * The npm that bundles the library, for the node-semver it reads ranges with.
+         * The npm that bundles the library, for the npm-package-arg and node-semver it reads specs and ranges with.
          */
         @Builder.Default
         NpmRelease npm = NpmRelease.PORTED;
@@ -235,7 +235,7 @@ public final class PickManifest {
 
         double time = truthy(before) && truthy(verTimes) ? timeValue(before) : Double.POSITIVE_INFINITY;
         Spec spec = Spec.resolve(name instanceof String ? (String) name : null, truthy(wanted) ? wanted : defaultTag,
-                null);
+                null, release.npmPackageArg());
         Spec.Type type = spec.getType();
         Object distTags = truthy(packument.get("dist-tags")) ? packument.get("dist-tags") : new LinkedHashMap<>();
 

@@ -71,8 +71,6 @@ public final class Shrinkwrap {
         return holds.test("yarn.lock");
     }
 
-    public static final int DEFAULT_LOCKFILE_VERSION = 3;
-
     // npm 12.0.0: a node's patch record and a manifest extension's state each make the lock version 4, the newest
     // version it reads
     private static final int PATCHED_LOCKFILE_VERSION = 4;
@@ -85,6 +83,9 @@ public final class Shrinkwrap {
     private static final Pattern NODE_MODULES = Pattern.compile("(?:^|/)node_modules/");
     private static final Pattern YARN_REGISTRY = Pattern.compile("^https?://registry\\.yarnpkg\\.com/");
     private static final Pattern NPM_REGISTRY = Pattern.compile("^https?://registry\\.npmjs\\.org/");
+    // before npm 8.5.2 a dot of the host matches any character
+    private static final Pattern YARN_REGISTRY_UNESCAPED = Pattern.compile("^https?://registry.yarnpkg.com/");
+    private static final Pattern NPM_REGISTRY_UNESCAPED = Pattern.compile("^https?://registry.npmjs.org/");
     private static final Pattern LAST_SEGMENT = Pattern.compile("(^|/)[^/]*$");
 
     private static final List<String> PKG_META_KEYS = Collections.unmodifiableList(Arrays.asList(
@@ -237,8 +238,9 @@ public final class Shrinkwrap {
         Object resolved = ConsistentResolve.consistentResolve(node.getResolved(), node.getPath(), path, true,
                 options.getRelease());
         if (truthy(resolved)) {
-            Object written = node.isRegistryDependency() ?
-                    OverrideResolves.overrideResolves(resolved, options) : resolved;
+            Object written = options.getRelease().definesOmitLockfileRegistryResolved() &&
+                             node.isRegistryDependency() ? OverrideResolves.overrideResolves(resolved, options) :
+                    resolved;
             if (written != null) {
                 meta.put("resolved", written);
             }
@@ -288,7 +290,7 @@ public final class Shrinkwrap {
      * loaded, with {@code resolved} and {@code integrity} added to {@code options} for the fetch.
      */
     public Spec checkYarnLock(String spec, Map<String, Object> options) {
-        return checkYarnLock(Spec.npa(spec), options);
+        return checkYarnLock(Spec.npa(spec, null, resolveOptions.getRelease().npmPackageArg()), options);
     }
 
     public Spec checkYarnLock(Spec parsed, Map<String, Object> options) {
@@ -301,9 +303,9 @@ public final class Shrinkwrap {
             Object integrity = fromYarn.get("integrity");
             String resolvedString = resolved instanceof String ? (String) resolved : null;
             boolean isYarnReg = parsed.isRegistry() && resolvedString != null &&
-                                YARN_REGISTRY.matcher(resolvedString).find();
+                                yarnRegRe().matcher(resolvedString).find();
             boolean isnpmReg = parsed.isRegistry() && !isYarnReg && resolvedString != null &&
-                               NPM_REGISTRY.matcher(resolvedString).find();
+                               npmRegRe().matcher(resolvedString).find();
             boolean isReg = isnpmReg || isYarnReg;
             VersionFromTgz.NameVersion tgz =
                     isReg ? VersionFromTgz.versionFromTgz(parsed.getName(), resolvedString) : null;
@@ -316,12 +318,20 @@ public final class Shrinkwrap {
             }
             if (truthy(yspec)) {
                 options.put("resolved", resolvedString == null ? resolved :
-                        YARN_REGISTRY.matcher(resolvedString).replaceFirst("https://registry.npmjs.org/"));
+                        yarnRegRe().matcher(resolvedString).replaceFirst("https://registry.npmjs.org/"));
                 options.put("integrity", integrity);
-                return Spec.npa(parsed.getName() + "@" + yspec);
+                return Spec.npa(parsed.getName() + "@" + yspec, null, resolveOptions.getRelease().npmPackageArg());
             }
         }
         return parsed;
+    }
+
+    private Pattern yarnRegRe() {
+        return resolveOptions.getRelease().escapesRegistryHostDots() ? YARN_REGISTRY : YARN_REGISTRY_UNESCAPED;
+    }
+
+    private Pattern npmRegRe() {
+        return resolveOptions.getRelease().escapesRegistryHostDots() ? NPM_REGISTRY : NPM_REGISTRY_UNESCAPED;
     }
 
     public void setData(@Nullable Map<String, Object> data) {
@@ -335,7 +345,8 @@ public final class Shrinkwrap {
         packagesArray = null;
         packageExtensionsHash = null;
         npmExtensionHash = null;
-        Object lockfileVersion = truthy(this.lockfileVersion) ? this.lockfileVersion : DEFAULT_LOCKFILE_VERSION;
+        Object lockfileVersion = truthy(this.lockfileVersion) ? this.lockfileVersion :
+                resolveOptions.getRelease().defaultLockfileVersion();
         originalLockfileVersion = lockfileVersion;
 
         Map<String, Object> data = new LinkedHashMap<>();
@@ -367,7 +378,7 @@ public final class Shrinkwrap {
             loadedFromDisk = lock != null && truthy(lock.getText());
 
             if (truthy(yarn)) {
-                yarnLock = new YarnLock();
+                yarnLock = new YarnLock(resolveOptions.getRelease());
                 try {
                     yarnLock.parse(yarn);
                 } catch (RuntimeException ignored) {
@@ -392,13 +403,19 @@ public final class Shrinkwrap {
             ancientLockfile = false;
             data = new LinkedHashMap<>();
         }
-        Object lockfileVersion = DEFAULT_LOCKFILE_VERSION;
+        NpmRelease release = resolveOptions.getRelease();
+        Object lockfileVersion = release.defaultLockfileVersion();
         Object fileVersion = Js.get(data, "lockfileVersion");
-        if (Js.toNumber(fileVersion) > MAX_LOCKFILE_VERSION && resolveOptions.getRelease().refusesNewerLockfile()) {
+        if (Js.toNumber(fileVersion) > MAX_LOCKFILE_VERSION && release.refusesNewerLockfile()) {
             throw new UnsupportedLockfileVersion(fileVersion);
         }
         if (truthy(this.lockfileVersion)) {
             lockfileVersion = this.lockfileVersion;
+        } else if (!release.keepsLoadedLockfileVersion()) {
+            // Math.max(lock.lockfileVersion || 0, defaultLockfileVersion)
+            double version = Js.toNumber(truthy(fileVersion) ? fileVersion : 0);
+            lockfileVersion = Double.isNaN(version) ? Double.NaN :
+                    (Object) Math.max(version, release.defaultLockfileVersion());
         } else if (truthy(fileVersion) && !Js.strictEquals(fileVersion, 1)) {
             lockfileVersion = fileVersion;
         }
@@ -633,7 +650,7 @@ public final class Shrinkwrap {
         }
         Map<String, Object> lock = asObject(entry);
 
-        Spec spec = SpecFromLock.specFromLock(name, lock, path);
+        Spec spec = SpecFromLock.specFromLock(name, lock, path, resolveOptions.getRelease().npmPackageArg());
         Spec.Type type = spec == null ? null : spec.getType();
 
         if (spec != null && type == Spec.Type.DIRECTORY) {
@@ -741,7 +758,8 @@ public final class Shrinkwrap {
                 if (!Js.string(resolved).startsWith("file:")) {
                     pathFixed = resolved;
                 } else if (resolved instanceof String) {
-                    pathFixed = "file:" + PosixPath.resolve(path, ((String) resolved).substring(5));
+                    pathFixed = "file:" + ConsistentResolve.escapeHash(
+                            PosixPath.resolve(path, ((String) resolved).substring(5)), resolveOptions.getRelease());
                 } else {
                     // only an array reads as a file: string, and Array.prototype.slice hands path.resolve an array
                     throw new IllegalArgumentException(
@@ -801,7 +819,8 @@ public final class Shrinkwrap {
             }
         }
 
-        Spec spec = Spec.npa(node.getName() + "@" + edge.getSpec());
+        Spec spec = Spec.npa(node.getName() + "@" + edge.getSpec(), null,
+                resolveOptions.getRelease().npmPackageArg());
         YarnLock.Entry entry = entries.get(node.getName() + "@" + edge.getSpec());
 
         if (entry == null ||
@@ -812,9 +831,9 @@ public final class Shrinkwrap {
         }
 
         Object entryResolved = entry.get("resolved");
-        if (entryResolved instanceof String && YARN_REGISTRY.matcher((String) entryResolved).find() &&
+        if (entryResolved instanceof String && yarnRegRe().matcher((String) entryResolved).find() &&
             spec.isRegistry()) {
-            entryResolved = YARN_REGISTRY.matcher((String) entryResolved).replaceFirst("https://registry.npmjs.org/");
+            entryResolved = yarnRegRe().matcher((String) entryResolved).replaceFirst("https://registry.npmjs.org/");
             entry.set("resolved", entryResolved);
         }
 
@@ -899,7 +918,7 @@ public final class Shrinkwrap {
         }
 
         if (!truthy(lockfileVersion)) {
-            lockfileVersion = DEFAULT_LOCKFILE_VERSION;
+            lockfileVersion = resolveOptions.getRelease().defaultLockfileVersion();
         }
         // only an object's values hold an entry to read
         Map<String, Object> entries = asObject(data.get("packages"));
@@ -992,17 +1011,19 @@ public final class Shrinkwrap {
 
         Object res = ConsistentResolve.consistentResolve(node.getResolved(), this.path, this.path, true,
                 resolveOptions.getRelease());
-        Spec rSpec = specFromResolved(res);
+        Spec rSpec = specFromResolved(res, resolveOptions.getRelease());
 
         Spec spec = rSpec;
         if (edge != null) {
-            spec = Spec.resolve(node.getName(), edge.getSpec(), edge.getFrom().getRealpath());
+            spec = Spec.resolve(node.getName(), edge.getSpec(), edge.getFrom().getRealpath(),
+                    resolveOptions.getRelease().npmPackageArg());
         }
 
         Spec.Type specType = spec == null ? null : spec.getType();
         Spec.Type rType = rSpec == null ? null : rSpec.getType();
         if (node.isLink()) {
-            lock.put("version", "file:" + Relpath.relpath(this.path, node.getRealpath()));
+            lock.put("version", "file:" + ConsistentResolve.escapeHash(
+                    Relpath.relpath(this.path, node.getRealpath()), resolveOptions.getRelease()));
         } else if (specType == Spec.Type.FILE || specType == Spec.Type.REMOTE) {
             lock.put("version", spec.getSaveSpec());
         } else if (specType == Spec.Type.GIT || rType == Spec.Type.GIT) {
@@ -1064,7 +1085,8 @@ public final class Shrinkwrap {
                     String edgeSpec = v.getSpec();
                     if (edgeSpec.startsWith("file:")) {
                         String p = PosixPath.resolve(node.getRealpath(), edgeSpec.substring("file:".length()));
-                        requires.put(entry.getKey(), "file:" + Relpath.relpath(node.getRealpath(), p));
+                        requires.put(entry.getKey(), "file:" + ConsistentResolve.escapeHash(
+                                Relpath.relpath(node.getRealpath(), p), resolveOptions.getRelease()));
                     } else {
                         requires.put(entry.getKey(), edgeSpec);
                     }
@@ -1098,9 +1120,9 @@ public final class Shrinkwrap {
         return lock;
     }
 
-    private static @Nullable Spec specFromResolved(@Nullable Object resolved) {
+    private static @Nullable Spec specFromResolved(@Nullable Object resolved, NpmRelease release) {
         try {
-            return Spec.npa(resolved, null);
+            return Spec.npa(resolved, null, release.npmPackageArg());
         } catch (RuntimeException er) {
             return null;
         }

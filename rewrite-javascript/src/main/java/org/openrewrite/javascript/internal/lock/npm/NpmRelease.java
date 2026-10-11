@@ -17,7 +17,10 @@ package org.openrewrite.javascript.internal.lock.npm;
 
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.javascript.internal.lock.BraceExpansion;
+import org.openrewrite.javascript.internal.lock.GitHost;
+import org.openrewrite.javascript.internal.lock.Spec;
 import org.openrewrite.javascript.internal.lock.Ssri;
+import org.openrewrite.javascript.internal.lock.ValidateNpmPackageName;
 import org.openrewrite.javascript.semver.NodeSemver;
 
 import java.util.regex.Matcher;
@@ -159,6 +162,14 @@ public final class NpmRelease implements Comparable<NpmRelease> {
     }
 
     /**
+     * {@code #initTree}: the lock takes the newline and default indent of the root package.json ({@code
+     * inferFormattingOptions}), from npm 8.3.2; before, those of the lock it read.
+     */
+    boolean infersLockFormatFromManifest() {
+        return atLeast(8, 3, 2);
+    }
+
+    /**
      * {@code #nodeFromSpec}: under {@code install-links}, a directory dependency of an installed {@code file:} package
      * is installed from that package's source instead of linked, from npm 11.6.0.
      */
@@ -206,6 +217,22 @@ public final class NpmRelease implements Comparable<NpmRelease> {
     }
 
     /**
+     * {@code #buildDepStep} places every dependency of a step before it visits any placement, until npm 9.6.6; from
+     * then, each placement is visited as soon as it is made.
+     */
+    boolean placesWholeStepBeforeVisiting() {
+        return !atLeast(9, 6, 6);
+    }
+
+    /**
+     * {@code #nodeFromSpec}: a spec naming a workspace that satisfies the edge takes the workspace instead of a
+     * registry manifest, from npm 8.5.0.
+     */
+    boolean prefersSatisfyingWorkspace() {
+        return atLeast(8, 5, 0);
+    }
+
+    /**
      * {@code #idealTreePrune}: a node flagged both peer and optional is pruned like an extraneous one, from npm 11.5.0
      * until 11.6.3.
      */
@@ -226,6 +253,14 @@ public final class NpmRelease implements Comparable<NpmRelease> {
      */
     boolean queuesNodesMissingDependencies() {
         return atLeast(11, 6, 2);
+    }
+
+    /**
+     * {@code #initTree} queues each node of the loaded tree that has an invalid edge, from npm 8.6.0; before, only the
+     * root is queued.
+     */
+    boolean queuesProblemNodesOfLock() {
+        return atLeast(8, 6, 0);
     }
 
     /**
@@ -253,10 +288,26 @@ public final class NpmRelease implements Comparable<NpmRelease> {
     }
 
     /**
+     * {@code #nodeFromSpec}: a workspace that satisfies the edge is returned for it, from npm 9.6.0; before, the edge's
+     * current target.
+     */
+    boolean returnsSatisfyingWorkspace() {
+        return atLeast(9, 6, 0);
+    }
+
+    /**
      * {@code #checkEngineAndPlatform}: a node {@code omit} leaves out is not checked, from npm 11.5.0.
      */
     boolean skipsEngineCheckOfOmitted() {
         return atLeast(11, 5, 0);
+    }
+
+    /**
+     * {@code #inflateAncientLockfile} leaves out a node outside node_modules, a link target the link brings in, from
+     * npm 8.6.0; before, it fetches its manifest too, as {@code file:} of its path when it has no version.
+     */
+    boolean skipsLinkTargetsWhenInflating() {
+        return atLeast(8, 6, 0);
     }
 
     /**
@@ -267,6 +318,14 @@ public final class NpmRelease implements Comparable<NpmRelease> {
      */
     boolean skipsPeerConflictOfDetachedNode() {
         return atLeast(12, 0, 2) || atLeast(11, 19, 0) && !atLeast(12, 0, 0);
+    }
+
+    /**
+     * The queue of nodes to build is a plain array, duplicates and all, sorted by depth and path at every step, until
+     * npm 9.6.6; from then, {@code DepsQueue} keeps each node once and sorts only after a push.
+     */
+    boolean sortsDepsQueueAtEveryStep() {
+        return !atLeast(9, 6, 6);
     }
 
     /**
@@ -310,7 +369,26 @@ public final class NpmRelease implements Comparable<NpmRelease> {
         return atLeast(10, 8, 2);
     }
 
+    // @npmcli/arborist can-place-dep.js
+
+    /**
+     * {@code checkCanPlace}: a dependency the target's own edge of its name does not accept conflicts only where the
+     * target has no node of that name to dedupe against, from npm 8.1.1; before, there too.
+     */
+    boolean skipsTargetEdgeCheckWithCurrent() {
+        return atLeast(8, 1, 1);
+    }
+
     // @npmcli/arborist consistent-resolve.js
+
+    /**
+     * A {@code #} in a path that becomes a {@code file:} spec is written {@code %23} (also link.js, load-virtual.js,
+     * node.js and shrinkwrap.js), from npm 8.15.1 until 10.9.3 and 11.2.0, whose npm-package-arg escapes a path
+     * before the URL parser reads it.
+     */
+    boolean escapesHashOfFilePaths() {
+        return atLeast(8, 15, 1) && !atLeast(10, 9, 3) || atLeast(11, 0, 0) && !atLeast(11, 2, 0);
+    }
 
     /**
      * A hosted git URL written as https resolves to https ({@code hosted.default}), from npm 12.0.0; before, only one
@@ -318,6 +396,14 @@ public final class NpmRelease implements Comparable<NpmRelease> {
      */
     boolean keepsHostedGitHttps() {
         return atLeast(12, 0, 0);
+    }
+
+    /**
+     * A resolved whose spec is {@code *}, as npm-package-arg 10 reads a bare name, is returned as written, from npm
+     * 9.0.0; before, a bare name, whose spec npm-package-arg 9 reads as empty, unless it ends in {@code @}.
+     */
+    boolean returnsRawOfStarSpec() {
+        return atLeast(9, 0, 0);
     }
 
     // @npmcli/arborist dep-valid.js
@@ -328,6 +414,14 @@ public final class NpmRelease implements Comparable<NpmRelease> {
      */
     boolean comparesLockedGitCommittish() {
         return atLeast(11, 17, 0);
+    }
+
+    /**
+     * {@code linkValid}: a workspace's link stays valid under {@code install-links}, from npm 9.0.0; before, every link
+     * is invalid there.
+     */
+    boolean keepsWorkspaceLinksValid() {
+        return atLeast(9, 0, 0);
     }
 
     /**
@@ -348,6 +442,22 @@ public final class NpmRelease implements Comparable<NpmRelease> {
     }
 
     /**
+     * {@code error} is computed when it is first read after the edge is made or reloaded, from npm 9.6.6; before, when
+     * the edge is made and whenever its target changes or it is reloaded hard ({@code #loadError}).
+     */
+    boolean computesEdgeErrorWhenRead() {
+        return atLeast(9, 6, 6);
+    }
+
+    /**
+     * {@code spec}: an override whose value is {@code *} leaves the edge's spec as declared, from npm 9.0.0; before,
+     * the edge reads {@code *}.
+     */
+    boolean ignoresStarOverride() {
+        return atLeast(9, 0, 0);
+    }
+
+    /**
      * {@code satisfiedBy} reads a dependency the root project bundles by the overridden spec, as any other ({@code
      * inDepBundle} in place of {@code inBundle}), from npm 12.0.0.
      */
@@ -356,11 +466,53 @@ public final class NpmRelease implements Comparable<NpmRelease> {
     }
 
     /**
+     * {@code satisfiedBy} reads a node that is bundled or shrinkwrapped by the spec as declared, from npm 8.12.0;
+     * before, through the override as any other.
+     */
+    boolean readsRawSpecOfBundled() {
+        return atLeast(8, 12, 0);
+    }
+
+    /**
+     * {@code spec}: a {@code $name} override read by an edge of a virtual root resolves against the real root's
+     * package, from npm 8.16.0; before, against the virtual root's.
+     */
+    boolean readsReferenceFromRealRoot() {
+        return atLeast(8, 16, 0);
+    }
+
+    /**
+     * {@code reload} takes the edge's rule from its dependent's overrides again, from npm 8.7.0; before, the edge keeps
+     * the overrides it was made with.
+     */
+    boolean recomputesOverridesOnReload() {
+        return atLeast(8, 7, 0);
+    }
+
+    /**
      * {@code spec}: a {@code $name} override the root does not declare is read from the edge's own package, from npm
      * 11.3.0.
      */
     boolean resolvesOverrideReferenceInOwnPackage() {
         return atLeast(11, 3, 0);
+    }
+
+    // @npmcli/arborist from-path.js
+
+    /**
+     * A node's {@code resolved} is read with npm-package-arg only once no override answers, from npm 9.6.6; before,
+     * first, so that one npa refuses fails the dependent's edge even where an override answers.
+     */
+    boolean parsesResolvedAfterOverride() {
+        return atLeast(9, 6, 6);
+    }
+
+    /**
+     * An edge an override replaces resolves its spec from the project root's directory, from npm 8.16.0; before, from
+     * the node's own, as any other.
+     */
+    boolean resolvesOverriddenSpecFromRoot() {
+        return atLeast(8, 16, 0);
     }
 
     // @npmcli/arborist link.js
@@ -409,6 +561,14 @@ public final class NpmRelease implements Comparable<NpmRelease> {
     // @npmcli/arborist node.js
 
     /**
+     * {@code replace}: a link the node replaces takes its target out of the tree, from npm 8.8.0; before, the target
+     * stays.
+     */
+    boolean dropsTargetOfReplacedLink() {
+        return atLeast(8, 8, 0);
+    }
+
+    /**
      * {@code shouldOmit}: only a node under the project root or a workspace is omitted, from npm 11.6.1.
      */
     boolean omitsUnderProjectTopsOnly() {
@@ -422,6 +582,21 @@ public final class NpmRelease implements Comparable<NpmRelease> {
      */
     boolean propagatesOverrideSets() {
         return atLeast(11, 2, 0);
+    }
+
+    /**
+     * {@code loadOverrides}: the root reads the {@code overrides} of its package.json, from npm 8.3.0; before, npm has
+     * no overrides.
+     */
+    boolean readsOverrides() {
+        return atLeast(8, 3, 0);
+    }
+
+    /**
+     * The {@code root} setter gives a node without overrides its parent's rule for it, from npm 8.7.0.
+     */
+    boolean takesParentOverrideRuleWhenRooted() {
+        return atLeast(8, 7, 0);
     }
 
     // @npmcli/arborist optional-set.js
@@ -467,6 +642,14 @@ public final class NpmRelease implements Comparable<NpmRelease> {
     }
 
     /**
+     * A rule whose key names no spec ({@code npa(key).rawSpec === ''}, as npm-package-arg before 10.0.0 reads a bare
+     * name) has the key spec {@code ''}, which every edge and node of its name matches, until npm 9.0.0.
+     */
+    boolean keepsEmptyOverrideKeySpec() {
+        return !atLeast(9, 0, 0);
+    }
+
+    /**
      * {@code getEdgeRule}: a rule's key is matched against the spec the edge declares, from npm 11.2.0; before, against
      * the spec with the edge's override applied.
      */
@@ -474,7 +657,34 @@ public final class NpmRelease implements Comparable<NpmRelease> {
         return atLeast(11, 2, 0);
     }
 
+    /**
+     * {@code getEdgeRule} reads the edge's spec with npm-package-arg: a range or version (a git spec's range) is
+     * compared with the rule's key, any other kind of spec takes the rule, from npm 9.3.0; before,
+     * {@code semver.intersects(edge.spec, rule.keySpec)}, which throws on a spec that is no range.
+     */
+    boolean matchesEdgeRuleBySpecType() {
+        return atLeast(9, 3, 0);
+    }
+
+    // @npmcli/arborist place-dep.js
+
+    /**
+     * {@code replaceOldDep}: the peer set a workspace's edge brings in is left in place, with a warning, as the project
+     * root's is, from npm 8.1.3; before, only the tree root's.
+     */
+    boolean leavesWorkspacePeerEntriesAlone() {
+        return atLeast(8, 1, 3);
+    }
+
     // @npmcli/arborist shrinkwrap.js
+
+    /**
+     * {@code defaultLockfileVersion}, what a lock is written as when neither the config nor the lock says: 3 from npm
+     * 9.0.0; 2 before.
+     */
+    int defaultLockfileVersion() {
+        return atLeast(9, 0, 0) ? 3 : 2;
+    }
 
     /**
      * {@code commit}: an extraneous node outside node_modules, a workspace or {@code file:} dependency the manifest no
@@ -482,6 +692,22 @@ public final class NpmRelease implements Comparable<NpmRelease> {
      */
     boolean dropsExtraneousOutsideNodeModules() {
         return atLeast(11, 15, 0);
+    }
+
+    /**
+     * {@code yarnRegRe} and {@code npmRegRe}, which pick a yarn.lock's registry URLs, read the dots of the registry
+     * hosts as dots, from npm 8.5.2; before, as any character.
+     */
+    boolean escapesRegistryHostDots() {
+        return atLeast(8, 5, 2);
+    }
+
+    /**
+     * {@code load} keeps the version of the lock it reads unless it is 1, which it upgrades to the default, from npm
+     * 9.0.0; before, it takes the greater of that version and the default ({@code Math.max}).
+     */
+    boolean keepsLoadedLockfileVersion() {
+        return atLeast(9, 0, 0);
     }
 
     /**
@@ -539,6 +765,17 @@ public final class NpmRelease implements Comparable<NpmRelease> {
         return atLeast(11, 15, 0);
     }
 
+    // @npmcli/arborist yarn-lock.js
+
+    /**
+     * A yarn.lock is written with yarn's quoting ({@code quoteIfNeeded}), an entry's fields in yarn's order and its
+     * integrity unquoted, from npm 9.0.1; before, every key and value is JSON-quoted and an entry's scalar fields come
+     * before its objects, each in {@code localeCompare} order.
+     */
+    boolean quotesYarnLockAsYarnDoes() {
+        return atLeast(9, 0, 1);
+    }
+
     // @npmcli/config definitions.js
 
     /**
@@ -584,6 +821,28 @@ public final class NpmRelease implements Comparable<NpmRelease> {
     }
 
     /**
+     * {@code install-links} is a config from npm 8.8.0 (lib/utils/config/definitions.js until npm 9.7.2).
+     */
+    boolean definesInstallLinks() {
+        return atLeast(8, 8, 0);
+    }
+
+    /**
+     * {@code install-strategy} is a config from npm 9.0.0; before, {@code global-style} and {@code legacy-bundling}
+     * are arborist's own options, {@code legacyBundling} read first.
+     */
+    boolean definesInstallStrategy() {
+        return atLeast(9, 0, 0);
+    }
+
+    /**
+     * {@code install-strategy} takes {@code linked} from npm 9.4.0; before, arborist hoists it.
+     */
+    boolean definesLinkedInstallStrategy() {
+        return atLeast(9, 4, 0);
+    }
+
+    /**
      * {@code min-release-age} is a config from npm 11.10.0.
      */
     boolean definesMinReleaseAge() {
@@ -598,6 +857,36 @@ public final class NpmRelease implements Comparable<NpmRelease> {
     }
 
     /**
+     * {@code omit-lockfile-registry-resolved} is a config from npm 8.10.0, when shrinkwrap.js's {@code metaFromNode}
+     * begins to ask whether a node is a registry dependency.
+     */
+    boolean definesOmitLockfileRegistryResolved() {
+        return atLeast(8, 10, 0);
+    }
+
+    /**
+     * {@code prefer-dedupe} is a config from npm 9.7.0.
+     */
+    boolean definesPreferDedupe() {
+        return atLeast(9, 7, 0);
+    }
+
+    /**
+     * The default of {@code install-links}: {@code true} from npm 9.0.0 until 9.4.2.
+     */
+    boolean installLinksDefault() {
+        return atLeast(9, 0, 0) && !atLeast(9, 4, 2);
+    }
+
+    /**
+     * {@code lockfile-version}'s type takes the strings {@code 1}, {@code 2} and {@code 3} an npmrc file holds, from
+     * npm 8.1.2; before, only the numbers.
+     */
+    boolean typesLockfileVersionAsStrings() {
+        return atLeast(8, 1, 2);
+    }
+
+    /**
      * {@code min-release-age}'s flatten: {@code before} wins over it within one source and a falsy age filters nothing,
      * from npm 11.15.0; before, the two exclude each other and any age sets {@code before}.
      */
@@ -606,6 +895,16 @@ public final class NpmRelease implements Comparable<NpmRelease> {
     }
 
     // @npmcli/config index.js
+
+    /**
+     * The options npm installs with are flattened from the config as {@code validate} leaves it (nopt's clean drops a
+     * value of none of its definition's types and makes a date a Date): before npm 9.0.0, where {@code load}
+     * validates, and in 9.1.0 and 9.2.0, whose npm.js sets {@code location} between loading and the command's
+     * validation; otherwise npm.js flattens them while it loads, before the command validates.
+     */
+    boolean flattensValidatedConfig() {
+        return !atLeast(9, 0, 0) || atLeast(9, 1, 0) && !atLeast(9, 3, 0);
+    }
 
     /**
      * {@code validate} refuses an auth key outside a registry's scope in an npmrc file ({@code ERR_INVALID_AUTH}), and
@@ -623,14 +922,29 @@ public final class NpmRelease implements Comparable<NpmRelease> {
         return atLeast(12, 0, 0);
     }
 
+    // @npmcli/config parse-field.js
+
+    /**
+     * A {@code before} an npmrc file sets reaches pacote as the string it is written as, whose fetchers fail on it
+     * ({@code this.before.toISOString is not a function}): npm 9.0.0 and 9.0.1, and 9.3.0 until 9.6.2, whose
+     * parseField reads a date into a Date; the other releases flatten the validated config
+     * ({@link #flattensValidatedConfig()}).
+     */
+    boolean keepsNpmrcBeforeAString() {
+        return !flattensValidatedConfig() && !atLeast(9, 6, 2);
+    }
+
     // @npmcli/map-workspaces
 
     /**
-     * The @npmcli/map-workspaces npm bundles: 3.0.6 from npm 10.5.2, which finds the members 5.0.3 finds; 3.0.4
-     * before.
+     * The @npmcli/map-workspaces npm bundles: 3.0.6 from npm 10.5.2, which finds the members 5.0.3 finds; 3.0.4 and
+     * the releases back to 2.0.2 (npm 8.5.4) that find them alike; 2.0.1 in npm 8.5.3, which refuses a duplicate name
+     * as soon as it is found; before, 2.0.0, which also reads a backslash as glob's escape.
      */
     MapWorkspaces.Release mapWorkspaces() {
-        return atLeast(10, 5, 2) ? MapWorkspaces.Release.V5_0_3 : MapWorkspaces.Release.V3_0_4;
+        return atLeast(10, 5, 2) ? MapWorkspaces.Release.V5_0_3 :
+                atLeast(8, 5, 4) ? MapWorkspaces.Release.V3_0_4 :
+                        atLeast(8, 5, 3) ? MapWorkspaces.Release.V2_0_1 : MapWorkspaces.Release.V2_0_0;
     }
 
     // @npmcli/package-json normalize.js
@@ -672,6 +986,19 @@ public final class NpmRelease implements Comparable<NpmRelease> {
                 BraceExpansion.Release.V5_0_6;
     }
 
+    // hosted-git-info
+
+    /**
+     * The hosted-git-info npm bundles: 9.0.3 from npm 11.15.0, whose https URL of a sourcehut repository ends in no
+     * {@code .git}; 9.0.2 and the releases back to 5.2.1 (npm 8.19.3) that read a URL as it does (parse-url.js); 4.1.0
+     * from npm 8.3.1, and 5.0.0 and 5.1.0 that answer as it does; before, 4.0.2, which knows no sourcehut.
+     */
+    GitHost.Release hostedGitInfo() {
+        return atLeast(11, 15, 0) ? GitHost.Release.V9_0_3 :
+                atLeast(8, 19, 3) ? GitHost.Release.V9_0_2 :
+                        atLeast(8, 3, 1) ? GitHost.Release.V4_1_0 : GitHost.Release.V4_0_2;
+    }
+
     // npm base-cmd.js
 
     /**
@@ -689,15 +1016,54 @@ public final class NpmRelease implements Comparable<NpmRelease> {
         return atLeast(12, 0, 0);
     }
 
-    // npm-install-checks dev-engines.js
+    // npm-install-checks
+
+    /**
+     * {@code checkPlatform} holds a package's {@code libc} to the machine's, which a machine other than linux has none
+     * of, from npm 9.6.3 (npm-install-checks 6.1.0); before, only {@code os} and {@code cpu}.
+     */
+    boolean checksLibc() {
+        return atLeast(9, 6, 3);
+    }
+
+    /**
+     * {@code checkPlatform} finds glibc by the process report's {@code glibcVersionRuntime}, from npm 9.6.5
+     * (npm-install-checks 6.1.1); in 9.6.3 and 9.6.4 it reads {@code glibcRuntimeVersion}, which no report has, so a
+     * glibc machine has no libc.
+     */
+    boolean detectsGlibc() {
+        return atLeast(9, 6, 5);
+    }
 
     /**
      * Whether a {@code devEngines} failure names the property ({@code Invalid devEngines.runtime}) where earlier
-     * releases name the engine alone ({@code Invalid engine "runtime"}): npm-install-checks 7.1.2, which npm 10.9.5
-     * bundles and, of npm 11, the releases from 11.6.1.
+     * releases name the engine alone ({@code Invalid engine "runtime"}): npm-install-checks 7.1.2 (dev-engines.js),
+     * which npm 10.9.5 bundles and, of npm 11, the releases from 11.6.1.
      */
     boolean namesDevEnginesProperty() {
         return atLeast(11, 6, 1) || atLeast(10, 9, 5) && !atLeast(11, 0, 0);
+    }
+
+    // npm-package-arg
+
+    /**
+     * The npm-package-arg npm bundles, with the libraries it calls: 13.0.1 from npm 11.6.2, which takes {@code .tar.gz}
+     * and no other character between the two for a tarball's ending; 12.0.2 from npm 11.2.0 and, of npm 10, from
+     * 10.9.3, which escapes a file path before the URL parser reads it; 12.0.1 and the 11.x and 12.0.0 that answer
+     * nearly as it does from npm 10.0.0; 10.0.0 and 10.1.0 from npm 9.0.0, which refuse a file: URL with a host and
+     * need no name of an alias; 9.1.0 from npm 8.14.0, which reads a bare name as the default tag; 9.0.0 to 9.0.2
+     * from npm 8.5.2, which read a git committish as a ref or a semver: range alone; before, 8.1.5, whose messages
+     * name no package.
+     */
+    Spec.Options npmPackageArg() {
+        return Spec.Options.of(
+                atLeast(11, 6, 2) ? Spec.Release.V13_0_2 :
+                        atLeast(11, 2, 0) || atLeast(10, 9, 3) && !atLeast(11, 0, 0) ? Spec.Release.V13_0_0 :
+                                atLeast(10, 0, 0) ? Spec.Release.V12_0_1 :
+                                        atLeast(9, 0, 0) ? Spec.Release.V10_1_0 :
+                                                atLeast(8, 14, 0) ? Spec.Release.V9_1_0 :
+                                                        atLeast(8, 5, 2) ? Spec.Release.V9_0_0 : Spec.Release.V8_1_5,
+                validateNpmPackageName(), hostedGitInfo(), semver());
     }
 
     // npm-pick-manifest
@@ -730,21 +1096,35 @@ public final class NpmRelease implements Comparable<NpmRelease> {
         return atLeast(11, 10, 0);
     }
 
+    // pacote registry.js
+
+    /**
+     * A registry spec npm-package-arg reads as a tag with no spec (a bare name) is fetched as the configured {@code tag}
+     * when that is not {@code latest}, until npm 9.0.0 (pacote 12 and 13, beside npm-package-arg 8 and 9).
+     */
+    boolean takesDefaultTagForEmptySpec() {
+        return !atLeast(9, 0, 0);
+    }
+
     // semver
 
     /**
      * The node-semver npm bundles: 7.8.5 from npm 11.18.0, whose {@code ~1.2} reaches down to {@code 1.2.0-0} under
      * {@code includePrerelease} (classes/range.js); 7.8.4 from npm 11.17.0 (7.8.2 takes an x-range with a number after
      * a wildcard for no range); 7.8.1 from npm 11.16.0, which strips build metadata from a whole range; 7.7.3 from npm
-     * 11.6.2 and 7.7.4 from npm 10.9.5, which strip it from a comparator as 7.8.0 does; before, 7.7.2, as every release
-     * from 7.5.4 (npm 10.0.0) answers.
+     * 11.6.2 and 7.7.4 from npm 10.9.5, which strip it from a comparator as 7.8.0 does; 7.7.2, as every release from
+     * 7.5.4 (npm 9.8.1) answers; 7.5.2 in npm 9.7.2 to 9.8.0, which reads a loose range's {@code ||} groups untrimmed;
+     * before, 7.7.2 again, as 7.3.6 to 7.5.1 (npm 8.7.0 to 9.7.1) answer, and 7.3.5 (npm 8.0.0 to 8.6.0) but for
+     * {@code >=} and a 0, any character, 0, any character, 0, which its {@code GTE0} (dots unescaped) reads as any.
      */
     NodeSemver.Release semver() {
         return atLeast(11, 18, 0) ? NodeSemver.Release.V7_8_5 :
                 atLeast(11, 17, 0) ? NodeSemver.Release.V7_8_4 :
                         atLeast(11, 16, 0) ? NodeSemver.Release.V7_8_1 :
                                 atLeast(11, 6, 2) || atLeast(10, 9, 5) && !atLeast(11, 0, 0) ?
-                                        NodeSemver.Release.V7_8_0 : NodeSemver.Release.V7_7_2;
+                                        NodeSemver.Release.V7_8_0 :
+                                        atLeast(9, 7, 2) && !atLeast(9, 8, 1) ? NodeSemver.Release.V7_5_2 :
+                                                NodeSemver.Release.V7_7_2;
     }
 
     // ssri
@@ -755,6 +1135,21 @@ public final class NpmRelease implements Comparable<NpmRelease> {
      */
     Ssri.Release ssri() {
         return atLeast(11, 10, 0) ? Ssri.Release.V13_0_1 : Ssri.Release.V13_0_0;
+    }
+
+    // validate-npm-package-name
+
+    /**
+     * The validate-npm-package-name npm bundles: 7.0.2 from npm 11.8.0, which refuses a name that starts with a hyphen;
+     * 6.0.2 from npm 11.5.0 and 10.9.5, which rewords the excluded names, as 7.0.0 does; 6.0.1 from npm 11.4.2 and
+     * 10.9.3, which refuses a scoped name whose own part starts with a period; before, 6.0.0.
+     */
+    ValidateNpmPackageName.Release validateNpmPackageName() {
+        return atLeast(11, 8, 0) ? ValidateNpmPackageName.Release.V7_0_2 :
+                atLeast(11, 5, 0) || atLeast(10, 9, 5) && !atLeast(11, 0, 0) ?
+                        ValidateNpmPackageName.Release.V6_0_2 :
+                        atLeast(11, 4, 2) || atLeast(10, 9, 3) && !atLeast(11, 0, 0) ?
+                                ValidateNpmPackageName.Release.V6_0_1 : ValidateNpmPackageName.Release.V6_0_0;
     }
 
     @Override

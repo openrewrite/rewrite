@@ -105,7 +105,9 @@ final class NodeSemverRange {
         String raw = range.trim().replaceAll("\\s+", " ");
         List<List<NodeSemverComparator>> set = new ArrayList<>();
         for (String group : raw.split("\\|\\|", -1)) {
-            List<NodeSemverComparator> comparators = parseRange(group.trim(), options);
+            // 7.5.2 parses each group with the spaces around its || still on it
+            List<NodeSemverComparator> comparators = parseRange(options.release == Release.V7_5_2 ? group :
+                    group.trim(), options);
             if (comparators == null) {
                 return null;
             }
@@ -180,7 +182,7 @@ final class NodeSemverRange {
     static String invalidRangeMessage(String range, Options options) {
         String raw = range.trim().replaceAll("\\s+", " ");
         for (String group : raw.split("\\|\\|", -1)) {
-            for (String comp : comparators(group.trim(), options)) {
+            for (String comp : comparators(options.release == Release.V7_5_2 ? group : group.trim(), options)) {
                 if (NodeSemverComparator.parse(comp, options) == null) {
                     return "Invalid comparator: " + comp;
                 }
@@ -195,19 +197,20 @@ final class NodeSemverRange {
 
     // 7.8.1 strips build metadata from the whole range before anything reads it
     private static boolean stripsBuildFromRange(Options options) {
-        return options.release != Release.V7_7_2 && options.release != Release.V7_8_0;
+        return options.release != Release.V7_5_2 && options.release != Release.V7_7_2 &&
+               options.release != Release.V7_8_0;
     }
 
     // 7.7.3 strips the first build metadata of a comparator, by re.js's length-bounded BUILD
     private static boolean stripsBuildFromComparator(Options options) {
-        return options.release != Release.V7_7_2;
+        return options.release != Release.V7_5_2 && options.release != Release.V7_7_2;
     }
 
     // 7.8.2 leaves a caret range below 1.0.0 without the -0 includePrerelease adds to other lower bounds, and takes an
     // x-range with a number after a wildcard for no x-range
     private static boolean followsXRangeOrder(Options options) {
-        return options.release != Release.V7_7_2 && options.release != Release.V7_8_0 &&
-               options.release != Release.V7_8_1;
+        return options.release != Release.V7_5_2 && options.release != Release.V7_7_2 &&
+               options.release != Release.V7_8_0 && options.release != Release.V7_8_1;
     }
 
     // the comparator strings parseRange makes of one group, before it parses them

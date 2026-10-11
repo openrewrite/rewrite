@@ -86,7 +86,9 @@ public final class Edge {
         if (spec == null) {
             throw new IllegalArgumentException("must provide string spec");
         }
-        if (type == Type.WORKSPACE && Spec.npa(spec).getType() != Spec.Type.DIRECTORY) {
+        if (type == Type.WORKSPACE && Spec.npa(spec, null,
+                (from != null ? from.getRelease() : NpmRelease.PORTED).npmPackageArg()).getType() !=
+                                      Spec.Type.DIRECTORY) {
             throw new IllegalArgumentException("workspace edges must be a symlink");
         }
         if (name == null) {
@@ -114,6 +116,10 @@ public final class Edge {
         from.addEdgeOut(this);
 
         reload(true);
+        if (!release.computesEdgeErrorWhenRead()) {
+            // this[_setFrom](from), then this[_error] = this[_loadError]() once more
+            error = loadError();
+        }
         this.peerConflicted = false;
     }
 
@@ -130,9 +136,9 @@ public final class Edge {
         }
 
         // from npm 12.0.0 no node has a shrinkwrap, and what the root bundles is overridden as any other
-        // (node.inDepBundle alone)
-        if (truthy(node.getHasShrinkwrap()) || node.isInShrinkwrap() ||
-            node.isInBundle() && (node.isInDepBundle() || !release.overridesWhatTheRootBundles())) {
+        // (node.inDepBundle alone); before npm 8.12.0 every node is read through the override
+        if (release.readsRawSpecOfBundled() && (truthy(node.getHasShrinkwrap()) || node.isInShrinkwrap() ||
+            node.isInBundle() && (node.isInDepBundle() || !release.overridesWhatTheRootBundles()))) {
             return DepValid.depValid(node, getRawSpec(), accept, from);
         }
 
@@ -268,7 +274,8 @@ public final class Edge {
      * package declares; IllegalArgumentException, arborist's TypeError, when the override is not a string.
      */
     public String getSpec() {
-        if (overrides != null && truthy(overrides.getValue()) && !"*".equals(overrides.getValue()) &&
+        if (overrides != null && truthy(overrides.getValue()) &&
+            (!"*".equals(overrides.getValue()) || !release.ignoresStarOverride()) &&
             name.equals(overrides.getName())) {
             if (!(overrides.getValue() instanceof String)) {
                 throw new IllegalArgumentException("this.overrides.value.startsWith is not a function");
@@ -276,8 +283,9 @@ public final class Edge {
             String value = (String) overrides.getValue();
             if (value.startsWith("$")) {
                 String ref = value.substring(1);
-                Map<String, Object> pkg = from == null ? null : from.getSourceReference() != null ?
-                        from.getSourceReference().getRoot().getPackage() : from.getRoot().getPackage();
+                Map<String, Object> pkg = from == null ? null :
+                        from.getSourceReference() != null && release.readsReferenceFromRealRoot() ?
+                                from.getSourceReference().getRoot().getPackage() : from.getRoot().getPackage();
                 String specValue = calculateReferentialOverrideSpec(ref, pkg);
                 if (specValue == null && from != null && from.getRelease().resolvesOverrideReferenceInOwnPackage()) {
                     pkg = from.getPackage();
@@ -333,22 +341,25 @@ public final class Edge {
 
     public @Nullable String getError() {
         if (error == null) {
-            if (to == null) {
-                error = isOptional() ? null : MISSING;
-            } else if (isPeer() && from == to.getParent() && (from == null || !from.isTop())) {
-                error = PEER_LOCAL;
-            } else if (!satisfiedBy(to)) {
-                error = INVALID;
-            } else if (release.propagatesOverrideSets() && overrides != null &&
-                       (to.getOverrides() != null || !release.comparesOverridesOfOverriddenTargets()) &&
-                       to.getEdgesOut().size() > 0 &&
-                       OverrideSet.doOverrideSetsConflict(overrides, to.getOverrides())) {
-                error = INVALID;
-            } else {
-                error = OK;
-            }
+            error = loadError();
         }
         return OK.equals(error) ? null : error;
+    }
+
+    private @Nullable String loadError() {
+        if (to == null) {
+            return isOptional() ? null : MISSING;
+        } else if (isPeer() && from == to.getParent() && (from == null || !from.isTop())) {
+            return PEER_LOCAL;
+        } else if (!satisfiedBy(to)) {
+            return INVALID;
+        } else if (release.propagatesOverrideSets() && overrides != null &&
+                   (to.getOverrides() != null || !release.comparesOverridesOfOverriddenTargets()) &&
+                   to.getEdgesOut().size() > 0 &&
+                   OverrideSet.doOverrideSetsConflict(overrides, to.getOverrides())) {
+            return INVALID;
+        }
+        return OK;
     }
 
     public void reload() {
@@ -396,15 +407,22 @@ public final class Edge {
         }
     }
 
-    // reload before npm 11.2.0: the edge takes the rule of its dependent's overrides and tells its target nothing
+    // reload before npm 11.2.0: the edge takes the rule of its dependent's overrides, from npm 8.7.0 (before, it keeps
+    // the one it was made with), and tells its target nothing; before npm 9.6.6 its error is computed here, before the
+    // target hears of the edge
     private void reloadWithDependentsRule(boolean hard) {
-        if (from == null) {
-            throw new IllegalArgumentException("Cannot read properties of null (reading 'overrides')");
+        if (release.recomputesOverridesOnReload()) {
+            if (from == null) {
+                throw new IllegalArgumentException("Cannot read properties of null (reading 'overrides')");
+            }
+            if (from.getOverrides() != null) {
+                overrides = from.getOverrides().getEdgeRule(this);
+            } else {
+                overrides = null;
+            }
         }
-        if (from.getOverrides() != null) {
-            overrides = from.getOverrides().getEdgeRule(this);
-        } else {
-            overrides = null;
+        if (from == null) {
+            throw new IllegalArgumentException("Cannot read properties of null (reading 'resolve')");
         }
         Node newTo = from.resolve(name);
         if (newTo != to) {
@@ -412,12 +430,12 @@ public final class Edge {
                 to.getEdgesIn().remove(this);
             }
             to = newTo;
-            error = null;
+            error = release.computesEdgeErrorWhenRead() ? null : loadError();
             if (to != null) {
                 to.addEdgeIn(this);
             }
         } else if (hard) {
-            error = null;
+            error = release.computesEdgeErrorWhenRead() ? null : loadError();
         }
     }
 

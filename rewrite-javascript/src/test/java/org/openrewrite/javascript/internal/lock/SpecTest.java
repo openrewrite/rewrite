@@ -403,7 +403,8 @@ class SpecTest {
         List<Arguments> out = new ArrayList<>();
         for (Spec.Release release : Spec.Release.values()) {
             for (Call call : UpstreamCalls.read(resource(release))) {
-                if (!"toPurl".equals(call.getFn()) && !madeByTheTest(call)) {
+                if (!"toPurl".equals(call.getFn()) && !madeByTheTest(call) && !relativeWhere(release, call) &&
+                    !strict8909(call) && !urlParse(release, call)) {
                     out.add(Arguments.of(release, call));
                 }
             }
@@ -412,7 +413,8 @@ class SpecTest {
     }
 
     private static String resource(Spec.Release release) {
-        return "npm-package-arg-" + (release == Spec.Release.PNPM_2_0_0 ? "pnpm-2.0.0" : "13.0.2") + ".jsonl.gz";
+        return "npm-package-arg-" + (release == Spec.Release.PNPM_2_0_0 ? "pnpm-2.0.0" :
+          release.name().substring(1).replace('_', '.')) + ".jsonl.gz";
     }
 
     private static final String[] FIELDS = {"type", "registry", "where", "raw", "name", "escapedName", "scope",
@@ -479,12 +481,50 @@ class SpecTest {
                ((Map<?, ?>) Objects.requireNonNull(call.getSelf())).get("type") == EcmaScript.UNDEFINED;
     }
 
+    // 12.0.1 and the releases before it make a URL of where as written, so windows.js's C:\test\path, a relative path
+    // on POSIX, becomes segments under the directory its test ran in: the answer counts that directory's depth and
+    // reads its first segment
+    private static boolean relativeWhere(Spec.Release release, Call call) {
+        Object where = call.arg("resolve".equals(call.getFn()) ? 2 : 1);
+        return release != Spec.Release.V13_0_0 && release != Spec.Release.V13_0_2 &&
+               release != Spec.Release.PNPM_2_0_0 && where instanceof String && ((String) where).startsWith("C:\\");
+    }
+
+    // before 11.0.0 the tests turn NPM_PACKAGE_ARG_8909_STRICT on for these; npm never sets it
+    private static boolean strict8909(Call call) {
+        return call.getTest().contains("strict 8909 compliance mode");
+    }
+
+    // before 11.0.0 fromURL reads the URL with url.parse, which the port reads with WHATWG URL: a port that is not a
+    // number becomes part of the path and a space in the host leaves the protocol to reject, where WHATWG URL rejects
+    // both as an invalid URL; npm cannot clone either, so neither reaches a lock
+    private static boolean urlParse(Spec.Release release, Call call) {
+        Object arg = call.arg(0);
+        return (release == Spec.Release.V8_1_5 || release == Spec.Release.V9_0_0 || release == Spec.Release.V9_1_0 ||
+                release == Spec.Release.V10_1_0) && "npa".equals(call.getFn()) &&
+               ("git+ssh://git@host:12abc/repo".equals(arg) || "gopher://yea right".equals(arg));
+    }
+
     @Test
     void namesEveryUpstreamCallItDoesNotReplay() {
-        assertThat(UpstreamCalls.read(resource(Spec.Release.V13_0_2)).stream()
-          .filter(call -> "toPurl".equals(call.getFn()))).as("toPurl: npm never calls it on a lock").hasSize(7);
-        assertThat(UpstreamCalls.read(resource(Spec.Release.V13_0_2)).stream().filter(SpecTest::madeByTheTest))
-          .as("toString of a Result the test constructs").hasSize(3);
+        for (Spec.Release release : new Spec.Release[]{Spec.Release.V8_1_5, Spec.Release.V9_0_0, Spec.Release.V9_1_0,
+          Spec.Release.V10_1_0, Spec.Release.V12_0_1, Spec.Release.V13_0_0, Spec.Release.V13_0_2}) {
+            boolean before10 = release == Spec.Release.V8_1_5 || release == Spec.Release.V9_0_0 ||
+                               release == Spec.Release.V9_1_0;
+            boolean before11 = before10 || release == Spec.Release.V10_1_0;
+            assertThat(UpstreamCalls.read(resource(release)).stream()
+              .filter(call -> "toPurl".equals(call.getFn()))).as("toPurl: npm never calls it on a lock")
+              .hasSize(before10 ? 0 : 7);
+            assertThat(UpstreamCalls.read(resource(release)).stream().filter(SpecTest::madeByTheTest))
+              .as("toString of a Result the test constructs").hasSize(3);
+            assertThat(UpstreamCalls.read(resource(release)).stream().filter(call -> relativeWhere(release, call)))
+              .as("a Windows where before 12.0.2 on POSIX")
+              .hasSize(before11 || release == Spec.Release.V12_0_1 ? 8 : 0);
+            assertThat(UpstreamCalls.read(resource(release)).stream().filter(SpecTest::strict8909))
+              .as("a call under NPM_PACKAGE_ARG_8909_STRICT").hasSize(before11 ? 2 : 0);
+            assertThat(UpstreamCalls.read(resource(release)).stream().filter(call -> urlParse(release, call)))
+              .as("a URL url.parse reads apart from WHATWG URL").hasSize(before11 ? 2 : 0);
+        }
         assertThat(UpstreamCalls.read(resource(Spec.Release.PNPM_2_0_0)).stream()
           .filter(call -> "toPurl".equals(call.getFn()) || madeByTheTest(call))).isEmpty();
     }
@@ -517,5 +557,51 @@ class SpecTest {
         assertThat(local.getType()).isEqualTo(Spec.Type.DIRECTORY);
         assertThat(local.getRaw()).isEqualTo("./local");
         assertThat(Spec.npa("./path\\backslash").getRawSpec()).isEqualTo("./path\\backslash");
+    }
+
+    // what npm 11.1.0's npm-package-arg 12.0.1 and npm 11.2.0's 12.0.2 (13.0.0 answers as it) return for
+    // npa.resolve('foo', spec, '/w'): 12.0.1 hands the URL parser the spec as written
+    @ParameterizedTest
+    @CsvSource(delimiter = '|', value = {
+      "file:../a#b | file:../a | /a | file:../a#b | /a#b",
+      "./a#b | file:a | /w/a | file:a#b | /w/a#b",
+      "/abs/c#x | file:/abs/c | /abs/c | file:/abs/c#x | /abs/c#x",
+      "file:./a?b | file:a | /w/a | file:a?b | /w/a?b",
+      "file:a%41b | file:aAb | /w/aAb | file:a%41b | /w/a%41b",
+      "file:a%23b | file:a#b | /w/a#b | file:a%23b | /w/a%23b",
+      "file:/abs/c%23x | file:/abs/c#x | /abs/c#x | file:/abs/c%23x | /abs/c%23x",
+      "file:a\\b | file:a/b | /w/a/b | file:a/b | /w/a\\b",
+      "file://localhost/x/y | file:/x/y | /x/y | file:/localhost/x/y | /localhost/x/y",
+      "file:a b | file:a b | /w/a b | file:a b | /w/a b",
+    })
+    void fileSpecBeforeNpaEscapesIt(String spec, String saveSpec12, String fetchSpec12, String saveSpec13,
+                                    String fetchSpec13) {
+        Spec v12 = Spec.resolve("foo", spec, "/w", Spec.Release.V12_0_1);
+        assertThat(v12.getType()).isEqualTo(Spec.Type.DIRECTORY);
+        assertThat(v12.getSaveSpec()).isEqualTo(saveSpec12);
+        assertThat(v12.getFetchSpec()).isEqualTo(fetchSpec12);
+        for (Spec.Release release : new Spec.Release[]{Spec.Release.V13_0_0, Spec.Release.V13_0_2}) {
+            Spec v13 = Spec.resolve("foo", spec, "/w", release);
+            assertThat(v13.getType()).isEqualTo(Spec.Type.DIRECTORY);
+            assertThat(v13.getSaveSpec()).isEqualTo(saveSpec13);
+            assertThat(v13.getFetchSpec()).isEqualTo(fetchSpec13);
+        }
+    }
+
+    @Test
+    void fileSpecEscapeNpa12CannotDecode() {
+        assertThatThrownBy(() -> Spec.resolve("foo", "file:a%b", "/w", Spec.Release.V12_0_1))
+          .hasMessage("URI malformed");
+        assertThat(Spec.resolve("foo", "file:a%b", "/w", Spec.Release.V13_0_0).getFetchSpec()).isEqualTo("/w/a%b");
+    }
+
+    @Test
+    void anyCharacterBetweenTarAndGzBefore13_0_1() {
+        assertThat(Spec.resolve("foo", "file:x.tar_gz", "/w", Spec.Release.V12_0_1).getType())
+          .isEqualTo(Spec.Type.FILE);
+        assertThat(Spec.resolve("foo", "file:x.tar_gz", "/w", Spec.Release.V13_0_0).getType())
+          .isEqualTo(Spec.Type.FILE);
+        assertThat(Spec.resolve("foo", "file:x.tar_gz", "/w", Spec.Release.V13_0_2).getType())
+          .isEqualTo(Spec.Type.DIRECTORY);
     }
 }

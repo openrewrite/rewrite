@@ -89,6 +89,26 @@ class PacoteTest {
           .isEqualTo("2.0.0");
     }
 
+    // pacote 13 (npm 8.19.4) fetches a bare name, which npm-package-arg 9 reads as a tag with no spec, as the
+    // configured tag (registry.js: "handle case when npm-package-arg guesses wrong"), as npm 9 picks for its '*'
+    @Test
+    void emptySpecTakesTheConfiguredTagBefore9_0_0() {
+        String packument = "{\"name\":\"x\",\"dist-tags\":{\"latest\":\"1.0.0\",\"beta\":\"2.0.0\"},\"versions\":{" +
+          "\"1.0.0\":{\"name\":\"x\",\"version\":\"1.0.0\",\"dist\":{\"tarball\":\"https://r/x-1.0.0.tgz\"}}," +
+          "\"2.0.0\":{\"name\":\"x\",\"version\":\"2.0.0\",\"dist\":{\"tarball\":\"https://r/x-2.0.0.tgz\"}}}}";
+        for (String version : new String[]{"8.19.4", "9.0.0"}) {
+            NpmRelease release = NpmRelease.of(version);
+            Pacote pacote = new Pacote(registry(packument), NpmOptions.builder().release(release).build(),
+              VirtualTreeLoader.ProjectFiles.builder().build(), "/");
+            Spec bare = Spec.npa("x@", "/", release.npmPackageArg());
+            assertThat(pacote.manifest(bare, Pacote.Options.builder().defaultTag("beta").build()).get("version"))
+              .as(version).isEqualTo("2.0.0");
+            assertThat(pacote.manifest(bare, Pacote.Options.builder().build()).get("version"))
+              .as(version).isEqualTo("1.0.0");
+        }
+        assertThat(Spec.npa("x@", "/", NpmRelease.of("8.19.4").npmPackageArg()).getType()).isEqualTo(Spec.Type.TAG);
+    }
+
     private static @Nullable Object integrity(String dist, @Nullable Object held) {
         return manifest(versioned(dist), "x@1.0.0", Pacote.Options.builder().integrity(held).build()).get("_integrity");
     }
