@@ -24,6 +24,7 @@ import org.openrewrite.InMemoryExecutionContext;
 import org.openrewrite.Tree;
 import org.openrewrite.javascript.NodeExecutionContextView;
 import org.openrewrite.javascript.NodeRegistry;
+import org.openrewrite.javascript.internal.LockFileRegeneration.InstallRoot;
 import org.openrewrite.javascript.internal.LockFileRegeneration.Kind;
 import org.openrewrite.javascript.internal.LockFileRegeneration.Request;
 import org.openrewrite.javascript.internal.LockFileRegeneration.Result;
@@ -34,6 +35,8 @@ import org.openrewrite.javascript.marker.NodeRuntime;
 
 import java.nio.file.Paths;
 import java.time.Instant;
+import java.util.Arrays;
+import java.util.HashSet;
 import java.util.List;
 
 import static java.util.Collections.singletonList;
@@ -177,6 +180,28 @@ class NodeRuntimeInputsTest {
         assumeThat(before).isNotEmpty();
 
         assertCannotKnow(before.get(before.size() - 1).toString());
+    }
+
+    // npm before 12 reads an npm-shrinkwrap.json in its lock's place, which no regeneration writes: where npm
+    // installs is walked as the release that built the LST, as the regeneration installs
+    @Test
+    void theInstallRootIsWalkedAsTheReleaseThatBuiltTheLst() {
+        Request.RequestBuilder shrinkwrapped = Request.builder()
+          .packageJson(MANIFEST)
+          .lock(LOCK)
+          .marker(nodeResolutionResult(PackageManager.Npm))
+          .packageJsonPath(Paths.get("package.json"))
+          .manifest(Paths.get("package.json"), MANIFEST)
+          .projectPaths(new HashSet<>(Arrays.asList(Paths.get("package.json"), Paths.get("package-lock.json"),
+            Paths.get("npm-shrinkwrap.json"))));
+
+        assertThat(NpmInputs.PORT.installRoot(LockDirectory.of(shrinkwrapped.runtime(LINUX).build())))
+          .isEqualTo(InstallRoot.stops(0, InstallRoot.Stop.WRITES_ANOTHER_FILE));
+        InstallRoot npm12 = NpmInputs.PORT.installRoot(LockDirectory.of(shrinkwrapped
+          .runtime(runtime(PackageManager.Npm, "12.2.0")).build()));
+        // a release the engine does not reproduce stops the walk, which the regeneration reports
+        assertThat(npm12).isEqualTo(NpmReleases.isProven(NpmRelease.of("12.2.0")) ? InstallRoot.HERE :
+          InstallRoot.STOPS_HERE);
     }
 
     // a failure the port returns, not an exception out of it

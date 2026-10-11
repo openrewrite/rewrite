@@ -17,11 +17,17 @@ package org.openrewrite.javascript;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.HttpSenderExecutionContextView;
 import org.openrewrite.InMemoryExecutionContext;
+import org.openrewrite.Tree;
 import org.openrewrite.ipc.http.HttpSender;
+import org.openrewrite.javascript.internal.lock.npm.NpmRelease;
+import org.openrewrite.javascript.internal.lock.npm.NpmReleases;
 import org.openrewrite.javascript.marker.NodeResolutionResult.PackageManager;
+import org.openrewrite.javascript.marker.NodeRuntime;
 import org.openrewrite.javascript.table.NodeLockRegenerationFailures;
 import org.openrewrite.marker.Markup;
 import org.openrewrite.test.RewriteTest;
@@ -37,6 +43,7 @@ import java.util.Map;
 
 import static java.util.Collections.singletonList;
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assumptions.assumeTrue;
 import static org.openrewrite.javascript.Assertions.dependency;
 import static org.openrewrite.javascript.Assertions.nodeResolutionResult;
 import static org.openrewrite.javascript.Assertions.packageJson;
@@ -87,6 +94,31 @@ class AddDependencyLockRegenTest implements RewriteTest {
                         })),
                 packageLock(resource("lock/npm/add-leaf/before"), resource("lock/npm/add-leaf/after"),
                         s -> s.noTrim())
+        );
+    }
+
+    /**
+     * npm before 10.8.0 writes the new entry without its license (lock/npm/add-leaf, whose release/9.0.1 is what npm
+     * 9.0.1 to 10.7.0 write): the lock is the one the npm that built the LST writes, as its {@link NodeRuntime} names
+     * it. A release the engine does not reproduce yet is cannot-know, so each case runs once {@code PROVEN} holds it.
+     */
+    @ParameterizedTest
+    @CsvSource({"10.7.0, lock/npm/add-leaf/release/9.0.1/cross", "10.8.0, lock/npm/add-leaf/after"})
+    void theNpmReleaseThatBuiltTheLstWritesTheLock(String release, String lock) {
+        assumeTrue(NpmReleases.isProven(NpmRelease.of(release)), "npm " + release + " is not reproduced yet");
+        routes.put("https://registry.npmjs.org/left-pad", resource("lock/npm/add-leaf/http/left-pad"));
+        routes.put("https://registry.npmjs.org/left-pad/1.3.0", resource("lock/npm/add-leaf/http/left-pad-1.3.0"));
+
+        rewriteRun(
+                spec -> spec.recipe(new AddDependency("left-pad", "^1.3.0", "dependencies")).executionContext(ctx),
+                packageJson(resource("lock/npm/add-leaf/pkg-before"), null,
+                        nodeResolutionResult(PackageManager.Npm, dependency("is-number", "6.0.0")),
+                        s -> s.markers(new NodeRuntime(Tree.randomId(), "v24.21.0", "darwin", "arm64", null,
+                                PackageManager.Npm, release)).after(actual -> {
+                            assertThat(actual).contains("\"left-pad\": \"^1.3.0\"");
+                            return actual;
+                        })),
+                packageLock(resource("lock/npm/add-leaf/before"), resource(lock), s -> s.noTrim())
         );
     }
 
