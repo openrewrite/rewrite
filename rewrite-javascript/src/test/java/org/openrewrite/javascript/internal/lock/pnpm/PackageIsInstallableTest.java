@@ -276,4 +276,13 @@ class PackageIsInstallableTest {
         assertThat(PackageIsInstallable.packageIsInstallable("p@1.0.0", linuxOnly, false, null, false, null,
           Host.UNKNOWN)).isTrue();
     }
+
+    @Test
+    void anUnknownLibcFailsEngineStrictWhereSomeLinuxHostDoes() {
+        assertThatThrownBy(() -> PackageIsInstallable.packageIsInstallable("p@1.0.0", obj("{'libc':['!musl']}"),
+          true, null, false, null, Host.UNKNOWN)).isInstanceOf(CannotKnow.class).hasMessageContaining("the libc pnpm");
+
+        assertThat(PackageIsInstallable.packageIsInstallable("p@1.0.0", obj("{'libc':['!enten-libc']}"), true,
+          null, false, null, Host.UNKNOWN)).isTrue();
+    }
 }

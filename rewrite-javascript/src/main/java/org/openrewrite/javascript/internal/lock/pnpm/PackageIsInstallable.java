@@ -24,6 +24,7 @@ import org.openrewrite.javascript.internal.lock.NodeHosts;
 import org.openrewrite.javascript.semver.NodeSemver;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -235,10 +236,15 @@ final class PackageIsInstallable {
             cpuOk = cpu == null ? passesAny("cpu", wanted.get("cpu"), unknown) : checkList(cpu, wanted.get("cpu"));
         }
         if (Js.truthy(wanted.get("libc")) && host.getOs() == null) {
-            // detect-libc finds none off linux, which skips the check
-            if (!(libc != null && checkList(libc, wanted.get("libc"))) && unknown != null &&
-                !isAny(wanted.get("libc"))) {
-                unknown.add("libc");
+            // detect-libc finds none off linux, which skips the check, and glibc or musl on it
+            List<String> families = host.getLibc() == null ? Arrays.asList("glibc", "musl") :
+                    Collections.singletonList(host.getLibc());
+            for (String family : families) {
+                List<@Nullable Object> current = dedupeCurrent(family, property(supportedArchitectures, "libc"));
+                if (unknown != null && !checkList(current, wanted.get("libc"))) {
+                    unknown.add("libc");
+                    break;
+                }
             }
         } else if (Js.truthy(wanted.get("libc")) && !"unknown".equals(currentLibc)) {
             libcOk = libc == null || checkList(libc, wanted.get("libc"));
