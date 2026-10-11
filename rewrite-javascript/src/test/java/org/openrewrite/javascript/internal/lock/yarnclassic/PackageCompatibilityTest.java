@@ -17,6 +17,7 @@ package org.openrewrite.javascript.internal.lock.yarnclassic;
 
 import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.Timeout;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
 
@@ -59,8 +60,13 @@ class PackageCompatibilityTest {
             "<1;             true",
             ">=20.18.1;",
             "<0.10;          false",
-            "not a range;    false"
+            "not a range;    false",
+            "0.11.18 || 0.11.19 || >=20; true",
+            "<99999;         true",
+            ">=99999;",
+            ">=1000000;"
     })
+    @Timeout(1)
     void anUnknownNodeVersionPassesWhereEveryHostDoes(String range, @Nullable Boolean every) {
         assertThat(PackageCompatibility.everyHost(range, false)).isEqualTo(every);
     }
