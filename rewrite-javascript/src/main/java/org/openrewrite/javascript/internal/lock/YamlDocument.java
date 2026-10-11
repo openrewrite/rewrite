@@ -17,7 +17,6 @@ package org.openrewrite.javascript.internal.lock;
 
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.PrintOutputCapture;
-import org.openrewrite.javascript.internal.lock.pnpm.WorkspaceManifestWriter;
 import org.openrewrite.yaml.tree.Yaml;
 
 import java.util.ArrayDeque;
@@ -36,6 +35,13 @@ import static java.util.Collections.singletonList;
  * with @pnpm/yaml.document-sync's patchDocument, as pnpm writes pnpm-workspace.yaml.
  */
 public final class YamlDocument {
+
+    private static final Pattern PLAIN_UNSAFE = Pattern.compile(
+            "^[\\n\\t ,\\[\\]{}#&*!|>'\"%@`]|^[?-]$|^[?-][ \\t]|[\\n:][ \\t]|[ \\t]\\n|[\\n\\t ]#|[\\n\\t :]$");
+    private static final Pattern CORE_SCHEMA = Pattern.compile(
+            "^(?:~|[Nn]ull|NULL)?$|^(?:[Tt]rue|TRUE|[Ff]alse|FALSE)$|^0o[0-7]+$|^[-+]?[0-9]+$|^0x[0-9a-fA-F]+$|" +
+            "^(?:[-+]?\\.(?:inf|Inf|INF)|\\.nan|\\.NaN|\\.NAN)$|" +
+            "^[-+]?(?:\\.[0-9]+|[0-9]+(?:\\.[0-9]*)?)[eE][-+]?[0-9]+$|^[-+]?(?:\\.[0-9]+|[0-9]+\\.[0-9]*)$");
 
     private static final String INDENT_STEP = "  ";
     private static final Pattern NULL = Pattern.compile("^(?:~|[Nn]ull|NULL)?$");
@@ -440,20 +446,20 @@ public final class YamlDocument {
                 throw unsupported("a string over more than one line");
             }
             if (type == Yaml.Scalar.Style.DOUBLE_QUOTED) {
-                return WorkspaceManifestWriter.doubleQuoted(value);
+                return doubleQuoted(value);
             }
             if (type == Yaml.Scalar.Style.SINGLE_QUOTED) {
                 return "'" + value.replace("'", "''") + "'";
             }
             if (ctx.inFlow && FLOW_INDICATOR.matcher(value).find() ||
                 DOCUMENT_MARKER.matcher(value).find() && ctx.implicitKey && INDENT_STEP.equals(ctx.indent)) {
-                return value.contains("'") && !value.contains("\"") ? WorkspaceManifestWriter.doubleQuoted(value) :
+                return value.contains("'") && !value.contains("\"") ? doubleQuoted(value) :
                         "'" + value.replace("'", "''") + "'";
             }
             if (DOCUMENT_MARKER.matcher(value).find() && ctx.indent.isEmpty()) {
                 throw unsupported("a document marker yaml writes as a block scalar");
             }
-            return WorkspaceManifestWriter.scalar(value);
+            return scalar(value);
         }
 
         // blockString of a value without leading white space that ends in clip or strip chomping
@@ -1699,5 +1705,27 @@ public final class YamlDocument {
         boolean spaceBefore;
         String comment = "";
         boolean found;
+    }
+
+    /**
+     * stringifyString of a new scalar under {@code singleQuote: true}: plain where it reads back as that string, else
+     * single quoted, double quoted when it holds only a single quote; refused where it would need an escape.
+     */
+    public static String scalar(String value) {
+        for (int i = 0; i < value.length(); i++) {
+            char c = value.charAt(i);
+            if (c < 0x20 || c >= 0x7f && c <= 0x9f || c == 0x2028 || c == 0x2029) {
+                throw new IllegalArgumentException("yaml would need an escape for " + value);
+            }
+        }
+        if (PLAIN_UNSAFE.matcher(value).find() || CORE_SCHEMA.matcher(value).find()) {
+            return value.contains("'") && !value.contains("\"") ? doubleQuoted(value) :
+                    "'" + value.replace("'", "''") + "'";
+        }
+        return value;
+    }
+
+    public static String doubleQuoted(String value) {
+        return "\"" + value.replace("\\", "\\\\").replace("\"", "\\\"") + "\"";
     }
 }

@@ -30,20 +30,12 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import java.util.regex.Pattern;
 
 /**
  * Port of @pnpm/workspace.workspace-manifest-writer src/index.ts (pnpm 11.2.2, the release's writer otherwise): where
- * it puts a new key and its blank line, and how its yaml writes a new scalar ({@code singleQuote: true}).
+ * it puts a new key and its blank line.
  */
 public final class WorkspaceManifestWriter {
-
-    private static final Pattern PLAIN_UNSAFE = Pattern.compile(
-            "^[\\n\\t ,\\[\\]{}#&*!|>'\"%@`]|^[?-]$|^[?-][ \\t]|[\\n:][ \\t]|[ \\t]\\n|[\\n\\t ]#|[\\n\\t :]$");
-    private static final Pattern CORE_SCHEMA = Pattern.compile(
-            "^(?:~|[Nn]ull|NULL)?$|^(?:[Tt]rue|TRUE|[Ff]alse|FALSE)$|^0o[0-7]+$|^[-+]?[0-9]+$|^0x[0-9a-fA-F]+$|" +
-            "^(?:[-+]?\\.(?:inf|Inf|INF)|\\.nan|\\.NaN|\\.NAN)$|" +
-            "^[-+]?(?:\\.[0-9]+|[0-9]+(?:\\.[0-9]*)?)[eE][-+]?[0-9]+$|^[-+]?(?:\\.[0-9]+|[0-9]+\\.[0-9]*)$");
 
     private static final List<String> DEPENDENCY_TYPES = Arrays.asList("dependencies", "devDependencies",
             "optionalDependencies", "peerDependencies");
@@ -168,24 +160,6 @@ public final class WorkspaceManifestWriter {
     }
 
     /**
-     * How the yaml library writes {@code value} as a new scalar: plain where it reads back as that string, else
-     * single quoted, double quoted when it holds only a single quote; refused where it would need an escape.
-     */
-    public static String scalar(String value) {
-        for (int i = 0; i < value.length(); i++) {
-            char c = value.charAt(i);
-            if (c < 0x20 || c >= 0x7f && c <= 0x9f || c == 0x2028 || c == 0x2029) {
-                throw new IllegalArgumentException("pnpm-workspace.yaml would need an escape for " + value);
-            }
-        }
-        if (PLAIN_UNSAFE.matcher(value).find() || CORE_SCHEMA.matcher(value).find()) {
-            return value.contains("'") && !value.contains("\"") ? doubleQuoted(value) :
-                    "'" + value.replace("'", "''") + "'";
-        }
-        return value;
-    }
-
-    /**
      * updateWorkspaceManifest's {@code cleanupUnusedCatalogs} over installDeps' allProjects, those of {@code projects}
      * (by directory, null unread) the manifest's packages match; true when it removed anything from {@code manifest}.
      */
@@ -289,10 +263,6 @@ public final class WorkspaceManifestWriter {
     private static void addPackageReference(Map<String, Set<Object>> packageReferences, String pkgName,
                                             @Nullable Object version) {
         packageReferences.computeIfAbsent(pkgName, k -> new HashSet<>()).add(version == null ? "undefined" : version);
-    }
-
-    public static String doubleQuoted(String value) {
-        return "\"" + value.replace("\\", "\\\\").replace("\"", "\\\"") + "\"";
     }
 
     // detectKeyLayout: alphabetical after an optional leading `packages`, by lexCompare

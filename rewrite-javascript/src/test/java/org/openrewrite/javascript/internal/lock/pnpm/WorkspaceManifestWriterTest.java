@@ -51,16 +51,16 @@ class WorkspaceManifestWriterTest {
         StringBuilder written = new StringBuilder("packages:\n  - .\ncatalog:\n");
         for (Map.Entry<String, String> entry : set.entrySet()) {
             written.append("  ").append(entry.getKey()).append(": ")
-              .append(WorkspaceManifestWriter.scalar(entry.getValue())).append('\n');
+              .append(YamlDocument.scalar(entry.getValue())).append('\n');
         }
         assertThat(written.toString()).isEqualTo(read("workspace"));
     }
 
     @Test
     void aValueThatWouldNeedAnEscapeIsRefused() {
-        assertThatThrownBy(() -> WorkspaceManifestWriter.scalar("1.0.0\u0007"))
+        assertThatThrownBy(() -> YamlDocument.scalar("1.0.0\u0007"))
           .isInstanceOf(IllegalArgumentException.class);
-        assertThatThrownBy(() -> WorkspaceManifestWriter.scalar("1.0.0\u2028"))
+        assertThatThrownBy(() -> YamlDocument.scalar("1.0.0\u2028"))
           .isInstanceOf(IllegalArgumentException.class);
     }
 

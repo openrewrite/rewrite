@@ -558,7 +558,7 @@ public abstract class NodeCatalogs {
             String[] following = {doc.getEnd().getPrefix()};
             Yaml.Mapping edited;
             try {
-                edited = insertedInto(root, "", path, key, WorkspaceManifestWriter.scalar(value), following,
+                edited = insertedInto(root, "", path, key, YamlDocument.scalar(value), following,
                         print().contains("\r\n") ? "\r\n" : "\n");
             } catch (IllegalArgumentException e) {
                 return null;
@@ -606,7 +606,7 @@ public abstract class NodeCatalogs {
                 text.append(i == 0 ? "" : nested).append(path.get(i)).append(':').append(lineBreak);
                 nested += unit;
             }
-            text.append(path.isEmpty() ? "" : nested).append(WorkspaceManifestWriter.scalar(key)).append(": ")
+            text.append(path.isEmpty() ? "" : nested).append(YamlDocument.scalar(key)).append(": ")
                     .append(value).append(lineBreak);
             Yaml.Mapping parsed = yamlRoot((Yaml.Documents) YamlParser.builder().build().parse(text.toString())
                     .findFirst().orElseThrow(IllegalStateException::new));
@@ -754,13 +754,13 @@ public abstract class NodeCatalogs {
             }
             Yaml.Scalar rewritten;
             try {
-                WorkspaceManifestWriter.scalar(value);
+                YamlDocument.scalar(value);
                 rewritten = scalar.getStyle() == Yaml.Scalar.Style.SINGLE_QUOTED ?
                         scalar.withValue(value.replace("'", "''")) :
                         scalar.getStyle() == Yaml.Scalar.Style.DOUBLE_QUOTED ?
-                                scalar.withValue(WorkspaceManifestWriter.doubleQuoted(value)
-                                        .substring(1, WorkspaceManifestWriter.doubleQuoted(value).length() - 1)) :
-                                plain(scalar, WorkspaceManifestWriter.scalar(value));
+                                scalar.withValue(YamlDocument.doubleQuoted(value)
+                                        .substring(1, YamlDocument.doubleQuoted(value).length() - 1)) :
+                                plain(scalar, YamlDocument.scalar(value));
             } catch (IllegalArgumentException e) {
                 return null;
             }
