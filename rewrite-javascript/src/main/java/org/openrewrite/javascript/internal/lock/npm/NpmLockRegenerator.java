@@ -142,8 +142,8 @@ public final class NpmLockRegenerator {
         String written;
         String yarnLock;
         try {
-            INSTALL.requireInstallsAt(NpmOptions.loadLocalPrefix(inputs.getManifests().get(inputs.getRunsIn()),
-                    inputs.getParentTrees()), inputs.getRunsIn(), "lock");
+            INSTALL.requireInstallsAt(NpmOptions.loadLocalPrefix(inputs.getRelease(),
+                    inputs.getManifests().get(inputs.getRunsIn()), inputs.getParentTrees()), inputs.getRunsIn(), "lock");
             if (inputs.getPaths() != null && Shrinkwrap.readsShrinkwrap(inputs.getPaths()::contains)) {
                 throw new CannotKnow("the lock npm writes: it reads and writes the npm-shrinkwrap.json beside this " +
                                      "lock in its place");
@@ -179,13 +179,13 @@ public final class NpmLockRegenerator {
     }
 
     /**
-     * Where npm run in {@code runsIn} installs and writes its lock, by {@link Inputs#getParentTrees()}; a walk that
-     * fails, which {@link #regenerate()} reports as it walks first, stops here.
+     * Where npm {@code release} run in {@code runsIn} installs and writes its lock, by {@link
+     * Inputs#getParentTrees()}; a walk that fails, which {@link #regenerate()} reports as it walks first, stops here.
      */
-    public static InstallRoot installRoot(String runsIn, Map<String, String> manifests,
+    public static InstallRoot installRoot(NpmRelease release, String runsIn, Map<String, String> manifests,
                                           Map<String, Map<String, @Nullable String>> parentTrees) {
         try {
-            return InstallRoot.at(NpmOptions.loadLocalPrefix(manifests.get(runsIn), parentTrees));
+            return InstallRoot.at(NpmOptions.loadLocalPrefix(release, manifests.get(runsIn), parentTrees));
         } catch (RuntimeException e) {
             return InstallRoot.STOPS_HERE;
         }
@@ -198,7 +198,7 @@ public final class NpmLockRegenerator {
     static Node setWorkspaces(Node node, VirtualTreeLoader.ProjectFiles files) {
         Map<String, String> workspaces = new LinkedHashMap<>();
         for (Map.Entry<Object, String> workspace : MapWorkspaces.mapWorkspaces(node.getPath(), node.getPackage(),
-                files).entrySet()) {
+                files, node.getRelease()).entrySet()) {
             // the workspace edge the name becomes is what refuses it
             if (!(workspace.getKey() instanceof String)) {
                 throw new IllegalArgumentException("must provide dependency name");

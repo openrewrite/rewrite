@@ -604,7 +604,7 @@ public final class IdealTreeBuilder {
             return null;
         }
         if (ReleaseAgeExclude.isReleaseAgeExcluded(ReleaseAgeExclude.trustedSpecName(spec),
-                options.getMinReleaseAgeExclude())) {
+                options.getMinReleaseAgeExclude(), options.getRelease())) {
             return null;
         }
         if (before instanceof String) {

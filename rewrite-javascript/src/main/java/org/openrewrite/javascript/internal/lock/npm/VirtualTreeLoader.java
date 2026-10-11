@@ -286,7 +286,8 @@ public final class VirtualTreeLoader {
         }
 
         Map<String, Object> lockWS = new LinkedHashMap<>();
-        Map<String, String> workspaces = MapWorkspaces.virtual(path, Objects.requireNonNull(s.getData()));
+        Map<String, String> workspaces = MapWorkspaces.virtual(path, Objects.requireNonNull(s.getData()),
+                options.getRelease());
         for (Map.Entry<String, String> ws : workspaces.entrySet()) {
             lockWS.put(ws.getKey(), "file:" + ws.getValue());
         }

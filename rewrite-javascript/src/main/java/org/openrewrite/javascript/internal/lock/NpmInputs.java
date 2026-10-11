@@ -21,6 +21,7 @@ import org.openrewrite.javascript.internal.LockFileRegeneration.Result;
 import org.openrewrite.javascript.internal.lock.npm.NpmLockRegenerator;
 import org.openrewrite.javascript.internal.lock.npm.NpmLockRegenerator.Inputs;
 import org.openrewrite.javascript.internal.lock.npm.NpmManifestRules;
+import org.openrewrite.javascript.internal.lock.npm.NpmRelease;
 import org.openrewrite.javascript.internal.lock.npm.Shrinkwrap;
 import org.openrewrite.javascript.internal.registry.NpmRegistryClient;
 
@@ -139,7 +140,9 @@ final class NpmInputs implements Port {
 
     @Override
     public InstallRoot installRoot(LockDirectory dir) {
-        InstallRoot walked = NpmLockRegenerator.installRoot(dir.getRunsIn(), dir.getManifests(), parentTrees(dir));
+        // the release from(...) installs as: none names another yet
+        InstallRoot walked = NpmLockRegenerator.installRoot(NpmRelease.PORTED, dir.getRunsIn(), dir.getManifests(),
+                parentTrees(dir));
         String root = dir.aboveRunsIn(walked.getDepth());
         Predicate<String> holds = name -> dir.holds(RootRelativePath.join(root, name));
         boolean another = Shrinkwrap.readsShrinkwrap(holds) || Shrinkwrap.writesBesideLock(holds) &&

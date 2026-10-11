@@ -638,10 +638,10 @@ public class NpmOptions {
     }
 
     /**
-     * @npmcli/config {@code loadLocalPrefix}: how many directories above the one it runs in npm installs, at the
-     * nearest of {@code parentTrees} whose workspaces map it; 0 when it installs there.
+     * @npmcli/config {@code loadLocalPrefix}: how many directories above the one it runs in npm {@code release}
+     * installs, at the nearest of {@code parentTrees} whose workspaces map it; 0 when it installs there.
      */
-    static int loadLocalPrefix(@Nullable String manifest,
+    static int loadLocalPrefix(NpmRelease release, @Nullable String manifest,
                                Map<String, Map<String, @Nullable String>> parentTrees) {
         if (manifest == null) {
             return 0;
@@ -665,7 +665,7 @@ public class NpmOptions {
             if (!truthy(pkg.get("workspaces"))) {
                 continue;
             }
-            if (MapWorkspaces.mapWorkspaces("/", pkg, files).containsValue("/" + parent.getKey())) {
+            if (MapWorkspaces.mapWorkspaces("/", pkg, files, release).containsValue("/" + parent.getKey())) {
                 return parent.getKey().split("/").length;
             }
         }

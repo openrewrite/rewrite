@@ -54,12 +54,12 @@ final class MapWorkspaces {
         }
     }
 
-    private static final Minimatch.Options PARTIAL =
-            Minimatch.Options.builder(Minimatch.Release.V10_2_5).partial(true).windowsPathsNoEscape(true).build();
-    private static final Minimatch.Options IGNORE =
-            Minimatch.Options.builder(Minimatch.Release.V10_2_5).dot(true).nocomment(true).nonegate(true).build();
-
     private MapWorkspaces() {
+    }
+
+    // minimatch 10.2.5 with the brace-expansion the npm release bundles beside it
+    private static Minimatch.Options.OptionsBuilder minimatch(NpmRelease release) {
+        return Minimatch.Options.builder(Minimatch.Release.V10_2_5).braceExpansion(release::braceExpansion);
     }
 
     private static final class Patterns {
@@ -67,7 +67,8 @@ final class MapWorkspaces {
         final List<String> negatedPatterns = new ArrayList<>();
     }
 
-    private static Patterns appendNegatedPatterns(List<?> allPatterns) {
+    private static Patterns appendNegatedPatterns(List<?> allPatterns, NpmRelease release) {
+        Minimatch.Options options = minimatch(release).build();
         Patterns out = new Patterns();
         for (Object raw : allPatterns) {
             if (!(raw instanceof String)) {
@@ -86,7 +87,7 @@ final class MapWorkspaces {
                 out.negatedPatterns.add(pattern);
             } else {
                 for (int i = 0; i < out.negatedPatterns.size(); i++) {
-                    if (Minimatch.minimatch(pattern, out.negatedPatterns.get(i), Minimatch.Release.V10_2_5)) {
+                    if (Minimatch.minimatch(pattern, out.negatedPatterns.get(i), options)) {
                         out.negatedPatterns.remove(i);
                     }
                 }
@@ -94,20 +95,20 @@ final class MapWorkspaces {
             }
         }
         for (String negated : out.negatedPatterns) {
-            for (String pattern : Minimatch.match(new ArrayList<>(out.patterns), negated, Minimatch.Release.V10_2_5)) {
+            for (String pattern : Minimatch.match(new ArrayList<>(out.patterns), negated, options)) {
                 out.patterns.remove(pattern);
             }
         }
         return out;
     }
 
-    private static Patterns getPatterns(@Nullable Object workspaces) {
+    private static Patterns getPatterns(@Nullable Object workspaces, NpmRelease release) {
         Object packages = Js.get(workspaces, "packages");
         Object declaration = packages instanceof List ? packages : workspaces;
         if (!(declaration instanceof List)) {
             throw new WorkspacesException("workspaces config expects an Array", "EWORKSPACESCONFIG");
         }
-        return appendNegatedPatterns((List<?>) declaration);
+        return appendNegatedPatterns((List<?>) declaration, release);
     }
 
     private static Object getPackageName(@Nullable Object pkg, String pathname) {
@@ -117,28 +118,31 @@ final class MapWorkspaces {
 
     /**
      * {@code mapWorkspaces({cwd, pkg})} over the locations holding a package.json ({@code ""} the root): package name
-     * to absolute path, in the order the patterns list them.
+     * to absolute path, in the order the patterns list them, as the npm {@code release} bundles the library.
      */
     static Map<Object, String> mapWorkspaces(String cwd, Map<String, Object> pkg,
-            VirtualTreeLoader.ProjectFiles files) {
+            VirtualTreeLoader.ProjectFiles files, NpmRelease release) {
         Object workspaces = pkg.containsKey("workspaces") ? pkg.get("workspaces") : new ArrayList<>();
-        Patterns p = getPatterns(workspaces);
+        Patterns p = getPatterns(workspaces, release);
         Map<Object, String> results = new LinkedHashMap<>();
         if (p.patterns.isEmpty() && p.negatedPatterns.isEmpty()) {
             return results;
         }
 
+        Minimatch.Options options = minimatch(release).build();
+        Minimatch.Options partial = minimatch(release).partial(true).windowsPathsNoEscape(true).build();
+        Minimatch.Options ignoring = minimatch(release).dot(true).nocomment(true).nonegate(true).build();
         List<String> ignore = new ArrayList<>();
         ignore.add("**/node_modules/**");
         ignore.addAll(p.negatedPatterns);
         List<String> matches = new ArrayList<>();
         for (String location : files.manifestLocations()) {
             String dir = location.isEmpty() ? "." : location;
-            if (ignored(dir, ignore)) {
+            if (ignored(dir, ignore, ignoring)) {
                 continue;
             }
             for (String pattern : p.patterns) {
-                if (Minimatch.minimatch(dir, globPattern(pattern), Minimatch.Release.V10_2_5)) {
+                if (Minimatch.minimatch(dir, globPattern(pattern), options)) {
                     matches.add(dir);
                     break;
                 }
@@ -149,7 +153,7 @@ final class MapWorkspaces {
         List<String> orderedMatches = new ArrayList<>();
         for (String pattern : p.patterns) {
             for (String m : matches) {
-                if (Minimatch.minimatch(m, pattern, PARTIAL)) {
+                if (Minimatch.minimatch(m, pattern, partial)) {
                     orderedMatches.add(m);
                 }
             }
@@ -199,9 +203,9 @@ final class MapWorkspaces {
     }
 
     // glob's Ignore: a pattern matches the directory or its trailing-slash form, and one ending in ** ignores children
-    private static boolean ignored(String dir, List<String> ignore) {
+    private static boolean ignored(String dir, List<String> ignore, Minimatch.Options options) {
         for (String pattern : ignore) {
-            Minimatch mm = new Minimatch(pattern, IGNORE);
+            Minimatch mm = new Minimatch(pattern, options);
             if (mm.match(dir) || mm.match(dir + "/")) {
                 return true;
             }
@@ -220,30 +224,31 @@ final class MapWorkspaces {
 
     /**
      * {@code mapWorkspaces.virtual({cwd, lockfile})}: the members the lock's root entry and link
-     * entries describe.
+     * entries describe, as the npm {@code release} bundles the library.
      */
-    static Map<String, String> virtual(String cwd, Map<String, Object> lockfile) {
+    static Map<String, String> virtual(String cwd, Map<String, Object> lockfile, NpmRelease release) {
         Object packages = truthy(lockfile.get("packages")) ? lockfile.get("packages") : new LinkedHashMap<>();
         Object root = Js.get(packages, "");
         Object workspaces = root instanceof Map && ((Map<?, ?>) root).containsKey("workspaces") ?
                 ((Map<?, ?>) root).get("workspaces") : new ArrayList<>();
         Map<String, String> results = new LinkedHashMap<>();
-        Patterns p = getPatterns(workspaces);
+        Patterns p = getPatterns(workspaces, release);
         if (p.patterns.isEmpty() && p.negatedPatterns.isEmpty()) {
             return results;
         }
         p.negatedPatterns.add("**/node_modules/**");
 
+        Minimatch.Options options = minimatch(release).build();
         List<String> packageKeys = new ArrayList<>(Js.keys(packages));
         for (String pattern : p.negatedPatterns) {
-            for (String key : Minimatch.match(new ArrayList<>(packageKeys), pattern, Minimatch.Release.V10_2_5)) {
+            for (String key : Minimatch.match(new ArrayList<>(packageKeys), pattern, options)) {
                 packageKeys.remove(key);
             }
         }
 
         Map<String, String> byPath = new LinkedHashMap<>();
         for (String pattern : p.patterns) {
-            for (String key : Minimatch.match(packageKeys, pattern, Minimatch.Release.V10_2_5)) {
+            for (String key : Minimatch.match(packageKeys, pattern, options)) {
                 String pathname = PosixPath.join(cwd, key);
                 byPath.put(pathname, Js.string(getPackageName(Js.get(packages, key), pathname)));
             }

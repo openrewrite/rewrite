@@ -17,6 +17,7 @@ package org.openrewrite.javascript.internal.lock.npm;
 
 import lombok.EqualsAndHashCode;
 import lombok.Getter;
+import org.openrewrite.javascript.internal.lock.BraceExpansion;
 import org.openrewrite.javascript.semver.NodeSemver;
 
 import java.util.regex.Matcher;
@@ -114,6 +115,17 @@ public final class NpmRelease implements Comparable<NpmRelease> {
      */
     String allowRemoteDefault() {
         return atLeast(12, 0, 0) ? "none" : "all";
+    }
+
+    // brace-expansion
+
+    /**
+     * The brace-expansion minimatch calls: 5.0.9 from npm 11.19.1 and, of npm 12, from 12.1.0, which combines the
+     * sets of a pattern left to right (index.js expand_); before, 5.0.6 and 5.0.7, which expand alike.
+     */
+    BraceExpansion.Release braceExpansion() {
+        return atLeast(12, 1, 0) || atLeast(11, 19, 1) && !atLeast(12, 0, 0) ? BraceExpansion.Release.V5_0_9 :
+                BraceExpansion.Release.V5_0_6;
     }
 
     // semver
