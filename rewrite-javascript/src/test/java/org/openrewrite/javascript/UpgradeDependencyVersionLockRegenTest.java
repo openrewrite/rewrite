@@ -22,6 +22,7 @@ import org.openrewrite.HttpSenderExecutionContextView;
 import org.openrewrite.InMemoryExecutionContext;
 import org.openrewrite.ipc.http.HttpSender;
 import org.openrewrite.javascript.marker.NodeResolutionResult.PackageManager;
+import org.openrewrite.javascript.table.NodeLockRegenerationFailures;
 import org.openrewrite.marker.Markup;
 import org.openrewrite.test.RewriteTest;
 
@@ -43,10 +44,8 @@ import static org.openrewrite.javascript.Assertions.packageLock;
 import static org.openrewrite.javascript.Assertions.pnpmLock;
 
 /**
- * PM-free end-to-end tests of native lock regeneration for a closure-unchanged version bump. No
- * package manager is executed: the registry is stubbed over the run's {@link HttpSender} with
- * recorded packument/manifest responses, and the regenerated lock is asserted byte-identical to a
- * golden recorded from a real {@code npm}/{@code pnpm} install.
+ * Native lock regeneration for a version bump over a stubbed {@link HttpSender}, each lock byte-identical to the one
+ * npm or pnpm wrote; a bump whose lock cannot be regenerated keeps the edit and warns.
  */
 class UpgradeDependencyVersionLockRegenTest implements RewriteTest {
 
@@ -94,6 +93,38 @@ class UpgradeDependencyVersionLockRegenTest implements RewriteTest {
                 packageLock(resource("lock/npm/v3/before"), resource("lock/npm/v3/after"),
                         s -> s.noTrim().afterRecipe(doc -> assertThat(doc.getMarkers().findFirst(Markup.Warn.class))
                                 .as("successful regeneration must not warn").isEmpty()))
+        );
+    }
+
+    @Test
+    void aBumpWhoseLockCannotBeRegeneratedKeepsTheEditAndWarns() {
+        String pkgBefore = "{\n" +
+                "  \"name\": \"npm-lock-v3\",\n" +
+                "  \"version\": \"1.0.0\",\n" +
+                "  \"dependencies\": {\n" +
+                "    \"is-odd\": \"3.0.0\"\n" +
+                "  }\n" +
+                "}\n";
+        String lock = resource("lock/npm/v3/before");
+
+        rewriteRun(
+                spec -> spec.recipe(new UpgradeDependencyVersion("is-odd", null, "3.0.1")).executionContext(ctx)
+                        .dataTable(NodeLockRegenerationFailures.Row.class, rows -> {
+                            assertThat(rows).hasSize(1);
+                            assertThat(rows.get(0).getSourcePath()).isEqualTo("package.json");
+                            assertThat(rows.get(0).getPackageName()).isEqualTo("is-odd");
+                        }),
+                packageJson(pkgBefore, null,
+                        nodeResolutionResult(PackageManager.Npm, dependency("is-odd", "3.0.0")),
+                        s -> s.after(actual -> {
+                            assertThat(actual).contains("\"is-odd\": \"3.0.1\"")
+                              .contains("npm rejects this edit (E404)");
+                            return actual;
+                        }).afterRecipe(doc -> assertThat(doc.getMarkers().findFirst(Markup.Warn.class)).isPresent())),
+                packageLock(lock, null, s -> s.noTrim().after(actual -> {
+                    assertThat(actual).contains("\"node_modules/is-odd\": {\n      \"version\": \"3.0.0\"");
+                    return actual;
+                }).afterRecipe(doc -> assertThat(doc.getMarkers().findFirst(Markup.Warn.class)).isPresent()))
         );
     }
 

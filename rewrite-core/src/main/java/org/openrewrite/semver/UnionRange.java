@@ -22,77 +22,73 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
 import java.util.Map;
+import java.util.function.UnaryOperator;
 
 /**
  * An npm range as node-semver models it: an OR ({@code ||}) of AND-groups of {@link NodeComparand}
  * clauses, parsed by a direct port of node's {@code classes/range.js}. A prerelease only satisfies
- * a group when some clause names the same major.minor.patch tuple with a prerelease of its own,
- * unless {@code includePrerelease}.
+ * a group when some clause names the same major.minor.patch tuple with a prerelease of its own.
  */
 class UnionRange implements VersionComparator {
 
     private static final int MAX_CACHE_SIZE = 4_096;
     private static final Map<String, UnionRange> CACHE = LruCache.bounded(MAX_CACHE_SIZE);
-    private static final UnionRange INVALID = new UnionRange("", false, new ArrayList<>(), null);
+    private static final UnionRange INVALID = new UnionRange("", new ArrayList<>(), null);
 
     private final String raw;
-    private final boolean includePrerelease;
     private final List<List<NodeComparand>> set;
 
     private final @Nullable String metadataPattern;
 
-    private UnionRange(String raw, boolean includePrerelease, List<List<NodeComparand>> set,
-                       @Nullable String metadataPattern) {
+    private UnionRange(String raw, List<List<NodeComparand>> set, @Nullable String metadataPattern) {
         this.raw = raw;
-        this.includePrerelease = includePrerelease;
         this.set = set;
         this.metadataPattern = metadataPattern;
     }
 
     static Validated<VersionComparator> build(String pattern, @Nullable String metadataPattern) {
-        UnionRange range = parse(pattern, false);
+        UnionRange range = parse(pattern);
         if (range == null) {
             return Validated.invalid("nodeRange", pattern, "not a node-semver range");
         }
         return Validated.valid("nodeRange", metadataPattern == null ? range :
-                new UnionRange(range.raw, false, range.set, metadataPattern));
+                new UnionRange(range.raw, range.set, metadataPattern));
     }
 
-    static @Nullable UnionRange parse(@Nullable String range, boolean includePrerelease) {
+    static @Nullable UnionRange parse(@Nullable String range) {
         if (range == null) {
             return null;
         }
-        String key = (includePrerelease ? "1" : "0") + ' ' + range;
-        UnionRange cached = CACHE.get(key);
+        UnionRange cached = CACHE.get(range);
         if (cached != null) {
             return cached == INVALID ? null : cached;
         }
-        UnionRange parsed = doParse(range, includePrerelease);
-        CACHE.put(key, parsed == null ? INVALID : parsed);
+        UnionRange parsed = doParse(range);
+        CACHE.put(range, parsed == null ? INVALID : parsed);
         return parsed;
     }
 
-    private static @Nullable UnionRange doParse(String range, boolean includePrerelease) {
+    private static @Nullable UnionRange doParse(String range) {
         List<List<NodeComparand>> set = new ArrayList<>();
         for (String group : range.trim().split("\\|\\|", -1)) {
-            List<NodeComparand> comparands = parseGroup(group, includePrerelease);
+            List<NodeComparand> comparands = parseGroup(group);
             if (comparands == null) {
                 return null;
             }
             set.add(comparands);
         }
-        return new UnionRange(range, includePrerelease, set, null);
+        return new UnionRange(range, set, null);
     }
 
-    private static @Nullable List<NodeComparand> parseGroup(String groupStr, boolean incPre) {
-        String g = trimOperators(HyphenRange.hyphenReplace(groupStr.trim(), incPre)).trim();
+    private static @Nullable List<NodeComparand> parseGroup(String groupStr) {
+        String g = trimOperators(HyphenRange.hyphenReplace(groupStr.trim())).trim();
         String[] pieces = g.isEmpty() ? new String[]{""} : g.split("\\s+");
         List<NodeComparand> comparands = new ArrayList<>();
         for (String piece : pieces) {
-            String s = CaretRange.replaceCaret(piece, incPre);
-            s = mapTokens(s, incPre, TildeRange::replaceTilde);
-            s = mapTokens(s, incPre, XRange::replaceXRange);
-            s = mapTokens(s, incPre, (token, ignored) -> XRange.replaceStar(token));
+            String s = CaretRange.replaceCaret(piece);
+            s = mapTokens(s, TildeRange::replaceTilde);
+            s = mapTokens(s, XRange::replaceXRange);
+            s = mapTokens(s, XRange::replaceStar);
             String st = s.trim();
             if (st.isEmpty()) {
                 comparands.add(NodeComparand.parse(""));
@@ -109,18 +105,14 @@ class UnionRange implements VersionComparator {
         return comparands;
     }
 
-    private interface TokenFn {
-        String apply(String token, boolean incPre);
-    }
-
-    private static String mapTokens(String s, boolean incPre, TokenFn fn) {
+    private static String mapTokens(String s, UnaryOperator<String> fn) {
         String[] parts = s.trim().split("\\s+");
         StringBuilder sb = new StringBuilder();
         for (String part : parts) {
             if (sb.length() > 0) {
                 sb.append(' ');
             }
-            sb.append(fn.apply(part, incPre));
+            sb.append(fn.apply(part));
         }
         return sb.toString();
     }
@@ -145,7 +137,7 @@ class UnionRange implements VersionComparator {
                 return false;
             }
         }
-        if (version.hasPrerelease() && !includePrerelease) {
+        if (version.hasPrerelease()) {
             // A prerelease only satisfies the group if some comparand names the same
             // major.minor.patch tuple and itself carries a prerelease.
             for (NodeComparand c : group) {
@@ -209,97 +201,26 @@ class UnionRange implements VersionComparator {
 
     // --- corpus-facing operations (exercised by the node-semver conformance suite) ---
 
-    static boolean satisfies(String version, String range, boolean includePrerelease) {
+    static boolean satisfies(String version, String range) {
         ParsedVersion v = ParsedVersion.parse(version);
-        UnionRange r = parse(range, includePrerelease);
+        UnionRange r = parse(range);
         return v.isStrictSemver() && r != null && r.test(v);
     }
 
-    static @Nullable String maxSatisfying(Collection<String> versions, String range, boolean includePrerelease) {
-        return bestSatisfying(versions, range, includePrerelease, true);
-    }
-
-    static @Nullable String minSatisfying(Collection<String> versions, String range, boolean includePrerelease) {
-        return bestSatisfying(versions, range, includePrerelease, false);
-    }
-
-    private static @Nullable String bestSatisfying(Collection<String> versions, String range,
-                                                   boolean includePrerelease, boolean max) {
-        UnionRange r = parse(range, includePrerelease);
+    static @Nullable String minSatisfying(Collection<String> versions, String range) {
+        UnionRange r = parse(range);
         if (r == null) {
             return null;
         }
-        String best = null;
-        ParsedVersion bestVersion = null;
+        String min = null;
+        ParsedVersion minVersion = null;
         for (String candidate : versions) {
             ParsedVersion v = ParsedVersion.parse(candidate);
-            if (!v.isStrictSemver() || !r.test(v)) {
-                continue;
-            }
-            int c = bestVersion == null ? 0 : v.comparePrecedence(bestVersion);
-            if (bestVersion == null || (max ? c > 0 : c < 0)) {
-                best = candidate;
-                bestVersion = v;
+            if (v.isStrictSemver() && r.test(v) && (minVersion == null || v.comparePrecedence(minVersion) < 0)) {
+                min = candidate;
+                minVersion = v;
             }
         }
-        return best;
-    }
-
-    /**
-     * @return {@code true} if {@code version} is greater than every version {@code range} allows.
-     */
-    static boolean gtr(String version, String range) {
-        return outside(version, range, true);
-    }
-
-    /**
-     * @return {@code true} if {@code version} is less than every version {@code range} allows.
-     */
-    static boolean ltr(String version, String range) {
-        return outside(version, range, false);
-    }
-
-    // Port of node-semver functions/outside.js (gtr = hilo '>', ltr = hilo '<').
-    private static boolean outside(String version, String range, boolean gtr) {
-        ParsedVersion v = ParsedVersion.parse(version);
-        UnionRange r = parse(range, false);
-        if (!v.isStrictSemver() || r == null || r.test(v)) {
-            return false;
-        }
-        NodeComparand.Op comp = gtr ? NodeComparand.Op.GT : NodeComparand.Op.LT;
-        NodeComparand.Op ecomp = gtr ? NodeComparand.Op.GTE : NodeComparand.Op.LTE;
-        for (List<NodeComparand> comparands : r.set) {
-            NodeComparand high = null;
-            NodeComparand low = null;
-            for (NodeComparand c0 : comparands) {
-                NodeComparand c = c0.isAny() ? NodeComparand.GTE_ZERO : c0;
-                if (high == null) {
-                    high = c;
-                    low = c;
-                }
-                int ch = c.getVersion().comparePrecedence(high.getVersion());
-                if (gtr ? ch > 0 : ch < 0) {
-                    high = c;
-                } else {
-                    int cl = c.getVersion().comparePrecedence(low.getVersion());
-                    if (gtr ? cl < 0 : cl > 0) {
-                        low = c;
-                    }
-                }
-            }
-            if (high.getOp() == comp || high.getOp() == ecomp) {
-                return false;
-            }
-            int vLow = v.comparePrecedence(low.getVersion());
-            boolean ltefn = gtr ? vLow <= 0 : vLow >= 0;
-            boolean ltfn = gtr ? vLow < 0 : vLow > 0;
-            if ((low.getOp() == NodeComparand.Op.EQ || low.getOp() == comp) && ltefn) {
-                return false;
-            }
-            if (low.getOp() == ecomp && ltfn) {
-                return false;
-            }
-        }
-        return true;
+        return min;
     }
 }

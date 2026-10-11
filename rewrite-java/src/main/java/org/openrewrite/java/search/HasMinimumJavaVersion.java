@@ -55,7 +55,9 @@ public class HasMinimumJavaVersion extends ScanningRecipe<AtomicReference<JavaVe
                "use is the lowest version across every source set of every subproject in a " +
                "repository. For example, the main source set of a project may use Java 8 " +
                "while its test source set uses Java 17; in that case the oldest Java version " +
-               "in use is Java 8.";
+               "in use is Java 8. When the minimum is met, the source files at that oldest Java " +
+               "version are found, along with Gradle build scripts and every non-Java source file " +
+               "(such as `pom.xml`), which have no Java version of their own.";
 
     @SuppressWarnings("ConstantConditions")
     @Override
@@ -114,18 +116,17 @@ public class HasMinimumJavaVersion extends ScanningRecipe<AtomicReference<JavaVe
         VersionComparator versionComparator = requireNonNull(Semver.validate(canonicalizeVersion(version), null).getValue());
         return Preconditions.check(minimumVersionInRange(acc, versionComparator), new TreeVisitor<Tree, ExecutionContext>() {
             @Override
-            public boolean isAcceptable(SourceFile sourceFile, ExecutionContext ctx) {
-                return sourceFile instanceof JavaSourceFile && !isBuildScript(sourceFile);
-            }
-
-            @Override
             public @Nullable Tree visit(@Nullable Tree tree, ExecutionContext ctx) {
-                if (!(tree instanceof JavaSourceFile)) {
+                if (!(tree instanceof SourceFile)) {
                     return tree;
                 }
+                int lowestMajorVersion = majorVersion(requireNonNull(acc.get()));
+                if (!(tree instanceof JavaSourceFile) || isBuildScript((SourceFile) tree)) {
+                    return SearchResult.found(tree, "Java version " + lowestMajorVersion);
+                }
                 return tree.getMarkers().findFirst(JavaVersion.class)
-                        .filter(javaVersion -> acc.get() != null && majorVersion(javaVersion) == majorVersion(acc.get()))
-                        .map(javaVersion -> SearchResult.found(tree, "Java version " + majorVersion(javaVersion)))
+                        .filter(javaVersion -> majorVersion(javaVersion) == lowestMajorVersion)
+                        .map(javaVersion -> SearchResult.found(tree, "Java version " + lowestMajorVersion))
                         .orElse(tree);
             }
         });

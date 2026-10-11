@@ -330,9 +330,8 @@ class PythonSemanticComparator(PythonComparatorVisitor):
                 if (
                     p_decl.fully_qualified_name == t_decl.fully_qualified_name
                     and p_mt.name == t_mt.name
+                    and self._receiver_free(p_mt, t_mt)
                 ):
-                    # FQN match — skip select comparison (allows different
-                    # import styles to match, e.g. os.path.join vs join).
                     return self._compare_arguments(
                         pattern.padding.arguments,
                         target.padding.arguments,
@@ -347,6 +346,16 @@ class PythonSemanticComparator(PythonComparatorVisitor):
         return self._compare_arguments(
             pattern.padding.arguments, target.padding.arguments, cursor
         )
+
+    @staticmethod
+    def _receiver_free(p_mt: JavaType.Method, t_mt: JavaType.Method) -> bool:
+        """Whether the method type alone identifies two calls, so their receivers need not
+        match or even be spelled. An instance call's receiver is a value the method type does
+        not identify, so ``sys.stdout.write`` is not ``sys.stderr.write``.
+        """
+        if p_mt.is_constructor and t_mt.is_constructor:
+            return True
+        return bool(p_mt.flags_bit_map & t_mt.flags_bit_map & JavaType.Flag.Static)
 
     def _compare_arguments(
         self,

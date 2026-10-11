@@ -87,7 +87,6 @@ _PYTHON_PRIMITIVES: Dict[str, JavaType.Primitive] = {
     'bool': JavaType.Primitive.Boolean,
     'None': JavaType.Primitive.Null,
     'NoneType': JavaType.Primitive.Null,
-    'bytes': JavaType.Primitive.String,  # Close enough for matching
     'LiteralString': JavaType.Primitive.String,
 }
 
@@ -103,6 +102,12 @@ PRIMITIVE_TO_PYTHON: Dict[JavaType.Primitive, str] = {
 
 # ty-types descriptor kinds that map to JavaType.Method
 _FUNCTION_KINDS = frozenset(('function', 'boundMethod', 'callable', 'wrapperDescriptor'))
+
+
+def _is_module_function(descriptor: Dict[str, Any]) -> bool:
+    """Whether ty describes a function declared outside any class, at module level or nested."""
+    return descriptor.get('kind') == 'function' and 'declaringClassId' not in descriptor
+
 
 # `os.path` binds whichever of these the running platform provides, so a symbol
 # defined in one has no portable defining name. `os.path` names the same module
@@ -713,20 +718,23 @@ class PythonTypeMapping:
             # `tuple` has a single generic parameter, so typeArgs conflates
             # `tuple[int, str]` with `tuple[int | str, ...]`. Subclasses inherit
             # elements from `tuple` without being generic, so only `tuple` takes them.
+            # A homogeneous (`T, ...`) element is an array of `T`, as a Java varargs
+            # parameter is, which keeps `tuple[int, ...]` apart from `tuple[int]`.
             tuple_elements = (descriptor.get('tupleElements')
                               if class_name == 'tuple' and module_name == 'builtins'
                               else None)
             if isinstance(tuple_elements, list):
-                arg_ids = [element.get('typeId') for element in tuple_elements
-                           if isinstance(element, dict)]
+                args = [(element.get('typeId'), element.get('kind') == 'homogeneous')
+                        for element in tuple_elements if isinstance(element, dict)]
             else:
-                arg_ids = descriptor.get('typeArgs') or []
+                args = [(arg_id, False) for arg_id in descriptor.get('typeArgs') or []]
 
-            resolved_args = []
-            for arg_id in arg_ids:
+            resolved_args: List[JavaType] = []
+            for arg_id, homogeneous in args:
                 arg_type = self._resolve_type(arg_id) if arg_id is not None else None
                 if arg_type is not None:
-                    resolved_args.append(arg_type)
+                    resolved_args.append(JavaType.Array(_elem_type=arg_type)
+                                         if homogeneous else arg_type)
             if resolved_args:
                 param = JavaType.Parameterized()
                 param._type = base_class
@@ -745,23 +753,16 @@ class PythonTypeMapping:
             return JavaType.Primitive.String
 
         elif kind == 'bytesLiteral':
-            return JavaType.Primitive.String
+            return self._class_reference({'className': 'bytes', 'moduleName': 'builtins'})
 
         elif kind == 'union':
-            # Resolve all non-None members into a Union type.
-            # For Optional[X] (= X | None) with a single real member, unwrap to just X.
+            # `None` is a member like any other, so a recipe can tell `X | None` from `X`.
             resolved_bounds = []
             for member_id in descriptor.get('members', []):
-                member = self._type_registry.get(member_id)
-                if member:
-                    member_kind = member.get('kind')
-                    # Skip None/NoneType members
-                    if member_kind == 'instance' and member.get('className') in ('None', 'NoneType'):
-                        continue
-                    resolved = self._resolve_type(member_id)
-                    if resolved is not None:
-                        resolved_bounds.append(resolved)
-            if not resolved_bounds:
+                resolved = self._resolve_type(member_id)
+                if resolved is not None:
+                    resolved_bounds.append(resolved)
+            if all(b is JavaType.Primitive.Null for b in resolved_bounds):
                 return _UNKNOWN
             if len(resolved_bounds) == 1:
                 return resolved_bounds[0]
@@ -1074,7 +1075,7 @@ class PythonTypeMapping:
 
     def _constant_type(self, node: ast.Constant) -> Optional[JavaType]:
         """Get the type for a constant/literal node."""
-        if isinstance(node.value, (str, bytes)):
+        if isinstance(node.value, str):
             return JavaType.Primitive.String
         elif isinstance(node.value, bool):
             return JavaType.Primitive.Boolean
@@ -1087,7 +1088,7 @@ class PythonTypeMapping:
             return JavaType.Primitive.Long if -2 ** 63 <= node.value < 2 ** 63 else JavaType.Primitive.None_
         elif isinstance(node.value, float):
             return JavaType.Primitive.Double
-        elif isinstance(node.value, complex):
+        elif isinstance(node.value, (bytes, complex)):
             # A literal's type slot holds a JavaType.Primitive, and J.Literal#withType
             # drops a class type put there.
             return JavaType.Primitive.None_
@@ -1340,7 +1341,7 @@ class PythonTypeMapping:
                 ret_id = descriptor.get('returnType')
                 if params is not None or ret_id is not None:
                     return self._method_from_function_descriptor(
-                        descriptor, node.name)
+                        descriptor, node.name, self._is_static_declaration(node, descriptor))
 
         # Fallback: build from individual parameter/return annotation types
         param_names: List[str] = []
@@ -1369,7 +1370,7 @@ class PythonTypeMapping:
             return None
 
         return JavaType.Method(
-            _flags_bit_map=0,
+            _flags_bit_map=JavaType.Flag.Static if self._is_static_declaration(node, None) else 0,
             _declaring_type=None,
             _name=node.name,
             _return_type=return_type,
@@ -1378,8 +1379,16 @@ class PythonTypeMapping:
             _declared_formal_type_names=type_param_names if type_param_names else None,
         )
 
+    @staticmethod
+    def _is_static_declaration(node: ast.FunctionDef, descriptor: Optional[Dict[str, Any]]) -> bool:
+        """A function declared outside a class is static, as is a static method or a classmethod."""
+        if descriptor is not None and _is_module_function(descriptor):
+            return True
+        return any(isinstance(d, ast.Name) and d.id in ('staticmethod', 'classmethod')
+                   for d in node.decorator_list)
+
     def _method_from_function_descriptor(
-            self, descriptor: Dict[str, Any], name: str
+            self, descriptor: Dict[str, Any], name: str, static: bool
     ) -> JavaType.Method:
         """Build a JavaType.Method from a function descriptor with parameters/returnType."""
         param_names, param_types = self._process_method_params(
@@ -1393,7 +1402,7 @@ class PythonTypeMapping:
         type_param_names = self._extract_type_param_names(descriptor)
 
         return JavaType.Method(
-            _flags_bit_map=0,
+            _flags_bit_map=JavaType.Flag.Static if static else 0,
             _declaring_type=self._get_declaration_declaring_type(descriptor),
             _name=name,
             _return_type=return_type,
@@ -1529,7 +1538,7 @@ class PythonTypeMapping:
                 type_param_names = self._extract_type_param_names(func_desc)
 
         return JavaType.Method(
-            _flags_bit_map=0,
+            _flags_bit_map=JavaType.Flag.Static if self._is_static_call(node) else 0,
             _declaring_type=declaring_type,
             _name=method_name,
             _return_type=return_type,
@@ -1537,6 +1546,27 @@ class PythonTypeMapping:
             _parameter_types=param_types if param_types else None,
             _declared_formal_type_names=type_param_names if type_param_names else None,
         )
+
+    def _is_static_call(self, node: ast.Call) -> bool:
+        """Whether the call's receiver, if spelled, is a module or a class. ty types a module
+        function, a static method and a method looked up on its class as a plain ``function``.
+        A classmethod counts too, so a pattern on a class also matches calls on its subclasses.
+        Without a callee type, an import naming the receiver names a module.
+        """
+        callee = self._descriptor_of(node.func)
+        kind = callee.get('kind')
+        if kind == 'function':
+            return True
+        if kind == 'boundMethod':
+            params = callee.get('parameters') or [{}]
+            bound_id = params[0].get('typeId')
+            bound = self._type_registry.get(bound_id) if bound_id is not None else None
+            return bound is not None and bound.get('kind') == 'subclassOf'
+        if kind in (None, 'dynamic'):
+            if isinstance(node.func, ast.Attribute):
+                return self._import_binding_fqn(node.func.value) is not None
+            return self._bound_from_import_member(node.func) is not None
+        return False
 
     def _callee_declared_name(self, node: ast.Call) -> Optional[str]:
         """The name the callee carries where it is defined. Its owner is read off the
@@ -2031,7 +2061,7 @@ class PythonTypeMapping:
         type_param_names = self._extract_type_param_names(descriptor)
 
         return JavaType.Method(
-            _flags_bit_map=0,
+            _flags_bit_map=JavaType.Flag.Static if _is_module_function(descriptor) else 0,
             _declaring_type=declaring_type,
             _name=name,
             _return_type=return_type,

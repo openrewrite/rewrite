@@ -13,7 +13,7 @@ J2 = TypeVar('J2', bound=J)
 J3 = TypeVar('J3', bound=J)
 
 from abc import abstractmethod, ABC
-from enum import Enum
+from enum import Enum, IntFlag
 from rewrite import Markers
 from rewrite import Tree, SourceFile, TreeVisitor
 from rewrite.utils import replace_if_changed
@@ -54,6 +54,9 @@ class MethodCall(Expression):
     pass
 
 class JavaType:
+    class Flag(IntFlag):
+        Static = ...
+
     class FullyQualified(JavaType):
         class Kind(Enum):
             Class = ...

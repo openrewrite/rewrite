@@ -2710,6 +2710,81 @@ describe('JavaScript type mapping', () => {
             );
         });
 
+        test('every spelling of a callable module\'s member attributes to its namespace, as a static', async () => {
+            const spec = new RecipeSpec();
+            spec.recipe = markTypes((node, type) => {
+                const call = declaringTypeAndName(node, type);
+                return call && (type as Type.Method).flags & Type.Flag.Static ? `${call} static` : call;
+            });
+
+            await withDir(async (repo) => {
+                await spec.rewriteRun(
+                    npm(
+                        repo.path,
+                        //language=typescript
+                        typescript(
+                            `
+                                import moment from 'moment';
+                                import m from 'moment';
+                                import {utc} from 'moment';
+                                const local = moment.utc;
+
+                                moment.utc('a');
+                                m.utc('b');
+                                utc('c');
+                                local('d');
+                                moment('e');
+                            `,
+                            //@formatter:off
+                            `
+                                import moment from 'moment';
+                                import m from 'moment';
+                                import {utc} from 'moment';
+                                const local = moment.utc;
+
+                                /*~~(moment#utc static)~~>*/moment.utc('a');
+                                /*~~(moment#utc static)~~>*/m.utc('b');
+                                /*~~(moment#utc static)~~>*/utc('c');
+                                /*~~(moment#utc static)~~>*/local('d');
+                                /*~~(moment#<default> static)~~>*/moment('e');
+                            `
+                            //@formatter:on
+                        ),
+                        //language=json
+                        packageJson(`{"name": "test-project", "version": "1.0.0", "dependencies": {"moment": "^2.30.0"}}`)
+                    )
+                );
+            }, {unsafeCleanup: true});
+        });
+
+        test('a parsed namespace\'s function and a class\'s static method are static, an instance method is not', async () => {
+            const spec = new RecipeSpec();
+            spec.recipe = markTypes((node, type) => {
+                const call = declaringTypeAndName(node, type);
+                return call && (type as Type.Method).flags & Type.Flag.Static ? `${call} static` : call;
+            });
+
+            await spec.rewriteRun(
+                //language=typescript
+                typescript(
+                    `
+                        namespace tz { export function utc() {} utc(); }
+                        tz.utc();
+                        class Calc { static of() { return new Calc(); } add() {} }
+                        Calc.of().add();
+                    `,
+                    //@formatter:off
+                    `
+                        namespace tz { export function utc() {} /*~~(tz#utc static)~~>*/utc(); }
+                        /*~~(tz#utc static)~~>*/tz.utc();
+                        class Calc { static of() { return new Calc(); } add() {} }
+                        /*~~(Calc#add)~~>*//*~~(Calc#of static)~~>*/Calc.of().add();
+                    `
+                    //@formatter:on
+                )
+            );
+        });
+
         test('a static method on an imported class attributes to the class', async () => {
             // Previously the import's local name replaced the class's package, giving \`URL.URL\`.
             const spec = new RecipeSpec();

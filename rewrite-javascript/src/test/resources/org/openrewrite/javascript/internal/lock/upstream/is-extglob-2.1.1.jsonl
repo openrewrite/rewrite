@@ -1,0 +1,105 @@
+{"header":"is-extglob 2.1.1: every call its own tests (test.js) make, with its answer; generate/upstream-calls.js generate/upstream/is-extglob.js <checkout> 2.1.1"}
+{"test":"test.js > isExtglob > should return true when the string has an extglob:","fn":"isExtglob","args":["?(abc)"],"out":true}
+{"test":"test.js > isExtglob > should return true when the string has an extglob:","fn":"isExtglob","args":["@(abc)"],"out":true}
+{"test":"test.js > isExtglob > should return true when the string has an extglob:","fn":"isExtglob","args":["!(abc)"],"out":true}
+{"test":"test.js > isExtglob > should return true when the string has an extglob:","fn":"isExtglob","args":["*(abc)"],"out":true}
+{"test":"test.js > isExtglob > should return true when the string has an extglob:","fn":"isExtglob","args":["+(abc)"],"out":true}
+{"test":"test.js > isExtglob > should return true when the string has an extglob:","fn":"isExtglob","args":["xyz/?(abc)/xyz"],"out":true}
+{"test":"test.js > isExtglob > should return true when the string has an extglob:","fn":"isExtglob","args":["xyz/@(abc)/xyz"],"out":true}
+{"test":"test.js > isExtglob > should return true when the string has an extglob:","fn":"isExtglob","args":["xyz/!(abc)/xyz"],"out":true}
+{"test":"test.js > isExtglob > should return true when the string has an extglob:","fn":"isExtglob","args":["xyz/*(abc)/xyz"],"out":true}
+{"test":"test.js > isExtglob > should return true when the string has an extglob:","fn":"isExtglob","args":["xyz/+(abc)/xyz"],"out":true}
+{"test":"test.js > isExtglob > should return true when the string has an extglob:","fn":"isExtglob","args":["?(abc|xyz)/xyz"],"out":true}
+{"test":"test.js > isExtglob > should return true when the string has an extglob:","fn":"isExtglob","args":["@(abc|xyz)"],"out":true}
+{"test":"test.js > isExtglob > should return true when the string has an extglob:","fn":"isExtglob","args":["!(abc|xyz)"],"out":true}
+{"test":"test.js > isExtglob > should return true when the string has an extglob:","fn":"isExtglob","args":["*(abc|xyz)"],"out":true}
+{"test":"test.js > isExtglob > should return true when the string has an extglob:","fn":"isExtglob","args":["+(abc|xyz)"],"out":true}
+{"test":"test.js > isExtglob > should not match escaped extglobs","fn":"isExtglob","args":["?(abc/xyz"],"out":false}
+{"test":"test.js > isExtglob > should not match escaped extglobs","fn":"isExtglob","args":["@(abc"],"out":false}
+{"test":"test.js > isExtglob > should not match escaped extglobs","fn":"isExtglob","args":["!(abc"],"out":false}
+{"test":"test.js > isExtglob > should not match escaped extglobs","fn":"isExtglob","args":["*(abc"],"out":false}
+{"test":"test.js > isExtglob > should not match escaped extglobs","fn":"isExtglob","args":["+(abc"],"out":false}
+{"test":"test.js > isExtglob > should not match escaped extglobs","fn":"isExtglob","args":["(a|b"],"out":false}
+{"test":"test.js > isExtglob > should not match escaped extglobs","fn":"isExtglob","args":["\\?(abc)"],"out":false}
+{"test":"test.js > isExtglob > should not match escaped extglobs","fn":"isExtglob","args":["\\@(abc)"],"out":false}
+{"test":"test.js > isExtglob > should not match escaped extglobs","fn":"isExtglob","args":["\\!(abc)"],"out":false}
+{"test":"test.js > isExtglob > should not match escaped extglobs","fn":"isExtglob","args":["\\*(abc)"],"out":false}
+{"test":"test.js > isExtglob > should not match escaped extglobs","fn":"isExtglob","args":["\\+(abc)"],"out":false}
+{"test":"test.js > isExtglob > should not match escaped extglobs","fn":"isExtglob","args":["xyz/\\?(abc)/xyz"],"out":false}
+{"test":"test.js > isExtglob > should not match escaped extglobs","fn":"isExtglob","args":["xyz/\\@(abc)/xyz"],"out":false}
+{"test":"test.js > isExtglob > should not match escaped extglobs","fn":"isExtglob","args":["xyz/\\!(abc)/xyz"],"out":false}
+{"test":"test.js > isExtglob > should not match escaped extglobs","fn":"isExtglob","args":["xyz/\\*(abc)/xyz"],"out":false}
+{"test":"test.js > isExtglob > should not match escaped extglobs","fn":"isExtglob","args":["xyz/\\+(abc)/xyz"],"out":false}
+{"test":"test.js > isExtglob > should not match escaped extglobs","fn":"isExtglob","args":["\\?(abc|xyz)/xyz"],"out":false}
+{"test":"test.js > isExtglob > should not match escaped extglobs","fn":"isExtglob","args":["\\@(abc|xyz)"],"out":false}
+{"test":"test.js > isExtglob > should not match escaped extglobs","fn":"isExtglob","args":["\\!(abc|xyz)"],"out":false}
+{"test":"test.js > isExtglob > should not match escaped extglobs","fn":"isExtglob","args":["\\*(abc|xyz)"],"out":false}
+{"test":"test.js > isExtglob > should not match escaped extglobs","fn":"isExtglob","args":["\\+(abc|xyz)"],"out":false}
+{"test":"test.js > isExtglob > should not match escaped extglobs","fn":"isExtglob","args":["?\\(abc)"],"out":false}
+{"test":"test.js > isExtglob > should not match escaped extglobs","fn":"isExtglob","args":["@\\(abc)"],"out":false}
+{"test":"test.js > isExtglob > should not match escaped extglobs","fn":"isExtglob","args":["!\\(abc)"],"out":false}
+{"test":"test.js > isExtglob > should not match escaped extglobs","fn":"isExtglob","args":["*\\(abc)"],"out":false}
+{"test":"test.js > isExtglob > should not match escaped extglobs","fn":"isExtglob","args":["+\\(abc)"],"out":false}
+{"test":"test.js > isExtglob > should not match escaped extglobs","fn":"isExtglob","args":["xyz/?\\(abc)/xyz"],"out":false}
+{"test":"test.js > isExtglob > should not match escaped extglobs","fn":"isExtglob","args":["xyz/@\\(abc)/xyz"],"out":false}
+{"test":"test.js > isExtglob > should not match escaped extglobs","fn":"isExtglob","args":["xyz/!\\(abc)/xyz"],"out":false}
+{"test":"test.js > isExtglob > should not match escaped extglobs","fn":"isExtglob","args":["xyz/*\\(abc)/xyz"],"out":false}
+{"test":"test.js > isExtglob > should not match escaped extglobs","fn":"isExtglob","args":["xyz/+\\(abc)/xyz"],"out":false}
+{"test":"test.js > isExtglob > should not match escaped extglobs","fn":"isExtglob","args":["?\\(abc|xyz)/xyz"],"out":false}
+{"test":"test.js > isExtglob > should not match escaped extglobs","fn":"isExtglob","args":["@\\(abc|xyz)"],"out":false}
+{"test":"test.js > isExtglob > should not match escaped extglobs","fn":"isExtglob","args":["!\\(abc|xyz)"],"out":false}
+{"test":"test.js > isExtglob > should not match escaped extglobs","fn":"isExtglob","args":["*\\(abc|xyz)"],"out":false}
+{"test":"test.js > isExtglob > should not match escaped extglobs","fn":"isExtglob","args":["+\\(abc|xyz)"],"out":false}
+{"test":"test.js > isExtglob > should detect when an extglob is in the same pattern as an escaped extglob","fn":"isExtglob","args":["\\?(abc)/?(abc)"],"out":true}
+{"test":"test.js > isExtglob > should detect when an extglob is in the same pattern as an escaped extglob","fn":"isExtglob","args":["\\@(abc)/@(abc)"],"out":true}
+{"test":"test.js > isExtglob > should detect when an extglob is in the same pattern as an escaped extglob","fn":"isExtglob","args":["\\!(abc)/!(abc)"],"out":true}
+{"test":"test.js > isExtglob > should detect when an extglob is in the same pattern as an escaped extglob","fn":"isExtglob","args":["\\*(abc)/*(abc)"],"out":true}
+{"test":"test.js > isExtglob > should detect when an extglob is in the same pattern as an escaped extglob","fn":"isExtglob","args":["\\+(abc)/+(abc)"],"out":true}
+{"test":"test.js > isExtglob > should detect when an extglob is in the same pattern as an escaped extglob","fn":"isExtglob","args":["xyz/\\?(abc)/xyz/xyz/?(abc)/xyz"],"out":true}
+{"test":"test.js > isExtglob > should detect when an extglob is in the same pattern as an escaped extglob","fn":"isExtglob","args":["xyz/\\@(abc)/xyz/xyz/@(abc)/xyz"],"out":true}
+{"test":"test.js > isExtglob > should detect when an extglob is in the same pattern as an escaped extglob","fn":"isExtglob","args":["xyz/\\!(abc)/xyz/xyz/!(abc)/xyz"],"out":true}
+{"test":"test.js > isExtglob > should detect when an extglob is in the same pattern as an escaped extglob","fn":"isExtglob","args":["xyz/\\*(abc)/xyz/xyz/*(abc)/xyz"],"out":true}
+{"test":"test.js > isExtglob > should detect when an extglob is in the same pattern as an escaped extglob","fn":"isExtglob","args":["xyz/\\+(abc)/xyz/xyz/+(abc)/xyz"],"out":true}
+{"test":"test.js > isExtglob > should detect when an extglob is in the same pattern as an escaped extglob","fn":"isExtglob","args":["\\?(abc|xyz)/xyz/?(abc|xyz)/xyz"],"out":true}
+{"test":"test.js > isExtglob > should detect when an extglob is in the same pattern as an escaped extglob","fn":"isExtglob","args":["\\@(abc|xyz)/@(abc|xyz)"],"out":true}
+{"test":"test.js > isExtglob > should detect when an extglob is in the same pattern as an escaped extglob","fn":"isExtglob","args":["\\!(abc|xyz)/!(abc|xyz)"],"out":true}
+{"test":"test.js > isExtglob > should detect when an extglob is in the same pattern as an escaped extglob","fn":"isExtglob","args":["\\*(abc|xyz)/*(abc|xyz)"],"out":true}
+{"test":"test.js > isExtglob > should detect when an extglob is in the same pattern as an escaped extglob","fn":"isExtglob","args":["\\+(abc|xyz)/+(abc|xyz)"],"out":true}
+{"test":"test.js > isExtglob > should return false when the string does not have an extglob:","fn":"isExtglob","args":[],"out":false}
+{"test":"test.js > isExtglob > should return false when the string does not have an extglob:","fn":"isExtglob","args":[null],"out":false}
+{"test":"test.js > isExtglob > should return false when the string does not have an extglob:","fn":"isExtglob","args":[""],"out":false}
+{"test":"test.js > isExtglob > should return false when the string does not have an extglob:","fn":"isExtglob","args":["? (abc)"],"out":false}
+{"test":"test.js > isExtglob > should return false when the string does not have an extglob:","fn":"isExtglob","args":["@.(abc)"],"out":false}
+{"test":"test.js > isExtglob > should return false when the string does not have an extglob:","fn":"isExtglob","args":["!&(abc)"],"out":false}
+{"test":"test.js > isExtglob > should return false when the string does not have an extglob:","fn":"isExtglob","args":["*z(abc)"],"out":false}
+{"test":"test.js > isExtglob > should return false when the string does not have an extglob:","fn":"isExtglob","args":["+~(abc)"],"out":false}
+{"test":"test.js > isExtglob > should return false when the string does not have an extglob:","fn":"isExtglob","args":[["**/*.js"]],"out":false}
+{"test":"test.js > isExtglob > should return false when the string does not have an extglob:","fn":"isExtglob","args":[["foo.js"]],"out":false}
+{"test":"test.js > isExtglob > should return false when the string does not have an extglob:","fn":"isExtglob","args":["*.js"],"out":false}
+{"test":"test.js > isExtglob > should return false when the string does not have an extglob:","fn":"isExtglob","args":["!*.js"],"out":false}
+{"test":"test.js > isExtglob > should return false when the string does not have an extglob:","fn":"isExtglob","args":["!foo"],"out":false}
+{"test":"test.js > isExtglob > should return false when the string does not have an extglob:","fn":"isExtglob","args":["!foo.js"],"out":false}
+{"test":"test.js > isExtglob > should return false when the string does not have an extglob:","fn":"isExtglob","args":["**/abc.js"],"out":false}
+{"test":"test.js > isExtglob > should return false when the string does not have an extglob:","fn":"isExtglob","args":["abc/*.js"],"out":false}
+{"test":"test.js > isExtglob > should return false when the string does not have an extglob:","fn":"isExtglob","args":["abc/{a,b}.js"],"out":false}
+{"test":"test.js > isExtglob > should return false when the string does not have an extglob:","fn":"isExtglob","args":["abc/{a..z}.js"],"out":false}
+{"test":"test.js > isExtglob > should return false when the string does not have an extglob:","fn":"isExtglob","args":["abc/{a..z..2}.js"],"out":false}
+{"test":"test.js > isExtglob > should return false when the string does not have an extglob:","fn":"isExtglob","args":["abc/(aaa|bbb).js"],"out":false}
+{"test":"test.js > isExtglob > should return false when the string does not have an extglob:","fn":"isExtglob","args":["abc/?.js"],"out":false}
+{"test":"test.js > isExtglob > should return false when the string does not have an extglob:","fn":"isExtglob","args":["?.js"],"out":false}
+{"test":"test.js > isExtglob > should return false when the string does not have an extglob:","fn":"isExtglob","args":["[abc].js"],"out":false}
+{"test":"test.js > isExtglob > should return false when the string does not have an extglob:","fn":"isExtglob","args":["[^abc].js"],"out":false}
+{"test":"test.js > isExtglob > should return false when the string does not have an extglob:","fn":"isExtglob","args":["a/b/c/[a-z].js"],"out":false}
+{"test":"test.js > isExtglob > should return false when the string does not have an extglob:","fn":"isExtglob","args":["[a-j]*[^c]b/c"],"out":false}
+{"test":"test.js > isExtglob > should return false when the string does not have an extglob:","fn":"isExtglob","args":["."],"out":false}
+{"test":"test.js > isExtglob > should return false when the string does not have an extglob:","fn":"isExtglob","args":["aa"],"out":false}
+{"test":"test.js > isExtglob > should return false when the string does not have an extglob:","fn":"isExtglob","args":["abc.js"],"out":false}
+{"test":"test.js > isExtglob > should return false when the string does not have an extglob:","fn":"isExtglob","args":["abc/def/ghi.js"],"out":false}
+{"test":"differences","fn":"isExtglob","args":[""],"out":false}
+{"test":"differences","fn":"isExtglob","args":["\\@(a)"],"out":false}
+{"test":"differences","fn":"isExtglob","args":["@(a"],"out":false}
+{"test":"differences","fn":"isExtglob","args":["a!(b)c"],"out":true}
+{"test":"differences","fn":"isExtglob","args":["\\\\!(a)"],"out":true}
+{"test":"differences","fn":"isExtglob","args":["+(a\nb)"],"out":false}
+{"test":"differences","fn":"isExtglob","args":["*(a )"],"out":false}
+{"test":"differences","fn":"isExtglob","args":["?(a)"],"out":true}

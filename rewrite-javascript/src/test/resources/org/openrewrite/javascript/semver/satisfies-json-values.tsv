@@ -1,0 +1,181 @@
+# satisfies(version, range, true) in node-semver 5.5.0 and 7.8.4 with a version as JSON package data holds it: version, range, 5.5.0, 7.8.4 (JSON; {"threw":msg} a throw)
+5	"^1.0.0"	{"threw":"Invalid Version: 5"}	{"threw":"Invalid version. Must be a string. Got type \"number\"."}
+5	"*"	{"threw":"Cannot read properties of undefined (reading 'length')"}	{"threw":"Cannot read properties of undefined (reading 'length')"}
+5	""	{"threw":"Cannot read properties of undefined (reading 'length')"}	{"threw":"Cannot read properties of undefined (reading 'length')"}
+5	"x"	{"threw":"Cannot read properties of undefined (reading 'length')"}	{"threw":"Cannot read properties of undefined (reading 'length')"}
+5	"* || ^1.0.0"	{"threw":"Cannot read properties of undefined (reading 'length')"}	{"threw":"Cannot read properties of undefined (reading 'length')"}
+5	"^1.0.0 || *"	{"threw":"Invalid Version: 5"}	{"threw":"Cannot read properties of undefined (reading 'length')"}
+5	">=0.0.0"	{"threw":"Invalid Version: 5"}	{"threw":"Cannot read properties of undefined (reading 'length')"}
+5	"not a range"	false	false
+5	"* || *"	{"threw":"Cannot read properties of undefined (reading 'length')"}	{"threw":"Cannot read properties of undefined (reading 'length')"}
+1.5	"^1.0.0"	{"threw":"Invalid Version: 1.5"}	{"threw":"Invalid version. Must be a string. Got type \"number\"."}
+1.5	"*"	{"threw":"Cannot read properties of undefined (reading 'length')"}	{"threw":"Cannot read properties of undefined (reading 'length')"}
+1.5	""	{"threw":"Cannot read properties of undefined (reading 'length')"}	{"threw":"Cannot read properties of undefined (reading 'length')"}
+1.5	"x"	{"threw":"Cannot read properties of undefined (reading 'length')"}	{"threw":"Cannot read properties of undefined (reading 'length')"}
+1.5	"* || ^1.0.0"	{"threw":"Cannot read properties of undefined (reading 'length')"}	{"threw":"Cannot read properties of undefined (reading 'length')"}
+1.5	"^1.0.0 || *"	{"threw":"Invalid Version: 1.5"}	{"threw":"Cannot read properties of undefined (reading 'length')"}
+1.5	">=0.0.0"	{"threw":"Invalid Version: 1.5"}	{"threw":"Cannot read properties of undefined (reading 'length')"}
+1.5	"not a range"	false	false
+1.5	"* || *"	{"threw":"Cannot read properties of undefined (reading 'length')"}	{"threw":"Cannot read properties of undefined (reading 'length')"}
+0.1	"^1.0.0"	{"threw":"Invalid Version: 0.1"}	{"threw":"Invalid version. Must be a string. Got type \"number\"."}
+0.1	"*"	{"threw":"Cannot read properties of undefined (reading 'length')"}	{"threw":"Cannot read properties of undefined (reading 'length')"}
+0.1	""	{"threw":"Cannot read properties of undefined (reading 'length')"}	{"threw":"Cannot read properties of undefined (reading 'length')"}
+0.1	"x"	{"threw":"Cannot read properties of undefined (reading 'length')"}	{"threw":"Cannot read properties of undefined (reading 'length')"}
+0.1	"* || ^1.0.0"	{"threw":"Cannot read properties of undefined (reading 'length')"}	{"threw":"Cannot read properties of undefined (reading 'length')"}
+0.1	"^1.0.0 || *"	{"threw":"Invalid Version: 0.1"}	{"threw":"Cannot read properties of undefined (reading 'length')"}
+0.1	">=0.0.0"	{"threw":"Invalid Version: 0.1"}	{"threw":"Cannot read properties of undefined (reading 'length')"}
+0.1	"not a range"	false	false
+0.1	"* || *"	{"threw":"Cannot read properties of undefined (reading 'length')"}	{"threw":"Cannot read properties of undefined (reading 'length')"}
+1e+21	"^1.0.0"	{"threw":"Invalid Version: 1e+21"}	{"threw":"Invalid version. Must be a string. Got type \"number\"."}
+1e+21	"*"	{"threw":"Cannot read properties of undefined (reading 'length')"}	{"threw":"Cannot read properties of undefined (reading 'length')"}
+1e+21	""	{"threw":"Cannot read properties of undefined (reading 'length')"}	{"threw":"Cannot read properties of undefined (reading 'length')"}
+1e+21	"x"	{"threw":"Cannot read properties of undefined (reading 'length')"}	{"threw":"Cannot read properties of undefined (reading 'length')"}
+1e+21	"* || ^1.0.0"	{"threw":"Cannot read properties of undefined (reading 'length')"}	{"threw":"Cannot read properties of undefined (reading 'length')"}
+1e+21	"^1.0.0 || *"	{"threw":"Invalid Version: 1e+21"}	{"threw":"Cannot read properties of undefined (reading 'length')"}
+1e+21	">=0.0.0"	{"threw":"Invalid Version: 1e+21"}	{"threw":"Cannot read properties of undefined (reading 'length')"}
+1e+21	"not a range"	false	false
+1e+21	"* || *"	{"threw":"Cannot read properties of undefined (reading 'length')"}	{"threw":"Cannot read properties of undefined (reading 'length')"}
+true	"^1.0.0"	{"threw":"Invalid Version: true"}	{"threw":"Invalid version. Must be a string. Got type \"boolean\"."}
+true	"*"	{"threw":"Cannot read properties of undefined (reading 'length')"}	{"threw":"Cannot read properties of undefined (reading 'length')"}
+true	""	{"threw":"Cannot read properties of undefined (reading 'length')"}	{"threw":"Cannot read properties of undefined (reading 'length')"}
+true	"x"	{"threw":"Cannot read properties of undefined (reading 'length')"}	{"threw":"Cannot read properties of undefined (reading 'length')"}
+true	"* || ^1.0.0"	{"threw":"Cannot read properties of undefined (reading 'length')"}	{"threw":"Cannot read properties of undefined (reading 'length')"}
+true	"^1.0.0 || *"	{"threw":"Invalid Version: true"}	{"threw":"Cannot read properties of undefined (reading 'length')"}
+true	">=0.0.0"	{"threw":"Invalid Version: true"}	{"threw":"Cannot read properties of undefined (reading 'length')"}
+true	"not a range"	false	false
+true	"* || *"	{"threw":"Cannot read properties of undefined (reading 'length')"}	{"threw":"Cannot read properties of undefined (reading 'length')"}
+[1]	"^1.0.0"	{"threw":"Invalid Version: 1"}	{"threw":"Invalid version. Must be a string. Got type \"object\"."}
+[1]	"*"	{"threw":"Cannot read properties of undefined (reading 'length')"}	{"threw":"Cannot read properties of undefined (reading 'length')"}
+[1]	""	{"threw":"Cannot read properties of undefined (reading 'length')"}	{"threw":"Cannot read properties of undefined (reading 'length')"}
+[1]	"x"	{"threw":"Cannot read properties of undefined (reading 'length')"}	{"threw":"Cannot read properties of undefined (reading 'length')"}
+[1]	"* || ^1.0.0"	{"threw":"Cannot read properties of undefined (reading 'length')"}	{"threw":"Cannot read properties of undefined (reading 'length')"}
+[1]	"^1.0.0 || *"	{"threw":"Invalid Version: 1"}	{"threw":"Cannot read properties of undefined (reading 'length')"}
+[1]	">=0.0.0"	{"threw":"Invalid Version: 1"}	{"threw":"Cannot read properties of undefined (reading 'length')"}
+[1]	"not a range"	false	false
+[1]	"* || *"	{"threw":"Cannot read properties of undefined (reading 'length')"}	{"threw":"Cannot read properties of undefined (reading 'length')"}
+["1","2"]	"^1.0.0"	{"threw":"Invalid Version: 1,2"}	{"threw":"Invalid version. Must be a string. Got type \"object\"."}
+["1","2"]	"*"	{"threw":"Cannot read properties of undefined (reading 'length')"}	{"threw":"Cannot read properties of undefined (reading 'length')"}
+["1","2"]	""	{"threw":"Cannot read properties of undefined (reading 'length')"}	{"threw":"Cannot read properties of undefined (reading 'length')"}
+["1","2"]	"x"	{"threw":"Cannot read properties of undefined (reading 'length')"}	{"threw":"Cannot read properties of undefined (reading 'length')"}
+["1","2"]	"* || ^1.0.0"	{"threw":"Cannot read properties of undefined (reading 'length')"}	{"threw":"Cannot read properties of undefined (reading 'length')"}
+["1","2"]	"^1.0.0 || *"	{"threw":"Invalid Version: 1,2"}	{"threw":"Cannot read properties of undefined (reading 'length')"}
+["1","2"]	">=0.0.0"	{"threw":"Invalid Version: 1,2"}	{"threw":"Cannot read properties of undefined (reading 'length')"}
+["1","2"]	"not a range"	false	false
+["1","2"]	"* || *"	{"threw":"Cannot read properties of undefined (reading 'length')"}	{"threw":"Cannot read properties of undefined (reading 'length')"}
+[]	"^1.0.0"	{"threw":"Invalid Version: "}	{"threw":"Invalid version. Must be a string. Got type \"object\"."}
+[]	"*"	{"threw":"Cannot read properties of undefined (reading 'length')"}	{"threw":"Cannot read properties of undefined (reading 'length')"}
+[]	""	{"threw":"Cannot read properties of undefined (reading 'length')"}	{"threw":"Cannot read properties of undefined (reading 'length')"}
+[]	"x"	{"threw":"Cannot read properties of undefined (reading 'length')"}	{"threw":"Cannot read properties of undefined (reading 'length')"}
+[]	"* || ^1.0.0"	{"threw":"Cannot read properties of undefined (reading 'length')"}	{"threw":"Cannot read properties of undefined (reading 'length')"}
+[]	"^1.0.0 || *"	{"threw":"Invalid Version: "}	{"threw":"Cannot read properties of undefined (reading 'length')"}
+[]	">=0.0.0"	{"threw":"Invalid Version: "}	{"threw":"Cannot read properties of undefined (reading 'length')"}
+[]	"not a range"	false	false
+[]	"* || *"	{"threw":"Cannot read properties of undefined (reading 'length')"}	{"threw":"Cannot read properties of undefined (reading 'length')"}
+{}	"^1.0.0"	{"threw":"Invalid Version: [object Object]"}	{"threw":"Invalid version. Must be a string. Got type \"object\"."}
+{}	"*"	{"threw":"Cannot read properties of undefined (reading 'length')"}	{"threw":"Cannot read properties of undefined (reading 'length')"}
+{}	""	{"threw":"Cannot read properties of undefined (reading 'length')"}	{"threw":"Cannot read properties of undefined (reading 'length')"}
+{}	"x"	{"threw":"Cannot read properties of undefined (reading 'length')"}	{"threw":"Cannot read properties of undefined (reading 'length')"}
+{}	"* || ^1.0.0"	{"threw":"Cannot read properties of undefined (reading 'length')"}	{"threw":"Cannot read properties of undefined (reading 'length')"}
+{}	"^1.0.0 || *"	{"threw":"Invalid Version: [object Object]"}	{"threw":"Cannot read properties of undefined (reading 'length')"}
+{}	">=0.0.0"	{"threw":"Invalid Version: [object Object]"}	{"threw":"Cannot read properties of undefined (reading 'length')"}
+{}	"not a range"	false	false
+{}	"* || *"	{"threw":"Cannot read properties of undefined (reading 'length')"}	{"threw":"Cannot read properties of undefined (reading 'length')"}
+{"prerelease":[]}	"^1.0.0"	{"threw":"Invalid Version: [object Object]"}	{"threw":"Invalid version. Must be a string. Got type \"object\"."}
+{"prerelease":[]}	"*"	true	true
+{"prerelease":[]}	""	true	true
+{"prerelease":[]}	"x"	true	true
+{"prerelease":[]}	"* || ^1.0.0"	true	true
+{"prerelease":[]}	"^1.0.0 || *"	{"threw":"Invalid Version: [object Object]"}	true
+{"prerelease":[]}	">=0.0.0"	{"threw":"Invalid Version: [object Object]"}	true
+{"prerelease":[]}	"not a range"	false	false
+{"prerelease":[]}	"* || *"	true	true
+{"prerelease":["a"]}	"^1.0.0"	{"threw":"Invalid Version: [object Object]"}	{"threw":"Invalid version. Must be a string. Got type \"object\"."}
+{"prerelease":["a"]}	"*"	false	false
+{"prerelease":["a"]}	""	false	false
+{"prerelease":["a"]}	"x"	false	false
+{"prerelease":["a"]}	"* || ^1.0.0"	{"threw":"Invalid Version: [object Object]"}	false
+{"prerelease":["a"]}	"^1.0.0 || *"	{"threw":"Invalid Version: [object Object]"}	false
+{"prerelease":["a"]}	">=0.0.0"	{"threw":"Invalid Version: [object Object]"}	false
+{"prerelease":["a"]}	"not a range"	false	false
+{"prerelease":["a"]}	"* || *"	false	false
+{"prerelease":"x"}	"^1.0.0"	{"threw":"Invalid Version: [object Object]"}	{"threw":"Invalid version. Must be a string. Got type \"object\"."}
+{"prerelease":"x"}	"*"	false	false
+{"prerelease":"x"}	""	false	false
+{"prerelease":"x"}	"x"	false	false
+{"prerelease":"x"}	"* || ^1.0.0"	{"threw":"Invalid Version: [object Object]"}	false
+{"prerelease":"x"}	"^1.0.0 || *"	{"threw":"Invalid Version: [object Object]"}	false
+{"prerelease":"x"}	">=0.0.0"	{"threw":"Invalid Version: [object Object]"}	false
+{"prerelease":"x"}	"not a range"	false	false
+{"prerelease":"x"}	"* || *"	false	false
+{"prerelease":""}	"^1.0.0"	{"threw":"Invalid Version: [object Object]"}	{"threw":"Invalid version. Must be a string. Got type \"object\"."}
+{"prerelease":""}	"*"	true	true
+{"prerelease":""}	""	true	true
+{"prerelease":""}	"x"	true	true
+{"prerelease":""}	"* || ^1.0.0"	true	true
+{"prerelease":""}	"^1.0.0 || *"	{"threw":"Invalid Version: [object Object]"}	true
+{"prerelease":""}	">=0.0.0"	{"threw":"Invalid Version: [object Object]"}	true
+{"prerelease":""}	"not a range"	false	false
+{"prerelease":""}	"* || *"	true	true
+{"prerelease":5}	"^1.0.0"	{"threw":"Invalid Version: [object Object]"}	{"threw":"Invalid version. Must be a string. Got type \"object\"."}
+{"prerelease":5}	"*"	true	true
+{"prerelease":5}	""	true	true
+{"prerelease":5}	"x"	true	true
+{"prerelease":5}	"* || ^1.0.0"	true	true
+{"prerelease":5}	"^1.0.0 || *"	{"threw":"Invalid Version: [object Object]"}	true
+{"prerelease":5}	">=0.0.0"	{"threw":"Invalid Version: [object Object]"}	true
+{"prerelease":5}	"not a range"	false	false
+{"prerelease":5}	"* || *"	true	true
+{"prerelease":null}	"^1.0.0"	{"threw":"Invalid Version: [object Object]"}	{"threw":"Invalid version. Must be a string. Got type \"object\"."}
+{"prerelease":null}	"*"	{"threw":"Cannot read properties of null (reading 'length')"}	{"threw":"Cannot read properties of null (reading 'length')"}
+{"prerelease":null}	""	{"threw":"Cannot read properties of null (reading 'length')"}	{"threw":"Cannot read properties of null (reading 'length')"}
+{"prerelease":null}	"x"	{"threw":"Cannot read properties of null (reading 'length')"}	{"threw":"Cannot read properties of null (reading 'length')"}
+{"prerelease":null}	"* || ^1.0.0"	{"threw":"Cannot read properties of null (reading 'length')"}	{"threw":"Cannot read properties of null (reading 'length')"}
+{"prerelease":null}	"^1.0.0 || *"	{"threw":"Invalid Version: [object Object]"}	{"threw":"Cannot read properties of null (reading 'length')"}
+{"prerelease":null}	">=0.0.0"	{"threw":"Invalid Version: [object Object]"}	{"threw":"Cannot read properties of null (reading 'length')"}
+{"prerelease":null}	"not a range"	false	false
+{"prerelease":null}	"* || *"	{"threw":"Cannot read properties of null (reading 'length')"}	{"threw":"Cannot read properties of null (reading 'length')"}
+{"prerelease":{"length":2}}	"^1.0.0"	{"threw":"Invalid Version: [object Object]"}	{"threw":"Invalid version. Must be a string. Got type \"object\"."}
+{"prerelease":{"length":2}}	"*"	false	false
+{"prerelease":{"length":2}}	""	false	false
+{"prerelease":{"length":2}}	"x"	false	false
+{"prerelease":{"length":2}}	"* || ^1.0.0"	{"threw":"Invalid Version: [object Object]"}	false
+{"prerelease":{"length":2}}	"^1.0.0 || *"	{"threw":"Invalid Version: [object Object]"}	false
+{"prerelease":{"length":2}}	">=0.0.0"	{"threw":"Invalid Version: [object Object]"}	false
+{"prerelease":{"length":2}}	"not a range"	false	false
+{"prerelease":{"length":2}}	"* || *"	false	false
+[null]	"^1.0.0"	{"threw":"Invalid Version: "}	{"threw":"Invalid version. Must be a string. Got type \"object\"."}
+[null]	"*"	{"threw":"Cannot read properties of undefined (reading 'length')"}	{"threw":"Cannot read properties of undefined (reading 'length')"}
+[null]	""	{"threw":"Cannot read properties of undefined (reading 'length')"}	{"threw":"Cannot read properties of undefined (reading 'length')"}
+[null]	"x"	{"threw":"Cannot read properties of undefined (reading 'length')"}	{"threw":"Cannot read properties of undefined (reading 'length')"}
+[null]	"* || ^1.0.0"	{"threw":"Cannot read properties of undefined (reading 'length')"}	{"threw":"Cannot read properties of undefined (reading 'length')"}
+[null]	"^1.0.0 || *"	{"threw":"Invalid Version: "}	{"threw":"Cannot read properties of undefined (reading 'length')"}
+[null]	">=0.0.0"	{"threw":"Invalid Version: "}	{"threw":"Cannot read properties of undefined (reading 'length')"}
+[null]	"not a range"	false	false
+[null]	"* || *"	{"threw":"Cannot read properties of undefined (reading 'length')"}	{"threw":"Cannot read properties of undefined (reading 'length')"}
+[[1,2]]	"^1.0.0"	{"threw":"Invalid Version: 1,2"}	{"threw":"Invalid version. Must be a string. Got type \"object\"."}
+[[1,2]]	"*"	{"threw":"Cannot read properties of undefined (reading 'length')"}	{"threw":"Cannot read properties of undefined (reading 'length')"}
+[[1,2]]	""	{"threw":"Cannot read properties of undefined (reading 'length')"}	{"threw":"Cannot read properties of undefined (reading 'length')"}
+[[1,2]]	"x"	{"threw":"Cannot read properties of undefined (reading 'length')"}	{"threw":"Cannot read properties of undefined (reading 'length')"}
+[[1,2]]	"* || ^1.0.0"	{"threw":"Cannot read properties of undefined (reading 'length')"}	{"threw":"Cannot read properties of undefined (reading 'length')"}
+[[1,2]]	"^1.0.0 || *"	{"threw":"Invalid Version: 1,2"}	{"threw":"Cannot read properties of undefined (reading 'length')"}
+[[1,2]]	">=0.0.0"	{"threw":"Invalid Version: 1,2"}	{"threw":"Cannot read properties of undefined (reading 'length')"}
+[[1,2]]	"not a range"	false	false
+[[1,2]]	"* || *"	{"threw":"Cannot read properties of undefined (reading 'length')"}	{"threw":"Cannot read properties of undefined (reading 'length')"}
+[{}]	"^1.0.0"	{"threw":"Invalid Version: [object Object]"}	{"threw":"Invalid version. Must be a string. Got type \"object\"."}
+[{}]	"*"	{"threw":"Cannot read properties of undefined (reading 'length')"}	{"threw":"Cannot read properties of undefined (reading 'length')"}
+[{}]	""	{"threw":"Cannot read properties of undefined (reading 'length')"}	{"threw":"Cannot read properties of undefined (reading 'length')"}
+[{}]	"x"	{"threw":"Cannot read properties of undefined (reading 'length')"}	{"threw":"Cannot read properties of undefined (reading 'length')"}
+[{}]	"* || ^1.0.0"	{"threw":"Cannot read properties of undefined (reading 'length')"}	{"threw":"Cannot read properties of undefined (reading 'length')"}
+[{}]	"^1.0.0 || *"	{"threw":"Invalid Version: [object Object]"}	{"threw":"Cannot read properties of undefined (reading 'length')"}
+[{}]	">=0.0.0"	{"threw":"Invalid Version: [object Object]"}	{"threw":"Cannot read properties of undefined (reading 'length')"}
+[{}]	"not a range"	false	false
+[{}]	"* || *"	{"threw":"Cannot read properties of undefined (reading 'length')"}	{"threw":"Cannot read properties of undefined (reading 'length')"}
+"1.0.0-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"	"^1.0.0"	{"threw":"version is longer than 256 characters"}	false
+"1.0.0-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"	"*"	{"threw":"version is longer than 256 characters"}	false
+"1.0.0-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"	""	{"threw":"version is longer than 256 characters"}	false
+"1.0.0-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"	"x"	{"threw":"version is longer than 256 characters"}	false
+"1.0.0-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"	"* || ^1.0.0"	{"threw":"version is longer than 256 characters"}	false
+"1.0.0-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"	"^1.0.0 || *"	{"threw":"version is longer than 256 characters"}	false
+"1.0.0-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"	">=0.0.0"	{"threw":"version is longer than 256 characters"}	false
+"1.0.0-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"	"not a range"	false	false
+"1.0.0-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"	"* || *"	{"threw":"version is longer than 256 characters"}	false

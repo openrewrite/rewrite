@@ -54,10 +54,6 @@ describeJavaRpc("a transfer that could not be read to its end", () => {
             await java.dispose();
         });
 
-        afterEach(() => {
-            vi.restoreAllMocks();
-        });
-
         test("is sent whole again after Java failed to receive it", async () => {
             const cu = await parse(1);
             const undecodable = await new class extends JavaScriptVisitor<number> {
@@ -71,8 +67,25 @@ describeJavaRpc("a transfer that could not be read to its end", () => {
             const after = await java.rpc.visit(cu, simplify, new ExecutionContext());
             expect(await TreePrinters.print(after as JS.CompilationUnit)).toEqual(simplified(1));
         });
+    });
 
-        // Java pages a thousand messages at a time, so the larger file is one it is still sending
+    // this side's page size only matters to what it sends
+    describe("with a thousand messages to a page from Java", () => {
+        let java: JavaRpcTestServer;
+
+        beforeAll(async () => {
+            java = await JavaRpcTestServer.start();
+        });
+
+        afterAll(async () => {
+            await java.dispose();
+        });
+
+        afterEach(() => {
+            vi.restoreAllMocks();
+        });
+
+        // the larger file is one Java is still sending
         test.each([1, 300])("is asked for whole again after this side failed to receive it (%d statements)", async statements => {
             const cu = await parse(statements);
 

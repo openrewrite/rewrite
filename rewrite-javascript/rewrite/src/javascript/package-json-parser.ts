@@ -343,6 +343,9 @@ export class PackageJsonParser extends Parser {
                     continue;
                 }
 
+                // a pattern without wildcards names the directory itself
+                candidates.push(absoluteBaseDir);
+
                 // Use walkDirs with appropriate depth limit
                 const dirs = await walkDirs(absoluteBaseDir, {
                     maxDepth: hasRecursive ? undefined : 0,
@@ -353,7 +356,7 @@ export class PackageJsonParser extends Parser {
             }
         }
 
-        return candidates;
+        return [...new Set(candidates)];
     }
 
     /**

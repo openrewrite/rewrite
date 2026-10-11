@@ -15,10 +15,12 @@
  */
 package org.openrewrite.javascript.internal;
 
+import lombok.Value;
 import lombok.experimental.UtilityClass;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
 import org.openrewrite.Tree;
+import org.openrewrite.marker.Markers;
 import org.openrewrite.marker.Markup;
 import org.openrewrite.javascript.marker.NodeResolutionResult;
 import org.openrewrite.javascript.marker.NodeResolutionResult.Dependency;
@@ -34,6 +36,7 @@ import org.openrewrite.yaml.tree.Yaml;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.*;
+import java.util.function.Function;
 import java.util.regex.Pattern;
 
 import static java.util.Collections.emptyList;
@@ -77,23 +80,67 @@ public class PackageJsonHelper {
         return members;
     }
 
-    // --- ctx side-channel for cross-recipe chaining ----------------------
+    /**
+     * A recipe's edits of the manifests and the package-manager files beside them, such as pnpm-workspace.yaml.
+     */
+    @FunctionalInterface
+    public interface FileEditor {
 
-    private static final String LIVE_PACKAGE_JSON_TREES =
-            "org.openrewrite.javascript.livePackageJsonTrees";
-
-    @SuppressWarnings("unchecked")
-    public static @Nullable SourceFile getLiveTree(ExecutionContext ctx, Path packageJsonPath) {
-        Map<Path, SourceFile> map = (Map<Path, SourceFile>) ctx.getMessage(LIVE_PACKAGE_JSON_TREES);
-        return map == null ? null : map.get(packageJsonPath);
+        /**
+         * {@code file}, as the recipes before this one in the cycle left it, with this recipe's edits.
+         */
+        SourceFile edit(ExecutionContext ctx, SourceFile file);
     }
 
-    public static void putLiveTree(ExecutionContext ctx, Path packageJsonPath, SourceFile tree) {
-        Map<Path, SourceFile> map = ctx.computeMessageIfAbsent(LIVE_PACKAGE_JSON_TREES, k -> new HashMap<>());
-        map.put(packageJsonPath, tree);
+    private static final String FILE_EDITORS = "org.openrewrite.javascript.packageManagerFileEditors";
+
+    private static final class FileEditors {
+        @Nullable
+        Object cycle;
+
+        final List<FileEditor> editors = new ArrayList<>();
     }
 
-    // --- Reparse helpers (preserve identity + markers) ------------------
+    /**
+     * Add {@code editor} to this cycle's editors of manifests and package-manager files, after those added before it.
+     */
+    public static void addFileEditor(ExecutionContext ctx, FileEditor editor) {
+        List<FileEditor> editors = fileEditors(ctx);
+        if (!editors.contains(editor)) {
+            editors.add(editor);
+        }
+    }
+
+    /**
+     * {@code scanned} as the editors added this cycle before {@code editor} leave it, in the order they were added.
+     */
+    public static SourceFile editedBefore(ExecutionContext ctx, FileEditor editor, SourceFile scanned) {
+        SourceFile file = scanned;
+        for (FileEditor earlier : new ArrayList<>(fileEditors(ctx))) {
+            if (earlier == editor) {
+                break;
+            }
+            file = earlier.edit(ctx, file);
+        }
+        return file;
+    }
+
+    private static List<FileEditor> fileEditors(ExecutionContext ctx) {
+        FileEditors editors = ctx.computeMessageIfAbsent(FILE_EDITORS, k -> new FileEditors());
+        Object cycle = ctx.getMessage(ExecutionContext.CURRENT_CYCLE);
+        if (editors.cycle != cycle) {
+            editors.cycle = cycle;
+            editors.editors.clear();
+        }
+        return editors.editors;
+    }
+
+    /**
+     * The file's text without its markers, which an earlier recipe's warning would otherwise print into.
+     */
+    public static String printed(SourceFile file) {
+        return file.printAll(new PrintOutputCapture<>(0, PrintOutputCapture.MarkerPrinter.SANITIZED));
+    }
 
     public static Json.Document reparseJson(Json.Document original, String newContent) {
         JsonParser parser = new JsonParser();
@@ -123,7 +170,7 @@ public class PackageJsonHelper {
         return original.withText(newContent);
     }
 
-    /** Reparse regenerated lock content, dispatching on the original's runtime type. */
+    /** Reparse regenerated lock content or an edited package-manager file, by the original's runtime type. */
     public static SourceFile reparseLock(SourceFile original, String newContent) {
         if (original instanceof Json.Document) {
             return reparseJson((Json.Document) original, newContent);
@@ -136,8 +183,6 @@ public class PackageJsonHelper {
         }
         return original;
     }
-
-    // --- Marker refresh ---------------------------------------------------
 
     /**
      * Re-derive the declared-dependency lists on the marker from the modified document;
@@ -224,12 +269,9 @@ public class PackageJsonHelper {
         return null;
     }
 
-    // --- Overlay helpers -------------------------------------------------
-
     /**
-     * Re-derive {@code resolvedDependencies} on the marker by parsing {@code lockContent} (npm, Bun,
-     * yarn classic/berry, pnpm; other PMs unchanged). Throws on a parse failure, which
-     * {@link #editAndRegenerate} surfaces via {@link org.openrewrite.marker.Markup#warn}.
+     * Re-derive {@code resolvedDependencies} on the marker from {@code lockContent}; throws on a parse failure, which
+     * {@link #editAndRegenerate} surfaces as a warning.
      */
     public static SourceFile overlayResolvedDeps(SourceFile pkg,
                                                  String lockContent,
@@ -299,8 +341,6 @@ public class PackageJsonHelper {
         return out;
     }
 
-    // --- JSON mutation helpers -------------------------------------------
-
     /**
      * Add {@code name: version} to {@code scope} in {@code doc}, creating the scope if absent;
      * a no-op when {@code name} is already present.
@@ -311,7 +351,6 @@ public class PackageJsonHelper {
 
         Json.JsonObject existingScope = findObjectMember(root, scope);
         if (existingScope == null) {
-            // Detect indent unit from the first root member's prefix (e.g. "\n  " → "  ").
             String outerIndent = detectIndentUnit(root);
             String innerIndent = outerIndent + outerIndent;
 
@@ -332,7 +371,6 @@ public class PackageJsonHelper {
             return doc.withValue(appendMember(root, newScopeMember));
         }
 
-        // Member already present? Skip (Add semantics).
         for (Json m : existingScope.getMembers()) {
             if (m instanceof Json.Member && name.equals(literalString(((Json.Member) m).getKey()))) {
                 return doc;
@@ -357,6 +395,92 @@ public class PackageJsonHelper {
             updatedScope = appendMember(existingScope, newDep);
         }
         return doc.withValue(replaceMember(root, scope, updatedScope));
+    }
+
+    /**
+     * {@code doc} with the members of its object {@code scope} in {@code order} of their keys, as a package manager
+     * writes a dependency field; each takes the layout of the member that stood in its place.
+     */
+    public static Json.Document sortMembers(Json.Document doc, String scope, Comparator<String> order) {
+        if (!(doc.getValue() instanceof Json.JsonObject)) return doc;
+        Json.JsonObject root = (Json.JsonObject) doc.getValue();
+        Json.JsonObject object = findObjectMember(root, scope);
+        if (object == null) return doc;
+        List<JsonRightPadded<Json>> members = object.getPadding().getMembers();
+        List<Json.Member> sorted = new ArrayList<>();
+        for (JsonRightPadded<Json> member : members) {
+            if (!(member.getElement() instanceof Json.Member)) return doc;
+            sorted.add((Json.Member) member.getElement());
+        }
+        sorted.sort(Comparator.comparing(member -> String.valueOf(literalString(member.getKey())), order));
+        List<JsonRightPadded<Json>> out = new ArrayList<>();
+        boolean changed = false;
+        for (int i = 0; i < members.size(); i++) {
+            Json.Member at = (Json.Member) members.get(i).getElement();
+            changed |= sorted.get(i) != at;
+            out.add(members.get(i).withElement(sorted.get(i).withPrefix(at.getPrefix())));
+        }
+        return changed ? doc.withValue(replaceMember(root, scope, object.getPadding().withMembers(out))) : doc;
+    }
+
+    /**
+     * Set {@code outerKey.innerKey[entryKey] = entryValue}, creating either object as needed; a no-op when the entry
+     * already holds {@code entryValue}.
+     */
+    public static Json.Document setNestedEntry(Json.Document doc, String outerKey, String innerKey,
+                                               String entryKey, String entryValue) {
+        if (!(doc.getValue() instanceof Json.JsonObject)) return doc;
+        Json.JsonObject root = (Json.JsonObject) doc.getValue();
+        String indent = detectIndentUnit(root);
+
+        Json.JsonObject outer = findObjectMember(root, outerKey);
+        if (outer == null) {
+            Json.JsonObject inner = newObjectHolding(makeMember(entryKey, makeStringLiteral(entryValue),
+                    Space.build("\n" + indent + indent + indent, emptyList())), indent + indent);
+            Json.JsonObject outerObj = newObjectHolding(makeMember(innerKey, inner,
+                    Space.build("\n" + indent + indent, emptyList())), indent);
+            return doc.withValue(appendMember(root, makeMember(outerKey, outerObj, Space.EMPTY)));
+        }
+
+        Json.JsonObject inner = findObjectMember(outer, innerKey);
+        if (inner == null) {
+            Json.JsonObject innerObj = newObjectHolding(makeMember(entryKey, makeStringLiteral(entryValue),
+                    Space.build("\n" + indent + indent + indent, emptyList())), indent + indent);
+            // {} parses as a single Json.Empty member, which an append would print as {,}
+            Json.JsonObject updatedOuter = outer.getMembers().stream().allMatch(m -> m instanceof Json.Empty) ?
+                    newObjectHolding(makeMember(innerKey, innerObj, Space.build("\n" + indent + indent, emptyList())),
+                            indent).withPrefix(outer.getPrefix()) :
+                    appendMember(outer, makeMember(innerKey, innerObj, Space.EMPTY));
+            return doc.withValue(replaceMember(root, outerKey, updatedOuter));
+        }
+
+        for (Json m : inner.getMembers()) {
+            if (!(m instanceof Json.Member)) continue;
+            Json.Member member = (Json.Member) m;
+            if (!entryKey.equals(literalString(member.getKey()))) continue;
+            if (entryValue.equals(literalString(member.getValue()))) {
+                return doc;
+            }
+            Json.Literal newLit = makeStringLiteral(entryValue).withPrefix(member.getValue().getPrefix());
+            return doc.withValue(replaceMember(root, outerKey,
+                    replaceMember(outer, innerKey, replaceMember(inner, entryKey, newLit))));
+        }
+
+        Json.JsonObject updatedInner;
+        if (inner.getMembers().stream().allMatch(m -> m instanceof Json.Empty)) {
+            updatedInner = newObjectHolding(makeMember(entryKey, makeStringLiteral(entryValue),
+                    Space.build("\n" + indent + indent + indent, emptyList())), indent + indent)
+                    .withPrefix(inner.getPrefix());
+        } else {
+            updatedInner = appendMember(inner, makeMember(entryKey, makeStringLiteral(entryValue), Space.EMPTY));
+        }
+        return doc.withValue(replaceMember(root, outerKey, replaceMember(outer, innerKey, updatedInner)));
+    }
+
+    private static Json.JsonObject newObjectHolding(Json.Member member, String closingIndent) {
+        return new Json.JsonObject(Tree.randomId(), Space.SINGLE_SPACE, Markers.EMPTY,
+                singletonList(JsonRightPadded.build((Json) member)
+                        .withAfter(Space.build("\n" + closingIndent, emptyList()))));
     }
 
     /**
@@ -389,7 +513,7 @@ public class PackageJsonHelper {
                 kept.add(rp);
             }
             if (kept.size() == scopeObj.getPadding().getMembers().size()) {
-                continue;  // member not present in this scope
+                continue;
             }
             changed = true;
             if (kept.isEmpty()) {
@@ -414,6 +538,45 @@ public class PackageJsonHelper {
             rootMembers.set(last, rootMembers.get(last).withAfter(originalLast.getAfter()));
         }
         return doc.withValue(root.getPadding().withMembers(rootMembers));
+    }
+
+    /**
+     * {@code doc} without each of its top-level {@code keys} whose value is an empty object.
+     */
+    public static Json.Document withoutEmptyObjects(Json.Document doc, Collection<String> keys) {
+        if (!(doc.getValue() instanceof Json.JsonObject)) return doc;
+        Json.JsonObject root = (Json.JsonObject) doc.getValue();
+        List<JsonRightPadded<Json>> members = root.getPadding().getMembers();
+        List<JsonRightPadded<Json>> kept = new ArrayList<>();
+        for (JsonRightPadded<Json> rp : members) {
+            Json elem = rp.getElement();
+            if (elem instanceof Json.Member && keys.contains(literalString(((Json.Member) elem).getKey())) &&
+                ((Json.Member) elem).getValue() instanceof Json.JsonObject && ((Json.JsonObject) ((Json.Member) elem)
+                    .getValue()).getMembers().stream().allMatch(m -> m instanceof Json.Empty)) {
+                continue;
+            }
+            kept.add(rp);
+        }
+        if (kept.size() == members.size() || kept.isEmpty()) return doc;
+        kept.set(kept.size() - 1, kept.get(kept.size() - 1).withAfter(members.get(members.size() - 1).getAfter()));
+        return doc.withValue(root.getPadding().withMembers(kept));
+    }
+
+    /** The indent unit of {@code doc}'s top-level members, or two spaces when none can be detected. */
+    public static String indentUnit(Json.Document doc) {
+        return doc.getValue() instanceof Json.JsonObject ? detectIndentUnit((Json.JsonObject) doc.getValue()) : "  ";
+    }
+
+    /** {@code doc} with the top-level member {@code key} holding {@code value}, appended when absent. */
+    public static Json.Document setMember(Json.Document doc, String key, JsonValue value) {
+        if (!(doc.getValue() instanceof Json.JsonObject)) return doc;
+        Json.JsonObject root = (Json.JsonObject) doc.getValue();
+        for (Json m : root.getMembers()) {
+            if (m instanceof Json.Member && key.equals(literalString(((Json.Member) m).getKey()))) {
+                return doc.withValue(replaceMember(root, key, value));
+            }
+        }
+        return doc.withValue(appendMember(root, makeMember(key, value, Space.EMPTY)));
     }
 
     /** The indent unit from {@code obj}'s first member, or two spaces when none can be detected. */
@@ -579,14 +742,97 @@ public class PackageJsonHelper {
     }
 
     /**
-     * Apply a transitive-dependency override to {@code doc} for the given package manager.
-     * Delegates to {@link PackageJsonOverrides#applyOverride}.
+     * Whether {@code doc}'s root holds {@code key} with a value that is not an object.
      */
-    public static Json.Document upgradeTransitive(Json.Document doc,
-                                                   NodeResolutionResult.PackageManager pm,
-                                                   String name, String newVersion,
-                                                   @Nullable List<DependencyPathSegment> path) {
-        return PackageJsonOverrides.applyOverride(doc, pm, name, newVersion, path);
+    public static boolean isNonObjectMember(Json.Document doc, String key) {
+        if (!(doc.getValue() instanceof Json.JsonObject)) {
+            return false;
+        }
+        for (Json m : ((Json.JsonObject) doc.getValue()).getMembers()) {
+            if (m instanceof Json.Member && key.equals(literalString(((Json.Member) m).getKey()))) {
+                return !(((Json.Member) m).getValue() instanceof Json.JsonObject);
+            }
+        }
+        return false;
+    }
+
+    /**
+     * The dependency maps a package.json declares, by scope then name, read from the document: the values as written.
+     */
+    public static Map<String, Map<String, String>> declaredDependencies(SourceFile packageJson) {
+        Map<String, Map<String, String>> declared = new LinkedHashMap<>();
+        if (!(packageJson instanceof Json.Document) || !(((Json.Document) packageJson).getValue() instanceof
+                Json.JsonObject)) {
+            return declared;
+        }
+        Json.JsonObject root = (Json.JsonObject) ((Json.Document) packageJson).getValue();
+        for (String scope : Arrays.asList("dependencies", "devDependencies", "peerDependencies",
+                "optionalDependencies")) {
+            Json.JsonObject members = findObjectMember(root, scope);
+            if (members == null) {
+                continue;
+            }
+            Map<String, String> values = new LinkedHashMap<>();
+            for (Json m : members.getMembers()) {
+                if (m instanceof Json.Member) {
+                    String name = literalString(((Json.Member) m).getKey());
+                    Object value = ((Json.Member) m).getValue() instanceof Json.Literal ?
+                            ((Json.Literal) ((Json.Member) m).getValue()).getValue() : null;
+                    if (name != null && value instanceof String) {
+                        values.put(name, (String) value);
+                    }
+                }
+            }
+            declared.put(scope, values);
+        }
+        return declared;
+    }
+
+    /**
+     * The {@code name} a package.json declares, read from the document; null when it holds no string there.
+     */
+    public static @Nullable String declaredName(SourceFile packageJson) {
+        if (!(packageJson instanceof Json.Document) || !(((Json.Document) packageJson).getValue() instanceof
+                Json.JsonObject)) {
+            return null;
+        }
+        for (Json m : ((Json.JsonObject) ((Json.Document) packageJson).getValue()).getMembers()) {
+            if (m instanceof Json.Member && "name".equals(literalString(((Json.Member) m).getKey()))) {
+                return literalString(((Json.Member) m).getValue());
+            }
+        }
+        return null;
+    }
+
+    /**
+     * {@code doc} with the string member {@code key} of the object {@code path} leads to set to {@code value}, in place
+     * or appended; unchanged when the path leads to no object holding members.
+     */
+    public static Json.Document withStringMember(Json.Document doc, List<String> path, String key, String value) {
+        if (!(doc.getValue() instanceof Json.JsonObject)) {
+            return doc;
+        }
+        Json.JsonObject updated = withStringMember((Json.JsonObject) doc.getValue(), path, 0, key, value);
+        return updated == null ? doc : doc.withValue(updated);
+    }
+
+    private static Json.@Nullable JsonObject withStringMember(Json.JsonObject obj, List<String> path, int depth,
+                                                              String key, String value) {
+        if (depth < path.size()) {
+            Json.JsonObject child = findObjectMember(obj, path.get(depth));
+            Json.JsonObject updated = child == null ? null : withStringMember(child, path, depth + 1, key, value);
+            return updated == null ? null : replaceMember(obj, path.get(depth), updated);
+        }
+        for (Json m : obj.getMembers()) {
+            if (m instanceof Json.Member && key.equals(literalString(((Json.Member) m).getKey()))) {
+                JsonValue old = ((Json.Member) m).getValue();
+                return replaceMember(obj, key, makeStringLiteral(value).withPrefix(old.getPrefix()));
+            }
+        }
+        if (obj.getMembers().stream().allMatch(m -> m instanceof Json.Empty)) {
+            return null;
+        }
+        return appendMember(obj, makeMember(key, makeStringLiteral(value), Space.EMPTY));
     }
 
     /**
@@ -645,7 +891,6 @@ public class PackageJsonHelper {
     /** A member with {@code prefix}; a bare literal value gets a leading space so it prints {@code "key": "value"}. */
     private static Json.Member makeMember(String key, JsonValue value, Space prefix) {
         Json.Literal keyLit = makeStringLiteral(key);
-        // Ensure there's a space between ':' and the value (standard JSON formatting).
         JsonValue spacedValue = value;
         if (value instanceof Json.Literal && ((Json.Literal) value).getPrefix().getWhitespace().isEmpty()) {
             spacedValue = ((Json.Literal) value).withPrefix(Space.SINGLE_SPACE);
@@ -657,62 +902,77 @@ public class PackageJsonHelper {
                 spacedValue);
     }
 
-    // --- Edit-and-regenerate orchestration ---------------------------------
-
-    @lombok.Value
+    @Value
     public static class EditAndRegenerateResult {
+        /**
+         * The package.json as the edit leaves it; null when the edit changes only {@link #editedFiles}.
+         */
         @Nullable SourceFile modifiedPackageJson;
+
         LockFileRegeneration.@Nullable Result regenResult;
 
-        public boolean isChanged() { return modifiedPackageJson != null; }
+        /**
+         * The package-manager files the edit changes or creates, by path, which travel to the visitor as the lock does.
+         */
+        Map<Path, String> editedFiles;
 
-        public static EditAndRegenerateResult unchanged() {
-            return new EditAndRegenerateResult(null, null);
+        /**
+         * Whether the edit changes the package.json or one of {@link #editedFiles}, and so the lock was regenerated.
+         */
+        public boolean isChanged() { return modifiedPackageJson != null || !editedFiles.isEmpty(); }
+
+        /**
+         * {@code visited} as the edit leaves it, parsed as it was, when it is one of {@link #editedFiles}; else null.
+         */
+        public @Nullable SourceFile editedFile(SourceFile visited) {
+            String content = editedFiles.get(visited.getSourcePath());
+            return content == null ? null : reparseLock(visited, content);
         }
 
-        public static EditAndRegenerateResult changed(SourceFile modified,
-                                                      LockFileRegeneration.@Nullable Result regen) {
-            return new EditAndRegenerateResult(modified, regen);
+        public static EditAndRegenerateResult unchanged() {
+            return new EditAndRegenerateResult(null, null, Collections.emptyMap());
         }
     }
 
     /**
-     * Apply a recipe-specific edit to a package.json, refresh its declared-deps
-     * marker, and (when the marker carries a package manager and a lock was captured
-     * at scan time) regenerate the lock file content via {@link LockFileRegeneration}.
+     * Apply a recipe's edit to a package.json and the package-manager files it edits ({@code editedFiles}, by path),
+     * refresh its marker and regenerate the captured lock over {@code projectFiles}, the rest of the project.
      */
     public static EditAndRegenerateResult editAndRegenerate(
             SourceFile packageJson,
-            java.util.function.Function<Json.Document, Json.Document> editFn,
+            Function<Json.Document, Json.Document> editFn,
+            Map<Path, String> editedFiles,
             @Nullable String capturedLockContent,
+            NodeDependencyScan.ProjectFiles projectFiles,
             ExecutionContext ctx) {
         if (!(packageJson instanceof Json.Document)) {
             return EditAndRegenerateResult.unchanged();
         }
         Json.Document before = (Json.Document) packageJson;
         Json.Document after = editFn.apply(before);
-        if (after == before) {
+        Map<Path, String> changed = changedFiles(editedFiles, projectFiles);
+        if (after == before && changed.isEmpty()) {
             return EditAndRegenerateResult.unchanged();
         }
         SourceFile refreshed = refreshMarker(after);
-        String originalPackageJsonContent = before.printAll();
         LockFileRegeneration.Result regen = capturedLockContent == null ? null
-                : regenerateLockContent(refreshed, originalPackageJsonContent, capturedLockContent, ctx);
-        return EditAndRegenerateResult.changed(withResolvedDeps(refreshed, regen), regen);
+                : regenerateLockContent(refreshed, capturedLockContent, projectFiles, changed, ctx);
+        return new EditAndRegenerateResult(after == before ? null : withResolvedDeps(refreshed, regen), regen, changed);
     }
 
-    /**
-     * Apply an edit already made (and its lock already regenerated) to another revision of the
-     * package.json, such as one an earlier recipe in the same run changed after the edit was first
-     * computed. The declared dependencies are what the lock depends on, so {@code regen} still applies.
-     */
-    public static SourceFile reapplyEdit(SourceFile packageJson,
-                                         java.util.function.Function<Json.Document, Json.Document> editFn,
-                                         LockFileRegeneration.@Nullable Result regen) {
-        if (!(packageJson instanceof Json.Document)) {
-            return packageJson;
+    private static Map<Path, String> changedFiles(Map<Path, String> editedFiles,
+                                                  NodeDependencyScan.ProjectFiles projectFiles) {
+        Map<Path, String> changed = new LinkedHashMap<>();
+        for (Map.Entry<Path, String> file : editedFiles.entrySet()) {
+            String captured = projectFiles.getPackageManagerFiles().get(file.getKey());
+            if (captured == null) {
+                captured = projectFiles.getManifests().get(file.getKey());
+            }
+            if (!file.getValue().equals(captured)) {
+                changed.put(file.getKey(), file.getValue());
+            }
         }
-        return withResolvedDeps(refreshMarker(editFn.apply((Json.Document) packageJson)), regen);
+        return changed;
     }
 
     private static SourceFile withResolvedDeps(SourceFile refreshed, LockFileRegeneration.@Nullable Result regen) {
@@ -727,19 +987,16 @@ public class PackageJsonHelper {
         try {
             return overlayResolvedDeps(refreshed, regen.getLockFileContent(), marker.getPackageManager());
         } catch (RuntimeException e) {
-            return Markup.warn(refreshed, new RuntimeException("lock parse failed: " + e.getMessage(), e));
+            return Markup.markup(refreshed,
+                    new Markup.Warn(Tree.randomId(), "lock parse failed: " + e.getMessage(), null));
         }
     }
 
     public static LockFileRegeneration.@Nullable Result regenerateLockContent(
-            SourceFile packageJson, @Nullable String capturedLockContent, ExecutionContext ctx) {
-        return regenerateLockContent(packageJson, null, capturedLockContent, ctx);
-    }
-
-    public static LockFileRegeneration.@Nullable Result regenerateLockContent(
             SourceFile packageJson,
-            @Nullable String originalPackageJsonContent,
             @Nullable String capturedLockContent,
+            NodeDependencyScan.ProjectFiles projectFiles,
+            Map<Path, String> editedFiles,
             ExecutionContext ctx) {
         NodeResolutionResult marker = packageJson.getMarkers()
                 .findFirst(NodeResolutionResult.class).orElse(null);
@@ -750,11 +1007,16 @@ public class PackageJsonHelper {
         if (regen == null) {
             return null;
         }
-        // Print without markers: a Markup.warn from an earlier failed run must not corrupt the manifest
-        // handed to regeneration.
-        String content = packageJson.printAll(
-                new PrintOutputCapture<>(0, PrintOutputCapture.MarkerPrinter.SANITIZED));
-        return regen.regenerate(content, originalPackageJsonContent,
-                capturedLockContent, marker, packageJson.getSourcePath(), ctx);
+        String content = printed(packageJson);
+        return regen.regenerate(LockFileRegeneration.Request.builder()
+                .packageJson(content)
+                .lock(capturedLockContent)
+                .marker(marker)
+                .packageJsonPath(packageJson.getSourcePath())
+                .manifests(projectFiles.getManifests())
+                .packageManagerFiles(projectFiles.getPackageManagerFiles())
+                .editedFiles(editedFiles)
+                .projectPaths(projectFiles.getPaths())
+                .build(), ctx);
     }
 }

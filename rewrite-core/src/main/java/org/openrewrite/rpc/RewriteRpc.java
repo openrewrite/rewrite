@@ -84,7 +84,9 @@ public class RewriteRpc {
      * Keeps track of the local and remote state of objects that are used in
      * visits and other operations for which incremental state sharing is useful
      * between two processes. Note these do not need to be ConcurrentHashMap as
-     * each RewriteRpc instance is held in its own ThreadLocal in RewriteRpcProcessManager
+     * each RewriteRpc instance is held in its own ThreadLocal in RewriteRpcProcessManager.
+     * The exception is {@link #localRefs}, which GetObject traversal threads write too, so
+     * it is only rolled back through {@link GetObject.Handler#cancelInProgress}.
      */
     @VisibleForTesting
     final Map<String, Object> remoteObjects = new HashMap<>();
@@ -100,6 +102,8 @@ public class RewriteRpc {
 
     @VisibleForTesting
     final IdentityHashMap<Object, Integer> localRefs = new IdentityHashMap<>();
+
+    private final GetObject.Handler getObject;
 
     private @Nullable List<String> remoteLanguages;
 
@@ -180,7 +184,7 @@ public class RewriteRpc {
                 getRecipeObject, this::getCursor));
         jsonRpc.rpc("Generate", new Generate.Handler(localObjects, preparedRecipes,
                 getRecipeObject));
-        GetObject.Handler getObject = new GetObject.Handler(batchSize, remoteObjects, localObjects,
+        getObject = new GetObject.Handler(batchSize, remoteObjects, localObjects,
                 localRefs, log, () -> traceGetObject.get().isSend());
         jsonRpc.rpc("GetObject", getObject);
         jsonRpc.rpc("AbortGetObject", new JsonRpcMethod<AbortGetObject>() {
@@ -256,11 +260,13 @@ public class RewriteRpc {
         jsonRpc.rpc("Reset", new JsonRpcMethod<Void>() {
             @Override
             protected Boolean handle(Void noParams) {
-                remoteObjects.clear();
-                localObjects.clear();
-                localObjectIds.clear();
+                getObject.cancelInProgress(() -> {
+                    remoteObjects.clear();
+                    localObjects.clear();
+                    localObjectIds.clear();
+                    localRefs.clear();
+                });
                 remoteRefs.clear();
-                localRefs.clear();
                 preparedRecipes.getInstantiated().clear();
                 preparedRecipes.getRecipeCursors().clear();
                 return true;
@@ -369,11 +375,13 @@ public class RewriteRpc {
         send("Reset", null, Boolean.class);
 
         // Clear local caches
-        remoteObjects.clear();
-        localObjects.clear();
-        localObjectIds.clear();
+        getObject.cancelInProgress(() -> {
+            remoteObjects.clear();
+            localObjects.clear();
+            localObjectIds.clear();
+            localRefs.clear();
+        });
         remoteRefs.clear();
-        localRefs.clear();
         remoteLanguages = null;
     }
 
@@ -396,7 +404,8 @@ public class RewriteRpc {
      * Drop a file's tree from both peers and roll their refs back to the pre-file checkpoint.
      * Symmetric by design: dropping the send-side ref forces the next file to re-{@code ADD} the
      * interned object instead of a {@code REF_USE} the rolled-back receiver would reject. Notified
-     * fire-and-forget — under source-outer iteration the file's transfer is already complete.
+     * fire-and-forget — under source-outer iteration the file's transfer is already complete. One
+     * that isn't, because the caller gave up on the remote mid-transfer, is cancelled first.
      *
      * @param localRefsCheckpoint  {@code refCheckpoint()[0]} captured before the file was visited
      * @param remoteRefsCheckpoint {@code refCheckpoint()[1]} captured before the file was visited
@@ -404,10 +413,11 @@ public class RewriteRpc {
     public void evict(String id, int localRefsCheckpoint, int remoteRefsCheckpoint) {
         jsonRpc.notify(new JsonRpcRequest(null, "Evict", RawJson.of(new Evict(id))));
 
-        remoteObjects.remove(id);
-        localObjects.remove(id);
-
-        localRefs.values().removeIf(ref -> ref > localRefsCheckpoint);
+        getObject.cancelInProgress(() -> {
+            remoteObjects.remove(id);
+            localObjects.remove(id);
+            localRefs.values().removeIf(ref -> ref > localRefsCheckpoint);
+        });
         remoteRefs.keySet().removeIf(ref -> ref > remoteRefsCheckpoint);
     }
 

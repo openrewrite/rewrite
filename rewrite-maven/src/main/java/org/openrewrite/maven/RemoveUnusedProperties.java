@@ -37,6 +37,7 @@ import org.openrewrite.xml.tree.Xml;
 import java.nio.file.InvalidPathException;
 import java.nio.file.Path;
 import java.util.*;
+import java.util.function.Consumer;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -56,6 +57,9 @@ public class RemoveUnusedProperties extends ScanningRecipe<RemoveUnusedPropertie
     String displayName = "Remove unused properties";
 
     String description = "Detect and remove Maven property declarations which do not have any usage within the project.";
+
+    private static final Pattern DOLLAR_PROPERTY_USAGE = Pattern.compile("(?<![$\\\\])\\$\\{([^${}\\s]+)}");
+    private static final Pattern AT_PROPERTY_USAGE = Pattern.compile("@([^@\\s]+)@");
 
     public static class Accumulator {
         public Map<String, Set<MavenResolutionResult>> propertiesToUsingPoms = new HashMap<>();
@@ -89,10 +93,10 @@ public class RemoveUnusedProperties extends ScanningRecipe<RemoveUnusedPropertie
 
     @Override
     public TreeVisitor<?, ExecutionContext> getScanner(RemoveUnusedProperties.Accumulator acc) {
-        String patternOrDefault = getPropertyPattern();
-        MavenIsoVisitor<ExecutionContext> findPomUsagesVisitor = new FindPomUsagesVisitor(dollarPropertyMatcher(patternOrDefault), acc);
+        Pattern propertyMatcher = Pattern.compile(getPropertyPattern());
+        MavenIsoVisitor<ExecutionContext> findPomUsagesVisitor = new FindPomUsagesVisitor(propertyMatcher, acc);
         MavenIsoVisitor<ExecutionContext> findFilteredResourcePathsVisitor = new FindFilteredResourcePathsVisitor(acc);
-        PlainTextVisitor<ExecutionContext> findResourceUsagesVisitor = new FindResourceUsagesVisitor(patternOrDefault, acc);
+        PlainTextVisitor<ExecutionContext> findResourceUsagesVisitor = new FindResourceUsagesVisitor(propertyMatcher, acc);
 
         return new TreeVisitor<Tree, ExecutionContext>() {
             @Override
@@ -114,12 +118,14 @@ public class RemoveUnusedProperties extends ScanningRecipe<RemoveUnusedPropertie
         };
     }
 
-    private static Pattern dollarPropertyMatcher(String patternOrDefault) {
-        return Pattern.compile("(?<![$\\\\])\\$\\{(" + patternOrDefault + ")}");
-    }
-
-    private static Pattern atPropertyMatcher(String patternOrDefault) {
-        return Pattern.compile("@(" + patternOrDefault + ")@");
+    private static void forEachPropertyUsage(Pattern usagePattern, Pattern propertyMatcher, String text, Consumer<String> action) {
+        Matcher matcher = usagePattern.matcher(text);
+        while (matcher.find()) {
+            String propertyName = matcher.group(1);
+            if (propertyMatcher.matcher(propertyName).matches()) {
+                action.accept(propertyName);
+            }
+        }
     }
 
     @Override
@@ -200,25 +206,19 @@ public class RemoveUnusedProperties extends ScanningRecipe<RemoveUnusedPropertie
     }
 
     private static class FindPomUsagesVisitor extends MavenIsoVisitor<ExecutionContext> {
-        private final Pattern propertyUsageMatcher;
+        private final Pattern propertyMatcher;
         private final Accumulator acc;
 
-        public FindPomUsagesVisitor(Pattern propertyUsageMatcher, Accumulator acc) {
-            this.propertyUsageMatcher = propertyUsageMatcher;
+        public FindPomUsagesVisitor(Pattern propertyMatcher, Accumulator acc) {
+            this.propertyMatcher = propertyMatcher;
             this.acc = acc;
         }
 
         @Override
         public Xml.Tag visitTag(Xml.Tag tag, ExecutionContext ctx) {
             Xml.Tag t = super.visitTag(tag, ctx);
-            Optional<String> value = t.getValue();
-            if (value.isPresent()) {
-                Matcher matcher = propertyUsageMatcher.matcher(value.get());
-                while (matcher.find()) {
-                    acc.propertiesToUsingPoms.putIfAbsent(matcher.group(1), new HashSet<>());
-                    acc.propertiesToUsingPoms.get(matcher.group(1)).add(getResolutionResult());
-                }
-            }
+            t.getValue().ifPresent(value -> forEachPropertyUsage(DOLLAR_PROPERTY_USAGE, propertyMatcher, value, propertyName ->
+                    acc.propertiesToUsingPoms.computeIfAbsent(propertyName, k -> new HashSet<>()).add(getResolutionResult())));
             return t;
         }
     }
@@ -251,28 +251,20 @@ public class RemoveUnusedProperties extends ScanningRecipe<RemoveUnusedPropertie
     }
 
     private static class FindResourceUsagesVisitor extends PlainTextVisitor<ExecutionContext> {
-        private final Pattern dollarMatcher;
-        private final Pattern atMatcher;
+        private final Pattern propertyMatcher;
         private final Accumulator acc;
 
-        public FindResourceUsagesVisitor(String pattern, Accumulator acc) {
-            this.dollarMatcher = dollarPropertyMatcher(pattern);
-            this.atMatcher = atPropertyMatcher(pattern);
+        public FindResourceUsagesVisitor(Pattern propertyMatcher, Accumulator acc) {
+            this.propertyMatcher = propertyMatcher;
             this.acc = acc;
         }
 
         @Override
         public PlainText visitText(PlainText text, ExecutionContext ctx) {
-            Matcher matcher = dollarMatcher.matcher(text.getText());
-            while (matcher.find()) {
-                acc.nonPomPathsToUsages.putIfAbsent(text.getSourcePath(), new HashSet<>());
-                acc.nonPomPathsToUsages.get(text.getSourcePath()).add(matcher.group(1));
-            }
-            matcher = atMatcher.matcher(text.getText());
-            while (matcher.find()) {
-                acc.nonPomPathsToUsages.putIfAbsent(text.getSourcePath(), new HashSet<>());
-                acc.nonPomPathsToUsages.get(text.getSourcePath()).add(matcher.group(1));
-            }
+            Consumer<String> addUsage = propertyName ->
+                    acc.nonPomPathsToUsages.computeIfAbsent(text.getSourcePath(), k -> new HashSet<>()).add(propertyName);
+            forEachPropertyUsage(DOLLAR_PROPERTY_USAGE, propertyMatcher, text.getText(), addUsage);
+            forEachPropertyUsage(AT_PROPERTY_USAGE, propertyMatcher, text.getText(), addUsage);
             return text;
         }
     }

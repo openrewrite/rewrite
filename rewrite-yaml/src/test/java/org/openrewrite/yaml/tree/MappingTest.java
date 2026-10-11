@@ -316,6 +316,25 @@ class MappingTest implements RewriteTest {
     }
 
     @Test
+    void scalarValueOnLineAfterAnchor() {
+        rewriteRun(
+          yaml(
+            """
+              version: &version
+                28-stable
+              stage: *version
+              """,
+            spec -> spec.afterRecipe(y -> {
+                var mapping = (Yaml.Mapping) y.getDocuments().getFirst().getBlock();
+                var anchored = (Scalar) mapping.getEntries().getFirst().getValue();
+                assertThat(anchored.getValue()).isEqualTo("28-stable");
+                assertThat(anchored.getAnchor().getPostfix()).isEqualTo("\n  ");
+            })
+          )
+        );
+    }
+
+    @Test
     void scalarValueInBrackets() {
         rewriteRun(
           yaml(

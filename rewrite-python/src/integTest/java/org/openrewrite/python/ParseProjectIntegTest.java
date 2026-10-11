@@ -20,6 +20,8 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
 import org.junit.jupiter.api.io.TempDir;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.openrewrite.InMemoryExecutionContext;
 import org.openrewrite.SourceFile;
 import org.openrewrite.java.JavaIsoVisitor;
@@ -231,6 +233,36 @@ class ParseProjectIntegTest {
                 .orElseThrow();
         assertThat(pyproject).isInstanceOf(Toml.Document.class);
         assertThat(pyproject.getMarkers().findFirst(PythonResolutionResult.class)).isPresent();
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"uv.lock", "poetry.lock", "pdm.lock"})
+    @Timeout(value = 60, unit = TimeUnit.SECONDS)
+    void includesPyprojectLockFile(String lockFileName) throws Exception {
+        Path projectDir = tempDir.resolve("with_" + lockFileName.replace('.', '_'));
+        Files.createDirectories(projectDir);
+
+        Files.writeString(projectDir.resolve("main.py"), "x = 1");
+        Files.writeString(projectDir.resolve("pyproject.toml"), """
+                [project]
+                name = "myapp"
+                version = "1.0.0"
+                dependencies = ["requests>=2.28.0"]
+                """);
+        Files.writeString(projectDir.resolve(lockFileName), """
+                [[package]]
+                name = "requests"
+                version = "2.31.0"
+                """);
+
+        List<SourceFile> sources = client()
+                .parseProject(projectDir, new InMemoryExecutionContext())
+                .collect(toList());
+
+        assertThat(sources)
+                .filteredOn(sf -> sf.getSourcePath().getFileName().toString().equals(lockFileName))
+                .singleElement()
+                .isInstanceOf(Toml.Document.class);
     }
 
     @Test

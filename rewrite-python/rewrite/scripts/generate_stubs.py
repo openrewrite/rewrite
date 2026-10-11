@@ -255,7 +255,7 @@ def is_plain_public_class(node: ast.ClassDef) -> bool:
 
 
 def is_enum(node: ast.ClassDef) -> bool:
-    return any(isinstance(base, ast.Name) and base.id == 'Enum' for base in node.bases)
+    return any(isinstance(base, ast.Name) and base.id in ('Enum', 'IntFlag') for base in node.bases)
 
 
 def get_class_bases(node: ast.ClassDef) -> str:
