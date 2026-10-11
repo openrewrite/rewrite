@@ -17,6 +17,7 @@ package org.openrewrite.javascript.internal.lock;
 
 import lombok.Getter;
 import org.jspecify.annotations.Nullable;
+import org.openrewrite.javascript.semver.NodeSemver;
 
 import java.io.IOException;
 import java.io.UncheckedIOException;
@@ -27,6 +28,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.Enumeration;
 import java.util.List;
@@ -69,6 +71,18 @@ public abstract class LockScenario {
 
     public static final String SCENARIOS_ENV = "REWRITE_LOCK_SCENARIOS";
     public static final String HTTP_CACHE_ENV = "REWRITE_LOCK_HTTP_CACHE";
+
+    /**
+     * When set, a scenario is replayed as every release of each range its {@code releases} files name, not only the
+     * first and last.
+     */
+    public static final String EVERY_RELEASE_ENV = "REWRITE_LOCK_EVERY_RELEASE";
+
+    /**
+     * When set to a node-semver range, the releases in it are replayed, proven or not; unset, the releases the
+     * package manager's port claims to reproduce.
+     */
+    public static final String RELEASES_ENV = "REWRITE_LOCK_RELEASES";
 
     private final String name;
 
@@ -273,6 +287,56 @@ public abstract class LockScenario {
             }
         }
         return false;
+    }
+
+    /**
+     * The releases a {@code releases} file names, one range a line ({@code 10.0.0 - 10.9.9} or {@code 12.0.0}): the
+     * first and last release of each, or with {@link #EVERY_RELEASE_ENV} every release of {@code all} (ascending)
+     * between them, which proves a range of releases. Only the releases of {@code proven}, the node-semver range the
+     * engine claims, are replayed, unless {@link #RELEASES_ENV} names another range, proven or not.
+     */
+    public static List<String> releaseEndpoints(Path releases, List<String> all, String proven) {
+        boolean every = System.getenv(EVERY_RELEASE_ENV) != null && !System.getenv(EVERY_RELEASE_ENV).isEmpty();
+        List<String> endpoints = new ArrayList<>();
+        if (Files.isRegularFile(releases)) {
+            for (String line : read(releases).split("\n")) {
+                String[] range = line.trim().split("\\s+-\\s+");
+                if (range[0].isEmpty()) {
+                    continue;
+                }
+                String first = range[0];
+                String last = range[range.length - 1];
+                for (String release : every ? all : Arrays.asList(first, last)) {
+                    if (compareReleases(release, first) >= 0 && compareReleases(release, last) <= 0 &&
+                        replays(release, proven) && !endpoints.contains(release)) {
+                        endpoints.add(release);
+                    }
+                }
+            }
+        }
+        return endpoints;
+    }
+
+    /**
+     * Two releases ({@code 4.10.3}) by major, minor and patch.
+     */
+    public static int compareReleases(String a, String b) {
+        String[] x = a.split("\\.");
+        String[] y = b.split("\\.");
+        for (int i = 0; i < 3; i++) {
+            int c = Integer.compare(Integer.parseInt(x[i]), Integer.parseInt(y[i]));
+            if (c != 0) {
+                return c;
+            }
+        }
+        return 0;
+    }
+
+    // the releases the engine claims, or the node-semver range REWRITE_LOCK_RELEASES names
+    private static boolean replays(String release, String proven) {
+        String range = System.getenv(RELEASES_ENV);
+        return NodeSemver.satisfies(release, range == null || range.isEmpty() ? proven : range,
+                NodeSemver.Options.DEFAULT);
     }
 
     private static @Nullable Path directory(@Nullable String path) {

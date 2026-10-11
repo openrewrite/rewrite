@@ -114,8 +114,26 @@ final class PatchResolver implements Resolver {
                                  ", locked over " + StructUtils.stringifyLocator(spec.getSourceItem()) +
                                  " (its hash= and checksum need the patch text the Yarn release ships)");
         }
+        // makePatchHash of the release's own patch text, whose effects for the source version the release data holds:
+        // a release that patches the version otherwise writes another locator, with the checksum of its patch applied
+        if (parsed.getPatchPaths().size() == 1) {
+            YarnRelease release = opts.getProject().configuration.getRelease();
+            String builtin = PatchUtils.builtinName(parsed.getPatchPaths().get(0));
+            String hash = builtin == null || !builtin.startsWith(COMPAT) ? null :
+                    release.compatPatchHash(builtin.substring(COMPAT.length()), String.valueOf(sourcePackage.version));
+            Locator released = hash == null ? null : PatchUtils.makeLocator(descriptor, parsed.getParentLocator(),
+                    sourcePackage, parsed.getPatchPaths(), hash);
+            if (released == null || !released.locatorHash.equals(locked.locatorHash)) {
+                throw new CannotKnow("the checksum of " + (released == null ? "the builtin compat patch of " +
+                        StructUtils.stringifyLocator(sourcePackage) : StructUtils.stringifyLocator(released)) +
+                                     " (builtin compat patch changed: Yarn " + release.getVersion() + " applies its " +
+                                     "own to the source's archive)");
+            }
+        }
         return Collections.singletonList(locked);
     }
+
+    private static final String COMPAT = "compat/";
 
     @Override
     public Satisfying getSatisfying(Descriptor descriptor, Map<String, Package> dependencies,

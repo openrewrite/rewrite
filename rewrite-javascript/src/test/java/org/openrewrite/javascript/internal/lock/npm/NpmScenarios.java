@@ -21,7 +21,6 @@ import org.openrewrite.javascript.internal.lock.Host;
 import org.openrewrite.javascript.internal.lock.HostInputs;
 import org.openrewrite.javascript.internal.lock.HostRegistries;
 import org.openrewrite.javascript.internal.lock.LockScenario;
-import org.openrewrite.javascript.semver.NodeSemver;
 
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
@@ -56,18 +55,6 @@ final class NpmScenarios {
     private static final Pattern LOCK = Pattern.compile("^(?:before|after|fresh)(?:-(.+))?$");
     private static final Pattern LOCK_FILE = Pattern.compile("^(before|after|fresh|again)(?:-(.+))?$");
     private static final Set<String> NOT_LOCKS = new HashSet<>(Arrays.asList("yarn", "npm", "npmrc"));
-    /**
-     * When set, a scenario is replayed as every release of each range its {@code releases} files name, not only the
-     * first and last.
-     */
-    static final String EVERY_RELEASE_ENV = "REWRITE_LOCK_EVERY_RELEASE";
-
-    /**
-     * When set to a node-semver range, the releases in it are replayed, proven or not; unset, the releases
-     * {@code NpmReleases.PROVEN} names.
-     */
-    static final String RELEASES_ENV = "REWRITE_LOCK_RELEASES";
-
     private static final Pattern NPM_VERSION = Pattern.compile("npm (\\d+\\.\\d+\\.\\d+)");
     private static final Pattern NODE_VERSION = Pattern.compile("node (v[0-9.]+)");
     private static final Pattern RECORDED_AT = Pattern.compile("after exit=-?\\d+ at ([^,\\s]+)");
@@ -389,37 +376,18 @@ final class NpmScenarios {
               outcome);
         }
 
-        // "10.0.0 - 10.9.9" or "12.0.0", one range a line
         // "10.0.0 - 10.9.9" or "12.0.0", one range a line: the first and last release of each, or with
         // REWRITE_LOCK_EVERY_RELEASE every release npm published between them, which proves a range of releases
         private static List<NpmRelease> endpoints(Path releases) {
-            boolean every = System.getenv(EVERY_RELEASE_ENV) != null && !System.getenv(EVERY_RELEASE_ENV).isEmpty();
+            List<String> all = new ArrayList<>();
+            for (NpmRelease release : NpmReleases.all()) {
+                all.add(release.toString());
+            }
             List<NpmRelease> endpoints = new ArrayList<>();
-            if (Files.isRegularFile(releases)) {
-                for (String line : read(releases).split("\n")) {
-                    String[] range = line.trim().split("\\s+-\\s+");
-                    if (range[0].isEmpty()) {
-                        continue;
-                    }
-                    NpmRelease first = NpmRelease.of(range[0]);
-                    NpmRelease last = NpmRelease.of(range[range.length - 1]);
-                    for (NpmRelease release : every ? NpmReleases.all() : Arrays.asList(first, last)) {
-                        if (release.compareTo(first) >= 0 && release.compareTo(last) <= 0 &&
-                            replays(release) && !endpoints.contains(release)) {
-                            endpoints.add(release);
-                        }
-                    }
-                }
+            for (String release : LockScenario.releaseEndpoints(releases, all, NpmReleases.PROVEN)) {
+                endpoints.add(NpmRelease.of(release));
             }
             return endpoints;
-        }
-
-        // the releases the engine claims to reproduce (NpmReleases.PROVEN), or the node-semver range
-        // REWRITE_LOCK_RELEASES names, which may ask for releases not proven yet
-        private static boolean replays(NpmRelease release) {
-            String range = System.getenv(RELEASES_ENV);
-            return range == null || range.isEmpty() ? NpmReleases.isProven(release) :
-                    NodeSemver.satisfies(release.toString(), range, NodeSemver.Options.DEFAULT);
         }
 
         private Path where(String file) {
