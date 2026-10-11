@@ -35,11 +35,13 @@ import static org.openrewrite.javascript.internal.lock.UriComponent.decodeURICom
 /**
  * Port of hosted-git-info ({@code fromUrl} and the URL forms npm-package-arg writes): 9.0.3, which npm 11.17.0
  * bundles, 9.0.2, which npm 11.6.2 to 11.14.1 bundle and whose answers 8.0.2 to 9.0.0 (npm 11.0.0 to 11.6.1) give
- * too, and 4.1.0, which pnpm 11.2.2's npm-package-arg fork calls.
+ * too, 4.1.0, which pnpm 11.2.2's npm-package-arg fork calls and whose answers 5.0.0 and 5.1.0 give too (npm 8.3.1
+ * to 8.19.2), and 4.0.2 (npm 8.0.0 to 8.3.0), 4.1.0 without the sourcehut host.
  */
 public final class GitHost {
 
     public enum Release {
+        V4_0_2,
         V4_1_0,
         V9_0_2,
         V9_0_3
@@ -286,8 +288,8 @@ public final class GitHost {
             return null;
         }
         WhatwgUrl parsed;
-        if (release == Release.V4_1_0) {
-            String url = isGitHubShorthand(giturl) ? "github:" + giturl : correctProtocol410(giturl);
+        if (release == Release.V4_1_0 || release == Release.V4_0_2) {
+            String url = isGitHubShorthand(giturl) ? "github:" + giturl : correctProtocol410(giturl, release);
             parsed = WhatwgUrl.tryParse(url);
             if (parsed == null) {
                 String corrected = correctUrl410(url);
@@ -299,9 +301,10 @@ public final class GitHost {
         if (parsed == null) {
             return null;
         }
-        String gitHostShortcut = BY_SHORTCUT.get(parsed.getProtocol());
+        String gitHostShortcut = knownHost(BY_SHORTCUT.get(parsed.getProtocol()), release);
         String hostname = parsed.getHostname();
-        String gitHostDomain = BY_DOMAIN.get(hostname.startsWith("www.") ? hostname.substring(4) : hostname);
+        String gitHostDomain = knownHost(BY_DOMAIN.get(hostname.startsWith("www.") ? hostname.substring(4) :
+                hostname), release);
         String gitHostName = gitHostShortcut != null ? gitHostShortcut : gitHostDomain;
         if (gitHostName == null) {
             return null;
@@ -506,11 +509,16 @@ public final class GitHost {
         return giturl;
     }
 
+    // a host the release knows: 4.0.2 has no sourcehut
+    private static @Nullable String knownHost(@Nullable String name, Release release) {
+        return release == Release.V4_0_2 && "sourcehut".equals(name) ? null : name;
+    }
+
     // 4.1.0's correctProtocol, which knows fewer protocols and looks for // only after an @
-    private static String correctProtocol410(String arg) {
+    private static String correctProtocol410(String arg, Release release) {
         int firstColon = arg.indexOf(':');
         String proto = arg.substring(0, firstColon + 1);
-        if (KNOWN_PROTOCOLS_4_1_0.contains(proto) || BY_SHORTCUT.containsKey(proto)) {
+        if (KNOWN_PROTOCOLS_4_1_0.contains(proto) || knownHost(BY_SHORTCUT.get(proto), release) != null) {
             return arg;
         }
         int firstAt = arg.indexOf('@');

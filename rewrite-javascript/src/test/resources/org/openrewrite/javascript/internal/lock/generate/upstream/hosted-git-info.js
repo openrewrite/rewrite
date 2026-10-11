@@ -13,8 +13,8 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-// hosted-git-info 4.1.0 and 9.0.3 for upstream-calls.js: fromUrl and the GitHost methods, a GitHost written with its
-// fields and the fromUrl arguments that made it ("from").
+// hosted-git-info 4.0.2, 4.1.0, 9.0.2 and 9.0.3 for upstream-calls.js: fromUrl and the GitHost methods, a GitHost
+// written with its fields and the fromUrl arguments that made it ("from").
 const fs = require('fs')
 const path = require('path')
 

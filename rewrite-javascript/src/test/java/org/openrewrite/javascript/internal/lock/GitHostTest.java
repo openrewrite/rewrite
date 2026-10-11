@@ -144,14 +144,16 @@ class GitHostTest {
         }
         Map<String, Integer> expected = new TreeMap<>();
         for (GitHost.Release release : GitHost.Release.values()) {
-            boolean v9 = release != GitHost.Release.V4_1_0;
+            // 4.0.2 has no sourcehut tests
+            boolean v4 = release == GitHost.Release.V4_0_2 || release == GitHost.Release.V4_1_0;
+            boolean sourcehut = release != GitHost.Release.V4_0_2;
             String never = ": npm-package-arg never calls it";
-            expected.put(release + " GitHost#browse" + never, v9 ? 36 : 30);
-            expected.put(release + " GitHost#bugs" + never, 5);
-            expected.put(release + " GitHost#docs" + never, 14);
-            expected.put(release + " GitHost#file" + never, 20);
-            expected.put(release + " GitHost#tarball" + never, release == GitHost.Release.V9_0_3 ? 9 : 8);
-            if (v9) {
+            expected.put(release + " GitHost#browse" + never, !sourcehut ? 24 : v4 ? 30 : 36);
+            expected.put(release + " GitHost#bugs" + never, sourcehut ? 5 : 4);
+            expected.put(release + " GitHost#docs" + never, sourcehut ? 14 : 11);
+            expected.put(release + " GitHost#file" + never, sourcehut ? 20 : 16);
+            expected.put(release + " GitHost#tarball" + never, release == GitHost.Release.V9_0_3 ? 9 : sourcehut ? 8 : 7);
+            if (!v4) {
                 expected.put(release + " GitHost#browseFile" + never, 4);
                 expected.put(release + " GitHost#edit" + never, 11);
             }

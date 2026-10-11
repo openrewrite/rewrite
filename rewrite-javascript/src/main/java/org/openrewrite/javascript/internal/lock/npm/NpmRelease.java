@@ -935,10 +935,13 @@ public final class NpmRelease implements Comparable<NpmRelease> {
 
     /**
      * The hosted-git-info npm bundles: 9.0.3 from npm 11.15.0, whose https URL of a sourcehut repository ends in no
-     * {@code .git}; before, 9.0.2 and the releases back to 8.0.2 that answer as it does.
+     * {@code .git}; 9.0.2 and the releases back to 5.2.1 (npm 8.19.3) that read a URL as it does (parse-url.js); 4.1.0
+     * from npm 8.3.1, and 5.0.0 and 5.1.0 that answer as it does; before, 4.0.2, which knows no sourcehut.
      */
     GitHost.Release hostedGitInfo() {
-        return atLeast(11, 15, 0) ? GitHost.Release.V9_0_3 : GitHost.Release.V9_0_2;
+        return atLeast(11, 15, 0) ? GitHost.Release.V9_0_3 :
+                atLeast(8, 19, 3) ? GitHost.Release.V9_0_2 :
+                        atLeast(8, 3, 1) ? GitHost.Release.V4_1_0 : GitHost.Release.V4_0_2;
     }
 
     // npm base-cmd.js
@@ -956,13 +959,20 @@ public final class NpmRelease implements Comparable<NpmRelease> {
     /**
      * The npm-package-arg npm bundles, with the libraries it calls: 13.0.1 from npm 11.6.2, which takes {@code .tar.gz}
      * and no other character between the two for a tarball's ending; 12.0.2 from npm 11.2.0 and, of npm 10, from
-     * 10.9.3, which escapes a file path before the URL parser reads it; before, 12.0.1.
+     * 10.9.3, which escapes a file path before the URL parser reads it; 12.0.1 and the 11.x and 12.0.0 that answer
+     * nearly as it does from npm 10.0.0; 10.0.0 and 10.1.0 from npm 9.0.0, which refuse a file: URL with a host and
+     * need no name of an alias; 9.1.0 from npm 8.14.0, which reads a bare name as the default tag; 9.0.0 to 9.0.2
+     * from npm 8.5.2, which read a git committish as a ref or a semver: range alone; before, 8.1.5, whose messages
+     * name no package.
      */
     Spec.Options npmPackageArg() {
         return Spec.Options.of(
                 atLeast(11, 6, 2) ? Spec.Release.V13_0_2 :
                         atLeast(11, 2, 0) || atLeast(10, 9, 3) && !atLeast(11, 0, 0) ? Spec.Release.V13_0_0 :
-                                Spec.Release.V12_0_1,
+                                atLeast(10, 0, 0) ? Spec.Release.V12_0_1 :
+                                        atLeast(9, 0, 0) ? Spec.Release.V10_1_0 :
+                                                atLeast(8, 14, 0) ? Spec.Release.V9_1_0 :
+                                                        atLeast(8, 5, 2) ? Spec.Release.V9_0_0 : Spec.Release.V8_1_5,
                 validateNpmPackageName(), hostedGitInfo(), semver());
     }
 

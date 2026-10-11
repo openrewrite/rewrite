@@ -13,8 +13,9 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-// npm-package-arg 13.0.2 and @pnpm/npm-package-arg 2.0.0 (release pnpm-2.0.0) for upstream-calls.js: npa, resolve,
-// toPurl and Result#toString, a Result with its fields and its hosted's; the home directory as <home>.
+// npm-package-arg 13.0.2 and the releases npm bundled before it, and @pnpm/npm-package-arg 2.0.0 (release pnpm-2.0.0)
+// for upstream-calls.js: npa, resolve, toPurl and Result#toString, a Result with its fields and its hosted's; the home
+// directory as <home>. Run each release with NODE_PATH naming the node_modules of an npm that bundles it.
 const fs = require('fs')
 const os = require('os')
 const path = require('path')
@@ -34,7 +35,8 @@ function isResult(v) {
 
 module.exports = {
   library: 'npm-package-arg',
-  entry: (dir, release) => release.startsWith('pnpm') ? 'npa.js' : 'lib/npa.js',
+  // npm-package-arg 8 and the fork keep npa.js at the package root
+  entry: (dir, release) => release.startsWith('pnpm') || release.startsWith('8.') ? 'npa.js' : 'lib/npa.js',
   self: 'npa',
   functions: ['resolve', 'toPurl'],
   tests: dir => fs.readdirSync(path.join(dir, 'test')).filter(f => f.endsWith('.js')).sort().map(f => 'test/' + f),
