@@ -362,9 +362,26 @@ class YarnBerryLockRegeneratorTest {
                 .manifest("", "{\"name\":\"r\",\"packageManager\":\"yarn@4.15.0\"}\n")
                 .configFile(".yarnrc.yml", "nodeLinker: node-modules\n")
                 .now(Instant.EPOCH)
-                .build(), BerryScenarios.NO_REGISTRY).regenerate();
+                .build(), BerryScenarios.NO_REGISTRY).regenerateWithConfiguration();
         assertThat(result.getFiles()).containsExactly(entry(".yarnrc.yml", "approvedGitRepositories:\n  - \"**\"\n\n" +
                 "enableScripts: true\n\nnodeLinker: node-modules\n\nnpmMinimalAgeGate: 0\n"));
+    }
+
+    // recorded with 4.10.3 under YARN_RC_FILENAME=.yarnrc-custom.yml, which left no .yarnrc.yml
+    @Test
+    void writesTheMigratedSettingsToTheRcFileYarnRcFilenameNames() {
+        String workspace = "\n\n\"p@workspace:.\":\n  version: 0.0.0-use.local\n  resolution: \"p@workspace:.\"\n" +
+                           "  languageName: unknown\n  linkType: soft\n";
+        Result result = new YarnBerryLockRegenerator(YarnBerryLockRegenerator.Inputs.builder()
+                .lock(LOCK_HEADER + "6\n  cacheKey: 8" + workspace)
+                .manifest("", "{\"name\":\"p\",\"packageManager\":\"yarn@4.10.3\"}\n")
+                .configFile(".yarnrc-custom.yml", "nodeLinker: node-modules\n")
+                .env(Collections.singletonMap("YARN_RC_FILENAME", ".yarnrc-custom.yml"))
+                .now(Instant.EPOCH)
+                .build(), BerryScenarios.NO_REGISTRY).regenerateWithConfiguration();
+        assertThat(result.getLockFileContent()).isEqualTo(LOCK_HEADER + "8\n  cacheKey: 10" + workspace);
+        assertThat(result.getFiles()).containsExactly(entry(".yarnrc-custom.yml",
+                "compressionLevel: mixed\n\nenableGlobalCache: false\n\nnodeLinker: node-modules\n"));
     }
 
     /**

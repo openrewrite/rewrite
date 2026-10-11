@@ -510,7 +510,7 @@ public final class Configuration {
         return value instanceof Map ? (Map<String, @Nullable Object>) value : new LinkedHashMap<>();
     }
 
-    private static String getRcFilename(Map<String, String> env) {
+    static String getRcFilename(Map<String, String> env) {
         for (Map.Entry<String, String> entry : env.entrySet()) {
             if ((ENVIRONMENT_PREFIX + "rc_filename").equals(entry.getKey().toLowerCase(Locale.ROOT))) {
                 return entry.getValue();

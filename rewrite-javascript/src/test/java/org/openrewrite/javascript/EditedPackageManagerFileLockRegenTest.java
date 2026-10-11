@@ -150,8 +150,8 @@ class EditedPackageManagerFileLockRegenTest implements RewriteTest {
                      "  languageName: unknown\n  linkType: soft\n", s -> s.path("yarn.lock").noTrim()
                         .after(actual -> {
                             assertThat(actual).contains("lock regeneration failed")
-                                    .contains(".yarnrc.yml Yarn writes with the settings it migrates")
-                                    .contains("compressionLevel: mixed");
+                                    .contains("Yarn would migrate compressionLevel, enableGlobalCache into " +
+                                              ".yarnrc.yml, which the recipes do not write");
                             return actual;
                         }))
         );

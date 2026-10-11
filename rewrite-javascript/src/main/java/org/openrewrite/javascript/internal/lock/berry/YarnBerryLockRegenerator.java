@@ -23,6 +23,7 @@ import lombok.Value;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.javascript.internal.LockFileRegeneration.Failure;
 import org.openrewrite.javascript.internal.LockFileRegeneration.InstallRoot;
+import org.openrewrite.javascript.internal.LockFileRegeneration.Kind;
 import org.openrewrite.javascript.internal.LockFileRegeneration.Reason;
 import org.openrewrite.javascript.internal.LockFileRegeneration.Result;
 import org.openrewrite.javascript.internal.lock.CannotKnow;
@@ -44,7 +45,10 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.TreeSet;
 import java.util.function.Predicate;
+
+import static java.util.Objects.requireNonNull;
 
 /**
  * Port of @yarnpkg/plugin-essentials sources/commands/install.ts, {@code --mode=update-lockfile} (Yarn 4.10.3).
@@ -167,35 +171,74 @@ public final class YarnBerryLockRegenerator {
 
     /**
      * The lock Yarn writes for the edited manifests over the project's lock, or the failure, after a second install
-     * over the written lock, with the settings the first wrote, changed nothing.
+     * over the written lock changed nothing. A lock whose migration writes settings to the rc file is refused.
      */
     public Result regenerate() {
+        Map<String, Object> settings = new LinkedHashMap<>();
+        Result installed = firstInstall(settings);
+        if (!installed.isSuccess()) {
+            return installed;
+        }
+        String written = requireNonNull(installed.getLockFileContent());
+        if (!settings.isEmpty()) {
+            // the lock's cacheKey and checksums follow the migrated settings, which the next install reads from the file
+            return Result.failure(new Failure(Kind.SECOND_INSTALL, Reason.RESOLUTION_REQUIRED, null,
+                    "Yarn would migrate " + String.join(", ", new TreeSet<>(settings.keySet())) + " into " +
+                    rcFilename() + ", which the recipes do not write", written));
+        }
+        return verify(written, settings);
+    }
+
+    /**
+     * {@link #regenerate()} that also writes the rc file with the settings the migration rules set, as Yarn rewrites
+     * it. Only tests call it, since the recipes do not write the rc file.
+     */
+    Result regenerateWithConfiguration() {
+        Map<String, Object> settings = new LinkedHashMap<>();
+        Result installed = firstInstall(settings);
+        if (!installed.isSuccess()) {
+            return installed;
+        }
+        String written = requireNonNull(installed.getLockFileContent());
+        if (settings.isEmpty()) {
+            return verify(written, settings);
+        }
+        String rcFile;
+        try {
+            rcFile = updateConfiguration(settings);
+        } catch (RuntimeException e) {
+            return Result.failure(failure(e));
+        }
+        Result verified = verify(written, settings);
+        return verified.isSuccess() ?
+                Result.success(written, Collections.singletonMap(rcFilename(), rcFile)) : verified;
+    }
+
+    // one install's lock, unverified, with the settings the migration rules set added to settings
+    private Result firstInstall(Map<String, Object> settings) {
         String lock = inputs.getLock();
         if (lock == null) {
             return Result.failure(INSTALL.failure(Rejected.discardsLock("the project has no yarn.lock")));
         }
-        Map<String, Object> settings = new LinkedHashMap<>();
-        String written;
-        String rcFile;
         try {
-            written = install(lock, settings);
-            rcFile = settings.isEmpty() ? null : updateConfiguration(settings);
+            return Result.success(install(lock, settings));
         } catch (RuntimeException e) {
             return Result.failure(failure(e));
         }
-        Result verified = INSTALL.verify(written, again -> new YarnBerryLockRegenerator(
+    }
+
+    private Result verify(String written, Map<String, Object> settings) {
+        return INSTALL.verify(written, again -> new YarnBerryLockRegenerator(
                 inputs.toBuilder().lock(again).build(), registry).install(again, settings),
                 YarnBerryLockRegenerator::failure);
-        return rcFile == null || !verified.isSuccess() ? verified :
-                Result.success(written, Collections.singletonMap(Configuration.DEFAULT_RC_FILENAME, rcFile));
     }
 
     /**
-     * Configuration.updateConfiguration of the project's .yarnrc.yml with the settings the migration rules set: the
+     * Configuration.updateConfiguration of the project's rc file with the settings the migration rules set: the
      * file as Yarn rewrites it, with its line endings.
      */
     private String updateConfiguration(Map<String, Object> settings) {
-        String rcFilename = Configuration.DEFAULT_RC_FILENAME;
+        String rcFilename = rcFilename();
         String current = inputs.getConfigFiles().get(rcFilename);
         if (current == null && inputs.getPaths() != null && inputs.getPaths().contains(rcFilename)) {
             throw new CannotKnow("the " + rcFilename + " Yarn rewrites with the settings it migrates (the host did " +
@@ -209,9 +252,14 @@ public final class YarnBerryLockRegenerator {
                 "win32".equals(os) ? "\r\n" : "\n");
     }
 
+    // Configuration.ts getRcFilename (Yarn 4.10.3), the file updateConfiguration writes and find reads
+    private String rcFilename() {
+        return Configuration.getRcFilename(HostEnvironment.of(inputs.getEnv()).known());
+    }
+
     /**
      * One install over a lock: the lock the project holds afterwards; {@code settings} is what the migration rules
-     * wrote to {@code .yarnrc.yml}, added to when this install migrates the lock.
+     * write to the rc file, added to when this install migrates the lock.
      */
     String install(String lock, Map<String, Object> settings) {
         YarnRelease release = release();
