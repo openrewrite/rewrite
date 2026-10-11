@@ -74,6 +74,15 @@ public class NpmOptions {
     NpmRelease release = NpmRelease.PORTED;
 
     /**
+     * {@code npmVersion}, npm's own version: what {@code engines.npm} and {@code devEngines.packageManager} are held
+     * to. It is the one text of the release an install reads, and the thresholds a followed release notes say nothing
+     * of the ranges compared with it.
+     */
+    public String getNpmVersion() {
+        return release.toString();
+    }
+
+    /**
      * {@code lockfile-version}: the version to write, or null to keep the lock's own (v1 is upgraded).
      */
     @Nullable

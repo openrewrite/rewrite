@@ -16,6 +16,7 @@
 package org.openrewrite.javascript.internal.lock.npm;
 
 import lombok.Builder;
+import lombok.Getter;
 import lombok.NonNull;
 import lombok.Singular;
 import lombok.Value;
@@ -35,8 +36,11 @@ import org.openrewrite.javascript.internal.lock.Spec;
 import org.openrewrite.javascript.internal.registry.NodeRegistryException;
 
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
+import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
@@ -45,7 +49,8 @@ import static org.openrewrite.javascript.internal.lock.npm.Js.truthy;
 
 /**
  * Port of @npmcli/arborist lib/arborist/index.js and reify.js (npm 11.17.0) for {@code npm install
- * --package-lock-only}; the lock written must come back unchanged from a second install, or that install is reported.
+ * --package-lock-only}, after the {@code devEngines} check of npm's lib/base-cmd.js; the lock written must come back
+ * unchanged from a second install, or that install is reported.
  */
 public final class NpmLockRegenerator {
 
@@ -126,6 +131,28 @@ public final class NpmLockRegenerator {
         Map<String, Map<String, @Nullable String>> parentTrees;
     }
 
+    /**
+     * {@code EBADDEVENGINES}: the {@code devEngines} of the package npm installs exclude the environment it runs in.
+     */
+    @Getter
+    static final class BadDevEngines extends IllegalStateException implements NpmError {
+        private final String engine;
+        private final transient Object current;
+        private final transient @Nullable Object required;
+
+        BadDevEngines(String message, NpmInstallChecks.InvalidDevEngine failure) {
+            super(message);
+            this.engine = failure.getEngine();
+            this.current = failure.getCurrent();
+            this.required = failure.getRequired();
+        }
+
+        @Override
+        public String getCode() {
+            return "EBADDEVENGINES";
+        }
+    }
+
     private static final LockOnlyInstall INSTALL = LockOnlyInstall.NPM;
 
     private final Inputs inputs;
@@ -151,6 +178,9 @@ public final class NpmLockRegenerator {
             CannotKnow.requireRead(inputs.getNpmrc(), inputs.getPaths(), ".npmrc");
             CannotKnow.requireRead(inputs.getYarnLock(), inputs.getPaths(), "yarn.lock");
             options = NpmOptions.fromNpmrc(inputs.getRelease(), inputs.getUserNpmrc(), inputs.getNpmrc());
+            if (!options.isGlobal()) {
+                checkDevEngines(inputs.getManifests().get(""), options, inputs.getHost());
+            }
             if (options.isGlobal()) {
                 throw new NpmRejection("ESHRINKWRAPGLOBAL", "cannot generate lockfile for global packages", null);
             }
@@ -189,6 +219,84 @@ public final class NpmLockRegenerator {
         } catch (RuntimeException e) {
             return InstallRoot.STOPS_HERE;
         }
+    }
+
+    /**
+     * base-cmd.js {@code checkDevEngines}, which npm.js runs before a command that is not global: the
+     * {@code devEngines} of the package.json where npm installs against the environment npm runs in. Of the engines it
+     * does not satisfy, the first whose mismatch is an error is npm's {@code EBADDEVENGINES}; npm logs those that warn
+     * and, under {@code force}, the errors too.
+     *
+     * @param manifest that package.json; null without one
+     * @return what npm logs, each warning as it words it
+     */
+    static List<String> checkDevEngines(@Nullable String manifest, NpmOptions options, Host host) {
+        boolean force = options.isForce();
+
+        Object devEngines = Js.get(localPackage(manifest), "devEngines");
+
+        // a release without the check never reads the field
+        if (devEngines == Js.UNDEFINED || !options.getRelease().checksDevEngines()) {
+            return Collections.emptyList();
+        }
+
+        Map<String, Object> current = NpmInstallChecks.devEngines(host, options.getNpmVersion());
+
+        List<NpmInstallChecks.InvalidDevEngine> warnings = new ArrayList<>();
+        List<NpmInstallChecks.InvalidDevEngine> errors = new ArrayList<>();
+        for (NpmInstallChecks.InvalidDevEngine failure : NpmInstallChecks.checkDevEngines(devEngines, current,
+                options.getRelease())) {
+            if (failure.isWarn()) {
+                warnings.add(failure);
+            }
+            if (failure.isError()) {
+                errors.add(failure);
+            }
+        }
+
+        List<String> logged = new ArrayList<>();
+        for (NpmInstallChecks.InvalidDevEngine failure : warnings) {
+            logged.add(genMsg(failure, logged.size()));
+        }
+        if (force) {
+            for (NpmInstallChecks.InvalidDevEngine failure : errors) {
+                logged.add(genMsg(failure, logged.size()));
+            }
+            return logged;
+        }
+
+        if (!errors.isEmpty()) {
+            NpmInstallChecks.InvalidDevEngine failure = errors.get(0);
+            throw new BadDevEngines(genMsg(failure, 0), failure);
+        }
+        return logged;
+    }
+
+    private static String genMsg(NpmInstallChecks.InvalidDevEngine failure, int i) {
+        Set<String> lines = new LinkedHashSet<>();
+        lines.add(i == 0 ? "The developer of this package has specified the following through devEngines" : "");
+        lines.add(failure.getMessage());
+        lines.add(String.join("\n", failure.getErrors()));
+        lines.remove("");
+        return String.join("\n", lines);
+    }
+
+    /**
+     * {@code PackageJson.normalize(localPrefix).then(p => p.content).catch(() => ({}))}: the package.json where npm
+     * installs as npm's own commands read it, an empty one where there is none or it does not normalize.
+     */
+    static Map<String, Object> localPackage(@Nullable String manifest) {
+        if (manifest != null) {
+            try {
+                return PackageJson.normalize(manifest).getContent();
+            } catch (PackageJson.NeedsPackageFiles e) {
+                // normalize fills bin from the package's files; every other field is as the manifest has it
+                return e.getContent();
+            } catch (RuntimeException e) {
+                return new LinkedHashMap<>();
+            }
+        }
+        return new LinkedHashMap<>();
     }
 
     /**

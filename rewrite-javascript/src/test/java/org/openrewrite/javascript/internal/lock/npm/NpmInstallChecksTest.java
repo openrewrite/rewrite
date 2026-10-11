@@ -17,18 +17,31 @@ package org.openrewrite.javascript.internal.lock.npm;
 
 import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.CsvSource;
+import org.junit.jupiter.params.provider.MethodSource;
+import org.junit.jupiter.params.provider.ValueSource;
+import org.openrewrite.javascript.internal.lock.CannotKnow;
 import org.openrewrite.javascript.internal.lock.Host;
+import org.openrewrite.javascript.internal.lock.JsError;
 
+import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
+import java.util.stream.Stream;
 
+import static java.util.Collections.singletonList;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.openrewrite.javascript.internal.lock.npm.NpmTreeSupport.json;
 
 /**
- * npm-install-checks 8.0.0 test/check-engine.js and test/check-platform.js over a known {@link Host}; the libc
- * detection cases mock the OS, whose libc is an input here.
+ * npm-install-checks 8.0.0 test/check-engine.js, test/check-platform.js and test/check-dev-engines.js over a known
+ * {@link Host}; the libc detection cases mock the OS, whose libc is an input here.
  */
 class NpmInstallChecksTest {
 
@@ -289,5 +302,323 @@ class NpmInstallChecksTest {
           false, Host.UNKNOWN, Host.UNKNOWN)).doesNotThrowAnyException();
         assertThatCode(() -> NpmInstallChecks.checkEngine(e(null, ">=99"), "11.17.0", null, false))
           .doesNotThrowAnyException();
+    }
+
+    // test/check-dev-engines.js, whose environment is a plain object by engine
+
+    private static List<NpmInstallChecks.InvalidDevEngine> devEngines(@Nullable Object wanted, String current) {
+        return NpmInstallChecks.checkDevEngines(wanted, json(current), NpmRelease.PORTED);
+    }
+
+    private static List<NpmInstallChecks.InvalidDevEngine> devEngines(String wanted, String current) {
+        return devEngines((Object) json(wanted), current);
+    }
+
+    private static NpmInstallChecks.InvalidDevEngine invalid(String engine, String current, String required,
+                                                             String... errors) {
+        return new NpmInstallChecks.InvalidDevEngine("Invalid devEngines." + engine, Arrays.asList(errors), engine,
+          false, true, json(current), json(required));
+    }
+
+    private static Map<String, Object> object(String key, @Nullable Object value) {
+        Map<String, Object> object = new LinkedHashMap<>();
+        object.put(key, value);
+        return object;
+    }
+
+    private static final String NONDESCRIPT = "{\"runtime\":{\"name\":\"nondescript\",\"version\":\"14\"}}";
+
+    @Test
+    void noopOptions() {
+        assertThat(NpmInstallChecks.checkDevEngines(json("{\"runtime\":[]}"),
+          NpmInstallChecks.devEngines(DARWIN, "11.17.0"), NpmRelease.PORTED)).isEmpty();
+    }
+
+    @Test
+    void unrecognizedProperty() {
+        assertThatThrownBy(() -> devEngines("{\"unrecognized\":{\"name\":\"alpha\",\"version\":\"1\"}}",
+          "{\"os\":{\"name\":\"alpha\"}}"))
+          .isInstanceOf(JsError.class).hasMessage("Invalid property \"devEngines.unrecognized\"");
+    }
+
+    @Test
+    void emptyDevEngines() {
+        assertThat(devEngines("{}", "{\"os\":{\"name\":\"darwin\"}}")).isEmpty();
+    }
+
+    @Test
+    void invalidName() {
+        assertThat(devEngines("{\"os\":{\"name\":\"alpha\",\"onFail\":\"download\"}}", "{\"os\":{\"name\":\"beta\"}}"))
+          .containsExactly(invalid("os", "{\"name\":\"beta\"}", "{\"name\":\"alpha\",\"onFail\":\"download\"}",
+            "Invalid name \"alpha\" does not match \"beta\" for \"os\""));
+    }
+
+    @Test
+    void defaultOptions() {
+        assertThat(NpmInstallChecks.checkDevEngines(json("{}"), NpmInstallChecks.devEngines(DARWIN, "11.17.0"),
+          NpmRelease.PORTED)).isEmpty();
+    }
+
+    static Stream<Arguments> nonObjects() {
+        List<Object> core = Arrays.asList(1, true, false, null, Js.UNDEFINED);
+        List<Arguments> nonObjects = new ArrayList<>();
+        for (Object value : core) {
+            nonObjects.add(Arguments.of(Js.string(value), value));
+        }
+        nonObjects.add(Arguments.of("[[]]", singletonList(new ArrayList<>())));
+        for (Object value : core) {
+            nonObjects.add(Arguments.of("[" + Js.string(value) + "]", singletonList(value)));
+        }
+        return nonObjects.stream();
+    }
+
+    @ParameterizedTest(name = "{0}")
+    @MethodSource("nonObjects")
+    void testsNonObject(String name, @Nullable Object nonObject) {
+        assertThatThrownBy(() -> devEngines(nonObject, NONDESCRIPT))
+          .isInstanceOf(JsError.class).hasMessage("Invalid non-object value for \"devEngines\"");
+        assertThatThrownBy(() -> devEngines(object("runtime", nonObject), NONDESCRIPT))
+          .isInstanceOf(JsError.class).hasMessage("Invalid non-object value for \"runtime\"");
+    }
+
+    static Stream<Arguments> nonStrings() {
+        return Stream.of(1, true, false, null, Js.UNDEFINED, new LinkedHashMap<>(), new ArrayList<>())
+          .map(value -> Arguments.of(value instanceof Map ? "{}" : value instanceof List ? "[]" : Js.string(value),
+            value));
+    }
+
+    @ParameterizedTest(name = "{0}")
+    @MethodSource("nonStrings")
+    void testsNonString(String name, @Nullable Object nonString) {
+        Map<String, Object> invalidName = object("name", nonString);
+        invalidName.put("version", "14");
+        assertThatThrownBy(() -> devEngines(object("runtime", invalidName), NONDESCRIPT))
+          .isInstanceOf(JsError.class).hasMessage("Invalid non-string value for \"name\" within \"runtime\"");
+
+        Map<String, Object> invalidVersion = object("name", "nondescript");
+        invalidVersion.put("version", nonString);
+        assertThatThrownBy(() -> devEngines(object("runtime", invalidVersion), NONDESCRIPT))
+          .isInstanceOf(JsError.class).hasMessage("Invalid non-string value for \"version\" within \"runtime\"");
+
+        Map<String, Object> invalidOnFail = object("name", "nondescript");
+        invalidOnFail.put("version", "14");
+        invalidOnFail.put("onFail", nonString);
+        assertThatThrownBy(() -> devEngines(object("runtime", invalidOnFail), NONDESCRIPT))
+          .isInstanceOf(JsError.class).hasMessage("Invalid non-string value for \"onFail\" within \"runtime\"");
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"packageManager", "runtime", "cpu", "libc", "os"})
+    void testsAllTheRightFields(String env) {
+        // current name does not match, wanted has extra attribute
+        assertThatThrownBy(() -> devEngines("{\"" + env + "\":{\"name\":\"test-" + env + "-wanted\",\"extra\":\"test-" +
+                                            env + "-extra\"}}", "{\"" + env + "\":{\"name\":\"test-" + env +
+                                                                "-current\"}}"))
+          .isInstanceOf(JsError.class).hasMessage("Invalid property \"extra\" for \"" + env + "\"");
+        // current is not given
+        assertThatThrownBy(() -> devEngines("{\"" + env + "\":{\"name\":\"test-" + env + "-wanted\"}}", "{}"))
+          .isInstanceOf(JsError.class).hasMessage("Unable to determine \"name\" for \"" + env + "\"");
+        // name only
+        assertThat(devEngines("{\"" + env + "\":{\"name\":\"test-name\"}}",
+          "{\"" + env + "\":{\"name\":\"test-name\"}}")).isEmpty();
+        // non-semver version is not the same
+        assertThat(devEngines("{\"" + env + "\":{\"name\":\"test-name\",\"version\":\"test-version-wanted\"}}",
+          "{\"" + env + "\":{\"name\":\"test-name\",\"version\":\"test-version-current\"}}"))
+          .containsExactly(invalid(env, "{\"name\":\"test-name\",\"version\":\"test-version-current\"}",
+            "{\"name\":\"test-name\",\"version\":\"test-version-wanted\"}",
+            "Invalid version \"test-version-wanted\" does not match \"test-version-current\" for \"" + env + "\""));
+        // non-semver version is the same
+        assertThat(devEngines("{\"" + env + "\":{\"name\":\"test-name\",\"version\":\"test-version\"}}",
+          "{\"" + env + "\":{\"name\":\"test-name\",\"version\":\"test-version\"}}")).isEmpty();
+        // semver version is not in range
+        assertThat(devEngines("{\"" + env + "\":{\"name\":\"test-name\",\"version\":\"^1.0.0\"}}",
+          "{\"" + env + "\":{\"name\":\"test-name\",\"version\":\"2.0.0\"}}"))
+          .containsExactly(invalid(env, "{\"name\":\"test-name\",\"version\":\"2.0.0\"}",
+            "{\"name\":\"test-name\",\"version\":\"^1.0.0\"}",
+            "Invalid semver version \"^1.0.0\" does not match \"2.0.0\" for \"" + env + "\""));
+        // semver version is in range
+        assertThat(devEngines("{\"" + env + "\":{\"name\":\"test-name\",\"version\":\"^1.0.0\"}}",
+          "{\"" + env + "\":{\"name\":\"test-name\",\"version\":\"1.0.0\"}}")).isEmpty();
+        // returns the last failure
+        String alternatives = "[{\"name\":\"test-name\",\"version\":\"test-version-one\"}," +
+                              "{\"name\":\"test-name\",\"version\":\"test-version-two\"}]";
+        assertThat(devEngines("{\"" + env + "\":" + alternatives + "}",
+          "{\"" + env + "\":{\"name\":\"test-name\",\"version\":\"test-version-three\"}}"))
+          .containsExactly(invalid(env, "{\"name\":\"test-name\",\"version\":\"test-version-three\"}", alternatives,
+            "Invalid version \"test-version-one\" does not match \"test-version-three\" for \"" + env + "\"",
+            "Invalid version \"test-version-two\" does not match \"test-version-three\" for \"" + env + "\""));
+        // unrecognized onFail
+        assertThatThrownBy(() -> devEngines("{\"" + env + "\":{\"name\":\"test-name\",\"version\":\"^1.0.0\"," +
+                                            "\"onFail\":\"unrecognized\"}}",
+          "{\"" + env + "\":{\"name\":\"test-name\",\"version\":\"1.0.0\"}}"))
+          .isInstanceOf(JsError.class).hasMessage("Invalid onFail value \"unrecognized\" for \"" + env + "\"");
+        // missing name
+        assertThatThrownBy(() -> devEngines("{\"" + env + "\":{\"version\":\"^1.0.0\"}}",
+          "{\"" + env + "\":{\"name\":\"test-name\",\"version\":\"1.0.0\"}}"))
+          .isInstanceOf(JsError.class).hasMessage("Missing \"name\" property for \"" + env + "\"");
+        // invalid name
+        assertThat(devEngines("{\"" + env + "\":{\"name\":\"alpha\"}}", "{\"" + env + "\":{\"name\":\"beta\"}}"))
+          .containsExactly(invalid(env, "{\"name\":\"beta\"}", "{\"name\":\"alpha\"}",
+            "Invalid name \"alpha\" does not match \"beta\" for \"" + env + "\""));
+        // missing version
+        assertThatThrownBy(() -> devEngines("{\"" + env + "\":{\"name\":\"alpha\",\"version\":\"1\"}}",
+          "{\"" + env + "\":{\"name\":\"alpha\"}}"))
+          .isInstanceOf(JsError.class)
+          .hasMessage("Unable to determine \"version\" for \"" + env + "\" \"alpha\"");
+    }
+
+    private static final String SPEC_CURRENT = "{\"os\":{\"name\":\"darwin\",\"version\":\"23.0.0\"}," +
+                                               "\"cpu\":{\"name\":\"arm\"},\"libc\":{\"name\":\"glibc\"}," +
+                                               "\"runtime\":{\"name\":\"node\",\"version\":\"20.0.0\"}," +
+                                               "\"packageManager\":{\"name\":\"yarn\",\"version\":\"3.2.3\"}}";
+
+    @Test
+    void spec1() {
+        assertThat(devEngines("{\"runtime\":{\"name\":\"node\",\"version\":\">= 20.0.0\",\"onFail\":\"error\"}," +
+                              "\"packageManager\":{\"name\":\"yarn\",\"version\":\"3.2.3\",\"onFail\":\"download\"}}",
+          SPEC_CURRENT)).isEmpty();
+    }
+
+    @Test
+    void spec2() {
+        String runtime = "[{\"name\":\"bun\",\"version\":\">= 1.0.0\",\"onFail\":\"ignore\"}," +
+                         "{\"name\":\"node\",\"version\":\">= 20.0.0\",\"onFail\":\"error\"}]";
+        String example = "{\"os\":{\"name\":\"darwin\",\"version\":\">= 23.0.0\"}," +
+                         "\"cpu\":[{\"name\":\"arm\"},{\"name\":\"x86\"}],\"libc\":{\"name\":\"glibc\"}," +
+                         "\"runtime\":" + runtime + "," +
+                         "\"packageManager\":[{\"name\":\"bun\",\"version\":\">= 1.0.0\",\"onFail\":\"ignore\"}," +
+                         "{\"name\":\"yarn\",\"version\":\"3.2.3\",\"onFail\":\"download\"}]}";
+
+        assertThat(devEngines(example, SPEC_CURRENT)).isEmpty();
+
+        assertThat(devEngines(example, SPEC_CURRENT.replace("23.0.0", "10.0.0")))
+          .containsExactly(invalid("os", "{\"name\":\"darwin\",\"version\":\"10.0.0\"}",
+            "{\"name\":\"darwin\",\"version\":\">= 23.0.0\"}",
+            "Invalid semver version \">= 23.0.0\" does not match \"10.0.0\" for \"os\""));
+
+        assertThat(devEngines(example, SPEC_CURRENT.replace("\"node\"", "\"nondescript\"")))
+          .containsExactly(invalid("runtime", "{\"name\":\"nondescript\",\"version\":\"20.0.0\"}", runtime,
+            "Invalid name \"bun\" does not match \"nondescript\" for \"runtime\"",
+            "Invalid name \"node\" does not match \"nondescript\" for \"runtime\""));
+    }
+
+    @Test
+    void emptyArrayAlongSideError() {
+        assertThat(devEngines("{\"cpu\":[],\"runtime\":{\"name\":\"bun\",\"onFail\":\"error\"}}",
+          "{\"cpu\":{\"name\":\"arm\"},\"runtime\":{\"name\":\"node\",\"version\":\"20.0.0\"}}"))
+          .containsExactly(invalid("runtime", "{\"name\":\"node\",\"version\":\"20.0.0\"}",
+            "{\"name\":\"bun\",\"onFail\":\"error\"}", "Invalid name \"bun\" does not match \"node\" for \"runtime\""));
+    }
+
+    // dev-engines.js: isWarn and isError follow the last alternative's onFail, download as error, neither for ignore
+    @Test
+    void theLastAlternativesOnFailDecides() {
+        String current = "{\"runtime\":{\"name\":\"node\",\"version\":\"20.0.0\"}}";
+        for (String onFail : new String[]{"warn", "ignore", "error", "download"}) {
+            List<NpmInstallChecks.InvalidDevEngine> failures = devEngines("{\"runtime\":[{\"name\":\"bun\"," +
+              "\"onFail\":\"error\"},{\"name\":\"deno\",\"onFail\":\"" + onFail + "\"}]}", current);
+            assertThat(failures).hasSize(1);
+            assertThat(failures.get(0).isWarn()).as(onFail).isEqualTo("warn".equals(onFail));
+            assertThat(failures.get(0).isError()).as(onFail).isEqualTo(!"warn".equals(onFail) &&
+                                                                       !"ignore".equals(onFail));
+        }
+        assertThat(devEngines("{\"runtime\":[{\"name\":\"node\",\"onFail\":\"error\"},{\"name\":\"deno\"}]}", current))
+          .isEmpty();
+    }
+
+    // npm-install-checks 7.1.2 reworded three messages: npm 10.9.5 bundles it and, of npm 11, 11.6.1 and later
+    @ParameterizedTest
+    @CsvSource({"10.9.0,false", "10.9.4,false", "10.9.5,true", "10.9.9,true", "11.0.0,false", "11.6.0,false",
+      "11.6.1,true", "11.17.0,true", "12.2.0,true"})
+    void aFailureNamesThePropertyFromNpmInstallChecks712(String release, boolean names) {
+        NpmRelease npm = NpmRelease.of(release);
+        Map<String, ?> current = json("{\"os\":{\"name\":\"beta\"}}");
+
+        assertThat(NpmInstallChecks.checkDevEngines(json("{\"os\":{\"name\":\"alpha\"}}"), current, npm))
+          .extracting(NpmInstallChecks.InvalidDevEngine::getMessage)
+          .containsExactly(names ? "Invalid devEngines.os" : "Invalid engine \"os\"");
+        assertThatThrownBy(() -> NpmInstallChecks.checkDevEngines("npm", current, npm))
+          .hasMessage(names ? "Invalid non-object value for \"devEngines\"" :
+            "Invalid non-object value for devEngines");
+        assertThatThrownBy(() -> NpmInstallChecks.checkDevEngines(json("{\"engine\":{\"name\":\"v8\"}}"), current, npm))
+          .hasMessage(names ? "Invalid property \"devEngines.engine\"" : "Invalid property \"engine\"");
+    }
+
+    // current-env.js devEngines over a Host: process.arch, process.platform, the libc detected on linux only,
+    // npm's own version and process.version
+    @Test
+    void theEnvironmentIsTheHosts() {
+        Host linux = Host.builder().os("linux").cpu("x64").libc("glibc").nodeVersion("v24.21.0").build();
+        Map<String, Object> current = NpmInstallChecks.devEngines(linux, "11.17.0");
+
+        assertThat(NpmInstallChecks.checkDevEngines(json("{\"os\":{\"name\":\"linux\"},\"cpu\":{\"name\":\"x64\"}," +
+          "\"libc\":{\"name\":\"glibc\"},\"runtime\":{\"name\":\"node\",\"version\":\">=24\"}," +
+          "\"packageManager\":{\"name\":\"npm\",\"version\":\"^11.17.0\"}}"), current, NpmRelease.PORTED)).isEmpty();
+        assertThat(NpmInstallChecks.checkDevEngines(json("{\"os\":{\"name\":\"darwin\"},\"cpu\":{\"name\":\"arm64\"}," +
+          "\"libc\":{\"name\":\"musl\"},\"runtime\":{\"name\":\"node\",\"version\":\"^22\"}," +
+          "\"packageManager\":{\"name\":\"npm\",\"version\":\"^10\"}}"), current, NpmRelease.PORTED))
+          .extracting(failure -> failure.getErrors().get(0))
+          .containsExactly("Invalid name \"darwin\" does not match \"linux\" for \"os\"",
+            "Invalid name \"arm64\" does not match \"x64\" for \"cpu\"",
+            "Invalid name \"musl\" does not match \"glibc\" for \"libc\"",
+            "Invalid semver version \"^22\" does not match \"v24.21.0\" for \"runtime\"",
+            "Invalid semver version \"^10\" does not match \"11.17.0\" for \"packageManager\"");
+        // a version that is no range is compared as text, and process.version starts with a v
+        assertThat(NpmInstallChecks.checkDevEngines(json("{\"runtime\":{\"name\":\"node\",\"version\":\"lts\"}}"),
+          current, NpmRelease.PORTED)).extracting(failure -> failure.getErrors().get(0))
+          .containsExactly("Invalid version \"lts\" does not match \"v24.21.0\" for \"runtime\"");
+    }
+
+    // libc(osName) is undefined off linux, and null on a linux where neither glibc nor musl is detected
+    @Test
+    void libcIsDeterminedOnLinuxOnly() {
+        Object libc = json("{\"libc\":{\"name\":\"glibc\"}}");
+        assertThatThrownBy(() -> NpmInstallChecks.checkDevEngines(libc, NpmInstallChecks.devEngines(DARWIN,
+          "11.17.0"), NpmRelease.PORTED))
+          .isInstanceOf(JsError.class).hasMessage("Unable to determine \"name\" for \"libc\"");
+        assertThatThrownBy(() -> NpmInstallChecks.checkDevEngines(libc, NpmInstallChecks.devEngines(
+          Host.builder().os("linux").cpu("x64").build(), "11.17.0"), NpmRelease.PORTED))
+          .isInstanceOf(JsError.class).hasMessage("Unable to determine \"name\" for \"libc\"");
+        // a cpu or a libc has no version
+        assertThatThrownBy(() -> NpmInstallChecks.checkDevEngines(
+          json("{\"cpu\":{\"name\":\"arm64\",\"version\":\"1\"}}"), NpmInstallChecks.devEngines(DARWIN, "11.17.0"),
+          NpmRelease.PORTED))
+          .isInstanceOf(JsError.class).hasMessage("Unable to determine \"version\" for \"cpu\" \"arm64\"");
+    }
+
+    @Test
+    void whatTheHostDoesNotSaySatisfiesDevEngines() {
+        Map<String, Object> unknown = NpmInstallChecks.devEngines(Host.UNKNOWN, "11.17.0");
+
+        assertThat(NpmInstallChecks.checkDevEngines(json("{\"os\":{\"name\":\"enten-os\",\"version\":\">=99\"}," +
+          "\"cpu\":[{\"name\":\"enten-cpu\"},{\"name\":\"another-cpu\"}],\"libc\":{\"name\":\"musl\"}," +
+          "\"runtime\":{\"name\":\"node\",\"version\":\">=99\"}}"), unknown, NpmRelease.PORTED)).isEmpty();
+        // what the host does say is still checked: the runtime's name, npm's own name and version
+        assertThat(NpmInstallChecks.checkDevEngines(json("{\"runtime\":{\"name\":\"bun\"}," +
+          "\"packageManager\":{\"name\":\"npm\",\"version\":\"^10\"}}"), unknown, NpmRelease.PORTED))
+          .extracting(NpmInstallChecks.InvalidDevEngine::getEngine).containsExactly("runtime", "packageManager");
+        // the release of an os no host gives
+        assertThat(NpmInstallChecks.checkDevEngines(json("{\"os\":{\"name\":\"darwin\",\"version\":\">=99\"}}"),
+          NpmInstallChecks.devEngines(DARWIN, "11.17.0"), NpmRelease.PORTED)).isEmpty();
+        // a shape npm fails on whatever it runs on is still npm failing
+        assertThatThrownBy(() -> NpmInstallChecks.checkDevEngines(json("{\"cpu\":{\"name\":\"arm64\"," +
+          "\"onFail\":\"never\"}}"), unknown, NpmRelease.PORTED))
+          .isInstanceOf(JsError.class).hasMessage("Invalid onFail value \"never\" for \"cpu\"");
+    }
+
+    // npm fails on a version for a cpu only where the cpu is the one named, and reports the other cpu elsewhere
+    @Test
+    void anUnknownNameThatDecidesWhetherNpmFailsIsCannotKnow() {
+        Map<String, Object> unknown = NpmInstallChecks.devEngines(Host.UNKNOWN, "11.17.0");
+
+        assertThatThrownBy(() -> NpmInstallChecks.checkDevEngines(
+          json("{\"cpu\":{\"name\":\"arm64\",\"version\":\"1\"}}"), unknown, NpmRelease.PORTED))
+          .isInstanceOf(CannotKnow.class)
+          .hasMessage("the engine cannot know the cpu npm runs on: where it is arm64 npm fails (Unable to determine " +
+                      "\"version\" for \"cpu\" \"arm64\"), and elsewhere devEngines.cpu does not match");
+        assertThatThrownBy(() -> NpmInstallChecks.checkDevEngines(
+          json("{\"os\":{\"name\":\"linux\",\"version\":5}}"), unknown, NpmRelease.PORTED))
+          .isInstanceOf(CannotKnow.class)
+          .hasMessageContaining("Invalid non-string value for \"version\" within \"os\"");
     }
 }

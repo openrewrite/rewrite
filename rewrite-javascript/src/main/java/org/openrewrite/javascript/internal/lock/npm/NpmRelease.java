@@ -116,6 +116,26 @@ public final class NpmRelease implements Comparable<NpmRelease> {
         return atLeast(12, 0, 0) ? "none" : "all";
     }
 
+    // npm lib/base-cmd.js
+
+    /**
+     * Whether a command checks the root's {@code devEngines} before it runs ({@code checkDevEngines}): from npm 10.9.0.
+     */
+    boolean checksDevEngines() {
+        return atLeast(10, 9, 0);
+    }
+
+    // npm-install-checks lib/dev-engines.js
+
+    /**
+     * Whether a {@code devEngines} failure names the property ({@code Invalid devEngines.runtime}) where earlier
+     * releases name the engine alone ({@code Invalid engine "runtime"}): npm-install-checks 7.1.2, which npm 10.9.5
+     * bundles and, of npm 11, the releases from 11.6.1.
+     */
+    boolean namesDevEnginesProperty() {
+        return atLeast(11, 6, 1) || atLeast(10, 9, 5) && !atLeast(11, 0, 0);
+    }
+
     @Override
     public int compareTo(NpmRelease o) {
         int c = Integer.compare(major, o.major);
