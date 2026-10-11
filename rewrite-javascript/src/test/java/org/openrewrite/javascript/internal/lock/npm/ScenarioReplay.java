@@ -212,7 +212,34 @@ final class ScenarioReplay {
           .userNpmrc(scenario.host().userNpmrc(HostInputs.GLOBAL_AND_USER))
           .host(host(scenario))
           .now(now(scenario))
+          .paths(paths(edit))
           .build();
+    }
+
+    /**
+     * The files of the directory npm installed in, as the recorder laid it out for the edit: package.json, the lock,
+     * the .npmrc, the yarn.lock and the tree's files.
+     */
+    static Set<String> paths(NpmScenarios.Edit edit) {
+        Set<String> paths = new LinkedHashSet<>();
+        paths.add("package.json");
+        paths.add("package-lock.json");
+        if (edit.getScenario().npmrc() != null) {
+            paths.add(".npmrc");
+        }
+        if (edit.getInputs().getYarnLock() != null) {
+            paths.add("yarn.lock");
+        }
+        paths.addAll(edit.getInputs().getTree().keySet());
+        return paths;
+    }
+
+    /**
+     * npm's own devEngines check, which it runs before the arborist builds anything.
+     */
+    static void checkDevEngines(NpmScenarios.Edit edit) {
+        NpmScenarios.Scenario scenario = edit.getScenario();
+        NpmLockRegenerator.checkDevEngines(edit.manifests().get(""), options(scenario), host(scenario));
     }
 
     static IdealTreeBuilder builder(NpmScenarios.Edit edit, ScenarioRegistry http, String path) {
@@ -222,7 +249,7 @@ final class ScenarioReplay {
     static IdealTreeBuilder builder(NpmScenarios.Edit edit, ScenarioRegistry http, String path, NpmOptions options) {
         NpmScenarios.Scenario scenario = edit.getScenario();
         VirtualTreeLoader.ProjectFiles files = NpmLockRegenerator.projectFiles(new LockFile(edit.getStart().getText()),
-          edit.getInputs().getYarnLock(), edit.manifests()).readBy(options.getRelease(), null);
+          edit.getInputs().getYarnLock(), edit.manifests()).readBy(options.getRelease(), paths(edit));
         return new IdealTreeBuilder(path, files, options, registry(http), host(scenario), now(scenario));
     }
 

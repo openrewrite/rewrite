@@ -176,6 +176,7 @@ class IdealTreeBuilderTest extends ScenarioTest {
         boolean treeOrCannotKnow = result != null && kind.equals("cannot-know");
         Node built;
         try {
+            ScenarioReplay.checkDevEngines(edit);
             built = ScenarioReplay.builder(edit, http, path).buildIdealTree();
         } catch (RuntimeException e) {
             String code = codeOf(e);
