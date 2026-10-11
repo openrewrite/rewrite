@@ -22,9 +22,11 @@ import org.openrewrite.javascript.internal.lock.V8RegExp;
 
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.WeakHashMap;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -32,6 +34,9 @@ import java.util.regex.Pattern;
  * Port of @yarnpkg/plugin-patch sources/tools/parse.ts (Yarn 4.10.3).
  */
 final class PatchParse {
+
+    private static final Map<String, List<Map<String, Object>>> PARSED =
+            Collections.synchronizedMap(new WeakHashMap<>());
 
     static final int NON_EXECUTABLE_FILE_MODE = 0644;
     static final int EXECUTABLE_FILE_MODE = 0755;
@@ -324,7 +329,19 @@ final class PatchParse {
         return parsedMode;
     }
 
+    /**
+     * The file's effects, which callers only read. They are kept while the text is, so a builtin patch is parsed once.
+     */
     static List<Map<String, Object>> parsePatchFile(String file) {
+        List<Map<String, Object>> parsed = PARSED.get(file);
+        if (parsed == null) {
+            parsed = parse(file);
+            PARSED.put(file, parsed);
+        }
+        return parsed;
+    }
+
+    private static List<Map<String, Object>> parse(String file) {
         List<String> lines = new ArrayList<>(Arrays.asList(file.split("\n", -1)));
         if (lines.get(lines.size() - 1).isEmpty()) {
             lines.remove(lines.size() - 1);

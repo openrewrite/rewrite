@@ -97,7 +97,7 @@ class YarnBerryScenarioTest extends LockScenarioTest {
         skipUnlessReplayed(edit.getLabel(), scenario, expect);
         BerryScenarios.ScenarioRegistry http = scenario.registry();
         Result result = new YarnBerryLockRegenerator(scenario.editInputs(edit.getPhase(), edit.getStart()), http)
-                .regenerate();
+                .regenerateWithConfiguration();
         check(edit.getLabel(), expect, edit.getAfter(), result, http);
         String rcFile = scenario.file(edit.getPhase() == Phase.AFTER ? "yarnrc.written" : "yarnrc-before.written");
         if (rcFile != null && result.isSuccess()) {
