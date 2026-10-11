@@ -280,13 +280,13 @@ public final class IdealTreeBuilder {
                     }
                     engineWarnings.add(err);
                 }
-                NpmInstallChecks.checkPlatform(node.getPackage(), options.isForce(), Host.UNKNOWN, host);
+                NpmInstallChecks.checkPlatform(node.getPackage(), options.isForce(), Host.UNKNOWN, host, release);
             }
             if (release.marksUninstallableOptionalInert() && node.isOptional() && !node.isInert()) {
                 try {
                     NpmInstallChecks.checkEngine(node.getPackage(), NPM_VERSION, host.getNodeVersion(), false,
                             options.getRelease());
-                    NpmInstallChecks.checkPlatform(node.getPackage(), false, environment, host);
+                    NpmInstallChecks.checkPlatform(node.getPackage(), false, environment, host, release);
                 } catch (RuntimeException error) {
                     for (Node n : OptionalSet.optionalSet(node)) {
                         n.setInert(true);

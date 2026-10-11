@@ -972,11 +972,14 @@ public final class NpmRelease implements Comparable<NpmRelease> {
     // @npmcli/map-workspaces
 
     /**
-     * The @npmcli/map-workspaces npm bundles: 3.0.6 from npm 10.5.2, which finds the members 5.0.3 finds; 3.0.4
-     * before.
+     * The @npmcli/map-workspaces npm bundles: 3.0.6 from npm 10.5.2, which finds the members 5.0.3 finds; 3.0.4 and
+     * the releases back to 2.0.2 (npm 8.5.4) that find them alike; 2.0.1 in npm 8.5.3, which refuses a duplicate name
+     * as soon as it is found; before, 2.0.0, which also reads a backslash as glob's escape.
      */
     MapWorkspaces.Release mapWorkspaces() {
-        return atLeast(10, 5, 2) ? MapWorkspaces.Release.V5_0_3 : MapWorkspaces.Release.V3_0_4;
+        return atLeast(10, 5, 2) ? MapWorkspaces.Release.V5_0_3 :
+                atLeast(8, 5, 4) ? MapWorkspaces.Release.V3_0_4 :
+                        atLeast(8, 5, 3) ? MapWorkspaces.Release.V2_0_1 : MapWorkspaces.Release.V2_0_0;
     }
 
     // @npmcli/package-json normalize.js
@@ -1041,6 +1044,25 @@ public final class NpmRelease implements Comparable<NpmRelease> {
         return atLeast(12, 0, 0);
     }
 
+    // npm-install-checks
+
+    /**
+     * {@code checkPlatform} holds a package's {@code libc} to the machine's, which a machine other than linux has none
+     * of, from npm 9.6.3 (npm-install-checks 6.1.0); before, only {@code os} and {@code cpu}.
+     */
+    boolean checksLibc() {
+        return atLeast(9, 6, 3);
+    }
+
+    /**
+     * {@code checkPlatform} finds glibc by the process report's {@code glibcVersionRuntime}, from npm 9.6.5
+     * (npm-install-checks 6.1.1); in 9.6.3 and 9.6.4 it reads {@code glibcRuntimeVersion}, which no report has, so a
+     * glibc machine has no libc.
+     */
+    boolean detectsGlibc() {
+        return atLeast(9, 6, 5);
+    }
+
     // npm-package-arg
 
     /**
@@ -1093,21 +1115,35 @@ public final class NpmRelease implements Comparable<NpmRelease> {
         return atLeast(11, 10, 0);
     }
 
+    // pacote registry.js
+
+    /**
+     * A registry spec npm-package-arg reads as a tag with no spec (a bare name) is fetched as the configured {@code tag}
+     * when that is not {@code latest}, until npm 9.0.0 (pacote 12 and 13, beside npm-package-arg 8 and 9).
+     */
+    boolean takesDefaultTagForEmptySpec() {
+        return !atLeast(9, 0, 0);
+    }
+
     // semver
 
     /**
      * The node-semver npm bundles: 7.8.5 from npm 11.18.0, whose {@code ~1.2} reaches down to {@code 1.2.0-0} under
      * {@code includePrerelease} (classes/range.js); 7.8.4 from npm 11.17.0 (7.8.2 takes an x-range with a number after
      * a wildcard for no range); 7.8.1 from npm 11.16.0, which strips build metadata from a whole range; 7.7.3 from npm
-     * 11.6.2 and 7.7.4 from npm 10.9.5, which strip it from a comparator as 7.8.0 does; before, 7.7.2, as every release
-     * from 7.5.4 (npm 10.0.0) answers.
+     * 11.6.2 and 7.7.4 from npm 10.9.5, which strip it from a comparator as 7.8.0 does; 7.7.2, as every release from
+     * 7.5.4 (npm 9.8.1) answers; 7.5.2 in npm 9.7.2 to 9.8.0, which reads a loose range's {@code ||} groups untrimmed;
+     * before, 7.7.2 again, as 7.3.6 to 7.5.1 (npm 8.7.0 to 9.7.1) answer, and 7.3.5 (npm 8.0.0 to 8.6.0) but for
+     * {@code >=} and a 0, any character, 0, any character, 0, which its {@code GTE0} (dots unescaped) reads as any.
      */
     NodeSemver.Release semver() {
         return atLeast(11, 18, 0) ? NodeSemver.Release.V7_8_5 :
                 atLeast(11, 17, 0) ? NodeSemver.Release.V7_8_4 :
                         atLeast(11, 16, 0) ? NodeSemver.Release.V7_8_1 :
                                 atLeast(11, 6, 2) || atLeast(10, 9, 5) && !atLeast(11, 0, 0) ?
-                                        NodeSemver.Release.V7_8_0 : NodeSemver.Release.V7_7_2;
+                                        NodeSemver.Release.V7_8_0 :
+                                        atLeast(9, 7, 2) && !atLeast(9, 8, 1) ? NodeSemver.Release.V7_5_2 :
+                                                NodeSemver.Release.V7_7_2;
     }
 
     // ssri

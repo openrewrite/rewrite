@@ -28,8 +28,9 @@ import java.util.Map;
 import static org.openrewrite.javascript.internal.lock.npm.Js.truthy;
 
 /**
- * Port of npm-install-checks 8.0.0 ({@code checkEngine}, {@code checkPlatform}). The machine's own
- * values come from a {@link Host}; an unknown host satisfies every check.
+ * Port of npm-install-checks 8.0.0 ({@code checkEngine}, {@code checkPlatform}), and of the releases npm bundled
+ * before it where they read libc otherwise. The machine's own values come from a {@link Host}; an unknown host
+ * satisfies every check.
  */
 final class NpmInstallChecks {
 
@@ -110,8 +111,10 @@ final class NpmInstallChecks {
     /**
      * @param environment the {@code os}, {@code cpu} and {@code libc} the caller overrides, if any
      * @param current     the machine's own
+     * @param release     the npm that bundles the library, for whether it reads {@code libc}
      */
-    static void checkPlatform(Map<String, Object> target, boolean force, Host environment, Host current) {
+    static void checkPlatform(Map<String, Object> target, boolean force, Host environment, Host current,
+                              NpmRelease release) {
         if (force) {
             return;
         }
@@ -120,22 +123,28 @@ final class NpmInstallChecks {
         // currentEnv.libc(os) detects a libc on linux only
         String libc = truthy(environment.getLibc()) ? environment.getLibc() :
                 "linux".equals(os) ? current.getLibc() : null;
+        if ("glibc".equals(libc) && !truthy(environment.getLibc()) && !release.detectsGlibc()) {
+            // 6.1.0 reads report.header.glibcRuntimeVersion, which no process report has
+            libc = null;
+        }
 
         boolean osOk = os == null || !truthy(target.get("os")) || checkList(os, target.get("os"));
         boolean cpuOk = cpu == null || !truthy(target.get("cpu")) || checkList(cpu, target.get("cpu"));
         // a machine that reports an os but no libc has none; an unknown machine's libc is unknown
-        boolean libcOk = !truthy(target.get("libc")) ||
+        boolean libcOk = !release.checksLibc() || !truthy(target.get("libc")) ||
                          (libc != null ? checkList(libc, target.get("libc")) : current.getOs() == null);
 
         if (!osOk || !cpuOk || !libcOk) {
             Map<String, @Nullable String> currentValues = new LinkedHashMap<>();
             currentValues.put("os", os);
             currentValues.put("cpu", cpu);
-            currentValues.put("libc", libc);
             Map<String, @Nullable Object> required = new LinkedHashMap<>();
             required.put("os", target.get("os"));
             required.put("cpu", target.get("cpu"));
-            required.put("libc", target.get("libc"));
+            if (release.checksLibc()) {
+                currentValues.put("libc", libc);
+                required.put("libc", target.get("libc"));
+            }
             throw new UnsupportedPlatform(Js.string(target.get("_id")), currentValues, required);
         }
     }

@@ -21,7 +21,9 @@
 const fs = require('fs')
 const path = require('path')
 const checkout = path.resolve(process.argv[2])
-const fx = name => require(path.join(checkout, "test/fixtures", name))
+// a fixture an older checkout lacks (7.5.2 has no valid-versions.js) dumps as none
+const fx = name => fs.existsSync(path.join(checkout, "test/fixtures", name)) ?
+  require(path.join(checkout, "test/fixtures", name)) : []
 const semver = require(path.join(process.env.NPM_NODE_MODULES ||
   path.resolve(path.dirname(process.execPath), "../lib/node_modules/npm/node_modules"), "semver"))
 
