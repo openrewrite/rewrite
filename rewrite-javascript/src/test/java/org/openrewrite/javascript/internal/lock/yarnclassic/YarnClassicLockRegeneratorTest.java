@@ -234,6 +234,23 @@ class YarnClassicLockRegeneratorTest {
      * A range that is not semver and names a directory holding a package.json is a {@code file:} dependency
      * (package-request.js {@code normalizeRange}; {@code open-implicit-file-range}), whether or not the host read it.
      */
+    // yarn 1.22.22 fails "Found incompatible module" over the first on Node 18 and over the second on darwin, and
+    // installs both on Node 24 linux (lock/yarn-classic/small-engines-node-18-incompatible-fails)
+    @Test
+    void aProjectWhoseCompatibilityFollowsTheUnknownHostCannotBeKnown() {
+        YarnClassicLockRegenerator.Inputs.InputsBuilder inputs = YarnClassicLockRegenerator.Inputs.builder()
+                .lock("# yarn lockfile v1\n\n\n");
+        Result engine = new YarnClassicLockRegenerator(inputs.manifest("", "{\"name\":\"p\",\"version\":\"1.0.0\"," +
+                "\"engines\":{\"node\":\">=20.18.1\"}}").build(), YarnClassicScenarios.NO_REGISTRY).regenerate();
+        Result platform = new YarnClassicLockRegenerator(inputs.manifest("", "{\"name\":\"p\",\"version\":\"1.0.0\"," +
+                "\"os\":[\"linux\"]}").build(), YarnClassicScenarios.NO_REGISTRY).regenerate();
+
+        assertThat(engine.getErrorMessage()).isEqualTo("RESOLUTION_REQUIRED: the engine cannot know the engine " +
+                                                       "node yarn runs on, which p@1.0.0 restricts");
+        assertThat(platform.getErrorMessage()).isEqualTo("RESOLUTION_REQUIRED: the engine cannot know the platform " +
+                                                         "yarn runs on, which p@1.0.0 restricts");
+    }
+
     @Test
     void aRangeNamingADirectoryTheProjectHoldsIsAFileDependency() {
         YarnClassicLockRegenerator.Inputs.InputsBuilder inputs = YarnClassicLockRegenerator.Inputs.builder()

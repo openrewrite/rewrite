@@ -15,6 +15,7 @@
  */
 package org.openrewrite.javascript.internal.lock.yarnclassic;
 
+import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
@@ -48,6 +49,20 @@ class PackageCompatibilityTest {
     })
     void nodeSemverSemantics(String name, String range, String actual, boolean loose, boolean satisfied) {
         assertThat(PackageCompatibility.testEngine(name, range, actual, loose)).isEqualTo(satisfied);
+    }
+
+    // over Node 18 and up, which also pass as 0.10 to 0.13: "<1" passes 18 as 0.10.18
+    @ParameterizedTest(name = "{0}")
+    @CsvSource(delimiter = ';', value = {
+            ">=16;           true",
+            "0.12.x || >=20; true",
+            "<1;             true",
+            ">=20.18.1;",
+            "<0.10;          false",
+            "not a range;    false"
+    })
+    void anUnknownNodeVersionPassesWhereEveryHostDoes(String range, @Nullable Boolean every) {
+        assertThat(PackageCompatibility.everyHost(range, false)).isEqualTo(every);
     }
 
     @Test

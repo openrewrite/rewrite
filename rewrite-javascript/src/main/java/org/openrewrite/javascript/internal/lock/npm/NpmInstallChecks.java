@@ -19,6 +19,7 @@ import lombok.Getter;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.javascript.internal.lock.CannotKnow;
 import org.openrewrite.javascript.internal.lock.Host;
+import org.openrewrite.javascript.internal.lock.NodeHosts;
 import org.openrewrite.semver.NodeSemver;
 
 import java.util.Collections;
@@ -80,12 +81,6 @@ final class NpmInstallChecks {
         }
     }
 
-    /**
-     * The node releases that count as hosts. Below its own engines npm 11.17.0 warns and runs on (lib/cli/entry.js),
-     * as it does on node 18.20.8. No older release was tried.
-     */
-    static final String NODE_HOSTS = ">=18.0.0";
-
     private NpmInstallChecks() {
     }
 
@@ -97,7 +92,8 @@ final class NpmInstallChecks {
             return;
         }
         Object node = Js.get(eng, "node");
-        Boolean everyNode = !force && nodeVer == null && truthy(node) ? everyHost(node) : Boolean.TRUE;
+        Boolean everyNode = !force && nodeVer == null && truthy(node) ? NodeHosts.NPM.satisfiedBy(node) :
+                Boolean.TRUE;
         boolean nodeFail = truthy(nodev) && truthy(node) && !satisfies(nodev, node) ||
                            Boolean.FALSE.equals(everyNode);
         boolean npmFail = truthy(npmVer) && truthy(Js.get(eng, "npm")) && !satisfies(npmVer, Js.get(eng, "npm"));
@@ -111,19 +107,6 @@ final class NpmInstallChecks {
             throw new CannotKnow("the node version npm runs on (" + Js.string(target.get("_id")) +
                                  " requires node " + Js.string(node) + ")");
         }
-    }
-
-    // TRUE when every node release in NODE_HOSTS satisfies the range, FALSE when none does, null when some do
-    private static @Nullable Boolean everyHost(Object range) {
-        String valid = range instanceof String ?
-                NodeSemver.validRange((String) range, NodeSemver.Options.DEFAULT) : null;
-        if (valid == null) {
-            return Boolean.FALSE;
-        }
-        if (NodeSemver.subset(NODE_HOSTS, valid, NodeSemver.Options.DEFAULT)) {
-            return Boolean.TRUE;
-        }
-        return NodeSemver.intersects(NODE_HOSTS, valid, NodeSemver.Options.DEFAULT) ? null : Boolean.FALSE;
     }
 
     private static boolean satisfies(String version, @Nullable Object range) {

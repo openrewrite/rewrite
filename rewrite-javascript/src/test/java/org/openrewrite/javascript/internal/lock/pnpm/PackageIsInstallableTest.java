@@ -17,6 +17,7 @@ package org.openrewrite.javascript.internal.lock.pnpm;
 
 import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.Test;
+import org.openrewrite.javascript.internal.lock.CannotKnow;
 import org.openrewrite.javascript.internal.lock.Host;
 
 import java.util.Map;
@@ -249,9 +250,30 @@ class PackageIsInstallableTest {
           HOST)).isInstanceOf(PackageIsInstallable.UnsupportedEngineError.class);
     }
 
+    // pnpm 11.2.2 runs on Node 22.13 and up, so ">=20" holds on every host, ">=24" on some and "<10" on none
     @Test
-    void aNodeVersionTheHostDoesNotReportIsSatisfied() {
-        PackageIsInstallable.projectIsInstallable(".", obj("{'engines':{'node':'<10'}}"), true, null, null,
+    void anUnknownNodeVersionFailsEngineStrictOnlyWhereEveryHostDoes() {
+        PackageIsInstallable.projectIsInstallable(".", obj("{'engines':{'node':'>=20'}}"), true, null, null,
           Host.UNKNOWN);
+
+        assertThatThrownBy(() -> PackageIsInstallable.projectIsInstallable(".", obj("{'engines':{'node':'>=24'}}"),
+          true, null, null, Host.UNKNOWN)).isInstanceOf(CannotKnow.class).hasMessageContaining("the node pnpm");
+
+        assertThatThrownBy(() -> PackageIsInstallable.projectIsInstallable(".", obj("{'engines':{'node':'<10'}}"),
+          true, null, null, Host.UNKNOWN)).isInstanceOf(PackageIsInstallable.UnsupportedEngineError.class);
+    }
+
+    // pnpm skips an optional package where it does not fit, and fails engine-strict on a required one
+    @Test
+    void anUnknownPlatformFailsOnlyARequiredPackageUnderEngineStrict() {
+        Map<String, @Nullable Object> linuxOnly = obj("{'os':['linux'],'cpu':['x64']}");
+
+        assertThatThrownBy(() -> PackageIsInstallable.packageIsInstallable("p@1.0.0", linuxOnly, true, null, false,
+          null, Host.UNKNOWN)).isInstanceOf(CannotKnow.class).hasMessageContaining("the os and cpu pnpm");
+
+        assertThat(PackageIsInstallable.packageIsInstallable("p@1.0.0", linuxOnly, true, null, true, null,
+          Host.UNKNOWN)).isTrue();
+        assertThat(PackageIsInstallable.packageIsInstallable("p@1.0.0", linuxOnly, false, null, false, null,
+          Host.UNKNOWN)).isTrue();
     }
 }

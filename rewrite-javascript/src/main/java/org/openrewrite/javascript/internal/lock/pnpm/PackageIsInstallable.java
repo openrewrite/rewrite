@@ -17,8 +17,10 @@ package org.openrewrite.javascript.internal.lock.pnpm;
 
 import lombok.Getter;
 import org.jspecify.annotations.Nullable;
+import org.openrewrite.javascript.internal.lock.CannotKnow;
 import org.openrewrite.javascript.internal.lock.Host;
 import org.openrewrite.javascript.internal.lock.JsError;
+import org.openrewrite.javascript.internal.lock.NodeHosts;
 import org.openrewrite.semver.NodeSemver;
 
 import java.util.ArrayList;
@@ -28,8 +30,9 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * Port of @pnpm/config.package-is-installable (pnpm 11.2.2) and @pnpm/cli.utils src/packageIsInstallable.ts; a
- * platform or Node.js version the host does not report counts as satisfied.
+ * Port of @pnpm/config.package-is-installable (pnpm 11.2.2) and @pnpm/cli.utils src/packageIsInstallable.ts. A check
+ * that reads a platform or Node.js version the host does not report passes or fails where it does so on every host.
+ * Where hosts differ, it raises {@link CannotKnow} only when the answer fails the install.
  */
 final class PackageIsInstallable {
 
@@ -67,8 +70,12 @@ final class PackageIsInstallable {
     static @Nullable Boolean packageIsInstallable(String pkgId, Map<String, @Nullable Object> pkg, boolean engineStrict,
                                                   @Nullable Object nodeVersion, boolean optional,
                                                   @Nullable Object supportedArchitectures, Host host) {
-        PnpmError warn = checkPackage(pkgId, pkg, nodeVersion, null, supportedArchitectures, host);
+        List<String> unknown = new ArrayList<>();
+        PnpmError warn = checkPackage(pkgId, pkg, nodeVersion, null, supportedArchitectures, host, unknown);
         if (warn == null) {
+            if (!unknown.isEmpty() && !optional && engineStrict) {
+                throw differsByHost(pkgId, unknown);
+            }
             return true;
         }
         if (optional) {
@@ -87,11 +94,23 @@ final class PackageIsInstallable {
     static void projectIsInstallable(String pkgPath, Map<String, @Nullable Object> pkg, boolean engineStrict,
                                      @Nullable Object nodeVersion, @Nullable Object supportedArchitectures,
                                      Host host) {
-        PnpmError err = checkPackage(pkgPath, pkg, nodeVersion, PNPM_VERSION, supportedArchitectures, host);
-        if (err instanceof UnsupportedEngineError &&
-            (((UnsupportedEngineError) err).getWanted().containsKey("pnpm") || engineStrict)) {
+        List<String> unknown = new ArrayList<>();
+        PnpmError err = checkPackage(pkgPath, pkg, nodeVersion, PNPM_VERSION, supportedArchitectures, host, unknown);
+        boolean throwsHere = err instanceof UnsupportedEngineError &&
+                             (((UnsupportedEngineError) err).getWanted().containsKey("pnpm") || engineStrict);
+        // a platform error, which some hosts raise in its place, throws nowhere
+        boolean platformUnknown = unknown.stream().anyMatch(check -> !"node".equals(check));
+        if (throwsHere && platformUnknown || err == null && engineStrict && unknown.contains("node")) {
+            throw differsByHost(pkgPath, unknown);
+        }
+        if (throwsHere) {
             throw err;
         }
+    }
+
+    private static CannotKnow differsByHost(String pkgId, List<String> unknown) {
+        return new CannotKnow("the " + String.join(" and ", unknown) + " pnpm runs on, which " + pkgId +
+                              " restricts");
     }
 
     /**
@@ -100,11 +119,22 @@ final class PackageIsInstallable {
     static @Nullable PnpmError checkPackage(String pkgId, Map<String, @Nullable Object> manifest,
                                             @Nullable Object nodeVersion, @Nullable String pnpmVersion,
                                             @Nullable Object supportedArchitectures, Host host) {
+        return checkPackage(pkgId, manifest, nodeVersion, pnpmVersion, supportedArchitectures, host, null);
+    }
+
+    /**
+     * @param unknown where given, collects the checks that read what the host does not report and whose answer
+     *                differs between hosts. Each passes.
+     */
+    private static @Nullable PnpmError checkPackage(String pkgId, Map<String, @Nullable Object> manifest,
+                                                    @Nullable Object nodeVersion, @Nullable String pnpmVersion,
+                                                    @Nullable Object supportedArchitectures, Host host,
+                                                    @Nullable List<String> unknown) {
         Map<String, @Nullable Object> wantedPlatform = new LinkedHashMap<>();
         wantedPlatform.put("cpu", orAny(manifest.get("cpu")));
         wantedPlatform.put("os", orAny(manifest.get("os")));
         wantedPlatform.put("libc", orAny(manifest.get("libc")));
-        PnpmError platformError = checkPlatform(pkgId, wantedPlatform, supportedArchitectures, host);
+        PnpmError platformError = checkPlatform(pkgId, wantedPlatform, supportedArchitectures, host, unknown);
         if (platformError != null) {
             return platformError;
         }
@@ -112,7 +142,8 @@ final class PackageIsInstallable {
         if (engines == null || engines == Js.UNDEFINED) {
             return null;
         }
-        return checkEngine(pkgId, engines, nodeVersion != null ? nodeVersion : host.getNodeVersion(), pnpmVersion);
+        return checkEngine(pkgId, engines, nodeVersion != null ? nodeVersion : host.getNodeVersion(), pnpmVersion,
+                unknown);
     }
 
     private static Object orAny(@Nullable Object value) {
@@ -125,11 +156,24 @@ final class PackageIsInstallable {
      */
     static @Nullable UnsupportedEngineError checkEngine(String packageId, @Nullable Object wantedEngine,
                                                         @Nullable Object node, @Nullable String pnpm) {
+        return checkEngine(packageId, wantedEngine, node, pnpm, null);
+    }
+
+    private static @Nullable UnsupportedEngineError checkEngine(String packageId, @Nullable Object wantedEngine,
+                                                                @Nullable Object node, @Nullable String pnpm,
+                                                                @Nullable List<String> unknown) {
         if (!Js.truthy(wantedEngine)) {
             return null;
         }
         Map<String, @Nullable Object> unsatisfiedWanted = new LinkedHashMap<>();
         Object wantedNode = property(wantedEngine, "node");
+        Boolean everyHost = unknown != null && node == null && Js.truthy(wantedNode) ?
+                NodeHosts.PNPM.satisfiedBy(wantedNode) : Boolean.TRUE;
+        if (everyHost == null) {
+            unknown.add("node");
+        } else if (!everyHost) {
+            unsatisfiedWanted.put("node", wantedNode);
+        }
         if (node != null && Js.truthy(wantedNode) && !satisfies(node, wantedNode)) {
             if (!(node instanceof String) || NodeSemver.valid((String) node, NodeSemver.Options.DEFAULT) == null) {
                 throw new PnpmError("INVALID_NODE_VERSION", "The nodeVersion setting is \"" + Js.string(node) +
@@ -170,6 +214,13 @@ final class PackageIsInstallable {
      */
     static @Nullable UnsupportedPlatformError checkPlatform(String packageId, Map<String, @Nullable Object> wanted,
                                                             @Nullable Object supportedArchitectures, Host host) {
+        return checkPlatform(packageId, wanted, supportedArchitectures, host, null);
+    }
+
+    private static @Nullable UnsupportedPlatformError checkPlatform(String packageId,
+                                                                    Map<String, @Nullable Object> wanted,
+                                                                    @Nullable Object supportedArchitectures, Host host,
+                                                                    @Nullable List<String> unknown) {
         String currentLibc = host.getLibc() == null ? "unknown" : host.getLibc();
         List<@Nullable Object> os = dedupeCurrent(host.getOs(), property(supportedArchitectures, "os"));
         List<@Nullable Object> cpu = dedupeCurrent(host.getCpu(), property(supportedArchitectures, "cpu"));
@@ -178,12 +229,18 @@ final class PackageIsInstallable {
         boolean cpuOk = true;
         boolean libcOk = true;
         if (Js.truthy(wanted.get("os"))) {
-            osOk = os == null || checkList(os, wanted.get("os"));
+            osOk = os == null ? passesAny("os", wanted.get("os"), unknown) : checkList(os, wanted.get("os"));
         }
         if (Js.truthy(wanted.get("cpu"))) {
-            cpuOk = cpu == null || checkList(cpu, wanted.get("cpu"));
+            cpuOk = cpu == null ? passesAny("cpu", wanted.get("cpu"), unknown) : checkList(cpu, wanted.get("cpu"));
         }
-        if (Js.truthy(wanted.get("libc")) && !"unknown".equals(currentLibc)) {
+        if (Js.truthy(wanted.get("libc")) && host.getOs() == null) {
+            // detect-libc finds none off linux, which skips the check
+            if (!(libc != null && checkList(libc, wanted.get("libc"))) && unknown != null &&
+                !isAny(wanted.get("libc"))) {
+                unknown.add("libc");
+            }
+        } else if (Js.truthy(wanted.get("libc")) && !"unknown".equals(currentLibc)) {
             libcOk = libc == null || checkList(libc, wanted.get("libc"));
         }
         if (!osOk || !cpuOk || !libcOk) {
@@ -196,7 +253,15 @@ final class PackageIsInstallable {
         return null;
     }
 
-    private static boolean checkList(List<@Nullable Object> values, @Nullable Object wanted) {
+    // a value the host does not report passes on every host only for ["any"]
+    private static boolean passesAny(String check, @Nullable Object wanted, @Nullable List<String> unknown) {
+        if (unknown != null && !isAny(wanted)) {
+            unknown.add(check);
+        }
+        return true;
+    }
+
+    private static List<String> strings(@Nullable Object wanted) {
         List<@Nullable Object> list;
         if (wanted instanceof String) {
             list = Collections.singletonList(wanted);
@@ -213,6 +278,16 @@ final class PackageIsInstallable {
                 strings.add((String) entry);
             }
         }
+        return strings;
+    }
+
+    private static boolean isAny(@Nullable Object wanted) {
+        List<String> strings = strings(wanted);
+        return strings.size() == 1 && "any".equals(strings.get(0));
+    }
+
+    private static boolean checkList(List<@Nullable Object> values, @Nullable Object wanted) {
+        List<String> strings = strings(wanted);
         if (strings.size() == 1 && "any".equals(strings.get(0))) {
             return true;
         }
