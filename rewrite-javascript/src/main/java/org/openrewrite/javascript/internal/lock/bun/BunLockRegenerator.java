@@ -21,7 +21,6 @@ import lombok.NonNull;
 import lombok.Singular;
 import lombok.Value;
 import org.jspecify.annotations.Nullable;
-import org.openrewrite.javascript.NodeRegistry;
 import org.openrewrite.javascript.internal.LockFileRegeneration.Failure;
 import org.openrewrite.javascript.internal.LockFileRegeneration.InstallRoot;
 import org.openrewrite.javascript.internal.LockFileRegeneration.Reason;
@@ -83,11 +82,11 @@ public final class BunLockRegenerator {
         String bunfig;
 
         /**
-         * The registries the user's own .npmrc names, the host's, which bun reads after bunfig.toml and before the
-         * project's .npmrc: the one without a scope is its {@code registry}.
+         * The user's .npmrc, the host's registries, which bun reads after bunfig.toml and before the project's .npmrc;
+         * null for none.
          */
-        @Singular("userRegistry")
-        List<NodeRegistry> userConfig;
+        @Nullable
+        String userNpmrc;
 
         /**
          * The project's package-manager files under the root, by path relative to it, with their contents: the
@@ -399,7 +398,7 @@ public final class BunLockRegenerator {
      * Up to the resolution of what the diff enqueued. A lock bun would ignore is not installed over.
      */
     private static PendingInstall installWithManager(Inputs inputs, ManifestSource registry, Log log) {
-        BunOptions options = BunOptions.load(inputs.getBunfig(), inputs.getUserConfig(), inputs.getNpmrc(),
+        BunOptions options = BunOptions.load(inputs.getBunfig(), inputs.getUserNpmrc(), inputs.getNpmrc(),
                 DotEnv.load(HostEnvironment.UNKNOWN, inputs.getFiles()));
         LoadResult loadResult = loadFromCwd(options.isLoadLockfile() ? inputs.getLock() : null, options);
         int configVersion = loadResult.chooseConfigVersion();

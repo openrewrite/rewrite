@@ -15,6 +15,8 @@
  */
 package org.openrewrite.javascript.internal.lock.berry;
 
+import org.openrewrite.javascript.internal.lock.RegistrySource;
+
 import lombok.AllArgsConstructor;
 import lombok.Value;
 import org.jspecify.annotations.Nullable;

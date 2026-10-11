@@ -52,6 +52,7 @@ import java.util.Set;
 
 import static java.util.Collections.emptyList;
 import static java.util.Collections.singletonList;
+import static java.util.Objects.requireNonNull;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.javascript.Assertions.nodeResolutionResult;
 
@@ -90,7 +91,7 @@ class NativeLockEngineTest {
 
     private Result regen(PackageManager pm, String edited, @Nullable String lock,
                          @Nullable NodeResolutionResult marker) {
-        return NativeLockEngine.regenerate(pm, Request.builder()
+        return regenerate(pm, Request.builder()
                 .packageJson(edited)
                 .lock(lock)
                 .marker(marker)
@@ -112,7 +113,7 @@ class NativeLockEngineTest {
         String scenario = "lock/bun/small-registry-mirror/";
         routes.put("https://registry.npmmirror.com/is-number", resource(scenario + "http/is-number"));
 
-        Result result = NativeLockEngine.regenerate(PackageManager.Bun, Request.builder()
+        Result result = regenerate(PackageManager.Bun, Request.builder()
                 .packageJson(resource(scenario + "pkg"))
                 .lock(resource(scenario + "before"))
                 .packageJsonPath(Paths.get("app/package.json"))
@@ -132,8 +133,8 @@ class NativeLockEngineTest {
                 .lock(resource(scenario + "before"))
                 .packageJsonPath(Paths.get("package.json"));
 
-        Result withoutDirectory = NativeLockEngine.regenerate(PackageManager.Bun, request.build(), ctx);
-        Result result = NativeLockEngine.regenerate(PackageManager.Bun,
+        Result withoutDirectory = regenerate(PackageManager.Bun, request.build(), ctx);
+        Result result = regenerate(PackageManager.Bun,
                 request.manifest(Paths.get("local/package.json"), resource(scenario + "tree/local/package.json"))
                         .build(),
                 ctx);
@@ -157,11 +158,11 @@ class NativeLockEngineTest {
         Set<Path> withPatch = new HashSet<>(withoutPatch);
         withPatch.add(Paths.get("app/" + patch));
 
-        Result noView = NativeLockEngine.regenerate(PackageManager.Bun, request.build(), ctx);
-        Result unread = NativeLockEngine.regenerate(PackageManager.Bun, request.projectPaths(withPatch).build(), ctx);
-        Result absent = NativeLockEngine.regenerate(PackageManager.Bun, request.projectPaths(withoutPatch).build(),
+        Result noView = regenerate(PackageManager.Bun, request.build(), ctx);
+        Result unread = regenerate(PackageManager.Bun, request.projectPaths(withPatch).build(), ctx);
+        Result absent = regenerate(PackageManager.Bun, request.projectPaths(withoutPatch).build(),
                 ctx);
-        Result read = NativeLockEngine.regenerate(PackageManager.Bun, request.projectPaths(withPatch)
+        Result read = regenerate(PackageManager.Bun, request.projectPaths(withPatch)
                 .packageManagerFile(Paths.get("app/" + patch), resource(scenario + "tree/" + patch)).build(), ctx);
 
         assertThat(noView.getFailure().getDetail()).startsWith("the engine cannot know patch file ./" + patch);
@@ -182,8 +183,8 @@ class NativeLockEngineTest {
                 .packageJsonPath(Paths.get("app/package.json"))
                 .projectPaths(new HashSet<>(Arrays.asList(Paths.get("app/package.json"), Paths.get("app/.npmrc"))));
 
-        Result unread = NativeLockEngine.regenerate(PackageManager.Bun, request.build(), ctx);
-        Result read = NativeLockEngine.regenerate(PackageManager.Bun,
+        Result unread = regenerate(PackageManager.Bun, request.build(), ctx);
+        Result read = regenerate(PackageManager.Bun,
                 request.packageManagerFile(Paths.get("app/.npmrc"), resource(scenario + "npmrc")).build(), ctx);
 
         assertThat(unread.getFailure().getDetail())
@@ -202,8 +203,8 @@ class NativeLockEngineTest {
                 .packageJsonPath(Paths.get("app/package.json"))
                 .projectPaths(new HashSet<>(Arrays.asList(Paths.get("app/package.json"), Paths.get("app/.env"))));
 
-        Result unread = NativeLockEngine.regenerate(PackageManager.Bun, request.build(), ctx);
-        Result read = NativeLockEngine.regenerate(PackageManager.Bun,
+        Result unread = regenerate(PackageManager.Bun, request.build(), ctx);
+        Result read = regenerate(PackageManager.Bun,
                 request.packageManagerFile(Paths.get("app/.env"), resource(scenario + "tree/.env")).build(), ctx);
 
         assertThat(unread.getFailure().getDetail())
@@ -227,7 +228,7 @@ class NativeLockEngineTest {
         binaryRoutes.put("https://registry.npmjs.org/which-module/-/which-module-2.0.1.tgz",
                 bytes(scenario + "http/which-module-2.0.1.tgz"));
 
-        Result result = NativeLockEngine.regenerate(PackageManager.YarnClassic, Request.builder()
+        Result result = regenerate(PackageManager.YarnClassic, Request.builder()
                 .packageJson(resource(scenario + "pkg"))
                 .lock(resource(scenario + "before"))
                 .packageJsonPath(Paths.get("app/package.json"))
@@ -249,11 +250,12 @@ class NativeLockEngineTest {
                 .manifest(Paths.get("packages/b/package.json"),
                         resource(scenario + "tree-before/packages/b/package.json"))
                 .build();
-        routes.put("https://registry.yarnpkg.com/is-number", resource(scenario + "http/is-number"));
+        // the host names npmjs, which yarn 1.22.22 asks over its own default and fetches from as its own (recorded)
+        routes.put("https://registry.npmjs.org/is-number", resource(scenario + "http/is-number"));
         binaryRoutes.put("https://registry.yarnpkg.com/is-number/-/is-number-7.0.0.tgz",
                 bytes(scenario + "http/is-number-7.0.0.tgz"));
 
-        Result result = NativeLockEngine.regenerate(PackageManager.YarnClassic, request, ctx);
+        Result result = regenerate(PackageManager.YarnClassic, request, ctx);
 
         assertThat(result.isSuccess()).as(String.valueOf(result.getErrorMessage())).isTrue();
         assertThat(result.getLockFileContent()).isEqualTo(resource(scenario + "after"));
@@ -270,11 +272,11 @@ class NativeLockEngineTest {
     @Test
     void yarnBerryRegeneratesFromItsConfigurationFiles() {
         String scenario = "lock/yarn-berry/small-catalog-default-edit/";
-        routes.put("https://registry.yarnpkg.com/path-is-absolute", resource(scenario + "http/path-is-absolute"));
-        binaryRoutes.put("https://registry.yarnpkg.com/path-is-absolute/-/path-is-absolute-1.0.1.tgz",
+        routes.put("https://registry.npmjs.org/path-is-absolute", resource(scenario + "http/path-is-absolute"));
+        binaryRoutes.put("https://registry.npmjs.org/path-is-absolute/-/path-is-absolute-1.0.1.tgz",
                 bytes(scenario + "http/path-is-absolute-1.0.1.tgz"));
 
-        Result result = NativeLockEngine.regenerate(PackageManager.YarnBerry, Request.builder()
+        Result result = regenerate(PackageManager.YarnBerry, Request.builder()
                 .packageJson(resource(scenario + "pkg"))
                 .lock(resource(scenario + "before"))
                 .packageJsonPath(Paths.get("app/package.json"))
@@ -288,7 +290,7 @@ class NativeLockEngineTest {
     @Test
     void yarnBerryReadsWorkspaceMembersFromTheProjectManifests() {
         String scenario = "lock/yarn-berry/ws-member-add/";
-        Result result = NativeLockEngine.regenerate(PackageManager.YarnBerry, Request.builder()
+        Result result = regenerate(PackageManager.YarnBerry, Request.builder()
                 .packageJson(resource(scenario + "tree/packages/app/package.json"))
                 .lock(resource(scenario + "before"))
                 .packageJsonPath(Paths.get("packages/app/package.json"))
@@ -330,10 +332,10 @@ class NativeLockEngineTest {
                 .packageJsonPath(Paths.get("package.json"))
                 .marker(projectNpmrc("@corp:registry", "https://corp.example/"));
 
-        NativeLockEngine.regenerate(PackageManager.YarnClassic, request
+        regenerate(PackageManager.YarnClassic, request
                 .packageJson("{\"name\":\"p\",\"version\":\"1.0.0\",\"dependencies\":{\"@corp/a\":\"^1.0.0\"}}")
                 .build(), ctx);
-        NativeLockEngine.regenerate(PackageManager.YarnBerry, request
+        regenerate(PackageManager.YarnBerry, request
                 .packageJson("{\"name\":\"p\",\"packageManager\":\"yarn@4.10.3\"," +
                              "\"dependencies\":{\"@corp/a\":\"^1.0.0\"}}")
                 .lock("__metadata:\n  version: 8\n  cacheKey: 10c0\n\n\"p@workspace:.\":\n" +
@@ -369,10 +371,10 @@ class NativeLockEngineTest {
                 .packageJsonPath(Paths.get("package.json"))
                 .marker(projectNpmrc("registry", "https://corp.example/"));
 
-        NativeLockEngine.regenerate(PackageManager.YarnClassic, request
+        regenerate(PackageManager.YarnClassic, request
                 .packageJson("{\"name\":\"p\",\"version\":\"1.0.0\",\"dependencies\":{\"a\":\"^1.0.0\"}}")
                 .build(), ctx);
-        NativeLockEngine.regenerate(PackageManager.YarnBerry, request
+        regenerate(PackageManager.YarnBerry, request
                 .packageJson("{\"name\":\"p\",\"packageManager\":\"yarn@4.10.3\"," +
                              "\"dependencies\":{\"a\":\"^1.0.0\"}}")
                 .lock("__metadata:\n  version: 8\n  cacheKey: 10c0\n\n\"p@workspace:.\":\n" +
@@ -407,10 +409,10 @@ class NativeLockEngineTest {
                 .marker(projectNpmrc("registry", "https://corp.example/", "//corp.example/:_authToken",
                         "project-token"));
 
-        NativeLockEngine.regenerate(PackageManager.YarnClassic, request
+        regenerate(PackageManager.YarnClassic, request
                 .packageJson("{\"name\":\"p\",\"version\":\"1.0.0\",\"dependencies\":{\"a\":\"^1.0.0\"}}")
                 .build(), ctx);
-        NativeLockEngine.regenerate(PackageManager.YarnBerry, request
+        regenerate(PackageManager.YarnBerry, request
                 .packageJson("{\"name\":\"p\",\"packageManager\":\"yarn@4.10.3\"," +
                              "\"dependencies\":{\"a\":\"^1.0.0\"}}")
                 .lock("__metadata:\n  version: 8\n  cacheKey: 10c0\n\n\"p@workspace:.\":\n" +
@@ -511,7 +513,7 @@ class NativeLockEngineTest {
         String scenario = "lock/pnpm/small-overrides-ws-direct/";
         routes.put("https://registry.npmjs.org/wrappy", resource(scenario + "http/wrappy"));
 
-        Result result = NativeLockEngine.regenerate(PackageManager.Pnpm, Request.builder()
+        Result result = regenerate(PackageManager.Pnpm, Request.builder()
                 .packageJson(resource(scenario + "pkg"))
                 .lock(resource(scenario + "before"))
                 .packageJsonPath(Paths.get("app/package.json"))
@@ -527,7 +529,7 @@ class NativeLockEngineTest {
         String scenario = "lock/pnpm/small-ws-member-bump/";
         routes.put("https://registry.npmjs.org/wrappy", resource(scenario + "http/wrappy"));
 
-        Result result = NativeLockEngine.regenerate(PackageManager.Pnpm, Request.builder()
+        Result result = regenerate(PackageManager.Pnpm, Request.builder()
                 .packageJson(resource(scenario + "tree/packages/a/package.json"))
                 .lock(resource(scenario + "before"))
                 .packageJsonPath(Paths.get("packages/a/package.json"))
@@ -585,7 +587,7 @@ class NativeLockEngineTest {
         routes.put("https://registry.npmjs.org/is-odd/3.0.0", resource("lock/npm/v3/http/is-odd-3.0.0"));
         routes.put("https://registry.npmjs.org/is-odd/3.0.1", resource("lock/npm/v3/http/is-odd-3.0.1"));
 
-        Result result = NativeLockEngine.regenerate(PackageManager.Npm, Request.builder()
+        Result result = regenerate(PackageManager.Npm, Request.builder()
                 .packageJson(resource("lock/npm/workspace/pkg-after"))
                 .lock(resource("lock/npm/workspace/before"))
                 .packageJsonPath(Paths.get("packages/foo/package.json"))
@@ -602,7 +604,7 @@ class NativeLockEngineTest {
         String before = "{\n  \"dependencies\": {\n    \"lodash\": \"^4.17.20\"\n  }\n}\n";
         String after = "{\n  \"dependencies\": {}\n}\n";
 
-        Result result = NativeLockEngine.regenerate(PackageManager.Npm, Request.builder()
+        Result result = regenerate(PackageManager.Npm, Request.builder()
                 .packageJson(after)
                 .lock(npmLock("4.17.20"))
                 .packageJsonPath(Paths.get("package.json"))
@@ -701,5 +703,13 @@ class NativeLockEngineTest {
         } catch (IOException e) {
             throw new UncheckedIOException(e);
         }
+    }
+
+    private static Result regenerate(PackageManager pm, Request request, ExecutionContext ctx) {
+        return NativeLockEngine.regenerate(port(pm), request, ctx);
+    }
+
+    private static Port port(PackageManager pm) {
+        return requireNonNull(NativeLockEngine.port(pm));
     }
 }

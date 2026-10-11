@@ -155,7 +155,7 @@ class PackageManagerTest {
     }
 
     private static PackageManager manager(Lockfile lockfile) {
-        return new PackageManager(lockfile, BunOptions.load(null, Collections.emptyList(), null,
+        return new PackageManager(lockfile, BunOptions.load(null, null, null,
           HostEnvironment.UNKNOWN), new Log(),
           Collections.emptyMap(),
           (registry, name, extended) -> {

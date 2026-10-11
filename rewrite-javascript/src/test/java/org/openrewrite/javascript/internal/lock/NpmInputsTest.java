@@ -20,18 +20,15 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
-import org.openrewrite.InMemoryExecutionContext;
 import org.openrewrite.javascript.NodeRegistry;
 import org.openrewrite.javascript.internal.LockFileRegeneration.InstallRoot;
 import org.openrewrite.javascript.internal.LockFileRegeneration.Kind;
 import org.openrewrite.javascript.internal.LockFileRegeneration.Request;
 import org.openrewrite.javascript.internal.LockFileRegeneration.Result;
-import org.openrewrite.javascript.internal.lock.npm.HostRegistries;
 import org.openrewrite.javascript.internal.lock.npm.NpmLockRegenerator;
 import org.openrewrite.javascript.internal.lock.npm.NpmLockRegenerator.Inputs;
 import org.openrewrite.javascript.internal.lock.npm.NpmOptions;
 import org.openrewrite.javascript.internal.lock.npm.PackumentSource;
-import org.openrewrite.javascript.internal.registry.NodeRegistries;
 import org.openrewrite.javascript.marker.NodeResolutionResult.Npmrc;
 import org.openrewrite.javascript.marker.NodeResolutionResult.NpmrcScope;
 import org.openrewrite.javascript.marker.NodeResolutionResult.PackageManager;
@@ -40,7 +37,6 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.time.Instant;
 import java.util.Arrays;
-import java.util.Collections;
 import java.util.HashSet;
 import java.util.Map;
 
@@ -82,7 +78,7 @@ class NpmInputsTest {
           .packageManagerFile(Paths.get("repo/other/package.json"), "{\"name\":\"other\"}")
           .build();
 
-        Inputs inputs = NpmInputs.from(LockDirectory.of(request), null, Host.UNKNOWN, Instant.EPOCH);
+        Inputs inputs = NpmInputs.from(LockDirectory.of(request), HostRegistries.NONE);
 
         assertThat(inputs.getParentTrees().keySet()).containsExactly("packages/a", "repo/packages/a");
         assertThat(inputs.getParentTrees().get("packages/a")).containsOnly(entry("", "{\"name\":\"repo\"}"),
@@ -107,7 +103,7 @@ class NpmInputsTest {
           .packageManagerFile(Paths.get("package.json"), "{\"workspaces\":[\"repo\"]}")
           .build();
 
-        Inputs inputs = NpmInputs.from(LockDirectory.of(request), null, Host.UNKNOWN, Instant.EPOCH);
+        Inputs inputs = NpmInputs.from(LockDirectory.of(request), HostRegistries.NONE);
 
         assertThat(inputs.getManifests()).containsOnlyKeys("", "packages/a");
         assertThat(inputs.getRunsIn()).isEqualTo("packages/a");
@@ -173,9 +169,9 @@ class NpmInputsTest {
         }
         LockDirectory dir = LockDirectory.of(request.build());
 
-        Result result = new NpmLockRegenerator(NpmInputs.from(dir, null, Host.UNKNOWN, Instant.EPOCH), NO_REGISTRY)
+        Result result = new NpmLockRegenerator(NpmInputs.from(dir, HostRegistries.NONE), NO_REGISTRY)
           .regenerate();
-        InstallRoot installRoot = NpmInputs.installRoot(dir);
+        InstallRoot installRoot = NpmInputs.PORT.installRoot(dir);
 
         if ("installs here".equals(outcome)) {
             assertThat(result.getLockFileContent()).isEqualTo(MEMBER_LOCK);
@@ -210,14 +206,14 @@ class NpmInputsTest {
             Paths.get("packages/a/package.json"))))
           .build());
 
-        Result result = new NpmLockRegenerator(NpmInputs.from(dir, null, Host.UNKNOWN, Instant.EPOCH), NO_REGISTRY)
+        Result result = new NpmLockRegenerator(NpmInputs.from(dir, HostRegistries.NONE), NO_REGISTRY)
           .regenerate();
 
         assertThat(result.getFailure()).isNotNull();
         assertThat(result.getFailure().getKind()).isEqualTo(Kind.CANNOT_KNOW);
         assertThat(result.getFailure().getDetail()).isEqualTo("the engine cannot know libs/x/package.json (its " +
                                                               "contents were not read)");
-        assertThat(NpmInputs.installRoot(dir).isStopped()).isTrue();
+        assertThat(NpmInputs.PORT.installRoot(dir).isStopped()).isTrue();
     }
 
     /**
@@ -230,23 +226,23 @@ class NpmInputsTest {
           .projectPaths(new HashSet<>(Arrays.asList(Paths.get("package.json"), Paths.get("packages/a/package.json"))))
           .build());
 
-        Result result = new NpmLockRegenerator(NpmInputs.from(dir, null, Host.UNKNOWN, Instant.EPOCH), NO_REGISTRY)
+        Result result = new NpmLockRegenerator(NpmInputs.from(dir, HostRegistries.NONE), NO_REGISTRY)
           .regenerate();
 
         assertThat(result.getFailure()).isNotNull();
         assertThat(result.getFailure().getKind()).isEqualTo(Kind.CANNOT_KNOW);
         assertThat(result.getFailure().getDetail()).contains("package.json (its contents were not read)");
-        assertThat(NpmInputs.installRoot(dir).isStopped()).isTrue();
+        assertThat(NpmInputs.PORT.installRoot(dir).isStopped()).isTrue();
     }
 
     @Test
     void theHostsRegistriesAreNpmsUserConfig() {
-        NodeRegistries registries = new NodeRegistries(new NodeRegistry(null, "https://registry.npmmirror.com/", null,
-          null, null, null, false, null, true, false), Collections.emptyMap(), null, null, null);
+        HostInputs host = HostRegistries.NONE.toBuilder().registry(new NodeRegistry(null,
+          "https://registry.npmmirror.com/", null, null, null, null, false, null, true, false)).build();
 
-        Inputs inputs = NpmInputs.from(LockDirectory.of(member().build()), registries, Host.UNKNOWN, Instant.EPOCH);
+        Inputs inputs = NpmInputs.from(LockDirectory.of(member().build()), host);
 
-        assertThat(inputs.getUserConfig()).isSameAs(registries);
+        assertThat(inputs.getUserNpmrc()).isEqualTo("registry=https://registry.npmmirror.com/\n");
     }
 
     // npm 11.17.0 run in repo/mid/app under a repo/.npmrc naming a mirror asks npmjs, or the registry its user config
@@ -276,10 +272,10 @@ class NpmInputsTest {
           .packageJsonPath(Paths.get(dir, "package.json"))
           .marker(nodeResolutionResult(PackageManager.Npm).withNpmrcConfigs(Arrays.asList(marker)))
           .build();
-        NodeRegistries user = NpmInputs.userConfig(new InMemoryExecutionContext(), request.getMarker(),
-          HostRegistries.environment(home));
-        Inputs inputs = NpmInputs.from(LockDirectory.of(request), user, Host.UNKNOWN, Instant.EPOCH);
-        return NpmOptions.fromNpmrc(inputs.getUserConfig(), inputs.getNpmrc()).registryFor("is-number");
+        HostInputs host = HostInputs.builder().now(Instant.EPOCH).npmrc(Arrays.asList(marker))
+          .system(HostRegistries.environment(home)).build();
+        Inputs inputs = NpmInputs.from(LockDirectory.of(request), host);
+        return NpmOptions.fromNpmrc(inputs.getUserNpmrc(), inputs.getNpmrc()).registryFor("is-number");
     }
 
     private static Request.RequestBuilder member() {
@@ -304,7 +300,7 @@ class NpmInputsTest {
           .manifest(Paths.get("app/package.json"), "{\"name\":\"a\",\"version\":\"1.0.0\"}")
           .projectPaths(new HashSet<>(Arrays.asList(Paths.get("app/package.json"), Paths.get("app/.npmrc"))));
 
-        Inputs unread = NpmInputs.from(LockDirectory.of(request.build()), null, Host.UNKNOWN, Instant.EPOCH);
+        Inputs unread = NpmInputs.from(LockDirectory.of(request.build()), HostRegistries.NONE);
         Result result = new NpmLockRegenerator(unread, NO_REGISTRY).regenerate();
 
         assertThat(unread.getPaths()).contains(".npmrc");
@@ -314,7 +310,7 @@ class NpmInputsTest {
                                                               "read)");
 
         Inputs read = NpmInputs.from(LockDirectory.of(request.packageManagerFile(Paths.get("app/.npmrc"),
-          "legacy-peer-deps=true\n").build()), null, Host.UNKNOWN, Instant.EPOCH);
+          "legacy-peer-deps=true\n").build()), HostRegistries.NONE);
         assertThat(new NpmLockRegenerator(read, NO_REGISTRY).regenerate().isSuccess()).isTrue();
     }
 
@@ -333,8 +329,7 @@ class NpmInputsTest {
           .projectPaths(new HashSet<>(Arrays.asList(Paths.get("app/package.json"), Paths.get("app/yarn.lock"))))
           .build();
 
-        Result result = new NpmLockRegenerator(NpmInputs.from(LockDirectory.of(request), null, Host.UNKNOWN,
-          Instant.EPOCH), NO_REGISTRY).regenerate();
+        Result result = new NpmLockRegenerator(NpmInputs.from(LockDirectory.of(request), HostRegistries.NONE), NO_REGISTRY).regenerate();
 
         assertThat(result.getFailure()).isNotNull();
         assertThat(result.getFailure().getKind()).isEqualTo(Kind.CANNOT_KNOW);
@@ -358,8 +353,7 @@ class NpmInputsTest {
             Paths.get("app/npm-shrinkwrap.json"))))
           .build();
 
-        Result result = new NpmLockRegenerator(NpmInputs.from(LockDirectory.of(request), null, Host.UNKNOWN,
-          Instant.EPOCH), NO_REGISTRY).regenerate();
+        Result result = new NpmLockRegenerator(NpmInputs.from(LockDirectory.of(request), HostRegistries.NONE), NO_REGISTRY).regenerate();
 
         assertThat(result.getFailure()).isNotNull();
         assertThat(result.getFailure().getKind()).isEqualTo(Kind.CANNOT_KNOW);

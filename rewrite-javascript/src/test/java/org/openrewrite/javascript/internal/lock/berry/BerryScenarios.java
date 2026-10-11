@@ -22,6 +22,7 @@ import org.jspecify.annotations.Nullable;
 import org.openrewrite.javascript.internal.lock.Host;
 import org.openrewrite.javascript.internal.lock.LockScenario;
 import org.openrewrite.javascript.internal.lock.RecordedRegistry;
+import org.openrewrite.javascript.internal.lock.RegistrySource;
 
 import java.io.IOException;
 import java.io.UncheckedIOException;
@@ -75,7 +76,7 @@ final class BerryScenarios {
      */
     static final RegistrySource NO_REGISTRY = new RegistrySource() {
         @Override
-        public @Nullable String packument(String registry, String name, @Nullable String authorization) {
+        public @Nullable String packument(String registry, String name, boolean full, @Nullable String authorization) {
             return null;
         }
 
@@ -405,7 +406,7 @@ final class BerryScenarios {
         }
 
         @Override
-        public @Nullable String packument(String registry, String name, @Nullable String authorization) {
+        public @Nullable String packument(String registry, String name, boolean full, @Nullable String authorization) {
             String mirror = mirror(registry, "npmjs", "yarnpkg");
             byte[] body = http(mirror, name);
             if (body == null) {

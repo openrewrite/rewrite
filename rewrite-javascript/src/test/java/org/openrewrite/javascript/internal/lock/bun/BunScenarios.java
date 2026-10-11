@@ -17,20 +17,17 @@ package org.openrewrite.javascript.internal.lock.bun;
 
 import lombok.Getter;
 import org.jspecify.annotations.Nullable;
-import org.openrewrite.InMemoryExecutionContext;
-import org.openrewrite.javascript.NodeRegistry;
-import org.openrewrite.javascript.internal.lock.BunInputs;
 import org.openrewrite.javascript.internal.lock.Host;
+import org.openrewrite.javascript.internal.lock.HostInputs;
+import org.openrewrite.javascript.internal.lock.HostRegistries;
 import org.openrewrite.javascript.internal.lock.LockScenario;
 import org.openrewrite.javascript.internal.lock.RootRelativePath;
-import org.openrewrite.javascript.internal.lock.npm.HostRegistries;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -235,7 +232,7 @@ final class BunScenarios {
                     .manifests(manifests(phase, lock == null ? "" : lock))
                     .npmrc(config(phase, "npmrc", ".npmrc"))
                     .bunfig(config(phase, "bunfig", "bunfig.toml"))
-                    .userConfig(userConfig(phase))
+                    .userNpmrc(userNpmrc(phase))
                     .runsIn(runDir(phase))
                     .parentManifests(parentManifests(phase))
                     .now(now());
@@ -327,16 +324,13 @@ final class BunScenarios {
 
         /**
          * The user's .npmrc of a phase ({@code user-npmrc}, {@code user-npmrc-before}; an empty one is none) as the
-         * host hands it over, the marker's user npmrc: the registries it names.
+         * host renders it from the marker's user npmrc.
          */
-        List<NodeRegistry> userConfig(Phase phase) {
+        String userNpmrc(Phase phase) {
             String npmrc = phase == Phase.BEFORE && has("user-npmrc-before") ? file("user-npmrc-before") :
                     file("user-npmrc");
-            if (npmrc == null || npmrc.isEmpty()) {
-                return Collections.emptyList();
-            }
-            return BunInputs.userConfig(new InMemoryExecutionContext(), HostRegistries.userMarker(npmrc),
-                    HostRegistries.environment(getDir()));
+            return HostRegistries.host(npmrc == null || npmrc.isEmpty() ? null : npmrc, getDir())
+                    .userNpmrc(HostInputs.USER);
         }
 
         @Nullable

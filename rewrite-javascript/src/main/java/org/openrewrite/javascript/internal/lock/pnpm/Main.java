@@ -207,7 +207,7 @@ public final class Main {
             // workspace-manifest-reader reads a missing pnpm-workspace.yaml as an empty one
             workspaceManifest = "";
         }
-        return PnpmOptions.load(workspaceManifest, inputs.getFiles().get(".npmrc"), inputs.getUserConfig(),
+        return PnpmOptions.load(workspaceManifest, inputs.getFiles().get(".npmrc"), inputs.getUserNpmrc(),
                 rootManifest, inputs.getEnv());
     }
 

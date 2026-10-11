@@ -22,10 +22,8 @@ import org.openrewrite.javascript.marker.NodeResolutionResult.NpmrcScope;
 import org.openrewrite.javascript.marker.NodeResolutionResult.PackageManager;
 
 import java.nio.file.Paths;
-import java.time.Instant;
 import java.util.Collections;
 
-import static java.util.Collections.emptyList;
 import static java.util.Collections.singletonMap;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.javascript.Assertions.nodeResolutionResult;
@@ -75,9 +73,9 @@ class LockDirectoryTest {
         LockDirectory dir = LockDirectory.of(inMidApp(PackageManager.Bun).build());
         assertThat(dir.getFiles()).containsOnlyKeys("../../.npmrc");
 
-        assertThat(NpmInputs.from(dir, null, Host.UNKNOWN, Instant.EPOCH).getNpmrc()).isNull();
-        assertThat(BunInputs.from(dir, emptyList(), Host.UNKNOWN, Instant.EPOCH).getNpmrc()).isNull();
-        assertThat(YarnClassicInputs.from(dir, Host.UNKNOWN, null, null).getConfigFiles())
+        assertThat(NpmInputs.from(dir, HostRegistries.NONE).getNpmrc()).isNull();
+        assertThat(BunInputs.from(dir, HostRegistries.NONE).getNpmrc()).isNull();
+        assertThat(YarnClassicInputs.from(dir, HostRegistries.NONE).getConfigFiles())
           .containsOnlyKeys("../../.npmrc");
 
         LockDirectory held = LockDirectory.of(inMidApp(PackageManager.Npm)
@@ -85,7 +83,7 @@ class LockDirectoryTest {
           .packageManagerFile(Paths.get("mid/app/.npmrc"), "registry=https://own.example/\n")
           .build());
         assertThat(held.file("../../.npmrc")).isEqualTo("registry=https://example.com/\n");
-        assertThat(NpmInputs.from(held, null, Host.UNKNOWN, Instant.EPOCH).getNpmrc())
+        assertThat(NpmInputs.from(held, HostRegistries.NONE).getNpmrc())
           .isEqualTo("registry=https://own.example/\n");
     }
 }

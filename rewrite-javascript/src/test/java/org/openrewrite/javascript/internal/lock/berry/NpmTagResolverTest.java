@@ -17,6 +17,7 @@ package org.openrewrite.javascript.internal.lock.berry;
 
 import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.Test;
+import org.openrewrite.javascript.internal.lock.RegistrySource;
 import org.openrewrite.javascript.internal.LockFileRegeneration.Failure;
 import org.openrewrite.javascript.internal.LockFileRegeneration.Kind;
 
@@ -44,8 +45,9 @@ class NpmTagResolverTest {
         BerryScenarios.ScenarioRegistry recorded = scenario.registry();
         RegistrySource withoutDistTags = new RegistrySource() {
             @Override
-            public @Nullable String packument(String registry, String name, @Nullable String authorization) {
-                String text = recorded.packument(registry, name, authorization);
+            public @Nullable String packument(String registry, String name, boolean full,
+                                              @Nullable String authorization) {
+                String text = recorded.packument(registry, name, full, authorization);
                 if (text == null) {
                     return null;
                 }

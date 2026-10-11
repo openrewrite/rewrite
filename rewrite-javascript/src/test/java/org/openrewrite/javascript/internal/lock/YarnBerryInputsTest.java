@@ -18,16 +18,12 @@ package org.openrewrite.javascript.internal.lock;
 import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
-import org.openrewrite.InMemoryExecutionContext;
-import org.openrewrite.javascript.NodeExecutionContextView;
 import org.openrewrite.javascript.NodeRegistry;
 import org.openrewrite.javascript.NodeRegistryCredentials;
 import org.openrewrite.javascript.internal.LockFileRegeneration.Request;
-import org.openrewrite.javascript.internal.lock.berry.RegistrySource;
 import org.openrewrite.javascript.internal.lock.berry.YarnBerryLockRegenerator;
 import org.openrewrite.javascript.internal.lock.berry.YarnBerryLockRegenerator.Inputs;
 import org.openrewrite.javascript.internal.registry.Environment;
-import org.openrewrite.javascript.internal.registry.NodeRegistries;
 import org.openrewrite.javascript.marker.NodeResolutionResult.Npmrc;
 import org.openrewrite.javascript.marker.NodeResolutionResult.NpmrcScope;
 import org.openrewrite.javascript.marker.NodeResolutionResult.PackageManager;
@@ -40,7 +36,6 @@ import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.Map;
 
-import static java.util.Collections.singletonList;
 import static java.util.Collections.singletonMap;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.entry;
@@ -50,7 +45,7 @@ class YarnBerryInputsTest {
 
     private static final RegistrySource NO_REGISTRY = new RegistrySource() {
         @Override
-        public @Nullable String packument(String registry, String name, @Nullable String authorization) {
+        public @Nullable String packument(String registry, String name, boolean full, @Nullable String authorization) {
             return null;
         }
 
@@ -80,7 +75,7 @@ class YarnBerryInputsTest {
           .packageManagerFile(Paths.get("repo/app/.npmrc"), "registry=https://example.com/\n")
           .build();
 
-        Inputs inputs = YarnBerryInputs.from(LockDirectory.of(request), Host.UNKNOWN, Instant.EPOCH, null, null);
+        Inputs inputs = YarnBerryInputs.from(LockDirectory.of(request), HostRegistries.NONE);
 
         assertThat(inputs.getLock()).isEqualTo("__metadata:\n  version: 8\n");
         assertThat(inputs.getManifests()).containsOnlyKeys("", "packages/a");
@@ -104,7 +99,7 @@ class YarnBerryInputsTest {
             Paths.get("repo/packages/a/package.json"), Paths.get("other/.yarnrc.yml"))))
           .build();
 
-        Inputs inputs = YarnBerryInputs.from(LockDirectory.of(request), Host.UNKNOWN, Instant.EPOCH, null, null);
+        Inputs inputs = YarnBerryInputs.from(LockDirectory.of(request), HostRegistries.NONE);
 
         assertThat(inputs.getPaths()).containsExactlyInAnyOrder("package.json", ".yarnrc.yml",
           "packages/a/package.json");
@@ -113,7 +108,7 @@ class YarnBerryInputsTest {
 
     /**
      * The host's registries are the home directory's .yarnrc.yml ({@code user-yarnrc-registry-bump},
-     * {@code user-yarnrc-scoped-add}); npm's default, the host's answer when nothing names a registry, stays unnamed.
+     * {@code user-yarnrc-scoped-add}); where the host names no default, none is written.
      */
     @Test
     void theHostsRegistriesAreTheHomeDirectorysYarnrc() {
@@ -122,13 +117,10 @@ class YarnBerryInputsTest {
           .lock("")
           .packageJsonPath(Paths.get("package.json"))
           .build();
-        Map<String, NodeRegistry> scopes = new LinkedHashMap<>();
-        scopes.put("@types", registry("https://registry.npmmirror.com/"));
-
-        Inputs mirrored = YarnBerryInputs.from(LockDirectory.of(request), Host.UNKNOWN, Instant.EPOCH,
-          new NodeRegistries(registry("https://registry.npmmirror.com/"), scopes, null, null, null), null);
-        Inputs unnamed = YarnBerryInputs.from(LockDirectory.of(request), Host.UNKNOWN, Instant.EPOCH,
-          new NodeRegistries(registry("https://registry.npmjs.org/"), new LinkedHashMap<>(), null, null, null), null);
+        Inputs mirrored = YarnBerryInputs.from(LockDirectory.of(request), HostRegistries.NONE.toBuilder()
+          .registry(registry(null, "https://registry.npmmirror.com/"))
+          .registry(registry("@types", "https://registry.npmmirror.com/")).build());
+        Inputs unnamed = YarnBerryInputs.from(LockDirectory.of(request), HostRegistries.NONE);
 
         assertThat(mirrored.getHomeFiles()).containsOnlyKeys(".yarnrc.yml");
         assertThat(mirrored.getHomeFiles().get(".yarnrc.yml")).isEqualTo(
@@ -150,8 +142,8 @@ class YarnBerryInputsTest {
         NodeRegistry registry = new NodeRegistry(null, "https://r.example/npm/", null, "u", "p", null, false, null,
           true, false);
 
-        NodeRegistries user = new NodeRegistries(registry, scopes, null, null, null);
-        assertThat(YarnBerryInputs.userYarnrc(user, user)).isEqualTo(
+        HostInputs host = HostRegistries.NONE.toBuilder().registry(registry).registries(scopes.values()).build();
+        assertThat(host.userYarnrc()).isEqualTo(
           "npmRegistryServer: \"https://r.example/npm/\"\nnpmRegistries:\n  \"//r.example/npm\":\n" +
           "    npmAuthIdent: \"u:p\"\n    npmAlwaysAuth: true\n  \"//corp.example.com\":\n" +
           "    npmAuthToken: \"corp-token\"\n    npmAlwaysAuth: true\nnpmScopes:\n  \"corp\":\n" +
@@ -164,14 +156,12 @@ class YarnBerryInputsTest {
      */
     @Test
     void alwaysAuthWithoutCredentialsIsNoSetting() {
-        Map<String, NodeRegistry> scopes = new LinkedHashMap<>();
-        scopes.put("@corp", new NodeRegistry("@corp", "https://corp.example.com/", null, null, null, null, true, null,
-          true, false));
-        NodeRegistry registry = new NodeRegistry(null, "https://registry.npmjs.org/", null, null, null, null, true,
-          null, true, false);
+        Map<String, String> npmrc = new LinkedHashMap<>();
+        npmrc.put("always-auth", "true");
+        npmrc.put("@corp:registry", "https://corp.example.com/");
+        HostInputs host = HostRegistries.NONE.toBuilder().npmrc(new Npmrc(NpmrcScope.User, npmrc)).build();
 
-        NodeRegistries user = new NodeRegistries(registry, scopes, null, null, null);
-        assertThat(YarnBerryInputs.userYarnrc(user, user)).isEqualTo(
+        assertThat(host.userYarnrc()).isEqualTo(
           "npmScopes:\n  \"corp\":\n    npmRegistryServer: \"https://corp.example.com/\"\n");
     }
 
@@ -191,16 +181,13 @@ class YarnBerryInputsTest {
               .packageJsonPath(Paths.get("package.json"))
               .packageManagerFile(Paths.get(".yarnrc.yml"), "npmRegistryServer: \"https://corp.example\"\n" +
                                                               alwaysAuth)
-              .marker(nodeResolutionResult(PackageManager.YarnBerry).withNpmrcConfigs(singletonList(
-                new Npmrc(NpmrcScope.Project, singletonMap("registry", "https://corp.example/")))))
               .build();
-            InMemoryExecutionContext ctx = new InMemoryExecutionContext();
-            NodeExecutionContextView.view(ctx).setRegistryCredentials(singletonList(
-              new NodeRegistryCredentials("corp.example", "corp-token", null, null)));
+            HostInputs host = HostInputs.builder().now(Instant.EPOCH).system(scratch(home))
+              .npmrc(new Npmrc(NpmrcScope.Project, singletonMap("registry", "https://corp.example/")))
+              .credential(new NodeRegistryCredentials("corp.example", "corp-token", null, null))
+              .build();
 
-            Inputs inputs = YarnBerryInputs.from(LockDirectory.of(request), Host.UNKNOWN, Instant.EPOCH,
-              YarnBerryInputs.userConfig(ctx, request.getMarker(), scratch(home)),
-              YarnBerryInputs.hostCredentials(ctx, request.getMarker(), scratch(home)));
+            Inputs inputs = YarnBerryInputs.from(LockDirectory.of(request), host);
 
             assertThat(inputs.getHomeFiles().get(".yarnrc.yml")).isEqualTo(
               "npmRegistries:\n  \"//corp.example\":\n    npmAuthToken: \"corp-token\"\n    npmAlwaysAuth: true\n");
@@ -226,19 +213,15 @@ class YarnBerryInputsTest {
                 "  resolution: \"p@workspace:.\"\n  languageName: unknown\n  linkType: soft\n")
           .packageJsonPath(Paths.get("package.json"))
           .packageManagerFile(Paths.get(".yarnrc.yml"), "npmRegistryServer: \"https://corp.example\"\n")
-          .marker(nodeResolutionResult(PackageManager.YarnBerry).withNpmrcConfigs(singletonList(
-            new Npmrc(NpmrcScope.Project, npmrc))))
           .build();
         for (String hostToken : new String[]{null, "corp-token"}) {
-            InMemoryExecutionContext ctx = new InMemoryExecutionContext();
+            HostInputs.HostInputsBuilder host = HostInputs.builder().now(Instant.EPOCH).system(scratch(home))
+              .npmrc(new Npmrc(NpmrcScope.Project, npmrc));
             if (hostToken != null) {
-                NodeExecutionContextView.view(ctx).setRegistryCredentials(singletonList(
-                  new NodeRegistryCredentials("corp.example", hostToken, null, null)));
+                host.credential(new NodeRegistryCredentials("corp.example", hostToken, null, null));
             }
 
-            Inputs inputs = YarnBerryInputs.from(LockDirectory.of(request), Host.UNKNOWN, Instant.EPOCH,
-              YarnBerryInputs.userConfig(ctx, request.getMarker(), scratch(home)),
-              YarnBerryInputs.hostCredentials(ctx, request.getMarker(), scratch(home)));
+            Inputs inputs = YarnBerryInputs.from(LockDirectory.of(request), host.build());
 
             assertThat(inputs.getHomeFiles().get(".yarnrc.yml")).isEqualTo(hostToken == null ? "" :
               "npmRegistries:\n  \"//corp.example\":\n    npmAuthToken: \"corp-token\"\n    npmAlwaysAuth: true\n");
@@ -262,11 +245,10 @@ class YarnBerryInputsTest {
           .packageManagerFile(Paths.get("package.json"), "{\"name\":\"root\",\"packageManager\":\"yarn@" + url + "\"}");
 
         Inputs without = YarnBerryInputs.from(LockDirectory.of(request.projectPaths(new HashSet<>(Arrays.asList(
-          Paths.get("app/package.json"), Paths.get("package.json")))).build()), Host.UNKNOWN, Instant.EPOCH, null,
-          null);
+          Paths.get("app/package.json"), Paths.get("package.json")))).build()), HostRegistries.NONE);
         Inputs with = YarnBerryInputs.from(LockDirectory.of(request.projectPaths(new HashSet<>(Arrays.asList(
           Paths.get("app/package.json"), Paths.get("package.json"), Paths.get(".corepack.env")))).build()),
-          Host.UNKNOWN, Instant.EPOCH, null, null);
+          HostRegistries.NONE);
 
         assertThat(with.getPaths()).containsExactlyInAnyOrder("package.json", "../package.json", "../.corepack.env");
         assertThat(new YarnBerryLockRegenerator(without, NO_REGISTRY).regenerate().getErrorMessage())
@@ -290,16 +272,12 @@ class YarnBerryInputsTest {
           .packageManagerFile(Paths.get(".yarnrc.yml"),
             "npmScopes:\n  corp:\n    npmRegistryServer: \"https://corp.example.com\"\n")
           .build();
-        NodeRegistries user = new NodeRegistries(registry("https://registry.npmjs.org/"), new LinkedHashMap<>(),
-          null, null, null);
-        Map<String, NodeRegistry> scopes = new LinkedHashMap<>();
-        scopes.put("@corp", new NodeRegistry("@corp", "https://corp.example.com/", "corp-token", null, null, null,
-          false, null, true, false));
-        NodeRegistries credentials = new NodeRegistries(registry("https://registry.npmjs.org/"), scopes, null, null,
-          null);
+        HostInputs host = HostRegistries.NONE.toBuilder()
+          .npmrc(new Npmrc(NpmrcScope.Project, singletonMap("@corp:registry", "https://corp.example.com/")))
+          .credential(new NodeRegistryCredentials("corp.example.com", "corp-token", null, null))
+          .build();
 
-        Inputs inputs = YarnBerryInputs.from(LockDirectory.of(request), Host.UNKNOWN, Instant.EPOCH, user,
-          credentials);
+        Inputs inputs = YarnBerryInputs.from(LockDirectory.of(request), host);
 
         assertThat(inputs.getHomeFiles().get(".yarnrc.yml")).isEqualTo(
           "npmRegistries:\n  \"//corp.example.com\":\n    npmAuthToken: \"corp-token\"\n    npmAlwaysAuth: true\n");
@@ -311,7 +289,7 @@ class YarnBerryInputsTest {
         Map<String, @Nullable String> asked = new LinkedHashMap<>();
         String error = new YarnBerryLockRegenerator(inputs, new RegistrySource() {
             @Override
-            public @Nullable String packument(String registry, String name, @Nullable String authorization) {
+            public @Nullable String packument(String registry, String name, boolean full, @Nullable String authorization) {
                 asked.put(registry + " " + name, authorization);
                 return null;
             }
@@ -349,10 +327,9 @@ class YarnBerryInputsTest {
           .packageJsonPath(Paths.get("app/package.json"))
           .marker(nodeResolutionResult(PackageManager.YarnBerry).withNpmrcConfigs(Arrays.asList(marker)))
           .build();
-        InMemoryExecutionContext ctx = new InMemoryExecutionContext();
-        return YarnBerryInputs.from(LockDirectory.of(request), Host.UNKNOWN, Instant.EPOCH,
-          YarnBerryInputs.userConfig(ctx, request.getMarker(), scratch(home)), YarnBerryInputs.hostCredentials(ctx,
-            request.getMarker(), scratch(home))).getHomeFiles().get(".yarnrc.yml");
+        HostInputs host = HostInputs.builder().now(Instant.EPOCH).system(scratch(home)).npmrc(Arrays.asList(marker))
+          .build();
+        return YarnBerryInputs.from(LockDirectory.of(request), host).getHomeFiles().get(".yarnrc.yml");
     }
 
     // a scratch HOME without a .netrc, and no variables
@@ -375,7 +352,7 @@ class YarnBerryInputsTest {
         };
     }
 
-    private static NodeRegistry registry(String url) {
-        return new NodeRegistry(null, url, null, null, null, null, false, null, true, false);
+    private static NodeRegistry registry(@Nullable String scope, String url) {
+        return new NodeRegistry(scope, url, null, null, null, null, false, null, true, false);
     }
 }

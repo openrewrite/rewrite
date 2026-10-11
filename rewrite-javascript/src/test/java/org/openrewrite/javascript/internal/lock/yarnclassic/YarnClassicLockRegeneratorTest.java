@@ -29,6 +29,7 @@ import org.openrewrite.javascript.internal.lock.CannotKnow;
 import org.openrewrite.javascript.internal.lock.EventLoop;
 import org.openrewrite.javascript.internal.lock.Host;
 import org.openrewrite.javascript.internal.lock.JsError;
+import org.openrewrite.javascript.internal.lock.RegistrySource;
 import org.openrewrite.javascript.internal.lock.Rejected;
 import org.openrewrite.javascript.internal.registry.NodeRegistryException;
 
@@ -573,7 +574,7 @@ class YarnClassicLockRegeneratorTest {
     void typesARegistryFailureByWhatFailed(String unfetched, String answer, @Nullable String failure) {
         RegistrySource registry = new RegistrySource() {
             @Override
-            public @Nullable String packument(String url, String name, @Nullable String authorization) {
+            public @Nullable String packument(String url, String name, boolean full, @Nullable String authorization) {
             if (name.equals(unfetched)) {
                 if ("absent".equals(answer)) {
                     return null;

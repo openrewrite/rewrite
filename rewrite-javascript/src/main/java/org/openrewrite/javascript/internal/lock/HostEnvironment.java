@@ -70,6 +70,13 @@ public final class HostEnvironment {
     }
 
     /**
+     * The process environment for a port that reads it as a map; null when the host does not know it.
+     */
+    public @Nullable Map<String, String> process() {
+        return complete ? variables : null;
+    }
+
+    /**
      * Whether the value of {@code name} is what the host says: set, or unset in an environment the host knows.
      */
     public boolean settles(String name) {

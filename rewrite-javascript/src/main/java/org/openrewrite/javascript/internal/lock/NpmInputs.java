@@ -16,66 +16,69 @@
 package org.openrewrite.javascript.internal.lock;
 
 import org.jspecify.annotations.Nullable;
-import org.openrewrite.ExecutionContext;
 import org.openrewrite.javascript.internal.LockFileRegeneration.InstallRoot;
+import org.openrewrite.javascript.internal.LockFileRegeneration.Result;
 import org.openrewrite.javascript.internal.lock.npm.NpmLockRegenerator;
 import org.openrewrite.javascript.internal.lock.npm.NpmLockRegenerator.Inputs;
 import org.openrewrite.javascript.internal.lock.npm.Shrinkwrap;
-import org.openrewrite.javascript.internal.registry.Environment;
-import org.openrewrite.javascript.internal.registry.NodeRegistries;
-import org.openrewrite.javascript.internal.registry.RegistryDiscovery;
-import org.openrewrite.javascript.marker.NodeResolutionResult;
-import org.openrewrite.javascript.marker.NodeResolutionResult.NpmrcScope;
+import org.openrewrite.javascript.internal.registry.NpmRegistryClient;
 
-import java.time.Instant;
 import java.util.Arrays;
-import java.util.EnumSet;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Set;
 import java.util.function.Predicate;
 
 /**
- * The npm regenerator's inputs: the host's registries as the user's config, the lock's directory's own .npmrc and the
- * paths held there, and the package.json files under each directory above the one npm runs in.
+ * npm's port: the host's registries as the user's config, the lock's directory's own .npmrc and the paths held there,
+ * and the package.json files under each directory above the one npm runs in.
  */
-final class NpmInputs {
+final class NpmInputs implements Port {
+
+    static final NpmInputs PORT = new NpmInputs();
 
     private NpmInputs() {
     }
 
-    static boolean reads(String fileName) {
+    @Override
+    public String lockFile() {
+        return "package-lock.json";
+    }
+
+    @Override
+    public boolean reads(String fileName) {
         return readsOnlyBesideLock(fileName);
     }
 
-    static boolean readsOnlyBesideLock(String fileName) {
+    @Override
+    public boolean readsOnlyBesideLock(String fileName) {
         return ".npmrc".equals(fileName);
     }
 
-    static boolean writesBesideLock(String fileName) {
+    @Override
+    public boolean writesBesideLock(String fileName) {
         return Shrinkwrap.writesBesideLock(fileName::equals);
     }
 
-    /**
-     * The host's registries as npm's user-level config: the view's, else the marker's global and user npmrc; its
-     * project npmrc (the repository root's) npm reads only as {@link #from}'s .npmrc where it installs there.
-     */
-    static NodeRegistries userConfig(ExecutionContext ctx, @Nullable NodeResolutionResult marker, Environment env) {
-        return RegistryDiscovery.discover(ctx, marker, env, EnumSet.of(NpmrcScope.Global, NpmrcScope.User));
+    @Override
+    public Result regenerate(LockDirectory dir, HostInputs host, NpmRegistryClient client) {
+        return new NpmLockRegenerator(from(dir, host), new NpmRegistryPackuments(host.transport(), client))
+                .regenerate();
     }
 
     /**
-     * @param registries the host's registries, npm's user config; null when the host gives none
+     * With the host's registries as npm's user config, its global and user npmrc; the marker's project npmrc (the
+     * repository root's) npm reads only as the .npmrc where it installs there.
      */
-    static Inputs from(LockDirectory dir, @Nullable NodeRegistries registries, Host host, Instant now) {
+    static Inputs from(LockDirectory dir, HostInputs host) {
         return Inputs.builder()
                 .lock(dir.getLock())
                 .yarnLock(dir.file("yarn.lock"))
                 .npmrc(dir.file(".npmrc"))
-                .userConfig(registries)
+                .userNpmrc(host.userNpmrc(HostInputs.GLOBAL_AND_USER))
                 .paths(dir.pathsUnder(""))
-                .host(host)
-                .now(now)
+                .host(host.getHost())
+                .now(host.getNow())
                 .directoryName(dir.name())
                 .manifests(dir.getManifests())
                 .runsIn(dir.getRunsIn())
@@ -128,7 +131,8 @@ final class NpmInputs {
      * npm's walk from where it runs; it stops where npm writes a file no regeneration writes (Shrinkwrap's rules): its
      * lock as an npm-shrinkwrap.json, or the yarn.lock beside a lock the host does not hold.
      */
-    static InstallRoot installRoot(LockDirectory dir) {
+    @Override
+    public InstallRoot installRoot(LockDirectory dir) {
         InstallRoot walked = NpmLockRegenerator.installRoot(dir.getRunsIn(), dir.getManifests(), parentTrees(dir));
         String root = dir.aboveRunsIn(walked.getDepth());
         Predicate<String> holds = name -> dir.holds(RootRelativePath.join(root, name));

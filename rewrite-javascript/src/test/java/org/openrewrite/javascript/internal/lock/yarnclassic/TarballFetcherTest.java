@@ -22,6 +22,7 @@ import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
 import org.openrewrite.javascript.internal.lock.CannotKnow;
 import org.openrewrite.javascript.internal.lock.JsError;
+import org.openrewrite.javascript.internal.lock.RegistrySource;
 
 import java.io.BufferedReader;
 import java.io.ByteArrayOutputStream;
@@ -83,7 +84,7 @@ class TarballFetcherTest {
         remote.integrity = "sha512-AAAA whirlpool-AAAA";
         RegistrySource tarballs = new RegistrySource() {
             @Override
-            public @Nullable String packument(String r, String name, @Nullable String authorization) {
+            public @Nullable String packument(String r, String name, boolean full, @Nullable String authorization) {
                 return null;
             }
 

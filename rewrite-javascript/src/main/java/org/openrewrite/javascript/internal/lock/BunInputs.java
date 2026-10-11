@@ -15,70 +15,55 @@
  */
 package org.openrewrite.javascript.internal.lock;
 
-import org.jspecify.annotations.Nullable;
-import org.openrewrite.ExecutionContext;
-import org.openrewrite.javascript.NodeExecutionContextView;
-import org.openrewrite.javascript.NodeRegistry;
 import org.openrewrite.javascript.internal.LockFileRegeneration.InstallRoot;
+import org.openrewrite.javascript.internal.LockFileRegeneration.Result;
 import org.openrewrite.javascript.internal.lock.bun.BunLockRegenerator;
 import org.openrewrite.javascript.internal.lock.bun.BunLockRegenerator.Inputs;
 import org.openrewrite.javascript.internal.lock.bun.DotEnv;
 import org.openrewrite.javascript.internal.lock.bun.Lockfile;
-import org.openrewrite.javascript.internal.registry.Environment;
-import org.openrewrite.javascript.internal.registry.NodeRegistries;
-import org.openrewrite.javascript.internal.registry.RegistryDiscovery;
-import org.openrewrite.javascript.marker.NodeResolutionResult;
-import org.openrewrite.javascript.marker.NodeResolutionResult.NpmrcScope;
+import org.openrewrite.javascript.internal.registry.NpmRegistryClient;
 
-import java.time.Instant;
-import java.util.ArrayList;
-import java.util.EnumSet;
 import java.util.LinkedHashMap;
-import java.util.List;
 import java.util.Map;
 import java.util.function.Predicate;
 
 /**
- * The Bun regenerator's inputs: the host's registries as the user's .npmrc, the lock's directory's own .npmrc and
- * bunfig.toml, the patch and .env files under it, and the package.json of each directory above the one bun runs in.
+ * Bun's port: the host's registries as the user's .npmrc, the lock's directory's own .npmrc and bunfig.toml, the patch
+ * and .env files under it, and the package.json of each directory above the one bun runs in.
  */
-public final class BunInputs {
+final class BunInputs implements Port {
+
+    static final BunInputs PORT = new BunInputs();
 
     private BunInputs() {
     }
 
-    static boolean reads(String fileName) {
+    @Override
+    public String lockFile() {
+        return "bun.lock";
+    }
+
+    @Override
+    public boolean reads(String fileName) {
         return fileName.endsWith(".patch") || readsOnlyBesideLock(fileName);
     }
 
-    static boolean readsOnlyBesideLock(String fileName) {
+    @Override
+    public boolean readsOnlyBesideLock(String fileName) {
         return ".npmrc".equals(fileName) || "bunfig.toml".equals(fileName) || DotEnv.FILES.contains(fileName);
     }
 
-    /**
-     * The registries bun's user .npmrc names, the host's: the view's, else those the marker's user npmrc names. bun
-     * reads no global npmrc, and the marker's project npmrc (the repository root's) only as {@link #from}'s .npmrc.
-     */
-    public static List<NodeRegistry> userConfig(ExecutionContext ctx, @Nullable NodeResolutionResult marker,
-                                                Environment env) {
-        List<NodeRegistry> explicit = NodeExecutionContextView.view(ctx).getRegistries();
-        if (!explicit.isEmpty() || marker == null || marker.getNpmrcConfigs() == null) {
-            return explicit;
-        }
-        NodeRegistries registries = RegistryDiscovery.discover(ctx, marker, env, EnumSet.of(NpmrcScope.User));
-        List<NodeRegistry> named = new ArrayList<>();
-        if (marker.getNpmrcConfigs().stream().anyMatch(npmrc -> npmrc.getScope() == NpmrcScope.User &&
-                                                                npmrc.getProperties().containsKey("registry"))) {
-            named.add(registries.getDefaultRegistry());
-        }
-        named.addAll(registries.getByScope().values());
-        return named;
+    @Override
+    public Result regenerate(LockDirectory dir, HostInputs host, NpmRegistryClient client) {
+        return new BunLockRegenerator(from(dir, host), new BunRegistryManifests(host.transport(), client))
+                .regenerate();
     }
 
     /**
-     * @param registries the registries bun's user .npmrc names, the host's
+     * With the host's registries as bun's user .npmrc, its user npmrc only: bun reads no global npmrc, and the
+     * marker's project npmrc (the repository root's) only as the .npmrc beside the lock.
      */
-    static Inputs from(LockDirectory dir, List<NodeRegistry> registries, Host host, Instant now) {
+    static Inputs from(LockDirectory dir, HostInputs host) {
         Map<String, String> files = new LinkedHashMap<>();
         for (Map.Entry<String, String> file : dir.filesUnder("").entrySet()) {
             if (DotEnv.FILES.contains(file.getKey())) {
@@ -96,13 +81,13 @@ public final class BunInputs {
                 .manifests(dir.getManifests())
                 .npmrc(dir.file(".npmrc"))
                 .bunfig(dir.file("bunfig.toml"))
-                .userConfig(registries)
+                .userNpmrc(host.userNpmrc(HostInputs.USER))
                 .files(files)
                 .paths(dir.pathsUnder(""))
                 .runsIn(dir.getRunsIn())
                 .parentManifests(dir.manifestsAbove(dir.getRunsIn()))
-                .host(host)
-                .now(now)
+                .host(host.getHost())
+                .now(host.getNow())
                 .build();
     }
 
@@ -110,7 +95,8 @@ public final class BunInputs {
      * bun's walk from where it runs; where it finds no bun.lock it stops at a file no regeneration writes (Lockfile's
      * rule).
      */
-    static InstallRoot installRoot(LockDirectory dir) {
+    @Override
+    public InstallRoot installRoot(LockDirectory dir) {
         InstallRoot walked = BunLockRegenerator.installRoot(dir.getRunsIn(), dir.getManifests(),
                 dir.manifestsAbove(dir.getRunsIn()));
         String root = dir.aboveRunsIn(walked.getDepth());

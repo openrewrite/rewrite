@@ -18,6 +18,7 @@ package org.openrewrite.javascript.internal.lock.yarnclassic;
 import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
+import org.openrewrite.javascript.internal.lock.RegistrySource;
 import org.openrewrite.javascript.internal.LockFileRegeneration.Result;
 
 import static java.util.Objects.requireNonNull;
@@ -58,8 +59,8 @@ class PackageFetcherTest {
         YarnClassicScenarioTest.ScenarioRegistry recorded = new YarnClassicScenarioTest.ScenarioRegistry(scenario);
         RegistrySource registry = new RegistrySource() {
             @Override
-            public @Nullable String packument(String url, String name, @Nullable String authorization) {
-                return recorded.packument(url, name, authorization);
+            public @Nullable String packument(String url, String name, boolean full, @Nullable String authorization) {
+                return recorded.packument(url, name, full, authorization);
             }
 
             @Override

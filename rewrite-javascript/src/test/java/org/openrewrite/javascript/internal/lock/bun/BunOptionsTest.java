@@ -17,11 +17,7 @@ package org.openrewrite.javascript.internal.lock.bun;
 
 import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.Test;
-import org.openrewrite.javascript.NodeRegistry;
 import org.openrewrite.javascript.internal.lock.HostEnvironment;
-
-import java.util.ArrayList;
-import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -81,18 +77,9 @@ class BunOptionsTest {
         assertThat(options.scopeForPackageName("@types/ms")).isEqualTo(OTHER);
     }
 
-    private static List<NodeRegistry> user(@Nullable String registry, @Nullable String types) {
-        List<NodeRegistry> named = new ArrayList<>();
-        if (registry != null) {
-            named.add(registry(null, registry));
-        }
-        if (types != null) {
-            named.add(registry("@types", types));
-        }
-        return named;
-    }
-
-    private static NodeRegistry registry(@Nullable String scope, String url) {
-        return new NodeRegistry(scope, url, null, null, null, null, false, null, true, false);
+    // the user's .npmrc as the host renders the registries it names
+    private static String user(@Nullable String registry, @Nullable String types) {
+        return (registry == null ? "" : "registry=" + registry + "\n") +
+               (types == null ? "" : "@types:registry=" + types + "\n");
     }
 }

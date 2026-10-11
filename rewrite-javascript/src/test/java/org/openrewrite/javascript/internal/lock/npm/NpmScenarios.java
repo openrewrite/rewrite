@@ -18,8 +18,9 @@ package org.openrewrite.javascript.internal.lock.npm;
 import lombok.Getter;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.javascript.internal.lock.Host;
+import org.openrewrite.javascript.internal.lock.HostInputs;
+import org.openrewrite.javascript.internal.lock.HostRegistries;
 import org.openrewrite.javascript.internal.lock.LockScenario;
-import org.openrewrite.javascript.internal.registry.NodeRegistries;
 
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
@@ -404,13 +405,10 @@ final class NpmScenarios {
         }
 
         /**
-         * The user config the edit ran under ({@code user-npmrc}, npm's {@code --userconfig}) as the host hands it
-         * over: its registries.
+         * The host's side for the user config the edit ran under ({@code user-npmrc}, npm's {@code --userconfig}).
          */
-        @Nullable
-        NodeRegistries userConfig() {
-            String npmrc = file("user-npmrc");
-            return npmrc == null ? null : HostRegistries.fromUserNpmrc(npmrc, getDir());
+        HostInputs host() {
+            return HostRegistries.host(file("user-npmrc"), getDir());
         }
 
         /**

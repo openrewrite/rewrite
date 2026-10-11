@@ -25,7 +25,6 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.stream.Stream;
 
-import static java.util.Collections.emptyList;
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**
@@ -90,7 +89,7 @@ class PackageManifestTest {
         PackageManifest.FindResult found = version.tag == DependencyVersion.Tag.NPM ?
           manifest.findBestVersion(version.npm().version) : manifest.findByDistTag(version.distTag().tag);
         Lockfile lockfile = TextLockfileReader.load(fresh,
-          BunOptions.load(null, emptyList(), null, HostEnvironment.UNKNOWN));
+          BunOptions.load(null, null, null, HostEnvironment.UNKNOWN));
         Package locked = topLevel(lockfile, alias);
         if (found == null) {
             assertThat(locked).as("bun installed nothing for " + alias).isNull();

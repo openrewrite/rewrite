@@ -19,6 +19,7 @@ import org.openrewrite.javascript.internal.lock.EventLoop;
 import lombok.Getter;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.javascript.internal.lock.JsError;
+import org.openrewrite.javascript.internal.lock.RegistrySource;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -89,7 +90,7 @@ final class NpmRegistry {
         String name = pathname.replaceFirst("%2f", "/");
         String authorization = config.getAuthorization(pathname, url);
         Io<Object> io = Io.issue(loop, causal, () -> {
-            String body = source.packument(registry, name, authorization);
+            String body = source.packument(registry, name, false, authorization);
             if (body == null) {
                 throw new NotFound(url, name);
             }

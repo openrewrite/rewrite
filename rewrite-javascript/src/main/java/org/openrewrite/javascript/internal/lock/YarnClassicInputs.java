@@ -16,148 +16,62 @@
 package org.openrewrite.javascript.internal.lock;
 
 import org.jspecify.annotations.Nullable;
-import org.openrewrite.ExecutionContext;
-import org.openrewrite.javascript.NodeRegistry;
 import org.openrewrite.javascript.internal.LockFileRegeneration.InstallRoot;
+import org.openrewrite.javascript.internal.LockFileRegeneration.Result;
 import org.openrewrite.javascript.internal.lock.yarnclassic.YarnClassicLockRegenerator;
 import org.openrewrite.javascript.internal.lock.yarnclassic.YarnClassicLockRegenerator.Inputs;
-import org.openrewrite.javascript.internal.registry.Environment;
-import org.openrewrite.javascript.internal.registry.NodeRegistries;
-import org.openrewrite.javascript.internal.registry.RegistryDiscovery;
-import org.openrewrite.javascript.marker.NodeResolutionResult;
-import org.openrewrite.javascript.marker.NodeResolutionResult.Npmrc;
-import org.openrewrite.javascript.marker.NodeResolutionResult.NpmrcScope;
+import org.openrewrite.javascript.internal.registry.NpmRegistryClient;
 
-import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
-import java.util.Base64;
-import java.util.EnumSet;
 import java.util.LinkedHashMap;
-import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import java.util.regex.Pattern;
-
-import static java.util.stream.Collectors.toList;
-import static org.openrewrite.javascript.internal.registry.NodeRegistries.hasCredentials;
 
 /**
- * The Yarn classic regenerator's inputs: the config files of the lock's directory, of each directory above it and of
- * those from where yarn runs up to it, and the package.json of those directories.
+ * Yarn classic's port: the config files yarn reads from where it runs up, the home .npmrc the host's registries stand
+ * for, the manifests above, and the paths under the lock's directory and directly above it.
  */
-final class YarnClassicInputs {
+final class YarnClassicInputs implements Port {
+
+    static final YarnClassicInputs PORT = new YarnClassicInputs();
 
     private static final List<String> CONFIG_FILES = Arrays.asList(".yarnrc", ".yarnrc.yml", ".npmrc");
-    private static final String NPM_DEFAULT_REGISTRY = "https://registry.npmjs.org/";
-    private static final Pattern USERINFO = Pattern.compile("^([A-Za-z][A-Za-z0-9+.-]*://)[^/?#@]*@");
 
     private YarnClassicInputs() {
     }
 
-    static boolean reads(String fileName) {
+    @Override
+    public String lockFile() {
+        return "yarn.lock";
+    }
+
+    @Override
+    public boolean reads(String fileName) {
         return CONFIG_FILES.contains(fileName);
     }
 
-    static InstallRoot installRoot(LockDirectory dir) {
+    @Override
+    public InstallRoot installRoot(LockDirectory dir) {
         return YarnClassicLockRegenerator.installRoot(project(dir).build());
     }
 
-    /**
-     * The host's registries as yarn's user-level config: the view's, else the marker's global and user npmrc; its
-     * project npmrc (the repository root's) yarn reads as a project file, under the home one from a member.
-     */
-    static NodeRegistries userConfig(ExecutionContext ctx, @Nullable NodeResolutionResult marker, Environment env) {
-        return RegistryDiscovery.discover(ctx, marker, env, EnumSet.of(NpmrcScope.Global, NpmrcScope.User));
+    @Override
+    public Result regenerate(LockDirectory dir, HostInputs host, NpmRegistryClient client) {
+        return new YarnClassicLockRegenerator(from(dir, host), new HostRegistrySource(host.transport(), client))
+                .regenerate();
     }
 
     /**
-     * The host's credentials for every registry the marker's npmrc names, its project npmrc's too; that file's own
-     * credentials and always-auth stay the project's, read where yarn reads them.
+     * With the home .npmrc yarn reads under the project's: the host's registries as the user's global and user
+     * npmrc, with the host's credentials for the registries the project names too.
      */
-    static NodeRegistries hostCredentials(ExecutionContext ctx, @Nullable NodeResolutionResult marker,
-                                          Environment env) {
-        return RegistryDiscovery.discover(ctx, marker == null || marker.getNpmrcConfigs() == null ? marker :
-                marker.withNpmrcConfigs(marker.getNpmrcConfigs().stream()
-                        .map(npmrc -> npmrc.getScope() == NpmrcScope.Project ? registriesOnly(npmrc) : npmrc)
-                        .collect(toList())), env);
-    }
-
-    private static Npmrc registriesOnly(Npmrc npmrc) {
-        Map<String, String> registries = new LinkedHashMap<>();
-        for (Map.Entry<String, String> property : npmrc.getProperties().entrySet()) {
-            if ("registry".equals(property.getKey()) || property.getKey().endsWith(":registry")) {
-                registries.put(property.getKey(), USERINFO.matcher(property.getValue()).replaceFirst("$1"));
-            }
-        }
-        return npmrc.withProperties(registries);
-    }
-
-    /**
-     * With the home directory's .npmrc, which yarn reads under the project's: {@code user}, the host's registries as
-     * the user's own config (null for none), with the host's {@code credentials} for those the project names too.
-     */
-    static Inputs from(LockDirectory dir, Host host, @Nullable NodeRegistries user,
-                       @Nullable NodeRegistries credentials) {
-        Inputs.InputsBuilder inputs = project(dir).host(host);
-        if (user != null) {
-            inputs.homeFile(".npmrc", userNpmrc(user, credentials == null ? user : credentials));
-        }
-        return inputs.build();
-    }
-
-    /**
-     * {@code user}'s registries as .npmrc lines, with their credentials and {@code credentials}' others; npm's own
-     * default, the host's answer when nothing names one, stays unnamed.
-     */
-    static String userNpmrc(NodeRegistries user, NodeRegistries credentials) {
-        StringBuilder npmrc = new StringBuilder();
-        Set<String> keys = new LinkedHashSet<>();
-        NodeRegistry registry = user.getDefaultRegistry();
-        if (!NPM_DEFAULT_REGISTRY.equals(registry.getUrl()) || hasCredentials(registry)) {
-            npmrc.append("registry=").append(registry.getUrl()).append('\n');
-        }
-        credentials(npmrc, registry, keys);
-        for (Map.Entry<String, NodeRegistry> scoped : user.getByScope().entrySet()) {
-            npmrc.append(scoped.getKey()).append(":registry=").append(scoped.getValue().getUrl()).append('\n');
-            credentials(npmrc, scoped.getValue(), keys);
-        }
-        credentials(npmrc, credentials.getDefaultRegistry(), keys);
-        for (NodeRegistry scoped : credentials.getByScope().values()) {
-            credentials(npmrc, scoped, keys);
-        }
-        return npmrc.toString();
-    }
-
-    /**
-     * Keyed by the registry's url without its protocol, as getRegistryOption reads them, once per key; always-auth
-     * with them, since the host's credentials for a registry go with every request to it, as npm sends them.
-     */
-    private static void credentials(StringBuilder npmrc, NodeRegistry registry, Set<String> keys) {
-        String key = key(registry);
-        boolean sent = registry.isAlwaysAuth();
-        if (hasCredentials(registry) && keys.add(key)) {
-            sent = true;
-            if (registry.getAuthToken() != null) {
-                npmrc.append(key).append(":_authToken=").append(EcmaScript.quote(registry.getAuthToken()))
-                        .append('\n');
-            } else if (registry.getAuthBase64() != null) {
-                npmrc.append(key).append(":_auth=").append(EcmaScript.quote(registry.getAuthBase64())).append('\n');
-            } else if (registry.getUsername() != null && registry.getPassword() != null) {
-                npmrc.append(key).append(":username=").append(EcmaScript.quote(registry.getUsername())).append('\n')
-                        .append(key).append(":_password=").append(EcmaScript.quote(Base64.getEncoder()
-                                .encodeToString(registry.getPassword().getBytes(StandardCharsets.UTF_8))))
-                        .append('\n');
-            }
-        }
-        if (sent && keys.add(key + ":always-auth")) {
-            npmrc.append(key).append(":always-auth=true\n");
-        }
-    }
-
-    private static String key(NodeRegistry registry) {
-        String key = registry.getUrl().replaceFirst("^[A-Za-z][A-Za-z0-9+.-]*:", "");
-        return key.endsWith("/") ? key : key + "/";
+    static Inputs from(LockDirectory dir, HostInputs host) {
+        return project(dir)
+                .host(host.getHost())
+                .env(host.getEnvironment().process())
+                .homeFile(".npmrc", host.userNpmrc(HostInputs.GLOBAL_AND_USER))
+                .build();
     }
 
     // what yarn reads of the project, which is all its walk reads

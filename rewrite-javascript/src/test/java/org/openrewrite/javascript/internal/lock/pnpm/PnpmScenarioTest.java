@@ -83,7 +83,7 @@ class PnpmScenarioTest extends LockScenarioTest {
           .manifests(manifests)
           .files(files)
           .paths(PnpmScenarios.paths(files, manifests, scenario.lockDir()))
-          .userConfig(recording.userConfig())
+          .userNpmrc(recording.userNpmrc())
           .now(recording.phaseTime("after"))
           .host(host(recording.recordedWith()));
         if (recording.recordedWith() == null) {

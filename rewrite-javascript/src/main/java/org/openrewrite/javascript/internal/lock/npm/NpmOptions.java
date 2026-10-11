@@ -18,12 +18,10 @@ package org.openrewrite.javascript.internal.lock.npm;
 import lombok.Builder;
 import lombok.Value;
 import org.jspecify.annotations.Nullable;
-import org.openrewrite.javascript.NodeRegistry;
 import org.openrewrite.javascript.internal.lock.CannotKnow;
 import org.openrewrite.javascript.internal.lock.HostEnvironment;
 import org.openrewrite.javascript.internal.lock.Ini;
 import org.openrewrite.javascript.internal.lock.V8Date;
-import org.openrewrite.javascript.internal.registry.NodeRegistries;
 
 import java.time.Instant;
 import java.util.ArrayList;
@@ -260,23 +258,14 @@ public class NpmOptions {
     }
 
     /**
-     * The options of the user's config (the host's registries; null for none) and a project's {@code .npmrc} over it,
-     * as npm's config loads them; a {@code ${VAR}} in a key read, or one it could expand to, is cannot-know.
+     * The options of the user's .npmrc (the host's registries) and a project's over it, each null without one, as
+     * npm's config loads them; a {@code ${VAR}} in a key read, or one it could expand to, is cannot-know.
      */
-    public static NpmOptions fromNpmrc(@Nullable NodeRegistries user, @Nullable String npmrc) {
+    public static NpmOptions fromNpmrc(@Nullable String userNpmrc, @Nullable String npmrc) {
         // npm reads no file that sets a variable, and the host does not know the environment npm runs in
         HostEnvironment env = HostEnvironment.UNKNOWN;
         NpmOptionsBuilder options = builder();
         Map<String, String> scopedRegistries = new LinkedHashMap<>();
-        if (user != null) {
-            options.registry(user.getDefaultRegistry().getUrl());
-            for (Map.Entry<String, NodeRegistry> scoped : user.getByScope().entrySet()) {
-                scopedRegistries.put(scoped.getKey(), scoped.getValue().getUrl());
-            }
-        }
-        if (npmrc == null) {
-            return options.scopedRegistries(scopedRegistries).build();
-        }
         Object omit = null;
         Object include = null;
         Object only = null;
@@ -284,10 +273,16 @@ public class NpmOptions {
         Object dev = null;
         Object optional = null;
         Object also = null;
+        List<Map.Entry<String, @Nullable Object>> entries = new ArrayList<>();
+        for (String file : Arrays.asList(userNpmrc, npmrc)) {
+            if (file != null) {
+                entries.addAll(Ini.decode(file, Ini.Release.V6_0_0).entrySet());
+            }
+        }
         // global-style and legacy-bundling flatten by writing install-strategy into the config they come from,
         // which install-strategy's own flatten then reads, wherever it stands in the file
         String installStrategyWritten = null;
-        for (Map.Entry<String, @Nullable Object> entry : Ini.decode(npmrc, Ini.Release.V6_0_0).entrySet()) {
+        for (Map.Entry<String, @Nullable Object> entry : entries) {
             String key;
             try {
                 key = envReplace(entry.getKey(), env);

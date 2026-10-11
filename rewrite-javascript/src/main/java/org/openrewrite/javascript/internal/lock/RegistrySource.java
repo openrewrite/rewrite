@@ -13,25 +13,26 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.openrewrite.javascript.internal.lock.yarnclassic;
+package org.openrewrite.javascript.internal.lock;
 
 import org.jspecify.annotations.Nullable;
 
 /**
- * What yarn requests from a registry: packuments, and the tarballs of the versions it picks anew, each with the
- * Authorization header yarn sends, null for none.
+ * What a Yarn install reads from the network: packuments and tarballs, each with the Authorization header the port
+ * computes as its package manager does, null for none.
  */
 public interface RegistrySource {
 
     /**
-     * {@code GET <registry><name>} with yarn's {@code Accept} header: the abbreviated packument, or null when the
+     * {@code GET <registry><name>}: the full packument, or the abbreviated one yarn 1 asks for; null when the
      * registry has no such package.
      */
     @Nullable
-    String packument(String registry, String name, @Nullable String authorization);
+    String packument(String registry, String name, boolean full, @Nullable String authorization);
 
     /**
-     * {@code GET} of a version's {@code dist.tarball}: its bytes, or null when the registry answers 404.
+     * The tarball at the url, which holds the package {@code name} at {@code version}; null when the server answers
+     * 404.
      */
     byte @Nullable [] tarball(String url, String name, String version, @Nullable String authorization);
 }

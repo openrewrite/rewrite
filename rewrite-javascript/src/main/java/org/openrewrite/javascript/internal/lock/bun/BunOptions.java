@@ -17,7 +17,6 @@ package org.openrewrite.javascript.internal.lock.bun;
 
 import lombok.Getter;
 import org.jspecify.annotations.Nullable;
-import org.openrewrite.javascript.NodeRegistry;
 import org.openrewrite.javascript.internal.lock.HostEnvironment;
 
 import java.util.ArrayList;
@@ -61,10 +60,10 @@ public final class BunOptions {
     }
 
     /**
-     * The options from the project's bunfig.toml, the registries the user's .npmrc names (the host's), the project's
-     * .npmrc and the environment, any of which may be absent.
+     * The options from the project's bunfig.toml, the user's .npmrc (the host's registries), the project's .npmrc
+     * and the environment, any of which may be absent.
      */
-    public static BunOptions load(@Nullable String bunfigToml, List<NodeRegistry> user, @Nullable String npmrc,
+    public static BunOptions load(@Nullable String bunfigToml, @Nullable String userNpmrc, @Nullable String npmrc,
                                   HostEnvironment env) {
         Install install = new Install();
         if (bunfigToml != null) {
@@ -74,7 +73,9 @@ public final class BunOptions {
                 install.readBunfig(installObj);
             }
         }
-        install.readUserNpmrc(user);
+        if (userNpmrc != null) {
+            install.readNpmrc(userNpmrc, env);
+        }
         if (npmrc != null) {
             install.readNpmrc(npmrc, env);
         }
@@ -218,18 +219,6 @@ public final class BunOptions {
             Json.Expr value = obj.get(key);
             Boolean b = value == null ? null : value.asBool();
             return b != null ? b : current;
-        }
-
-        // loadNpmrc over the user's .npmrc: its registry and each @scope:registry
-        void readUserNpmrc(List<NodeRegistry> user) {
-            for (NodeRegistry registry : user) {
-                String scope = registry.getScope();
-                if (scope == null) {
-                    defaultRegistry = registry.getUrl();
-                } else {
-                    scoped.put(scope.substring(1), registry.getUrl());
-                }
-            }
         }
 
         // ini.zig loadNpmrc: the top-level keys a lock-only install uses, each of the type it takes

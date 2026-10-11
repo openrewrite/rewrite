@@ -17,16 +17,15 @@ package org.openrewrite.javascript.internal.lock;
 
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.javascript.NodeRegistry;
-import org.openrewrite.javascript.internal.lock.berry.RegistrySource;
 import org.openrewrite.javascript.internal.registry.NodeRegistries;
 import org.openrewrite.javascript.internal.registry.NodeRegistryException;
 import org.openrewrite.javascript.internal.registry.NpmRegistryClient;
 
 /**
- * The full packuments and the tarballs a Yarn Berry install reads, from the registry Yarn's own config names, with
- * the Authorization header Yarn sends and the host's transport settings for the url.
+ * A port's requests through the host's client, with the Authorization header the port computes and the host's
+ * transport settings for the url.
  */
-final class YarnBerryRegistrySource implements RegistrySource {
+final class HostRegistrySource implements RegistrySource {
 
     private static final String BEARER = "Bearer ";
     private static final String BASIC = "Basic ";
@@ -34,15 +33,15 @@ final class YarnBerryRegistrySource implements RegistrySource {
     private final NodeRegistries registries;
     private final NpmRegistryClient client;
 
-    YarnBerryRegistrySource(NodeRegistries registries, NpmRegistryClient client) {
+    HostRegistrySource(NodeRegistries registries, NpmRegistryClient client) {
         this.registries = registries;
         this.client = client;
     }
 
     @Override
-    public @Nullable String packument(String registry, String name, @Nullable String authorization) {
+    public @Nullable String packument(String registry, String name, boolean full, @Nullable String authorization) {
         try {
-            return client.getPackumentText(request(name, registry, authorization), name, true);
+            return client.getPackumentText(request(name, registry, authorization), name, full);
         } catch (NodeRegistryException e) {
             if (e.getReason() == NodeRegistryException.Reason.PACKAGE_NOT_FOUND) {
                 return null;
@@ -56,7 +55,8 @@ final class YarnBerryRegistrySource implements RegistrySource {
         try {
             return client.getTarball(request(name, url, authorization), name, version, url);
         } catch (NodeRegistryException e) {
-            if (e.getReason() == NodeRegistryException.Reason.PACKAGE_NOT_FOUND) {
+            if (e.getReason() == NodeRegistryException.Reason.VERSION_NOT_FOUND ||
+                e.getReason() == NodeRegistryException.Reason.PACKAGE_NOT_FOUND) {
                 return null;
             }
             throw e;

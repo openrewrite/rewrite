@@ -19,7 +19,6 @@ import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import org.openrewrite.javascript.NodeRegistry;
-import org.openrewrite.javascript.internal.lock.npm.HostRegistries;
 import org.openrewrite.javascript.internal.registry.NodeRegistries;
 import org.openrewrite.javascript.internal.registry.NpmRegistryClient;
 

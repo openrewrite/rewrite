@@ -18,6 +18,7 @@ package org.openrewrite.javascript.internal.lock.berry;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.javascript.internal.lock.CannotKnow;
 import org.openrewrite.javascript.internal.lock.Picomatch;
+import org.openrewrite.javascript.internal.lock.RegistrySource;
 import org.openrewrite.javascript.internal.lock.V8Date;
 
 import java.nio.charset.StandardCharsets;
@@ -84,7 +85,7 @@ final class NpmHttpUtils {
         }
         String registryUrl = getScopeRegistry(ident.scope, project.configuration);
         return project.packageMetadata.computeIfAbsent(registryUrl + getIdentUrl(ident), key -> {
-            String packument = registry.packument(registryUrl, StructUtils.stringifyIdent(ident),
+            String packument = registry.packument(registryUrl, StructUtils.stringifyIdent(ident), true,
                     getAuthenticationHeader(registryUrl, ident.scope, project.configuration));
             if (packument == null) {
                 throw new ReportError(ReportError.NETWORK_ERROR, "Package not found");

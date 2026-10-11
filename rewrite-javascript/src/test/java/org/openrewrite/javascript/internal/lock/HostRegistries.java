@@ -13,11 +13,10 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.openrewrite.javascript.internal.lock.npm;
+package org.openrewrite.javascript.internal.lock;
 
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.InMemoryExecutionContext;
-import org.openrewrite.javascript.internal.lock.Ini;
 import org.openrewrite.javascript.internal.registry.Environment;
 import org.openrewrite.javascript.internal.registry.NodeRegistries;
 import org.openrewrite.javascript.internal.registry.RegistryDiscovery;
@@ -27,6 +26,8 @@ import org.openrewrite.javascript.marker.NodeResolutionResult.NpmrcScope;
 import org.openrewrite.javascript.marker.NodeResolutionResult.PackageManager;
 
 import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.time.Instant;
 import java.util.LinkedHashMap;
 import java.util.Map;
 
@@ -34,10 +35,15 @@ import static java.util.Collections.singletonList;
 import static org.openrewrite.javascript.Assertions.nodeResolutionResult;
 
 /**
- * The host's registries for a recording's user .npmrc: the marker's user scope, as the host reads $HOME/.npmrc, and
+ * The host's side for a recording's user .npmrc: the marker's user scope, as the host reads $HOME/.npmrc, and
  * discovered from there as the host discovers them.
  */
 public final class HostRegistries {
+
+    /**
+     * A host that names no registry and holds no credentials, its home without config.
+     */
+    public static final HostInputs NONE = host(null, Paths.get("/nonexistent-home"));
 
     private HostRegistries() {
     }
@@ -50,15 +56,31 @@ public final class HostRegistries {
     }
 
     /**
+     * The host's side of a regeneration whose user .npmrc is a recording's (null for none), its scratch HOME {@code
+     * home}; its clock and machine are the port inputs' own.
+     */
+    public static HostInputs host(@Nullable String npmrc, Path home) {
+        HostInputs.HostInputsBuilder host = HostInputs.builder().now(Instant.EPOCH).system(environment(home));
+        if (npmrc != null) {
+            host.npmrc(new Npmrc(NpmrcScope.User, properties(npmrc)));
+        }
+        return host.build();
+    }
+
+    /**
      * A marker whose only npmrc is a recording's user .npmrc, in the user scope.
      */
     public static NodeResolutionResult userMarker(String npmrc) {
+        return nodeResolutionResult(PackageManager.Npm)
+          .withNpmrcConfigs(singletonList(new Npmrc(NpmrcScope.User, properties(npmrc))));
+    }
+
+    private static Map<String, String> properties(String npmrc) {
         Map<String, String> properties = new LinkedHashMap<>();
         for (Map.Entry<String, @Nullable Object> entry : Ini.decode(npmrc, Ini.Release.V6_0_0).entrySet()) {
             properties.put(entry.getKey(), String.valueOf(entry.getValue()));
         }
-        return nodeResolutionResult(PackageManager.Npm)
-          .withNpmrcConfigs(singletonList(new Npmrc(NpmrcScope.User, properties)));
+        return properties;
     }
 
     /**

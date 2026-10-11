@@ -115,25 +115,21 @@ public final class PnpmOptions {
 
     static PnpmOptions load(@Nullable String workspaceManifest, @Nullable String npmrc,
                             @Nullable Map<String, @Nullable Object> rootManifest, @Nullable Map<String, String> env) {
-        return load(workspaceManifest, npmrc, Collections.emptyMap(), rootManifest, env);
+        return load(workspaceManifest, npmrc, null, rootManifest, env);
     }
 
     /**
-     * {@code getConfig} over the project's pnpm-workspace.yaml and .npmrc (null without one), the user's .npmrc as
-     * the inputs give it (the host's registries), the root manifest and the environment (null when unknown).
+     * {@code getConfig} over the project's pnpm-workspace.yaml and .npmrc, the user's .npmrc (the host's registries),
+     * each null without one, the root manifest and the environment (null when unknown).
      */
     @SuppressWarnings("unchecked")
-    static PnpmOptions load(@Nullable String workspaceManifest, @Nullable String npmrc, Map<String, String> userNpmrc,
+    static PnpmOptions load(@Nullable String workspaceManifest, @Nullable String npmrc, @Nullable String userNpmrc,
                             @Nullable Map<String, @Nullable Object> rootManifest, @Nullable Map<String, String> env) {
         Map<String, @Nullable Object> defaultOptions = defaultOptions();
         Map<String, @Nullable Object> workspaceNpmrc = npmrc == null ? new LinkedHashMap<>() :
                 readAndFilterNpmrc(npmrc, env);
-        Map<String, @Nullable Object> userConfig = new LinkedHashMap<>();
-        for (Map.Entry<String, String> entry : userNpmrc.entrySet()) {
-            if (isNpmrcReadableKey(entry.getKey())) {
-                userConfig.put(entry.getKey(), entry.getValue());
-            }
-        }
+        Map<String, @Nullable Object> userConfig = userNpmrc == null ? new LinkedHashMap<>() :
+                readAndFilterNpmrc(userNpmrc, env);
         Map<String, @Nullable Object> builtin = new LinkedHashMap<>();
         builtin.put("registry", DEFAULT_REGISTRY);
         builtin.put("@jsr:registry", "https://npm.jsr.io/");

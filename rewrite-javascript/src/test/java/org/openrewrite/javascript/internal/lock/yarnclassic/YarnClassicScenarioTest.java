@@ -28,6 +28,7 @@ import org.openrewrite.javascript.internal.lock.Expect;
 import org.openrewrite.javascript.internal.lock.Host;
 import org.openrewrite.javascript.internal.lock.LockScenarioTest;
 import org.openrewrite.javascript.internal.lock.RecordedRegistry;
+import org.openrewrite.javascript.internal.lock.RegistrySource;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -71,7 +72,7 @@ class YarnClassicScenarioTest extends LockScenarioTest {
         }
 
         @Override
-        public @Nullable String packument(String registry, String name, @Nullable String authorization) {
+        public @Nullable String packument(String registry, String name, boolean full, @Nullable String authorization) {
             String mirror = mirror(registry, "npmjs", "yarnpkg");
             String body = mirror == null ? scenario.http(name) : scenario.file(mirror + "/" + name);
             if (body == null) {

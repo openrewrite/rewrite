@@ -101,11 +101,10 @@ public final class PnpmLockRegenerator {
         Host host = Host.UNKNOWN;
 
         /**
-         * The host's registries as the user's .npmrc pnpm reads under the project's: {@code registry} and each
-         * {@code @scope:registry}; empty when the host names none.
+         * The user's .npmrc, the host's registries, which pnpm reads under the project's; null for none.
          */
-        @Builder.Default
-        Map<String, String> userConfig = Collections.emptyMap();
+        @Nullable
+        String userNpmrc;
 
         /**
          * The files the project holds relative to its root, when the host says.

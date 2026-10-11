@@ -17,7 +17,8 @@ package org.openrewrite.javascript.internal.lock.pnpm;
 
 import lombok.Getter;
 import org.jspecify.annotations.Nullable;
-import org.openrewrite.javascript.internal.lock.Ini;
+import org.openrewrite.javascript.internal.lock.HostInputs;
+import org.openrewrite.javascript.internal.lock.HostRegistries;
 import org.openrewrite.javascript.internal.lock.JsYaml;
 import org.openrewrite.javascript.internal.lock.LockScenario;
 import org.openrewrite.javascript.internal.lock.RootRelativePath;
@@ -222,23 +223,10 @@ final class PnpmScenarios {
         }
 
         /**
-         * The host's registries as the recording's user .npmrc ({@code user-npmrc}) names them: {@code registry}
-         * and each {@code @scope:registry}.
+         * The recording's user .npmrc ({@code user-npmrc}) as the host renders it from the marker's user npmrc.
          */
-        Map<String, String> userConfig() {
-            String npmrc = file("user-npmrc");
-            Map<String, String> config = new LinkedHashMap<>();
-            if (npmrc == null) {
-                return config;
-            }
-            for (Map.Entry<String, @Nullable Object> entry : Ini.decode(npmrc, Ini.Release.V6_0_0).entrySet()) {
-                String key = entry.getKey();
-                if (entry.getValue() instanceof String && ("registry".equals(key) ||
-                                                           key.startsWith("@") && key.endsWith(":registry"))) {
-                    config.put(key, (String) entry.getValue());
-                }
-            }
-            return config;
+        String userNpmrc() {
+            return HostRegistries.host(file("user-npmrc"), getDir()).userNpmrc(HostInputs.USER);
         }
 
         /**

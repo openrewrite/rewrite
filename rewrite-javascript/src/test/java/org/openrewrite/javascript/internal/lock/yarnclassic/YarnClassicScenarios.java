@@ -20,7 +20,10 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.Getter;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.javascript.internal.lock.Host;
+import org.openrewrite.javascript.internal.lock.HostInputs;
+import org.openrewrite.javascript.internal.lock.HostRegistries;
 import org.openrewrite.javascript.internal.lock.LockScenario;
+import org.openrewrite.javascript.internal.lock.RegistrySource;
 
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
@@ -295,7 +298,10 @@ final class YarnClassicScenarios {
             }
             Map<String, String> home = new LinkedHashMap<>();
             if (phase == Phase.AFTER) {
-                putIfPresent(home, ".npmrc", file("user-npmrc"));
+                if (file("user-npmrc") != null) {
+                    home.put(".npmrc", HostRegistries.host(file("user-npmrc"), getDir())
+                            .userNpmrc(HostInputs.GLOBAL_AND_USER));
+                }
                 putIfPresent(home, ".yarnrc", file("user-yarnrc"));
             }
             return YarnClassicLockRegenerator.Inputs.builder()
@@ -377,7 +383,7 @@ final class YarnClassicScenarios {
     static RegistrySource packuments(Packuments packuments) {
         return new RegistrySource() {
             @Override
-            public @Nullable String packument(String registry, String name, @Nullable String authorization) {
+            public @Nullable String packument(String registry, String name, boolean full, @Nullable String authorization) {
                 return packuments.packument(registry, name);
             }
 

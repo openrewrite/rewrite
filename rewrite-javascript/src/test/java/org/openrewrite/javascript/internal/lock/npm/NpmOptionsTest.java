@@ -21,7 +21,6 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
 import org.openrewrite.javascript.internal.lock.CannotKnow;
 import org.openrewrite.javascript.internal.lock.HostEnvironment;
-import org.openrewrite.javascript.internal.registry.NodeRegistries;
 
 import java.time.Instant;
 import java.util.HashMap;
@@ -90,9 +89,7 @@ class NpmOptionsTest {
     // 11.17.0 and a --userconfig naming a mirror (lock/npm/open-user-registry-*)
     @Test
     void theHostsRegistriesAreTheUserConfigUnderTheProjectsNpmrc() {
-        Map<String, String> types = new HashMap<>();
-        types.put("@types", "https://registry.npmmirror.com/");
-        NodeRegistries user = ScenarioReplay.registries("https://registry.npmmirror.com/", types);
+        String user = "registry=https://registry.npmmirror.com/\n@types:registry=https://registry.npmmirror.com/\n";
 
         NpmOptions userOnly = NpmOptions.fromNpmrc(user, null);
         assertThat(userOnly.registryFor("ms")).isEqualTo("https://registry.npmmirror.com/");

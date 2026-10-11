@@ -22,17 +22,14 @@ import org.openrewrite.javascript.NodeRegistry;
 import org.openrewrite.javascript.NodeRegistryCredentials;
 import org.openrewrite.javascript.marker.NodeResolutionResult;
 import org.openrewrite.javascript.marker.NodeResolutionResult.Npmrc;
-import org.openrewrite.javascript.marker.NodeResolutionResult.NpmrcScope;
 
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 
 import static java.util.Collections.emptyList;
-import static java.util.stream.Collectors.toList;
 
 /**
  * The registries and credentials a project locks against: the {@link NodeExecutionContextView}'s, else the marker's
@@ -46,13 +43,21 @@ public final class RegistryDiscovery {
 
     public static NodeRegistries discover(ExecutionContext ctx, @Nullable NodeResolutionResult marker, Environment env) {
         NodeExecutionContextView view = NodeExecutionContextView.view(ctx);
-        List<NodeRegistry> explicit = view.getRegistries();
+        return discover(view.getRegistries(), view.getRegistryCredentials(),
+                marker == null ? null : marker.getNpmrcConfigs(), env);
+    }
+
+    /**
+     * {@link #discover(ExecutionContext, NodeResolutionResult, Environment)} over the view's registries and
+     * credentials as given and the marker's npmrc files (null for none).
+     */
+    public static NodeRegistries discover(List<NodeRegistry> explicit, List<NodeRegistryCredentials> credentials,
+                                          @Nullable List<Npmrc> npmrcConfigs, Environment env) {
         if (!explicit.isEmpty()) {
             return fromExplicit(explicit);
         }
 
-        NpmConfig config = new NpmConfig(mergeNpmrc(marker), env);
-        List<NodeRegistryCredentials> credentials = view.getRegistryCredentials();
+        NpmConfig config = new NpmConfig(mergeNpmrc(npmrcConfigs), env);
 
         EnvExpansion.Expansion defaultUrl = config.defaultRegistry();
         String resolvedDefaultUrl = defaultUrl.value != null ? defaultUrl.value : DEFAULT_REGISTRY;
@@ -70,17 +75,6 @@ public final class RegistryDiscovery {
 
         return new NodeRegistries(defaultRegistry, byScope,
                 config.getProxy(), config.getHttpsProxy(), config.getNoProxy());
-    }
-
-    /**
-     * The registries a package manager reads as its user's own config: the view's, else those of the marker's npmrc
-     * files of the {@code scopes} it reads.
-     */
-    public static NodeRegistries discover(ExecutionContext ctx, @Nullable NodeResolutionResult marker, Environment env,
-                                          Set<NpmrcScope> scopes) {
-        return discover(ctx, marker == null || marker.getNpmrcConfigs() == null ? marker :
-                marker.withNpmrcConfigs(marker.getNpmrcConfigs().stream()
-                        .filter(npmrc -> scopes.contains(npmrc.getScope())).collect(toList())), env);
     }
 
     private static NodeRegistries fromExplicit(List<NodeRegistry> registries) {
@@ -166,12 +160,12 @@ public final class RegistryDiscovery {
         return new NodeRegistry(scope, url, null, null, null, null, false, null, true, unresolved);
     }
 
-    private static Map<String, String> mergeNpmrc(@Nullable NodeResolutionResult marker) {
+    private static Map<String, String> mergeNpmrc(@Nullable List<Npmrc> npmrcConfigs) {
         Map<String, String> merged = new LinkedHashMap<>();
-        if (marker == null || marker.getNpmrcConfigs() == null) {
+        if (npmrcConfigs == null) {
             return merged;
         }
-        List<Npmrc> configs = new ArrayList<>(marker.getNpmrcConfigs());
+        List<Npmrc> configs = new ArrayList<>(npmrcConfigs);
         // Global -> User -> Project, later scopes overriding earlier per key.
         configs.sort(Comparator.comparingInt(n -> n.getScope().ordinal()));
         for (Npmrc config : configs) {

@@ -65,7 +65,7 @@ class PnpmLockRoundTripTest {
           .manifests(lock.manifests())
           .files(files)
           .paths(PnpmScenarios.paths(files, lock.manifests(), lock.getScenario().lockDir()))
-          .userConfig(lock.getScenario().userConfig())
+          .userNpmrc(lock.getScenario().userNpmrc())
           .now(lock.now())
           .host(PnpmScenarioTest.host(lock.getScenario().recordedWith()));
         if (lock.getScenario().recordedWith() == null) {

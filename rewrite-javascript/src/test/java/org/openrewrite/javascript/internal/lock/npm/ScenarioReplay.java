@@ -20,6 +20,7 @@ import org.junit.jupiter.params.provider.Arguments;
 import org.openrewrite.ipc.http.HttpSender;
 import org.openrewrite.javascript.NodeRegistry;
 import org.openrewrite.javascript.internal.lock.Host;
+import org.openrewrite.javascript.internal.lock.HostInputs;
 import org.openrewrite.javascript.internal.lock.NpmRegistryPackuments;
 import org.openrewrite.javascript.internal.lock.RecordedRegistry;
 import org.openrewrite.javascript.internal.registry.NodeRegistries;
@@ -30,7 +31,6 @@ import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.Deque;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
@@ -143,9 +143,7 @@ final class ScenarioReplay {
     }
 
     static PackumentSource registry(ScenarioRegistry http) {
-        NodeRegistries user = http.recording().userConfig();
-        return new NpmRegistryPackuments(user != null ? user : registries(REG, Collections.emptyMap()),
-          new NpmRegistryClient(http));
+        return new NpmRegistryPackuments(http.recording().host().transport(), new NpmRegistryClient(http));
     }
 
     /**
@@ -176,7 +174,7 @@ final class ScenarioReplay {
 
     static NpmOptions options(NpmScenarios.Scenario scenario) {
         String npmrc = scenario.npmrc() == null ? "" : scenario.npmrc() + "\n";
-        return NpmOptions.fromNpmrc(scenario.userConfig(), npmrc + scenario.argsAfter());
+        return NpmOptions.fromNpmrc(scenario.host().userNpmrc(HostInputs.GLOBAL_AND_USER), npmrc + scenario.argsAfter());
     }
 
     static NpmOptions options(@Nullable String npmrc) {
@@ -191,7 +189,7 @@ final class ScenarioReplay {
           .yarnLock(edit.getInputs().getYarnLock())
           .manifests(edit.manifests())
           .npmrc(npmrc + scenario.argsAfter())
-          .userConfig(scenario.userConfig())
+          .userNpmrc(scenario.host().userNpmrc(HostInputs.GLOBAL_AND_USER))
           .host(host(scenario))
           .now(now(scenario))
           .build();

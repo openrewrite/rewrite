@@ -21,7 +21,9 @@ import lombok.Singular;
 import lombok.Value;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.ExecutionContext;
+import org.openrewrite.javascript.internal.lock.LockDirectory;
 import org.openrewrite.javascript.internal.lock.NativeLockEngine;
+import org.openrewrite.javascript.internal.lock.Port;
 import org.openrewrite.javascript.marker.NodeResolutionResult;
 import org.openrewrite.javascript.marker.NodeResolutionResult.PackageManager;
 import org.openrewrite.javascript.table.NodeLockRegenerationFailures;
@@ -37,6 +39,7 @@ import static java.util.Arrays.asList;
 import static java.util.Collections.emptyMap;
 import static java.util.Collections.unmodifiableList;
 import static java.util.Collections.unmodifiableMap;
+import static java.util.Objects.requireNonNull;
 
 /**
  * Regenerates a JavaScript project's lock without running its package manager, through the port that
@@ -44,28 +47,21 @@ import static java.util.Collections.unmodifiableMap;
  */
 public final class LockFileRegeneration {
 
-    public static final LockFileRegeneration NPM = new LockFileRegeneration(PackageManager.Npm, "package-lock.json");
-    public static final LockFileRegeneration YARN_CLASSIC =
-            new LockFileRegeneration(PackageManager.YarnClassic, "yarn.lock");
-    public static final LockFileRegeneration YARN_BERRY =
-            new LockFileRegeneration(PackageManager.YarnBerry, "yarn.lock");
-    public static final LockFileRegeneration PNPM = new LockFileRegeneration(PackageManager.Pnpm, "pnpm-lock.yaml");
-    public static final LockFileRegeneration BUN = new LockFileRegeneration(PackageManager.Bun, "bun.lock");
+    public static final LockFileRegeneration NPM = new LockFileRegeneration(PackageManager.Npm);
+    public static final LockFileRegeneration YARN_CLASSIC = new LockFileRegeneration(PackageManager.YarnClassic);
+    public static final LockFileRegeneration YARN_BERRY = new LockFileRegeneration(PackageManager.YarnBerry);
+    public static final LockFileRegeneration PNPM = new LockFileRegeneration(PackageManager.Pnpm);
+    public static final LockFileRegeneration BUN = new LockFileRegeneration(PackageManager.Bun);
     public static final List<LockFileRegeneration> ALL = unmodifiableList(asList(NPM, YARN_CLASSIC, YARN_BERRY, PNPM,
             BUN));
 
     public static @Nullable LockFileRegeneration forPackageManager(@Nullable PackageManager pm) {
-        if (pm == null) {
-            return null;
+        for (LockFileRegeneration regeneration : ALL) {
+            if (regeneration.pm == pm) {
+                return regeneration;
+            }
         }
-        switch (pm) {
-            case Npm:         return NPM;
-            case YarnClassic: return YARN_CLASSIC;
-            case YarnBerry:   return YARN_BERRY;
-            case Pnpm:        return PNPM;
-            case Bun:         return BUN;
-            default:          return null;
-        }
+        return null;
     }
 
     public enum Reason {
@@ -273,50 +269,50 @@ public final class LockFileRegeneration {
     }
 
     private final PackageManager pm;
-    private final String lockFile;
+    private final Port port;
 
-    private LockFileRegeneration(PackageManager pm, String lockFile) {
+    private LockFileRegeneration(PackageManager pm) {
         this.pm = pm;
-        this.lockFile = lockFile;
+        this.port = requireNonNull(NativeLockEngine.port(pm));
     }
 
     public String getLockFile() {
-        return lockFile;
+        return port.lockFile();
     }
 
     /**
      * Whether the package manager reads the contents of a project file of this name.
      */
     public boolean reads(String fileName) {
-        return readsAsManifest(fileName) || NativeLockEngine.reads(pm, fileName);
+        return port.readsAsManifest(fileName) || port.reads(fileName);
     }
 
     /**
      * Whether it reads a project's manifest from a file of this name, as it reads a package.json.
      */
     public boolean readsAsManifest(String fileName) {
-        return NativeLockEngine.readsAsManifest(pm, fileName);
+        return port.readsAsManifest(fileName);
     }
 
     /**
      * Whether it reads a file of this name only from its lock's directory.
      */
     public boolean readsOnlyBesideLock(String fileName) {
-        return NativeLockEngine.readsOnlyBesideLock(pm, fileName);
+        return port.readsOnlyBesideLock(fileName);
     }
 
     /**
      * Whether its install also reads the locks of the workspace's other projects.
      */
     public boolean readsOtherLocks() {
-        return NativeLockEngine.readsOtherLocks(pm);
+        return port.readsOtherLocks();
     }
 
     /**
      * Whether its install reads and rewrites a file of this name beside its lock, which the regeneration writes too.
      */
     public boolean writesBesideLock(String fileName) {
-        return NativeLockEngine.writesBesideLock(pm, fileName);
+        return port.writesBesideLock(fileName);
     }
 
     /**
@@ -324,13 +320,13 @@ public final class LockFileRegeneration {
      * @return the new lock content, or a structured failure
      */
     public Result regenerate(Request request, ExecutionContext ctx) {
-        return NativeLockEngine.regenerate(pm, request, ctx);
+        return NativeLockEngine.regenerate(port, request, ctx);
     }
 
     /**
      * The package manager's own answer to where it installs when run in the edited manifest's directory.
      */
     public InstallRoot installRoot(Request request) {
-        return NativeLockEngine.installRoot(pm, request);
+        return port.installRoot(LockDirectory.of(request));
     }
 }
