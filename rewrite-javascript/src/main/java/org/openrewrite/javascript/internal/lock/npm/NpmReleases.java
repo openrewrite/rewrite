@@ -15,6 +15,13 @@
  */
 package org.openrewrite.javascript.internal.lock.npm;
 
+import org.jspecify.annotations.Nullable;
+import org.openrewrite.javascript.internal.lock.CannotKnow;
+import org.openrewrite.javascript.internal.lock.Host;
+import org.openrewrite.javascript.internal.lock.HostEnvironment;
+import org.openrewrite.javascript.internal.lock.JsError;
+import org.openrewrite.javascript.internal.lock.Rejected;
+import org.openrewrite.javascript.internal.lock.SpecUtils;
 import org.openrewrite.javascript.semver.NodeSemver;
 
 import java.io.ByteArrayOutputStream;
@@ -26,10 +33,11 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.List;
+import java.util.Map;
 import java.util.TreeSet;
 
 /**
- * The npm releases there are, and the ones the engine reproduces.
+ * The npm releases there are, the ones the engine reproduces, and the ones a project is installed as.
  */
 public final class NpmReleases {
 
@@ -70,6 +78,113 @@ public final class NpmReleases {
             }
         }
         return proven;
+    }
+
+    /**
+     * The releases a project is installed as, newest first: of those its package.json allows ({@link #allowed}), the
+     * ones the engine reproduces, and {@link #undeclared()} where it names none.
+     *
+     * @param pkg the package.json where npm installs, as npm reads it
+     * @throws CannotKnow when the engine reproduces none of the releases the project names
+     */
+    static List<NpmRelease> candidates(Map<String, Object> pkg) {
+        List<NpmRelease> allowed = allowed(pkg);
+        if (allowed == null) {
+            return undeclared();
+        }
+        List<NpmRelease> candidates = new ArrayList<>();
+        for (int i = allowed.size() - 1; i >= 0; i--) {
+            if (isProven(allowed.get(i))) {
+                candidates.add(allowed.get(i));
+            }
+        }
+        if (candidates.isEmpty()) {
+            throw notReproduced(ranges(allowed));
+        }
+        return candidates;
+    }
+
+    /**
+     * The releases a project is installed as when its package.json names none: every release the engine reproduces,
+     * newest first, so that the result is the lock each of them writes or, where they differ, cannot be known. The
+     * policy is this method's alone.
+     */
+    static List<NpmRelease> undeclared() {
+        List<NpmRelease> releases = proven();
+        Collections.reverse(releases);
+        return releases;
+    }
+
+    /**
+     * The releases of {@link #all()} a package.json allows, in ascending order; null where it names none:
+     * <ul>
+     * <li>a {@code packageManager} that names {@code npm@<version>}, as corepack reads the field, allows that
+     * release alone. npm itself does not read it, so one that names another package manager, a range, a URL or what
+     * corepack refuses allows every release.</li>
+     * <li>else {@code devEngines.packageManager} allows the releases npm's check passes or only warns for, also those
+     * too old to run it. One no release satisfies, as for another package manager, allows every release: each
+     * install reports what npm does.</li>
+     * </ul>
+     *
+     * @throws CannotKnow when {@code packageManager} names an npm that is none of these releases
+     */
+    static @Nullable List<NpmRelease> allowed(Map<String, Object> pkg) {
+        String named = namedByPackageManager(pkg.get("packageManager"));
+        if (named != null) {
+            for (NpmRelease release : ALL) {
+                if (release.toString().equals(named)) {
+                    return Collections.singletonList(release);
+                }
+            }
+            throw notReproduced(named);
+        }
+        List<NpmRelease> allowed = new ArrayList<>();
+        for (NpmRelease release : ALL) {
+            if (!devEnginesRefuse(pkg.get("devEngines"), release)) {
+                allowed.add(release);
+            }
+        }
+        return allowed.isEmpty() || allowed.size() == ALL.size() ? null : allowed;
+    }
+
+    /**
+     * Whether {@code devEngines.packageManager} does not match npm {@code release} in a way that is an error for npm's
+     * check; never for a shape the check fails on.
+     */
+    static boolean devEnginesRefuse(@Nullable Object devEngines, NpmRelease release) {
+        if (!(devEngines instanceof Map) || !((Map<?, ?>) devEngines).containsKey("packageManager")) {
+            return false;
+        }
+        Map<String, Object> wanted = Collections.singletonMap("packageManager",
+                ((Map<?, ?>) devEngines).get("packageManager"));
+        try {
+            // whatever the release, as the ported one words what it finds: nothing is asked of it here
+            for (NpmInstallChecks.InvalidDevEngine failure : NpmInstallChecks.checkDevEngines(wanted,
+                    NpmInstallChecks.devEngines(Host.UNKNOWN, release.toString()), NpmRelease.PORTED)) {
+                if (failure.isError()) {
+                    return true;
+                }
+            }
+        } catch (JsError e) {
+            return false;
+        }
+        return false;
+    }
+
+    // corepack's parseSpec of a packageManager field where it must name a version: the npm version it names
+    private static @Nullable String namedByPackageManager(@Nullable Object packageManager) {
+        try {
+            SpecUtils.Descriptor spec = SpecUtils.parseSpec(packageManager, "package.json", true,
+                    HostEnvironment.UNKNOWN, null);
+            return "npm".equals(spec.getName()) ? SpecUtils.installVersion(spec) : null;
+        } catch (Rejected e) {
+            return null;
+        }
+    }
+
+    private static CannotKnow notReproduced(String releases) {
+        return new CannotKnow("what npm " + releases + " writes, since the engine reproduces npm " +
+                              ranges(proven()));
     }
 
     /**
