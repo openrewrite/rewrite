@@ -179,14 +179,14 @@ public final class OverrideSet {
 
             if (spec.getType() == Spec.Type.GIT) {
                 if (spec.getGitRange() != null && !spec.getGitRange().isEmpty() &&
-                    NodeSemver.intersects(spec.getGitRange(), rule.keySpec, DEFAULT)) {
+                    NodeSemver.intersects(spec.getGitRange(), rule.keySpec, DEFAULT.release(release.semver()))) {
                     return rule;
                 }
                 continue;
             }
 
             if (spec.getType() == Spec.Type.RANGE || spec.getType() == Spec.Type.VERSION) {
-                if (NodeSemver.intersects(spec.getFetchSpec(), rule.keySpec, DEFAULT)) {
+                if (NodeSemver.intersects(spec.getFetchSpec(), rule.keySpec, DEFAULT.release(release.semver()))) {
                     return rule;
                 }
                 continue;
@@ -215,8 +215,9 @@ public final class OverrideSet {
             if (!Objects.equals(rule.name, nodeName)) {
                 continue;
             }
-            if (NodeSemver.satisfies(version, rule.keySpec, DEFAULT) ||
-                rule.value instanceof String && NodeSemver.satisfies(version, (String) rule.value, DEFAULT)) {
+            NodeSemver.Options semver = DEFAULT.release(release.semver());
+            if (NodeSemver.satisfies(version, rule.keySpec, semver) ||
+                rule.value instanceof String && NodeSemver.satisfies(version, (String) rule.value, semver)) {
                 return rule;
             }
         }
@@ -327,7 +328,8 @@ public final class OverrideSet {
                 Spec secondSpec = Spec.npa(secondRule.name + "@" + secondRule.value);
                 if ((firstSpec.getType() == Spec.Type.RANGE || firstSpec.getType() == Spec.Type.VERSION) &&
                     (secondSpec.getType() == Spec.Type.RANGE || secondSpec.getType() == Spec.Type.VERSION)) {
-                    if (!NodeSemver.intersects(firstSpec.getFetchSpec(), secondSpec.getFetchSpec(), DEFAULT)) {
+                    if (!NodeSemver.intersects(firstSpec.getFetchSpec(), secondSpec.getFetchSpec(),
+                            DEFAULT.release(first.release.semver()))) {
                         return true;
                     }
                 }

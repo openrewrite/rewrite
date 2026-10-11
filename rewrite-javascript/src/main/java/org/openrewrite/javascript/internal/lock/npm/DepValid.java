@@ -118,6 +118,7 @@ final class DepValid {
             return false;
         }
 
+        NodeSemver.Options loose = LOOSE.release(requestor.getRelease().semver());
         switch (requested.getType()) {
             case RANGE:
                 if ("*".equals(requested.getFetchSpec())) {
@@ -125,7 +126,7 @@ final class DepValid {
                 }
                 // fall through
             case VERSION:
-                return NodeSemver.satisfies(child.getVersion(), requested.getFetchSpec(), LOOSE);
+                return NodeSemver.satisfies(child.getVersion(), requested.getFetchSpec(), loose);
             case DIRECTORY:
                 return linkValid(child, requested, requestor);
             case FILE:
@@ -163,7 +164,7 @@ final class DepValid {
                     }
                     return true;
                 }
-                return NodeSemver.satisfies(child.getPackage().get("version"), requested.getGitRange(), LOOSE);
+                return NodeSemver.satisfies(child.getPackage().get("version"), requested.getGitRange(), loose);
             }
             default:
                 break;

@@ -18,6 +18,7 @@ package org.openrewrite.javascript.internal.lock.npm;
 import java.util.ArrayDeque;
 import java.util.Deque;
 import java.util.LinkedHashSet;
+import java.util.Locale;
 import java.util.Set;
 
 /**
@@ -198,6 +199,9 @@ public final class DepFlags {
         if (node.isLink()) {
             Node target = node.getTarget();
             if (target == null) {
+                if (!node.getRelease().passesOverLinkWithoutTarget()) {
+                    throw new IllegalArgumentException("Cannot set properties of null (setting 'dev')");
+                }
                 return node;
             }
             target.setDev(node.isDev());
@@ -282,6 +286,11 @@ public final class DepFlags {
             node.setExtraneous(false);
             flag.unset(node);
             Node target = node.isLink() ? node.getTarget() : null;
+            if (node.isLink() && target == null && !node.getRelease().passesOverLinkWithoutTarget()) {
+                throw new IllegalArgumentException("Cannot set properties of null (setting '" +
+                                                   (flag == Flag.DEV_OPTIONAL ? "devOptional" :
+                                                           flag.name().toLowerCase(Locale.ROOT)) + "')");
+            }
             if (target != null) {
                 target.setExtraneous(false);
                 flag.unset(target);

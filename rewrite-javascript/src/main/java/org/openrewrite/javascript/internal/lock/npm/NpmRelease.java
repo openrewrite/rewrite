@@ -17,6 +17,7 @@ package org.openrewrite.javascript.internal.lock.npm;
 
 import lombok.EqualsAndHashCode;
 import lombok.Getter;
+import org.openrewrite.javascript.semver.NodeSemver;
 
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -215,6 +216,14 @@ public final class NpmRelease implements Comparable<NpmRelease> {
      */
     boolean marksPeerEdgeTargetsPeer() {
         return atLeast(11, 6, 1);
+    }
+
+    /**
+     * {@code calcDepFlagsStep} and {@code unsetFlag} pass over a link whose target is null, from npm 10.8.2; before,
+     * they set the flags of the null target.
+     */
+    boolean passesOverLinkWithoutTarget() {
+        return atLeast(10, 8, 2);
     }
 
     // @npmcli/arborist dep-valid.js
@@ -472,6 +481,21 @@ public final class NpmRelease implements Comparable<NpmRelease> {
      */
     boolean namesTypeInAllowRejection() {
         return atLeast(11, 10, 0);
+    }
+
+    // semver
+
+    /**
+     * The node-semver npm bundles: 7.8.4 from npm 11.17.0 (7.8.2 takes an x-range with a number after a wildcard for no
+     * range); 7.8.1 from npm 11.16.0, which strips build metadata from a whole range; 7.7.3 from npm 11.6.2 and 7.7.4
+     * from npm 10.9.5, which strip it from a comparator as 7.8.0 does; before, 7.7.2, as every release from 7.5.4 (npm
+     * 10.0.0) answers.
+     */
+    NodeSemver.Release semver() {
+        return atLeast(11, 17, 0) ? NodeSemver.Release.V7_8_4 :
+                atLeast(11, 16, 0) ? NodeSemver.Release.V7_8_1 :
+                        atLeast(11, 6, 2) || atLeast(10, 9, 5) && !atLeast(11, 0, 0) ? NodeSemver.Release.V7_8_0 :
+                                NodeSemver.Release.V7_7_2;
     }
 
     @Override

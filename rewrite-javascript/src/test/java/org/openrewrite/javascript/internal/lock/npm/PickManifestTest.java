@@ -387,4 +387,32 @@ class PickManifestTest {
         assertThatThrownBy(() -> PickManifest.pickManifest(packument("{\"versions\":{}}"), null))
           .hasMessage("No versions available for undefined");
     }
+
+    private static PickManifest.Options release(String npm) {
+        return PickManifest.Options.builder().release(NpmRelease.of(npm)).build();
+    }
+
+    // npm-pick-manifest as each npm bundles it with its node-semver, asked for "1.2+a - 2": 7.7.2 and the releases
+    // before it read >=2.0.0 <3.0.0-0, 7.7.3 to 7.8.0 a range no version satisfies, 7.8.1 on >=1.2.0 <3.0.0-0
+    @Test
+    void rangeAsTheSemverOfTheReleaseReadsIt() {
+        Map<String, Object> one = packument("{\"name\":\"x\",\"versions\":{\"1.5.0\":{\"version\":\"1.5.0\"}}}");
+        Map<String, Object> two = packument("{\"name\":\"x\",\"versions\":{\"2.5.0\":{\"version\":\"2.5.0\"}}}");
+        String range = "1.2+a - 2";
+        for (String npm : new String[]{"10.0.0", "10.9.4", "11.0.0", "11.6.1"}) {
+            assertThatThrownBy(() -> PickManifest.pickManifest(one, range, release(npm))).as(npm)
+              .matches(t -> "ETARGET".equals(code(t)));
+            assertThat(version(two, range, release(npm))).as(npm).isEqualTo("2.5.0");
+        }
+        for (String npm : new String[]{"10.9.5", "10.9.9", "11.6.2", "11.15.0"}) {
+            assertThatThrownBy(() -> PickManifest.pickManifest(one, range, release(npm))).as(npm)
+              .matches(t -> "ETARGET".equals(code(t)));
+            assertThatThrownBy(() -> PickManifest.pickManifest(two, range, release(npm))).as(npm)
+              .matches(t -> "ETARGET".equals(code(t)));
+        }
+        for (String npm : new String[]{"11.16.0", "11.17.0"}) {
+            assertThat(version(one, range, release(npm))).as(npm).isEqualTo("1.5.0");
+            assertThat(version(two, range, release(npm))).as(npm).isEqualTo("2.5.0");
+        }
+    }
 }

@@ -54,13 +54,6 @@ public class NodeSemver {
         public static final Options LOOSE_INCLUDE_PRERELEASE = new Options(true, true, Release.V7_8_4);
 
         /**
-         * The options of a call into {@code release}.
-         */
-        public static Options of(Release release, boolean loose, boolean includePrerelease) {
-            return new Options(loose, includePrerelease, release);
-        }
-
-        /**
          * node-semver 5.5.0, whose functions take only {@code loose}.
          */
         public static final Options V5_5_0 = new Options(false, false, Release.V5_5_0);
@@ -69,6 +62,13 @@ public class NodeSemver {
         final boolean loose;
         final boolean includePrerelease;
         final Release release;
+
+        /**
+         * These options as another release of node-semver reads them.
+         */
+        public Options release(Release release) {
+            return release == this.release ? this : new Options(loose, includePrerelease, release);
+        }
     }
 
     /**

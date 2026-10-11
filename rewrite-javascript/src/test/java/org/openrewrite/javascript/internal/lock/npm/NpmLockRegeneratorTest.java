@@ -47,6 +47,44 @@ class NpmLockRegeneratorTest {
         }
     };
 
+    // A registry answers a version without its fields, as a proxy does for one it has not cached. Until npm 11.14.1
+    // arborist places what it was given and the lock gets an entry without fields (the entries npm 9.7.2 to 10.3.0
+    // wrote in closure-basic and its like, from abbreviated packuments); from 11.15.0 it fails the node.
+    @ParameterizedTest
+    @CsvSource({"11.0.0,true", "11.6.2,true", "11.14.1,true", "11.15.0,false", "11.17.0,false"})
+    void aRegistryManifestWithoutVersion(String release, boolean writes) {
+        String manifest = "{\n  \"name\": \"a\",\n  \"version\": \"1.0.0\",\n  \"dependencies\": {\n" +
+                          "    \"ms\": \"^2.0.0\"\n  }\n}\n";
+        PackumentSource registry = new PackumentSource() {
+            @Override
+            public Map<String, Object> packument(String registry, String name, boolean fullMetadata) {
+                return NpmTreeSupport.json("{\"name\":\"ms\",\"dist-tags\":{\"latest\":\"2.1.3\"}," +
+                                           "\"versions\":{\"2.1.3\":{}}}");
+            }
+
+            @Override
+            public Map<String, Object> manifest(String registry, String name, String version) {
+                return new LinkedHashMap<>();
+            }
+        };
+        Result result = new NpmLockRegenerator(NpmLockRegenerator.Inputs.builder()
+          .release(NpmRelease.of(release))
+          .lock(LOCK)
+          .manifest("", manifest)
+          .now(Instant.EPOCH)
+          .build(), registry).regenerate();
+
+        if (writes) {
+            assertThat(result.getLockFileContent()).isEqualTo(LOCK.replace("\"version\": \"1.0.0\"\n    }",
+              "\"version\": \"1.0.0\",\n      \"dependencies\": {\n        \"ms\": \"^2.0.0\"\n      }\n    },\n" +
+              "    \"node_modules/ms\": {}"));
+        } else {
+            assertThat(result.getFailure()).isNotNull();
+            assertThat(result.getFailure().getKind()).isEqualTo(Kind.PM_REJECTS);
+            assertThat(result.getErrorMessage()).contains("(EINCOMPLETEMANIFEST)");
+        }
+    }
+
     /**
      * {@code npm prefix} (npm 11.17.0) run in packages/a under the root's package.json and that of packages/ when
      * given ({@code npm-arborist/generate/npm-prefix-cases.js}); npm writes the lock of the directory it prints.

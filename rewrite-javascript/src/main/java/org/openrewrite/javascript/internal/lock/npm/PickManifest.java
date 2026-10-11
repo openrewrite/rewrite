@@ -68,6 +68,12 @@ public final class PickManifest {
         String avoid;
 
         boolean avoidStrict;
+
+        /**
+         * The npm that bundles the library, for the node-semver it reads ranges with.
+         */
+        @Builder.Default
+        NpmRelease release = NpmRelease.PORTED;
     }
 
     /**
@@ -96,12 +102,12 @@ public final class PickManifest {
     }
 
     private static boolean engineOk(@Nullable Object manifest, @Nullable String npmVersion,
-            @Nullable String nodeVersion) {
+            @Nullable String nodeVersion, NpmRelease release) {
         if (!(manifest instanceof Map)) {
             return true;
         }
         try {
-            NpmInstallChecks.checkEngine(asMap(manifest), npmVersion, nodeVersion, false);
+            NpmInstallChecks.checkEngine(asMap(manifest), npmVersion, nodeVersion, false, release);
             return true;
         } catch (RuntimeException e) {
             return false;
@@ -113,12 +119,14 @@ public final class PickManifest {
         return !truthy(verTimes) || !truthy(verTime) || V8Date.dateParse(Js.string(verTime)) <= time;
     }
 
-    private static boolean shouldAvoid(@Nullable Object ver, @Nullable String avoid) {
-        return truthy(avoid) && NodeSemver.satisfies(ver, avoid, LOOSE_INCLUDE_PRERELEASE);
+    private static boolean shouldAvoid(@Nullable Object ver, @Nullable String avoid, NpmRelease release) {
+        return truthy(avoid) &&
+               NodeSemver.satisfies(ver, avoid, LOOSE_INCLUDE_PRERELEASE.release(release.semver()));
     }
 
-    private static @Nullable Object decorateAvoid(@Nullable Object result, @Nullable String avoid) {
-        if (truthy(result) && shouldAvoid(Js.get(result, "version"), avoid)) {
+    private static @Nullable Object decorateAvoid(@Nullable Object result, @Nullable String avoid,
+                                                  NpmRelease release) {
+        if (truthy(result) && shouldAvoid(Js.get(result, "version"), avoid, release)) {
             Map<String, Object> decorated = spread(result);
             decorated.put("_shouldAvoid", true);
             return decorated;
@@ -166,6 +174,7 @@ public final class PickManifest {
         String defaultTag = opts.getDefaultTag();
         Object before = opts.getBefore();
         String avoid = opts.getAvoid();
+        NpmRelease release = opts.getRelease();
 
         Object name = Js.get(packument, "name");
         Object verTimes = packument.get("time");
@@ -220,7 +229,7 @@ public final class PickManifest {
             Object ver = Js.get(distTags, wanted);
             if (isBefore(verTimes, ver, time)) {
                 return decorateAvoid(firstTruthy(Js.get(versions, Js.string(ver)), Js.get(staged, Js.string(ver)),
-                        Js.get(restricted, Js.string(ver))), avoid);
+                        Js.get(restricted, Js.string(ver))), avoid, release);
             } else {
                 return pick(packument, "<=" + Js.string(ver), opts);
             }
@@ -230,20 +239,20 @@ public final class PickManifest {
             String ver = clean(wanted);
             Object mani = firstTruthy(Js.get(versions, Js.string(ver)), Js.get(staged, Js.string(ver)),
                     Js.get(restricted, Js.string(ver)));
-            return isBefore(verTimes, ver, time) ? decorateAvoid(mani, avoid) : null;
+            return isBefore(verTimes, ver, time) ? decorateAvoid(mani, avoid, release) : null;
         }
 
         String range = type == Spec.Type.RANGE ? wanted : "*";
 
         Object defaultVer = Js.get(distTags, defaultTag);
         if (truthy(defaultVer) &&
-            ("*".equals(range) || NodeSemver.satisfies(defaultVer, range, LOOSE)) &&
+            ("*".equals(range) || NodeSemver.satisfies(defaultVer, range, LOOSE.release(release.semver()))) &&
             !truthy(Js.get(restricted, Js.string(defaultVer))) &&
-            !shouldAvoid(defaultVer, avoid)) {
+            !shouldAvoid(defaultVer, avoid, release)) {
             Object mani = Js.get(versions, Js.string(defaultVer));
             boolean ok = truthy(mani) &&
                          isBefore(verTimes, defaultVer, time) &&
-                         engineOk(mani, opts.getNpmVersion(), opts.getNodeVersion()) &&
+                         engineOk(mani, opts.getNpmVersion(), opts.getNodeVersion(), release) &&
                          !truthy(Js.get(mani, "deprecated")) &&
                          !truthy(Js.get(staged, Js.string(defaultVer)));
             if (ok) {
@@ -266,7 +275,7 @@ public final class PickManifest {
 
         List<Map.Entry<String, @Nullable Object>> entries = new ArrayList<>();
         for (Map.Entry<String, @Nullable Object> entry : allEntries) {
-            if (NodeSemver.satisfies(entry.getKey(), range, LOOSE)) {
+            if (NodeSemver.satisfies(entry.getKey(), range, LOOSE.release(release.semver()))) {
                 entries.add(entry);
             }
         }
@@ -277,16 +286,16 @@ public final class PickManifest {
             Object mania = a.getValue();
             String verb = b.getKey();
             Object manib = b.getValue();
-            int notavoida = shouldAvoid(vera, avoid) ? 0 : 1;
-            int notavoidb = shouldAvoid(verb, avoid) ? 0 : 1;
+            int notavoida = shouldAvoid(vera, avoid, release) ? 0 : 1;
+            int notavoidb = shouldAvoid(verb, avoid, release) ? 0 : 1;
             int notrestra = truthy(Js.get(restricted, vera)) ? 0 : 1;
             int notrestrb = truthy(Js.get(restricted, verb)) ? 0 : 1;
             int notstagea = truthy(Js.get(staged, vera)) ? 0 : 1;
             int notstageb = truthy(Js.get(staged, verb)) ? 0 : 1;
             int notdepra = truthy(Js.get(mania, "deprecated")) ? 0 : 1;
             int notdeprb = truthy(Js.get(manib, "deprecated")) ? 0 : 1;
-            int enginea = engineOk(mania, npmVersion, nodeVersion) ? 1 : 0;
-            int engineb = engineOk(manib, npmVersion, nodeVersion) ? 1 : 0;
+            int enginea = engineOk(mania, npmVersion, nodeVersion, release) ? 1 : 0;
+            int engineb = engineOk(manib, npmVersion, nodeVersion, release) ? 1 : 0;
             int result = notavoidb - notavoida;
             if (result == 0) {
                 result = notrestrb - notrestra;
@@ -309,7 +318,7 @@ public final class PickManifest {
             return result;
         });
 
-        return decorateAvoid(entries.isEmpty() ? null : entries.get(0).getValue(), avoid);
+        return decorateAvoid(entries.isEmpty() ? null : entries.get(0).getValue(), avoid, release);
     }
 
     // semver.clean(version, { loose: true })

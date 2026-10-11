@@ -61,7 +61,12 @@ class NodeSemverReleasesTest {
     }
 
     private static Options options(Release release, JsonNode cell) {
-        return Options.of(release, cell.get("loose").asBoolean(), cell.get("includePrerelease").asBoolean());
+        return options(release, cell.get("loose").asBoolean(), cell.get("includePrerelease").asBoolean());
+    }
+
+    private static Options options(Release release, boolean loose, boolean includePrerelease) {
+        return (loose ? includePrerelease ? Options.LOOSE_INCLUDE_PRERELEASE : Options.LOOSE :
+                includePrerelease ? Options.INCLUDE_PRERELEASE : Options.DEFAULT).release(release);
     }
 
     static Stream<Arguments> ownFixtures() {
@@ -93,14 +98,14 @@ class NodeSemverReleasesTest {
                 break;
             case "rangeIntersection":
                 for (boolean loose : new boolean[]{false, true}) {
-                    Options options = Options.of(release, loose, false);
+                    Options options = options(release, loose, false);
                     assertThat(NodeSemver.intersects(a, b, options)).isEqualTo(row.get(2).asBoolean());
                     assertThat(NodeSemver.intersects(b, a, options)).isEqualTo(row.get(2).asBoolean());
                 }
                 break;
             case "comparatorIntersection":
                 for (boolean loose : new boolean[]{false, true}) {
-                    Options options = Options.of(release, loose, row.get(3).asBoolean());
+                    Options options = options(release, loose, row.get(3).asBoolean());
                     assertThat(NodeSemver.intersects(a, b, options)).isEqualTo(row.get(2).asBoolean());
                     assertThat(NodeSemver.intersects(b, a, options)).isEqualTo(row.get(2).asBoolean());
                 }
@@ -110,7 +115,7 @@ class NodeSemverReleasesTest {
                         .isEqualTo(row.get(1).isNull() ? null : row.get(1).asText());
                 break;
             case "validVersions":
-                assertThat(NodeSemver.valid(a, Options.of(release, false, false)))
+                assertThat(NodeSemver.valid(a, options(release, false, false)))
                         .isEqualTo(row.get(1).isNull() ? null : row.get(1).asText());
                 break;
             case "invalidVersions":
@@ -164,20 +169,20 @@ class NodeSemverReleasesTest {
     @MethodSource("differences")
     void answersWhereItDiffersFromTheNewest(Release release, JsonNode row) {
         JsonNode args = row.get(2);
-        Options options = Options.of(release, row.get(3).asBoolean(), row.get(4).asBoolean());
+        Options options = options(release, row.get(3).asBoolean(), row.get(4).asBoolean());
         JsonNode answer = row.get(5);
         if ("validRange".equals(row.get(1).asText())) {
             assertThat(NodeSemver.validRange(args.get(0).asText(), options))
                     .isEqualTo(answer.isNull() ? null : answer.asText());
             // and the newest release answers another thing
             assertThat(NodeSemver.validRange(args.get(0).asText(),
-                    Options.of(Release.V7_8_4, row.get(3).asBoolean(), row.get(4).asBoolean())))
+                    options(Release.V7_8_4, row.get(3).asBoolean(), row.get(4).asBoolean())))
                     .isNotEqualTo(answer.isNull() ? null : answer.asText());
         } else {
             assertThat(NodeSemver.satisfies(args.get(0).asText(), args.get(1).asText(), options))
                     .isEqualTo(answer.asBoolean());
             assertThat(NodeSemver.satisfies(args.get(0).asText(), args.get(1).asText(),
-                    Options.of(Release.V7_8_4, row.get(3).asBoolean(), row.get(4).asBoolean())))
+                    options(Release.V7_8_4, row.get(3).asBoolean(), row.get(4).asBoolean())))
                     .isNotEqualTo(answer.asBoolean());
         }
     }

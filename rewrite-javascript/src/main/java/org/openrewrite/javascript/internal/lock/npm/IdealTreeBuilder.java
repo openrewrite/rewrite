@@ -184,7 +184,7 @@ public final class IdealTreeBuilder {
                 try {
                     if (!(node.isRoot() && truthy(node.getPackage().get("devEngines")))) {
                         NpmInstallChecks.checkEngine(node.getPackage(), NPM_VERSION, host.getNodeVersion(),
-                                options.isForce());
+                                options.isForce(), options.getRelease());
                     }
                 } catch (NpmInstallChecks.UnsupportedEngine err) {
                     if (options.isEngineStrict()) {
@@ -196,7 +196,8 @@ public final class IdealTreeBuilder {
             }
             if (release.marksUninstallableOptionalInert() && node.isOptional() && !node.isInert()) {
                 try {
-                    NpmInstallChecks.checkEngine(node.getPackage(), NPM_VERSION, host.getNodeVersion(), false);
+                    NpmInstallChecks.checkEngine(node.getPackage(), NPM_VERSION, host.getNodeVersion(), false,
+                            options.getRelease());
                     NpmInstallChecks.checkPlatform(node.getPackage(), false, environment, host);
                 } catch (RuntimeException error) {
                     for (Node n : OptionalSet.optionalSet(node)) {
@@ -266,7 +267,7 @@ public final class IdealTreeBuilder {
 
                 Object resolvedRootVersion = Js.get(rootNode.getPackage(), "version");
                 if (!NodeSemver.satisfies(resolvedRootVersion == Js.UNDEFINED ? null : resolvedRootVersion,
-                        edge.getSpec(), NodeSemver.Options.DEFAULT)) {
+                        edge.getSpec(), NodeSemver.Options.DEFAULT.release(options.getRelease().semver()))) {
                     edge.detach();
                     node.getChildren().delete(depName);
                 }
