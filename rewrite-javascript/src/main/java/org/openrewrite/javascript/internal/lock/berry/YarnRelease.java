@@ -19,11 +19,6 @@ import lombok.Getter;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.javascript.internal.lock.V8RegExp;
 
-import java.io.ByteArrayOutputStream;
-import java.io.IOException;
-import java.io.InputStream;
-import java.io.UncheckedIOException;
-import java.nio.charset.StandardCharsets;
 import java.util.AbstractMap;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -32,7 +27,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.regex.Pattern;
-import java.util.zip.GZIPInputStream;
 
 /**
  * The data each Yarn 4.x release ships that reaches a lock, from {@code yarn-releases.json.gz}.
@@ -41,8 +35,6 @@ import java.util.zip.GZIPInputStream;
 final class YarnRelease {
 
     private static final String RESOURCE = "yarn-releases.json.gz";
-
-    private static volatile @Nullable Map<String, @Nullable Object> data;
 
     private final String version;
 
@@ -148,28 +140,13 @@ final class YarnRelease {
         return 0;
     }
 
-    @SuppressWarnings("unchecked")
     private static Map<String, @Nullable Object> data() {
-        Map<String, @Nullable Object> loaded = data;
-        if (loaded == null) {
-            InputStream resource = YarnRelease.class.getResourceAsStream(RESOURCE);
-            if (resource == null) {
-                throw new IllegalStateException(RESOURCE + " is missing");
-            }
-            try (InputStream in = new GZIPInputStream(resource)) {
-                ByteArrayOutputStream out = new ByteArrayOutputStream();
-                byte[] buffer = new byte[65536];
-                int n;
-                while ((n = in.read(buffer)) > 0) {
-                    out.write(buffer, 0, n);
-                }
-                loaded = (Map<String, @Nullable Object>) Js.jsonParse(new String(out.toByteArray(),
-                        StandardCharsets.UTF_8));
-                data = loaded;
-            } catch (IOException e) {
-                throw new UncheckedIOException(e);
-            }
-        }
-        return loaded;
+        return Data.ALL;
+    }
+
+    private static final class Data {
+        @SuppressWarnings("unchecked")
+        static final Map<String, @Nullable Object> ALL =
+                (Map<String, @Nullable Object>) Js.gzipJsonResource(YarnRelease.class, RESOURCE);
     }
 }

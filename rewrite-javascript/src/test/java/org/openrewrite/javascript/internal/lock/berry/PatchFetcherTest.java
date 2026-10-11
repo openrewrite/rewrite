@@ -52,6 +52,15 @@ class PatchFetcherTest {
         assertThat(builtinPatchHash("4.18.1")).isEqualTo("9bd1a5");
     }
 
+    @Test
+    void buildsAndParsesABuiltinPatchOncePerRelease() {
+        // the typescript patch is megabytes, which the resolver hashes and the fetcher applies
+        YarnRelease release = YarnRelease.of("4.10.3");
+        String text = CompatPatches.getBuiltinPatch("compat/typescript", release);
+        assertThat(CompatPatches.getBuiltinPatch("compat/typescript", release)).isSameAs(text);
+        assertThat(PatchParse.parsePatchFile(text)).isSameAs(PatchParse.parsePatchFile(text));
+    }
+
     private static String builtinPatchHash(String release) {
         String text = CompatPatches.getBuiltinPatch("compat/resolve", YarnRelease.of(release));
         return PatchUtils.makePatchHash(Collections.singletonList(new PatchUtils.PatchFile(text, true)), "1.22.13");

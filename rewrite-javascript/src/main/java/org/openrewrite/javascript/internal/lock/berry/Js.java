@@ -18,10 +18,17 @@ package org.openrewrite.javascript.internal.lock.berry;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.javascript.internal.lock.EcmaScript;
 import org.openrewrite.javascript.internal.lock.EcmaScript.JsonSyntaxError;
+import org.openrewrite.internal.StringUtils;
 import org.openrewrite.javascript.internal.lock.JsError;
 
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.UncheckedIOException;
 import java.util.List;
 import java.util.Map;
+import java.util.zip.GZIPInputStream;
+
+import static java.nio.charset.StandardCharsets.UTF_8;
 
 /**
  * Yarn's plain objects as the port holds them: property reads and {@code JSON.parse}.
@@ -73,6 +80,21 @@ final class Js extends EcmaScript {
             return EcmaScript.jsonParse(text);
         } catch (JsonSyntaxError e) {
             throw new SyntaxError(e.getMessage());
+        }
+    }
+
+    /**
+     * {@code JSON.parse} of the gzipped resource {@code name} beside {@code owner}.
+     */
+    static @Nullable Object gzipJsonResource(Class<?> owner, String name) {
+        InputStream resource = owner.getResourceAsStream(name);
+        if (resource == null) {
+            throw new IllegalStateException(name + " is missing");
+        }
+        try (InputStream in = resource) {
+            return jsonParse(StringUtils.readFully(new GZIPInputStream(in), UTF_8));
+        } catch (IOException e) {
+            throw new UncheckedIOException(e);
         }
     }
 }
