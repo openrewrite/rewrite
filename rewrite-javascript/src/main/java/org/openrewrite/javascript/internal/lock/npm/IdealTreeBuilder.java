@@ -261,6 +261,7 @@ public final class IdealTreeBuilder {
 
     private Node rootNodeFromPackage(Map<String, Object> pkg) {
         return new Node(Node.options()
+                .release(options.getRelease())
                 .path(path)
                 .realpath(path)
                 .pkg(pkg)
@@ -533,6 +534,7 @@ public final class IdealTreeBuilder {
         }
 
         Node vr = new Node(Node.options()
+                .release(options.getRelease())
                 .path(node.getRealpath())
                 .sourceReference(node)
                 .installLinks(options.isInstallLinks())
@@ -543,6 +545,7 @@ public final class IdealTreeBuilder {
         for (Node child : node.getChildren().values()) {
             if (child.isLink()) {
                 new Node(Node.options()
+                        .release(options.getRelease())
                         .path(child.getRealpath())
                         .sourceReference(child.getTarget())
                         .root(vr)
@@ -599,8 +602,9 @@ public final class IdealTreeBuilder {
         if (before == null) {
             return null;
         }
-        if (ReleaseAgeExclude.isReleaseAgeExcluded(ReleaseAgeExclude.trustedSpecName(spec),
-                options.getMinReleaseAgeExclude())) {
+        if (options.getRelease().exemptsFromReleaseAge() &&
+            ReleaseAgeExclude.isReleaseAgeExcluded(ReleaseAgeExclude.trustedSpecName(spec),
+                    options.getMinReleaseAgeExclude())) {
             return null;
         }
         if (before instanceof String) {
@@ -668,6 +672,7 @@ public final class IdealTreeBuilder {
             ((NpmRejection) error).setRequiredBy(from != null && truthy(from.getLocation()) ? from.getLocation() : ".");
         }
         Node n = new Node(Node.options()
+                .release(options.getRelease())
                 .name(name)
                 .parent(parent)
                 .error(error)
@@ -705,6 +710,7 @@ public final class IdealTreeBuilder {
         if (spec.getType() == Spec.Type.DIRECTORY && shouldLink) {
             String realpath = Objects.requireNonNull(spec.getFetchSpec());
             Link link = new Link(Node.options()
+                    .release(options.getRelease())
                     .name(name)
                     .parent(parent)
                     .realpath(realpath)
@@ -744,6 +750,7 @@ public final class IdealTreeBuilder {
                     "incomplete manifest for " + name + ", missing version", null), edge);
         }
         return new Node(Node.options()
+                .release(options.getRelease())
                 .name(name)
                 .pkg(pkg)
                 .parent(parent)

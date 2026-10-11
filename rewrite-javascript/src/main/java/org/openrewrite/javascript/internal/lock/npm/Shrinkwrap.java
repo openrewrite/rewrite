@@ -761,6 +761,9 @@ public final class Shrinkwrap {
      * target: a workspace or {@code file:} dependency the manifest no longer names gets no entry.
      */
     static boolean isStaleTopLevelEntry(Node node, String loc) {
+        if (!node.getRelease().keepsNestedExtraneousFsChildren()) {
+            return node.isExtraneous() && !NODE_MODULES.matcher(loc).find() && !"node_modules".equals(loc);
+        }
         return node.isExtraneous() && !NODE_MODULES.matcher(loc).find() && !"node_modules".equals(loc) &&
                (node.getFsParent() == null || node.getFsParent().isRoot());
     }

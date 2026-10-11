@@ -153,7 +153,7 @@ final class DepValid {
                     }
                 }
                 if (!truthy(requested.getGitRange())) {
-                    if (!reqCommit) {
+                    if (!reqCommit && requestor.getRelease().comparesLockedGitCommittish()) {
                         String locked = lockedGitCommittish(child, requestor);
                         if (locked != null && !locked.equals(reqCommittish)) {
                             return false;

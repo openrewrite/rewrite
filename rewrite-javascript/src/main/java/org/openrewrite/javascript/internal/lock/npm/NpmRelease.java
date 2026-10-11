@@ -62,6 +62,36 @@ public final class NpmRelease implements Comparable<NpmRelease> {
         return compareTo(new NpmRelease(major, minor, patch)) >= 0;
     }
 
+    // @npmcli/arborist build-ideal-tree.js
+
+    /**
+     * {@code #releaseAgeBefore}: a package {@code min-release-age-exclude} names is exempt from {@code before}, from
+     * npm 11.17.0.
+     */
+    boolean exemptsFromReleaseAge() {
+        return atLeast(11, 17, 0);
+    }
+
+    // @npmcli/arborist dep-valid.js
+
+    /**
+     * {@code lockedGitCommittish}: a git edge naming a ref is invalid when the lock records another committish for
+     * it, from npm 11.17.0.
+     */
+    boolean comparesLockedGitCommittish() {
+        return atLeast(11, 17, 0);
+    }
+
+    // @npmcli/arborist shrinkwrap.js
+
+    /**
+     * {@code commit}: an extraneous node outside node_modules keeps its entry under another package's directory,
+     * from npm 11.17.0.
+     */
+    boolean keepsNestedExtraneousFsChildren() {
+        return atLeast(11, 17, 0);
+    }
+
     // @npmcli/config definitions.js
 
     /**

@@ -402,6 +402,7 @@ public final class VirtualTreeLoader {
             sw.put("name", Node.nameFromFolder(nodePath));
         }
         return new Node(Node.options()
+                .release(options.getRelease())
                 .installLinks(options.isInstallLinks())
                 .legacyPeerDeps(options.isLegacyPeerDeps())
                 .root(virtualTree)
@@ -423,6 +424,7 @@ public final class VirtualTreeLoader {
     private Link loadLink(String location, String targetLoc, Node target) {
         String linkPath = PosixPath.resolve(path, location);
         Link link = new Link(Node.options()
+                .release(options.getRelease())
                 .installLinks(options.isInstallLinks())
                 .legacyPeerDeps(options.isLegacyPeerDeps())
                 .path(linkPath)
