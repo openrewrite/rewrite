@@ -304,6 +304,42 @@ class YarnClassicInputsTest {
     }
 
     /**
+     * A user's global always-auth stays global in the home .npmrc, so a project's {@code always-auth=false} turns it
+     * off for the project's own token, as yarn 1.22.22 sends it (recorded with an auth-logging registry).
+     */
+    @ParameterizedTest
+    @CsvSource(delimiter = '|', nullValues = "-", value = {
+      "always-auth=false|-",
+      "-|Bearer project-token"
+    })
+    void aUsersGlobalAlwaysAuthStaysGlobal(@Nullable String projectAlwaysAuth, @Nullable String sent,
+                                          @TempDir Path home) {
+        Map<String, String> project = new LinkedHashMap<>();
+        project.put("registry", "https://corp.example/");
+        project.put("//corp.example/:_authToken", "project-token");
+        StringBuilder lines = new StringBuilder("registry=https://corp.example/\n" +
+                                                "//corp.example/:_authToken=project-token\n");
+        if (projectAlwaysAuth != null) {
+            project.put("always-auth", "false");
+            lines.append(projectAlwaysAuth).append('\n');
+        }
+        Request request = Request.builder()
+          .packageJson("{\"name\":\"p\",\"version\":\"1.0.0\",\"dependencies\":{\"a\":\"^1.0.0\"}}")
+          .lock("# yarn lockfile v1\n\n\n")
+          .packageJsonPath(Paths.get("package.json"))
+          .packageManagerFile(Paths.get(".npmrc"), lines.toString())
+          .build();
+        HostInputs host = HostInputs.builder().now(Instant.EPOCH).system(scratch(home))
+          .npmrc(new Npmrc(NpmrcScope.User, singletonMap("always-auth", "true")))
+          .npmrc(new Npmrc(NpmrcScope.Project, project)).build();
+
+        Inputs inputs = YarnClassicInputs.from(LockDirectory.of(request), host);
+
+        assertThat(inputs.getHomeFiles().get(".npmrc")).isEqualTo("always-auth=true\n");
+        assertThat(asked(inputs)).containsExactly(entry("https://corp.example/a", sent));
+    }
+
+    /**
      * A credential in the URL of a registry the project's .npmrc names is that file's too.
      */
     @Test

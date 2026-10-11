@@ -33,6 +33,7 @@ import org.openrewrite.javascript.marker.NodeResolutionResult.NpmrcScope;
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Base64;
 import java.util.EnumSet;
 import java.util.LinkedHashMap;
@@ -59,6 +60,8 @@ public class HostInputs {
     public static final Set<NpmrcScope> GLOBAL_AND_USER = EnumSet.of(NpmrcScope.Global, NpmrcScope.User);
 
     public static final Set<NpmrcScope> USER = EnumSet.of(NpmrcScope.User);
+
+    private static final String ALWAYS_AUTH = "always-auth";
 
     private static final Pattern USERINFO = Pattern.compile("^([A-Za-z][A-Za-z0-9+.-]*://)[^/?#@]*@");
 
@@ -121,8 +124,12 @@ public class HostInputs {
      * credentials of every registry the npmrc files name under always-auth, as the host sends them with each request.
      */
     public String userNpmrc(Set<NpmrcScope> scopes) {
-        NodeRegistries user = discover(scopes);
+        NodeRegistries user = discover(scopes, true);
         StringBuilder npmrc = new StringBuilder();
+        String alwaysAuth = globalAlwaysAuth(scopes);
+        if (alwaysAuth != null) {
+            npmrc.append(ALWAYS_AUTH).append('=').append(alwaysAuth).append('\n');
+        }
         Set<String> keys = new LinkedHashSet<>();
         NodeRegistry registry = user.getDefaultRegistry();
         if (namesDefault(scopes)) {
@@ -145,7 +152,7 @@ public class HostInputs {
      * and each registry's credentials as its npmRegistries entry.
      */
     public String userYarnrc() {
-        NodeRegistries user = discover(GLOBAL_AND_USER);
+        NodeRegistries user = discover(GLOBAL_AND_USER, false);
         StringBuilder yarnrc = new StringBuilder();
         NodeRegistry registry = user.getDefaultRegistry();
         if (namesDefault(GLOBAL_AND_USER)) {
@@ -181,9 +188,35 @@ public class HostInputs {
         return yarnrc.toString();
     }
 
-    private NodeRegistries discover(Set<NpmrcScope> scopes) {
-        return RegistryDiscovery.discover(registries, credentials,
-                npmrc.stream().filter(file -> scopes.contains(file.getScope())).collect(toList()), system);
+    // a global always-auth left out, to stand in the rendered file as itself, not as each registry's
+    private NodeRegistries discover(Set<NpmrcScope> scopes, boolean globalAlwaysAuthAside) {
+        return RegistryDiscovery.discover(registries, credentials, npmrc.stream()
+                .filter(file -> scopes.contains(file.getScope()))
+                .map(file -> globalAlwaysAuthAside ? withoutGlobalAlwaysAuth(file) : file)
+                .collect(toList()), system);
+    }
+
+    // the user's file over the global one, as npm layers them
+    private @Nullable String globalAlwaysAuth(Set<NpmrcScope> scopes) {
+        String value = null;
+        for (NpmrcScope scope : Arrays.asList(NpmrcScope.Global, NpmrcScope.User)) {
+            for (Npmrc file : npmrc) {
+                if (scopes.contains(scope) && file.getScope() == scope &&
+                    file.getProperties().containsKey(ALWAYS_AUTH)) {
+                    value = file.getProperties().get(ALWAYS_AUTH);
+                }
+            }
+        }
+        return value;
+    }
+
+    private static Npmrc withoutGlobalAlwaysAuth(Npmrc file) {
+        if (!file.getProperties().containsKey(ALWAYS_AUTH)) {
+            return file;
+        }
+        Map<String, String> properties = new LinkedHashMap<>(file.getProperties());
+        properties.remove(ALWAYS_AUTH);
+        return file.withProperties(properties);
     }
 
     // the view's list as given, else the npmrc files of those scopes, says whether the host names a default
@@ -200,7 +233,7 @@ public class HostInputs {
     private NodeRegistries projectCredentials() {
         List<Npmrc> files = new ArrayList<>();
         for (Npmrc file : npmrc) {
-            files.add(file.getScope() == NpmrcScope.Project ? registriesOnly(file) : file);
+            files.add(file.getScope() == NpmrcScope.Project ? registriesOnly(file) : withoutGlobalAlwaysAuth(file));
         }
         return RegistryDiscovery.discover(registries, credentials, files, system);
     }
