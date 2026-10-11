@@ -20,6 +20,7 @@ export * from "./parser";
 export * from "./style";
 export * from "./markers";
 export * from "./node-resolution-result";
+export * from "./node-runtime";
 export * from "./package-json-parser";
 export * from "./package-manager";
 export * from "./dependency-manager";
