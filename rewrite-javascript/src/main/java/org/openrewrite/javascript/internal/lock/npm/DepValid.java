@@ -35,6 +35,7 @@ import static org.openrewrite.javascript.semver.NodeSemver.Options.LOOSE;
 final class DepValid {
 
     private static final Pattern COMMIT = Pattern.compile("^[a-fA-F0-9]{40,64}$");
+    private static final Pattern SHA1_COMMIT = Pattern.compile("^[a-fA-F0-9]{40}$");
 
     /**
      * An error dep-valid records on the requesting node, for a spec nothing could satisfy.
@@ -117,6 +118,7 @@ final class DepValid {
             return false;
         }
 
+        NodeSemver.Options loose = LOOSE.release(requestor.getRelease().semver());
         switch (requested.getType()) {
             case RANGE:
                 if ("*".equals(requested.getFetchSpec())) {
@@ -124,7 +126,7 @@ final class DepValid {
                 }
                 // fall through
             case VERSION:
-                return NodeSemver.satisfies(child.getVersion(), requested.getFetchSpec(), LOOSE);
+                return NodeSemver.satisfies(child.getVersion(), requested.getFetchSpec(), loose);
             case DIRECTORY:
                 return linkValid(child, requested, requestor);
             case FILE:
@@ -141,7 +143,8 @@ final class DepValid {
                 GitHost resHost = resRepo.getHosted();
                 GitHost reqHost = requested.getHosted();
                 String reqCommittish = requested.getGitCommittish() == null ? "" : requested.getGitCommittish();
-                boolean reqCommit = COMMIT.matcher(reqCommittish).matches();
+                boolean reqCommit = (requestor.getRelease().readsSha256Commits() ? COMMIT : SHA1_COMMIT)
+                        .matcher(reqCommittish).matches();
                 GitHost.Opts nc = GitHost.Opts.of(null, !reqCommit);
                 if (resHost == null) {
                     if (!Objects.equals(resRepo.getFetchSpec(), requested.getFetchSpec())) {
@@ -153,7 +156,7 @@ final class DepValid {
                     }
                 }
                 if (!truthy(requested.getGitRange())) {
-                    if (!reqCommit) {
+                    if (!reqCommit && requestor.getRelease().comparesLockedGitCommittish()) {
                         String locked = lockedGitCommittish(child, requestor);
                         if (locked != null && !locked.equals(reqCommittish)) {
                             return false;
@@ -161,7 +164,7 @@ final class DepValid {
                     }
                     return true;
                 }
-                return NodeSemver.satisfies(child.getPackage().get("version"), requested.getGitRange(), LOOSE);
+                return NodeSemver.satisfies(child.getPackage().get("version"), requested.getGitRange(), loose);
             }
             default:
                 break;

@@ -169,9 +169,11 @@ public final class NpmLockRegenerator {
         String written;
         String yarnLock;
         try {
-            INSTALL.requireInstallsAt(NpmOptions.loadLocalPrefix(inputs.getManifests().get(inputs.getRunsIn()),
-                    inputs.getParentTrees()), inputs.getRunsIn(), "lock");
-            if (inputs.getPaths() != null && Shrinkwrap.readsShrinkwrap(inputs.getPaths()::contains)) {
+            INSTALL.requireInstallsAt(NpmOptions.loadLocalPrefix(inputs.getRelease(),
+                    inputs.getManifests().get(inputs.getRunsIn()), inputs.getParentTrees()), inputs.getRunsIn(),
+                    "lock");
+            if (inputs.getPaths() != null &&
+                Shrinkwrap.readsShrinkwrap(inputs.getRelease(), inputs.getPaths()::contains)) {
                 throw new CannotKnow("the lock npm writes: it reads and writes the npm-shrinkwrap.json beside this " +
                                      "lock in its place");
             }
@@ -209,13 +211,13 @@ public final class NpmLockRegenerator {
     }
 
     /**
-     * Where npm run in {@code runsIn} installs and writes its lock, by {@link Inputs#getParentTrees()}; a walk that
-     * fails, which {@link #regenerate()} reports as it walks first, stops here.
+     * Where npm {@code release} run in {@code runsIn} installs and writes its lock, by {@link
+     * Inputs#getParentTrees()}; a walk that fails, which {@link #regenerate()} reports as it walks first, stops here.
      */
-    public static InstallRoot installRoot(String runsIn, Map<String, String> manifests,
+    public static InstallRoot installRoot(NpmRelease release, String runsIn, Map<String, String> manifests,
                                           Map<String, Map<String, @Nullable String>> parentTrees) {
         try {
-            return InstallRoot.at(NpmOptions.loadLocalPrefix(manifests.get(runsIn), parentTrees));
+            return InstallRoot.at(NpmOptions.loadLocalPrefix(release, manifests.get(runsIn), parentTrees));
         } catch (RuntimeException e) {
             return InstallRoot.STOPS_HERE;
         }
@@ -233,7 +235,7 @@ public final class NpmLockRegenerator {
     static List<String> checkDevEngines(@Nullable String manifest, NpmOptions options, Host host) {
         boolean force = options.isForce();
 
-        Object devEngines = Js.get(localPackage(manifest), "devEngines");
+        Object devEngines = Js.get(localPackage(manifest, options.getRelease()), "devEngines");
 
         // a release without the check never reads the field
         if (devEngines == Js.UNDEFINED || !options.getRelease().checksDevEngines()) {
@@ -283,12 +285,12 @@ public final class NpmLockRegenerator {
 
     /**
      * {@code PackageJson.normalize(localPrefix).then(p => p.content).catch(() => ({}))}: the package.json where npm
-     * installs as npm's own commands read it, an empty one where there is none or it does not normalize.
+     * {@code release} installs as its own commands read it, an empty one where there is none or it does not normalize.
      */
-    static Map<String, Object> localPackage(@Nullable String manifest) {
+    static Map<String, Object> localPackage(@Nullable String manifest, NpmRelease release) {
         if (manifest != null) {
             try {
-                return PackageJson.normalize(manifest).getContent();
+                return PackageJson.normalize(manifest, release).getContent();
             } catch (PackageJson.NeedsPackageFiles e) {
                 // normalize fills bin from the package's files; every other field is as the manifest has it
                 return e.getContent();
@@ -306,7 +308,7 @@ public final class NpmLockRegenerator {
     static Node setWorkspaces(Node node, VirtualTreeLoader.ProjectFiles files) {
         Map<String, String> workspaces = new LinkedHashMap<>();
         for (Map.Entry<Object, String> workspace : MapWorkspaces.mapWorkspaces(node.getPath(), node.getPackage(),
-                files).entrySet()) {
+                files, node.getRelease()).entrySet()) {
             // the workspace edge the name becomes is what refuses it
             if (!(workspace.getKey() instanceof String)) {
                 throw new IllegalArgumentException("must provide dependency name");
@@ -320,7 +322,8 @@ public final class NpmLockRegenerator {
     }
 
     private VirtualTreeLoader.ProjectFiles projectFiles(@Nullable LockFile lock) {
-        return projectFiles(lock, inputs.getYarnLock(), inputs.getManifests());
+        return projectFiles(lock, inputs.getYarnLock(), inputs.getManifests())
+                .readBy(inputs.getRelease(), inputs.getPaths());
     }
 
     /**
@@ -428,7 +431,7 @@ public final class NpmLockRegenerator {
             return Rejected.coded(Reason.PEER_CONFLICT, conflict.getEdge().getName(), "ERESOLVE",
                     ExplainEresolve.explain(conflict.getExplanation(), 4));
         }
-        if (e instanceof CannotKnow) {
+        if (e instanceof CannotKnow || e instanceof Rejected) {
             return e;
         }
         if (e instanceof PackageJson.NeedsPackageFiles) {
@@ -459,6 +462,10 @@ public final class NpmLockRegenerator {
     }
 
     private static Reason reasonFor(String code) {
+        // npm 12's verdicts on the root's packageExtensions and patchedDependencies
+        if (code.startsWith("EEXTENSION") || code.startsWith("EPATCH")) {
+            return Reason.MALFORMED_MANIFEST;
+        }
         switch (code) {
             case "E404":
                 return SharedError.PACKAGE_NOT_FOUND.getReason();
@@ -471,6 +478,8 @@ public final class NpmLockRegenerator {
             case "ENOVERSIONS":
             case "E403":
                 return Reason.VERSION_NOT_FOUND;
+            case "ELOCKFILEVERSION":
+                return Reason.UNSUPPORTED_LOCKFILE_VERSION;
             case "EUNSUPPORTEDPROTOCOL":
             case "EALLOWGIT":
             case "EALLOWFILE":

@@ -16,6 +16,9 @@
 package org.openrewrite.javascript.internal.lock.npm;
 
 import org.jspecify.annotations.Nullable;
+import org.openrewrite.javascript.internal.lock.BraceExpansion;
+import org.openrewrite.javascript.internal.lock.Ssri;
+import org.openrewrite.javascript.semver.NodeSemver;
 
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -65,6 +68,477 @@ public final class NpmRelease implements Comparable<NpmRelease> {
         return compareTo(new NpmRelease(major, minor, patch)) >= 0;
     }
 
+    // @npmcli/arborist build-ideal-tree.js
+
+    /**
+     * The root's {@code packageExtensions} extend the manifests they select ({@code #loadPackageExtensions}, {@code
+     * #applyPackageExtension}, package-extensions.js), from npm 12.0.0.
+     */
+    boolean appliesPackageExtensions() {
+        return atLeast(12, 0, 0);
+    }
+
+    /**
+     * {@code #applyRootOverridesToWorkspaces}: a workspace's edge to a package the root overrides is detached when the
+     * root's copy does not satisfy it, from npm 11.3.0 until 11.14.0.
+     */
+    boolean appliesRootOverridesToWorkspaces() {
+        return atLeast(11, 3, 0) && !atLeast(11, 14, 0);
+    }
+
+    /**
+     * {@code #checkAllow}: {@code allow-git}, {@code allow-file}, {@code allow-directory} and {@code allow-remote} are
+     * enforced before a spec is linked or fetched, from npm 11.15.0; before, pacote alone enforces them, on what it
+     * fetches.
+     */
+    boolean checksAllowedSpecTypes() {
+        return atLeast(11, 15, 0);
+    }
+
+    /**
+     * {@code #checkEngineAndPlatform} leaves the root's {@code engines} unchecked when it has {@code devEngines}:
+     * from npm 10.9.0.
+     */
+    boolean devEnginesReplaceRootEngines() {
+        return atLeast(10, 9, 0);
+    }
+
+    /**
+     * {@code #fetchManifest} drops {@code license} from the manifest pacote returns: npm 10.4.0 until 10.8.0.
+     */
+    boolean dropsLicenseOfFetchedManifest() {
+        return atLeast(10, 4, 0) && !atLeast(10, 8, 0);
+    }
+
+    /**
+     * {@code #releaseAgeBefore}: a package {@code min-release-age-exclude} names is exempt from {@code before}, from
+     * npm 11.17.0.
+     */
+    boolean exemptsFromReleaseAge() {
+        return atLeast(11, 17, 0);
+    }
+
+    /**
+     * {@code #nodeFromSpec}: a registry manifest without a version is a load failure ({@code EINCOMPLETEMANIFEST}),
+     * from npm 11.15.0.
+     */
+    boolean failsIncompleteManifests() {
+        return atLeast(11, 15, 0);
+    }
+
+    /**
+     * {@code #fetchManifest}: pacote's {@code _isRoot} is whether the node the manifest is fetched under is the project
+     * root or a workspace, from npm 11.13.0 until 11.15.0 asks the edge's dependent instead; before, pacote is told
+     * nothing.
+     */
+    boolean fetchesAsRootUnderRootParent() {
+        return atLeast(11, 13, 0);
+    }
+
+    /**
+     * {@code #fetchManifest} asks pacote for the full packument ({@code fullMetadata: true}): from npm 10.4.0.
+     */
+    boolean fetchesFullMetadata() {
+        return atLeast(10, 4, 0);
+    }
+
+    /**
+     * {@code #findHoistableNode}: an invalid optional peer edge takes a node already in the tree that satisfies it
+     * before the registry is asked, from npm 11.14.0 (npm/cli#9249).
+     */
+    boolean findsHoistablePeerOptional() {
+        return atLeast(11, 14, 0);
+    }
+
+    /**
+     * {@code #resolveLinks} gives a link's overrides to its target before the target resolves, from npm 11.18.0
+     * (npm/cli#9659).
+     */
+    boolean forwardsLinkOverridesToSubtree() {
+        return atLeast(11, 18, 0);
+    }
+
+    /**
+     * {@code #nodeFromSpec}: under {@code install-links}, a directory dependency of an installed {@code file:} package
+     * is installed from that package's source instead of linked, from npm 11.6.0.
+     */
+    boolean installsTransitiveFileDependencies() {
+        return atLeast(11, 6, 0);
+    }
+
+    /**
+     * {@code #pruneFailedOptional}: an optional dependency that failed to load stays in the tree, inert, from npm
+     * 11.3.0; before, it and its optional set are removed.
+     */
+    boolean keepsFailedOptionalInert() {
+        return atLeast(11, 3, 0);
+    }
+
+    /**
+     * {@code #initTree}: a missing optional peer does not queue its dependent, from npm 11.6.3.
+     */
+    boolean leavesMissingPeerOptionalUnqueued() {
+        return atLeast(11, 6, 3);
+    }
+
+    /**
+     * {@code #nodeFromSpec}: a {@code file:./} or {@code file:../} dependency inside the project is linked whatever
+     * {@code install-links} says, from npm 11.5.0.
+     */
+    boolean linksProjectInternalFileSpecs() {
+        return atLeast(11, 5, 0);
+    }
+
+    /**
+     * {@code #checkEngineAndPlatform}: an optional package the engine or platform excludes is marked inert with its
+     * optional set, from npm 11.6.2.
+     */
+    boolean marksUninstallableOptionalInert() {
+        return atLeast(11, 6, 2);
+    }
+
+    /**
+     * {@code #loadPeerSet} resolves an optional peer only against a version in the tree that does not satisfy it, from
+     * npm 11.20.0 and, of npm 12, from 12.1.0; before, every optional peer the virtual root lacks.
+     */
+    boolean peerSetHoldsOptionalPeerOnlyOnConflict() {
+        return atLeast(12, 1, 0) || atLeast(11, 20, 0) && !atLeast(12, 0, 0);
+    }
+
+    /**
+     * {@code #idealTreePrune}: a node flagged both peer and optional is pruned like an extraneous one, from npm 11.5.0
+     * until 11.6.3.
+     */
+    boolean prunesOptionalPeers() {
+        return atLeast(11, 5, 0) && !atLeast(11, 6, 3);
+    }
+
+    /**
+     * {@code DepsQueue} keeps one list per depth, each sorted by path alone, in place of one list sorted when it is
+     * popped: npm 10.4.0 until 10.8.0.
+     */
+    boolean queuesDepsByDepth() {
+        return atLeast(10, 4, 0) && !atLeast(10, 8, 0);
+    }
+
+    /**
+     * {@code #initTree}: a node with an edge to nothing is queued like one with an invalid edge, from npm 11.6.2.
+     */
+    boolean queuesNodesMissingDependencies() {
+        return atLeast(11, 6, 2);
+    }
+
+    /**
+     * {@code #inflateAncientLockfile}: the dependency flags are reset before they are calculated again, from npm
+     * 11.6.3.
+     */
+    boolean resetsDepFlagsOfInflatedLock() {
+        return atLeast(11, 6, 3);
+    }
+
+    /**
+     * An invalid optional peer edge is a problem only when the install saves, and a placement that invalidates an edge
+     * of a node already visited queues that node again when it does, from npm 11.10.1 (npm/cli#8726).
+     */
+    boolean resolvesInvalidPeerOptionalBySave() {
+        return atLeast(11, 10, 1);
+    }
+
+    /**
+     * The root's {@code patchedDependencies} are resolved against the tree once it is built
+     * (patched-dependencies.js), from npm 12.0.0.
+     */
+    boolean resolvesPatchedDependencies() {
+        return atLeast(12, 0, 0);
+    }
+
+    /**
+     * {@code #checkEngineAndPlatform}: a node {@code omit} leaves out is not checked, from npm 11.5.0.
+     */
+    boolean skipsEngineCheckOfOmitted() {
+        return atLeast(11, 5, 0);
+    }
+
+    /**
+     * {@code #loadPeerSet}: a node that fetching the peer its parent declares replaced is not failed for that peer's
+     * conflict, from npm 11.19.0 and, of npm 12, from 12.0.2; before, arborist reads the conflict off the detached
+     * node. The guard of npm 11.6.0 ({@link #stopsPeerSetOfDetachedNode()}) stands at the head of the loop, before the
+     * next peer is read.
+     */
+    boolean skipsPeerConflictOfDetachedNode() {
+        return atLeast(12, 0, 2) || atLeast(11, 19, 0) && !atLeast(12, 0, 0);
+    }
+
+    /**
+     * {@code #loadPeerSet}: the peers of a node that lost its parent while they loaded are left alone, from npm 11.6.0;
+     * before, arborist reads the missing parent.
+     */
+    boolean stopsPeerSetOfDetachedNode() {
+        return atLeast(11, 6, 0);
+    }
+
+    // @npmcli/arborist calc-dep-flags.js
+
+    /**
+     * The flags are unset along the edges from a queue of changed nodes, from npm 11.6.3; before, by a depth walk that
+     * unsets each flag down the dependencies.
+     */
+    boolean calculatesDepFlagsByQueue() {
+        return atLeast(11, 6, 3);
+    }
+
+    /**
+     * A link only unsets its target's flags, as an edge does, from npm 11.18.0; before, it assigns its own.
+     */
+    boolean linkOnlyUnsetsTargetFlags() {
+        return atLeast(11, 18, 0);
+    }
+
+    /**
+     * The depth walk flags the target of a peer edge peer and unsets the flag only where no peer edge comes in, from
+     * npm 11.6.1.
+     */
+    boolean marksPeerEdgeTargetsPeer() {
+        return atLeast(11, 6, 1);
+    }
+
+    /**
+     * {@code calcDepFlagsStep} and {@code unsetFlag} pass over a link whose target is null, from npm 10.8.2; before,
+     * they set the flags of the null target.
+     */
+    boolean passesOverLinkWithoutTarget() {
+        return atLeast(10, 8, 2);
+    }
+
+    // @npmcli/arborist consistent-resolve.js
+
+    /**
+     * A hosted git URL written as https resolves to https ({@code hosted.default}), from npm 12.0.0; before, only one
+     * that carries credentials, and every other to ssh.
+     */
+    boolean keepsHostedGitHttps() {
+        return atLeast(12, 0, 0);
+    }
+
+    // @npmcli/arborist dep-valid.js
+
+    /**
+     * {@code lockedGitCommittish}: a git edge naming a ref is invalid when the lock records another committish for it,
+     * from npm 11.17.0.
+     */
+    boolean comparesLockedGitCommittish() {
+        return atLeast(11, 17, 0);
+    }
+
+    /**
+     * A git committish of up to 64 hex digits is a commit, from npm 11.10.0; before, 40 exactly.
+     */
+    boolean readsSha256Commits() {
+        return atLeast(11, 10, 0);
+    }
+
+    // @npmcli/arborist edge.js
+
+    /**
+     * {@code error}: the override sets of an edge and its target are compared only when the target has one, from npm
+     * 11.6.4.
+     */
+    boolean comparesOverridesOfOverriddenTargets() {
+        return atLeast(11, 6, 4);
+    }
+
+    /**
+     * {@code satisfiedBy} reads a dependency the root project bundles by the overridden spec, as any other ({@code
+     * inDepBundle} in place of {@code inBundle}), from npm 12.0.0.
+     */
+    boolean overridesWhatTheRootBundles() {
+        return atLeast(12, 0, 0);
+    }
+
+    /**
+     * {@code spec}: a {@code $name} override the root does not declare is read from the edge's own package, from npm
+     * 11.3.0.
+     */
+    boolean resolvesOverrideReferenceInOwnPackage() {
+        return atLeast(11, 3, 0);
+    }
+
+    // @npmcli/arborist link.js
+
+    /**
+     * {@code recalculateOutEdgesOverrides}: a link forwards the overrides it receives to its target, from npm 11.14.0.
+     */
+    boolean forwardsLinkOverridesToTarget() {
+        return atLeast(11, 14, 0);
+    }
+
+    /**
+     * {@code recalculateOutEdgesOverrides}: a link forwards only an override set with a rule naming a dependency of its
+     * target, from npm 11.15.0 (npm/cli#9357).
+     */
+    boolean forwardsLinkOverridesWithMatchingRule() {
+        return atLeast(11, 15, 0);
+    }
+
+    /**
+     * A link forwards its overrides when a rule applies anywhere under its target ({@code overrideMatchesSubtree}),
+     * from npm 11.18.0 (npm/cli#9619); before, when a rule names a dependency the target declares.
+     */
+    boolean linkOverridesMatchSubtree() {
+        return atLeast(11, 18, 0);
+    }
+
+    // @npmcli/arborist load-virtual.js
+
+    /**
+     * {@code #resolveLinks}: a failure to assign a link target's package.json is swallowed like a failure to read it,
+     * from npm 11.6.1, where @npmcli/package-json replaces read-package-json-fast.
+     */
+    boolean guardsLinkTargetPackage() {
+        return atLeast(11, 6, 1);
+    }
+
+    /**
+     * {@code #resolveLinks}: a link whose target the lock lacks is {@code EMISSINGTARGET}, from npm 11.4.0; before,
+     * arborist reads the missing target.
+     */
+    boolean rejectsLinkWithoutTarget() {
+        return atLeast(11, 4, 0);
+    }
+
+    // @npmcli/arborist node.js
+
+    /**
+     * {@code shouldOmit}: only a node under the project root or a workspace is omitted, from npm 11.6.1.
+     */
+    boolean omitsUnderProjectTopsOnly() {
+        return atLeast(11, 6, 1);
+    }
+
+    /**
+     * An edge passes its override set on to its target, which keeps the most specific of the sets coming in, and an
+     * edge is invalid when its set conflicts with its target's, from npm 11.2.0 (also edge.js); before, a node takes
+     * its parent's rule for it and the set of the last edge in.
+     */
+    boolean propagatesOverrideSets() {
+        return atLeast(11, 2, 0);
+    }
+
+    // @npmcli/arborist optional-set.js
+
+    /**
+     * The set gathers the dependencies no node outside it depends on, from npm 11.6.2; before, those no node outside it
+     * requires through a non-optional edge.
+     */
+    boolean boundsOptionalSetByMembership() {
+        return atLeast(11, 6, 2);
+    }
+
+    /**
+     * A node not flagged optional has an optional set too, from npm 11.6.3.
+     */
+    boolean gathersOptionalSetOfAnyNode() {
+        return atLeast(11, 6, 3);
+    }
+
+    /**
+     * The set leaves out what an inert node outside it depends on, from npm 11.13.0.
+     */
+    boolean leavesInertDependentsOutOfOptionalSet() {
+        return atLeast(11, 13, 0);
+    }
+
+    // @npmcli/arborist override-set.js
+
+    /**
+     * {@code doOverrideSetsConflict}: two sets neither of which contains the other conflict only when their rules for a
+     * package do not intersect, from npm 11.6.3.
+     */
+    boolean comparesOverrideRulesForConflict() {
+        return atLeast(11, 6, 3);
+    }
+
+    /**
+     * {@code findSpecificOverrideSet}: two sets neither of which contains the other, with compatible rules, resolve to
+     * their nearest common ancestor, from npm 11.12.0.
+     */
+    boolean fallsBackToCommonOverrideAncestor() {
+        return atLeast(11, 12, 0);
+    }
+
+    /**
+     * {@code getEdgeRule}: a rule's key is matched against the spec the edge declares, from npm 11.2.0; before, against
+     * the spec with the edge's override applied.
+     */
+    boolean matchesEdgeRuleByRawSpec() {
+        return atLeast(11, 2, 0);
+    }
+
+    // @npmcli/arborist shrinkwrap.js
+
+    /**
+     * {@code commit}: an extraneous node outside node_modules, a workspace or {@code file:} dependency the manifest no
+     * longer names, gets no entry, from npm 11.15.0.
+     */
+    boolean dropsExtraneousOutsideNodeModules() {
+        return atLeast(11, 15, 0);
+    }
+
+    /**
+     * {@code commit}: an extraneous node outside node_modules keeps its entry under another package's directory, from
+     * npm 11.17.0.
+     */
+    boolean keepsNestedExtraneousFsChildren() {
+        return atLeast(11, 17, 0);
+    }
+
+    /**
+     * {@code libc} is one of the package fields an entry keeps, from npm 11.11.0.
+     */
+    boolean locksLibc() {
+        return atLeast(11, 11, 0);
+    }
+
+    /**
+     * {@code metaFromNode} writes the package name of a node whose folder is named otherwise even when the node
+     * itself goes by that name, as a link target just placed does: from npm 10.8.2.
+     */
+    boolean namesEntryByFolder() {
+        return atLeast(10, 8, 2);
+    }
+
+    /**
+     * An npm-shrinkwrap.json is read, the project's in place of its package-lock.json and a dependency's for the tree
+     * below it ({@code hasShrinkwrap}), until npm 12.0.0.
+     */
+    boolean readsNpmShrinkwrap() {
+        return !atLeast(12, 0, 0);
+    }
+
+    /**
+     * A node's {@code patched}, {@code packageExtensionsApplied} and {@code npmExtensionApplied} and the root's
+     * extension hashes are read from the lock (load-virtual.js) and written to it, from npm 12.0.0.
+     */
+    boolean recordsPatchesAndExtensions() {
+        return atLeast(12, 0, 0);
+    }
+
+    /**
+     * {@code load} refuses a lock whose {@code lockfileVersion} is above 4 ({@code ELOCKFILEVERSION}), from npm
+     * 12.0.0.
+     */
+    boolean refusesNewerLockfile() {
+        return atLeast(12, 0, 0);
+    }
+
+    /**
+     * {@code commit}: an inert node without a version, an optional dependency that failed to load, gets no entry, from
+     * npm 11.15.0.
+     */
+    boolean skipsInertNodesWithoutVersion() {
+        return atLeast(11, 15, 0);
+    }
+
     // @npmcli/config definitions.js
 
     /**
@@ -81,6 +555,123 @@ public final class NpmRelease implements Comparable<NpmRelease> {
         return atLeast(12, 0, 0) ? "none" : "all";
     }
 
+    /**
+     * {@code allow-directory} is a config from npm 11.14.0.
+     */
+    boolean definesAllowDirectory() {
+        return atLeast(11, 14, 0);
+    }
+
+    /**
+     * {@code allow-file} is a config from npm 11.14.0.
+     */
+    boolean definesAllowFile() {
+        return atLeast(11, 14, 0);
+    }
+
+    /**
+     * {@code allow-git} is a config from npm 11.9.0.
+     */
+    boolean definesAllowGit() {
+        return atLeast(11, 9, 0);
+    }
+
+    /**
+     * {@code allow-remote} is a config from npm 11.14.0.
+     */
+    boolean definesAllowRemote() {
+        return atLeast(11, 14, 0);
+    }
+
+    /**
+     * {@code min-release-age} is a config from npm 11.10.0.
+     */
+    boolean definesMinReleaseAge() {
+        return atLeast(11, 10, 0);
+    }
+
+    /**
+     * {@code min-release-age-exclude} is a config from npm 11.17.0.
+     */
+    boolean definesMinReleaseAgeExclude() {
+        return atLeast(11, 17, 0);
+    }
+
+    /**
+     * {@code min-release-age}'s flatten: {@code before} wins over it within one source and a falsy age filters nothing,
+     * from npm 11.15.0; before, the two exclude each other and any age sets {@code before}.
+     */
+    boolean yieldsMinReleaseAgeToBefore() {
+        return atLeast(11, 15, 0);
+    }
+
+    // @npmcli/config index.js
+
+    /**
+     * {@code validate} refuses an auth key outside a registry's scope in an npmrc file ({@code ERR_INVALID_AUTH}), and
+     * a {@code registry} that is no URL where it names that scope ({@code ERR_INVALID_URL}), from npm 9.0.0.
+     */
+    boolean refusesUnscopedAuth() {
+        return atLeast(9, 0, 0);
+    }
+
+    /**
+     * {@code validate} holds {@code email}, {@code certfile} and {@code keyfile} to a registry's scope as it does the
+     * other auth keys, from npm 12.0.0.
+     */
+    boolean refusesUnscopedEmailAndCertificate() {
+        return atLeast(12, 0, 0);
+    }
+
+    // @npmcli/map-workspaces
+
+    /**
+     * The @npmcli/map-workspaces npm bundles: 3.0.6 from npm 10.5.2, which finds the members 5.0.3 finds; 3.0.4
+     * before.
+     */
+    MapWorkspaces.Release mapWorkspaces() {
+        return atLeast(10, 5, 2) ? MapWorkspaces.Release.V5_0_3 : MapWorkspaces.Release.V3_0_4;
+    }
+
+    // @npmcli/package-json normalize.js
+
+    /**
+     * {@code binDir} is a normalize step that reads the package's directory even for a manifest without a path, as the
+     * registry's are, from npm 11.6.1 until 11.6.4 (@npmcli/package-json 7.0.1 and 7.0.2).
+     */
+    boolean expandsBinDirOfRegistryManifests() {
+        return atLeast(11, 6, 1) && !atLeast(11, 6, 4);
+    }
+
+    /**
+     * Normalizing removes an {@code overrides} that is not an object or is empty (the {@code overrides} step of
+     * @npmcli/package-json 8.0.0), from npm 12.0.0.
+     */
+    boolean normalizesOverrides() {
+        return atLeast(12, 0, 0);
+    }
+
+    /**
+     * The @npmcli/package-json whose {@code bin} step pacote runs over a fetched manifest: 6.0.1 from npm 10.9.0,
+     * which reads as 7.0.5 there; 5.1.1 and 5.2.0 from npm 10.8.1; 5.1.0 and, before npm 10.6.0,
+     * read-package-json-fast before that.
+     */
+    PackageJson.Release packageJson() {
+        return atLeast(10, 9, 0) ? PackageJson.Release.V7_0_5 :
+                atLeast(10, 8, 1) ? PackageJson.Release.V5_2_0 : PackageJson.Release.V5_1_0;
+    }
+
+    // brace-expansion
+
+    /**
+     * The brace-expansion minimatch calls: 5.0.9 from npm 11.19.1 and, of npm 12, from 12.1.0, which combines the
+     * sets of a pattern left to right (index.js expand_); before, 5.0.6 and 5.0.7, which expand alike.
+     */
+    BraceExpansion.Release braceExpansion() {
+        return atLeast(12, 1, 0) || atLeast(11, 19, 1) && !atLeast(12, 0, 0) ? BraceExpansion.Release.V5_0_9 :
+                BraceExpansion.Release.V5_0_6;
+    }
+
     // npm base-cmd.js
 
     /**
@@ -88,6 +679,14 @@ public final class NpmRelease implements Comparable<NpmRelease> {
      */
     boolean checksDevEngines() {
         return atLeast(10, 9, 0);
+    }
+
+    /**
+     * {@code validateCli} fails the command when {@code strict-npmrc} is set and an npmrc file holds a key the config
+     * does not define ({@code EUNKNOWNCONFIG}), from npm 12.0.0; before, {@code strict-npmrc} is such a key itself.
+     */
+    boolean strictNpmrcRefusesUnknownKeys() {
+        return atLeast(12, 0, 0);
     }
 
     // npm-install-checks dev-engines.js
@@ -99,6 +698,63 @@ public final class NpmRelease implements Comparable<NpmRelease> {
      */
     boolean namesDevEnginesProperty() {
         return atLeast(11, 6, 1) || atLeast(10, 9, 5) && !atLeast(11, 0, 0);
+    }
+
+    // npm-pick-manifest
+
+    /**
+     * The npm-pick-manifest npm bundles: 9.1.0 from npm 10.8.2, which picks as 11.0.3 does; 9.0.1 and older before.
+     */
+    PickManifest.Release pickManifest() {
+        return atLeast(10, 8, 2) ? PickManifest.Release.V11_0_3 : PickManifest.Release.V9_0_1;
+    }
+
+    // pacote dir.js
+
+    /**
+     * The manifest of a directory gets its {@code bin} from the files of {@code directories.bin}:
+     * read-package-json-fast until npm 10.6.0 and @npmcli/package-json 7 from npm 11.6.1 fill it,
+     * @npmcli/package-json 5 and 6 between them do not.
+     */
+    boolean dirFetcherReadsBinDirectory() {
+        return !atLeast(10, 6, 0) || atLeast(11, 6, 1);
+    }
+
+    // pacote fetcher.js
+
+    /**
+     * {@code canUse}: the {@code EALLOWGIT} message names the spec type as every {@code EALLOW*} does, from npm 11.10.0
+     * (pacote 21.3.1).
+     */
+    boolean namesTypeInAllowRejection() {
+        return atLeast(11, 10, 0);
+    }
+
+    // semver
+
+    /**
+     * The node-semver npm bundles: 7.8.5 from npm 11.18.0, whose {@code ~1.2} reaches down to {@code 1.2.0-0} under
+     * {@code includePrerelease} (classes/range.js); 7.8.4 from npm 11.17.0 (7.8.2 takes an x-range with a number after
+     * a wildcard for no range); 7.8.1 from npm 11.16.0, which strips build metadata from a whole range; 7.7.3 from npm
+     * 11.6.2 and 7.7.4 from npm 10.9.5, which strip it from a comparator as 7.8.0 does; before, 7.7.2, as every release
+     * from 7.5.4 (npm 10.0.0) answers.
+     */
+    NodeSemver.Release semver() {
+        return atLeast(11, 18, 0) ? NodeSemver.Release.V7_8_5 :
+                atLeast(11, 17, 0) ? NodeSemver.Release.V7_8_4 :
+                        atLeast(11, 16, 0) ? NodeSemver.Release.V7_8_1 :
+                                atLeast(11, 6, 2) || atLeast(10, 9, 5) && !atLeast(11, 0, 0) ?
+                                        NodeSemver.Release.V7_8_0 : NodeSemver.Release.V7_7_2;
+    }
+
+    // ssri
+
+    /**
+     * The ssri npm bundles: 13.0.1 from npm 11.10.0, which drops a hash whose algorithm Node cannot hash with; before,
+     * 13.0.0, which keeps it, as every release from 10.0.5 (npm 10.0.0) answers.
+     */
+    Ssri.Release ssri() {
+        return atLeast(11, 10, 0) ? Ssri.Release.V13_0_1 : Ssri.Release.V13_0_0;
     }
 
     @Override

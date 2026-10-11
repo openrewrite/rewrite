@@ -130,15 +130,20 @@ final class NpmInstallChecks {
     private NpmInstallChecks() {
     }
 
+    /**
+     * @param release the npm that bundles the library, for the node-semver it reads an engine's range with
+     */
     static void checkEngine(Map<String, Object> target, @Nullable String npmVer, @Nullable String nodeVer,
-                            boolean force) {
+                            boolean force, NpmRelease release) {
         String nodev = force ? null : nodeVer;
         Object eng = target.get("engines");
         if (!truthy(eng)) {
             return;
         }
-        boolean nodeFail = truthy(nodev) && truthy(Js.get(eng, "node")) && !satisfies(nodev, Js.get(eng, "node"));
-        boolean npmFail = truthy(npmVer) && truthy(Js.get(eng, "npm")) && !satisfies(npmVer, Js.get(eng, "npm"));
+        boolean nodeFail = truthy(nodev) && truthy(Js.get(eng, "node")) &&
+                           !satisfies(nodev, Js.get(eng, "node"), release);
+        boolean npmFail = truthy(npmVer) && truthy(Js.get(eng, "npm")) &&
+                          !satisfies(npmVer, Js.get(eng, "npm"), release);
         if (nodeFail || npmFail) {
             Map<String, @Nullable String> current = new LinkedHashMap<>();
             current.put("node", nodeVer);
@@ -147,8 +152,8 @@ final class NpmInstallChecks {
         }
     }
 
-    private static boolean satisfies(String version, @Nullable Object range) {
-        return NodeSemver.satisfies(version, range, NodeSemver.Options.INCLUDE_PRERELEASE);
+    private static boolean satisfies(String version, @Nullable Object range, NpmRelease release) {
+        return NodeSemver.satisfies(version, range, NodeSemver.Options.INCLUDE_PRERELEASE.release(release.semver()));
     }
 
     /**
@@ -251,8 +256,9 @@ final class NpmInstallChecks {
     }
 
     // dev-engines.js checkDependency: what one alternative of a devEngines entry does not match in the environment,
-    // null where it is satisfied; a shape npm fails on is thrown
-    private static @Nullable String checkDependency(@Nullable Object wanted, Object current, String engine) {
+    // null where it is satisfied; a shape npm fails on is thrown. semver: the node-semver npm bundles
+    private static @Nullable String checkDependency(@Nullable Object wanted, Object current, String engine,
+                                                    NodeSemver.Options semver) {
         if (!(wanted instanceof Map)) {
             throw new JsError(JsError.ERROR, "Invalid non-object value for \"" + engine + "\"");
         }
@@ -314,8 +320,8 @@ final class NpmInstallChecks {
             }
             String range = (String) wantedVersion;
             String version = (String) currentVersion;
-            if (NodeSemver.validRange(range, NodeSemver.Options.DEFAULT) != null) {
-                if (!NodeSemver.satisfies(version, range, NodeSemver.Options.DEFAULT)) {
+            if (NodeSemver.validRange(range, semver) != null) {
+                if (!NodeSemver.satisfies(version, range, semver)) {
                     return "Invalid semver version \"" + range + "\" does not match \"" + version + "\" for \"" +
                            engine + "\"";
                 }
@@ -368,7 +374,8 @@ final class NpmInstallChecks {
 
             List<String> depErrors = new ArrayList<>();
             for (Object dep : dependencies) {
-                String result = checkDependency(dep, currentEngine, engine);
+                String result = checkDependency(dep, currentEngine, engine,
+                        NodeSemver.Options.DEFAULT.release(release.semver()));
                 if (result != null) {
                     depErrors.add(result);
                 }

@@ -226,6 +226,50 @@ class LinkTest {
         assertThat(bazEdge.getSpec()).isEqualTo("1.0.0");
     }
 
+    // link.js overrideMatchesSubtree, from npm 11.18.0 (npm/cli#9619): a rule naming a dependency below the target
+    @Test
+    void recalculateOutEdgesOverridesForwardsWhenARuleAppliesBelowTheTargetFrom1118() {
+        for (String version : new String[]{"11.17.0", "11.18.0"}) {
+            NpmRelease release = NpmRelease.of(version);
+            Node root = node(opts().release(release).path("/path/to/root").loadOverrides(true).pkg(obj("name", "root",
+              "dependencies", obj("foo", "1.0.0"), "overrides", obj("bar", "2.0.0"))));
+            Node target = node(opts().release(release).path("/path/to/store/foo").root(root)
+              .pkg(obj("name", "foo", "version", "1.0.0", "dependencies", obj("baz", "1.0.0"))));
+            Node baz = node(opts().release(release).parent(target)
+              .pkg(obj("name", "baz", "version", "1.0.0", "dependencies", obj("bar", "1.0.0"))));
+            link(opts().release(release).pkg(obj("name", "foo", "version", "1.0.0"))
+              .path("/path/to/root/node_modules/foo").realpath("/path/to/store/foo").target(target).parent(root));
+
+            Edge barEdge = baz.getEdgesOut().get("bar");
+            if ("11.18.0".equals(version)) {
+                assertThat(target.getOverrides()).as("npm %s forwards to the target", version).isNotNull();
+                assertThat(barEdge.getSpec()).as("npm %s overrides the transitive edge", version).isEqualTo("2.0.0");
+            } else {
+                assertThat(target.getOverrides()).as("npm %s forwards nothing", version).isNull();
+                assertThat(barEdge.getSpec()).as("npm %s leaves the transitive edge", version).isEqualTo("1.0.0");
+            }
+        }
+    }
+
+    // getEdgeRule matches on name and spec, so from npm 11.18.0 a rule for another version of a declared dependency
+    // no longer gives the target the override set (npm/cli#9357)
+    @Test
+    void recalculateOutEdgesOverridesIgnoresARuleForAnotherVersionFrom1118() {
+        for (String version : new String[]{"11.17.0", "11.18.0"}) {
+            NpmRelease release = NpmRelease.of(version);
+            Node root = node(opts().release(release).path("/path/to/root").loadOverrides(true).pkg(obj("name", "root",
+              "dependencies", obj("foo", "1.0.0"), "overrides", obj("bar@2", "3.0.0"))));
+            Node target = node(opts().release(release).path("/path/to/store/foo").root(root)
+              .pkg(obj("name", "foo", "version", "1.0.0", "dependencies", obj("bar", "1.0.0"))));
+            link(opts().release(release).pkg(obj("name", "foo", "version", "1.0.0"))
+              .path("/path/to/root/node_modules/foo").realpath("/path/to/store/foo").target(target).parent(root));
+
+            assertThat(target.getOverrides() != null).as("npm %s gives the target the override set", version)
+              .isEqualTo("11.17.0".equals(version));
+            assertThat(target.getEdgesOut().get("bar").getSpec()).isEqualTo("1.0.0");
+        }
+    }
+
     @Test
     void linkToRootPathGetsRootAsTarget() {
         Node root = node(opts().path("/project/root").pkg(obj("name", "root", "dependencies", obj("root", "file:."))));

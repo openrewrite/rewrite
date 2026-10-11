@@ -34,12 +34,14 @@ import static org.openrewrite.javascript.internal.lock.UriComponent.decodeURICom
 
 /**
  * Port of hosted-git-info ({@code fromUrl} and the URL forms npm-package-arg writes): 9.0.3, which npm 11.17.0
- * bundles, and 4.1.0, which pnpm 11.2.2's npm-package-arg fork calls.
+ * bundles, 9.0.2, which npm 11.6.2 to 11.14.1 bundle and whose answers 8.0.2 to 9.0.0 (npm 11.0.0 to 11.6.1) give
+ * too, and 4.1.0, which pnpm 11.2.2's npm-package-arg fork calls.
  */
 public final class GitHost {
 
     public enum Release {
         V4_1_0,
+        V9_0_2,
         V9_0_3
     }
 
@@ -97,7 +99,7 @@ public final class GitHost {
             Arrays.asList("git+https:", "git:", "http:", "https:", "git+http:");
     private static final List<String> KNOWN_PROTOCOLS_4_1_0 =
             Arrays.asList("http:", "https:", "git:", "git+ssh:", "git+https:", "ssh:");
-    private static final Function<Fill, String> SOURCEHUT_HTTPS_4_1_0 = t ->
+    private static final Function<Fill, String> SOURCEHUT_HTTPS_DOT_GIT = t ->
             "https://" + t.domain + "/" + t.user + "/" + t.project + ".git" + maybeJoin("#", t.committish);
 
     static {
@@ -389,8 +391,9 @@ public final class GitHost {
         return fill("sshurl", over);
     }
 
+    // 9.0.3 drops the .git sourcehut's https template ends in
     public @Nullable String https(Opts over) {
-        return release == Release.V4_1_0 && "sourcehut".equals(type) ? fill(SOURCEHUT_HTTPS_4_1_0, this, over) :
+        return release != Release.V9_0_3 && "sourcehut".equals(type) ? fill(SOURCEHUT_HTTPS_DOT_GIT, this, over) :
                 fill("https", over);
     }
 

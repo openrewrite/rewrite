@@ -301,7 +301,8 @@ public final class YarnLock {
         if (truthy(node.getResolved())) {
             String from = node.isLink() ? PosixPath.dirname(node.getPath()) : node.getPath();
             n.put("resolved",
-                    ConsistentResolve.consistentResolve(node.getResolved(), from, node.getRoot().getPath(), true));
+                    ConsistentResolve.consistentResolve(node.getResolved(), from, node.getRoot().getPath(), true,
+                            node.getRelease()));
         }
         if (truthy(node.getIntegrity())) {
             n.put("integrity", node.getIntegrity());

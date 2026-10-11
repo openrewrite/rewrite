@@ -164,7 +164,6 @@ class IdealTreeBuilderTest extends ScenarioTest {
         skipUnlessReplayed(label, scenario, expect);
         NpmScenarios.Lock result = edit.getResult();
         String path = ScenarioReplay.projectPath(result != null ? result.getText() : edit.getStart().getText());
-        NpmOptions options = ScenarioReplay.options(scenario.npmrc());
         ScenarioRegistry http = new ScenarioRegistry(scenario);
 
         // the directory's name is the regenerator's input, not the builder's: here it is given
@@ -206,6 +205,8 @@ class IdealTreeBuilderTest extends ScenarioTest {
             record(label, "exact", "bytes" + http.describe());
             return;
         }
+        // npm's own tree is loaded as the release that wrote it, whose config the build has read without a refusal
+        NpmOptions options = ScenarioReplay.options(scenario.release(), scenario.npmrc());
         Map<String, String> expected = describe(ScenarioReplay.load(result, options, path), path);
         Map<String, String> actual = describe(built, path);
         String difference = firstDifference(expected, actual);

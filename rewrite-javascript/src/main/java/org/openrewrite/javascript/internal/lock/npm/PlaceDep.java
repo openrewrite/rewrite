@@ -258,13 +258,14 @@ public final class PlaceDep {
 
         for (Node p = target; p != null; p = p.getResolveParent()) {
             if (p.matches(dep) && !p.isTop()) {
-                placed = new Link(Node.options().parent(target).target(p).build());
+                placed = new Link(Node.options().release(options.getRelease()).parent(target).target(p).build());
                 return;
             }
         }
 
         Node virtualRoot = dep.getParent();
         Node.Options.OptionsBuilder placedOptions = Node.options()
+                .release(options.getRelease())
                 .name(dep.getName())
                 .pkg(dep.getPackage())
                 .resolved(dep.getResolved())
@@ -272,6 +273,13 @@ public final class PlaceDep {
                 .installLinks(options.isInstallLinks())
                 .legacyPeerDeps(options.isLegacyPeerDeps())
                 .error(dep.getErrors().isEmpty() ? null : dep.getErrors().get(0));
+        // npm 12.0.0 carries what a root manifest extension did to the dep, which only it records
+        if (Js.truthy(dep.getPackageExtensionsApplied())) {
+            placedOptions.packageExtensionsApplied(dep.getPackageExtensionsApplied());
+        }
+        if (Js.truthy(dep.getNpmExtensionApplied())) {
+            placedOptions.npmExtensionApplied(dep.getNpmExtensionApplied());
+        }
         if (dep.getOverrides() != null) {
             placedOptions.overrides(dep.getOverrides());
         }

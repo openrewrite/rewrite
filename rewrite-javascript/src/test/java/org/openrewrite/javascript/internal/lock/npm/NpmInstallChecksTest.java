@@ -65,21 +65,26 @@ class NpmInstallChecksTest {
         return target;
     }
 
+    private static void checkEngine(Map<String, Object> target, @Nullable String npmVer, @Nullable String nodeVer,
+                                    boolean force) {
+        NpmInstallChecks.checkEngine(target, npmVer, nodeVer, force, NpmRelease.PORTED);
+    }
+
     @Test
     void noEngine() {
-        assertThatCode(() -> NpmInstallChecks.checkEngine(new LinkedHashMap<>(), "1.3.2", "0.2.1", false))
+        assertThatCode(() -> checkEngine(new LinkedHashMap<>(), "1.3.2", "0.2.1", false))
           .doesNotThrowAnyException();
     }
 
     @Test
     void emptyEngineObject() {
-        assertThatCode(() -> NpmInstallChecks.checkEngine(e(null, null), "1.1.2", "0.2.1", false))
+        assertThatCode(() -> checkEngine(e(null, null), "1.1.2", "0.2.1", false))
           .doesNotThrowAnyException();
     }
 
     @Test
     void nodeVersionTooOld() {
-        assertThatThrownBy(() -> NpmInstallChecks.checkEngine(e(null, "0.10.24"), "1.1.2", "0.10.18", false))
+        assertThatThrownBy(() -> checkEngine(e(null, "0.10.24"), "1.1.2", "0.10.18", false))
           .isInstanceOf(NpmInstallChecks.UnsupportedEngine.class)
           .matches(t -> "0.10.24".equals(Js.get(((NpmInstallChecks.UnsupportedEngine) t).getRequired(), "node")))
           .matches(t -> "EBADENGINE".equals(((NpmError) t).getCode()));
@@ -87,46 +92,55 @@ class NpmInstallChecksTest {
 
     @Test
     void npmVersionTooOld() {
-        assertThatThrownBy(() -> NpmInstallChecks.checkEngine(e("^1.4.6", null), "1.3.2", "0.2.1", false))
+        assertThatThrownBy(() -> checkEngine(e("^1.4.6", null), "1.3.2", "0.2.1", false))
           .matches(t -> "^1.4.6".equals(Js.get(((NpmInstallChecks.UnsupportedEngine) t).getRequired(), "npm")))
           .matches(t -> "EBADENGINE".equals(((NpmError) t).getCode()));
     }
 
     @Test
     void forceNodeVersionTooOld() {
-        assertThatCode(() -> NpmInstallChecks.checkEngine(e(null, "0.1.0", "test@1.0.0"), "1.3.2", "0.2.1", true))
+        assertThatCode(() -> checkEngine(e(null, "0.1.0", "test@1.0.0"), "1.3.2", "0.2.1", true))
           .doesNotThrowAnyException();
     }
 
     @Test
     void cannotForceWhenNpmVersionTooOld() {
-        assertThatThrownBy(() -> NpmInstallChecks.checkEngine(e("^1.4.6", null, "test@1.0.0"), "1.3.2", "0.2.1", false))
+        assertThatThrownBy(() -> checkEngine(e("^1.4.6", null, "test@1.0.0"), "1.3.2", "0.2.1", false))
           .matches(t -> "EBADENGINE".equals(((NpmError) t).getCode()));
     }
 
     @Test
     void npmPrerelease() {
         assertThatCode(() ->
-          NpmInstallChecks.checkEngine(e(">=1.2.3", ">=0.8"), "69.420.0-yolo", "69.420.0-yolo", false))
+          checkEngine(e(">=1.2.3", ">=0.8"), "69.420.0-yolo", "69.420.0-yolo", false))
           .doesNotThrowAnyException();
     }
 
     @Test
     void nodePrerelease() {
-        assertThatCode(() -> NpmInstallChecks.checkEngine(e(">=1.2.3", ">=0.8"), "1.2.3", "69.420.0-yolo", false))
+        assertThatCode(() -> checkEngine(e(">=1.2.3", ">=0.8"), "1.2.3", "69.420.0-yolo", false))
           .doesNotThrowAnyException();
     }
 
     @Test
     void noNodeVersion() {
-        assertThatCode(() -> NpmInstallChecks.checkEngine(e(">=1.2.3", ">=0.8"), "1.2.3", null, false))
+        assertThatCode(() -> checkEngine(e(">=1.2.3", ">=0.8"), "1.2.3", null, false))
           .doesNotThrowAnyException();
     }
 
     @Test
     void noNpmVersion() {
-        assertThatCode(() -> NpmInstallChecks.checkEngine(e(">=1.2.3", ">=0.8"), null, "1.2.3", false))
+        assertThatCode(() -> checkEngine(e(">=1.2.3", ">=0.8"), null, "1.2.3", false))
           .doesNotThrowAnyException();
+    }
+
+    // node-semver 7.8.5, which npm 11.18.0 bundles, reads ~22 down to 22.0.0-0 under includePrerelease
+    @Test
+    void tildeRangeAdmitsAPrereleaseOfItsLowerBoundFrom1118() {
+        assertThatThrownBy(() -> NpmInstallChecks.checkEngine(e(null, "~22"), "11.17.0", "v22.0.0-rc.1", false,
+          NpmRelease.of("11.17.0"))).isInstanceOf(NpmInstallChecks.UnsupportedEngine.class);
+        assertThatCode(() -> NpmInstallChecks.checkEngine(e(null, "~22"), "11.18.0", "v22.0.0-rc.1", false,
+          NpmRelease.of("11.18.0"))).doesNotThrowAnyException();
     }
 
     private static void platform(String target) {
@@ -274,16 +288,16 @@ class NpmInstallChecksTest {
     // the platform lists throw as JavaScript does (npm-install-checks 8.0.0 run on these values)
     @Test
     void valuesOfTheWrongType() {
-        assertThatThrownBy(() -> NpmInstallChecks.checkEngine(json("{\"_id\":\"p@1\",\"engines\":{\"node\":5}}"),
+        assertThatThrownBy(() -> checkEngine(json("{\"_id\":\"p@1\",\"engines\":{\"node\":5}}"),
           "11.17.0", "v20.0.0", false)).isInstanceOf(NpmInstallChecks.UnsupportedEngine.class);
-        assertThatThrownBy(() -> NpmInstallChecks.checkEngine(json("{\"_id\":\"p@1\",\"engines\":{\"npm\":true}}"),
+        assertThatThrownBy(() -> checkEngine(json("{\"_id\":\"p@1\",\"engines\":{\"npm\":true}}"),
           "11.17.0", "v20.0.0", false)).isInstanceOf(NpmInstallChecks.UnsupportedEngine.class);
-        assertThatThrownBy(() -> NpmInstallChecks.checkEngine(json("{\"_id\":\"p@1\"," +
+        assertThatThrownBy(() -> checkEngine(json("{\"_id\":\"p@1\"," +
                 "\"engines\":{\"node\":[\">=1\"]}}"),
           "11.17.0", "v20.0.0", false)).isInstanceOf(NpmInstallChecks.UnsupportedEngine.class);
-        assertThatThrownBy(() -> NpmInstallChecks.checkEngine(json("{\"_id\":\"p@1\",\"engines\":{\"node\":{}}}"),
+        assertThatThrownBy(() -> checkEngine(json("{\"_id\":\"p@1\",\"engines\":{\"node\":{}}}"),
           "11.17.0", "v20.0.0", false)).isInstanceOf(NpmInstallChecks.UnsupportedEngine.class);
-        assertThatCode(() -> NpmInstallChecks.checkEngine(json("{\"_id\":\"p@1\",\"engines\":{\"node\":5}}"),
+        assertThatCode(() -> checkEngine(json("{\"_id\":\"p@1\",\"engines\":{\"node\":5}}"),
           null, "v20.0.0", true)).doesNotThrowAnyException();
 
         assertThatThrownBy(() -> platform("{\"os\":5}")).hasMessage("list is not iterable");
@@ -300,7 +314,7 @@ class NpmInstallChecksTest {
         assertThatCode(() -> NpmInstallChecks.checkPlatform(json("{\"cpu\":\"enten-cpu\",\"os\":\"enten-os\"," +
                 "\"libc\":\"musl\"}"),
           false, Host.UNKNOWN, Host.UNKNOWN)).doesNotThrowAnyException();
-        assertThatCode(() -> NpmInstallChecks.checkEngine(e(null, ">=99"), "11.17.0", null, false))
+        assertThatCode(() -> checkEngine(e(null, ">=99"), "11.17.0", null, false))
           .doesNotThrowAnyException();
     }
 

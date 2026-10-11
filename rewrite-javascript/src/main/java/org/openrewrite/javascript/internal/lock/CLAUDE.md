@@ -6,7 +6,7 @@ is how the ports are written and tested.
 
 | Package | Ports |
 |---|---|
-| `npm` | `@npmcli/arborist` and its libraries, npm 11.17.0 |
+| `npm` | `@npmcli/arborist` and its libraries, npm 11.17.0; every release in `NpmReleases.PROVEN` beside it (`NpmRelease`) |
 | `bun` | Bun 1.3.10 |
 | `yarnclassic` | Yarn 1.22.22 |
 | `berry` | Yarn 4.10.3; every 4.x release runs as it, with its own data and lockfile version |
@@ -39,7 +39,9 @@ package manager writes, byte for byte, or a failure of a `LockFileRegeneration.K
 - **Round trips:** `<Pm>LockRoundTripTest` installs over every recorded lock with nothing changed, and expects the
   lock's own bytes, or what the package manager was recorded rewriting it to.
 - **Scenarios:** `<Pm>ScenarioTest` replays every scenario offline and expects `after` byte for byte, or the
-  recorded `expect` line (`Expect`).
+  recorded `expect` line (`Expect`). For npm, also as every other release: a scenario's `releases` file names the
+  releases that write its recorded outcome, and each `release/<first>/` holds another outcome with its own
+  `releases`; the first and last release of each range are replayed.
 - **Recipes:** `*Dependency*Test`, `*LockRegenTest` and `*CatalogTest` in `org.openrewrite.javascript` run the
   recipes over the same scenarios.
 
@@ -59,8 +61,22 @@ To add one, record it with the fixtures repository's `record/` scripts (its READ
 repository's `main`, delete `build/lock-fixtures`, and run the tests. Never hand-edit a recorded lock, and change
 a test's expectation only when a recording says so.
 
-## A new package-manager release
+## Another release
 
-Diff the upstream source between the ported tag and the new one, limited to the modules the port's classes name.
-Port the differences, update the release in each class's Javadoc, then re-record the scenarios with the new release.
-A scenario whose lock changes is the new release's behavior, kept as recorded.
+The npm port reproduces each release in `NpmReleases.PROVEN`; the release that installs is the one the
+`NodeRuntime` marker names, 11.17.0 without one. To add releases:
+
+1. Sweep them: the fixtures repository's sweep runs each real release over every scenario against the scenario's
+   recorded registry, and its export writes what each release wrote into the `releases` files and `release/`
+   outcomes. A scenario whose outcome changes between two releases marks a boundary.
+2. At each boundary, diff the upstream modules the port's classes name between the two releases. Add a question to
+   `NpmRelease`, named for what npm does and answered through `atLeast` by the release that made the change, and
+   branch on it in the ported class where upstream changed, keeping 11.17.0's code as it is. Take the threshold
+   from the source, never from the releases the sweep sampled. A library npm bundles at several releases takes its
+   release as an option of its one port.
+3. Widen `NpmReleases.PROVEN` once every replay of the new releases passes.
+
+The other ports follow one release each: diff the upstream source between the ported tag and the new one, limited
+to the modules the port's classes name, port the differences, update the release in each class's Javadoc, then
+re-record the scenarios with the new release. A scenario whose lock changes is the new release's behavior, kept as
+recorded.

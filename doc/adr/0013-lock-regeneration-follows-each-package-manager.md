@@ -8,7 +8,8 @@ Accepted. Supersedes [ADR 0011](0011-native-node-lock-regeneration.md). Amended 
 regenerates through the port of its own resolver, and the shared engine of ADR 0011 is removed. Amended 2026-10-10:
 what `internal.lock` holds, and how the recipes write overrides and follow catalogs for each package manager; and
 again: one port per library, the host's registries as the user's config, corepack, the regenerators by module.
-Amended 2026-10-11: later releases of the ported pnpm and Yarn majors.
+Amended 2026-10-11: later releases of the ported pnpm and Yarn majors; and the npm release that built the LST,
+with every npm release from 10.0.0 reproduced beside the one ported.
 
 ## Context
 
@@ -228,3 +229,32 @@ arrays and objects that npm, pnpm and yarn 1 print again with `JSON.stringify`.
   4.18.1 write the entries 4.10.3 writes, but for one: a `npmPreapprovedPackages` entry that makes micromatch throw
   under the age gate fails 4.18.1's install, where 4.10.3 skips that version. Yarn 2 and 3, and a release after the
   data's, stay cannot-know.
+
+## Amendment 2026-10-11: the npm release that built the LST
+
+The npm port follows npm 11.17.0 and reproduces other releases beside it. A release is not inferred from the project:
+npm reads `packageManager` for nothing, and a sweep of every npm release showed that releases a project's declarations
+allow write different locks for the plainest edit (every release before 10.8.0 drops `license` from a new entry).
+
+- **The release that installs** is the one that built the LST. The JavaScript parser records it in a marker beside
+  `NodeResolutionResult`, `NodeRuntime`, as `JavaVersion` records the JDK that built a Java LST: the package manager it
+  found, what that package manager's `--version` answers in the project's root directory, and the Node version and
+  platform the parser ran on. The npm port installs as the marker's release, and as 11.17.0 without one. The machine
+  engines and platforms are checked against is the execution context's where the host gives one, else the marker's.
+  npm's own `devEngines` check (`lib/base-cmd.js`, from npm 10.9.0) runs for that release and rejects as npm does.
+- **One question per upstream change.** `NpmRelease` holds each difference between 11.17.0 and another release as a
+  question named for what npm does, answered through `atLeast` by the release that made the change; the ported module
+  branches on it where upstream changed, 11.17.0's code unchanged beside it. A library npm bundles at several releases
+  is ported once with its release as an option (`NodeSemver`, `Ssri`, `PickManifest`, `PackageJson`, `MapWorkspaces`),
+  and `NpmRelease` names the one each npm bundles.
+- **What is reproduced.** `NpmReleases.PROVEN` is the range of releases for which every recorded scenario replays as
+  that release wrote it. A marker naming a release outside it, or one npm never published, is cannot-know.
+- **How a release is proven.** Every npm release from 7.0.0 is run over every recorded scenario against a frozen
+  registry: the scenario's own `http/`, a full packument it kept abbreviated rebuilt from today's registry cut back to
+  the versions, tags and deprecations the recording saw. The release that recorded a scenario is its control and must
+  reproduce it byte for byte. Each run keeps the recorder's phases, the second install over every lock it writes, and
+  `cross`: the edit installed over the scenario's own `before`. A scenario's `releases` file names the releases that
+  write its recorded outcome, and each `release/<first>/` another outcome with the releases that write it;
+  `NpmScenarioTest` replays the first and last release of every range. An expect line `exact-or <failure>` holds a
+  release to the lock byte for byte where the engine writes one, and to the failure otherwise: a recording the engine
+  cannot know may be one another release, reading less, writes plainly.

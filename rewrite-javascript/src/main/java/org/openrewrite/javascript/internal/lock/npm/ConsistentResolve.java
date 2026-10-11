@@ -31,33 +31,34 @@ final class ConsistentResolve {
     private ConsistentResolve() {
     }
 
-    static @Nullable Object consistentResolve(@Nullable Object resolved) {
-        return consistentResolve(resolved, null, null, false);
+    static @Nullable Object consistentResolve(@Nullable Object resolved, NpmRelease release) {
+        return consistentResolve(resolved, null, null, false, release);
     }
 
     // a resolved of another JSON type comes back untouched: npa throws on it and the catch returns the input
     static @Nullable Object consistentResolve(@Nullable Object resolved, @Nullable String fromPath,
-                                              @Nullable String toPath, boolean relPaths) {
+                                              @Nullable String toPath, boolean relPaths, NpmRelease release) {
         if (!truthy(resolved)) {
             return null;
         }
         try {
-            return consistentResolve(Spec.npa(resolved, fromPath), toPath, relPaths);
+            return consistentResolve(Spec.npa(resolved, fromPath), toPath, relPaths, release);
         } catch (RuntimeException e) {
             return resolved;
         }
     }
 
     static @Nullable String consistentResolve(Spec resolved, @Nullable String fromPath,
-                                              @Nullable String toPath, boolean relPaths) {
+                                              @Nullable String toPath, boolean relPaths, NpmRelease release) {
         try {
-            return consistentResolve(Spec.npa(resolved, fromPath), toPath, relPaths);
+            return consistentResolve(Spec.npa(resolved, fromPath), toPath, relPaths, release);
         } catch (RuntimeException e) {
             return resolved.toString();
         }
     }
 
-    private static @Nullable String consistentResolve(Spec spec, @Nullable String toPath, boolean relPaths) {
+    private static @Nullable String consistentResolve(Spec spec, @Nullable String toPath, boolean relPaths,
+                                                      NpmRelease release) {
         Spec.Type type = spec.getType();
         if (type == Spec.Type.FILE || type == Spec.Type.DIRECTORY) {
             if (relPaths && toPath != null && !toPath.isEmpty()) {
@@ -67,7 +68,8 @@ final class ConsistentResolve {
         }
         GitHost hosted = spec.getHosted();
         if (hosted != null) {
-            return "git+" + (hosted.getAuth() != null && !hosted.getAuth().isEmpty() ?
+            return "git+" + (hosted.getAuth() != null && !hosted.getAuth().isEmpty() ||
+                             "https".equals(hosted.getDefaultRepresentation()) && release.keepsHostedGitHttps() ?
                     hosted.https(HOSTED_OPT) : hosted.sshurl(HOSTED_OPT));
         }
         if (type == Spec.Type.GIT) {
