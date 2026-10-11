@@ -65,6 +65,14 @@ public final class NpmRelease implements Comparable<NpmRelease> {
     // @npmcli/arborist build-ideal-tree.js
 
     /**
+     * {@code #checkEngineAndPlatform} leaves the root's {@code engines} unchecked when it has {@code devEngines}:
+     * from npm 10.9.0.
+     */
+    boolean devEnginesReplaceRootEngines() {
+        return atLeast(10, 9, 0);
+    }
+
+    /**
      * {@code #fetchManifest} drops {@code license} from the manifest pacote returns: npm 10.4.0 until 10.8.0.
      */
     boolean dropsLicenseOfFetchedManifest() {
@@ -86,6 +94,16 @@ public final class NpmRelease implements Comparable<NpmRelease> {
         return atLeast(10, 4, 0) && !atLeast(10, 8, 0);
     }
 
+    // @npmcli/arborist shrinkwrap.js
+
+    /**
+     * {@code metaFromNode} writes the package name of a node whose folder is named otherwise even when the node
+     * itself goes by that name, as a link target just placed does: from npm 10.8.2.
+     */
+    boolean namesEntryByFolder() {
+        return atLeast(10, 8, 2);
+    }
+
     // @npmcli/config definitions.js
 
     /**
@@ -100,6 +118,18 @@ public final class NpmRelease implements Comparable<NpmRelease> {
      */
     String allowRemoteDefault() {
         return atLeast(12, 0, 0) ? "none" : "all";
+    }
+
+    // @npmcli/package-json normalize.js
+
+    /**
+     * The @npmcli/package-json whose {@code bin} step pacote runs over a fetched manifest: 6.0.1 from npm 10.9.0,
+     * which reads as 7.0.5 there; 5.1.1 and 5.2.0 from npm 10.8.1; 5.1.0 and, before npm 10.6.0,
+     * read-package-json-fast before that.
+     */
+    PackageJson.Release packageJson() {
+        return atLeast(10, 9, 0) ? PackageJson.Release.V7_0_5 :
+                atLeast(10, 8, 1) ? PackageJson.Release.V5_2_0 : PackageJson.Release.V5_1_0;
     }
 
     // npm-pick-manifest

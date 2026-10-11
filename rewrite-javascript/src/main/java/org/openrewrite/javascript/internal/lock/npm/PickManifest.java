@@ -55,6 +55,13 @@ public final class PickManifest {
         @Builder.Default
         Release release = Release.V11_0_3;
 
+        /**
+         * The @npmcli/package-json whose {@code bin} step the caller runs over the pick: 7.0.5's settles what
+         * npm-normalize-package-bin leaves here, so the pick runs that step in its place; an older one does not.
+         */
+        @Builder.Default
+        PackageJson.Release packageJson = PackageJson.Release.V7_0_5;
+
         @Builder.Default
         String defaultTag = "latest";
 
@@ -374,7 +381,11 @@ public final class PickManifest {
         Object mani = pick(packument, wanted, opts);
         Object picked = mani;
         if (truthy(mani) && mani instanceof Map) {
-            PackageJson.normalizeBin(asMap(mani));
+            if (opts.getPackageJson() == PackageJson.Release.V7_0_5) {
+                PackageJson.normalizeBin(asMap(mani));
+            } else {
+                PackageJson.normalizePackageBin(asMap(mani));
+            }
         }
         Object policyRestrictions = packument.get("policyRestrictions");
         Object restrictedVersions = truthy(policyRestrictions) ? Js.get(policyRestrictions, "versions") : null;

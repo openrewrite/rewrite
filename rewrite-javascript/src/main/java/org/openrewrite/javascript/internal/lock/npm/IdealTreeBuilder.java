@@ -254,7 +254,8 @@ public final class IdealTreeBuilder {
         for (Node node : tree.getInventory().values()) {
             if (!node.isOptional() && !node.shouldOmit(omitSet)) {
                 try {
-                    if (!(node.isRoot() && truthy(node.getPackage().get("devEngines")))) {
+                    if (!(options.getRelease().devEnginesReplaceRootEngines() && node.isRoot() &&
+                          truthy(node.getPackage().get("devEngines")))) {
                         NpmInstallChecks.checkEngine(node.getPackage(), NPM_VERSION, host.getNodeVersion(),
                                 options.isForce());
                     }

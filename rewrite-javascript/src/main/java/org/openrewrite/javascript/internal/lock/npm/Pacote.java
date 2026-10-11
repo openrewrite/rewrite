@@ -106,6 +106,7 @@ final class Pacote {
         Map<String, Object> picked = PickManifest.pickManifest(packument, fetched.getFetchSpec(),
                 PickManifest.Options.builder()
                         .release(options.getRelease().pickManifest())
+                        .packageJson(options.getRelease().packageJson())
                         .defaultTag(truthy(opts.getDefaultTag()) ? opts.getDefaultTag() : "latest")
                         .before(opts.getBefore())
                         .nodeVersion(opts.getNodeVersion())
@@ -115,7 +116,7 @@ final class Pacote {
                 withVersionDocument(picked, registry.manifest(options.registryFor(name), name,
                         versionKey(packument, picked)));
         PackageJson.syncNormalize(mani);
-        PackageJson.normalizeBin(mani);
+        PackageJson.normalizeBin(mani, options.getRelease().packageJson());
 
         Object time = truthy(packument.get("time")) ?
                 Js.get(packument.get("time"), Js.string(mani.get("version"))) : null;

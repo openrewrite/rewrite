@@ -20,6 +20,7 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
 import org.openrewrite.javascript.internal.LockFileRegeneration.Kind;
 import org.openrewrite.javascript.internal.LockFileRegeneration.Result;
+import org.openrewrite.javascript.internal.lock.Host;
 
 import java.time.Instant;
 import java.util.LinkedHashMap;
@@ -105,6 +106,63 @@ class NpmLockRegeneratorTest {
         assertThat(result.getFailure().getKind()).isEqualTo(Kind.PM_FAILS);
         assertThat(result.getErrorMessage()).isEqualTo("MALFORMED_MANIFEST: npm fails on this edit: it cannot apply " +
           "the manifest: directories.bin: ref.replace is not a function");
+    }
+
+    // run with engine-strict under Node 24, npm 10.8.3 rejects this manifest (EBADENGINE) and 10.9.0, 10.9.9 and
+    // 11.17.0 write the lock: from 10.9.0 a root with devEngines has its engines left unchecked
+    @ParameterizedTest
+    @CsvSource({"10.8.3,false", "10.9.0,true", "11.17.0,true"})
+    void devEnginesReplaceTheRootsEngines(String release, boolean writes) {
+        String manifest = "{\"name\":\"a\",\"version\":\"1.0.0\",\"engines\":{\"node\":\">=99\"}," +
+                          "\"devEngines\":{\"runtime\":{\"name\":\"node\"}}}\n";
+        Result result = new NpmLockRegenerator(NpmLockRegenerator.Inputs.builder()
+          .release(NpmRelease.of(release))
+          .lock(LOCK)
+          .manifest("", manifest)
+          .npmrc("engine-strict=true\n")
+          .host(Host.builder().os("darwin").cpu("arm64").nodeVersion("v24.21.0").build())
+          .now(Instant.EPOCH)
+          .build(), NO_REGISTRY).regenerate();
+
+        if (writes) {
+            assertThat(result.getLockFileContent()).isEqualTo(LOCK.replace("\"version\": \"1.0.0\"\n    }",
+              "\"version\": \"1.0.0\",\n      \"engines\": {\n        \"node\": \">=99\"\n      }\n    }"));
+        } else {
+            assertThat(result.getFailure()).isNotNull();
+            assertThat(result.getFailure().getKind()).isEqualTo(Kind.PM_REJECTS);
+            assertThat(result.getErrorMessage()).contains("(EBADENGINE)");
+        }
+    }
+
+    // lock/npm/arb-link-satisfies-peer's lock without its file:v2 link, whose target's folder is not named after
+    // its package. npm 10.7.0 and older wrote the target placed from scratch without its name and added the name
+    // once they loaded it from that lock (the scenario's before and after as 9.7.2 to 10.7.0 wrote them); from
+    // 10.8.2 the name is written at once.
+    @ParameterizedTest
+    @CsvSource({"10.8.1,false", "10.8.2,true", "11.17.0,true"})
+    void aLinkTargetJustPlacedIsNamedByItsFolder(String release, boolean named) {
+        NpmScenarios.Edit edit = ScenarioReplay.edit("arb-link-satisfies-peer");
+        NpmScenarios.Scenario scenario = edit.getScenario();
+        String whole = scenario.before();
+        String link = whole.substring(
+          whole.indexOf(",\n    \"node_modules/@isaacs/testing-peer-dep-conflict-chain-v\": {"),
+          whole.indexOf("\n  }\n}"));
+        Result result = new NpmLockRegenerator(NpmLockRegenerator.Inputs.builder()
+          .release(NpmRelease.of(release))
+          .lock(whole.replace(link, ""))
+          .manifests(edit.getStart().manifests())
+          .host(ScenarioReplay.host(scenario))
+          .now(ScenarioReplay.now(scenario))
+          .build(), ScenarioReplay.registry(new ScenarioReplay.ScenarioRegistry(scenario))).regenerate();
+
+        if (named) {
+            assertThat(result.getLockFileContent()).isEqualTo(whole);
+        } else {
+            assertThat(result.getFailure()).isNotNull();
+            assertThat(result.getFailure().getKind()).isEqualTo(Kind.SECOND_INSTALL);
+            assertThat(result.getErrorMessage()).contains("would rewrite it: line 64 \"\"version\": \"2.0.0\"\" " +
+              "becomes \"\"name\": \"@isaacs/testing-peer-dep-conflict-chain-v\",\"");
+        }
     }
 
     // lock/npm/gap-orphan-prune-duplicate-name's lock without is-buffer, which the kind-of nested under is-number
