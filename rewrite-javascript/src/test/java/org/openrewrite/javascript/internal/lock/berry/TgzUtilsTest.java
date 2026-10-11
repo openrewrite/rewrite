@@ -107,6 +107,61 @@ class TgzUtilsTest {
         assertThat(entries).isEqualTo(expected);
     }
 
+    // node-tar 6.1.11 over a header whose octal size is signed, then a valid file of 5 bytes: a size whose block count
+    // stays zero reads nothing, one below a block throws (recorded)
+    @ParameterizedTest
+    @ValueSource(strings = {"00000000000", "-0000001"})
+    void aSignedSizeWithinABlockReadsNothing(String size) {
+        List<String> entries = new ArrayList<>();
+        for (TgzUtils.TarEntry entry : TgzUtils.parseTar(signedSizeTar(size))) {
+            entries.add(entry.path + " " + entry.body.length);
+        }
+        assertThat(entries).containsExactly("package/neg 0", "package/after 5");
+    }
+
+    @Test
+    void aSignedSizeBelowABlockFailsAsNodeTarDoes() {
+        assertThatThrownBy(() -> TgzUtils.parseTar(signedSizeTar("-0001000")))
+          .hasMessageContaining("writing more to entry than is appropriate");
+    }
+
+    private static byte[] signedSizeTar(String size) {
+        byte[] tar = new byte[512 * 6];
+        System.arraycopy(header("package/neg", size), 0, tar, 0, 512);
+        System.arraycopy(header("package/after", "00000000005"), 0, tar, 512, 512);
+        System.arraycopy("hello".getBytes(StandardCharsets.US_ASCII), 0, tar, 1024, 5);
+        return tar;
+    }
+
+    private static byte[] header(String name, String size) {
+        byte[] header = new byte[512];
+        put(header, 0, name);
+        put(header, 100, "0000644");
+        put(header, 108, "0000000");
+        put(header, 116, "0000000");
+        put(header, 124, size);
+        put(header, 136, "00000000000");
+        header[156] = '0';
+        put(header, 257, "ustar");
+        put(header, 263, "00");
+        for (int i = 148; i < 156; i++) {
+            header[i] = ' ';
+        }
+        long sum = 0;
+        for (byte b : header) {
+            sum += b & 0xff;
+        }
+        put(header, 148, String.format("%06o", sum));
+        header[154] = 0;
+        header[155] = ' ';
+        return header;
+    }
+
+    private static void put(byte[] header, int offset, String text) {
+        byte[] bytes = text.getBytes(StandardCharsets.US_ASCII);
+        System.arraycopy(bytes, 0, header, offset, bytes.length);
+    }
+
     private static String sha512(byte[] tgz, String prefixPath, int stripComponents) {
         return HashUtils.sha512Hex(TgzUtils.convertToZip(tgz, prefixPath, stripComponents).toByteArray());
     }

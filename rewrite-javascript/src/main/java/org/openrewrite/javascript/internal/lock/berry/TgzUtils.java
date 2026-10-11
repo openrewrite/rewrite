@@ -176,6 +176,10 @@ final class TgzUtils {
                 continue;
             }
             long size = header.size == null ? 0 : header.size;
+            // ReadEntry's blockRemain: below zero, any byte written to the entry is more than it takes
+            if (size < 0 && 512 * (long) Math.ceil(size / 512.0) < 0 && position < tar.length) {
+                throw new ReportError(ReportError.EXCEPTION, "writing more to entry than is appropriate");
+            }
             byte[] body = new byte[(int) Math.max(0, Math.min(size, tar.length - position))];
             System.arraycopy(tar, position, body, 0, body.length);
             position = size >= tar.length - position ? tar.length :

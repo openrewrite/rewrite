@@ -118,6 +118,14 @@ class JsonStringifyNiceTest {
           "  \"a\": {\n    \"b\": 1,\n    \"a\": {\n      \"nested\": true\n    }\n  }\n}\n");
     }
 
+    // npm 11.17.0's bundled json-stringify-nice 1.1.4, run over an own __proto__ as JSON.parse makes one
+    @Test
+    void anOwnProtoKeyIsLeftOut() {
+        assertThat(JsonStringifyNice.stringify(obj("__proto__", false, "a b", 1))).isEqualTo("{\n  \"a b\": 1\n}\n");
+        assertThat(JsonStringifyNice.stringify(obj("a", obj("__proto__", obj("x", 1)), "b", 2))).isEqualTo(
+          "{\n  \"b\": 2,\n  \"a\": {}\n}\n");
+    }
+
     @Test
     void dontBeConfusedByEmptyStringsOrOtherFalseyValues() {
         assertThat(JsonStringifyNice.stringify(obj("z", "", "y", null, "w", false, "x", 0))).isEqualTo(

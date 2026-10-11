@@ -70,7 +70,10 @@ final class JsonStringifyNice {
                     isObj(a.getValue()) ? 1 : -1);
             Map<String, Object> ret = new LinkedHashMap<>();
             for (Map.Entry<String, Object> e : entries) {
-                ret.put(e.getKey(), e.getValue());
+                // the reduce's set[k] = v makes an own __proto__ the new object's prototype, or nothing
+                if (!"__proto__".equals(e.getKey())) {
+                    ret.put(e.getKey(), e.getValue());
+                }
             }
             seen.put(val, ret);
             return ret;
