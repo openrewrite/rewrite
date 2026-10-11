@@ -20,6 +20,7 @@ import org.openrewrite.javascript.internal.LockFileRegeneration.InstallRoot;
 import org.openrewrite.javascript.internal.LockFileRegeneration.Result;
 import org.openrewrite.javascript.internal.lock.yarnclassic.YarnClassicLockRegenerator;
 import org.openrewrite.javascript.internal.lock.yarnclassic.YarnClassicLockRegenerator.Inputs;
+import org.openrewrite.javascript.internal.lock.yarnclassic.YarnClassicManifestRules;
 import org.openrewrite.javascript.internal.registry.NpmRegistryClient;
 
 import java.util.Arrays;
@@ -49,6 +50,11 @@ final class YarnClassicInputs implements Port {
     @Override
     public boolean reads(String fileName) {
         return CONFIG_FILES.contains(fileName);
+    }
+
+    @Override
+    public ManifestRules manifestRules() {
+        return YarnClassicManifestRules.RULES;
     }
 
     @Override

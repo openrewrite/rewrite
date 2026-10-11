@@ -19,16 +19,18 @@ import lombok.EqualsAndHashCode;
 import lombok.Value;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
-import org.openrewrite.javascript.internal.DependencyPathSegment;
+import org.openrewrite.javascript.internal.LockFileRegeneration;
 import org.openrewrite.javascript.internal.NodeCatalogs;
 import org.openrewrite.javascript.internal.NodeDependencyEdits;
 import org.openrewrite.javascript.internal.NodeDependencyScan;
 import org.openrewrite.javascript.internal.PackageJsonHelper;
 import org.openrewrite.javascript.internal.PackageJsonOverrides;
 import org.openrewrite.javascript.internal.lock.CannotKnow;
+import org.openrewrite.javascript.internal.lock.DependencyPathSegment;
+import org.openrewrite.javascript.internal.lock.ManifestRules;
+import org.openrewrite.javascript.internal.lock.ManifestRules.OverridePlace;
 import org.openrewrite.javascript.internal.lock.Rejected;
 import org.openrewrite.javascript.internal.lock.Spec;
-import org.openrewrite.javascript.internal.lock.pnpm.WorkspaceRootFinder;
 import org.openrewrite.javascript.marker.NodeResolutionResult.PackageManager;
 import org.openrewrite.javascript.table.NodeDependencyEditsDeclined;
 import org.openrewrite.javascript.table.NodeDependencyProtocolsSkipped;
@@ -39,7 +41,7 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.*;
 
-import static org.openrewrite.javascript.internal.PackageJsonOverrides.WORKSPACE_MANIFEST;
+import static java.util.Objects.requireNonNull;
 
 @EqualsAndHashCode(callSuper = false)
 @Value
@@ -120,13 +122,14 @@ public class UpgradeTransitiveDependencyVersion extends ScanningRecipe<NodeDepen
             return;
         }
         Path path = decision.getPath();
-        Path found = pm == PackageManager.Pnpm ? pnpmWorkspaceManifest(acc.scan, path) : null;
-        if (found != null && !WORKSPACE_MANIFEST.equals(String.valueOf(found.getFileName()))) {
-            decision.decline("pnpm finds " + found + " where it reads " + WORKSPACE_MANIFEST +
-                             " (ERR_PNPM_BAD_WORKSPACE_MANIFEST_NAME)");
+        ManifestRules rules = LockFileRegeneration.manifestRules(pm);
+        Path root;
+        try {
+            root = workspaceRoot(acc.scan, path, pm, rules);
+        } catch (Rejected e) {
+            decision.decline(String.valueOf(e.getMessage()));
             return;
         }
-        Path root = workspaceRoot(acc.scan, path, pm);
         if (!root.equals(path)) {
             if (!acc.holds(root)) {
                 decision.decline("the override belongs in the workspace root's " + root +
@@ -135,13 +138,14 @@ public class UpgradeTransitiveDependencyVersion extends ScanningRecipe<NodeDepen
             return;
         }
         String workspace = null;
-        if (pm == PackageManager.Pnpm) {
-            Path workspaceManifest = root.resolveSibling(WORKSPACE_MANIFEST);
+        String settingsFile = rules.workspaceSettingsFile();
+        if (settingsFile != null) {
+            Path workspaceManifest = root.resolveSibling(settingsFile);
             NodeCatalogs catalogs = decision.catalogs();
             if (catalogs != null && catalogs.getPath().equals(workspaceManifest)) {
                 workspace = catalogs.print();
             } else if (acc.scan.paths.contains(workspaceManifest)) {
-                decision.cannotKnow(CannotKnow.unread(WORKSPACE_MANIFEST));
+                decision.cannotKnow(CannotKnow.unread(settingsFile));
                 return;
             }
         }
@@ -154,12 +158,12 @@ public class UpgradeTransitiveDependencyVersion extends ScanningRecipe<NodeDepen
             decision.decline(declined);
             return;
         }
-        boolean inWorkspace = override.getPlace() == PackageJsonOverrides.Place.WORKSPACE_MANIFEST;
+        boolean inWorkspace = override.getPlace() == OverridePlace.WORKSPACE_MANIFEST;
         if (inWorkspace ? override.applyToWorkspaceManifest().equals(workspace) :
                 override.apply(manifest) == manifest) {
             return;
         }
-        List<NodeDependencyProtocolsSkipped.Row> references = references(acc, ctx, root, manifest, pm);
+        List<NodeDependencyProtocolsSkipped.Row> references = references(acc, ctx, root, manifest, pm, rules);
         for (NodeDependencyProtocolsSkipped.Row row : references) {
             decision.insertRow(protocolsSkipped, ctx, row);
         }
@@ -171,7 +175,7 @@ public class UpgradeTransitiveDependencyVersion extends ScanningRecipe<NodeDepen
             decision.decline(outranked);
         }
         if (inWorkspace) {
-            decision.editFileBeside(WORKSPACE_MANIFEST, c -> c instanceof NodeCatalogs.Pnpm ?
+            decision.editFileBeside(requireNonNull(settingsFile), c -> c instanceof NodeCatalogs.Pnpm ?
                     override.from(manifest, c.print()).applyTo((NodeCatalogs.Pnpm) c) : null);
         } else {
             decision.editManifest(override::apply);
@@ -182,14 +186,14 @@ public class UpgradeTransitiveDependencyVersion extends ScanningRecipe<NodeDepen
     // in the root or a member it governs, or for an override scoped to a member, in that member
     private List<NodeDependencyProtocolsSkipped.Row> references(NodeDependencyEdits acc, ExecutionContext ctx,
                                                                 Path root, Json.Document rootRevision,
-                                                                PackageManager pm) {
+                                                                PackageManager pm, ManifestRules rules) {
         List<DependencyPathSegment> path = dependencyPath == null ? null :
                 PackageJsonOverrides.parsePath(dependencyPath);
         String parent = path == null || path.isEmpty() ? null : path.get(path.size() - 1).getName();
         List<NodeDependencyProtocolsSkipped.Row> rows = new ArrayList<>();
         for (Path project : new TreeSet<>(acc.scan.projects.keySet())) {
             SourceFile manifest = project.equals(root) ? rootRevision : acc.editedBefore(ctx, project);
-            if (manifest == null || !root.equals(workspaceRoot(acc.scan, project, pm)) ||
+            if (manifest == null || !root.equals(governingRoot(acc.scan, project, pm, rules)) ||
                 parent != null && (project.equals(root) || !parent.equals(PackageJsonHelper.declaredName(manifest)))) {
                 continue;
             }
@@ -207,33 +211,25 @@ public class UpgradeTransitiveDependencyVersion extends ScanningRecipe<NodeDepen
         return rows;
     }
 
-    // pnpm's workspace root holds the workspace manifest its root-finder finds above packageJson; for the others, the
-    // package.json whose lock an edit of packageJson lands in, else the nearest that lists it as a member
-    private static Path workspaceRoot(NodeDependencyScan.Accumulator acc, Path packageJson, PackageManager pm) {
-        Path found = pm == PackageManager.Pnpm ? pnpmWorkspaceManifest(acc, packageJson) : null;
+    // the package manager's workspace root: the one its settings file names, else where it installs
+    private static Path workspaceRoot(NodeDependencyScan.Accumulator acc, Path packageJson, PackageManager pm,
+                                      ManifestRules rules) {
+        Path dir = packageJson.getParent();
+        String found = rules.workspaceRoot(path -> acc.paths.contains(Paths.get(path)),
+                dir == null ? "" : dir.toString().replace('\\', '/'));
         if (found != null) {
-            return found.resolveSibling("package.json");
+            return found.isEmpty() ? Paths.get("package.json") : Paths.get(found).resolve("package.json");
         }
-        Path lock = NodeDependencyScan.lockFor(acc, packageJson);
-        Path root = lock == null ? null : acc.lockToPackage.get(lock);
-        if (root != null) {
-            return root;
-        }
-        for (Map.Entry<Path, NodeDependencyScan.ProjectState> project : acc.projects.entrySet()) {
-            SourceFile captured = project.getValue().capturedPackageJson;
-            if (captured != null && !project.getKey().equals(packageJson) &&
-                PackageJsonHelper.workspaceMemberPaths(captured).contains(packageJson)) {
-                return project.getKey();
-            }
-        }
-        return packageJson;
+        return NodeDependencyScan.installRootOf(acc, packageJson, pm);
     }
 
-    // pnpm's root-finder from packageJson's directory up over the files the host holds, misspellings included
-    private static @Nullable Path pnpmWorkspaceManifest(NodeDependencyScan.Accumulator acc, Path packageJson) {
-        Path dir = packageJson.getParent();
-        String found = WorkspaceRootFinder.findWorkspaceManifest(path -> acc.paths.contains(Paths.get(path)),
-                dir == null ? "" : dir.toString().replace('\\', '/'));
-        return found == null ? null : Paths.get(found);
+    // a project whose workspace root the package manager rejects is governed by none
+    private static @Nullable Path governingRoot(NodeDependencyScan.Accumulator acc, Path packageJson,
+                                                PackageManager pm, ManifestRules rules) {
+        try {
+            return workspaceRoot(acc, packageJson, pm, rules);
+        } catch (Rejected e) {
+            return null;
+        }
     }
 }

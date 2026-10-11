@@ -23,12 +23,10 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.Tree;
+import org.openrewrite.javascript.internal.lock.DependencyPathSegment;
 import org.openrewrite.javascript.internal.lock.EcmaScript;
-import org.openrewrite.javascript.internal.lock.berry.Resolution;
-import org.openrewrite.javascript.internal.lock.bun.OverrideMap;
-import org.openrewrite.javascript.internal.lock.pnpm.ParseOverrides;
-import org.openrewrite.javascript.internal.lock.pnpm.WorkspaceManifest;
-import org.openrewrite.javascript.internal.lock.yarnclassic.ResolutionMap;
+import org.openrewrite.javascript.internal.lock.ManifestRules;
+import org.openrewrite.javascript.internal.lock.ManifestRules.OverridePlace;
 import org.openrewrite.javascript.marker.NodeResolutionResult.PackageManager;
 import org.openrewrite.json.tree.Json;
 import org.openrewrite.json.tree.JsonRightPadded;
@@ -57,28 +55,28 @@ public final class PackageJsonOverrides {
 
     public static final String WORKSPACE_MANIFEST = "pnpm-workspace.yaml";
 
-    private final PackageManager pm;
+    private final ManifestRules rules;
     private final String packageName;
     private final String newVersion;
     private final @Nullable List<DependencyPathSegment> path;
     private final Json.Document root;
     private final WorkspaceSettings workspace;
     private final @Nullable PnpmRelease release;
-    private final Place place;
+    private final OverridePlace place;
     private @Nullable String rootText;
     private @Nullable String declined;
     private boolean declinedKnown;
 
-    private PackageJsonOverrides(PackageManager pm, Json.Document root, WorkspaceSettings workspace,
+    private PackageJsonOverrides(ManifestRules rules, Json.Document root, WorkspaceSettings workspace,
                                  String packageName, String newVersion, @Nullable List<DependencyPathSegment> path) {
-        this.pm = pm;
+        this.rules = rules;
         this.root = root;
         this.packageName = packageName;
         this.newVersion = newVersion;
         this.path = path;
         this.workspace = workspace;
-        this.release = pm == PackageManager.Pnpm ? PnpmRelease.of(rootText(), workspace.settings()) : null;
-        this.place = place(release == null ? -1 : release.getMajor());
+        this.release = PnpmRelease.of(rules, rootText(), workspace.settings());
+        this.place = rules.overridePlace(rootText(), workspace.settings(), release == null ? -1 : release.getMajor());
     }
 
     // the root as printed, once
@@ -96,8 +94,9 @@ public final class PackageJsonOverrides {
     public static PackageJsonOverrides of(PackageManager pm, Json.Document root, @Nullable String workspaceManifest,
                                           String packageName, String newVersion,
                                           @Nullable List<DependencyPathSegment> path) {
-        return new PackageJsonOverrides(pm, root, new WorkspaceSettings(workspaceManifest), packageName, newVersion,
-                path);
+        ManifestRules rules = LockFileRegeneration.manifestRules(pm);
+        return new PackageJsonOverrides(rules, root, new WorkspaceSettings(rules, workspaceManifest), packageName,
+                newVersion, path);
     }
 
     /**
@@ -109,8 +108,8 @@ public final class PackageJsonOverrides {
         if (root == this.root && sameWorkspace) {
             return this;
         }
-        return new PackageJsonOverrides(pm, root, sameWorkspace ? workspace : new WorkspaceSettings(workspaceManifest),
-                packageName, newVersion, path);
+        return new PackageJsonOverrides(rules, root, sameWorkspace ? workspace :
+                new WorkspaceSettings(rules, workspaceManifest), packageName, newVersion, path);
     }
 
     /**
@@ -127,27 +126,21 @@ public final class PackageJsonOverrides {
         if (why != null) {
             return "declined (" + why + ")";
         }
-        String where = place == Place.WORKSPACE_MANIFEST ? WORKSPACE_MANIFEST : place == Place.PNPM_FIELD ?
-                "pnpm.overrides" : place == Place.RESOLUTIONS ? "resolutions" : "overrides";
-        return pm == PackageManager.Pnpm ? where + " for " + release : where;
+        String where = place == OverridePlace.WORKSPACE_MANIFEST ? WORKSPACE_MANIFEST :
+                place == OverridePlace.PNPM_FIELD ? "pnpm.overrides" :
+                        place == OverridePlace.RESOLUTIONS ? "resolutions" : "overrides";
+        return release != null ? where + " for " + release : where;
     }
 
     /**
      * Where the root's package manager reads the override.
      */
-    public Place getPlace() {
+    public OverridePlace getPlace() {
         return place;
     }
 
     int getRelease() {
         return release == null ? -1 : release.getMajor();
-    }
-
-    /**
-     * Where a package manager reads overrides.
-     */
-    public enum Place {
-        OVERRIDES, RESOLUTIONS, PNPM_FIELD, WORKSPACE_MANIFEST
     }
 
     /**
@@ -205,52 +198,6 @@ public final class PackageJsonOverrides {
         return new DependencyPathSegment(part, null);
     }
 
-    private Place place(int release) {
-        switch (pm) {
-            case Bun:
-                return "resolutions".equals(OverrideMap.readsFrom(rootText())) ?
-                        Place.RESOLUTIONS : Place.OVERRIDES;
-            case YarnClassic:
-            case YarnBerry:
-                return Place.RESOLUTIONS;
-            case Pnpm:
-                // pnpm 9 reads package.json's overrides only, 10 instead of pnpm-workspace.yaml's when it holds any
-                // (override-pnpm9-reads-pnpm-field, override-pnpm10-recipe-beside-resolutions)
-                if (release == 9 || release == 10 && (holdsOverrides(root) ||
-                                                      !workspace.holdsOverrides() && hasPnpmField(root))) {
-                    // {...resolutions, ...pnpm?.overrides}; a null pnpm field: override-pnpm10-recipe-null-pnpm-*
-                    return !hasPnpmField(root) && member(root, "pnpm") != null &&
-                           holdsMembers(member(root, "resolutions")) ? Place.RESOLUTIONS : Place.PNPM_FIELD;
-                }
-                return Place.WORKSPACE_MANIFEST;
-            case Npm:
-            default:
-                return Place.OVERRIDES;
-        }
-    }
-
-    private static boolean holdsOverrides(Json.Document root) {
-        Json pnpm = member(root, "pnpm");
-        return holdsMembers(member(root, "resolutions")) ||
-               pnpm instanceof Json.JsonObject && holdsMembers(member((Json.JsonObject) pnpm, "overrides"));
-    }
-
-    private static boolean holdsMembers(@Nullable Json value) {
-        if (value instanceof Json.JsonObject) {
-            for (Json m : ((Json.JsonObject) value).getMembers()) {
-                if (m instanceof Json.Member) {
-                    return true;
-                }
-            }
-        }
-        return false;
-    }
-
-    private static boolean hasPnpmField(Json.Document root) {
-        Json pnpm = member(root, "pnpm");
-        return pnpm != null && !(pnpm instanceof Json.Literal && ((Json.Literal) pnpm).getValue() == null);
-    }
-
     /**
      * Why the root's package manager would not read the override where it is written, or why pnpm-workspace.yaml is
      * not edited in place; null when neither.
@@ -258,7 +205,7 @@ public final class PackageJsonOverrides {
     public @Nullable String declined() {
         if (!declinedKnown) {
             declined = decline();
-            if (declined == null && place == Place.WORKSPACE_MANIFEST) {
+            if (declined == null && place == OverridePlace.WORKSPACE_MANIFEST) {
                 try {
                     applyToWorkspaceManifest();
                 } catch (IllegalArgumentException e) {
@@ -271,40 +218,20 @@ public final class PackageJsonOverrides {
     }
 
     private @Nullable String decline() {
-        int depth = path == null ? 0 : path.size();
-        if (pm == PackageManager.Pnpm) {
-            String declined = requireNonNull(release).declined();
-            if (declined != null) {
-                return "the override is not written: " + declined;
-            }
-            String selector = pnpmSelector(packageName, path);
-            String rejected = ParseOverrides.rejects(selector);
-            if (rejected != null) {
-                return "pnpm rejects the override selector " + selector + ": " + rejected;
-            }
-        } else if (pm == PackageManager.Bun && depth > 0) { // override-nested
-            return "bun does not support nested overrides";
-        } else if (pm == PackageManager.YarnBerry && Resolution.rejects(berryKey(packageName, path)) != null) {
-            return "Yarn drops the resolution " + berryKey(packageName, path) + " (YN0057): " +
-                   Resolution.rejects(berryKey(packageName, path));
-        } else if (pm == PackageManager.YarnBerry && path != null && depth == 1 && // override-key-ranged-parent
-                   !exactVersion(path.get(0).getVersion())) {
-            return "Yarn matches a resolution's parent by its exact version only, not " + segment(path.get(0));
-        } else if (pm == PackageManager.YarnClassic && path != null) { // override-key-versioned-parent
-            for (DependencyPathSegment segment : path) {
-                if (segment.getVersion() != null) {
-                    return "yarn matches a resolution's path by package names only, not " + segment.getName() +
-                           "@" + segment.getVersion();
-                }
-            }
+        if (release != null && release.declined() != null) {
+            return "the override is not written: " + release.declined();
         }
-        String field = place == Place.OVERRIDES ? "overrides" : place == Place.RESOLUTIONS ? "resolutions" :
-                place == Place.PNPM_FIELD ? "pnpm" : null;
+        String rejected = rules.overrideDeclined(packageName, segments());
+        if (rejected != null) {
+            return rejected;
+        }
+        String field = place == OverridePlace.OVERRIDES ? "overrides" :
+                place == OverridePlace.RESOLUTIONS ? "resolutions" : place == OverridePlace.PNPM_FIELD ? "pnpm" : null;
         Json value = field == null ? null : member(root, field);
         if (value != null && !(value instanceof Json.JsonObject)) {
             return "the root's " + field + " is not an object";
         }
-        if (place == Place.PNPM_FIELD && value != null) {
+        if (place == OverridePlace.PNPM_FIELD && value != null) {
             Json overrides = member((Json.JsonObject) value, "overrides");
             if (overrides != null && !(overrides instanceof Json.JsonObject)) {
                 return "the root's pnpm.overrides is not an object";
@@ -334,14 +261,10 @@ public final class PackageJsonOverrides {
                 }
                 return setNestedOverride(doc, path, packageName, newVersion);
             case RESOLUTIONS:
-                String resolution = pm == PackageManager.Pnpm ? pnpmKey(packageName, path) :
-                        resolutionKey(pm, packageName, path);
-                if (pm == PackageManager.YarnClassic) {
-                    resolution = yarnClassicKeyOf(member(doc, "resolutions"), resolution);
-                }
-                return setFlatEntry(doc, "resolutions", resolution, newVersion);
+                return setFlatEntry(doc, "resolutions", rules.overrideKey(packageName, segments(),
+                        keys(member(doc, "resolutions"))), newVersion);
             case PNPM_FIELD:
-                String key = pnpmKey(packageName, path);
+                String key = rules.overrideKey(packageName, segments(), emptyList());
                 Json pnpm = member(doc, "pnpm");
                 Json overrides = pnpm instanceof Json.JsonObject ? member((Json.JsonObject) pnpm, "overrides") : null;
                 Json resolutions = member(doc, "resolutions");
@@ -362,7 +285,7 @@ public final class PackageJsonOverrides {
      * an {@link IllegalArgumentException} names why it is not written (an anchor, a block scalar).
      */
     public String applyToWorkspaceManifest() {
-        return applyTo(NodeCatalogs.Pnpm.parse(workspace.text, requireNonNull(release))).print();
+        return applyTo(NodeCatalogs.Pnpm.parse(workspace.text, rules, requireNonNull(release))).print();
     }
 
     /**
@@ -370,61 +293,26 @@ public final class PackageJsonOverrides {
      * {@link #applyToWorkspaceManifest()} writes it, by the one editor of that file.
      */
     public NodeCatalogs applyTo(NodeCatalogs.Pnpm workspace) {
-        return workspace.forRelease(requireNonNull(release)).withOverride(pnpmKey(packageName, path), newVersion);
+        return workspace.forRelease(requireNonNull(release)).withOverride(rules.overrideKey(packageName, segments(),
+                emptyList()), newVersion);
     }
 
-    // the selector of the whole path, which pnpm reads with one parent only
-    private static String pnpmSelector(String packageName, @Nullable List<DependencyPathSegment> path) {
-        StringBuilder selector = new StringBuilder();
-        for (DependencyPathSegment segment : path == null ? Collections.<DependencyPathSegment>emptyList() : path) {
-            selector.append(segment(segment)).append('>');
-        }
-        return selector.append(packageName).toString();
+    private List<DependencyPathSegment> segments() {
+        return path == null ? emptyList() : path;
     }
 
-    // the resolution key of the whole path, which Yarn reads with one parent only
-    private static String berryKey(String packageName, @Nullable List<DependencyPathSegment> path) {
-        StringBuilder key = new StringBuilder();
-        for (DependencyPathSegment segment : path == null ? Collections.<DependencyPathSegment>emptyList() : path) {
-            key.append(segment(segment)).append('/');
-        }
-        return key.append(packageName).toString();
-    }
-
-    // pnpm reads one parent, a>b (override-recipe-path)
-    private static String pnpmKey(String packageName, @Nullable List<DependencyPathSegment> path) {
-        return path == null || path.isEmpty() ? packageName : segment(path.get(path.size() - 1)) + ">" + packageName;
-    }
-
-    // Yarn Berry reads one parent (override-recipe-path), Yarn classic matches from the root
-    // (small-resolutions-parent-not-root)
-    private static String resolutionKey(PackageManager pm, String packageName,
-                                        @Nullable List<DependencyPathSegment> path) {
-        if (path == null || path.isEmpty()) {
-            return packageName;
-        }
-        if (pm == PackageManager.YarnBerry) {
-            return segment(path.get(path.size() - 1)) + "/" + packageName;
-        }
-        StringBuilder key = new StringBuilder("**/");
-        for (DependencyPathSegment segment : path) {
-            key.append(segment.getName()).append('/');
-        }
-        return key.append(packageName).toString();
-    }
-
-    // the first key yarn reads as the same glob, since it applies the first resolution whose glob matches
-    private static String yarnClassicKeyOf(@Nullable Json resolutions, String key) {
-        if (resolutions instanceof Json.JsonObject) {
-            String glob = ResolutionMap.globPattern(key);
-            for (Json m : ((Json.JsonObject) resolutions).getMembers()) {
-                String existing = m instanceof Json.Member ? literalString(((Json.Member) m).getKey()) : null;
-                if (existing != null && glob != null && glob.equals(ResolutionMap.globPattern(existing))) {
-                    return existing;
+    // a JSON object's keys in the order of its members
+    private static List<String> keys(@Nullable Json object) {
+        List<String> keys = new ArrayList<>();
+        if (object instanceof Json.JsonObject) {
+            for (Json m : ((Json.JsonObject) object).getMembers()) {
+                String key = m instanceof Json.Member ? literalString(((Json.Member) m).getKey()) : null;
+                if (key != null) {
+                    keys.add(key);
                 }
             }
         }
-        return key;
+        return keys;
     }
 
     /**
@@ -432,29 +320,10 @@ public final class PackageJsonOverrides {
      * reads them; null when there are none or the override is scoped.
      */
     public @Nullable String outranked() {
-        if (path != null && !path.isEmpty() || declined() != null) {
+        if (!segments().isEmpty() || declined() != null) {
             return null;
         }
-        if (pm == PackageManager.YarnClassic) {
-            List<String> before = ResolutionMap.triedBefore(parsedResolutions(),
-                    yarnClassicKeyOf(member(root, "resolutions"), packageName));
-            return before.isEmpty() ? null : "yarn applies " + String.join(", ", before) +
-                                             " before a global override of " + packageName;
-        }
-        if (pm != PackageManager.Pnpm && pm != PackageManager.YarnBerry) {
-            return null;
-        }
-        List<String> keys = new ArrayList<>();
-        for (String key : overrideKeys()) {
-            int at = key.lastIndexOf('>');
-            if (pm == PackageManager.Pnpm ? at > 0 && packageName.equals(nameOf(key.substring(at + 1))) :
-                    key.endsWith("/" + packageName) && isParent(key.substring(0, key.length() -
-                                                                              packageName.length() - 1))) {
-                keys.add(key);
-            }
-        }
-        return keys.isEmpty() ? null : (pm == PackageManager.Pnpm ? "pnpm" : "Yarn") + " applies " +
-                                      String.join(", ", keys) + " before a global override of " + packageName;
+        return rules.outranked(packageName, overrideKeys(), parsedResolutions());
     }
 
     // the root's resolutions as JSON.parse reads them
@@ -472,7 +341,7 @@ public final class PackageJsonOverrides {
 
     private List<String> overrideKeys() {
         List<String> keys = new ArrayList<>();
-        if (place == Place.WORKSPACE_MANIFEST) {
+        if (place == OverridePlace.WORKSPACE_MANIFEST) {
             Object overrides = workspace.setting("overrides");
             if (overrides instanceof Map) {
                 for (Object key : ((Map<?, ?>) overrides).keySet()) {
@@ -482,39 +351,15 @@ public final class PackageJsonOverrides {
             return keys;
         }
         Json pnpm = member(root, "pnpm");
-        for (Json map : Arrays.asList(member(root, "resolutions"), place == Place.PNPM_FIELD &&
+        for (Json map : Arrays.asList(member(root, "resolutions"), place == OverridePlace.PNPM_FIELD &&
                 pnpm instanceof Json.JsonObject ? member((Json.JsonObject) pnpm, "overrides") : null)) {
-            if (map instanceof Json.JsonObject) {
-                for (Json m : ((Json.JsonObject) map).getMembers()) {
-                    String key = m instanceof Json.Member ? literalString(((Json.Member) m).getKey()) : null;
-                    if (key != null) {
-                        keys.add(key);
-                    }
-                }
-            }
+            keys.addAll(keys(map));
         }
         return keys;
     }
 
-    // a Berry resolution's parent descriptor, not the scope of the package it resolves
-    private static boolean isParent(String prefix) {
-        return !prefix.isEmpty() && !(prefix.startsWith("@") && prefix.indexOf('/') < 0);
-    }
-
-    // a selector's package name, without the range after its name's @
-    private static String nameOf(String selector) {
-        int at = selector.indexOf('@', selector.startsWith("@") ? 1 : 0);
-        return at < 0 ? selector : selector.substring(0, at);
-    }
-
     private static String segment(DependencyPathSegment segment) {
         return segment.getVersion() == null ? segment.getName() : segment.getName() + "@" + segment.getVersion();
-    }
-
-    // Berry compares a resolution's parent with the resolved locator, which an npm range never equals
-    private static boolean exactVersion(@Nullable String version) {
-        String bare = version != null && version.startsWith("npm:") ? version.substring("npm:".length()) : version;
-        return bare == null || bare.equals(NodeSemver.valid(bare, NodeSemver.Options.DEFAULT));
     }
 
     private static Json.Document setNestedOverride(Json.Document doc, List<DependencyPathSegment> path,
@@ -700,11 +545,11 @@ public final class PackageJsonOverrides {
         private final @Nullable String text;
         private final @Nullable Map<String, @Nullable Object> loaded;
 
-        WorkspaceSettings(@Nullable String text) {
+        WorkspaceSettings(ManifestRules rules, @Nullable String text) {
             this.text = text;
             Map<String, @Nullable Object> document = null;
             try {
-                document = WorkspaceManifest.readWorkspaceManifest(text);
+                document = rules.workspaceSettings(text);
             } catch (RuntimeException ignored) {
                 // the editor names why pnpm rejects it
             }

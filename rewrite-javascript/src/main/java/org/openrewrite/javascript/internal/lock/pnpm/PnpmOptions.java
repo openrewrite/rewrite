@@ -273,7 +273,7 @@ public final class PnpmOptions {
      * The release getConfig wants for the root manifest {@code rootManifest}, under the {@code pmOnFail} of the
      * workspace's pnpm-workspace.yaml as pnpm reads it (null without one); null when the manifest names none.
      */
-    public static @Nullable WantedPackageManager wantedPackageManager(
+    static @Nullable WantedPackageManager wantedPackageManager(
             String rootManifest, @Nullable Map<String, @Nullable Object> workspace) {
         return withPmOnFail(getWantedPackageManager(Manifests.parse(rootManifest, "package.json")),
                 workspace == null ? null : workspace.get("pmOnFail"));

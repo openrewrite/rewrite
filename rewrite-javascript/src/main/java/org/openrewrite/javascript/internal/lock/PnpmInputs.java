@@ -19,6 +19,7 @@ import org.openrewrite.javascript.internal.LockFileRegeneration.InstallRoot;
 import org.openrewrite.javascript.internal.LockFileRegeneration.Result;
 import org.openrewrite.javascript.internal.lock.pnpm.PnpmLockRegenerator;
 import org.openrewrite.javascript.internal.lock.pnpm.PnpmLockRegenerator.Inputs;
+import org.openrewrite.javascript.internal.lock.pnpm.PnpmManifestRules;
 import org.openrewrite.javascript.internal.lock.pnpm.WorkspaceRootFinder;
 import org.openrewrite.javascript.internal.registry.NpmRegistryClient;
 
@@ -62,6 +63,11 @@ final class PnpmInputs implements Port {
     @Override
     public boolean readsOtherLocks() {
         return true;
+    }
+
+    @Override
+    public ManifestRules manifestRules() {
+        return PnpmManifestRules.RULES;
     }
 
     @Override

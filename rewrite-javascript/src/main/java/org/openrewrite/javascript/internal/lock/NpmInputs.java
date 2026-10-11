@@ -20,6 +20,7 @@ import org.openrewrite.javascript.internal.LockFileRegeneration.InstallRoot;
 import org.openrewrite.javascript.internal.LockFileRegeneration.Result;
 import org.openrewrite.javascript.internal.lock.npm.NpmLockRegenerator;
 import org.openrewrite.javascript.internal.lock.npm.NpmLockRegenerator.Inputs;
+import org.openrewrite.javascript.internal.lock.npm.NpmManifestRules;
 import org.openrewrite.javascript.internal.lock.npm.Shrinkwrap;
 import org.openrewrite.javascript.internal.registry.NpmRegistryClient;
 
@@ -131,6 +132,11 @@ final class NpmInputs implements Port {
      * npm's walk from where it runs; it stops where npm writes a file no regeneration writes (Shrinkwrap's rules): its
      * lock as an npm-shrinkwrap.json, or the yarn.lock beside a lock the host does not hold.
      */
+    @Override
+    public ManifestRules manifestRules() {
+        return NpmManifestRules.RULES;
+    }
+
     @Override
     public InstallRoot installRoot(LockDirectory dir) {
         InstallRoot walked = NpmLockRegenerator.installRoot(dir.getRunsIn(), dir.getManifests(), parentTrees(dir));

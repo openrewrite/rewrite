@@ -376,7 +376,7 @@ public final class Main {
      * The release pnpm installs with: the one it switches to or fails without, else this one; CannotKnow where corepack
      * would start another or refuse the spec ({@code corepack}), as the host does not say whether it starts pnpm.
      */
-    public static String release(PnpmOptions.@Nullable WantedPackageManager wanted,
+    static String release(PnpmOptions.@Nullable WantedPackageManager wanted,
                                  Supplier<SpecUtils.@Nullable Descriptor> corepack) {
         boolean checks = wanted != null && ("download".equals(wanted.getOnFail()) ||
                                             "error".equals(wanted.getOnFail()));

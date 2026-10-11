@@ -1,0 +1,3 @@
+[ERROR] The 'default' catalog was defined multiple times. Use the 'catalog' field or 'catalogs.default', but not both.
+For help, run: pnpm help config
+exit=1

@@ -20,6 +20,7 @@ import org.jspecify.annotations.Nullable;
 import org.openrewrite.PrintOutputCapture;
 import org.openrewrite.SourceFile;
 import org.openrewrite.javascript.marker.NodeResolutionResult;
+import org.openrewrite.javascript.marker.NodeResolutionResult.PackageManager;
 import org.openrewrite.quark.Quark;
 
 import java.nio.file.Path;
@@ -195,6 +196,30 @@ public final class NodeDependencyScan {
             lock = own != null ? own : nearestLockAbove(acc, packageJsonPath, regeneration);
         }
         return lock;
+    }
+
+    /**
+     * The package.json of the directory {@code pm} installs in when run from {@code packageJsonPath}'s, by its own
+     * walk; where the walk stops, that of the lock the edit lands in, else {@code packageJsonPath}.
+     */
+    public static Path installRootOf(Accumulator acc, Path packageJsonPath, @Nullable PackageManager pm) {
+        ProjectState ps = acc.projects.get(packageJsonPath);
+        NodeResolutionResult marker = marker(ps);
+        LockFileRegeneration regeneration = LockFileRegeneration.forPackageManager(pm);
+        if (ps == null || marker == null || regeneration == null) {
+            return packageJsonPath;
+        }
+        LockFileRegeneration.InstallRoot walked = pm == marker.getPackageManager() ?
+                acc.installRoots.computeIfAbsent(packageJsonPath, k -> installRoot(acc, packageJsonPath, ps,
+                        lockBeside(acc, packageJsonPath, regeneration), marker, regeneration)) :
+                installRoot(acc, packageJsonPath, ps, lockBeside(acc, packageJsonPath, regeneration), marker,
+                        regeneration);
+        if (!walked.isStopped()) {
+            return up(packageJsonPath, walked.getDepth());
+        }
+        Path lock = lockFor(acc, packageJsonPath);
+        Path root = lock == null ? null : acc.lockToPackage.get(lock);
+        return root == null ? packageJsonPath : root;
     }
 
     private static @Nullable NodeResolutionResult marker(@Nullable ProjectState ps) {

@@ -26,13 +26,13 @@ import java.util.Map;
  * Port of bun's src/install/lockfile/CatalogMap.zig (bun 1.3.10): the default catalog and the named groups, each
  * from a dependency name to its dependency.
  */
-public final class CatalogMap {
+final class CatalogMap {
 
     /**
      * The catalog group a dependency's version names, as Dependency.Version.parse reads a catalog reference; {@code ""}
      * the default one, null for no catalog reference.
      */
-    public static @Nullable String groupOf(String dependency) {
+    static @Nullable String groupOf(String dependency) {
         if (DependencyVersion.Tag.infer(dependency) != DependencyVersion.Tag.CATALOG) {
             return null;
         }

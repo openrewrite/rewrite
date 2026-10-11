@@ -20,8 +20,8 @@ import org.openrewrite.javascript.internal.LockFileRegeneration.Result;
 import org.openrewrite.javascript.internal.registry.NpmRegistryClient;
 
 /**
- * What a regeneration asks one package manager's port: its lock, the project files it reads, where it installs, and
- * its install over the lock.
+ * What a regeneration asks one package manager's port: its lock, the project files it reads, where it installs, its
+ * install over the lock, and what it reads of the files the recipes edit.
  */
 public interface Port {
 
@@ -64,6 +64,11 @@ public interface Port {
      * Where the package manager installs when run in the edited manifest's directory, by its own walk.
      */
     InstallRoot installRoot(LockDirectory dir);
+
+    /**
+     * What the package manager reads of the files the dependency recipes edit.
+     */
+    ManifestRules manifestRules();
 
     Result regenerate(LockDirectory dir, HostInputs host, NpmRegistryClient client);
 }

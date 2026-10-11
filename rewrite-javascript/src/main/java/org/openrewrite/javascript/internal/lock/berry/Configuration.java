@@ -409,6 +409,45 @@ public final class Configuration {
     /**
      * The version in the file name of the release {@code yarnPath} names ({@code .yarn/releases/yarn-4.10.3.cjs}).
      */
+    /**
+     * The {@code catalog} and {@code catalogs} settings of one rc file as Yarn parses them, {@code ""} the default
+     * catalog; throws where Yarn rejects the file or them.
+     */
+    static Map<String, Map<String, String>> catalogs(String rcFile, HostEnvironment env) {
+        Object data;
+        try {
+            data = Syml.parseSyml(rcFile);
+        } catch (RuntimeException e) {
+            throw new UsageError("Parse error when loading " + DEFAULT_RC_FILENAME + "; please check it's proper Yaml");
+        }
+        Configuration options = new Configuration(env);
+        Map<String, Map<String, String>> catalogs = new LinkedHashMap<>();
+        Map<String, @Nullable Object> settings = asMap(data);
+        if (settings.get("catalog") != null) {
+            catalogs.put("", strings(options.parseValue("catalog", settings.get("catalog"),
+                    DEFINITIONS.get("catalog"))));
+        }
+        if (settings.get("catalogs") != null) {
+            for (Map.Entry<String, @Nullable Object> named : asMap(options.parseValue("catalogs",
+                    settings.get("catalogs"), DEFINITIONS.get("catalogs"))).entrySet()) {
+                if (!named.getKey().isEmpty()) {
+                    catalogs.put(named.getKey(), strings(named.getValue()));
+                }
+            }
+        }
+        return catalogs;
+    }
+
+    private static Map<String, String> strings(@Nullable Object catalog) {
+        Map<String, String> entries = new LinkedHashMap<>();
+        for (Map.Entry<String, @Nullable Object> entry : asMap(catalog).entrySet()) {
+            if (entry.getValue() instanceof String) {
+                entries.put(entry.getKey(), (String) entry.getValue());
+            }
+        }
+        return entries;
+    }
+
     static @Nullable String yarnPathVersion(String yarnPath) {
         Matcher m = YARN_RELEASE.matcher(yarnPath);
         return m.find() ? m.group(1) : null;

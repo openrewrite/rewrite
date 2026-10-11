@@ -27,6 +27,8 @@ import org.openrewrite.ExecutionContext;
 import org.openrewrite.InMemoryExecutionContext;
 import org.openrewrite.PrintOutputCapture;
 import org.openrewrite.SourceFile;
+import org.openrewrite.javascript.internal.lock.DependencyPathSegment;
+import org.openrewrite.javascript.internal.lock.ManifestRules.OverridePlace;
 import org.openrewrite.javascript.marker.NodeResolutionResult.PackageManager;
 import org.openrewrite.json.JsonParser;
 import org.openrewrite.json.tree.Json;
@@ -166,11 +168,11 @@ class PackageJsonOverridesTest {
         String workspace = "packages:\n  - apps/*\n";
         PackageJsonOverrides scanned = PackageJsonOverrides.of(Pnpm, pnpm9, workspace, "is-number", "7.0.0", null);
         assertThat(scanned.from(pnpm9, workspace)).isSameAs(scanned);
-        assertThat(scanned.getPlace()).isEqualTo(PackageJsonOverrides.Place.PNPM_FIELD);
+        assertThat(scanned.getPlace()).isEqualTo(OverridePlace.PNPM_FIELD);
         assertThat(scanned.from(pnpm9, "pmOnFail: ignore\n").getRelease()).isEqualTo(-1);
 
         PackageJsonOverrides changed = scanned.from(pnpm11, workspace);
-        assertThat(changed.getPlace()).isEqualTo(PackageJsonOverrides.Place.WORKSPACE_MANIFEST);
+        assertThat(changed.getPlace()).isEqualTo(OverridePlace.WORKSPACE_MANIFEST);
         assertThat(changed.writesAs(scanned)).isFalse();
         assertThat(changed.toString()).isEqualTo("pnpm-workspace.yaml for pnpm 11.2.2");
         assertThat(changed.writesAs(changed.from(pnpm11, workspace + "autoInstallPeers: false\n"))).isTrue();
@@ -181,17 +183,17 @@ class PackageJsonOverridesTest {
     @Test
     void eachPackageManagerReadsItsOwnPlace() {
         Json.Document plain = manifest("{\"name\":\"p\"}");
-        assertThat(place(Npm, plain, null)).isEqualTo(PackageJsonOverrides.Place.OVERRIDES);
-        assertThat(place(Bun, plain, null)).isEqualTo(PackageJsonOverrides.Place.OVERRIDES);
+        assertThat(place(Npm, plain, null)).isEqualTo(OverridePlace.OVERRIDES);
+        assertThat(place(Bun, plain, null)).isEqualTo(OverridePlace.OVERRIDES);
         assertThat(place(Bun, manifest("{\"resolutions\":{}}"), null))
-          .isEqualTo(PackageJsonOverrides.Place.RESOLUTIONS);
+          .isEqualTo(OverridePlace.RESOLUTIONS);
         assertThat(place(Bun, manifest("{\"overrides\":{},\"resolutions\":{}}"), null))
-          .isEqualTo(PackageJsonOverrides.Place.OVERRIDES);
-        assertThat(place(YarnClassic, plain, null)).isEqualTo(PackageJsonOverrides.Place.RESOLUTIONS);
-        assertThat(place(YarnBerry, plain, null)).isEqualTo(PackageJsonOverrides.Place.RESOLUTIONS);
-        assertThat(place(Pnpm, plain, null)).isEqualTo(PackageJsonOverrides.Place.WORKSPACE_MANIFEST);
+          .isEqualTo(OverridePlace.OVERRIDES);
+        assertThat(place(YarnClassic, plain, null)).isEqualTo(OverridePlace.RESOLUTIONS);
+        assertThat(place(YarnBerry, plain, null)).isEqualTo(OverridePlace.RESOLUTIONS);
+        assertThat(place(Pnpm, plain, null)).isEqualTo(OverridePlace.WORKSPACE_MANIFEST);
         assertThat(place(Pnpm, manifest("{\"packageManager\":\"pnpm@9.15.9\"}"), null))
-          .isEqualTo(PackageJsonOverrides.Place.PNPM_FIELD);
+          .isEqualTo(OverridePlace.PNPM_FIELD);
     }
 
     @ParameterizedTest
@@ -207,7 +209,7 @@ class PackageJsonOverridesTest {
       "\"pnpm\":null,\"resolutions\":{\"left-pad\":\"1.3.0\"} ; ; RESOLUTIONS",
     })
     void pnpm10ReadsPackageJsonsOverridesInPlaceOfTheWorkspaces(@Nullable String fields, @Nullable String workspace,
-                                                                 PackageJsonOverrides.Place place) {
+                                                                 OverridePlace place) {
         Json.Document root = manifest("{\"packageManager\":\"pnpm@10.34.6\"" + (fields == null ? "" : "," + fields) +
                                       "}");
         assertThat(place(Pnpm, root, workspace)).isEqualTo(place);
@@ -413,7 +415,7 @@ class PackageJsonOverridesTest {
                 path == null ? null : PackageJsonOverrides.parsePath(path)).apply(root).printAll();
     }
 
-    private static PackageJsonOverrides.Place place(PackageManager pm, Json.Document root,
+    private static OverridePlace place(PackageManager pm, Json.Document root,
                                                     @Nullable String workspace) {
         return PackageJsonOverrides.of(pm, root, workspace == null ? null : workspace + "\n", "is-number", "7.0.0",
                 null).getPlace();

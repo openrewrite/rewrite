@@ -19,6 +19,7 @@ import org.openrewrite.javascript.internal.LockFileRegeneration.InstallRoot;
 import org.openrewrite.javascript.internal.LockFileRegeneration.Result;
 import org.openrewrite.javascript.internal.lock.bun.BunLockRegenerator;
 import org.openrewrite.javascript.internal.lock.bun.BunLockRegenerator.Inputs;
+import org.openrewrite.javascript.internal.lock.bun.BunManifestRules;
 import org.openrewrite.javascript.internal.lock.bun.DotEnv;
 import org.openrewrite.javascript.internal.lock.bun.Lockfile;
 import org.openrewrite.javascript.internal.registry.NpmRegistryClient;
@@ -95,6 +96,11 @@ final class BunInputs implements Port {
      * bun's walk from where it runs; where it finds no bun.lock it stops at a file no regeneration writes (Lockfile's
      * rule).
      */
+    @Override
+    public ManifestRules manifestRules() {
+        return BunManifestRules.RULES;
+    }
+
     @Override
     public InstallRoot installRoot(LockDirectory dir) {
         InstallRoot walked = BunLockRegenerator.installRoot(dir.getRunsIn(), dir.getManifests(),

@@ -86,10 +86,15 @@ class NodeCatalogsTest {
     }
 
     @Test
-    void bothSpellingsReadAsTheCatalogField() {
-        NodeCatalogs catalogs = requireNonNull(NodeCatalogs.read(PackageManager.Pnpm, yaml(
-          "catalog:\n  wrappy: 1.0.1\ncatalogs:\n  default:\n    wrappy: 1.0.2\n")));
-        assertThat(catalogs.specifier("default", "wrappy")).isEqualTo("1.0.1");
+    void bothSpellingsOfTheDefaultCatalogAreDeclinedAsPnpmRejectsThem() {
+        String recorded = "pnpm-rejects/11.2.2/catalog-and-catalogs-default/";
+        NodeCatalogs catalogs = requireNonNull(NodeCatalogs.read(PackageManager.Pnpm,
+          yaml(file(recorded + "workspace-before"))));
+        assertThat(catalogs.declined())
+          .isEqualTo("ERR_PNPM_INVALID_CATALOGS_CONFIGURATION " + file(recorded + "pnpm.log")
+            .substring("[ERROR] ".length(), file(recorded + "pnpm.log").indexOf('\n')));
+        assertThat(catalogs.withEntry("default", "wrappy", "1.0.2")).isNull();
+        assertThat(file(recorded + "workspace")).isEqualTo(file(recorded + "workspace-before"));
     }
 
     // pnpm 10.34.6 writes the document sorted at every level, packages first, for an add and for an update alike

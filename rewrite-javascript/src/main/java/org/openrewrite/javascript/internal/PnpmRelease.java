@@ -17,16 +17,15 @@ package org.openrewrite.javascript.internal;
 
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.javascript.internal.lock.CannotKnow;
-import org.openrewrite.javascript.internal.lock.HostEnvironment;
-import org.openrewrite.javascript.internal.lock.SpecUtils;
-import org.openrewrite.javascript.internal.lock.pnpm.Main;
-import org.openrewrite.javascript.internal.lock.pnpm.PnpmOptions;
+import org.openrewrite.javascript.internal.lock.ManifestRules;
 import org.openrewrite.javascript.internal.lock.pnpm.WorkspaceManifestWriter;
 import org.openrewrite.semver.NodeSemver;
 
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
+
+import static java.util.Objects.requireNonNull;
 
 /**
  * The pnpm release that installs a workspace root, as pnpm reads its manifest and pnpm-workspace.yaml; the recipes
@@ -53,18 +52,24 @@ public final class PnpmRelease {
      * rule; declined where corepack would start another or refuse the spec, as the host does not say which runs.
      */
     public static PnpmRelease of(String rootManifest, @Nullable Map<String, @Nullable Object> workspace) {
-        PnpmOptions.WantedPackageManager wanted;
+        return requireNonNull(of(LockFileRegeneration.PNPM.manifestRules(), rootManifest, workspace));
+    }
+
+    /**
+     * The release that installs {@code rootManifest} by {@code rules}; null for a package manager whose writes do not
+     * depend on its release.
+     */
+    public static @Nullable PnpmRelease of(ManifestRules rules, String rootManifest,
+                                           @Nullable Map<String, @Nullable Object> workspace) {
+        String release;
         try {
-            wanted = PnpmOptions.wantedPackageManager(rootManifest, workspace);
+            release = rules.release(rootManifest, workspace);
+        } catch (CannotKnow e) {
+            return new PnpmRelease("", -1, e.getSubject());
         } catch (RuntimeException e) {
             return new PnpmRelease("", -1, "pnpm cannot read the release the project names (" + e.getMessage() + ")");
         }
-        try {
-            return named(Main.release(wanted, () -> SpecUtils.findProjectSpec("", 0,
-                    dir -> dir.isEmpty() ? rootManifest : null, path -> false, "pnpm", HostEnvironment.UNKNOWN)));
-        } catch (CannotKnow e) {
-            return new PnpmRelease("", -1, e.getSubject());
-        }
+        return release == null ? null : named(release);
     }
 
     /**

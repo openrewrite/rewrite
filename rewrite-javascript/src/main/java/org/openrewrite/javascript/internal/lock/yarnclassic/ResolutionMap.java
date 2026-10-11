@@ -33,7 +33,7 @@ import java.util.regex.Pattern;
 /**
  * Port of yarn src/resolution-map.js and util/parse-package-path.js (yarn 1.22.22).
  */
-public final class ResolutionMap {
+final class ResolutionMap {
 
     private static final String GLOBAL_NESTED_DEP_PATTERN = "**/";
     private static final Pattern PACKAGE_PATH = Pattern.compile("(@[^/]+/)?([^/]+)");
@@ -122,7 +122,7 @@ public final class ResolutionMap {
      * The glob yarn matches a resolution's key against, as parsePatternInfo makes it ({@code **}{@code /name} for a
      * bare name); null for a key it ignores.
      */
-    public static @Nullable String globPattern(String key) {
+    static @Nullable String globPattern(String key) {
         if (!isValidPackagePath(key)) {
             return null;
         }
@@ -134,7 +134,7 @@ public final class ResolutionMap {
      * The keys of {@code resolutions} for the package {@code key} names that find tries before {@code key}, in the
      * order init reads them: every one when {@code key} is not there.
      */
-    public static List<String> triedBefore(Map<String, @Nullable Object> resolutions, String key) {
+    static List<String> triedBefore(Map<String, @Nullable Object> resolutions, String key) {
         List<String> before = new ArrayList<>();
         List<String> path = parsePackagePath(key);
         String name = path.isEmpty() ? null : path.get(path.size() - 1);

@@ -28,7 +28,7 @@ import java.util.Map;
  * Port of @pnpm/installing.deps-installer src/install/index.ts installSome's catalogMode check (pnpm 11.2.2) for
  * {@code pnpm add <alias>@<specifier>}, between {@link ParseWantedDependencies} and {@link ResolveDependencyTree}.
  */
-public final class InstallSome {
+final class InstallSome {
 
     private static final String CATALOG_PROTOCOL = "catalog:";
     private static final String DEFAULT = "default";
@@ -41,7 +41,7 @@ public final class InstallSome {
      * none).
      */
     @Value
-    public static class Saved {
+    static class Saved {
         String bareSpecifier;
 
         @Nullable
@@ -52,7 +52,7 @@ public final class InstallSome {
      * What pnpm add saves, the workspace manifest as its reader reads it (null without one); a {@link Rejected} for
      * what pnpm itself rejects or fails on.
      */
-    public static Saved add(String alias, String bareSpecifier, @Nullable Map<String, @Nullable Object> workspace) {
+    static Saved add(String alias, String bareSpecifier, @Nullable Map<String, @Nullable Object> workspace) {
         Map<String, @Nullable Map<String, @Nullable Object>> catalogs;
         try {
             catalogs = Catalogs.getCatalogsFromWorkspaceManifest(workspace);

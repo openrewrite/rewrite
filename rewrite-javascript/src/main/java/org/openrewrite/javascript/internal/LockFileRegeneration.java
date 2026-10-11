@@ -22,6 +22,7 @@ import lombok.Value;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.javascript.internal.lock.LockDirectory;
+import org.openrewrite.javascript.internal.lock.ManifestRules;
 import org.openrewrite.javascript.internal.lock.NativeLockEngine;
 import org.openrewrite.javascript.internal.lock.Port;
 import org.openrewrite.javascript.marker.NodeResolutionResult;
@@ -321,6 +322,21 @@ public final class LockFileRegeneration {
      */
     public Result regenerate(Request request, ExecutionContext ctx) {
         return NativeLockEngine.regenerate(port, request, ctx);
+    }
+
+    /**
+     * What the package manager reads of the files the dependency recipes edit.
+     */
+    public ManifestRules manifestRules() {
+        return port.manifestRules();
+    }
+
+    /**
+     * What {@code pm} reads of the files the dependency recipes edit; no package manager's rules when null.
+     */
+    public static ManifestRules manifestRules(@Nullable PackageManager pm) {
+        LockFileRegeneration regeneration = forPackageManager(pm);
+        return regeneration == null ? ManifestRules.NONE : regeneration.manifestRules();
     }
 
     /**

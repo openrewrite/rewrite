@@ -15,17 +15,18 @@
  */
 package org.openrewrite.javascript.internal;
 
+import lombok.AccessLevel;
 import lombok.Getter;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.InMemoryExecutionContext;
 import org.openrewrite.SourceFile;
 import org.openrewrite.Tree;
+import org.openrewrite.javascript.internal.lock.CannotKnow;
 import org.openrewrite.javascript.internal.lock.EcmaScript;
+import org.openrewrite.javascript.internal.lock.ManifestRules;
+import org.openrewrite.javascript.internal.lock.Rejected;
 import org.openrewrite.javascript.internal.lock.Spec;
 import org.openrewrite.javascript.internal.lock.YamlDocument;
-import org.openrewrite.javascript.internal.lock.berry.Catalogs;
-import org.openrewrite.javascript.internal.lock.bun.CatalogMap;
-import org.openrewrite.javascript.internal.lock.pnpm.WorkspaceManifest;
 import org.openrewrite.javascript.internal.lock.pnpm.WorkspaceManifestWriter;
 import org.openrewrite.javascript.marker.NodeResolutionResult.PackageManager;
 import org.openrewrite.json.tree.Json;
@@ -47,11 +48,10 @@ import java.util.Objects;
 import static java.util.Collections.emptyList;
 import static java.util.Collections.singletonList;
 import static java.util.Objects.requireNonNull;
-import static org.openrewrite.javascript.internal.lock.pnpm.Catalogs.parseCatalogProtocol;
 
 /**
- * A workspace's catalogs as its package manager reads them (pnpm from pnpm-workspace.yaml, Yarn from .yarnrc.yml, Bun
- * from the root package.json), by catalog then alias; an edit changes the document in place.
+ * A workspace's catalogs as its package manager's port reads them (pnpm from pnpm-workspace.yaml, Yarn from
+ * .yarnrc.yml, Bun from the root package.json), by catalog then alias; an edit changes the document in place.
  */
 @Getter
 public abstract class NodeCatalogs {
@@ -61,24 +61,34 @@ public abstract class NodeCatalogs {
      */
     private final SourceFile document;
 
+    @Getter(AccessLevel.PACKAGE)
+    private final ManifestRules rules;
+
     private final Map<String, Map<String, String>> catalogs;
 
-    private NodeCatalogs(SourceFile document, Map<String, Map<String, String>> catalogs) {
+    // why the package manager reads no catalogs from the file
+    @Getter(AccessLevel.NONE)
+    private final @Nullable String rejection;
+
+    private NodeCatalogs(SourceFile document, ManifestRules rules) {
         this.document = document;
-        this.catalogs = catalogs;
+        this.rules = rules;
+        Map<String, Map<String, String>> read = Collections.emptyMap();
+        String rejected = null;
+        try {
+            read = rules.catalogs(PackageJsonHelper.printed(document));
+        } catch (Rejected | CannotKnow e) {
+            rejected = e.getMessage();
+        }
+        this.catalogs = read;
+        this.rejection = rejected;
     }
 
     /**
      * The name of the file {@code pm} reads catalogs from, in the workspace root; null for one without catalogs.
      */
     public static @Nullable String fileName(@Nullable PackageManager pm) {
-        if (pm == PackageManager.Pnpm) {
-            return "pnpm-workspace.yaml";
-        }
-        if (pm == PackageManager.YarnBerry) {
-            return ".yarnrc.yml";
-        }
-        return pm == PackageManager.Bun ? "package.json" : null;
+        return LockFileRegeneration.manifestRules(pm).catalogFile();
     }
 
     /**
@@ -95,17 +105,24 @@ public abstract class NodeCatalogs {
      */
     public static @Nullable NodeCatalogs read(@Nullable PackageManager pm, SourceFile document,
                                               @Nullable String rootManifest) {
-        if (pm == PackageManager.Pnpm && document instanceof Yaml.Documents) {
-            return new Pnpm((Yaml.Documents) document, rootManifest, null);
+        return read(LockFileRegeneration.manifestRules(pm), document, rootManifest);
+    }
+
+    /**
+     * The catalogs {@code document} declares by {@code rules}; null when it is not a file they read catalogs from.
+     */
+    public static @Nullable NodeCatalogs read(ManifestRules rules, SourceFile document, @Nullable String rootManifest) {
+        if (rules.catalogFile() == null || rules.catalogsAt(PackageJsonHelper.printed(document)) == null) {
+            return null;
         }
-        if (pm == PackageManager.YarnBerry && document instanceof Yaml.Documents) {
-            return new YarnBerry((Yaml.Documents) document);
+        if (document instanceof Json.Document) {
+            return new Bun((Json.Document) document, rules);
         }
-        if (pm == PackageManager.Bun && document instanceof Json.Document &&
-            Bun.base((Json.Document) document) != null) {
-            return new Bun((Json.Document) document);
+        if (!(document instanceof Yaml.Documents)) {
+            return null;
         }
-        return null;
+        return rules.writesCatalogFile() ? new Pnpm((Yaml.Documents) document, rules, rootManifest, null) :
+                new YarnBerry((Yaml.Documents) document, rules);
     }
 
     public Path getPath() {
@@ -115,7 +132,9 @@ public abstract class NodeCatalogs {
     /**
      * The catalog a dependency value names, by the package manager's rules; null when it is no catalog reference.
      */
-    public abstract @Nullable String catalogOf(String value);
+    public @Nullable String catalogOf(String value) {
+        return rules.catalogOf(value);
+    }
 
     /**
      * The specifier the catalog's entry for {@code alias} holds; null when there is none.
@@ -158,9 +177,17 @@ public abstract class NodeCatalogs {
     }
 
     /**
-     * Why these catalogs are not edited for the package manager release that writes the file; null when they are.
+     * Why these catalogs are not edited: the package manager rejects the file, or the release that writes it is not
+     * one whose writes are recorded; null when they are.
      */
     public @Nullable String declined() {
+        return rejection;
+    }
+
+    /**
+     * The workspace settings the package manager reads from this file beside its catalogs; null for none.
+     */
+    public @Nullable Map<String, @Nullable Object> getSettings() {
         return null;
     }
 
@@ -185,8 +212,9 @@ public abstract class NodeCatalogs {
         private @Nullable RuntimeException rejection;
         private @Nullable PnpmRelease release;
 
-        Pnpm(Yaml.Documents document, @Nullable String rootManifest, @Nullable PnpmRelease release) {
-            super(document, read(yamlRoot(document)));
+        Pnpm(Yaml.Documents document, ManifestRules rules, @Nullable String rootManifest,
+             @Nullable PnpmRelease release) {
+            super(document, rules);
             this.rootManifest = rootManifest;
             this.release = release;
         }
@@ -206,7 +234,7 @@ public abstract class NodeCatalogs {
         }
 
         private Pnpm sharingSettings(@Nullable String rootManifest, @Nullable PnpmRelease release) {
-            Pnpm other = new Pnpm((Yaml.Documents) getDocument(), rootManifest, release);
+            Pnpm other = new Pnpm((Yaml.Documents) getDocument(), getRules(), rootManifest, release);
             other.settings = getSettings();
             other.rejection = rejection;
             other.settingsRead = true;
@@ -218,14 +246,16 @@ public abstract class NodeCatalogs {
          */
         public PnpmRelease getRelease() {
             if (release == null) {
-                release = PnpmRelease.of(rootManifest == null ? "{}" : rootManifest, getSettings());
+                release = requireNonNull(PnpmRelease.of(getRules(), rootManifest == null ? "{}" : rootManifest,
+                        getSettings()));
             }
             return release;
         }
 
         @Override
         public @Nullable String declined() {
-            return getRelease().declined();
+            String declined = getRelease().declined();
+            return declined != null ? declined : super.declined();
         }
 
         /**
@@ -237,26 +267,28 @@ public abstract class NodeCatalogs {
         }
 
         /**
-         * pnpm-workspace.yaml as {@code text} (none when null), for {@code release}.
+         * pnpm-workspace.yaml as {@code text} (none when null), read by {@code rules}, for {@code release}.
          */
-        static Pnpm parse(@Nullable String text, PnpmRelease release) {
+        static Pnpm parse(@Nullable String text, ManifestRules rules, PnpmRelease release) {
             SourceFile parsed = YamlParser.builder().build().parse(new InMemoryExecutionContext(),
                     text == null ? "" : text).findFirst().orElseThrow(IllegalStateException::new);
             if (!(parsed instanceof Yaml.Documents)) {
                 throw new IllegalArgumentException("pnpm-workspace.yaml is not YAML pnpm reads");
             }
-            return new Pnpm((Yaml.Documents) parsed.withSourcePath(Paths.get("pnpm-workspace.yaml")), null, release);
+            return new Pnpm((Yaml.Documents) parsed.withSourcePath(Paths.get(requireNonNull(rules.catalogFile()))),
+                    rules, null, release);
         }
 
         /**
          * pnpm-workspace.yaml as pnpm's workspace-manifest-reader reads it, once; null when empty or
          * {@link #isRejected}.
          */
+        @Override
         public @Nullable Map<String, @Nullable Object> getSettings() {
             if (!settingsRead) {
                 settingsRead = true;
                 try {
-                    settings = WorkspaceManifest.readWorkspaceManifest(print());
+                    settings = getRules().workspaceSettings(print());
                 } catch (RuntimeException e) {
                     rejection = e;
                 }
@@ -366,7 +398,7 @@ public abstract class NodeCatalogs {
         // the release read once for the root: an edit leaving pmOnFail as it was leaves it
         @Override
         NodeCatalogs reread(SourceFile edited) {
-            Pnpm next = new Pnpm((Yaml.Documents) edited, rootManifest, null);
+            Pnpm next = new Pnpm((Yaml.Documents) edited, getRules(), rootManifest, null);
             if (release != null && Objects.equals(pmOnFail(next.getSettings()), pmOnFail(getSettings()))) {
                 next.release = release;
             }
@@ -375,11 +407,6 @@ public abstract class NodeCatalogs {
 
         private static @Nullable Object pmOnFail(@Nullable Map<String, @Nullable Object> settings) {
             return settings == null ? null : settings.get("pmOnFail");
-        }
-
-        @Override
-        public @Nullable String catalogOf(String value) {
-            return parseCatalogProtocol(value);
         }
 
         // pnpm writes the default catalog where it is, `catalog` when it is neither place
@@ -496,24 +523,6 @@ public abstract class NodeCatalogs {
              */
             boolean apply(Map<String, @Nullable Object> manifest);
         }
-
-        private static Map<String, Map<String, String>> read(Yaml.@Nullable Mapping root) {
-            Map<String, Map<String, String>> catalogs = new LinkedHashMap<>();
-            Yaml.Mapping catalog = root == null ? null : mapping(root, "catalog");
-            Yaml.Mapping named = root == null ? null : mapping(root, "catalogs");
-            if (catalog != null) {
-                catalogs.put(DEFAULT, scalars(catalog));
-            }
-            if (named != null) {
-                for (Yaml.Mapping.Entry group : named.getEntries()) {
-                    Yaml.Mapping entries = asMapping(group.getValue());
-                    if (entries != null && !(catalog != null && DEFAULT.equals(group.getKey().getValue()))) {
-                        catalogs.put(group.getKey().getValue(), scalars(entries));
-                    }
-                }
-            }
-            return catalogs;
-        }
     }
 
     /**
@@ -521,36 +530,13 @@ public abstract class NodeCatalogs {
      */
     public static final class YarnBerry extends YamlCatalogs {
 
-        YarnBerry(Yaml.Documents document) {
-            super(document, read(yamlRoot(document)));
-        }
-
-        private static Map<String, Map<String, String>> read(Yaml.@Nullable Mapping root) {
-            Map<String, Map<String, String>> catalogs = new LinkedHashMap<>();
-            Yaml.Mapping catalog = root == null ? null : mapping(root, "catalog");
-            Yaml.Mapping named = root == null ? null : mapping(root, "catalogs");
-            if (catalog != null) {
-                catalogs.put("", scalars(catalog));
-            }
-            if (named != null) {
-                for (Yaml.Mapping.Entry group : named.getEntries()) {
-                    Yaml.Mapping entries = asMapping(group.getValue());
-                    if (entries != null && !group.getKey().getValue().isEmpty()) {
-                        catalogs.put(group.getKey().getValue(), scalars(entries));
-                    }
-                }
-            }
-            return catalogs;
-        }
-
-        @Override
-        public @Nullable String catalogOf(String value) {
-            return Catalogs.catalogOf(value);
+        YarnBerry(Yaml.Documents document, ManifestRules rules) {
+            super(document, rules);
         }
 
         @Override
         NodeCatalogs reread(SourceFile edited) {
-            return new YarnBerry((Yaml.Documents) edited);
+            return new YarnBerry((Yaml.Documents) edited, getRules());
         }
 
         @Override
@@ -653,37 +639,8 @@ public abstract class NodeCatalogs {
      */
     public static final class Bun extends NodeCatalogs {
 
-        Bun(Json.Document document) {
-            super(document, read(document));
-        }
-
-        private static Map<String, Map<String, String>> read(Json.Document document) {
-            Map<String, Map<String, String>> catalogs = new LinkedHashMap<>();
-            Json.JsonObject base = base(document);
-            if (base == null) {
-                return catalogs;
-            }
-            Json catalog = member(base, "catalog");
-            if (catalog instanceof Json.JsonObject) {
-                catalogs.put("", strings((Json.JsonObject) catalog));
-            }
-            Json named = member(base, "catalogs");
-            if (named instanceof Json.JsonObject) {
-                for (Json m : ((Json.JsonObject) named).getMembers()) {
-                    if (m instanceof Json.Member && ((Json.Member) m).getValue() instanceof Json.JsonObject) {
-                        String name = string(((Json.Member) m).getKey());
-                        if (name != null && !name.isEmpty()) {
-                            catalogs.put(name, strings((Json.JsonObject) ((Json.Member) m).getValue()));
-                        }
-                    }
-                }
-            }
-            return catalogs;
-        }
-
-        @Override
-        public @Nullable String catalogOf(String value) {
-            return CatalogMap.groupOf(value);
+        Bun(Json.Document document, ManifestRules rules) {
+            super(document, rules);
         }
 
         @Override
@@ -701,36 +658,16 @@ public abstract class NodeCatalogs {
                 return this;
             }
             Json.Document document = (Json.Document) getDocument();
-            return reread(PackageJsonHelper.withStringMember(document, path(document, catalog), alias, specifier));
+            return reread(PackageJsonHelper.withStringMember(document, path(catalog), alias, specifier));
         }
 
         @Override
         NodeCatalogs reread(SourceFile edited) {
-            return new Bun((Json.Document) edited);
+            return new Bun((Json.Document) edited, getRules());
         }
 
-        // Bun's Package.parse: the workspaces object when it declares a catalog, else the root when it has workspaces
-        static Json.@Nullable JsonObject base(Json.Document document) {
-            if (!(document.getValue() instanceof Json.JsonObject)) {
-                return null;
-            }
-            Json.JsonObject root = (Json.JsonObject) document.getValue();
-            Json workspaces = member(root, "workspaces");
-            if (workspaces == null) {
-                return null;
-            }
-            if (workspaces instanceof Json.JsonObject && (member((Json.JsonObject) workspaces, "catalog") != null ||
-                                                          member((Json.JsonObject) workspaces, "catalogs") != null)) {
-                return (Json.JsonObject) workspaces;
-            }
-            return root;
-        }
-
-        private static List<String> path(Json.Document document, String catalog) {
-            List<String> path = new ArrayList<>();
-            if (base(document) != document.getValue()) {
-                path.add("workspaces");
-            }
+        private List<String> path(String catalog) {
+            List<String> path = new ArrayList<>(requireNonNull(getRules().catalogsAt(print())));
             if (catalog.isEmpty()) {
                 path.add("catalog");
             } else {
@@ -738,20 +675,6 @@ public abstract class NodeCatalogs {
                 path.add(catalog);
             }
             return path;
-        }
-
-        private static Map<String, String> strings(Json.JsonObject object) {
-            Map<String, String> out = new LinkedHashMap<>();
-            for (Json m : object.getMembers()) {
-                if (m instanceof Json.Member) {
-                    String key = string(((Json.Member) m).getKey());
-                    String value = string(((Json.Member) m).getValue());
-                    if (key != null && value != null) {
-                        out.put(key, value);
-                    }
-                }
-            }
-            return out;
         }
     }
 
@@ -763,8 +686,8 @@ public abstract class NodeCatalogs {
 
         private final boolean flowStyle;
 
-        YamlCatalogs(Yaml.Documents document, Map<String, Map<String, String>> catalogs) {
-            super(document, catalogs);
+        YamlCatalogs(Yaml.Documents document, ManifestRules rules) {
+            super(document, rules);
             this.flowStyle = flowStyle(yamlRoot(document));
         }
 

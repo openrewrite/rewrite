@@ -26,6 +26,7 @@ import org.openrewrite.javascript.internal.lock.CannotKnow;
 import org.openrewrite.javascript.internal.lock.HostEnvironment;
 import org.openrewrite.javascript.internal.lock.JsError;
 import org.openrewrite.javascript.internal.lock.LockOnlyInstall;
+import org.openrewrite.javascript.internal.lock.ManifestRules;
 import org.openrewrite.javascript.internal.lock.Rejected;
 import org.openrewrite.javascript.internal.lock.SpecUtils;
 import org.openrewrite.javascript.marker.NodeResolutionResult;
@@ -113,8 +114,7 @@ public final class NodeDependencyEdits implements PackageJsonHelper.FileEditor {
     public void scan(SourceFile sf) {
         Path p = sf.getSourcePath();
         String basename = String.valueOf(p.getFileName());
-        if (sf instanceof Yaml.Documents && (basename.equals(NodeCatalogs.fileName(PackageManager.Pnpm)) ||
-                                            basename.equals(NodeCatalogs.fileName(PackageManager.YarnBerry)))) {
+        if (sf instanceof Yaml.Documents && readsCatalogsFrom(basename)) {
             yamlFiles.put(p, sf);
         }
         if (NodeDependencyScan.capturePackageManagerFile(scan, sf)) {
@@ -130,6 +130,15 @@ public final class NodeDependencyEdits implements PackageJsonHelper.FileEditor {
             sf.getMarkers().findFirst(NodeResolutionResult.class).isPresent()) {
             scan.projects.computeIfAbsent(p, k -> new NodeDependencyScan.ProjectState()).capturedPackageJson = sf;
         }
+    }
+
+    private static boolean readsCatalogsFrom(String fileName) {
+        for (LockFileRegeneration regeneration : LockFileRegeneration.ALL) {
+            if (fileName.equals(regeneration.manifestRules().catalogFile())) {
+                return true;
+            }
+        }
+        return false;
     }
 
     /**
@@ -692,7 +701,7 @@ public final class NodeDependencyEdits implements PackageJsonHelper.FileEditor {
 
     private @Nullable ManagedFile managedAt(Path path, PackageManager pm) {
         if (!managed.containsKey(path)) {
-            SourceFile document = pm == PackageManager.Bun ? captured(path) : yamlFiles.get(path);
+            SourceFile document = yamlFiles.containsKey(path) ? yamlFiles.get(path) : captured(path);
             NodeCatalogs catalogs = document == null ? null : NodeCatalogs.read(pm, document, rootBeside(path));
             managed.put(path, catalogs == null ? null : new ManagedFile(catalogs, false));
         }
@@ -711,8 +720,9 @@ public final class NodeDependencyEdits implements PackageJsonHelper.FileEditor {
         ManagedFile file = managed.get(path);
         if (file == null && !scan.paths.contains(path)) {
             SourceFile empty = YamlParser.builder().build().parse(ctx, "").findFirst().orElse(null);
-            NodeCatalogs catalogs = empty == null ? null :
-                    NodeCatalogs.read(PackageManager.Pnpm, empty.withSourcePath(path), rootBeside(path));
+            ManifestRules rules = writes(name);
+            NodeCatalogs catalogs = empty == null || rules == null ? null :
+                    NodeCatalogs.read(rules, empty.withSourcePath(path), rootBeside(path));
             if (catalogs != null) {
                 file = new ManagedFile(catalogs, true);
                 managed.put(path, file);
@@ -720,6 +730,16 @@ public final class NodeDependencyEdits implements PackageJsonHelper.FileEditor {
             }
         }
         return file;
+    }
+
+    // the rules of the package manager whose workspace settings file is named so
+    private static @Nullable ManifestRules writes(String name) {
+        for (LockFileRegeneration regeneration : LockFileRegeneration.ALL) {
+            if (name.equals(regeneration.manifestRules().workspaceSettingsFile())) {
+                return regeneration.manifestRules();
+            }
+        }
+        return null;
     }
 
     // the marker's package manager, else the one corepack finds named from the manifest's directory up, else the
@@ -749,18 +769,16 @@ public final class NodeDependencyEdits implements PackageJsonHelper.FileEditor {
 
     // the nearest file at or above the manifest's directory that pm reads catalogs from
     private @Nullable Path file(PackageManager pm, Path packageJson) {
-        String name = NodeCatalogs.fileName(pm);
+        ManifestRules rules = LockFileRegeneration.manifestRules(pm);
+        String name = rules.catalogFile();
         if (name == null) {
             return null;
         }
         for (Path dir = packageJson.getParent(); ; dir = dir.getParent()) {
             Path candidate = dir == null ? Paths.get(name) : dir.resolve(name);
-            if (pm == PackageManager.Bun) {
-                SourceFile manifest = captured(candidate);
-                if (manifest instanceof Json.Document && NodeCatalogs.Bun.base((Json.Document) manifest) != null) {
-                    return candidate;
-                }
-            } else if (yamlFiles.containsKey(candidate) || managed.get(candidate) != null) {
+            SourceFile manifest = captured(candidate);
+            if (manifest != null ? rules.catalogsAt(print(manifest)) != null :
+                    yamlFiles.containsKey(candidate) || managed.get(candidate) != null) {
                 return candidate;
             }
             if (dir == null) {

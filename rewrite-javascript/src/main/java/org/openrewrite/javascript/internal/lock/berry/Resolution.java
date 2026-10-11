@@ -26,13 +26,13 @@ import java.util.regex.Pattern;
  * Port of @yarnpkg/parsers sources/resolution.ts and sources/grammars/resolution.pegjs (Yarn 4.10.3).
  */
 @Value
-public class Resolution {
+class Resolution {
 
     /**
      * The error parseResolution raises for a resolution key, which Yarn reports and drops the entry for; null for one
      * it parses.
      */
-    public static @Nullable String rejects(String key) {
+    static @Nullable String rejects(String key) {
         try {
             parseResolution(key);
             return null;

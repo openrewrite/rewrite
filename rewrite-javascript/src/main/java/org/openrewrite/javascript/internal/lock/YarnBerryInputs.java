@@ -17,6 +17,7 @@ package org.openrewrite.javascript.internal.lock;
 
 import org.openrewrite.javascript.internal.LockFileRegeneration.InstallRoot;
 import org.openrewrite.javascript.internal.LockFileRegeneration.Result;
+import org.openrewrite.javascript.internal.lock.berry.BerryManifestRules;
 import org.openrewrite.javascript.internal.lock.berry.Configuration;
 import org.openrewrite.javascript.internal.lock.berry.YarnBerryLockRegenerator;
 import org.openrewrite.javascript.internal.lock.berry.YarnBerryLockRegenerator.Inputs;
@@ -51,6 +52,11 @@ final class YarnBerryInputs implements Port {
     @Override
     public boolean reads(String fileName) {
         return DEFAULT_RC_FILENAME.equals(fileName) || fileName.endsWith(".patch");
+    }
+
+    @Override
+    public ManifestRules manifestRules() {
+        return BerryManifestRules.RULES;
     }
 
     @Override

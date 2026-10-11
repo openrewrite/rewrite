@@ -19,32 +19,27 @@ import lombok.EqualsAndHashCode;
 import lombok.Value;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
+import org.openrewrite.javascript.internal.LockFileRegeneration;
 import org.openrewrite.javascript.internal.NodeCatalogs;
 import org.openrewrite.javascript.internal.NodeDependencyEdits;
 import org.openrewrite.javascript.internal.PackageJsonHelper;
 import org.openrewrite.javascript.internal.PnpmRelease;
-import org.openrewrite.javascript.internal.lock.LocaleCompare;
-import org.openrewrite.javascript.internal.lock.LockOnlyInstall;
+import org.openrewrite.javascript.internal.lock.ManifestRules;
 import org.openrewrite.javascript.internal.lock.Rejected;
-import org.openrewrite.javascript.internal.lock.pnpm.InstallSome;
 import org.openrewrite.javascript.marker.NodeResolutionResult.PackageManager;
 import org.openrewrite.javascript.table.NodeDependencyEditsDeclined;
 import org.openrewrite.javascript.table.NodeLockRegenerationFailures;
 import org.openrewrite.json.tree.Json;
 
-import java.util.Arrays;
 import java.util.Collection;
-import java.util.Comparator;
-import java.util.List;
 import java.util.Map;
+
+import static java.util.Objects.requireNonNull;
 
 
 @EqualsAndHashCode(callSuper = false)
 @Value
 public class AddDependency extends ScanningRecipe<NodeDependencyEdits> {
-
-    private static final List<String> DEPENDENCY_FIELDS = Arrays.asList("dependencies", "devDependencies",
-            "optionalDependencies", "peerDependencies");
 
     transient NodeLockRegenerationFailures lockRegenerationFailures = new NodeLockRegenerationFailures(this);
     transient NodeDependencyEditsDeclined editsDeclined = new NodeDependencyEditsDeclined(this);
@@ -126,63 +121,60 @@ public class AddDependency extends ScanningRecipe<NodeDependencyEdits> {
             declined(decision, packageName + "@" + version + " was not added: " + e.getMessage());
             return;
         }
-        String value = catalogs instanceof NodeCatalogs.Pnpm ? pnpmAdd(decision, (NodeCatalogs.Pnpm) catalogs) :
-                pm == PackageManager.Pnpm ? pnpmAdd(decision, PnpmRelease.of(PackageJsonHelper.printed(pkg), null)) :
-                        version;
+        ManifestRules rules = LockFileRegeneration.manifestRules(pm);
+        String value = added(decision, rules, catalogs);
         if (value != null) {
             decision.editManifest(doc -> !matchesAdd(doc) ? doc :
-                    saved(pm, PackageJsonHelper.addDependency(doc, packageName, value, targetScope())));
+                    saved(rules, PackageJsonHelper.addDependency(doc, packageName, value, targetScope())));
         }
     }
 
     // the manifest as each package manager's add saves it (add-<pm>-sorts-every-field, add-<pm>-beside-empty-field)
-    private Json.Document saved(@Nullable PackageManager pm, Json.Document doc) {
-        if (pm == null) {
-            return doc;
-        }
-        if (pm == PackageManager.Bun) {
-            return PackageJsonHelper.sortMembers(doc, targetScope(), String::compareTo);
-        }
-        Comparator<String> order = pm == PackageManager.Npm ? LocaleCompare::en : String::compareTo;
+    private Json.Document saved(ManifestRules rules, Json.Document doc) {
         Json.Document sorted = doc;
-        for (String field : DEPENDENCY_FIELDS) {
-            sorted = PackageJsonHelper.sortMembers(sorted, field, order);
+        for (String field : rules.sortedOnAdd(targetScope())) {
+            sorted = PackageJsonHelper.sortMembers(sorted, field, rules.addOrder());
         }
-        return pm == PackageManager.YarnClassic ? sorted : PackageJsonHelper.withoutEmptyObjects(sorted,
-                DEPENDENCY_FIELDS);
+        return rules.keepsEmptyFieldsOnAdd() ? sorted : PackageJsonHelper.withoutEmptyObjects(sorted,
+                ManifestRules.DEPENDENCY_FIELDS);
     }
 
-    private @Nullable String pnpmAdd(NodeDependencyEdits.Decision decision, PnpmRelease release) {
-        if (release.declined() != null) {
+    // what the release that runs writes, recorded: pnpm 9.15.9 the version, 10.34.6 and 11.2.2 by the catalogs
+    private @Nullable String added(NodeDependencyEdits.Decision decision, ManifestRules rules,
+                                   @Nullable NodeCatalogs catalogs) {
+        PnpmRelease release;
+        if (catalogs instanceof NodeCatalogs.Pnpm) {
+            SourceFile root = decision.manifestOf(catalogs.getPath().resolveSibling("package.json"));
+            release = (root == null ? (NodeCatalogs.Pnpm) catalogs :
+                    ((NodeCatalogs.Pnpm) catalogs).forRoot(PackageJsonHelper.printed(root))).getRelease();
+        } else {
+            release = PnpmRelease.of(rules, PackageJsonHelper.printed(decision.getManifest()), null);
+        }
+        if (release != null && release.declined() != null) {
             declined(decision, packageName + "@" + version + " was not added: " + release.declined());
             return null;
         }
-        return version;
-    }
-
-    // what the pnpm release that runs writes, recorded: 9.15.9 the version, 10.34.6 and 11.2.2 by the catalogs
-    private @Nullable String pnpmAdd(NodeDependencyEdits.Decision decision, NodeCatalogs.Pnpm catalogs) {
-        SourceFile root = decision.manifestOf(catalogs.getPath().resolveSibling("package.json"));
-        PnpmRelease release = (root == null ? catalogs : catalogs.forRoot(PackageJsonHelper.printed(root)))
-                .getRelease();
-        if (release.declined() != null || release.getMajor() == 9) {
-            return pnpmAdd(decision, release);
+        if (release != null && release.getMajor() == 9) {
+            return version;
         }
-        InstallSome.Saved saved;
+        if (catalogs != null && catalogs.declined() != null) {
+            declined(decision, packageName + "@" + version + " was not added: " + catalogs.declined());
+            return null;
+        }
+        ManifestRules.Saved saved;
         try {
-            saved = InstallSome.add(packageName, version, catalogs.getSettings());
+            saved = rules.added(packageName, version, catalogs == null ? null : catalogs.getSettings());
         } catch (Rejected e) {
-            declined(decision, packageName + "@" + version + " was not added: " +
-                               LockOnlyInstall.PNPM.failure(e).getDetail());
+            declined(decision, packageName + "@" + version + " was not added: " + e.getMessage());
             return null;
         }
         String catalog = saved.getCatalogName();
         if (catalog != null && !decision.editCatalogs(c -> c.withEntry(catalog, packageName, version))) {
-            declined(decision, packageName + "@" + version + " was not added: its catalog in " + catalogs.getPath() +
-                               " cannot take the entry in place");
+            declined(decision, packageName + "@" + version + " was not added: its catalog in " +
+                               requireNonNull(catalogs).getPath() + " cannot take the entry in place");
             return null;
         }
-        return saved.getBareSpecifier();
+        return saved.getSpecifier();
     }
 
     private static void declined(NodeDependencyEdits.Decision decision, String why) {

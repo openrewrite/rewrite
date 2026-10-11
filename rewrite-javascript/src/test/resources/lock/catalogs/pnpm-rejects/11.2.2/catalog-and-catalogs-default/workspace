@@ -1,0 +1,7 @@
+packages:
+  - 'packages/*'
+catalog:
+  react: ^18.2.0
+catalogs:
+  default:
+    vue: ^3.4.0

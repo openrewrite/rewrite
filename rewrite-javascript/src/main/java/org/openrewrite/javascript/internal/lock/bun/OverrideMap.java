@@ -26,13 +26,13 @@ import java.util.Map;
  * Port of bun's src/install/lockfile/OverrideMap.zig (bun 1.3.10): one flat map from a name hash to the dependency
  * every edge of that name resolves with, from {@code overrides}, else {@code resolutions}.
  */
-public final class OverrideMap {
+final class OverrideMap {
 
     /**
      * The field of the root manifest parseAppend reads overrides from: {@code overrides} when it has one, else
      * {@code resolutions} when it has that, else null.
      */
-    public static @Nullable String readsFrom(String rootManifest) {
+    static @Nullable String readsFrom(String rootManifest) {
         Json.Expr expr;
         try {
             expr = Json.parse(rootManifest);
