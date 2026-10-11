@@ -987,7 +987,8 @@ public class PackageJsonHelper {
         try {
             return overlayResolvedDeps(refreshed, regen.getLockFileContent(), marker.getPackageManager());
         } catch (RuntimeException e) {
-            return Markup.warn(refreshed, new RuntimeException("lock parse failed: " + e.getMessage(), e));
+            return Markup.markup(refreshed,
+                    new Markup.Warn(Tree.randomId(), "lock parse failed: " + e.getMessage(), null));
         }
     }
 

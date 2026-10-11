@@ -73,7 +73,9 @@ class ChangeDependencyCatalogTest implements RewriteTest {
       workspace:^                       | workspace: | null   | rename it where the value points first
       workspace:^                       | workspace: | ^2.0.0 | rename it where the value points first
       patch:acme-logger@1.4.1#fix.patch | patch:     | ^2.0.0 | rename it where the value points first
+      patch:acme-logger@1.4.1#fix.patch | patch:     | null   | rename it where the value points first
       npm:@acme/other@^1.0.0            | npm:       | null   | rename it where the value points first
+      npm:@acme/other@^1.0.0            | npm:       | ^2.0.0 | rename it where the value points first
       jsr:@acme/logger@^1.0.0           | jsr:       | ^2.0.0 | rename it where the value points first
       future:x                          | future:    | ^2.0.0 | rename it where the value points first
       catalog:                          | catalog:   | null   | its catalog holds no entry for it
