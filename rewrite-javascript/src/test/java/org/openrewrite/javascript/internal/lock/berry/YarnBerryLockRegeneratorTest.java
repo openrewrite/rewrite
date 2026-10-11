@@ -24,6 +24,7 @@ import org.openrewrite.javascript.internal.LockFileRegeneration.Failure;
 import org.openrewrite.javascript.internal.LockFileRegeneration.Kind;
 import org.openrewrite.javascript.internal.lock.CannotKnow;
 import org.openrewrite.javascript.internal.lock.HostEnvironment;
+import org.openrewrite.javascript.internal.lock.LockScenario.Phase;
 import org.openrewrite.javascript.internal.lock.Rejected;
 
 import java.time.Instant;
@@ -247,10 +248,10 @@ class YarnBerryLockRegeneratorTest {
     void migratesTheSettingsYarnWrote(BerryScenarios.Lock lock) {
         BerryScenarios.Scenario scenario = lock.getScenario();
         boolean seed = "lock-seed".equals(lock.getFileName());
-        BerryScenarios.Phase phase = seed ? BerryScenarios.Phase.BEFORE :
-                scenario.has("refresh") ? BerryScenarios.Phase.REFRESH : BerryScenarios.Phase.AFTER;
+        Phase phase = seed ? Phase.BEFORE :
+                scenario.has("refresh") ? Phase.REFRESH : Phase.AFTER;
         String written = scenario.file(seed ? "yarnrc-before.written" :
-                phase == BerryScenarios.Phase.REFRESH ? "yarnrc-refresh.written" : "yarnrc.written");
+                phase == Phase.REFRESH ? "yarnrc-refresh.written" : "yarnrc.written");
         YarnBerryLockRegenerator.Inputs recorded = scenario.inputs(phase, lock.getText());
         YarnBerryLockRegenerator regenerator = new YarnBerryLockRegenerator(YarnBerryLockRegenerator.Inputs.builder()
                 .lock(recorded.getLock())

@@ -17,9 +17,9 @@ package org.openrewrite.javascript.internal.lock.berry;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import lombok.Getter;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.javascript.internal.lock.Host;
+import org.openrewrite.javascript.internal.lock.LockScenario.Phase;
 import org.openrewrite.javascript.internal.lock.LockScenario;
 import org.openrewrite.javascript.internal.lock.RecordedRegistry;
 import org.openrewrite.javascript.internal.lock.RegistrySource;
@@ -62,9 +62,6 @@ final class BerryScenarios {
      * A phase of a recording: the before install, the after install with the edit, and a Yarn 4 install that
      * changes nothing over a {@code before} an older Yarn wrote.
      */
-    enum Phase {
-        BEFORE, REFRESH, AFTER
-    }
     private static final Pattern PLATFORM = Pattern.compile("\\(node (\\w+)-(\\w+)\\)");
     private static final Pattern RECORDED_ON = Pattern.compile("(\\d{4}-\\d{2}-\\d{2})\\s*$", Pattern.MULTILINE);
     private static final Pattern RECORDING_REGISTRY = Pattern.compile("^registry: yarn-berry-registry\\.js on " +
@@ -105,22 +102,10 @@ final class BerryScenarios {
     /**
      * One lock of a scenario with what Yarn had in the phase that wrote or read it.
      */
-    @Getter
-    static final class Lock {
-        private final Scenario scenario;
-        private final String fileName;
-        private final String text;
-
-        /**
-         * The phase that wrote the lock, or that started from it.
-         */
-        private final Phase phase;
+    static final class Lock extends LockScenario.RecordedLock<Scenario> {
 
         Lock(Scenario scenario, String fileName, String text, Phase phase) {
-            this.scenario = scenario;
-            this.fileName = fileName;
-            this.text = text;
-            this.phase = phase;
+            super(scenario, fileName, text, phase);
         }
 
         YarnBerryLockRegenerator.Inputs inputs() {

@@ -17,11 +17,11 @@ package org.openrewrite.javascript.internal.lock.yarnclassic;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import lombok.Getter;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.javascript.internal.lock.Host;
 import org.openrewrite.javascript.internal.lock.HostInputs;
 import org.openrewrite.javascript.internal.lock.HostRegistries;
+import org.openrewrite.javascript.internal.lock.LockScenario.Phase;
 import org.openrewrite.javascript.internal.lock.LockScenario;
 import org.openrewrite.javascript.internal.lock.RegistrySource;
 
@@ -67,28 +67,13 @@ final class YarnClassicScenarios {
     }
 
     /**
-     * The install a lock belongs to: the one from {@code pkg-before}, or the edit's and the installs over its lock.
-     */
-    enum Phase {
-        BEFORE, AFTER
-    }
-
-    /**
      * One lock of a scenario with what yarn had when it wrote or read it: the manifests and the config of the
      * phase.
      */
-    @Getter
-    static final class Lock {
-        private final Scenario scenario;
-        private final String fileName;
-        private final String text;
-        private final Phase phase;
+    static final class Lock extends LockScenario.RecordedLock<Scenario> {
 
         Lock(Scenario scenario, String fileName, String text) {
-            this.scenario = scenario;
-            this.fileName = fileName;
-            this.text = text;
-            this.phase = fileName.startsWith("before") ? Phase.BEFORE : Phase.AFTER;
+            super(scenario, fileName, text, fileName.startsWith("before") ? Phase.BEFORE : Phase.AFTER);
         }
 
         Map<String, String> manifests() {

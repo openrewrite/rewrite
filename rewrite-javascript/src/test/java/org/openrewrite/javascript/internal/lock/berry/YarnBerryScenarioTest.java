@@ -25,6 +25,7 @@ import org.openrewrite.javascript.internal.LockFileRegeneration.Kind;
 import org.openrewrite.javascript.internal.LockFileRegeneration.Reason;
 import org.openrewrite.javascript.internal.LockFileRegeneration.Result;
 import org.openrewrite.javascript.internal.lock.Expect;
+import org.openrewrite.javascript.internal.lock.LockScenario.Phase;
 import org.openrewrite.javascript.internal.lock.LockScenarioTest;
 import org.openrewrite.javascript.internal.lock.RecordedRegistry;
 
@@ -50,7 +51,7 @@ class YarnBerryScenarioTest extends LockScenarioTest {
         BerryScenarios.Scenario scenario;
         String label;
         String start;
-        BerryScenarios.Phase phase;
+        Phase phase;
 
         @Nullable
         String after;
@@ -71,13 +72,13 @@ class YarnBerryScenarioTest extends LockScenarioTest {
             String seed = scenario.file("lock-seed");
             String recorded = scenario.file("recorded-with");
             if (seed != null && before != null && recorded != null && recorded.contains("before exit=0")) {
-                Edit edit = new Edit(scenario, scenario.getLabel() + "/lock-seed", seed, BerryScenarios.Phase.BEFORE,
+                Edit edit = new Edit(scenario, scenario.getLabel() + "/lock-seed", seed, Phase.BEFORE,
                         before, "exact");
                 out.add(Arguments.of(edit.getLabel(), edit));
             }
             String after = scenario.file("after");
             if (before != null && (after != null || scenario.expect() != null)) {
-                Edit edit = new Edit(scenario, scenario.getLabel(), before, BerryScenarios.Phase.AFTER, after,
+                Edit edit = new Edit(scenario, scenario.getLabel(), before, Phase.AFTER, after,
                         scenario.expect());
                 out.add(Arguments.of(edit.getLabel(), edit));
             }

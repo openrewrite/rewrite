@@ -26,6 +26,7 @@ import org.openrewrite.javascript.internal.LockFileRegeneration.Reason;
 import org.openrewrite.javascript.internal.LockFileRegeneration.Result;
 import org.openrewrite.javascript.internal.lock.Expect;
 import org.openrewrite.javascript.internal.lock.Host;
+import org.openrewrite.javascript.internal.lock.LockScenario.Phase;
 import org.openrewrite.javascript.internal.lock.LockScenarioTest;
 import org.openrewrite.javascript.internal.lock.RecordedRegistry;
 import org.openrewrite.javascript.internal.lock.RegistrySource;
@@ -103,7 +104,7 @@ class YarnClassicScenarioTest extends LockScenarioTest {
         Expect expect = Expect.of(scenario.expect());
         skipUnlessReplayed(scenario.getLabel(), scenario, expect);
         ScenarioRegistry http = new ScenarioRegistry(scenario);
-        Result result = new YarnClassicLockRegenerator(scenario.inputs(YarnClassicScenarios.Phase.AFTER,
+        Result result = new YarnClassicLockRegenerator(scenario.inputs(Phase.AFTER,
                 scenario.file("before")), http).regenerate();
         check(scenario.getLabel(), expect, scenario.file("after"), result, http);
     }
@@ -121,7 +122,7 @@ class YarnClassicScenarioTest extends LockScenarioTest {
         YarnClassicScenarios.Scenario scenario = YarnClassicScenarios.discover().stream()
                 .filter(s -> s.getName().equals(name)).findFirst().orElseThrow(IllegalStateException::new);
         Host withoutNode = scenario.host().toBuilder().nodeVersion(null).build();
-        YarnClassicLockRegenerator.Inputs inputs = scenario.inputs(YarnClassicScenarios.Phase.AFTER,
+        YarnClassicLockRegenerator.Inputs inputs = scenario.inputs(Phase.AFTER,
                 scenario.file("before")).toBuilder().host(withoutNode).build();
         Result result = new YarnClassicLockRegenerator(inputs, new ScenarioRegistry(scenario)).regenerate();
         if (cannotKnow == null) {

@@ -20,6 +20,7 @@ import org.jspecify.annotations.Nullable;
 import org.openrewrite.javascript.internal.lock.HostInputs;
 import org.openrewrite.javascript.internal.lock.HostRegistries;
 import org.openrewrite.javascript.internal.lock.JsYaml;
+import org.openrewrite.javascript.internal.lock.LockScenario.Phase;
 import org.openrewrite.javascript.internal.lock.LockScenario;
 import org.openrewrite.javascript.internal.lock.RootRelativePath;
 
@@ -59,28 +60,13 @@ final class PnpmScenarios {
     }
 
     /**
-     * The project's files as an install found them: before the edit, or after it.
-     */
-    enum Phase {
-        BEFORE, AFTER
-    }
-
-    /**
      * One lock of a scenario with what pnpm had when it read or wrote it.
      */
-    @Getter
-    static final class Lock {
-        private final Scenario scenario;
-        private final String fileName;
-        private final String text;
-        private final Phase phase;
+    static final class Lock extends LockScenario.RecordedLock<Scenario> {
 
         Lock(Scenario scenario, String fileName, String text) {
-            this.scenario = scenario;
-            this.fileName = fileName;
-            this.text = text;
-            this.phase = fileName.startsWith("before") || fileName.startsWith("seed-lock") ? Phase.BEFORE :
-                    Phase.AFTER;
+            super(scenario, fileName, text, fileName.startsWith("before") || fileName.startsWith("seed-lock") ?
+                    Phase.BEFORE : Phase.AFTER);
         }
 
         Map<String, String> manifests() {

@@ -24,6 +24,7 @@ import org.openrewrite.javascript.internal.LockFileRegeneration.Kind;
 import org.openrewrite.javascript.internal.LockFileRegeneration.Reason;
 import org.openrewrite.javascript.internal.LockFileRegeneration.Result;
 import org.openrewrite.javascript.internal.lock.Expect;
+import org.openrewrite.javascript.internal.lock.LockScenario.Phase;
 import org.openrewrite.javascript.internal.lock.LockScenarioTest;
 import org.openrewrite.javascript.internal.lock.RecordedRegistry;
 
@@ -92,15 +93,15 @@ class BunScenarioTest extends LockScenarioTest {
     static BunLockRegenerator.Inputs inputs(BunScenarios.Scenario scenario) {
         String before = scenario.file("before");
         Map<String, String> patchesAbove = new TreeMap<>();
-        scenario.filesAbove(BunScenarios.Phase.AFTER).forEach((path, text) -> {
+        scenario.filesAbove(Phase.AFTER).forEach((path, text) -> {
             if (path.endsWith(".patch")) {
                 patchesAbove.put(path, text);
             }
         });
-        return scenario.inputs(BunScenarios.Phase.AFTER, before)
-          .files(scenario.tree(BunScenarios.Phase.AFTER))
+        return scenario.inputs(Phase.AFTER, before)
+          .files(scenario.tree(Phase.AFTER))
           .files(patchesAbove)
-          .paths(scenario.paths(BunScenarios.Phase.AFTER, before))
+          .paths(scenario.paths(Phase.AFTER, before))
           .host(scenario.host())
           .build();
     }

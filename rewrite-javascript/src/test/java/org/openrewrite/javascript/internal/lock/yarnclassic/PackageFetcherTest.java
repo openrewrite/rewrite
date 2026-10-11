@@ -18,6 +18,7 @@ package org.openrewrite.javascript.internal.lock.yarnclassic;
 import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
+import org.openrewrite.javascript.internal.lock.LockScenario.Phase;
 import org.openrewrite.javascript.internal.lock.RegistrySource;
 import org.openrewrite.javascript.internal.LockFileRegeneration.Result;
 
@@ -69,7 +70,7 @@ class PackageFetcherTest {
                         recorded.tarball(url, name, version, authorization);
             }
         };
-        Result result = new YarnClassicLockRegenerator(scenario.inputs(YarnClassicScenarios.Phase.AFTER, before),
+        Result result = new YarnClassicLockRegenerator(scenario.inputs(Phase.AFTER, before),
                 registry).regenerate();
         if (cannotKnow == null) {
             assertThat(result.getLockFileContent()).isEqualTo(before);

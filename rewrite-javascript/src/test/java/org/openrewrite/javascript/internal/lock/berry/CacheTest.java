@@ -39,6 +39,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.stream.Stream;
+import org.openrewrite.javascript.internal.lock.LockScenario.Phase;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -202,7 +203,7 @@ class CacheTest {
 
     private static Result replay(String name, Host host) {
         BerryScenarios.Scenario scenario = scenario(name);
-        YarnBerryLockRegenerator.Inputs inputs = scenario.inputs(BerryScenarios.Phase.AFTER, scenario.file("before"))
+        YarnBerryLockRegenerator.Inputs inputs = scenario.inputs(Phase.AFTER, scenario.file("before"))
                 .toBuilder().host(host).build();
         return new YarnBerryLockRegenerator(inputs, scenario.registry()).regenerate();
     }

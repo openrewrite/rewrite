@@ -42,6 +42,31 @@ import java.util.stream.Stream;
 @Getter
 public abstract class LockScenario {
 
+    /**
+     * The install a lock belongs to: the one from {@code pkg-before}, Yarn Berry's refresh, or the edit's install.
+     */
+    public enum Phase {
+        BEFORE, REFRESH, AFTER
+    }
+
+    /**
+     * One lock of a scenario, by its file name, with the phase that wrote or read it.
+     */
+    @Getter
+    public abstract static class RecordedLock<S extends LockScenario> {
+        protected final S scenario;
+        protected final String fileName;
+        protected final String text;
+        protected final Phase phase;
+
+        protected RecordedLock(S scenario, String fileName, String text, Phase phase) {
+            this.scenario = scenario;
+            this.fileName = fileName;
+            this.text = text;
+            this.phase = phase;
+        }
+    }
+
     public static final String SCENARIOS_ENV = "REWRITE_LOCK_SCENARIOS";
     public static final String HTTP_CACHE_ENV = "REWRITE_LOCK_HTTP_CACHE";
 

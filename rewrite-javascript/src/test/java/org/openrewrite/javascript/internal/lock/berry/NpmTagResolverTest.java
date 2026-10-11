@@ -17,6 +17,7 @@ package org.openrewrite.javascript.internal.lock.berry;
 
 import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.Test;
+import org.openrewrite.javascript.internal.lock.LockScenario.Phase;
 import org.openrewrite.javascript.internal.lock.RegistrySource;
 import org.openrewrite.javascript.internal.LockFileRegeneration.Failure;
 import org.openrewrite.javascript.internal.LockFileRegeneration.Kind;
@@ -62,7 +63,7 @@ class NpmTagResolverTest {
                 return recorded.tarball(url, name, version, authorization);
             }
         };
-        Failure failure = new YarnBerryLockRegenerator(scenario.inputs(BerryScenarios.Phase.AFTER, before),
+        Failure failure = new YarnBerryLockRegenerator(scenario.inputs(Phase.AFTER, before),
                 withoutDistTags).regenerate().getFailure();
         assertThat(failure).isNotNull();
         assertThat(failure.getKind()).isEqualTo(Kind.PM_FAILS);

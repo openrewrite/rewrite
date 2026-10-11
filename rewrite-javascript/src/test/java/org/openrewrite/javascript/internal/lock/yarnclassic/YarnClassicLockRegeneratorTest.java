@@ -29,6 +29,7 @@ import org.openrewrite.javascript.internal.lock.CannotKnow;
 import org.openrewrite.javascript.internal.lock.EventLoop;
 import org.openrewrite.javascript.internal.lock.Host;
 import org.openrewrite.javascript.internal.lock.JsError;
+import org.openrewrite.javascript.internal.lock.LockScenario.Phase;
 import org.openrewrite.javascript.internal.lock.RegistrySource;
 import org.openrewrite.javascript.internal.lock.Rejected;
 import org.openrewrite.javascript.internal.registry.NodeRegistryException;
@@ -78,19 +79,19 @@ class YarnClassicLockRegeneratorTest {
         for (YarnClassicScenarios.Scenario scenario : YarnClassicScenarios.discover()) {
             String before = scenario.file("yarn-before.log");
             if (before != null) {
-                out.add(Arguments.of(scenario.getLabel() + "/before", scenario, YarnClassicScenarios.Phase.BEFORE, null,
+                out.add(Arguments.of(scenario.getLabel() + "/before", scenario, Phase.BEFORE, null,
                         before));
             }
             String after = scenario.file("yarn-after.log");
             if (after != null) {
-                out.add(Arguments.of(scenario.getLabel() + "/after", scenario, YarnClassicScenarios.Phase.AFTER,
+                out.add(Arguments.of(scenario.getLabel() + "/after", scenario, Phase.AFTER,
                         scenario.file("before"),
                         after));
             }
             String again = scenario.file("yarnclassic-again.log");
             Matcher over = again == null ? null : OVER.matcher(again);
             if (over != null && over.find()) {
-                out.add(Arguments.of(scenario.getLabel() + "/again", scenario, YarnClassicScenarios.Phase.AFTER,
+                out.add(Arguments.of(scenario.getLabel() + "/again", scenario, Phase.AFTER,
                         scenario.file(over.group(1)),
                         again));
             }
@@ -100,7 +101,7 @@ class YarnClassicLockRegeneratorTest {
 
     @ParameterizedTest(name = "{0}")
     @MethodSource("installs")
-    void stopsWhereYarnStops(String name, YarnClassicScenarios.Scenario scenario, YarnClassicScenarios.Phase phase,
+    void stopsWhereYarnStops(String name, YarnClassicScenarios.Scenario scenario, Phase phase,
                              @Nullable String lock, String log) {
         String outcome = untilTheFirstStep(scenario.inputs(phase, lock));
         String expected = errorBeforeTheSteps(log);

@@ -26,6 +26,7 @@ import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.stream.Stream;
+import org.openrewrite.javascript.internal.lock.LockScenario.Phase;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.fail;
@@ -89,9 +90,9 @@ class BerryLockRoundTripTest {
             String refresh = scenario.file("refresh");
             String after = scenario.file("after");
             if ("before".equals(lock.getFileName()) && refresh != null) {
-                refreshesAsYarnDoes(lock, BerryScenarios.Phase.REFRESH, refresh);
+                refreshesAsYarnDoes(lock, Phase.REFRESH, refresh);
             } else if ("before".equals(lock.getFileName()) && after != null && onlyTheReleaseChanges(scenario)) {
-                refreshesAsYarnDoes(lock, BerryScenarios.Phase.AFTER, after);
+                refreshesAsYarnDoes(lock, Phase.AFTER, after);
             } else {
                 fail("no recording of a Yarn 4 install that changes nothing over this lock");
             }
@@ -119,7 +120,7 @@ class BerryLockRoundTripTest {
      * A lock older than version 8 under a Yarn 4 install that changes nothing else is refreshed from the registry, its
      * descriptors and checksums kept, under {@code compressionLevel: mixed}: Yarn's recording is the phase's lock.
      */
-    private static void refreshesAsYarnDoes(BerryScenarios.Lock lock, BerryScenarios.Phase phase, String expected) {
+    private static void refreshesAsYarnDoes(BerryScenarios.Lock lock, Phase phase, String expected) {
         BerryScenarios.Scenario scenario = lock.getScenario();
         YarnBerryLockRegenerator regenerator = new YarnBerryLockRegenerator(scenario.inputs(phase, lock.getText()),
                 scenario.registry());

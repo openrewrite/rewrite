@@ -20,7 +20,7 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
 import org.openrewrite.javascript.internal.lock.CannotKnow;
-import org.openrewrite.javascript.internal.lock.pnpm.PnpmScenarios.Phase;
+import org.openrewrite.javascript.internal.lock.LockScenario.Phase;
 
 import java.util.ArrayList;
 import java.util.Collections;

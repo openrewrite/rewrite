@@ -23,7 +23,7 @@ import org.openrewrite.javascript.internal.LockFileRegeneration.Kind;
 import org.openrewrite.javascript.internal.LockFileRegeneration.Result;
 import org.openrewrite.javascript.internal.lock.CannotKnow;
 import org.openrewrite.javascript.internal.lock.JsError;
-import org.openrewrite.javascript.internal.lock.pnpm.PnpmScenarios.Phase;
+import org.openrewrite.javascript.internal.lock.LockScenario.Phase;
 
 import java.time.Instant;
 import java.util.Arrays;
