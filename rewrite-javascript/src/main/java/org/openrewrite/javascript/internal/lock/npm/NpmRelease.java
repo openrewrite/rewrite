@@ -100,6 +100,48 @@ public final class NpmRelease implements Comparable<NpmRelease> {
         return compareTo(threshold) >= 0;
     }
 
+    // @npmcli/arborist build-ideal-tree.js
+
+    /**
+     * {@code #checkEngineAndPlatform} leaves the root's {@code engines} unchecked when it has {@code devEngines}:
+     * from npm 10.9.0.
+     */
+    boolean devEnginesReplaceRootEngines() {
+        return atLeast(10, 9, 0);
+    }
+
+    /**
+     * {@code #fetchManifest} drops {@code license} from the manifest pacote returns: npm 10.4.0 until 10.8.0.
+     */
+    boolean dropsLicenseOfFetchedManifest() {
+        return atLeast(10, 4, 0) && !atLeast(10, 8, 0);
+    }
+
+    /**
+     * {@code #fetchManifest} asks pacote for the full packument ({@code fullMetadata: true}): from npm 10.4.0.
+     */
+    boolean fetchesFullMetadata() {
+        return atLeast(10, 4, 0);
+    }
+
+    /**
+     * {@code DepsQueue} keeps one list per depth, each sorted by path alone, in place of one list sorted when it is
+     * popped: npm 10.4.0 until 10.8.0.
+     */
+    boolean queuesDepsByDepth() {
+        return atLeast(10, 4, 0) && !atLeast(10, 8, 0);
+    }
+
+    // @npmcli/arborist shrinkwrap.js
+
+    /**
+     * {@code metaFromNode} writes the package name of a node whose folder is named otherwise even when the node
+     * itself goes by that name, as a link target just placed does: from npm 10.8.2.
+     */
+    boolean namesEntryByFolder() {
+        return atLeast(10, 8, 2);
+    }
+
     // @npmcli/config definitions.js
 
     /**
@@ -114,6 +156,48 @@ public final class NpmRelease implements Comparable<NpmRelease> {
      */
     String allowRemoteDefault() {
         return atLeast(12, 0, 0) ? "none" : "all";
+    }
+
+    // @npmcli/map-workspaces
+
+    /**
+     * The @npmcli/map-workspaces npm bundles: 3.0.6 from npm 10.5.2, which finds the members 5.0.3 finds; 3.0.4
+     * before.
+     */
+    MapWorkspaces.Release mapWorkspaces() {
+        return atLeast(10, 5, 2) ? MapWorkspaces.Release.V5_0_3 : MapWorkspaces.Release.V3_0_4;
+    }
+
+    // @npmcli/package-json normalize.js
+
+    /**
+     * The @npmcli/package-json whose {@code bin} step pacote runs over a fetched manifest: 6.0.1 from npm 10.9.0,
+     * which reads as 7.0.5 there; 5.1.1 and 5.2.0 from npm 10.8.1; 5.1.0 and, before npm 10.6.0,
+     * read-package-json-fast before that.
+     */
+    PackageJson.Release packageJson() {
+        return atLeast(10, 9, 0) ? PackageJson.Release.V7_0_5 :
+                atLeast(10, 8, 1) ? PackageJson.Release.V5_2_0 : PackageJson.Release.V5_1_0;
+    }
+
+    // npm-pick-manifest
+
+    /**
+     * The npm-pick-manifest npm bundles: 9.1.0 from npm 10.8.2, which picks as 11.0.3 does; 9.0.1 and older before.
+     */
+    PickManifest.Release pickManifest() {
+        return atLeast(10, 8, 2) ? PickManifest.Release.V11_0_3 : PickManifest.Release.V9_0_1;
+    }
+
+    // pacote dir.js
+
+    /**
+     * The manifest of a directory gets its {@code bin} from the files of {@code directories.bin}:
+     * read-package-json-fast until npm 10.6.0 and @npmcli/package-json 7 from npm 11.6.1 fill it,
+     * @npmcli/package-json 5 and 6 between them do not.
+     */
+    boolean dirFetcherReadsBinDirectory() {
+        return !atLeast(10, 6, 0) || atLeast(11, 6, 1);
     }
 
     @Override

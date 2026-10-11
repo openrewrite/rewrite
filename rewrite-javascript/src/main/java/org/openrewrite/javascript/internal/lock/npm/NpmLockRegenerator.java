@@ -142,8 +142,9 @@ public final class NpmLockRegenerator {
         String written;
         String yarnLock;
         try {
-            INSTALL.requireInstallsAt(NpmOptions.loadLocalPrefix(inputs.getManifests().get(inputs.getRunsIn()),
-                    inputs.getParentTrees()), inputs.getRunsIn(), "lock");
+            INSTALL.requireInstallsAt(NpmOptions.loadLocalPrefix(inputs.getRelease(),
+                    inputs.getManifests().get(inputs.getRunsIn()), inputs.getParentTrees()), inputs.getRunsIn(),
+                    "lock");
             if (inputs.getPaths() != null && Shrinkwrap.readsShrinkwrap(inputs.getPaths()::contains)) {
                 throw new CannotKnow("the lock npm writes: it reads and writes the npm-shrinkwrap.json beside this " +
                                      "lock in its place");
@@ -196,9 +197,13 @@ public final class NpmLockRegenerator {
      * project's directories become its workspace edges.
      */
     static Node setWorkspaces(Node node, VirtualTreeLoader.ProjectFiles files) {
+        return setWorkspaces(node, files, NpmRelease.PORTED);
+    }
+
+    static Node setWorkspaces(Node node, VirtualTreeLoader.ProjectFiles files, NpmRelease release) {
         Map<String, String> workspaces = new LinkedHashMap<>();
         for (Map.Entry<Object, String> workspace : MapWorkspaces.mapWorkspaces(node.getPath(), node.getPackage(),
-                files).entrySet()) {
+                files, release.mapWorkspaces()).entrySet()) {
             // the workspace edge the name becomes is what refuses it
             if (!(workspace.getKey() instanceof String)) {
                 throw new IllegalArgumentException("must provide dependency name");
@@ -320,7 +325,7 @@ public final class NpmLockRegenerator {
             return Rejected.coded(Reason.PEER_CONFLICT, conflict.getEdge().getName(), "ERESOLVE",
                     ExplainEresolve.explain(conflict.getExplanation(), 4));
         }
-        if (e instanceof CannotKnow) {
+        if (e instanceof CannotKnow || e instanceof Rejected) {
             return e;
         }
         if (e instanceof PackageJson.NeedsPackageFiles) {

@@ -387,4 +387,66 @@ class PickManifestTest {
         assertThatThrownBy(() -> PickManifest.pickManifest(packument("{\"versions\":{}}"), null))
           .hasMessage("No versions available for undefined");
     }
+
+    // what npm-pick-manifest 9.0.1 (npm 10.8.1) and 9.1.0 (npm 10.8.2) each answer, asked of the libraries themselves:
+    // 9.0.1 takes the dist-tag's version when the range allows it, whatever else is wrong with it, and ranks the
+    // others without regard to staged or restricted versions
+    @Test
+    void distTagVersionUncheckedBefore9_1_0() {
+        PickManifest.Options old = PickManifest.Options.builder().release(PickManifest.Release.V9_0_1).build();
+        Map<String, Object> deprecatedLatest = packument("{\"dist-tags\":{\"latest\":\"2.0.0\"},\"versions\":{" +
+                                                         "\"1.0.0\":{\"version\":\"1.0.0\"}," +
+                                                         "\"2.0.0\":{\"version\":\"2.0.0\",\"deprecated\":\"no\"}}}");
+        assertThat(version(deprecatedLatest, "*", old)).isEqualTo("2.0.0");
+        assertThat(version(deprecatedLatest, "*")).isEqualTo("1.0.0");
+
+        Map<String, Object> deprecatedInRange = packument("{\"dist-tags\":{\"latest\":\"1.0.1\"},\"versions\":{" +
+                                                          "\"1.0.0\":{\"version\":\"1.0.0\"}," +
+                                                          "\"1.0.1\":{\"version\":\"1.0.1\",\"deprecated\":\"no\"}}}");
+        assertThat(version(deprecatedInRange, "^1.0.0", old)).isEqualTo("1.0.1");
+        assertThat(version(deprecatedInRange, "^1.0.0")).isEqualTo("1.0.0");
+
+        Map<String, Object> engineLatest = packument("{\"dist-tags\":{\"latest\":\"2.0.0\"},\"versions\":{" +
+                                                     "\"1.0.0\":{\"version\":\"1.0.0\"},\"2.0.0\":{" +
+                                                     "\"version\":\"2.0.0\",\"engines\":{\"node\":\">=99\"}}}}");
+        assertThat(version(engineLatest, "*", old.toBuilder().nodeVersion("20.0.0").build())).isEqualTo("2.0.0");
+        assertThat(version(engineLatest, "*", PickManifest.Options.builder().nodeVersion("20.0.0").build()))
+          .isEqualTo("1.0.0");
+
+        Map<String, Object> restrictedLatest = packument("{\"dist-tags\":{\"latest\":\"2.0.0\"}," +
+                                                         "\"policyRestrictions\":{\"versions\":{" +
+                                                         "\"2.0.0\":{\"version\":\"2.0.0\"}}},\"versions\":{" +
+                                                         "\"1.0.0\":{\"version\":\"1.0.0\"}," +
+                                                         "\"2.0.0\":{\"version\":\"2.0.0\"}}}");
+        assertThatThrownBy(() -> PickManifest.pickManifest(restrictedLatest, "*", old))
+          .matches(t -> "E403".equals(code(t)));
+        assertThat(version(restrictedLatest, "*")).isEqualTo("1.0.0");
+    }
+
+    @Test
+    void stagedAndRestrictedUnrankedBefore9_1_0() {
+        PickManifest.Options old = PickManifest.Options.builder().release(PickManifest.Release.V9_0_1).build();
+        Map<String, Object> restricted = packument("{\"policyRestrictions\":{\"versions\":{" +
+                                                   "\"1.0.1\":{\"version\":\"1.0.1\"}}},\"versions\":{" +
+                                                   "\"1.0.0\":{\"version\":\"1.0.0\"}}}");
+        assertThatThrownBy(() -> PickManifest.pickManifest(restricted, "^1.0.0", old))
+          .matches(t -> "E403".equals(code(t)));
+        assertThat(version(restricted, "^1.0.0")).isEqualTo("1.0.0");
+
+        Map<String, Object> staged = packument("{\"stagedVersions\":{\"versions\":{" +
+                                               "\"1.0.1\":{\"version\":\"1.0.1\"}}},\"versions\":{" +
+                                               "\"1.0.0\":{\"version\":\"1.0.0\"}}}");
+        assertThat(version(staged, "^1.0.0", old.toBuilder().includeStaged(true).build())).isEqualTo("1.0.1");
+        assertThat(version(staged, "^1.0.0", PickManifest.Options.builder().includeStaged(true).build()))
+          .isEqualTo("1.0.0");
+
+        Map<String, Object> stagedLatest = packument("{\"dist-tags\":{\"latest\":\"1.0.1\"}," +
+                                                     "\"stagedVersions\":{\"versions\":{" +
+                                                     "\"1.0.1\":{\"version\":\"1.0.1\"}}},\"versions\":{" +
+                                                     "\"1.0.0\":{\"version\":\"1.0.0\"}," +
+                                                     "\"1.0.1\":{\"version\":\"1.0.1\"}}}");
+        assertThat(version(stagedLatest, "^1.0.0", old.toBuilder().includeStaged(true).build())).isEqualTo("1.0.1");
+        assertThat(version(stagedLatest, "^1.0.0", PickManifest.Options.builder().includeStaged(true).build()))
+          .isEqualTo("1.0.0");
+    }
 }
