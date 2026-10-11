@@ -121,9 +121,9 @@ public final class NpmReleases {
      * <li>a {@code packageManager} that names {@code npm@<version>}, as corepack reads the field, allows that
      * release alone. npm itself does not read it, so one that names another package manager, a range, a URL or what
      * corepack refuses allows every release.</li>
-     * <li>else {@code devEngines.packageManager} allows the releases npm's check passes or only warns for, also those
-     * too old to run it. One no release satisfies, as for another package manager, allows every release: each
-     * install reports what npm does.</li>
+     * <li>else {@code devEngines.packageManager} allows the releases npm's check passes or only warns for. A release
+     * too old to run the check is held to it as well: the project says which npm it uses. One no release satisfies,
+     * as for another package manager, allows every release: each install reports what npm does.</li>
      * </ul>
      *
      * @throws CannotKnow when {@code packageManager} names an npm that is none of these releases
