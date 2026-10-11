@@ -22,6 +22,7 @@ import org.openrewrite.*;
 import org.openrewrite.javascript.internal.NodeCatalogs;
 import org.openrewrite.javascript.internal.NodeDependencyEdits;
 import org.openrewrite.javascript.internal.PackageJsonHelper;
+import org.openrewrite.javascript.internal.lock.Rejected;
 import org.openrewrite.javascript.internal.lock.Spec;
 import org.openrewrite.javascript.table.NodeDependencyProtocolsSkipped;
 import org.openrewrite.javascript.table.NodeDependencyEditsDeclined;
@@ -116,7 +117,15 @@ public class ChangeDependency extends ScanningRecipe<NodeDependencyEdits> {
             if (spec != null && (spec.isVersionSpec() || spec.isLocation() && newVersion != null)) {
                 keepValue.put(declared.getKey(), false);
             } else if (spec != null && spec.getType() == Spec.Type.CATALOG) {
-                NodeCatalogs catalogs = decision.catalogs();
+                NodeCatalogs catalogs;
+                try {
+                    catalogs = decision.catalogs();
+                } catch (Rejected e) {
+                    String why = oldPackageName + " was not renamed: " + e.getMessage();
+                    decision.warn(why);
+                    decision.decline(why);
+                    continue;
+                }
                 String catalog = catalogs == null ? null : catalogs.catalogOf(value);
                 String entry = newVersion;
                 if (catalog != null && entry == null) {

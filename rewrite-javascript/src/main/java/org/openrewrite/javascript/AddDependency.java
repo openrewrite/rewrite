@@ -108,17 +108,18 @@ public class AddDependency extends ScanningRecipe<NodeDependencyEdits> {
             declined(decision, "`" + targetScope() + "` is not an object, so " + packageName + " was not added");
             return;
         }
-        NodeCatalogs catalogs = decision.catalogs();
+        PackageManager pm;
+        NodeCatalogs catalogs;
+        try {
+            pm = decision.getPackageManager();
+            catalogs = decision.catalogs();
+        } catch (Rejected e) {
+            declined(decision, packageName + "@" + version + " was not added: " + e.getMessage());
+            return;
+        }
         if (catalogs instanceof NodeCatalogs.Pnpm && catalogs.isFlowStyle()) {
             declined(decision, packageName + "@" + version + " was not added: the catalogs in " + catalogs.getPath() +
                              " are written in flow style, which is not read");
-            return;
-        }
-        PackageManager pm;
-        try {
-            pm = decision.getPackageManager();
-        } catch (Rejected e) {
-            declined(decision, packageName + "@" + version + " was not added: " + e.getMessage());
             return;
         }
         ManifestRules rules = LockFileRegeneration.manifestRules(pm);

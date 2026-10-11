@@ -23,6 +23,7 @@ import org.openrewrite.javascript.internal.MatchedDependency;
 import org.openrewrite.javascript.internal.NodeCatalogs;
 import org.openrewrite.javascript.internal.NodeDependencyEdits;
 import org.openrewrite.javascript.internal.PackageJsonHelper;
+import org.openrewrite.javascript.internal.lock.Rejected;
 import org.openrewrite.javascript.internal.lock.Spec;
 import org.openrewrite.javascript.table.NodeDependencyProtocolsSkipped;
 import org.openrewrite.javascript.table.NodeDependencyEditsDeclined;
@@ -136,7 +137,13 @@ public class UpgradeDependencyVersion extends ScanningRecipe<NodeDependencyEdits
     }
 
     private boolean followCatalog(NodeDependencyEdits.Decision decision, String name, String value) {
-        NodeCatalogs catalogs = decision.catalogs();
+        NodeCatalogs catalogs;
+        try {
+            catalogs = decision.catalogs();
+        } catch (Rejected e) {
+            decision.decline(name + "'s catalog entry was not upgraded: " + e.getMessage());
+            return true;
+        }
         String catalog = catalogs == null ? null : catalogs.catalogOf(value);
         if (catalog == null) {
             return false;

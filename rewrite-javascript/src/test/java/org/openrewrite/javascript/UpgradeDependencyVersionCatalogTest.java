@@ -266,6 +266,30 @@ class UpgradeDependencyVersionCatalogTest implements RewriteTest {
         );
     }
 
+    // corepack 0.35.0 refuses a range as devEngines.packageManager's version (recorded)
+    @Test
+    void withoutALockASpecCorepackRejectsDeclinesWithItsMessage() {
+        rewriteRun(
+          spec -> spec.recipe(new UpgradeDependencyVersion("acme-logger", null, "~1.5.0"))
+            .dataTable(NodeDependencyEditsDeclined.Row.class, rows -> assertThat(rows).singleElement()
+              .extracting(NodeDependencyEditsDeclined.Row::getReason).asString()
+              .startsWith("acme-logger's catalog entry was not upgraded: ").contains("expected a semver version")),
+          packageJson("""
+            {
+              "name": "consumer",
+              "devEngines": {"packageManager": {"name": "pnpm", "version": "^10"}},
+              "dependencies": {
+                "acme-logger": "catalog:"
+              }
+            }
+            """, null, nodeResolutionResult((PackageManager) null)),
+          yaml("""
+            catalog:
+              acme-logger: ~1.4.1
+            """, s -> s.path("pnpm-workspace.yaml").noTrim())
+        );
+    }
+
     // the catalog entry moves and the override of the same package is declined, whichever recipe runs first
     @ParameterizedTest(name = "{0}/{1}")
     @CsvSource(delimiter = '|', textBlock = """

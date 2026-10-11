@@ -73,6 +73,7 @@ public final class NodeDependencyEdits implements PackageJsonHelper.FileEditor {
     private final Map<Path, SourceFile> yamlFiles = new HashMap<>();
     private final Map<Path, @Nullable ManagedFile> managed = new HashMap<>();
     private final Map<Path, @Nullable ManagedFile> managedOf = new HashMap<>();
+    private final Map<Path, Rejected> rejected = new HashMap<>();
     private final Map<Path, Decision> decisions = new LinkedHashMap<>();
     private final Map<Path, SourceFile> visited = new HashMap<>();
     private final Map<Path, String> left = new LinkedHashMap<>();
@@ -691,6 +692,7 @@ public final class NodeDependencyEdits implements PackageJsonHelper.FileEditor {
             try {
                 pm = packageManager(packageJson);
             } catch (Rejected e) {
+                rejected.put(packageJson, e);
                 pm = null;
             }
             Path path = pm == null ? null : file(pm, packageJson);
@@ -727,6 +729,7 @@ public final class NodeDependencyEdits implements PackageJsonHelper.FileEditor {
                 file = new ManagedFile(catalogs, true);
                 managed.put(path, file);
                 managedOf.clear();
+                rejected.clear();
             }
         }
         return file;
@@ -880,10 +883,14 @@ public final class NodeDependencyEdits implements PackageJsonHelper.FileEditor {
 
         /**
          * The catalogs the manifest's package manager reads for it, as the recipes before this one left them, with
-         * the edits decided so far.
+         * the edits decided so far; throws Rejected, with corepack's message, for a spec corepack rejects.
          */
         public @Nullable NodeCatalogs catalogs() {
             ManagedFile file = acc.managedOf(path);
+            Rejected rejected = acc.rejected.get(path);
+            if (rejected != null) {
+                throw rejected;
+            }
             return file == null ? null : file.current();
         }
 
