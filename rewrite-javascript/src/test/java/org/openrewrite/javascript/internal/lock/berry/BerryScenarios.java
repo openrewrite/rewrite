@@ -180,7 +180,7 @@ final class BerryScenarios {
          * {@code release/}.
          */
         List<Replay> releases() {
-            List<String> all = YarnRelease.all();
+            List<String> all = YarnReleases.all();
             List<Replay> replays = new ArrayList<>();
             String recorded = recordedRelease();
             for (String release : LockScenario.releaseEndpoints(getDir().resolve("releases"), all)) {

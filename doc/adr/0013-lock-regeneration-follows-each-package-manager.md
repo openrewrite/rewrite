@@ -8,8 +8,9 @@ Accepted. Supersedes [ADR 0011](0011-native-node-lock-regeneration.md). Amended 
 regenerates through the port of its own resolver, and the shared engine of ADR 0011 is removed. Amended 2026-10-10:
 what `internal.lock` holds, and how the recipes write overrides and follow catalogs for each package manager; and
 again: one port per library, the host's registries as the user's config, corepack, the regenerators by module.
-Amended 2026-10-11: later releases of the ported pnpm and Yarn majors; and the npm release that built the LST,
-with every npm release from 10.0.0 reproduced beside the one ported.
+Amended 2026-10-11: later releases of the ported pnpm and Yarn majors; the npm release that built the LST,
+with every npm release from 10.0.0 reproduced beside the one ported; and every Yarn 4.x release reproduced beside
+4.10.3.
 
 ## Context
 
@@ -224,11 +225,8 @@ arrays and objects that npm, pnpm and yarn 1 print again with `JSON.stringify`.
 - pnpm: a release from 11.0.6 to below 12 (`Main.RUNS_AS_PORTED`) runs as 11.2.2, for the port (`SwitchCliVersion`,
   `Main.release`) and the recipes (`PnpmRelease`) alike. Recordings with 11.13.0 and 11.28.5 write the locks 11.2.2
   writes; 11.0.5 sorts what 11.0.6 appends. Another major stays cannot-know.
-- Yarn Berry: every 4.x release the release data holds (4.0.0 to 4.18.1) runs as 4.10.3, with its own data and
-  lockfile version (8, 9 from 4.14.0, 10 from 4.15.0: `YarnRelease.getLockfileVersion`). Recordings with 4.11.0 to
-  4.18.1 write the entries 4.10.3 writes, but for one: a `npmPreapprovedPackages` entry that makes micromatch throw
-  under the age gate fails 4.18.1's install, where 4.10.3 skips that version. Yarn 2 and 3, and a release after the
-  data's, stay cannot-know.
+- Yarn Berry: every 4.x release the release data holds (4.0.0 to 4.18.1) is reproduced beside 4.10.3, as the
+  amendment on Yarn Berry releases below has it. Yarn 2 and 3, and a release after the data's, stay cannot-know.
 
 ## Amendment 2026-10-11: the npm release that built the LST
 
@@ -258,3 +256,25 @@ allow write different locks for the plainest edit (every release before 10.8.0 d
   `NpmScenarioTest` replays the first and last release of every range. An expect line `exact-or <failure>` holds a
   release to the lock byte for byte where the engine writes one, and to the failure otherwise: a recording the engine
   cannot know may be one another release, reading less, writes plainly.
+
+## Amendment 2026-10-11: Yarn Berry releases
+
+The Berry port follows Yarn 4.10.3 and reproduces every 4.x release beside it, as the npm port does npm's.
+
+- **The release that installs** is the one the `NodeRuntime` marker names, else the one `yarnPath` or corepack starts;
+  one outside `YarnReleases.PROVEN`, or one the release data does not hold (Yarn 2 and 3), is cannot-know.
+- **One question per upstream change.** `YarnRelease` holds each difference beside the release's data (package
+  extensions, builtin patches, plugins, settings) as a question named for what Yarn does, answered through `atLeast`
+  alone. Settings, their defaults and types are the release's: a setting it does not define is unknown to it, and
+  `npmMinimalAgeGate` is minutes until 4.11.0, a duration after, `1d` by default from 4.15.0, per scope from 4.17.0.
+  The lockfile migration rules (`approvedGitRepositories` and `enableScripts` over a lock older than version 9 from
+  4.14.0, `npmMinimalAgeGate: 0` older than 10 from 4.15.0) set what the install writes to `.yarnrc.yml`, which the
+  regeneration returns beside the lock. A builtin compat patch's `hash=` is the release's: the data holds, per patch,
+  its semver ranges and the hash each gives, and a lock holding another release's patch is cannot-know, since the
+  checksum is that of the patch applied to the source's archive.
+- **How a release is proven.** Every stable release from 2.1.0 was swept over every Berry scenario as npm's were. The
+  export (the fixtures repository's `releases` and `release/<first>/`) holds Yarn 4.x only; Yarn 2 and 3 write
+  another lockfile format, which no port reads. A release's outcome is its locks and the `.yarnrc.yml` it writes; a
+  lock with a builtin compat patch entry its start lock does not hold is `exact-or cannot-know builtin compat patch
+  changed`, as the scenarios recorded over such an entry say. `YarnBerryScenarioTest` replays the first and last
+  release of every range, and every release with `REWRITE_LOCK_EVERY_RELEASE`.

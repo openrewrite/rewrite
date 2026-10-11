@@ -306,19 +306,15 @@ public final class YarnBerryLockRegenerator {
 
     /**
      * The release the {@code NodeRuntime} marker names, the one that built the LST; else {@code yarnPath}'s unless
-     * {@code ignorePath}, else the packageManager corepack finds where Yarn runs; CannotKnow when none names a version
-     * or the data lacks it (Yarn 2 and 3, a release after the data's).
+     * {@code ignorePath}, else the packageManager corepack finds where Yarn runs; CannotKnow when none names a version,
+     * the data lacks it (Yarn 2 and 3, a release after the data's), or the engine does not reproduce it
+     * ({@link YarnReleases#PROVEN}).
      */
     YarnRelease release() {
         SpecUtils.Descriptor spec = SpecUtils.findProjectSpec(inputs.getRunsIn(), levelsAbove(), this::manifestText,
                 path -> inputs.getPaths() != null && inputs.getPaths().contains(path), "yarn",
                 HostEnvironment.of(inputs.getEnv()));
-        String version = inputs.getRelease() != null ? inputs.getRelease() : startedRelease(spec);
-        YarnRelease release = YarnRelease.of(version);
-        if (release == null) {
-            throw new CannotKnow("the data of Yarn " + version);
-        }
-        return release;
+        return YarnReleases.installedAs(inputs.getRelease() != null ? inputs.getRelease() : startedRelease(spec));
     }
 
     // the release yarnPath starts unless ignorePath, else the one corepack starts

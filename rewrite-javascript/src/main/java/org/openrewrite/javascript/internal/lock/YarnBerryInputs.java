@@ -22,6 +22,7 @@ import org.openrewrite.javascript.internal.lock.berry.Configuration;
 import org.openrewrite.javascript.internal.lock.berry.YarnBerryLockRegenerator;
 import org.openrewrite.javascript.internal.lock.berry.YarnBerryLockRegenerator.Inputs;
 import org.openrewrite.javascript.internal.registry.NpmRegistryClient;
+import org.openrewrite.javascript.marker.NodeResolutionResult.PackageManager;
 
 import java.util.LinkedHashMap;
 import java.util.Map;
@@ -72,12 +73,14 @@ final class YarnBerryInputs implements Port {
 
     /**
      * With the home .yarnrc.yml Yarn reads under every project rc file: the host's registries as the user's global
-     * and user npmrc, Yarn reading no .npmrc, with the host's credentials for the registries the project names too.
+     * and user npmrc, Yarn reading no .npmrc, with the host's credentials for the registries the project names too;
+     * and the Yarn release that built the LST ({@code NodeRuntime}), which installs.
      */
     static Inputs from(LockDirectory dir, HostInputs host) {
         return project(dir, host).toBuilder()
                 .env(host.getEnvironment().process())
                 .homeFile(DEFAULT_RC_FILENAME, host.userYarnrc())
+                .release(host.packageManagerVersion(PackageManager.YarnBerry))
                 .build();
     }
 
