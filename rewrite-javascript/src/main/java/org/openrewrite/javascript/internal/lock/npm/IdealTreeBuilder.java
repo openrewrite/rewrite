@@ -815,6 +815,10 @@ public final class IdealTreeBuilder {
                         continue;
                     }
 
+                    if (node.getParent() == null && options.getRelease().peerSetStopsAtDetachedNode()) {
+                        break;
+                    }
+
                     throw failPeerConflict(edge, parentEdge);
                 }
             }

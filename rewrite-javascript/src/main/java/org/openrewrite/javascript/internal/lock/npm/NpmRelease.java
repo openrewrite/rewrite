@@ -73,6 +73,14 @@ public final class NpmRelease implements Comparable<NpmRelease> {
         return atLeast(11, 18, 0);
     }
 
+    /**
+     * {@code #loadPeerSet} stops at a node its own peer set detached, where it failed reading the conflict, from npm
+     * 11.19.0 and, of npm 12, from 12.0.2.
+     */
+    boolean peerSetStopsAtDetachedNode() {
+        return atLeast(12, 0, 2) || atLeast(11, 19, 0) && !atLeast(12, 0, 0);
+    }
+
     // @npmcli/arborist calc-dep-flags.js
 
     /**
