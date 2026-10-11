@@ -24,7 +24,6 @@ import org.openrewrite.javascript.internal.LockFileRegeneration.Kind;
 import org.openrewrite.javascript.internal.LockFileRegeneration.Reason;
 import org.openrewrite.javascript.internal.LockFileRegeneration.Result;
 import org.openrewrite.javascript.internal.lock.Host;
-import org.openrewrite.javascript.internal.lock.JsError;
 
 import java.time.Instant;
 import java.util.ArrayList;
@@ -104,24 +103,6 @@ class NpmLockRegeneratorTest {
         }
     }
 
-    // npm 11.17.0 writes an empty lock over this manifest (lock/npm/open-root-bin-dir-number-added): normalize's
-    // TypeError, which the failure names with the field normalize read
-    @Test
-    void aRootDirectoriesBinThatIsNoStringIsMalformedAtThatField() {
-        String manifest = "{\n  \"name\": \"a\",\n  \"version\": \"1.0.0\",\n  \"directories\": {\n    \"bin\": 1\n" +
-                          "  }\n}\n";
-        Result result = new NpmLockRegenerator(NpmLockRegenerator.Inputs.builder()
-          .lock(LOCK)
-          .manifest("", manifest)
-          .now(Instant.EPOCH)
-          .build(), NO_REGISTRY).regenerate();
-
-        assertThat(result.getFailure()).isNotNull();
-        assertThat(result.getFailure().getKind()).isEqualTo(Kind.PM_FAILS);
-        assertThat(result.getErrorMessage()).isEqualTo("MALFORMED_MANIFEST: npm fails on this edit: it cannot apply " +
-          "the manifest: directories.bin: ref.replace is not a function");
-    }
-
     private static final Host NODE_24 = Host.builder().os("darwin").cpu("arm64").nodeVersion("v24.21.0").build();
     private static final String DEV_ENGINES = "The developer of this package has specified the following through " +
                                               "devEngines\n";
@@ -184,7 +165,7 @@ class NpmLockRegeneratorTest {
           NpmOptions.DEFAULT, NODE_24)).isEmpty();
         assertThat(NpmLockRegenerator.checkDevEngines("{\"name\":\"a\"}", NpmOptions.DEFAULT, NODE_24)).isEmpty();
         assertThatThrownBy(() -> NpmLockRegenerator.checkDevEngines(devEngines("null"), NpmOptions.DEFAULT, NODE_24))
-          .isInstanceOf(JsError.class).hasMessage("Invalid non-object value for \"devEngines\"");
+          .hasMessage("Invalid non-object value for \"devEngines\"");
     }
 
     // npm.js runs the check from 10.9.0; npm-install-checks 7.1.2 rewords it in 10.9.5 and 11.6.1
@@ -694,5 +675,23 @@ class NpmLockRegeneratorTest {
         assertThat(installs.get(0).getResult().isSuccess()).isTrue();
         assertThat(installs.get(1).getResult()).isEqualTo(installs.get(0).getResult());
         assertThat(http.requests).isNotEmpty().doesNotHaveDuplicates();
+    }
+
+    // npm 11.17.0 writes an empty lock over this manifest (lock/npm/open-root-bin-dir-number-added): normalize's
+    // TypeError, which the failure names with the field normalize read
+    @Test
+    void aRootDirectoriesBinThatIsNoStringIsMalformedAtThatField() {
+        String manifest = "{\n  \"name\": \"a\",\n  \"version\": \"1.0.0\",\n  \"directories\": {\n    \"bin\": 1\n" +
+                          "  }\n}\n";
+        Result result = new NpmLockRegenerator(NpmLockRegenerator.Inputs.builder()
+          .lock(LOCK)
+          .manifest("", manifest)
+          .now(Instant.EPOCH)
+          .build(), NO_REGISTRY).regenerate();
+
+        assertThat(result.getFailure()).isNotNull();
+        assertThat(result.getFailure().getKind()).isEqualTo(Kind.PM_FAILS);
+        assertThat(result.getErrorMessage()).isEqualTo("MALFORMED_MANIFEST: npm fails on this edit: it cannot apply " +
+          "the manifest: directories.bin: ref.replace is not a function");
     }
 }
