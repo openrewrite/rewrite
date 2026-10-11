@@ -415,8 +415,9 @@ public final class NpmLockRegenerator {
         if (!anyInstalls || same) {
             return newest;
         }
+        // "no single release": a devEngines.packageManager whose range holds releases that differ names several
         return Result.failure(failure(new CannotKnow("the npm release that installs the project: " +
-                differences(rest) + "; package.json names no release in packageManager or " +
+                differences(rest) + "; package.json names no single release in packageManager or " +
                 "devEngines.packageManager")));
     }
 

@@ -255,7 +255,7 @@ class NpmLockRegeneratorTest {
           "(ESHRINKWRAPGLOBAL): cannot generate lockfile for global packages");
     }
 
-    private static final String NAMES_NO_RELEASE = "; package.json names no release in packageManager or " +
+    private static final String NAMES_NO_RELEASE = "; package.json names no single release in packageManager or " +
                                                    "devEngines.packageManager";
     private static final String INTEGRITY = "sha512-6/mh1E2u2YgEsCHdY0Yx5oW+61gZU+1vXaoiHHrpKeuRNNgFvS+/jrwHiQhB5apA" +
                                             "f5oB7UB7E19ol2R2LKH8hQ==";
@@ -381,6 +381,10 @@ class NpmLockRegeneratorTest {
         assertThat(result.getErrorMessage()).isEqualTo("RESOLUTION_REQUIRED: the engine cannot know the npm release " +
           "that installs the project: npm 10.9.0 - 10.9.9 rejects it (EBADDEVENGINES) and npm 10.8.3 installs it" +
           NAMES_NO_RELEASE);
+        // a devEngines.packageManager whose range holds them all names several releases, and is said the same of
+        assertThat(regenerator(project(devEngines("{\"packageManager\":{\"name\":\"npm\",\"version\":\"^10.8\"}," +
+                                                  "\"runtime\":{\"name\":\"bun\"}}"))).regenerate(candidates))
+          .isEqualTo(result);
         // where every install fails, the newest one's failure
         assertThat(regenerator.regenerate(releasesBetween("10.9.0", "10.9.9")))
           .isEqualTo(installs.get("10.9.9").getResult());
