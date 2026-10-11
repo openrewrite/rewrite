@@ -89,6 +89,25 @@ type WithInvalidSyntaxSlots<T> = T & {
     modifiers?: ts.NodeArray<ts.ModifierLike>;
 };
 
+interface CompiledProject {
+    readonly program: ts.Program;
+    readonly typeMapping: JavaScriptTypeMapping;
+}
+
+/**
+ * The inputs of one parse that a single tsconfig governs, or that none does.
+ */
+interface Project {
+    /** Path of the governing config file, empty where there is none. */
+    readonly key: string;
+    readonly options: ts.CompilerOptions;
+    readonly rootNames: SourcePath[];
+    /** How many of the inputs are still to be mapped. */
+    unmapped: number;
+    /** Present from the first input mapped until the last. */
+    compiled?: CompiledProject;
+}
+
 export class JavaScriptParser extends Parser {
 
     private readonly tsConfig: TsConfigResolver;
@@ -216,8 +235,8 @@ export class JavaScriptParser extends Parser {
 
     override async* parse(...inputs: ParserInput[]): AsyncGenerator<SourceFile> {
         const inputFiles = new Map<SourcePath, ParserInput>();
-        const projectOf = new Map<SourcePath, string>();
-        const projects = new Map<string, { options: ts.CompilerOptions, rootNames: SourcePath[] }>();
+        const projectOf = new Map<SourcePath, Project>();
+        const projects = new Map<string, Project>();
 
         // Populate inputFiles map and remove from cache if necessary
         for (const input of inputs) {
@@ -236,12 +255,13 @@ export class JavaScriptParser extends Parser {
         for (const normalizedSourcePath of inputFiles.keys()) {
             const {configFilePath, options} = this.tsConfig.forFile(normalizedSourcePath);
             const projectKey = configFilePath ?? "";
-            projectOf.set(normalizedSourcePath, projectKey);
             let project = projects.get(projectKey);
             if (!project) {
-                projects.set(projectKey, project = {options, rootNames: []});
+                projects.set(projectKey, project = {key: projectKey, options, rootNames: [], unmapped: 0});
             }
             project.rootNames.push(normalizedSourcePath);
+            project.unmapped++;
+            projectOf.set(normalizedSourcePath, project);
         }
 
         // Module resolution probes a directory before the files in it, so a directory holding
@@ -253,53 +273,74 @@ export class JavaScriptParser extends Parser {
             }
         }
 
-        const compiled = new Map<string, { program: ts.Program, typeMapping: JavaScriptTypeMapping }>();
-        for (const [projectKey, {options, rootNames}] of projects) {
-            // TypeScript carries the previous program's bound files forward when the root paths match,
-            // so a parser held across parses of one path costs a fraction of a freshly built one.
-            const program = ts.createProgram(rootNames, options,
-                this.createCompilerHost(options, inputFiles, inputDirectories), this.oldPrograms.get(projectKey));
-            this.oldPrograms.set(projectKey, program);
-
-            // A JavaScriptTypeMapping deduplicates by `ts.Type.id`, which is only unique within
-            // the TypeChecker that issued it, so each program needs its own.
-            compiled.set(projectKey, {program, typeMapping: new JavaScriptTypeMapping(program.getTypeChecker(), this.relativeTo)});
-        }
+        // Each project's program holds its own copy of the standard library and of every dependency
+        // it reaches, a multiple of the sources it is built for. A repository of many projects cannot
+        // afford them all at once, so only one that is alone in its parse is kept for the next.
+        const carryForward = projects.size === 1;
 
         for (const [sourcePath, input] of inputFiles) {
-            const {program, typeMapping} = compiled.get(projectOf.get(sourcePath)!)!;
-            const filePath = parserInputFile(input);
-            const sourceFile = program.getSourceFile(filePath);
-            if (!sourceFile) {
-                yield this.error(input, new Error('Parser returned undefined'));
-                continue;
-            }
-
-            if (hasFlowAnnotation(sourceFile)) {
-                yield this.error(input, new FlowSyntaxNotSupportedError("Flow syntax not supported"));
-                continue;
-            }
-
-            const syntaxErrors = checkSyntaxErrors(program, sourceFile);
-            if (syntaxErrors.length > 0) {
-                let errors = syntaxErrors.map(e => `${e[0]} [${e[1]}]`).join('; ');
-                yield this.error(input, new SyntaxError(`Compiler error(s): ${errors}`));
-                continue;
-            }
-
-            try {
-                yield await this.requirePrintEqualsInput(produce(
-                    new JavaScriptParserVisitor(sourceFile, this.relativePath(input), typeMapping)
-                        .visit(sourceFile) as SourceFile,
-                    draft => {
-                        if (this.styles) {
-                            draft.markers = this.styles.reduce((m, s) => replaceMarkerByKind(m, s), draft.markers);
-                        }
-                    }), input, escapeLoneSurrogates(sourceFile.getFullText()));
-            } catch (error) {
-                yield this.error(input, error instanceof Error ? error : new Error('Parser threw unknown error: ' + error));
-            }
+            // Mapped by a call rather than inline: what a generator holds at a `yield` stays reachable
+            // until it is resumed, and here that would be the program of a project already finished.
+            yield await this.parseInput(input, projectOf.get(sourcePath)!, carryForward, inputFiles, inputDirectories);
         }
+    }
+
+    private async parseInput(input: ParserInput, project: Project, carryForward: boolean,
+                             inputFiles: Map<SourcePath, ParserInput>,
+                             inputDirectories: Set<string>): Promise<SourceFile> {
+        // Built when the first of a project's inputs comes up and let go with its last, so that the
+        // programs alive at any one time are those of the projects still being worked through.
+        const {program, typeMapping} = project.compiled ??=
+            this.compile(project, carryForward, inputFiles, inputDirectories);
+        if (--project.unmapped === 0) {
+            project.compiled = undefined;
+        }
+
+        const filePath = parserInputFile(input);
+        const sourceFile = program.getSourceFile(filePath);
+        if (!sourceFile) {
+            return this.error(input, new Error('Parser returned undefined'));
+        }
+
+        if (hasFlowAnnotation(sourceFile)) {
+            return this.error(input, new FlowSyntaxNotSupportedError("Flow syntax not supported"));
+        }
+
+        const syntaxErrors = checkSyntaxErrors(program, sourceFile);
+        if (syntaxErrors.length > 0) {
+            let errors = syntaxErrors.map(e => `${e[0]} [${e[1]}]`).join('; ');
+            return this.error(input, new SyntaxError(`Compiler error(s): ${errors}`));
+        }
+
+        try {
+            return await this.requirePrintEqualsInput(produce(
+                new JavaScriptParserVisitor(sourceFile, this.relativePath(input), typeMapping)
+                    .visit(sourceFile) as SourceFile,
+                draft => {
+                    if (this.styles) {
+                        draft.markers = this.styles.reduce((m, s) => replaceMarkerByKind(m, s), draft.markers);
+                    }
+                }), input, escapeLoneSurrogates(sourceFile.getFullText()));
+        } catch (error) {
+            return this.error(input, error instanceof Error ? error : new Error('Parser threw unknown error: ' + error));
+        }
+    }
+
+    private compile(project: Project, carryForward: boolean, inputFiles: Map<SourcePath, ParserInput>,
+                    inputDirectories: Set<string>): CompiledProject {
+        // TypeScript carries the previous program's bound files forward when the root paths match,
+        // so a parser held across parses of one path costs a fraction of a freshly built one.
+        const program = ts.createProgram(project.rootNames, project.options,
+            this.createCompilerHost(project.options, inputFiles, inputDirectories), this.oldPrograms.get(project.key));
+        if (carryForward) {
+            this.oldPrograms.set(project.key, program);
+        } else {
+            this.oldPrograms.delete(project.key);
+        }
+
+        // A JavaScriptTypeMapping deduplicates by `ts.Type.id`, which is only unique within
+        // the TypeChecker that issued it, so each program needs its own.
+        return {program, typeMapping: new JavaScriptTypeMapping(program.getTypeChecker(), this.relativeTo)};
     }
 
     private createCompilerHost(compilerOptions: ts.CompilerOptions, inputFiles: Map<SourcePath, ParserInput>,
