@@ -278,6 +278,17 @@ final class NpmHttpUtils {
         if (!Js.truthy(minimalAgeGate)) {
             return false;
         }
+        if (!project.configuration.getRelease().quarantinesVersionsWithoutPublishTime()) {
+            // new Date(publishTimes[version]): no times throw, no time of the version is an Invalid Date, no age
+            if (publishTimes == null || publishTimes == Syml.UNDEFINED) {
+                throw new JsError(JsError.TYPE_ERROR, "Cannot read properties of " +
+                                                      (publishTimes == null ? "null" : "undefined") +
+                                                      " (reading '" + Js.string(version) + "')");
+            }
+            if (Js.get(publishTimes, Js.string(version)) == Syml.UNDEFINED) {
+                return false;
+            }
+        }
         Object versionTime = Js.get(publishTimes, Js.string(version));
         if (versionTime == Syml.UNDEFINED) {
             return true;

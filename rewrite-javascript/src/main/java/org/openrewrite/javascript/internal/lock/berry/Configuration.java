@@ -594,9 +594,7 @@ public final class Configuration {
             if (value == Syml.UNDEFINED || "plugins".equals(key)) {
                 continue;
             }
-            if ("<environment>".equals(source) && (IGNORED_ENV_VARIABLES.contains(key) ||
-                                                   "ignoreScripts".equals(key) && readBy != null &&
-                                                   readBy.ignoresYarnClassicIgnoreScripts())) {
+            if ("<environment>".equals(source) && ignoresEnvVariable(key)) {
                 continue;
             }
             if ("rcFilename".equals(key)) {
@@ -638,6 +636,23 @@ public final class Configuration {
                 sources.put(key, source);
             }
         }
+    }
+
+    // IGNORED_ENV_VARIABLES of the release the sources are read by: zipDataEpilogue from 4.1.0, the architecture
+    // overrides from 4.10.0, ignoreScripts from 4.15.0
+    private boolean ignoresEnvVariable(String key) {
+        if (readBy != null) {
+            if ("zipDataEpilogue".equals(key)) {
+                return readBy.ignoresZipDataEpilogue();
+            }
+            if ("osOverride".equals(key) || "cpuOverride".equals(key) || "libcOverride".equals(key)) {
+                return readBy.ignoresArchitectureOverrides();
+            }
+            if ("ignoreScripts".equals(key)) {
+                return readBy.ignoresYarnClassicIgnoreScripts();
+            }
+        }
+        return IGNORED_ENV_VARIABLES.contains(key);
     }
 
     /**

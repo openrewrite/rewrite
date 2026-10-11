@@ -172,11 +172,34 @@ final class YarnRelease {
     }
 
     /**
+     * {@code IGNORED_ENV_VARIABLES} holds {@code zipDataEpilogue}, from 4.1.0.
+     */
+    boolean ignoresZipDataEpilogue() {
+        return atLeast(4, 1, 0);
+    }
+
+    /**
+     * {@code IGNORED_ENV_VARIABLES} holds {@code osOverride}, {@code cpuOverride} and {@code libcOverride}, from
+     * 4.10.0.
+     */
+    boolean ignoresArchitectureOverrides() {
+        return atLeast(4, 10, 0);
+    }
+
+    /**
      * {@code IGNORED_ENV_VARIABLES} holds {@code ignoreScripts}, so that Yarn 1's {@code YARN_IGNORE_SCRIPTS} is no
      * setting: from 4.15.0.
      */
     boolean ignoresYarnClassicIgnoreScripts() {
         return atLeast(4, 15, 0);
+    }
+
+    /**
+     * {@code normalizePackage} adds no optional {@code @types} peer for a peer whose types the package depends on,
+     * from 4.9.2.
+     */
+    boolean skipsTypesPeerOfATypesDependency() {
+        return atLeast(4, 9, 2);
     }
 
     // @yarnpkg/core miscUtils.ts
@@ -206,6 +229,14 @@ final class YarnRelease {
      */
     boolean approvesPackagesByAge() {
         return atLeast(4, 10, 0);
+    }
+
+    /**
+     * {@code shouldBeQuarantined} quarantines a version the packument gives no publish time, from 4.10.2; before, the
+     * time {@code new Date(undefined)} makes is no age, and a packument without times throws.
+     */
+    boolean quarantinesVersionsWithoutPublishTime() {
+        return atLeast(4, 10, 2);
     }
 
     /**
@@ -265,6 +296,26 @@ final class YarnRelease {
      */
     boolean resolvesStarToPrereleases() {
         return atLeast(4, 18, 0);
+    }
+
+    // @yarnpkg/plugin-npm NpmTagResolver.ts
+
+    /**
+     * {@code getCandidates}: below a quarantined {@code latest} that is no prerelease, the newest approved version is
+     * no prerelease either, from 4.10.3.
+     */
+    boolean skipsPrereleasesBelowLatest() {
+        return atLeast(4, 10, 3);
+    }
+
+    // @yarnpkg/plugin-http TarballHttpResolver.ts, TarballHttpFetcher.ts and urlUtils.ts
+
+    /**
+     * {@code isTgzUrl}: a url is a tarball's by its path, which may end in a segment without a dot, from 4.0.2; before,
+     * an http(s) url ending in {@code .tgz} or {@code .tar.gz}.
+     */
+    boolean readsTarballUrlsByPathname() {
+        return atLeast(4, 0, 2);
     }
 
     // @yarnpkg/plugin-essentials commands/install.ts
