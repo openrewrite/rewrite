@@ -84,10 +84,11 @@ changes only when a recording says so.
 
 `internal.lock` holds what more than one port needs, and nothing that resolves:
 
-- the dispatch (`NativeLockEngine`), the request seen from the lock's directory (`LockDirectory`), and per package
-  manager an `*Inputs` mapper from it to that port's own `Inputs` value, which selects the files the package manager
-  reads and declares their names, so the recipes' scan captures only those, and a registry source over the host's
-  client;
+- the dispatch (`NativeLockEngine`), the request seen from the lock's directory (`LockDirectory`), the host's side of
+  it (`HostInputs`: machine, time, environment, registries with their credentials), and per package manager a `Port`,
+  its `*Inputs`, which maps both to that port's own `Inputs` value, selects the files the package manager reads and
+  declares their names, so the recipes' scan captures only those, and holds the lock's name and the port's
+  `ManifestRules`;
 - the failure model: `CannotKnow` (with the one rule for a file the host holds without its contents), `Rejected`,
   `SharedError`, `JsError` (an error JavaScript or Node raises inside a package manager, by its name), and
   `LockOnlyInstall`, which words a failure with the package manager's command, gives it one of four kinds (cannot
@@ -102,6 +103,11 @@ changes only when a recording says so.
   host's credentials by its URL for npm and pnpm (the longest registry above it holding credentials, as npm's
   `getAuth` and pnpm's `getAuthHeaderByURI` pick them); Bun's by the registry's host, as bun gives a user .npmrc
   credential to every registry there; Yarn's as each Yarn's own request computes them from its config.
+
+`ManifestRules`, implemented in each port's package, is what the recipes ask about the files they edit: where and
+under which key the package manager reads an override, whether it applies it and what it applies first, its catalog
+file and the catalogs its own reader reads there, a catalog reference, pnpm's release and settings, and how its add
+saves a manifest. The recipes hold no rule of a package manager of their own.
 
 `Spec` is also the one classifier of a manifest's dependency value for the recipes: npa's kinds, and the catalog,
 workspace, link, portal, patch, jsr and exec protocols npa rejects, each its own kind. A recipe leaves a value that is
@@ -162,9 +168,11 @@ once too: `EcmaScript` (JSON.parse and JSON.stringify, parseInt, Number, Object.
 `V8Date` (toISOString, Date.UTC, TimeClip), `UriComponent`, `PosixPath` for Node's `path.posix`.
 
 The host's registry configuration is each package manager's user-level configuration, under the project's own files
-and by its precedence. `NativeLockEngine` reads it with `RegistryDiscovery.discover` over the marker's npmrc scopes
-that package manager reads (npm and Yarn classic the global and user ones, pnpm and Bun the user's only, as recorded),
-never the marker's project npmrc, which is the repository root's file:
+and by its precedence. `HostInputs` renders it, over the marker's npmrc scopes that package manager reads (npm and Yarn
+classic the global and user ones, pnpm and Bun the user's only, as recorded), never the marker's project npmrc, which
+is the repository root's file, as the user .npmrc text each port reads through its own npmrc reader, or Berry's home
+.yarnrc.yml. One rule says whether the host names a default registry: the view's list as given, else a `registry` key
+in those npmrc files, so a host naming npmjs names it (yarn 1.22.22 then asks npmjs over a project .yarnrc, recorded):
 
 - npm and pnpm take it as the user .npmrc, under the project's .npmrc; npm no longer falls back to npmjs where the
   project names no registry, and asks the host's;
@@ -175,8 +183,9 @@ never the marker's project npmrc, which is the repository root's file:
   `npmRegistries` holding the credentials), which Yarn reads under every project rc file.
 
 What the package manager writes with that configuration (resolved URLs, `tarball:` entries) is what the port writes;
-each rule was recorded with a user config naming a second registry. The registry sources still take the request's
-credentials from `discover` over every scope.
+each rule was recorded with a user config naming a second registry. Both Yarn ports send the Authorization header
+their own request computes, through one source; npm's, pnpm's and Bun's sources still take the request's credentials
+from `discover` over every scope.
 
 corepack 0.35.0's specUtils is `SpecUtils`: `parseSpec`, `parsePackageJSON` (`packageManager` checked against
 `devEngines.packageManager`, a mismatch corepack's error, the latter alone as a spec), `loadSpec` walking up through
@@ -186,7 +195,8 @@ message. Three questions ask it:
 
 - Berry's release is the one corepack starts (`yarn@1` is corepack's error, not Yarn Berry);
 - the package manager a lockless root names, for the recipes, is `loadSpec`'s (bun, which corepack does not run, by
-  its name); a spec corepack rejects declines the edit with its message;
+  its name), else the one whose workspace files lie above it; a spec corepack rejects declines the edit with its
+  message;
 - pnpm's release, for the port and the recipes alike, is the one pnpm switches to or fails without (`pmOnFail`
   download or error), else 11.2.2 (`Main.release`). Where corepack would start another release or refuse the spec
   (devEngines beside packageManager, `onFail` or `pmOnFail` ignore or warn, a range or a value that is no string,
@@ -202,5 +212,6 @@ pnpm-workspace.yaml is printed as pnpm 10 and 11 print it, through `YamlDocument
 (pnpm 10's sortKeysByPriority, pnpm 11's reorderRecursive and propagateBlankLinesToNewPairs), for the releases whose
 writes are recorded (9.5.0 - 9.15.9, 10.32.1 - 10.34.6, 11.0.6 - 11.2.2); pnpm 9's catalogs and Yarn's .yarnrc.yml
 are edited in place, and a layout the port does not read (document markers, CR line ends, a tab before a comment, a
-flow mapping with entries) is declined. AddDependency sorts the dependency fields as each package manager's add saves
-them, and still keeps inline arrays and objects that npm, pnpm and yarn 1 print again with `JSON.stringify`.
+flow mapping with entries) is declined. A workspace pnpm rejects (`catalog` beside `catalogs.default`, recorded) is
+declined. AddDependency sorts the dependency fields as each package manager's add saves them, and still keeps inline
+arrays and objects that npm, pnpm and yarn 1 print again with `JSON.stringify`.
