@@ -70,8 +70,8 @@ class PackageJsonHelperTest {
 
     @Test
     void aDeclaredValueThatIsNoStringIsNoDependency() {
-        Json.Document doc = parsePackageJson("{\"dependencies\": {\"a\": \"^1.0.0\", \"b\": null, \"c\": 1, \"d\": {}}," +
-                                             " \"devDependencies\": {\"e\": null}}");
+        Json.Document doc = parsePackageJson("{\"dependencies\": {\"a\": \"^1.0.0\", \"b\": null, \"c\": 1, " +
+                                             "\"d\": {}}, \"devDependencies\": {\"e\": null}}");
         assertThat(PackageJsonHelper.declaredDependencies(doc))
           .containsOnlyKeys("dependencies", "devDependencies")
           .containsEntry("dependencies", Collections.singletonMap("a", "^1.0.0"))
