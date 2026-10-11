@@ -252,8 +252,9 @@ class NpmLockRegeneratorTest {
     @Test
     void devEnginesAreCheckedBeforeTheInstall() {
         String manifest = devEngines("{\"runtime\":{\"name\":\"bun\"}}");
+        NpmRelease npm = NpmRelease.PORTED;
 
-        Result rejected = new NpmLockRegenerator(project(manifest).build(), NO_REGISTRY).regenerate();
+        Result rejected = new NpmLockRegenerator(project(manifest).release(npm).build(), NO_REGISTRY).regenerate();
         assertThat(rejected.getFailure()).isNotNull();
         assertThat(rejected.getFailure().getKind()).isEqualTo(Kind.PM_REJECTS);
         assertThat(rejected.getErrorMessage()).isEqualTo("RESOLUTION_REQUIRED: npm rejects this edit " +
@@ -261,16 +262,16 @@ class NpmLockRegeneratorTest {
           "Invalid name \"bun\" does not match \"node\" for \"runtime\"");
 
         // an Error without a code
-        Result fails = new NpmLockRegenerator(project(devEngines("{\"engine\":{\"name\":\"v8\"}}")).build(),
-          NO_REGISTRY).regenerate();
+        Result fails = new NpmLockRegenerator(project(devEngines("{\"engine\":{\"name\":\"v8\"}}")).release(npm)
+          .build(), NO_REGISTRY).regenerate();
         assertThat(fails.getFailure()).isNotNull();
         assertThat(fails.getFailure().getKind()).isEqualTo(Kind.PM_FAILS);
         assertThat(fails.getErrorMessage()).isEqualTo("RESOLUTION_REQUIRED: npm fails on this edit: Invalid " +
           "property \"devEngines.engine\"");
 
         // npm.js: commandInstance.checkDevEngines && !this.global
-        Result global = new NpmLockRegenerator(project(manifest).npmrc("global=true\n").build(), NO_REGISTRY)
-          .regenerate();
+        Result global = new NpmLockRegenerator(project(manifest).release(npm).npmrc("global=true\n").build(),
+          NO_REGISTRY).regenerate();
         assertThat(global.getErrorMessage()).isEqualTo("RESOLUTION_REQUIRED: npm rejects this edit " +
           "(ESHRINKWRAPGLOBAL): cannot generate lockfile for global packages");
     }
@@ -309,6 +310,26 @@ class NpmLockRegeneratorTest {
 
     private static NpmLockRegenerator regenerator(NpmLockRegenerator.Inputs.InputsBuilder project) {
         return new NpmLockRegenerator(project.build(), NO_REGISTRY);
+    }
+
+    // without a release from the caller, the releases come from the package.json where npm installs
+    @Test
+    void aProjectIsInstalledAsTheReleasesItsPackageJsonAllows() {
+        String named = "{\n  \"name\": \"a\",\n  \"version\": \"1.0.0\",\n  \"packageManager\": \"npm@%s\"\n}\n";
+
+        assertThat(regenerator(project(MANIFEST)).regenerate().getLockFileContent()).isEqualTo(LOCK);
+        assertThat(regenerator(project(String.format(named, NpmRelease.PORTED))).regenerate().getLockFileContent())
+          .isEqualTo(LOCK);
+
+        Result unknown = regenerator(project(String.format(named, "6.14.18"))).regenerate();
+        assertThat(unknown.getFailure()).isNotNull();
+        assertThat(unknown.getFailure().getKind()).isEqualTo(Kind.CANNOT_KNOW);
+        assertThat(unknown.getErrorMessage()).isEqualTo("RESOLUTION_REQUIRED: the engine cannot know what npm " +
+          "6.14.18 writes, since the engine reproduces npm " + NpmReleases.ranges(NpmReleases.proven()));
+
+        // the release the caller names installs it whatever its package.json says
+        assertThat(regenerator(project(String.format(named, "6.14.18")).release(NpmRelease.PORTED)).regenerate()
+          .getLockFileContent()).isEqualTo(LOCK);
     }
 
     private static List<String> standsFor(NpmLockRegenerator.Install install) {
@@ -643,6 +664,28 @@ class NpmLockRegeneratorTest {
 
         assertThat(result.isSuccess()).isTrue();
         assertThat(result).isEqualTo(recorded(edit).regenerate(singletonList(NpmRelease.PORTED)));
+    }
+
+    // lock/npm/add-leaf, its root holding npm to >=12 without engine-strict: npm 11 only warns, and is installed apart
+    @Test
+    void theInstallsOfSeveralReleasesFetchEachDocumentOnce() {
+        NpmScenarios.Edit edit = ScenarioReplay.edit("add-leaf");
+        NpmLockRegenerator.Inputs.InputsBuilder inputs = NpmLockRegenerator.Inputs.builder()
+          .lock(edit.getStart().getText())
+          .host(ScenarioReplay.host(edit.getScenario()))
+          .now(ScenarioReplay.now(edit.getScenario()));
+        edit.manifests().forEach((location, manifest) -> inputs.manifest(location, location.isEmpty() ?
+          manifest.replaceFirst("\\{", "{\"engines\":{\"npm\":\">=12\"},") : manifest));
+        ScenarioReplay.ScenarioRegistry http = new ScenarioReplay.ScenarioRegistry(edit.getScenario());
+        NpmLockRegenerator regenerator = new NpmLockRegenerator(inputs.build(), ScenarioReplay.registry(http));
+
+        List<NpmLockRegenerator.Install> installs = regenerator.installs(releases("12.2.0", "12.0.2", "11.17.0"));
+
+        assertThat(installs).extracting(NpmLockRegeneratorTest::standsFor)
+          .containsExactly(asList("12.2.0", "12.0.2"), singletonList("11.17.0"));
+        assertThat(installs.get(0).getResult().isSuccess()).isTrue();
+        assertThat(installs.get(1).getResult()).isEqualTo(installs.get(0).getResult());
+        assertThat(http.requests).isNotEmpty().doesNotHaveDuplicates();
     }
 
     static Stream<Arguments> edits() {
