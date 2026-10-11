@@ -29,8 +29,8 @@ import java.util.Map;
 import java.util.StringJoiner;
 
 /**
- * Port of node-semver's functions with its {@code loose} and {@code includePrerelease} options: 7.8.4, which npm
- * 11.17.0 bundles, and 5.5.0, which yarn 1.22.22 bundles.
+ * Port of node-semver's functions with its {@code loose} and {@code includePrerelease} options, in the release each
+ * package manager bundles.
  */
 @UtilityClass
 public class NodeSemver {
@@ -38,11 +38,11 @@ public class NodeSemver {
     private static final int MAX_LENGTH = 256;
 
     /**
-     * The node-semver release whose answers the functions give: 7.8.4, which npm bundles, or 5.5.0, which yarn
-     * 1.22.22 bundles.
+     * The node-semver release whose answers the functions give, as each package manager bundles one: 5.5.0 in Yarn
+     * 1.22.22, 7.6.0 in Yarn 4.10.3, 7.8.0 in pnpm 11.2.2 and 7.8.4 in npm 11.17.0.
      */
     public enum Release {
-        V5_5_0, V7_8_4
+        V5_5_0, V7_6_0, V7_8_0, V7_8_4
     }
 
     @RequiredArgsConstructor(access = AccessLevel.PRIVATE)
@@ -58,15 +58,53 @@ public class NodeSemver {
         public static final Options V5_5_0 = new Options(false, false, Release.V5_5_0);
         public static final Options V5_5_0_LOOSE = new Options(true, false, Release.V5_5_0);
 
+        public static final Options V7_6_0 = new Options(false, false, Release.V7_6_0);
+        public static final Options V7_6_0_LOOSE = new Options(true, false, Release.V7_6_0);
+        public static final Options V7_6_0_INCLUDE_PRERELEASE = new Options(false, true, Release.V7_6_0);
+        public static final Options V7_6_0_LOOSE_INCLUDE_PRERELEASE = new Options(true, true, Release.V7_6_0);
+
+        public static final Options V7_8_0 = new Options(false, false, Release.V7_8_0);
+        public static final Options V7_8_0_LOOSE = new Options(true, false, Release.V7_8_0);
+        public static final Options V7_8_0_INCLUDE_PRERELEASE = new Options(false, true, Release.V7_8_0);
+        public static final Options V7_8_0_LOOSE_INCLUDE_PRERELEASE = new Options(true, true, Release.V7_8_0);
+
         final boolean loose;
         final boolean includePrerelease;
         final Release release;
+
+        /**
+         * @throws IllegalArgumentException for 5.5.0 with {@code includePrerelease}, an option it does not have.
+         */
+        public static Options of(boolean loose, boolean includePrerelease, Release release) {
+            switch (release) {
+                case V5_5_0:
+                    if (includePrerelease) {
+                        throw new IllegalArgumentException("node-semver 5.5.0 has no includePrerelease option");
+                    }
+                    return loose ? V5_5_0_LOOSE : V5_5_0;
+                case V7_6_0:
+                    return loose ? (includePrerelease ? V7_6_0_LOOSE_INCLUDE_PRERELEASE : V7_6_0_LOOSE) :
+                            (includePrerelease ? V7_6_0_INCLUDE_PRERELEASE : V7_6_0);
+                case V7_8_0:
+                    return loose ? (includePrerelease ? V7_8_0_LOOSE_INCLUDE_PRERELEASE : V7_8_0_LOOSE) :
+                            (includePrerelease ? V7_8_0_INCLUDE_PRERELEASE : V7_8_0);
+                default:
+                    return loose ? (includePrerelease ? LOOSE_INCLUDE_PRERELEASE : LOOSE) :
+                            (includePrerelease ? INCLUDE_PRERELEASE : DEFAULT);
+            }
+        }
     }
 
     /**
      * @return the normalized version, or {@code null} when it does not parse.
      */
     public static @Nullable String valid(String version, Options options) {
+        // 5.5.0 tests its grammar on the version as given, before new SemVer trims it
+        if (options.release == Release.V5_5_0 && !version.isEmpty() &&
+            (NodeSemverVersion.isJsWhitespace(version.charAt(version.length() - 1)) ||
+             !options.loose && NodeSemverVersion.isJsWhitespace(version.charAt(0)))) {
+            return null;
+        }
         NodeSemverVersion v = NodeSemverVersion.parse(version, options);
         return v.isStrictSemver() ? v.nodeVersion() : null;
     }
@@ -162,24 +200,12 @@ public class NodeSemver {
      * {@code null} when it does not parse.
      */
     public static @Nullable String clean(String version, Options options) {
-        int start = 0;
-        int end = version.length();
-        while (start < end && isJsWhitespace(version.charAt(start))) {
-            start++;
-        }
-        while (end > start && isJsWhitespace(version.charAt(end - 1))) {
-            end--;
-        }
-        String trimmed = version.substring(start, end);
+        String trimmed = NodeSemverVersion.jsTrim(version);
         int i = 0;
         while (i < trimmed.length() && (trimmed.charAt(i) == '=' || trimmed.charAt(i) == 'v')) {
             i++;
         }
         return valid(trimmed.substring(i), options);
-    }
-
-    private static boolean isJsWhitespace(char c) {
-        return Character.isWhitespace(c) || Character.isSpaceChar(c) || c == '\uFEFF';
     }
 
     /**
@@ -404,7 +430,7 @@ public class NodeSemver {
                     if (higher == c && higher != gt) {
                         return false;
                     }
-                } else if (">=".equals(gt.operator()) && !c.test(gt.getVersion())) {
+                } else if (">=".equals(gt.operator()) && !boundSatisfies(gt, c, options)) {
                     return false;
                 }
             }
@@ -417,7 +443,7 @@ public class NodeSemver {
                     if (lower == c && lower != lt) {
                         return false;
                     }
-                } else if ("<=".equals(lt.operator()) && !c.test(lt.getVersion())) {
+                } else if ("<=".equals(lt.operator()) && !boundSatisfies(lt, c, options)) {
                     return false;
                 }
             }
@@ -432,6 +458,12 @@ public class NodeSemver {
             return false;
         }
         return needDomGTPre == null && needDomLTPre == null;
+    }
+
+    // 7.8.1 tests the bound against the comparator alone, where earlier releases call satisfies, which also
+    // excludes a prerelease the comparator does not name
+    private static boolean boundSatisfies(NodeSemverComparator bound, NodeSemverComparator c, Options options) {
+        return options.release == Release.V7_8_4 ? c.test(bound.getVersion()) : comparatorSatisfies(bound, c, options);
     }
 
     private static boolean comparatorSatisfies(NodeSemverComparator version, NodeSemverComparator comparator,

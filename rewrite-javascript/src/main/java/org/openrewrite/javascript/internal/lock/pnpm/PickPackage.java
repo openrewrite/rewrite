@@ -77,7 +77,7 @@ final class PickPackage {
         if (b == null) {
             return a;
         }
-        return NodeSemver.compare(a.get("version"), b.get("version"), NodeSemver.Options.DEFAULT) < 0 ? b : a;
+        return NodeSemver.compare(a.get("version"), b.get("version"), NodeSemver.Options.V7_8_0) < 0 ? b : a;
     }
 
     private static @Nullable Map<String, @Nullable Object> pickHighest(

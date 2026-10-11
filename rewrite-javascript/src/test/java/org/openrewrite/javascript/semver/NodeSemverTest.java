@@ -480,6 +480,32 @@ class NodeSemverTest {
           .isInstanceOf(IllegalArgumentException.class).hasMessage(message);
     }
 
+    // node-semver trims and splits with JavaScript's whitespace, which includes U+00A0 and U+FEFF
+    @Test
+    void javaScriptWhitespaceAroundAVersionOrRange() {
+        assertThat(NodeSemver.valid("\u00a01.2.3", Options.DEFAULT)).isEqualTo("1.2.3");
+        assertThat(NodeSemver.validRange("\u00a0^1.2.3", Options.LOOSE)).isEqualTo(">=1.2.3 <2.0.0-0");
+        assertThat(NodeSemver.satisfies("1.2.3", ">=\u00a01.2.3", Options.DEFAULT)).isTrue();
+    }
+
+    @Test
+    void releasesBeforeSevenEightFour() {
+        assertThat(NodeSemver.validRange("^0.2.3", Options.V7_8_0_INCLUDE_PRERELEASE))
+          .isEqualTo(">=0.2.3-0 <0.3.0-0");
+        assertThat(NodeSemver.validRange("^0.2.3", Options.INCLUDE_PRERELEASE)).isEqualTo(">=0.2.3 <0.3.0-0");
+
+        assertThat(NodeSemver.validRange("1.2.3+build - 2.0.0", Options.V7_8_0_INCLUDE_PRERELEASE))
+          .isEqualTo(">=1.2.3 <2.0.1-0");
+        assertThat(NodeSemver.validRange("1.2.3+build - 2.0.0", Options.INCLUDE_PRERELEASE))
+          .isEqualTo(">=1.2.3-0 <2.0.1-0");
+
+        assertThat(NodeSemver.subset("~1.0.0-rc.1", "^1.0.0-rc.1", Options.V7_8_0)).isFalse();
+        assertThat(NodeSemver.subset("~1.0.0-rc.1", "^1.0.0-rc.1", Options.DEFAULT)).isTrue();
+
+        assertThat(NodeSemver.validRange("^10+build", Options.V7_6_0)).isNull();
+        assertThat(NodeSemver.validRange("^10+build", Options.V7_8_0)).isEqualTo(">=10.0.0 <11.0.0-0");
+    }
+
     @Test
     void rangeIsASubsetOfItself() {
         assertThat(NodeSemver.subset("^1", "^1", Options.DEFAULT)).isTrue();

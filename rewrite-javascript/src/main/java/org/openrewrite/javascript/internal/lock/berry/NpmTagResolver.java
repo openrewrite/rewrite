@@ -92,9 +92,9 @@ final class NpmTagResolver implements Resolver {
             }
             String nextVersion = null;
             try {
-                NodeSemver.rsort(versions, NodeSemver.Options.DEFAULT);
+                NodeSemver.rsort(versions, NodeSemver.Options.V7_6_0);
                 for (String candidateVersion : versions) {
-                    if (NodeSemver.compare(candidateVersion, latest, NodeSemver.Options.DEFAULT) < 0 &&
+                    if (NodeSemver.compare(candidateVersion, latest, NodeSemver.Options.V7_6_0) < 0 &&
                         (toleratePrereleases || !candidateVersion.contains("-")) &&
                         NpmHttpUtils.isPackageApproved(project, descriptor, candidateVersion, times)) {
                         nextVersion = candidateVersion;

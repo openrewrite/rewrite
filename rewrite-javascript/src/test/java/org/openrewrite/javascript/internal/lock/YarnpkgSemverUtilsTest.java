@@ -73,6 +73,15 @@ class YarnpkgSemverUtilsTest {
         assertThat(YarnpkgSemverUtils.satisfiesWithPrereleases("2.0.0-rc1", "^1.0.0", true)).isFalse();
     }
 
+    // Yarn 4.10.3 bundles a semver before 7.8.4, whose replaceXRange reads a wildcard before a number as a partial
+    @Test
+    void wildcardBeforeANumberIsARange() {
+        YarnpkgSemverUtils.Range range = YarnpkgSemverUtils.validRange("5.x.1");
+        assertThat(range).isNotNull();
+        assertThat(range.getRange()).isEqualTo(">=5.0.0 <6.0.0-0");
+        assertThat(range.test("5.7.2")).isTrue();
+    }
+
     @Test
     void nothingSatisfiesAnInvalidRangeOrNoVersion() {
         assertThat(YarnpkgSemverUtils.satisfiesWithPrereleases("1.0.0", "not a range", true)).isFalse();

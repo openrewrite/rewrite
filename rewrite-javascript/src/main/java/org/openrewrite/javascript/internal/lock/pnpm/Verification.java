@@ -202,12 +202,12 @@ final class Verification {
                                                 orUndefined(specifier) + " don't match package manifest specifier (" +
                                                 Js.string(pkgDeps.get(depName)) + ")");
                 }
-                if (specifier == null || NodeSemver.validRange(specifier, NodeSemver.Options.DEFAULT) == null) {
+                if (specifier == null || NodeSemver.validRange(specifier, NodeSemver.Options.V7_8_0) == null) {
                     continue;
                 }
                 String version = DepPath.removeSuffix(importerDeps.get(depName));
-                if (NodeSemver.valid(version, NodeSemver.Options.DEFAULT) != null &&
-                    !NodeSemver.satisfies(version, specifier, NodeSemver.Options.DEFAULT)) {
+                if (NodeSemver.valid(version, NodeSemver.Options.V7_8_0) != null &&
+                    !NodeSemver.satisfies(version, specifier, NodeSemver.Options.V7_8_0)) {
                     return new Satisfies(false, "The importer resolution is broken at dependency \"" + depName +
                                                 "\": version \"" + version + "\" doesn't satisfy range \"" +
                                                 specifier + "\"");
@@ -412,7 +412,7 @@ final class Verification {
                                                      "~".equals(availableRange) ||
                                                      linkedPkg != null && NodeSemver.satisfies(
                                                              Js.string(linkedPkg.get("version")), availableRange,
-                                                             NodeSemver.Options.LOOSE);
+                                                             NodeSemver.Options.V7_8_0_LOOSE);
                 if (isLinked != localPackageSatisfiesRange) {
                     return false;
                 }
@@ -454,7 +454,7 @@ final class Verification {
                     continue;
                 }
                 if (!NodeSemver.satisfies(Js.string(lockfileDeps.get(depName)), getVersionRange(currentSpec),
-                        NodeSemver.Options.LOOSE)) {
+                        NodeSemver.Options.V7_8_0_LOOSE)) {
                     return false;
                 }
             }
@@ -490,10 +490,10 @@ final class Verification {
      * version-selector-type 3.0.0 (loose): {@code version}, {@code range}, {@code tag}, or null.
      */
     static @Nullable String versionSelectorType(String selector) {
-        if (NodeSemver.valid(selector, NodeSemver.Options.LOOSE) != null) {
+        if (NodeSemver.valid(selector, NodeSemver.Options.V7_8_0_LOOSE) != null) {
             return "version";
         }
-        if (NodeSemver.validRange(selector, NodeSemver.Options.LOOSE) != null) {
+        if (NodeSemver.validRange(selector, NodeSemver.Options.V7_8_0_LOOSE) != null) {
             return "range";
         }
         if (UriComponent.encodeURIComponent(selector).equals(selector)) {

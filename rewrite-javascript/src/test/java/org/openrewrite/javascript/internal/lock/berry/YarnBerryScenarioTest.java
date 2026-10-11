@@ -17,6 +17,7 @@ package org.openrewrite.javascript.internal.lock.berry;
 
 import lombok.Value;
 import org.jspecify.annotations.Nullable;
+import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
@@ -32,6 +33,8 @@ import org.openrewrite.javascript.internal.lock.RecordedRegistry;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.stream.Stream;
+
+import static org.assertj.core.api.Assertions.assertThat;
 
 /**
  * Replays every recorded edit {@link BerryScenarios} finds through {@link YarnBerryLockRegenerator} and asserts its
@@ -129,5 +132,16 @@ class YarnBerryScenarioTest extends LockScenarioTest {
             }
         }
         return true;
+    }
+
+    @Test
+    void wildcardBeforeANumberIsAnXRange() {
+        BerryScenarios.Scenario scenario = BerryScenarios.discover().stream()
+                .filter(s -> "open-semver-wildcard-before-number".equals(s.getName()))
+                .findFirst().orElseThrow(IllegalStateException::new);
+        Result result = new YarnBerryLockRegenerator(scenario.inputs(Phase.AFTER, scenario.file("before")),
+                scenario.registry()).regenerate();
+        assertThat(result.getLockFileContent()).as(String.valueOf(result.getFailure()))
+                .isEqualTo(scenario.file("after"));
     }
 }

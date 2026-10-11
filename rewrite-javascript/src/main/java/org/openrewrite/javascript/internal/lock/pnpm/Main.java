@@ -58,12 +58,12 @@ public final class Main {
      * Whether {@code version}, a release or a range, names only releases in {@link #RUNS_AS_PORTED}.
      */
     public static boolean runsAsPorted(String version) {
-        String exact = NodeSemver.valid(version, NodeSemver.Options.DEFAULT);
+        String exact = NodeSemver.valid(version, NodeSemver.Options.V7_8_0);
         if (exact != null) {
-            return NodeSemver.satisfies(exact, RUNS_AS_PORTED, NodeSemver.Options.DEFAULT);
+            return NodeSemver.satisfies(exact, RUNS_AS_PORTED, NodeSemver.Options.V7_8_0);
         }
-        return NodeSemver.validRange(version, NodeSemver.Options.DEFAULT) != null &&
-               NodeSemver.subset(version, RUNS_AS_PORTED, NodeSemver.Options.DEFAULT);
+        return NodeSemver.validRange(version, NodeSemver.Options.V7_8_0) != null &&
+               NodeSemver.subset(version, RUNS_AS_PORTED, NodeSemver.Options.V7_8_0);
     }
 
     // the inputs' root: workspaceDir, which is also rootProjectManifestDir, or the project's directory without one
@@ -410,7 +410,7 @@ public final class Main {
                 return direct;
             }
             String version = SpecUtils.installVersion(spec);
-            if (version != null && version.equals(NodeSemver.valid(direct, NodeSemver.Options.DEFAULT)) ||
+            if (version != null && version.equals(NodeSemver.valid(direct, NodeSemver.Options.V7_8_0)) ||
                 runsAsPorted(version == null ? spec.getRange() : version) && runsAsPorted(direct)) {
                 return direct;
             }
@@ -456,7 +456,8 @@ public final class Main {
             return;
         }
         if (Js.truthy(pm.getVersion()) &&
-            !NodeSemver.satisfies(PNPM_VERSION, Js.string(pm.getVersion()), NodeSemver.Options.INCLUDE_PRERELEASE)) {
+            !NodeSemver.satisfies(PNPM_VERSION, Js.string(pm.getVersion()),
+                    NodeSemver.Options.V7_8_0_INCLUDE_PRERELEASE)) {
             String msg = "This project is configured to use " + Js.string(pm.getVersion()) +
                          " of pnpm. Your current pnpm is v" + PNPM_VERSION;
             if (underCorepack) {

@@ -102,6 +102,21 @@ class NodeSemverRelease550Test {
         assertThat(NodeSemver.satisfies("1.0", "^1.0.0", Options.DEFAULT)).isFalse();
     }
 
+    // 5.5.0 reads a wildcard before a number as a partial, which only 7.8.4 rejects
+    @Test
+    void wildcardBeforeANumberIsAnXRange() {
+        assertThat(NodeSemver.validRange("5.x.1", Options.V5_5_0)).isEqualTo(">=5.0.0 <6.0.0");
+        assertThat(NodeSemver.satisfies("5.7.2", "5.x.1", Options.V5_5_0)).isTrue();
+    }
+
+    @Test
+    void untrimmedVersionsAndUnstrippedBuildMetadata() {
+        assertThat(NodeSemver.valid(" 1.2.3", Options.V5_5_0)).isNull();
+        assertThat(NodeSemver.valid(" 1.2.3", Options.V5_5_0_LOOSE)).isEqualTo("1.2.3");
+        assertThat(NodeSemver.valid("1.2.3 ", Options.V5_5_0_LOOSE)).isNull();
+        assertThat(NodeSemver.validRange("+build", Options.V5_5_0)).isNull();
+    }
+
     // new SemVer of a value that is not a string or of a string over 256 characters, run on 5.5.0 and 7.8.4
     @Test
     void compareThrowsAsEachRelease() {

@@ -16,6 +16,7 @@
 package org.openrewrite.javascript.internal.lock.npm;
 
 import org.jspecify.annotations.Nullable;
+import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
@@ -29,6 +30,9 @@ import org.openrewrite.javascript.internal.lock.RecordedRegistry;
 import org.openrewrite.javascript.internal.lock.npm.ScenarioReplay.ScenarioRegistry;
 
 import java.util.stream.Stream;
+
+import static java.util.Objects.requireNonNull;
+import static org.assertj.core.api.Assertions.assertThat;
 
 /**
  * Replays every recorded edit {@link NpmScenarios} finds through {@link NpmLockRegenerator} and asserts its
@@ -105,5 +109,14 @@ class NpmScenarioTest extends LockScenarioTest {
             default:
                 return false;
         }
+    }
+
+    @Test
+    void noBreakSpaceInARange() {
+        NpmScenarios.Edit edit = ScenarioReplay.edit("open-semver-nbsp-in-range");
+        Result result = new NpmLockRegenerator(ScenarioReplay.inputs(edit),
+          ScenarioReplay.registry(new ScenarioRegistry(edit.getScenario()))).regenerate();
+        assertThat(result.getLockFileContent()).as(String.valueOf(result.getFailure()))
+          .isEqualTo(requireNonNull(edit.getResult()).getText());
     }
 }

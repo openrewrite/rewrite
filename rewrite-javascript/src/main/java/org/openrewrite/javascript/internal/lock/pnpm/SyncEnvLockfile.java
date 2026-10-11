@@ -38,14 +38,14 @@ final class SyncEnvLockfile {
             return null;
         }
         String version = Js.string(pm.getVersion());
-        if (!NodeSemver.satisfies(Main.PNPM_VERSION, version, NodeSemver.Options.INCLUDE_PRERELEASE)) {
+        if (!NodeSemver.satisfies(Main.PNPM_VERSION, version, NodeSemver.Options.V7_8_0_INCLUDE_PRERELEASE)) {
             return null;
         }
         EnvLockfile locked = envLockfile.get();
         Object lockedVersion = EnvInstaller.lockedVersion(locked == null ? null : locked.packageManagerDependencies(),
                 "pnpm");
         if (lockedVersion != null && lockedVersion != Js.UNDEFINED &&
-            NodeSemver.satisfies(lockedVersion, version, NodeSemver.Options.INCLUDE_PRERELEASE)) {
+            NodeSemver.satisfies(lockedVersion, version, NodeSemver.Options.V7_8_0_INCLUDE_PRERELEASE)) {
             return null;
         }
         return Main.PNPM_VERSION;
