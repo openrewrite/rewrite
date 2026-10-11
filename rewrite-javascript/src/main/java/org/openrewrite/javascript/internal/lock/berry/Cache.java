@@ -81,6 +81,23 @@ final class Cache {
      * {@code node_modules/<ident>}, the tarball's first path component stripped.
      */
     static String checksum(byte[] tgz, Ident ident, Configuration options) {
+        requireStored(ident, options);
+        return getCacheKey(options) + "/" + HashUtils.sha512Hex(packageFs(tgz, ident).toByteArray());
+    }
+
+    static ZipArchive packageFs(byte[] tgz, Ident ident) {
+        return TgzUtils.convertToZip(tgz, StructUtils.getIdentVendorPath(ident), 1);
+    }
+
+    /**
+     * {@code <cacheKey>/<sha512>} of an archive a fetcher built.
+     */
+    static String checksum(ZipArchive archive, Ident ident, Configuration options) {
+        requireStored(ident, options);
+        return getCacheKey(options) + "/" + HashUtils.sha512Hex(archive.toByteArray());
+    }
+
+    private static void requireStored(Ident ident, Configuration options) {
         Object compressionLevel = options.get("compressionLevel");
         if (!Integer.valueOf(0).equals(compressionLevel)) {
             String name = ident instanceof Locator ? StructUtils.stringifyLocator((Locator) ident) :
@@ -88,7 +105,5 @@ final class Cache {
             throw new CannotKnow("the checksum of " + name + " under compressionLevel " + Js.string(compressionLevel) +
                                  " (zlib-ng deflate)");
         }
-        byte[] zip = TgzUtils.convertToZip(tgz, StructUtils.getIdentVendorPath(ident), 1).toByteArray();
-        return getCacheKey(options) + "/" + HashUtils.sha512Hex(zip);
     }
 }

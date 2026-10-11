@@ -47,6 +47,16 @@ final class MultiFetcher implements Fetcher {
         return fetcher.fetch(locator, opts);
     }
 
+    @Override
+    public ZipArchive fetchPackageFs(Locator locator, FetchOptions opts) {
+        Fetcher fetcher = tryFetcher(locator, opts);
+        if (fetcher == null) {
+            throw new ReportError(ReportError.FETCHER_NOT_FOUND, StructUtils.stringifyLocator(locator) + " isn't " +
+                                                                 "supported by any available fetcher");
+        }
+        return fetcher.fetchPackageFs(locator, opts);
+    }
+
     private @Nullable Fetcher tryFetcher(Locator locator, FetchOptions opts) {
         for (Fetcher fetcher : fetchers) {
             if (fetcher.supports(locator, opts)) {

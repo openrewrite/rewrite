@@ -39,7 +39,6 @@ final class PatchUtils {
     static final String PROTOCOL = "patch:";
 
     private static final String CACHE_VERSION = "3";
-    private static final String COMPAT_TAG = "compat/";
     private static final Pattern CRLF = Pattern.compile("\\r\\n?");
 
     private static final Pattern BUILTIN_REGEXP = Pattern.compile("^builtin<([^>]+)>$");
@@ -115,23 +114,21 @@ final class PatchUtils {
     }
 
     /**
-     * Whether a patch path is a builtin patch the release ships, whose text the engine does not hold.
+     * A patch file as {@code loadPatchFiles} gives it: its text with LF line endings (null for a builtin no plugin
+     * has) and whether its path is flagged {@code optional}.
      */
-    static boolean isShippedBuiltin(String patchPath, YarnRelease release) {
-        String name = builtinName(patchPath);
-        if (name == null || !name.startsWith(COMPAT_TAG)) {
-            return false;
-        }
-        Ident ident = StructUtils.parseIdent(name.substring(COMPAT_TAG.length()));
-        return release.getPatches().contains(StructUtils.stringifyIdent(ident));
+    @Value
+    static class PatchFile {
+        @Nullable
+        String source;
+
+        boolean optional;
     }
 
     /**
-     * {@code loadPatchFiles} where no path is a builtin the release ships: each file's text with LF line endings, null
-     * for any other builtin (no hook answers); throws CannotKnow for a file outside the project or a non-workspace's.
+     * {@code loadPatchFiles}: throws CannotKnow for a file outside the project or a non-workspace's.
      */
-    static List<@Nullable String> loadPatchFiles(@Nullable Locator parentLocator, List<String> patchPaths,
-                                                 Project project) {
+    static List<PatchFile> loadPatchFiles(@Nullable Locator parentLocator, List<String> patchPaths, Project project) {
         Workspace parent = null;
         if (parentLocator != null) {
             parent = project.tryWorkspaceByLocator(parentLocator);
@@ -141,16 +138,13 @@ final class PatchUtils {
                                              "archive)");
             }
         }
-        List<@Nullable String> sources = new ArrayList<>();
+        List<PatchFile> patchFiles = new ArrayList<>();
         for (String patchPath : patchPaths) {
             String name = builtinName(patchPath);
             String path = withoutFlags(patchPath);
             String source;
             if (name != null) {
-                if (name.startsWith(COMPAT_TAG)) {
-                    StructUtils.parseIdent(name.substring(COMPAT_TAG.length()));
-                }
-                source = null;
+                source = project.configuration.getBuiltinPatch(name);
             } else if (path.startsWith("~/")) {
                 source = project.readFile(projectPath(".", path.substring(2), patchPath));
             } else if (path.startsWith("/")) {
@@ -161,9 +155,18 @@ final class PatchUtils {
                 }
                 source = project.readFile(projectPath(parent.getRelativeCwd(), path, patchPath));
             }
-            sources.add(source == null ? null : CRLF.matcher(source).replaceAll("\n"));
+            patchFiles.add(new PatchFile(source == null ? null : CRLF.matcher(source).replaceAll("\n"),
+                    extractPatchFlags(patchPath)));
         }
-        return sources;
+        return patchFiles;
+    }
+
+    /**
+     * {@code extractPatchFlags}: whether the flags before the last {@code !} include {@code optional}.
+     */
+    private static boolean extractPatchFlags(String patchPath) {
+        int flagIndex = patchPath.lastIndexOf('!');
+        return flagIndex != -1 && Arrays.asList(patchPath.substring(0, flagIndex).split("!", -1)).contains("optional");
     }
 
     private static String projectPath(String cwd, String path, String patchPath) {
@@ -177,10 +180,11 @@ final class PatchUtils {
     /**
      * {@code makePatchHash}: the parsed effects of each file the source version is not excluded from, hashed.
      */
-    static String makePatchHash(List<@Nullable String> patchFiles, @Nullable String sourceVersion) {
+    static String makePatchHash(List<PatchFile> patchFiles, @Nullable String sourceVersion) {
         List<String> parts = new ArrayList<>();
         parts.add(CACHE_VERSION);
-        for (String source : patchFiles) {
+        for (PatchFile patchFile : patchFiles) {
+            String source = patchFile.getSource();
             if (source == null) {
                 continue;
             }

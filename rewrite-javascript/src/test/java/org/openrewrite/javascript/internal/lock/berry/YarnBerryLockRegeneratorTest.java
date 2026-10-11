@@ -291,11 +291,6 @@ class YarnBerryLockRegeneratorTest {
         return locks.stream();
     }
 
-    /**
-     * plugin-compat patches typescript with the patch text Yarn 4.10.3 ships, so a newly resolved version gets a
-     * locator whose hash is a function of that text and the version. Recorded: upgrading typescript 5.4.5 to 5.6.3
-     * locks {@code ::version=5.6.3&hash=8c6c40}.
-     */
     @Test
     void resolvesANewVersionOfAPackageWithABuiltinCompatPatch() {
         String before = LOCK_HEADER + "8\n  cacheKey: 10c0\n\n\"r@workspace:.\":\n  version: 0.0.0-use.local\n" +
@@ -343,6 +338,7 @@ class YarnBerryLockRegeneratorTest {
         for (Package pkg : project.storedPackages.values()) {
             resolutions.add(StructUtils.stringifyLocator(pkg));
         }
+        // recorded with Yarn 4.10.3, whose builtin typescript patch the hash covers
         assertThat(resolutions).contains("typescript@patch:typescript@npm%3A5.6.3#optional!builtin<compat/typescript>" +
                                          "::version=5.6.3&hash=8c6c40");
     }
