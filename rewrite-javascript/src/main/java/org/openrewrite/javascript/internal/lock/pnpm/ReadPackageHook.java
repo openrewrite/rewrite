@@ -191,7 +191,7 @@ final class ReadPackageHook {
             for (PackageExtension extension : extensions) {
                 String range = extension.getRange();
                 if (range != null &&
-                    !NodeSemver.satisfies(manifest.get("version"), range, NodeSemver.Options.V7_8_0)) {
+                    !NodeSemver.satisfies(manifest.get("version"), range, Main.SEMVER)) {
                     continue;
                 }
                 if (!(extension.getExtension() instanceof Map)) {
@@ -278,7 +278,7 @@ final class ReadPackageHook {
                 if (parentPkg.getName().equals(manifest.get("name")) &&
                     (!Js.truthy(parentPkg.getBareSpecifier()) ||
                      NodeSemver.satisfies(manifest.get("version"), parentPkg.getBareSpecifier(),
-                             NodeSemver.Options.V7_8_0))) {
+                             Main.SEMVER))) {
                     versionOverridesWithParent.add(override);
                 }
             }
@@ -369,16 +369,16 @@ final class ReadPackageHook {
 
     static boolean isIntersectingRange(@Nullable String range1, String range2) {
         return range1 == null || range1.isEmpty() || range2.equals(range1) ||
-               NodeSemver.validRange(range2, NodeSemver.Options.V7_8_0) != null &&
-               NodeSemver.validRange(range1, NodeSemver.Options.V7_8_0) != null &&
-               NodeSemver.intersects(range2, range1, NodeSemver.Options.V7_8_0);
+               NodeSemver.validRange(range2, Main.SEMVER) != null &&
+               NodeSemver.validRange(range1, Main.SEMVER) != null &&
+               NodeSemver.intersects(range2, range1, Main.SEMVER);
     }
 
     /**
      * @pnpm/deps.peer-range {@code isValidPeerRange}.
      */
     static boolean isValidPeerRange(String version) {
-        return NodeSemver.validRange(version, NodeSemver.Options.V7_8_0) != null || version.contains("workspace:") ||
+        return NodeSemver.validRange(version, Main.SEMVER) != null || version.contains("workspace:") ||
                version.contains("catalog:");
     }
 

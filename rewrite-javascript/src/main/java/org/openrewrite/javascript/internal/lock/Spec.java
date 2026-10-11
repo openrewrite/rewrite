@@ -17,6 +17,7 @@ package org.openrewrite.javascript.internal.lock;
 
 import lombok.Getter;
 import org.jspecify.annotations.Nullable;
+import org.openrewrite.javascript.internal.lock.pnpm.Main;
 import org.openrewrite.javascript.semver.NodeSemver;
 
 import java.util.ArrayList;
@@ -651,7 +652,8 @@ public final class Spec {
         String spec = !pnpm ? trim(res.rawSpec) : res.rawSpec.isEmpty() ? "latest" : res.rawSpec;
         res.saveSpec = null;
         res.fetchSpec = spec;
-        NodeSemver.Options semver = pnpm ? NodeSemver.Options.V7_8_0_LOOSE : NodeSemver.Options.LOOSE;
+        NodeSemver.Options semver = pnpm ? NodeSemver.Options.of(true, false, Main.SEMVER_RELEASE) :
+                NodeSemver.Options.LOOSE;
         String version = NodeSemver.valid(spec, semver);
         String range = NodeSemver.validRange(spec, semver);
         if (version != null) {

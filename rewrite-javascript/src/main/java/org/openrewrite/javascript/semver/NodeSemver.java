@@ -58,16 +58,6 @@ public class NodeSemver {
         public static final Options V5_5_0 = new Options(false, false, Release.V5_5_0);
         public static final Options V5_5_0_LOOSE = new Options(true, false, Release.V5_5_0);
 
-        public static final Options V7_6_0 = new Options(false, false, Release.V7_6_0);
-        public static final Options V7_6_0_LOOSE = new Options(true, false, Release.V7_6_0);
-        public static final Options V7_6_0_INCLUDE_PRERELEASE = new Options(false, true, Release.V7_6_0);
-        public static final Options V7_6_0_LOOSE_INCLUDE_PRERELEASE = new Options(true, true, Release.V7_6_0);
-
-        public static final Options V7_8_0 = new Options(false, false, Release.V7_8_0);
-        public static final Options V7_8_0_LOOSE = new Options(true, false, Release.V7_8_0);
-        public static final Options V7_8_0_INCLUDE_PRERELEASE = new Options(false, true, Release.V7_8_0);
-        public static final Options V7_8_0_LOOSE_INCLUDE_PRERELEASE = new Options(true, true, Release.V7_8_0);
-
         final boolean loose;
         final boolean includePrerelease;
         final Release release;
@@ -82,15 +72,11 @@ public class NodeSemver {
                         throw new IllegalArgumentException("node-semver 5.5.0 has no includePrerelease option");
                     }
                     return loose ? V5_5_0_LOOSE : V5_5_0;
-                case V7_6_0:
-                    return loose ? (includePrerelease ? V7_6_0_LOOSE_INCLUDE_PRERELEASE : V7_6_0_LOOSE) :
-                            (includePrerelease ? V7_6_0_INCLUDE_PRERELEASE : V7_6_0);
-                case V7_8_0:
-                    return loose ? (includePrerelease ? V7_8_0_LOOSE_INCLUDE_PRERELEASE : V7_8_0_LOOSE) :
-                            (includePrerelease ? V7_8_0_INCLUDE_PRERELEASE : V7_8_0);
-                default:
+                case V7_8_4:
                     return loose ? (includePrerelease ? LOOSE_INCLUDE_PRERELEASE : LOOSE) :
                             (includePrerelease ? INCLUDE_PRERELEASE : DEFAULT);
+                default:
+                    return new Options(loose, includePrerelease, release);
             }
         }
     }

@@ -143,7 +143,7 @@ final class PackageVersionPolicy {
     private static @Nullable List<String> parseExactVersionsUnion(String versionsStr) {
         List<String> versions = new ArrayList<>();
         for (String versionRaw : versionsStr.split("\\|\\|", -1)) {
-            String version = NodeSemver.valid(versionRaw, NodeSemver.Options.V7_8_0);
+            String version = NodeSemver.valid(versionRaw, Main.SEMVER);
             if (version == null) {
                 return null;
             }

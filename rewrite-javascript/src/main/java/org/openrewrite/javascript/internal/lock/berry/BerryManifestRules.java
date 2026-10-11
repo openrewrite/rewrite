@@ -22,6 +22,7 @@ import org.openrewrite.javascript.internal.lock.HostEnvironment;
 import org.openrewrite.javascript.internal.lock.JsError;
 import org.openrewrite.javascript.internal.lock.ManifestRules;
 import org.openrewrite.javascript.internal.lock.Rejected;
+import org.openrewrite.javascript.internal.lock.YarnpkgSemverUtils;
 import org.openrewrite.javascript.semver.NodeSemver;
 
 import java.util.ArrayList;
@@ -68,7 +69,7 @@ public final class BerryManifestRules implements ManifestRules {
 
     private static boolean exactVersion(@Nullable String version) {
         String bare = version != null && version.startsWith("npm:") ? version.substring("npm:".length()) : version;
-        return bare == null || bare.equals(NodeSemver.valid(bare, NodeSemver.Options.V7_6_0));
+        return bare == null || bare.equals(NodeSemver.valid(bare, YarnpkgSemverUtils.SEMVER));
     }
 
     // one parent (override-recipe-path)

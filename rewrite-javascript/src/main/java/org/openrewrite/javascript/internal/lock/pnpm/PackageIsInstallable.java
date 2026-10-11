@@ -176,7 +176,7 @@ final class PackageIsInstallable {
             unsatisfiedWanted.put("node", wantedNode);
         }
         if (node != null && Js.truthy(wantedNode) && !satisfies(node, wantedNode)) {
-            if (!(node instanceof String) || NodeSemver.valid((String) node, NodeSemver.Options.V7_8_0) == null) {
+            if (!(node instanceof String) || NodeSemver.valid((String) node, Main.SEMVER) == null) {
                 throw new PnpmError("INVALID_NODE_VERSION", "The nodeVersion setting is \"" + Js.string(node) +
                                                             "\", which is not exact semver version");
             }
@@ -184,7 +184,7 @@ final class PackageIsInstallable {
         }
         Object wantedPnpm = property(wantedEngine, "pnpm");
         if (Js.truthy(pnpm) && Js.truthy(wantedPnpm) &&
-            !NodeSemver.satisfies(pnpm, wantedPnpm, NodeSemver.Options.V7_8_0_INCLUDE_PRERELEASE)) {
+            !NodeSemver.satisfies(pnpm, wantedPnpm, Main.SEMVER_INCLUDE_PRERELEASE)) {
             unsatisfiedWanted.put("pnpm", wantedPnpm);
         }
         if (unsatisfiedWanted.isEmpty()) {
@@ -204,7 +204,7 @@ final class PackageIsInstallable {
             return false;
         }
         try {
-            return NodeSemver.satisfies(version, (String) range, NodeSemver.Options.V7_8_0_INCLUDE_PRERELEASE);
+            return NodeSemver.satisfies(version, (String) range, Main.SEMVER_INCLUDE_PRERELEASE);
         } catch (IllegalArgumentException e) {
             throw new JsError(JsError.ERROR, e.getMessage());
         }

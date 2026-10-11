@@ -154,7 +154,7 @@ final class PatchingConfig {
 
     private static boolean satisfies(String version, String range) {
         try {
-            return NodeSemver.satisfies(version, range, NodeSemver.Options.V7_8_0);
+            return NodeSemver.satisfies(version, range, Main.SEMVER);
         } catch (IllegalArgumentException e) {
             return false;
         }

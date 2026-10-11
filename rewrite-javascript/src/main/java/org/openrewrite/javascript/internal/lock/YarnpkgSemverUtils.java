@@ -28,6 +28,9 @@ import java.util.regex.Pattern;
  */
 public final class YarnpkgSemverUtils {
 
+    static final NodeSemver.Release SEMVER_RELEASE = NodeSemver.Release.V7_6_0;
+    public static final NodeSemver.Options SEMVER = NodeSemver.Options.of(false, false, SEMVER_RELEASE);
+
     private static final Pattern CLEAN_SEMVER_REGEXP = Pattern.compile("^(?:[\\sv=]*?)((0|[1-9]\\d*)\\.(0|[1-9]\\d*)" +
             "\\.(0|[1-9]\\d*)(?:-((?:0|[1-9]\\d*|\\d*[a-zA-Z-][0-9a-zA-Z-]*)(?:\\.(?:0|[1-9]\\d*|\\d*[a-zA-Z-]" +
             "[0-9a-zA-Z-]*))*))?(?:\\+([0-9a-zA-Z-]+(?:\\.[0-9a-zA-Z-]+)*))?)(?:\\s*)\\z");
@@ -51,7 +54,7 @@ public final class YarnpkgSemverUtils {
 
         public boolean test(String version) {
             try {
-                return NodeSemver.satisfies(version, raw, NodeSemver.Options.V7_6_0);
+                return NodeSemver.satisfies(version, raw, SEMVER);
             } catch (IllegalArgumentException e) {
                 return false;
             }
@@ -65,7 +68,7 @@ public final class YarnpkgSemverUtils {
         if (potentialRange.indexOf(':') != -1) {
             return null;
         }
-        String range = NodeSemver.validRange(potentialRange, NodeSemver.Options.V7_6_0);
+        String range = NodeSemver.validRange(potentialRange, SEMVER);
         return range == null ? null : new Range(potentialRange, range);
     }
 
@@ -75,7 +78,7 @@ public final class YarnpkgSemverUtils {
     }
 
     public static boolean valid(String version) {
-        return NodeSemver.valid(version, NodeSemver.Options.V7_6_0) != null;
+        return NodeSemver.valid(version, SEMVER) != null;
     }
 
     /**
@@ -83,7 +86,7 @@ public final class YarnpkgSemverUtils {
      */
     public static int compare(String a, String b) {
         try {
-            return NodeSemver.compare(a, b, NodeSemver.Options.V7_6_0);
+            return NodeSemver.compare(a, b, SEMVER);
         } catch (IllegalArgumentException e) {
             throw new JsError(JsError.TYPE_ERROR, e.getMessage());
         }
@@ -96,7 +99,7 @@ public final class YarnpkgSemverUtils {
      * Under includePrerelease, or else with the version's prerelease dropped against each comparator set.
      */
     public static boolean satisfiesWithPrereleases(@Nullable String version, String range, boolean loose) {
-        return satisfiesWithPrereleases(version, range, loose, NodeSemver.Release.V7_6_0);
+        return satisfiesWithPrereleases(version, range, loose, SEMVER_RELEASE);
     }
 
     /**

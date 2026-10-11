@@ -77,7 +77,7 @@ final class PickPackageFromMeta {
         if (bareSpecifier.startsWith("npm:")) {
             bareSpecifier = bareSpecifier.substring(4);
             if (alias != null && !alias.isEmpty() &&
-                NodeSemver.validRange(bareSpecifier, NodeSemver.Options.V7_8_0) != null) {
+                NodeSemver.validRange(bareSpecifier, Main.SEMVER) != null) {
                 name = alias;
             } else {
                 int index = bareSpecifier.lastIndexOf('@');
@@ -111,8 +111,8 @@ final class PickPackageFromMeta {
         if (type == null) {
             return null;
         }
-        String normalized = "version".equals(type) ? NodeSemver.valid(selector, NodeSemver.Options.V7_8_0_LOOSE) :
-                "range".equals(type) ? NodeSemver.validRange(selector, NodeSemver.Options.V7_8_0_LOOSE) : selector;
+        String normalized = "version".equals(type) ? NodeSemver.valid(selector, Main.LOOSE_SEMVER) :
+                "range".equals(type) ? NodeSemver.validRange(selector, Main.LOOSE_SEMVER) : selector;
         return new RegistryPackageSpec(type, name, normalized, null);
     }
 
@@ -220,7 +220,7 @@ final class PickPackageFromMeta {
         int scopelessNameLength = name.length() - (name.indexOf('/') + 1);
         String version = scopelessNameLength + 1 <= pathWithNoExtension.length() ?
                 pathWithNoExtension.substring(scopelessNameLength + 1) : "";
-        if (NodeSemver.valid(version, NodeSemver.Options.V7_8_0_LOOSE) == null) {
+        if (NodeSemver.valid(version, Main.LOOSE_SEMVER) == null) {
             return null;
         }
         return new String[]{name, version};
@@ -316,7 +316,7 @@ final class PickPackageFromMeta {
             return false;
         }
         try {
-            return NodeSemver.satisfies(version, range, NodeSemver.Options.V7_8_0_LOOSE);
+            return NodeSemver.satisfies(version, range, Main.LOOSE_SEMVER);
         } catch (IllegalArgumentException e) {
             return false;
         }
@@ -334,7 +334,7 @@ final class PickPackageFromMeta {
             for (List<String> preferredVersions : prioritizePreferredVersions(options.getMeta(),
                     options.getVersionRange(), selectors)) {
                 String preferredVersion = NodeSemver.minSatisfying(preferredVersions, options.getVersionRange(),
-                        NodeSemver.Options.V7_8_0_LOOSE);
+                        Main.LOOSE_SEMVER);
                 if (preferredVersion != null) {
                     return preferredVersion;
                 }
@@ -343,10 +343,10 @@ final class PickPackageFromMeta {
         List<String> versions = versionKeys(options.getMeta());
         if ("*".equals(options.getVersionRange())) {
             // semver.compare is consistent, so any stable sort gives V8's order
-            versions.sort((a, b) -> NodeSemver.compare(a, b, NodeSemver.Options.V7_8_0));
+            versions.sort((a, b) -> NodeSemver.compare(a, b, Main.SEMVER));
             return versions.isEmpty() ? null : versions.get(0);
         }
-        return NodeSemver.minSatisfying(versions, options.getVersionRange(), NodeSemver.Options.V7_8_0_LOOSE);
+        return NodeSemver.minSatisfying(versions, options.getVersionRange(), Main.LOOSE_SEMVER);
     }
 
     @SuppressWarnings("unchecked")
@@ -363,7 +363,7 @@ final class PickPackageFromMeta {
                     return latest;
                 }
                 String preferredVersion = NodeSemver.maxSatisfying(preferredVersions, versionRange,
-                        NodeSemver.Options.V7_8_0_LOOSE);
+                        Main.LOOSE_SEMVER);
                 if (preferredVersion != null) {
                     return preferredVersion;
                 }
@@ -373,7 +373,7 @@ final class PickPackageFromMeta {
         if (Js.truthy(latest) && ("*".equals(versionRange) || semverSatisfiesLoose(latest, versionRange))) {
             return latest;
         }
-        String maxVersion = NodeSemver.maxSatisfying(versions, versionRange, NodeSemver.Options.V7_8_0_LOOSE);
+        String maxVersion = NodeSemver.maxSatisfying(versions, versionRange, Main.LOOSE_SEMVER);
         Map<String, Object> versionManifests = (Map<String, Object>) meta.get("versions");
         if (maxVersion != null && Js.truthy(deprecated(versionManifests.get(maxVersion))) && versions.size() > 1) {
             List<String> nonDeprecatedVersions = new ArrayList<>();
@@ -385,7 +385,7 @@ final class PickPackageFromMeta {
                 }
             }
             String maxNonDeprecatedVersion = NodeSemver.maxSatisfying(nonDeprecatedVersions, versionRange,
-                    NodeSemver.Options.V7_8_0_LOOSE);
+                    Main.LOOSE_SEMVER);
             if (maxNonDeprecatedVersion != null) {
                 return maxNonDeprecatedVersion;
             }
@@ -490,7 +490,7 @@ final class PickPackageFromMeta {
                 distTagsWithinDate.put(tag, distTagVersion);
                 continue;
             }
-            String original = NodeSemver.valid(distTagVersion, NodeSemver.Options.V7_8_0_LOOSE);
+            String original = NodeSemver.valid(distTagVersion, Main.LOOSE_SEMVER);
             if (original == null) {
                 continue;
             }
@@ -498,7 +498,7 @@ final class PickPackageFromMeta {
             long originalMajor = Long.parseLong(original.substring(0, original.indexOf('.')));
             String bestVersion = null;
             for (String candidate : Js.keys(versionsWithinDate)) {
-                String parsed = NodeSemver.valid(candidate, NodeSemver.Options.V7_8_0_LOOSE);
+                String parsed = NodeSemver.valid(candidate, Main.LOOSE_SEMVER);
                 if (parsed == null ||
                     !"latest".equals(tag) &&
                     Long.parseLong(parsed.substring(0, parsed.indexOf('.'))) != originalMajor ||
@@ -510,7 +510,7 @@ final class PickPackageFromMeta {
                 } else {
                     boolean candidateIsDeprecated = deprecated(versions.get(candidate)) != null;
                     boolean bestVersionIsDeprecated = deprecated(versions.get(bestVersion)) != null;
-                    if (NodeSemver.compare(candidate, bestVersion, NodeSemver.Options.V7_8_0_LOOSE) > 0 &&
+                    if (NodeSemver.compare(candidate, bestVersion, Main.LOOSE_SEMVER) > 0 &&
                         bestVersionIsDeprecated == candidateIsDeprecated ||
                         bestVersionIsDeprecated && !candidateIsDeprecated) {
                         bestVersion = candidate;

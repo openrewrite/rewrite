@@ -16,6 +16,7 @@
 package org.openrewrite.javascript.internal.lock;
 
 import org.jspecify.annotations.Nullable;
+import org.openrewrite.javascript.internal.lock.pnpm.Main;
 import org.openrewrite.javascript.semver.NodeSemver;
 
 /**
@@ -33,7 +34,7 @@ public enum NodeHosts {
     /**
      * pnpm 11.2.2's bin/pnpm.mjs exits below Node 22.13. On Node 20 it warns, then fails to load its bundle.
      */
-    PNPM(">=22.13.0", NodeSemver.Options.of(false, true, NodeSemver.Release.V7_8_0)),
+    PNPM(">=22.13.0", NodeSemver.Options.of(false, true, Main.SEMVER_RELEASE)),
 
     /**
      * Node 18 and up is our assumption of the releases still in use. Yarn 1.22.22 itself runs from Node 4

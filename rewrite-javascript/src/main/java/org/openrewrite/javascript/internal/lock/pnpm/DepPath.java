@@ -210,7 +210,7 @@ final class DepPath {
                     version = version.substring(0, patchHashIndex);
                 }
             }
-            if (NodeSemver.valid(version, NodeSemver.Options.V7_8_0) != null) {
+            if (NodeSemver.valid(version, Main.SEMVER) != null) {
                 return new DependencyPath(name, peerDepGraphHash, version, null, patchHash);
             }
             return new DependencyPath(name, peerDepGraphHash, null, version, patchHash);

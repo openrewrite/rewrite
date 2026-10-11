@@ -49,6 +49,16 @@ public final class Main {
     public static final String PNPM_VERSION = "11.2.2";
 
     /**
+     * The node-semver pnpm 11.2.2 bundles.
+     */
+    public static final NodeSemver.Release SEMVER_RELEASE = NodeSemver.Release.V7_8_0;
+    static final NodeSemver.Options SEMVER = NodeSemver.Options.of(false, false, SEMVER_RELEASE);
+    static final NodeSemver.Options LOOSE_SEMVER = NodeSemver.Options.of(true, false, SEMVER_RELEASE);
+    static final NodeSemver.Options SEMVER_INCLUDE_PRERELEASE = NodeSemver.Options.of(false, true, SEMVER_RELEASE);
+    static final NodeSemver.Options LOOSE_SEMVER_INCLUDE_PRERELEASE =
+            NodeSemver.Options.of(true, true, SEMVER_RELEASE);
+
+    /**
      * The releases the engine runs as the one ported: recorded writing what 11.2.2 writes from 11.0.6 (11.0.5 sorts
      * what 11.0.6 appends), and 11.13.0 and 11.28.5 writing its locks.
      */
@@ -58,12 +68,12 @@ public final class Main {
      * Whether {@code version}, a release or a range, names only releases in {@link #RUNS_AS_PORTED}.
      */
     public static boolean runsAsPorted(String version) {
-        String exact = NodeSemver.valid(version, NodeSemver.Options.V7_8_0);
+        String exact = NodeSemver.valid(version, SEMVER);
         if (exact != null) {
-            return NodeSemver.satisfies(exact, RUNS_AS_PORTED, NodeSemver.Options.V7_8_0);
+            return NodeSemver.satisfies(exact, RUNS_AS_PORTED, SEMVER);
         }
-        return NodeSemver.validRange(version, NodeSemver.Options.V7_8_0) != null &&
-               NodeSemver.subset(version, RUNS_AS_PORTED, NodeSemver.Options.V7_8_0);
+        return NodeSemver.validRange(version, SEMVER) != null &&
+               NodeSemver.subset(version, RUNS_AS_PORTED, SEMVER);
     }
 
     // the inputs' root: workspaceDir, which is also rootProjectManifestDir, or the project's directory without one
@@ -410,7 +420,7 @@ public final class Main {
                 return direct;
             }
             String version = SpecUtils.installVersion(spec);
-            if (version != null && version.equals(NodeSemver.valid(direct, NodeSemver.Options.V7_8_0)) ||
+            if (version != null && version.equals(NodeSemver.valid(direct, SEMVER)) ||
                 runsAsPorted(version == null ? spec.getRange() : version) && runsAsPorted(direct)) {
                 return direct;
             }
@@ -457,7 +467,7 @@ public final class Main {
         }
         if (Js.truthy(pm.getVersion()) &&
             !NodeSemver.satisfies(PNPM_VERSION, Js.string(pm.getVersion()),
-                    NodeSemver.Options.V7_8_0_INCLUDE_PRERELEASE)) {
+                    SEMVER_INCLUDE_PRERELEASE)) {
             String msg = "This project is configured to use " + Js.string(pm.getVersion()) +
                          " of pnpm. Your current pnpm is v" + PNPM_VERSION;
             if (underCorepack) {
