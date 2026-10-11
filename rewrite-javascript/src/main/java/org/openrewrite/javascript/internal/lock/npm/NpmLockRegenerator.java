@@ -215,14 +215,16 @@ public final class NpmLockRegenerator {
             if (!candidate.answersAs(release)) {
                 return false;
             }
+            // the install is over: comparing its release from here on notes nothing more of it
+            NpmRelease installed = NpmRelease.of(release.toString());
             for (String range : npmRanges) {
-                if (NpmInstallChecks.satisfies(candidate.toString(), range) !=
-                    NpmInstallChecks.satisfies(release.toString(), range)) {
+                if (NpmInstallChecks.npmSatisfies(candidate, range) !=
+                    NpmInstallChecks.npmSatisfies(installed, range)) {
                     return false;
                 }
             }
             return NpmReleases.devEnginesRefuse(devEngines, candidate) ==
-                   NpmReleases.devEnginesRefuse(devEngines, release);
+                   NpmReleases.devEnginesRefuse(devEngines, installed);
         }
     }
 
@@ -369,12 +371,11 @@ public final class NpmLockRegenerator {
             return "packageManager".equals(((BadDevEngines) ended).getEngine());
         }
         Node root = built == null ? null : built.getIdealTree();
-        if (ended instanceof NpmInstallChecks.UnsupportedEngine && root != null) {
-            NpmInstallChecks.UnsupportedEngine unsupported = (NpmInstallChecks.UnsupportedEngine) ended;
-            Object engines = unsupported.getRequired();
-            String npmVersion = unsupported.getCurrent().get("npm");
-            return engines == root.getPackage().get("engines") && npmVersion != null &&
-                   truthy(Js.get(engines, "npm")) && !NpmInstallChecks.satisfies(npmVersion, Js.get(engines, "npm"));
+        NpmRelease release = inputs.getRelease();
+        if (ended instanceof NpmInstallChecks.UnsupportedEngine && root != null && release != null) {
+            Object engines = ((NpmInstallChecks.UnsupportedEngine) ended).getRequired();
+            return engines == root.getPackage().get("engines") && truthy(Js.get(engines, "npm")) &&
+                   !NpmInstallChecks.npmSatisfies(release, Js.get(engines, "npm"));
         }
         return false;
     }

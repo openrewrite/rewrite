@@ -147,11 +147,16 @@ final class NpmInstallChecks {
         }
     }
 
-    /**
-     * Whether an npm or Node version is in the range a package's {@code engines} hold it to.
-     */
-    static boolean satisfies(String version, @Nullable Object range) {
+    private static boolean satisfies(String version, @Nullable Object range) {
         return NodeSemver.satisfies(version, range, NodeSemver.Options.INCLUDE_PRERELEASE);
+    }
+
+    /**
+     * Whether npm {@code release} is in the range an {@code engines.npm} holds npm to, as {@link #checkEngine}
+     * compares the two.
+     */
+    static boolean npmSatisfies(NpmRelease release, @Nullable Object range) {
+        return satisfies(release.toString(), range);
     }
 
     /**

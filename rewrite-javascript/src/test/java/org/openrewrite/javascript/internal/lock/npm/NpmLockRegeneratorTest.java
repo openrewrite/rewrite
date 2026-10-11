@@ -336,11 +336,11 @@ class NpmLockRegeneratorTest {
 
     // an install stands for the releases that answer as its own and satisfy as it does each range it read
     private static void assertStandsForTheReleasesAlikeIn(NpmLockRegenerator.Install install, String range) {
-        String own = install.getRelease().toString();
+        NpmRelease own = NpmRelease.of(install.getRelease().toString());
         for (NpmRelease release : NpmReleases.all()) {
             assertThat(install.standsFor(release)).as(release + " as " + own)
-              .isEqualTo(release.answersAs(install.getRelease()) && NpmInstallChecks.satisfies(release.toString(),
-                range) == NpmInstallChecks.satisfies(own, range));
+              .isEqualTo(release.answersAs(install.getRelease()) &&
+                         NpmInstallChecks.npmSatisfies(release, range) == NpmInstallChecks.npmSatisfies(own, range));
         }
     }
 
