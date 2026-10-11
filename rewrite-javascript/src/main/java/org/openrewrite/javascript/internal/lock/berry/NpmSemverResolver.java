@@ -22,6 +22,7 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
+import org.openrewrite.javascript.internal.lock.YarnpkgSemverUtils;
 
 import static org.openrewrite.javascript.internal.lock.berry.NpmHttpUtils.PROTOCOL;
 
@@ -37,7 +38,7 @@ final class NpmSemverResolver implements Resolver {
         if (!descriptor.range.startsWith(PROTOCOL)) {
             return false;
         }
-        return SemverUtils.validRange(descriptor.range.substring(PROTOCOL.length())) != null;
+        return YarnpkgSemverUtils.validRange(descriptor.range.substring(PROTOCOL.length())) != null;
     }
 
     @Override
@@ -45,7 +46,7 @@ final class NpmSemverResolver implements Resolver {
         if (!locator.reference.startsWith(PROTOCOL)) {
             return false;
         }
-        return SemverUtils.valid(StructUtils.parseRange(locator.reference).getSelector());
+        return YarnpkgSemverUtils.valid(StructUtils.parseRange(locator.reference).getSelector());
     }
 
     @Override
@@ -66,7 +67,7 @@ final class NpmSemverResolver implements Resolver {
     @Override
     public List<Locator> getCandidates(Descriptor descriptor, Map<String, Package> dependencies,
                                        ResolveOptions opts) {
-        SemverUtils.Range range = SemverUtils.validRange(descriptor.range.substring(PROTOCOL.length()));
+        YarnpkgSemverUtils.Range range = YarnpkgSemverUtils.validRange(descriptor.range.substring(PROTOCOL.length()));
         if (range == null) {
             throw new JsError(JsError.ERROR, "Expected a valid range, got " +
                                              descriptor.range.substring(PROTOCOL.length()));
@@ -78,7 +79,7 @@ final class NpmSemverResolver implements Resolver {
         List<String> candidates = new ArrayList<>();
         for (Map.Entry<String, @Nullable Object> version : Js.entries(versions)) {
             try {
-                if (SemverUtils.valid(version.getKey()) && range.test(version.getKey()) &&
+                if (YarnpkgSemverUtils.valid(version.getKey()) && range.test(version.getKey()) &&
                     NpmHttpUtils.isPackageApproved(project, descriptor, version.getKey(), registryData.get("time"))) {
                     candidates.add(version.getKey());
                 }
@@ -93,7 +94,7 @@ final class NpmSemverResolver implements Resolver {
             }
         }
         List<String> finalCandidates = noDeprecatedCandidates.isEmpty() ? candidates : noDeprecatedCandidates;
-        finalCandidates.sort((a, b) -> -SemverUtils.compare(a, b));
+        finalCandidates.sort((a, b) -> -YarnpkgSemverUtils.compare(a, b));
         List<Locator> out = new ArrayList<>();
         for (String version : finalCandidates) {
             Locator versionLocator = StructUtils.makeLocator(descriptor, PROTOCOL + version);
@@ -111,7 +112,7 @@ final class NpmSemverResolver implements Resolver {
     @Override
     public Satisfying getSatisfying(Descriptor descriptor, Map<String, Package> dependencies,
                                     List<Locator> locators, ResolveOptions opts) {
-        SemverUtils.Range range = SemverUtils.validRange(descriptor.range.substring(PROTOCOL.length()));
+        YarnpkgSemverUtils.Range range = YarnpkgSemverUtils.validRange(descriptor.range.substring(PROTOCOL.length()));
         if (range == null) {
             throw new JsError(JsError.ERROR, "Expected a valid range, got " +
                                              descriptor.range.substring(PROTOCOL.length()));
@@ -127,7 +128,7 @@ final class NpmSemverResolver implements Resolver {
             if (parsedRange == null) {
                 continue;
             }
-            if (!SemverUtils.valid(parsedRange.getSelector())) {
+            if (!YarnpkgSemverUtils.valid(parsedRange.getSelector())) {
                 throw new JsError(JsError.TYPE_ERROR, "Invalid Version: " + parsedRange.getSelector());
             }
             if (!range.test(parsedRange.getSelector())) {
@@ -140,7 +141,7 @@ final class NpmSemverResolver implements Resolver {
         for (int i = 0; i < results.size(); i++) {
             order.add(i);
         }
-        order.sort((a, b) -> -SemverUtils.compare(versions.get(a), versions.get(b)));
+        order.sort((a, b) -> -YarnpkgSemverUtils.compare(versions.get(a), versions.get(b)));
         List<Locator> sorted = new ArrayList<>();
         for (int index : order) {
             sorted.add(results.get(index));
@@ -151,7 +152,7 @@ final class NpmSemverResolver implements Resolver {
     @Override
     public Package resolve(Locator locator, ResolveOptions opts) {
         String selector = StructUtils.parseRange(locator.reference).getSelector();
-        String version = SemverUtils.clean(selector);
+        String version = YarnpkgSemverUtils.clean(selector);
         if (version == null) {
             throw new ReportError(ReportError.RESOLVER_NOT_FOUND, "The npm semver resolver got selected, but the " +
                                                                   "version isn't semver");

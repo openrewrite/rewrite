@@ -23,6 +23,7 @@ import java.util.ArrayList;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Set;
+import org.openrewrite.javascript.internal.lock.YarnpkgSemverUtils;
 
 /**
  * Port of @yarnpkg/core sources/Workspace.ts (Yarn 4.10.3).
@@ -94,7 +95,7 @@ final class Workspace {
             ("*".equals(pathname) || "^".equals(pathname) || "~".equals(pathname))) {
             return true;
         }
-        SemverUtils.Range semverRange = SemverUtils.validRange(pathname);
+        YarnpkgSemverUtils.Range semverRange = YarnpkgSemverUtils.validRange(pathname);
         if (semverRange == null) {
             return false;
         }

@@ -15,13 +15,78 @@
  */
 package org.openrewrite.javascript.internal.lock;
 
+import lombok.Getter;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.semver.NodeSemver;
 
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+
 /**
- * Port of @yarnpkg/core's semverUtils {@code satisfiesWithPrereleases}, as Yarn 4.10.3 and pnpm 11.2.2 bundle it.
+ * Port of @yarnpkg/core sources/semverUtils.ts (Yarn 4.10.3) over node-semver, as Yarn and pnpm 11.2.2 bundle it.
  */
 public final class YarnpkgSemverUtils {
+
+    private static final Pattern CLEAN_SEMVER_REGEXP = Pattern.compile("^(?:[\\sv=]*?)((0|[1-9]\\d*)\\.(0|[1-9]\\d*)" +
+            "\\.(0|[1-9]\\d*)(?:-((?:0|[1-9]\\d*|\\d*[a-zA-Z-][0-9a-zA-Z-]*)(?:\\.(?:0|[1-9]\\d*|\\d*[a-zA-Z-]" +
+            "[0-9a-zA-Z-]*))*))?(?:\\+([0-9a-zA-Z-]+(?:\\.[0-9a-zA-Z-]+)*))?)(?:\\s*)\\z");
+
+    /**
+     * A range node-semver parses: {@code new semver.Range(raw)}.
+     */
+    @Getter
+    public static final class Range {
+        private final String raw;
+
+        /**
+         * The comparator sets as node-semver formats them: {@code range.range}.
+         */
+        private final String range;
+
+        Range(String raw, String range) {
+            this.raw = raw;
+            this.range = range;
+        }
+
+        public boolean test(String version) {
+            try {
+                return NodeSemver.satisfies(version, raw, NodeSemver.Options.DEFAULT);
+            } catch (IllegalArgumentException e) {
+                return false;
+            }
+        }
+    }
+
+    /**
+     * {@code validRange}: null for a range with a {@code :} or one node-semver does not parse.
+     */
+    public static @Nullable Range validRange(String potentialRange) {
+        if (potentialRange.indexOf(':') != -1) {
+            return null;
+        }
+        String range = NodeSemver.validRange(potentialRange, NodeSemver.Options.DEFAULT);
+        return range == null ? null : new Range(potentialRange, range);
+    }
+
+    public static @Nullable String clean(String potentialVersion) {
+        Matcher version = CLEAN_SEMVER_REGEXP.matcher(potentialVersion);
+        return version.find() ? version.group(1) : null;
+    }
+
+    public static boolean valid(String version) {
+        return NodeSemver.valid(version, NodeSemver.Options.DEFAULT) != null;
+    }
+
+    /**
+     * {@code new SemVer(a).compare(b)}.
+     */
+    public static int compare(String a, String b) {
+        try {
+            return NodeSemver.compare(a, b, NodeSemver.Options.DEFAULT);
+        } catch (IllegalArgumentException e) {
+            throw new JsError(JsError.TYPE_ERROR, e.getMessage());
+        }
+    }
 
     private YarnpkgSemverUtils() {
     }

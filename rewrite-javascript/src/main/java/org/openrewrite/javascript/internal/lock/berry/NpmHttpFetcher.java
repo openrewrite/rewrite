@@ -19,6 +19,7 @@ import org.jspecify.annotations.Nullable;
 import org.openrewrite.javascript.internal.lock.JsError;
 
 import java.util.Map;
+import org.openrewrite.javascript.internal.lock.YarnpkgSemverUtils;
 
 /**
  * Port of @yarnpkg/plugin-npm sources/NpmHttpFetcher.ts (Yarn 4.10.3).
@@ -31,7 +32,7 @@ final class NpmHttpFetcher implements Fetcher {
             return false;
         }
         StructUtils.Range range = StructUtils.parseRange(locator.reference);
-        if (!SemverUtils.valid(range.getSelector())) {
+        if (!YarnpkgSemverUtils.valid(range.getSelector())) {
             return false;
         }
         Map<String, Object> params = range.getParams();

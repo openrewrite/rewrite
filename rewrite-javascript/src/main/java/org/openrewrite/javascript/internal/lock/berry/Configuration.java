@@ -36,6 +36,7 @@ import java.util.function.Function;
 import java.util.function.Predicate;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import org.openrewrite.javascript.internal.lock.YarnpkgSemverUtils;
 
 import static java.util.Arrays.asList;
 import static java.util.Collections.emptyList;
@@ -827,7 +828,7 @@ public final class Configuration {
     }
 
     Locator normalizeLocator(Locator locator) {
-        if (SemverUtils.validRange(locator.reference) != null) {
+        if (YarnpkgSemverUtils.validRange(locator.reference) != null) {
             return StructUtils.makeLocator(locator, defaultProtocol() + locator.reference);
         }
         if (TAG_REGEXP.matcher(locator.reference).find()) {
@@ -837,7 +838,7 @@ public final class Configuration {
     }
 
     Descriptor normalizeDependency(Descriptor dependency) {
-        if (SemverUtils.validRange(dependency.range) != null) {
+        if (YarnpkgSemverUtils.validRange(dependency.range) != null) {
             return StructUtils.makeDescriptor(dependency, defaultProtocol() + dependency.range);
         }
         if (TAG_REGEXP.matcher(dependency.range).find()) {

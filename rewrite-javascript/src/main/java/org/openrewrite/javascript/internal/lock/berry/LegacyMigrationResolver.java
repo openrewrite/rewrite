@@ -28,6 +28,7 @@ import java.util.Map;
 import java.util.function.BiFunction;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import org.openrewrite.javascript.internal.lock.YarnpkgSemverUtils;
 
 import static org.openrewrite.javascript.internal.lock.V8RegExp.DOT;
 
@@ -94,7 +95,7 @@ final class LegacyMigrationResolver implements Resolver {
             if (parsedDescriptor == null) {
                 continue;
             }
-            Descriptor descriptor = SemverUtils.validRange(parsedDescriptor.range) != null ?
+            Descriptor descriptor = YarnpkgSemverUtils.validRange(parsedDescriptor.range) != null ?
                     StructUtils.makeDescriptor(parsedDescriptor, "npm:" + parsedDescriptor.range) :
                     parsedDescriptor;
             Object entry = parsed.get(key);

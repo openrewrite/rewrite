@@ -27,6 +27,7 @@ import java.util.Base64;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import org.openrewrite.javascript.internal.lock.YarnpkgSemverUtils;
 
 /**
  * Port of @yarnpkg/plugin-npm npmHttpUtils.ts, npmConfigUtils.ts and NpmSemverFetcher.ts (Yarn 4.10.3).
@@ -208,7 +209,7 @@ final class NpmHttpUtils {
     }
 
     static String getLocatorUrl(Locator locator) {
-        String version = SemverUtils.clean(locator.reference.substring(PROTOCOL.length()));
+        String version = YarnpkgSemverUtils.clean(locator.reference.substring(PROTOCOL.length()));
         if (version == null) {
             throw new ReportError(ReportError.RESOLVER_NOT_FOUND, "The npm semver resolver got selected, but the " +
                                                                   "version isn't semver");
@@ -287,7 +288,7 @@ final class NpmHttpUtils {
         if ("unknown".equals(validator.range)) {
             return true;
         }
-        SemverUtils.Range validatorRange = SemverUtils.validRange(validator.range);
+        YarnpkgSemverUtils.Range validatorRange = YarnpkgSemverUtils.validRange(validator.range);
         if (validatorRange == null) {
             return false;
         }

@@ -78,7 +78,7 @@ final class PackageExtensions {
 
     private static void register(Map<String, List<RangeExtensions>> packageExtensions, Descriptor descriptor,
                                  Map<String, @Nullable Object> extensionData) {
-        if (SemverUtils.validRange(descriptor.range) == null) {
+        if (YarnpkgSemverUtils.validRange(descriptor.range) == null) {
             throw new JsError(JsError.ERROR, "Only semver ranges are allowed as keys for the packageExtensions " +
                                              "setting");
         }

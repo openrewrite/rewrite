@@ -21,6 +21,7 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
+import org.openrewrite.javascript.internal.lock.YarnpkgSemverUtils;
 
 /**
  * Port of @yarnpkg/plugin-jsr sources/JsrResolver.ts and helpers.ts (Yarn 4.10.3).
@@ -31,7 +32,7 @@ final class JsrResolver implements Resolver {
 
     static Descriptor convertDescriptorFromJsrToNpm(Descriptor dependency) {
         String rangeWithoutProtocol = dependency.range.substring(PROTOCOL.length());
-        if (SemverUtils.validRange(rangeWithoutProtocol) != null) {
+        if (YarnpkgSemverUtils.validRange(rangeWithoutProtocol) != null) {
             return StructUtils.makeDescriptor(dependency, NpmHttpUtils.PROTOCOL +
                     StructUtils.stringifyIdent(StructUtils.wrapIdentIntoScope(dependency, "jsr")) + "@" +
                     rangeWithoutProtocol);

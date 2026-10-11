@@ -17,6 +17,7 @@ package org.openrewrite.javascript.internal.lock.berry;
 
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.javascript.internal.lock.JsError;
+import org.openrewrite.javascript.internal.lock.YarnpkgSemverUtils;
 import org.openrewrite.semver.NodeSemver;
 
 import java.util.ArrayList;
@@ -129,7 +130,7 @@ final class NpmTagResolver implements Resolver {
             }
             StructUtils.Range parsedRange = StructUtils.tryParseRange(locator.reference,
                     new StructUtils.RangeOptions(false, PROTOCOL, false, false));
-            if (parsedRange == null || !SemverUtils.valid(parsedRange.getSelector())) {
+            if (parsedRange == null || !YarnpkgSemverUtils.valid(parsedRange.getSelector())) {
                 continue;
             }
             if (parsedRange.getParams() != null && Js.truthy(parsedRange.getParams().get("__archiveUrl"))) {

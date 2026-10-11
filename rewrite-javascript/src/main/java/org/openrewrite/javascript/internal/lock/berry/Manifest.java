@@ -25,6 +25,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import org.openrewrite.javascript.internal.lock.YarnpkgSemverUtils;
 
 /**
  * Port of @yarnpkg/core sources/Manifest.ts for the fields a lock-only install reads (Yarn 4.10.3).
@@ -194,7 +195,7 @@ final class Manifest {
                 }
                 Object range = entry.getValue();
                 if (!(range instanceof String) || (!((String) range).startsWith(WorkspaceResolver.PROTOCOL) &&
-                                                   SemverUtils.validRange((String) range) == null)) {
+                                                   YarnpkgSemverUtils.validRange((String) range) == null)) {
                     errors.add("Invalid dependency range for '" + entry.getKey() + "'");
                     range = "*";
                 }
@@ -369,7 +370,7 @@ final class Manifest {
     }
 
     Map<String, Object> ensureDependencyMeta(Descriptor descriptor) {
-        if (!"unknown".equals(descriptor.range) && !SemverUtils.valid(descriptor.range)) {
+        if (!"unknown".equals(descriptor.range) && !YarnpkgSemverUtils.valid(descriptor.range)) {
             throw new JsError(JsError.ERROR, "Invalid meta field range for '" +
                                              StructUtils.stringifyDescriptor(descriptor) + "'");
         }

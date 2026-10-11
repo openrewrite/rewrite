@@ -38,6 +38,7 @@ import java.util.Set;
 import java.util.function.Function;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import org.openrewrite.javascript.internal.lock.YarnpkgSemverUtils;
 
 /**
  * Port of @yarnpkg/core sources/Project.ts (Yarn 4.10.3).
@@ -394,7 +395,7 @@ final class Project {
         if (descriptor.range.startsWith(WorkspaceResolver.PROTOCOL)) {
             String specifier = descriptor.range.substring(WorkspaceResolver.PROTOCOL.length());
             if (!"^".equals(specifier) && !"~".equals(specifier) && !"*".equals(specifier) &&
-                SemverUtils.validRange(specifier) == null) {
+                YarnpkgSemverUtils.validRange(specifier) == null) {
                 return tryWorkspaceByCwd(specifier);
             }
         }

@@ -18,6 +18,7 @@ package org.openrewrite.javascript.internal.lock.berry;
 import org.jspecify.annotations.Nullable;
 
 import java.util.Map;
+import org.openrewrite.javascript.internal.lock.YarnpkgSemverUtils;
 
 /**
  * Port of @yarnpkg/plugin-npm sources/NpmSemverFetcher.ts (Yarn 4.10.3).
@@ -30,7 +31,7 @@ final class NpmSemverFetcher implements Fetcher {
             return false;
         }
         StructUtils.Range range = StructUtils.parseRange(locator.reference);
-        if (!SemverUtils.valid(range.getSelector())) {
+        if (!YarnpkgSemverUtils.valid(range.getSelector())) {
             return false;
         }
         Map<String, Object> params = range.getParams();
@@ -47,7 +48,7 @@ final class NpmSemverFetcher implements Fetcher {
     }
 
     private static byte[] fetchFromNetwork(Locator locator, FetchOptions opts) {
-        String version = SemverUtils.clean(locator.reference.substring(NpmHttpUtils.PROTOCOL.length()));
+        String version = YarnpkgSemverUtils.clean(locator.reference.substring(NpmHttpUtils.PROTOCOL.length()));
         String url = NpmHttpUtils.getLocatorUrl(locator);
         try {
             return NpmHttpUtils.get(url, locator, String.valueOf(version), opts.getProject(), opts.getRegistry());
