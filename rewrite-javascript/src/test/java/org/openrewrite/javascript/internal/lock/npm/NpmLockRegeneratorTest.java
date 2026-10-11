@@ -91,9 +91,7 @@ class NpmLockRegeneratorTest {
         }
     }
 
-    // npm 11.17.0 rejects the first edit on darwin-arm64 (EBADPLATFORM) and writes its lock on linux-x64. It rejects
-    // the second under engine-strict on node 18 (EBADENGINE) and writes its lock on node 24. The recipes leave the
-    // host unknown.
+    // npm 11.17.0: EBADPLATFORM on darwin and a lock on linux, EBADENGINE on node 18 (engine-strict) and a lock on 24
     @Test
     void anEditWhoseOutcomeFollowsTheUnknownHostCannotBeKnown() {
         Result platform = new NpmLockRegenerator(NpmLockRegenerator.Inputs.builder()
@@ -113,7 +111,7 @@ class NpmLockRegeneratorTest {
         assertThat(Arrays.asList(kind(platform), kind(engine))).containsExactly(Kind.CANNOT_KNOW, Kind.CANNOT_KNOW);
     }
 
-    // npm 11.17.0 locks an optional package the same on a host it skips there (lock/npm/arb-platform-optional)
+    // npm 11.17.0 writes the same lock where it skips these optional packages as where it installs them
     @Test
     void anOptionalPackageForSomeHostsRegeneratesOnAnUnknownHost() {
         Map<String, String> packages = new LinkedHashMap<>();

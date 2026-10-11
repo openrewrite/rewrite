@@ -492,11 +492,7 @@ class NodeDependencyScanTest {
         assertThat(result.getFailure().getDetail()).startsWith("the engine cannot know " + reported);
     }
 
-    /**
-     * Recorded in a member with its own lock under a root that lists it: npm rewrites the root's npm-shrinkwrap.json
-     * and leaves the package-lock.json beside it, bun a bun.lockb; bun migrates a package-lock.json or yarn.lock before
-     * a pnpm-lock.yaml.
-     */
+    // recorded in a member with its own lock under a root that lists it and holds the row's files
     @ParameterizedTest
     @CsvSource(delimiter = '|', value = {
       "Npm | npm-shrinkwrap.json package-lock.json | npm-shrinkwrap.json |",

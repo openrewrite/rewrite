@@ -283,8 +283,7 @@ class NpmInstallChecksTest {
         assertThatThrownBy(() -> platform("{\"os\":[5]}")).hasMessage("entry.charAt is not a function");
     }
 
-    // ["any"] passes every os and cpu, but no libc list passes a host without one. Node 18 is the oldest host
-    // counted, so ">=16" holds on every host and "<1" on none.
+    // NodeHosts.NPM counts node 18 and up
     @Test
     void anUnknownHostAnswersOnlyWhereEveryHostAnswersAlike() {
         assertThatCode(() -> NpmInstallChecks.checkPlatform(json("{\"os\":[\"any\"],\"cpu\":\"any\"}"), false,

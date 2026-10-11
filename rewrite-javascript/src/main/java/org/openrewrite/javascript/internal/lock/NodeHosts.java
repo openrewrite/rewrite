@@ -19,7 +19,8 @@ import org.jspecify.annotations.Nullable;
 import org.openrewrite.javascript.semver.NodeSemver;
 
 /**
- * The Node releases a package manager runs on, which stand for the host when its own version is unknown.
+ * The Node releases a package manager runs on, which stand for the host when its own version is unknown. A check that
+ * reads the unknown version answers only where every release answers alike.
  */
 public enum NodeHosts {
 
