@@ -94,10 +94,7 @@ final class NpmInstallChecks {
         Object node = Js.get(eng, "node");
         Boolean everyNode = !force && nodeVer == null && truthy(node) ? NodeHosts.NPM.satisfiedBy(node) :
                 Boolean.TRUE;
-        boolean nodeFail = truthy(nodev) && truthy(node) && !satisfies(nodev, node) ||
-                           Boolean.FALSE.equals(everyNode);
-        boolean npmFail = truthy(npmVer) && truthy(Js.get(eng, "npm")) && !satisfies(npmVer, Js.get(eng, "npm"));
-        if (nodeFail || npmFail) {
+        if (!engineOk(eng, npmVer, nodev) || Boolean.FALSE.equals(everyNode)) {
             Map<String, @Nullable String> current = new LinkedHashMap<>();
             current.put("node", nodeVer);
             current.put("npm", npmVer);
@@ -107,6 +104,16 @@ final class NpmInstallChecks {
             throw new CannotKnow("the node version npm runs on (" + Js.string(target.get("_id")) +
                                  " requires node " + Js.string(node) + ")");
         }
+    }
+
+    /**
+     * Whether {@link #checkEngine} passes {@code engines} without force, skipping the node check where
+     * {@code nodeVer} is null.
+     */
+    static boolean engineOk(Object eng, @Nullable String npmVer, @Nullable String nodeVer) {
+        boolean nodeFail = truthy(nodeVer) && truthy(Js.get(eng, "node")) && !satisfies(nodeVer, Js.get(eng, "node"));
+        boolean npmFail = truthy(npmVer) && truthy(Js.get(eng, "npm")) && !satisfies(npmVer, Js.get(eng, "npm"));
+        return !nodeFail && !npmFail;
     }
 
     private static boolean satisfies(String version, @Nullable Object range) {

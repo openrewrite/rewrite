@@ -20,16 +20,13 @@ import lombok.Getter;
 import lombok.Value;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.javascript.internal.lock.CannotKnow;
+import org.openrewrite.javascript.internal.lock.NodeHosts;
 import org.openrewrite.javascript.internal.lock.Spec;
 import org.openrewrite.javascript.internal.lock.V8Date;
 import org.openrewrite.javascript.semver.NodeSemver;
 
 import java.time.Instant;
-import java.util.ArrayList;
-import java.util.Date;
-import java.util.LinkedHashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 
 import static org.openrewrite.javascript.internal.lock.npm.Js.truthy;
 import static org.openrewrite.javascript.semver.NodeSemver.Options.LOOSE;
@@ -96,36 +93,10 @@ public final class PickManifest {
     private PickManifest() {
     }
 
-    /**
-     * @param failing the version whose node engine fails where hosts differ. Every other version's passes there.
-     */
     private static boolean engineOk(@Nullable Object manifest, @Nullable String npmVersion,
-            @Nullable String nodeVersion, @Nullable String failing) {
-        if (!(manifest instanceof Map)) {
-            return true;
-        }
-        try {
-            NpmInstallChecks.checkEngine(asMap(manifest), npmVersion, nodeVersion, false);
-            return true;
-        } catch (CannotKnow e) {
-            return !Js.string(Js.get(manifest, "version")).equals(failing);
-        } catch (RuntimeException e) {
-            return false;
-        }
-    }
-
-    private static boolean nodeEngineVaries(@Nullable Object manifest, @Nullable String npmVersion) {
-        if (!(manifest instanceof Map)) {
-            return false;
-        }
-        try {
-            NpmInstallChecks.checkEngine(asMap(manifest), npmVersion, null, false);
-            return false;
-        } catch (CannotKnow e) {
-            return true;
-        } catch (RuntimeException e) {
-            return false;
-        }
+                                    @Nullable String nodeVersion) {
+        Object eng = manifest instanceof Map ? asMap(manifest).get("engines") : null;
+        return !truthy(eng) || NpmInstallChecks.engineOk(eng, npmVersion, nodeVersion);
     }
 
     private static boolean isBefore(@Nullable Object verTimes, @Nullable Object ver, double time) {
@@ -182,8 +153,7 @@ public final class PickManifest {
         return V8Date.dateParse(Js.string(before));
     }
 
-    private static @Nullable Object pick(Map<String, Object> packument, @Nullable String wanted, Options opts,
-                                       @Nullable String failing) {
+    private static @Nullable Object pick(Map<String, Object> packument, @Nullable String wanted, Options opts) {
         String defaultTag = opts.getDefaultTag();
         Object before = opts.getBefore();
         String avoid = opts.getAvoid();
@@ -195,12 +165,12 @@ public final class PickManifest {
         if (opts.isAvoidStrict()) {
             Options looseOpts = opts.toBuilder().avoidStrict(false).build();
 
-            Object result = pick(packument, wanted, looseOpts, failing);
+            Object result = pick(packument, wanted, looseOpts);
             if (!truthy(result) || !truthy(Js.get(result, "_shouldAvoid"))) {
                 return result;
             }
 
-            Object caret = pick(packument, "^" + Js.string(Js.get(result, "version")), looseOpts, failing);
+            Object caret = pick(packument, "^" + Js.string(Js.get(result, "version")), looseOpts);
             if (!truthy(caret) || !truthy(Js.get(caret, "_shouldAvoid"))) {
                 Map<String, Object> outside = spread(caret);
                 outside.put("_outsideDependencyRange", true);
@@ -208,7 +178,7 @@ public final class PickManifest {
                 return outside;
             }
 
-            Object star = pick(packument, "*", looseOpts, failing);
+            Object star = pick(packument, "*", looseOpts);
             if (!truthy(star) || !truthy(Js.get(star, "_shouldAvoid"))) {
                 Map<String, Object> outside = spread(star);
                 outside.put("_outsideDependencyRange", true);
@@ -243,7 +213,7 @@ public final class PickManifest {
                 return decorateAvoid(firstTruthy(Js.get(versions, Js.string(ver)), Js.get(staged, Js.string(ver)),
                         Js.get(restricted, Js.string(ver))), avoid);
             } else {
-                return pick(packument, "<=" + Js.string(ver), opts, failing);
+                return pick(packument, "<=" + Js.string(ver), opts);
             }
         }
 
@@ -264,7 +234,7 @@ public final class PickManifest {
             Object mani = Js.get(versions, Js.string(defaultVer));
             boolean ok = truthy(mani) &&
                          isBefore(verTimes, defaultVer, time) &&
-                         engineOk(mani, opts.getNpmVersion(), opts.getNodeVersion(), failing) &&
+                         engineOk(mani, opts.getNpmVersion(), opts.getNodeVersion()) &&
                          !truthy(Js.get(mani, "deprecated")) &&
                          !truthy(Js.get(staged, Js.string(defaultVer)));
             if (ok) {
@@ -291,8 +261,10 @@ public final class PickManifest {
                 entries.add(entry);
             }
         }
-        String npmVersion = opts.getNpmVersion();
-        String nodeVersion = opts.getNodeVersion();
+        Map<Map.Entry<String, @Nullable Object>, Integer> engine = new IdentityHashMap<>();
+        for (Map.Entry<String, @Nullable Object> entry : entries) {
+            engine.put(entry, engineOk(entry.getValue(), opts.getNpmVersion(), opts.getNodeVersion()) ? 1 : 0);
+        }
         entries.sort((a, b) -> {
             String vera = a.getKey();
             Object mania = a.getValue();
@@ -306,8 +278,8 @@ public final class PickManifest {
             int notstageb = truthy(Js.get(staged, verb)) ? 0 : 1;
             int notdepra = truthy(Js.get(mania, "deprecated")) ? 0 : 1;
             int notdeprb = truthy(Js.get(manib, "deprecated")) ? 0 : 1;
-            int enginea = engineOk(mania, npmVersion, nodeVersion, failing) ? 1 : 0;
-            int engineb = engineOk(manib, npmVersion, nodeVersion, failing) ? 1 : 0;
+            int enginea = engine.get(a);
+            int engineb = engine.get(b);
             int result = notavoidb - notavoida;
             if (result == 0) {
                 result = notrestrb - notrestra;
@@ -352,6 +324,67 @@ public final class PickManifest {
         return all;
     }
 
+    private static @Nullable Object versionOf(@Nullable Object pick) {
+        return truthy(pick) ? Js.get(pick, "version") : null;
+    }
+
+    /**
+     * One Node release for each class of {@link NodeHosts#NPM} hosts that pass the same versions' node engines.
+     * Membership in a range changes only at its comparators' versions, so the releases at and just above each bound
+     * reach every class.
+     */
+    private static Collection<String> hostClasses(Map<String, Object> packument) {
+        String hosts = NodeHosts.NPM.releases();
+        Set<Object> seen = new HashSet<>();
+        List<String> varying = new ArrayList<>();
+        for (String key : new String[]{"versions", "stagedVersions", "policyRestrictions"}) {
+            Object versions = packument.get(key);
+            if (!"versions".equals(key) && truthy(versions)) {
+                versions = Js.get(versions, "versions");
+            }
+            if (!(versions instanceof Map)) {
+                continue;
+            }
+            for (Object manifest : ((Map<?, ?>) versions).values()) {
+                Object engines = manifest instanceof Map ? ((Map<?, ?>) manifest).get("engines") : null;
+                Object node = engines instanceof Map ? ((Map<?, ?>) engines).get("node") : null;
+                if (node instanceof String && seen.add(node) && NodeHosts.NPM.satisfiedBy(node) == null) {
+                    varying.add((String) node);
+                }
+            }
+        }
+
+        Set<String> candidates = new LinkedHashSet<>();
+        candidates.add(Objects.requireNonNull(NodeSemver.minVersion(hosts, NodeSemver.Options.DEFAULT)));
+        for (String range : varying) {
+            for (String comparator : Objects.requireNonNull(NodeSemver.validRange(range, NodeSemver.Options.DEFAULT))
+                    .split("\\|\\|| ")) {
+                String bound = comparator.replaceFirst("^[<>=]+", "");
+                if (bound.isEmpty() || "*".equals(bound)) {
+                    continue;
+                }
+                String release = bound.replaceFirst("[-+].*$", "");
+                candidates.add(release);
+                if (release.equals(bound)) {
+                    String[] parts = release.split("\\.");
+                    candidates.add(parts[0] + "." + parts[1] + "." + (Long.parseLong(parts[2]) + 1));
+                }
+            }
+        }
+
+        Map<List<Boolean>, String> classes = new LinkedHashMap<>();
+        for (String candidate : candidates) {
+            if (NodeSemver.satisfies(candidate, hosts, NodeSemver.Options.DEFAULT)) {
+                List<Boolean> passes = new ArrayList<>(varying.size());
+                for (String range : varying) {
+                    passes.add(NodeSemver.satisfies(candidate, range, NodeSemver.Options.INCLUDE_PRERELEASE));
+                }
+                classes.putIfAbsent(passes, candidate);
+            }
+        }
+        return classes.values();
+    }
+
     public static Map<String, Object> pickManifest(Map<String, Object> packument, @Nullable String wanted) {
         return pickManifest(packument, wanted, Options.DEFAULT);
     }
@@ -362,15 +395,23 @@ public final class PickManifest {
      */
     public static Map<String, Object> pickManifest(Map<String, Object> packument, @Nullable String wanted,
                                                    Options opts) {
-        Object mani = pick(packument, wanted, opts, null);
-        if (opts.getNodeVersion() == null && nodeEngineVaries(mani, opts.getNpmVersion())) {
-            // with every other version's engine passing, a pick that holds where its own fails holds on every host
-            String version = Js.string(Js.get(mani, "version"));
-            Object elsewhere = pick(packument, wanted, opts, version);
-            if (!truthy(elsewhere) || !version.equals(Js.string(Js.get(elsewhere, "version")))) {
-                throw new CannotKnow("the node version npm runs on (" + Js.string(Js.get(packument, "name")) +
-                                     "@" + wanted + " picks " + version + " only where it satisfies " +
-                                     Js.string(Js.get(Js.get(mani, "engines"), "node")) + ")");
+        Object mani;
+        if (opts.getNodeVersion() != null) {
+            mani = pick(packument, wanted, opts);
+        } else {
+            mani = null;
+            String firstHost = null;
+            for (String host : hostClasses(packument)) {
+                Object hostPick = pick(packument, wanted, opts.toBuilder().nodeVersion(host).build());
+                if (firstHost == null) {
+                    mani = hostPick;
+                    firstHost = host;
+                } else if (!Objects.equals(versionOf(hostPick), versionOf(mani))) {
+                    throw new CannotKnow("the node version npm runs on (" + Js.string(Js.get(packument, "name")) +
+                                         "@" + wanted + " picks " + Js.string(versionOf(mani)) + " on node " +
+                                         firstHost + " and " + Js.string(versionOf(hostPick)) + " on node " +
+                                         host + ")");
+                }
             }
         }
         Object picked = mani;
