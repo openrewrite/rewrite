@@ -28,6 +28,14 @@ public interface Port {
     String lockFile();
 
     /**
+     * Whether a file of its lock's name that holds {@code lock} is one this package manager writes: both Yarns
+     * name theirs yarn.lock.
+     */
+    default boolean writes(String lock) {
+        return true;
+    }
+
+    /**
      * Whether the package manager reads the contents of a project file of this name.
      */
     boolean reads(String fileName);

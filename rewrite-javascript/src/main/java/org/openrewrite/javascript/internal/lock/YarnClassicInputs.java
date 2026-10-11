@@ -48,6 +48,11 @@ final class YarnClassicInputs implements Port {
     }
 
     @Override
+    public boolean writes(String lock) {
+        return !YarnBerryInputs.PORT.writes(lock);
+    }
+
+    @Override
     public boolean reads(String fileName) {
         return CONFIG_FILES.contains(fileName);
     }

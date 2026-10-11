@@ -66,6 +66,14 @@ import static org.openrewrite.Tree.randomId;
  * documents as the earlier recipes leave them, and again at a visit that finds one otherwise), and what it writes.
  */
 public final class NodeDependencyEdits implements PackageJsonHelper.FileEditor {
+
+    /**
+     * Why a manifest the recipe would edit is left as it is when the host parsed it without its marker: the marker
+     * records the registries its lock is regenerated from.
+     */
+    public static final String UNMARKED = "this package.json was parsed without its NodeResolutionResult marker, " +
+                                          "so its lock cannot be regenerated and it was not edited";
+
     public final NodeDependencyScan.Accumulator scan = new NodeDependencyScan.Accumulator();
     private final Rows rows;
     private final Set<Object> inserted = new HashSet<>();
@@ -131,8 +139,8 @@ public final class NodeDependencyEdits implements PackageJsonHelper.FileEditor {
             }
             return;
         }
-        if (sf instanceof Json.Document && "package.json".equals(basename) &&
-            sf.getMarkers().findFirst(NodeResolutionResult.class).isPresent()) {
+        // one parsed without its marker too: the package manager reads it, and a recipe that would edit it says so
+        if (sf instanceof Json.Document && "package.json".equals(basename)) {
             scan.projects.computeIfAbsent(p, k -> new NodeDependencyScan.ProjectState()).capturedPackageJson = sf;
         }
     }
@@ -370,6 +378,12 @@ public final class NodeDependencyEdits implements PackageJsonHelper.FileEditor {
         Decision decision = new Decision(this, path, (Json.Document) manifest, base, ctx);
         install(decision);
         requireNonNull(decider).decide(decision, ctx);
+        if (decision.edits() && !manifest.getMarkers().findFirst(NodeResolutionResult.class).isPresent()) {
+            decision.manifestEdit = null;
+            decision.fileEdits.clear();
+            version++;
+            decision.decline(UNMARKED);
+        }
         ManagedFile edited = decision.edits() ? managedOf(path) : null;
         String cleanupDeclined = edited == null ? null : cleanupDeclined(edited);
         if (cleanupDeclined != null) {

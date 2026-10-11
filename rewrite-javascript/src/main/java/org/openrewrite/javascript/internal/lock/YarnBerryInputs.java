@@ -49,6 +49,12 @@ final class YarnBerryInputs implements Port {
         return "yarn.lock";
     }
 
+    // a host's parser tells the two Yarns' locks apart by the metadata entry Yarn Berry writes first
+    @Override
+    public boolean writes(String lock) {
+        return lock.contains("__metadata:");
+    }
+
     @Override
     public boolean reads(String fileName) {
         return DEFAULT_RC_FILENAME.equals(fileName) || fileName.endsWith(".patch");

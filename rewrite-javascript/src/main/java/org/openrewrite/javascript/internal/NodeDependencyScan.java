@@ -207,15 +207,14 @@ public final class NodeDependencyScan {
      */
     public static @Nullable Path lockFor(Accumulator acc, Path packageJsonPath) {
         ProjectState ps = acc.projects.get(packageJsonPath);
-        NodeResolutionResult marker = marker(ps);
         LockFileRegeneration regeneration = LockFileRegeneration.forPackageManager(packageManager(acc,
                 packageJsonPath));
         Path own = lockBeside(acc, packageJsonPath, regeneration);
-        if (regeneration == null || marker == null) {
+        if (regeneration == null || ps == null || ps.capturedPackageJson == null) {
             return own;
         }
         LockFileRegeneration.InstallRoot walked = acc.installRoots.computeIfAbsent(packageJsonPath,
-                k -> installRoot(acc, packageJsonPath, requireNonNull(ps), own, marker, regeneration));
+                k -> installRoot(acc, packageJsonPath, ps, own, regeneration));
         Path lock = lockBeside(acc, up(packageJsonPath, walked.getDepth()), regeneration);
         if (lock == null && walked.isStopped()) {
             lock = own != null ? own : nearestLockAbove(acc, packageJsonPath, regeneration);
@@ -229,16 +228,14 @@ public final class NodeDependencyScan {
      */
     public static Path installRootOf(Accumulator acc, Path packageJsonPath, @Nullable PackageManager pm) {
         ProjectState ps = acc.projects.get(packageJsonPath);
-        NodeResolutionResult marker = marker(ps);
         LockFileRegeneration regeneration = LockFileRegeneration.forPackageManager(pm);
-        if (ps == null || marker == null || regeneration == null) {
+        if (ps == null || ps.capturedPackageJson == null || regeneration == null) {
             return packageJsonPath;
         }
         LockFileRegeneration.InstallRoot walked = pm == packageManager(acc, packageJsonPath) ?
                 acc.installRoots.computeIfAbsent(packageJsonPath, k -> installRoot(acc, packageJsonPath, ps,
-                        lockBeside(acc, packageJsonPath, regeneration), marker, regeneration)) :
-                installRoot(acc, packageJsonPath, ps, lockBeside(acc, packageJsonPath, regeneration), marker,
-                        regeneration);
+                        lockBeside(acc, packageJsonPath, regeneration), regeneration)) :
+                installRoot(acc, packageJsonPath, ps, lockBeside(acc, packageJsonPath, regeneration), regeneration);
         if (!walked.isStopped()) {
             return up(packageJsonPath, walked.getDepth());
         }
@@ -249,23 +246,23 @@ public final class NodeDependencyScan {
 
     /**
      * The package manager that installs {@code packageJsonPath}: its marker's where a lock of that package manager
-     * lies beside it. A manifest without one is installed by the nearest package manager above that holds its own
-     * lock and, run in the manifest's directory, installs there or stops on the way; a host that parsed a workspace
-     * member beside its installed node_modules marked it as npm's, whatever its workspace is. Else its marker's.
+     * lies beside it, and for a manifest parsed without its marker, the one whose lock lies beside it. A manifest
+     * without such a lock is installed by the nearest package manager above that holds its own lock and, run in the
+     * manifest's directory, installs there or stops on the way; a host that parsed a workspace member beside its
+     * installed node_modules marked it as npm's, whatever its workspace is. Else its marker's.
      */
     public static @Nullable PackageManager packageManager(Accumulator acc, Path packageJsonPath) {
         ProjectState ps = acc.projects.get(packageJsonPath);
-        NodeResolutionResult marker = marker(ps);
-        if (ps == null || marker == null) {
+        if (ps == null || ps.capturedPackageJson == null) {
             return null;
         }
         return acc.packageManagers.computeIfAbsent(packageJsonPath,
-                k -> Optional.ofNullable(packageManager(acc, packageJsonPath, ps, marker))).orElse(null);
+                k -> Optional.ofNullable(packageManager(acc, packageJsonPath, ps))).orElse(null);
     }
 
-    private static @Nullable PackageManager packageManager(Accumulator acc, Path packageJsonPath, ProjectState ps,
-                                                           NodeResolutionResult marker) {
-        PackageManager named = marker.getPackageManager();
+    private static @Nullable PackageManager packageManager(Accumulator acc, Path packageJsonPath, ProjectState ps) {
+        NodeResolutionResult marker = marker(ps);
+        PackageManager named = marker == null ? lockWriterBeside(acc, packageJsonPath) : marker.getPackageManager();
         LockFileRegeneration own = LockFileRegeneration.forPackageManager(named);
         if (own != null && lockBeside(acc, packageJsonPath, own) != null) {
             return named;
@@ -275,7 +272,7 @@ public final class NodeDependencyScan {
         for (int depth = 1; depth <= segments; depth++) {
             Path above = up(packageJsonPath, depth);
             NodeResolutionResult aboveMarker = marker(acc.projects.get(above));
-            PackageManager pm = aboveMarker == null ? null : aboveMarker.getPackageManager();
+            PackageManager pm = aboveMarker == null ? lockWriterBeside(acc, above) : aboveMarker.getPackageManager();
             LockFileRegeneration regeneration = LockFileRegeneration.forPackageManager(pm);
             if (regeneration == null || lockBeside(acc, above, regeneration) == null) {
                 continue;
@@ -283,13 +280,25 @@ public final class NodeDependencyScan {
             if (pm == named) {
                 return named;
             }
-            LockFileRegeneration.InstallRoot walked = installRoot(acc, packageJsonPath, ps, null, marker,
-                    regeneration);
+            LockFileRegeneration.InstallRoot walked = installRoot(acc, packageJsonPath, ps, null, regeneration);
             if (walked.isStopped() || walked.getDepth() == depth) {
                 return pm;
             }
         }
         return named;
+    }
+
+    // the package manager a host's parser names by the lock beside a manifest, in its order of precedence
+    private static @Nullable PackageManager lockWriterBeside(Accumulator acc, Path packageJsonPath) {
+        for (LockFileRegeneration regeneration : Arrays.asList(LockFileRegeneration.NPM, LockFileRegeneration.BUN,
+                LockFileRegeneration.PNPM, LockFileRegeneration.YARN_BERRY, LockFileRegeneration.YARN_CLASSIC)) {
+            Path lock = lockBeside(acc, packageJsonPath, regeneration);
+            String text = lock == null ? null : acc.locks.get(lock);
+            if (text != null && regeneration.writes(text)) {
+                return regeneration.getPackageManager();
+            }
+        }
+        return null;
     }
 
     private static @Nullable NodeResolutionResult marker(@Nullable ProjectState ps) {
@@ -299,8 +308,8 @@ public final class NodeDependencyScan {
 
     private static LockFileRegeneration.InstallRoot installRoot(Accumulator acc, Path packageJsonPath,
                                                                 ProjectState ps, @Nullable Path lock,
-                                                                NodeResolutionResult marker,
                                                                 LockFileRegeneration regeneration) {
+        NodeResolutionResult marker = marker(ps);
         String manifest = print(acc, p -> null, packageJsonPath, ps);
         ProjectFiles files = projectFiles(acc, p -> null, packageJsonPath, singletonMap(packageJsonPath, manifest),
                 regeneration.getPackageManager());

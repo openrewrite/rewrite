@@ -83,6 +83,7 @@ import static org.openrewrite.javascript.Assertions.nodeResolutionResult;
 import static org.openrewrite.javascript.Assertions.packageJson;
 import static org.openrewrite.javascript.Assertions.packageLock;
 import static org.openrewrite.javascript.Assertions.pnpmLock;
+import static org.openrewrite.json.Assertions.json;
 import static org.openrewrite.test.SourceSpecs.text;
 import static org.openrewrite.yaml.Assertions.yaml;
 
@@ -500,6 +501,16 @@ class UpgradeTransitiveDependencyVersionTest implements RewriteTest {
     }
 
     /**
+     * A member the host parsed without its marker is its workspace's member too: its package manager reads its
+     * manifest for the lock, and the override is the root's.
+     */
+    @ParameterizedTest
+    @CsvSource({"npm, Npm", "pnpm, Pnpm", "bun, Bun", "yarn-classic, YarnClassic", "yarn-berry, YarnBerry"})
+    void aMemberParsedWithoutItsMarkerIsStillItsWorkspacesMember(String family, PackageManager pm) {
+        golden(family + "/override-recipe-member", pm, null, "7.0.0", null, null);
+    }
+
+    /**
      * urql's shape: the workspace manifest is a parse error and the members are marked as npm's. No member is edited
      * as a root of its own, and the root reports what it cannot know.
      */
@@ -717,16 +728,17 @@ class UpgradeTransitiveDependencyVersionTest implements RewriteTest {
         golden(scenario, pm, pm, version, path, declined);
     }
 
-    // memberPm: the package manager the member's marker names
-    private void golden(String scenario, PackageManager pm, PackageManager memberPm, String version,
+    // memberPm: the package manager the member's marker names; null for a member parsed without its marker
+    private void golden(String scenario, PackageManager pm, @Nullable PackageManager memberPm, String version,
                         @Nullable String path, @Nullable String declined) {
         Scenario s = new Scenario(scenario);
         List<SourceSpecs> sources = new ArrayList<>();
         sources.add(s.root(pm, s.file("pkg")));
         String member = s.file("tree-before/" + MEMBER);
         if (member != null) {
-            sources.add(packageJson(member, null, nodeResolutionResult(memberPm, dependencies(member)),
-              spec -> spec.path(MEMBER).noTrim()));
+            sources.add(memberPm == null ? json(member, spec -> spec.path(MEMBER).noTrim()) :
+              packageJson(member, null, nodeResolutionResult(memberPm, dependencies(member)),
+                spec -> spec.path(MEMBER).noTrim()));
         }
         if (s.file("workspace") != null) {
             sources.add(s.workspace());

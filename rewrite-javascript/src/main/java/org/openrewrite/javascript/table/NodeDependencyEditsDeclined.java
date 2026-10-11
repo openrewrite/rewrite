@@ -41,7 +41,7 @@ public class NodeDependencyEditsDeclined extends DataTable<NodeDependencyEditsDe
         String packageName;
 
         @Column(displayName = "Reason",
-                description = "Why the package manager would not read the edit as asked.")
+                description = "Why the edit was not made, or why the package manager would not read it as asked.")
         String reason;
     }
 }

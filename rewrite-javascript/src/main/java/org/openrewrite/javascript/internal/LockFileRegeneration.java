@@ -286,6 +286,13 @@ public final class LockFileRegeneration {
     }
 
     /**
+     * Whether a file of its lock's name that holds {@code lock} is one the package manager writes.
+     */
+    public boolean writes(String lock) {
+        return port.writes(lock);
+    }
+
+    /**
      * Whether the package manager reads the contents of a project file of this name.
      */
     public boolean reads(String fileName) {
