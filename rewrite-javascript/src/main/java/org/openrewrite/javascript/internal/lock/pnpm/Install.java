@@ -548,12 +548,12 @@ final class Install {
 
     // semver.validRange of both, then semver.eq, which takes versions only
     private static boolean eq(String alias, String wanted, String catalogDepSpecifier) {
-        if (NodeSemver.validRange(wanted, NodeSemver.Options.DEFAULT) == null ||
-            NodeSemver.validRange(catalogDepSpecifier, NodeSemver.Options.DEFAULT) == null) {
+        if (NodeSemver.validRange(wanted, NodeSemver.Options.V7_8_0) == null ||
+            NodeSemver.validRange(catalogDepSpecifier, NodeSemver.Options.V7_8_0) == null) {
             return false;
         }
         try {
-            return NodeSemver.compare(wanted, catalogDepSpecifier, NodeSemver.Options.DEFAULT) == 0;
+            return NodeSemver.compare(wanted, catalogDepSpecifier, NodeSemver.Options.V7_8_0) == 0;
         } catch (IllegalArgumentException e) {
             throw Rejected.crashes(Reason.RESOLUTION_REQUIRED, alias, "TypeError: " + e.getMessage());
         }

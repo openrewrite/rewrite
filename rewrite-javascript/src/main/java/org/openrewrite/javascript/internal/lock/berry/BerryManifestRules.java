@@ -68,7 +68,7 @@ public final class BerryManifestRules implements ManifestRules {
 
     private static boolean exactVersion(@Nullable String version) {
         String bare = version != null && version.startsWith("npm:") ? version.substring("npm:".length()) : version;
-        return bare == null || bare.equals(NodeSemver.valid(bare, NodeSemver.Options.DEFAULT));
+        return bare == null || bare.equals(NodeSemver.valid(bare, NodeSemver.Options.V7_6_0));
     }
 
     // one parent (override-recipe-path)

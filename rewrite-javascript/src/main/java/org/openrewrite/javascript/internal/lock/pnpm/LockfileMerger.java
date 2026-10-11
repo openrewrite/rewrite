@@ -181,8 +181,8 @@ final class LockfileMerger {
         }
         String ourVersion = ourValue.split("\\(", -1)[0];
         String theirVersion = theirValue.split("\\(", -1)[0];
-        String validOurVersion = NodeSemver.valid(ourVersion, NodeSemver.Options.DEFAULT);
-        String validTheirVersion = NodeSemver.valid(theirVersion, NodeSemver.Options.DEFAULT);
+        String validOurVersion = NodeSemver.valid(ourVersion, NodeSemver.Options.V7_8_0);
+        String validTheirVersion = NodeSemver.valid(theirVersion, NodeSemver.Options.V7_8_0);
         if (validOurVersion != null && validTheirVersion != null) {
             return gt(ourVersion, theirVersion) ? ourValue : theirValue;
         }
@@ -190,7 +190,7 @@ final class LockfileMerger {
     }
 
     private static boolean gt(String a, String b) {
-        return NodeSemver.compare(a, b, NodeSemver.Options.DEFAULT) > 0;
+        return NodeSemver.compare(a, b, NodeSemver.Options.V7_8_0) > 0;
     }
 
     // lockfileVersion.toString(): undefined throws, as JavaScript does reading a property of it

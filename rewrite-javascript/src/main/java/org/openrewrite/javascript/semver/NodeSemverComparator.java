@@ -30,14 +30,16 @@ final class NodeSemverComparator {
     // node-semver re.js COMPARATOR: optional operator, optional whitespace, then a full version.
     // Only groups 1 (operator) and 2 (version) are read; the prerelease group inside is unused.
     private static final Pattern COMPARATOR = Pattern.compile(
-            "^((?:<|>)?=?)\\s*(v?" +
+            "^((?:<|>)?=?)" + NodeSemverVersion.JS_SPACE + "*(v?" +
                     "(?:" + NodeSemverVersion.NUMERIC_ID + ")\\.(?:" + NodeSemverVersion.NUMERIC_ID + ")\\.(?:" +
                         NodeSemverVersion.NUMERIC_ID + ")" +
                     NodeSemverVersion.PRERELEASE_GROUP + "?" + NodeSemverVersion.BUILD + "?)$");
 
     // node-semver re.js COMPARATORLOOSE.
     static final Pattern COMPARATOR_LOOSE = Pattern.compile(
-            "^((?:<|>)?=?)\\s*(" + NodeSemverVersion.LOOSE_PLAIN + ")$|^$");
+            "^((?:<|>)?=?)" + NodeSemverVersion.JS_SPACE + "*(" + NodeSemverVersion.LOOSE_PLAIN + ")$|^$");
+
+    private static final Pattern WHITESPACE = Pattern.compile(NodeSemverVersion.JS_SPACE + "+");
 
     private enum Op {
         LT("<"), LTE("<="), GT(">"), GTE(">="), EQ("=");
@@ -66,7 +68,7 @@ final class NodeSemverComparator {
      * @return the parsed comparator, or {@code null}, which invalidates the whole range.
      */
     static @Nullable NodeSemverComparator parse(String token, Options options) {
-        String t = token.trim().replaceAll("\\s+", " ");
+        String t = WHITESPACE.matcher(NodeSemverVersion.jsTrim(token)).replaceAll(" ");
         if (t.isEmpty()) {
             return new NodeSemverComparator(Op.GTE, null);
         }

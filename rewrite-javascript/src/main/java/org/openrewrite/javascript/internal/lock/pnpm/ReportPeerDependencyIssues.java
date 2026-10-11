@@ -190,7 +190,7 @@ final class ReportPeerDependencyIssues {
     private static boolean isSubRange(@Nullable String superRange, String subRange) {
         return !Js.truthy(superRange) || subRange.equals(superRange) ||
                ResolveDependencies.validRange(subRange) != null && ResolveDependencies.validRange(superRange) != null &&
-               NodeSemver.subset(subRange, superRange, NodeSemver.Options.DEFAULT);
+               NodeSemver.subset(subRange, superRange, NodeSemver.Options.V7_8_0);
     }
 
     private static void parseAllowedVersions(Map<String, String> allowedVersions,
@@ -220,7 +220,7 @@ final class ReportPeerDependencyIssues {
 
     private static boolean satisfies(String version, String range) {
         try {
-            return NodeSemver.satisfies(version, range, NodeSemver.Options.DEFAULT);
+            return NodeSemver.satisfies(version, range, NodeSemver.Options.V7_8_0);
         } catch (IllegalArgumentException e) {
             return false;
         }

@@ -23,7 +23,8 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 /**
- * Port of @yarnpkg/core sources/semverUtils.ts (Yarn 4.10.3) over node-semver, as Yarn and pnpm 11.2.2 bundle it.
+ * Port of @yarnpkg/core sources/semverUtils.ts (Yarn 4.10.3) over the node-semver Yarn 4.10.3 bundles, 7.6.0. pnpm
+ * 11.2.2 bundles {@link #satisfiesWithPrereleases} over its own node-semver, 7.8.0.
  */
 public final class YarnpkgSemverUtils {
 
@@ -50,7 +51,7 @@ public final class YarnpkgSemverUtils {
 
         public boolean test(String version) {
             try {
-                return NodeSemver.satisfies(version, raw, NodeSemver.Options.DEFAULT);
+                return NodeSemver.satisfies(version, raw, NodeSemver.Options.V7_6_0);
             } catch (IllegalArgumentException e) {
                 return false;
             }
@@ -64,7 +65,7 @@ public final class YarnpkgSemverUtils {
         if (potentialRange.indexOf(':') != -1) {
             return null;
         }
-        String range = NodeSemver.validRange(potentialRange, NodeSemver.Options.DEFAULT);
+        String range = NodeSemver.validRange(potentialRange, NodeSemver.Options.V7_6_0);
         return range == null ? null : new Range(potentialRange, range);
     }
 
@@ -74,7 +75,7 @@ public final class YarnpkgSemverUtils {
     }
 
     public static boolean valid(String version) {
-        return NodeSemver.valid(version, NodeSemver.Options.DEFAULT) != null;
+        return NodeSemver.valid(version, NodeSemver.Options.V7_6_0) != null;
     }
 
     /**
@@ -82,7 +83,7 @@ public final class YarnpkgSemverUtils {
      */
     public static int compare(String a, String b) {
         try {
-            return NodeSemver.compare(a, b, NodeSemver.Options.DEFAULT);
+            return NodeSemver.compare(a, b, NodeSemver.Options.V7_6_0);
         } catch (IllegalArgumentException e) {
             throw new JsError(JsError.TYPE_ERROR, e.getMessage());
         }
@@ -95,11 +96,18 @@ public final class YarnpkgSemverUtils {
      * Under includePrerelease, or else with the version's prerelease dropped against each comparator set.
      */
     public static boolean satisfiesWithPrereleases(@Nullable String version, String range, boolean loose) {
+        return satisfiesWithPrereleases(version, range, loose, NodeSemver.Release.V7_6_0);
+    }
+
+    /**
+     * {@link #satisfiesWithPrereleases(String, String, boolean)} over another node-semver release.
+     */
+    public static boolean satisfiesWithPrereleases(@Nullable String version, String range, boolean loose,
+                                                   NodeSemver.Release release) {
         if (version == null || version.isEmpty()) {
             return false;
         }
-        NodeSemver.Options options = loose ? NodeSemver.Options.LOOSE_INCLUDE_PRERELEASE :
-                NodeSemver.Options.INCLUDE_PRERELEASE;
+        NodeSemver.Options options = NodeSemver.Options.of(loose, true, release);
         String formatted;
         try {
             formatted = NodeSemver.validRange(range, options);
@@ -113,11 +121,11 @@ public final class YarnpkgSemverUtils {
         if (NodeSemver.satisfies(semverVersion, formatted, options)) {
             return true;
         }
-        String release = withoutPrerelease(semverVersion);
+        String cleared = withoutPrerelease(semverVersion);
         for (String set : formatted.split("\\|\\|")) {
             boolean all = true;
             for (String comparator : set.trim().split(" ")) {
-                if (!comparatorTest(comparator, release, loose)) {
+                if (!comparatorTest(comparator, cleared, loose, release)) {
                     all = false;
                     break;
                 }
@@ -129,7 +137,8 @@ public final class YarnpkgSemverUtils {
         return false;
     }
 
-    private static boolean comparatorTest(String comparator, String version, boolean loose) {
+    private static boolean comparatorTest(String comparator, String version, boolean loose,
+                                          NodeSemver.Release release) {
         if (comparator.isEmpty() || "*".equals(comparator)) {
             return true;
         }
@@ -140,8 +149,7 @@ public final class YarnpkgSemverUtils {
         String operator = comparator.substring(0, i);
         // the comparator's SemVer was made without includePrerelease, so cmp re-parses it from its version string
         // and the prerelease Yarn cleared is back
-        int cmp = NodeSemver.compare(version, comparator.substring(i),
-                loose ? NodeSemver.Options.LOOSE : NodeSemver.Options.DEFAULT);
+        int cmp = NodeSemver.compare(version, comparator.substring(i), NodeSemver.Options.of(loose, false, release));
         switch (operator) {
             case "":
             case "=":

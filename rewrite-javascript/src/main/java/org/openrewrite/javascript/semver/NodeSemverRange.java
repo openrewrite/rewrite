@@ -34,44 +34,48 @@ import java.util.regex.Pattern;
  */
 final class NodeSemverRange {
 
+    private static final String WS = NodeSemverVersion.JS_SPACE;
+
     private static final String XRANGE_ID = NodeSemverVersion.NUMERIC_ID + "|x|X|\\*";
 
     // node-semver XRANGEPLAIN; groups: major, minor, patch, prerelease.
     private static final String XRANGE_PLAIN =
-            "[v=\\s]*(" + XRANGE_ID + ")(?:\\.(" + XRANGE_ID + ")(?:\\.(" + XRANGE_ID + ")" +
-                    NodeSemverVersion.PRERELEASE_GROUP + "?" + NodeSemverVersion.BUILD + "?)?)?";
+            "[v=" + NodeSemverVersion.JS_WHITESPACE + "]*(" + XRANGE_ID + ")(?:\\.(" + XRANGE_ID + ")(?:\\.(" +
+                    XRANGE_ID + ")" + NodeSemverVersion.PRERELEASE_GROUP + "?" + NodeSemverVersion.BUILD + "?)?)?";
 
     private static final String XRANGE_ID_LOOSE = "\\d+|x|X|\\*";
 
     // node-semver XRANGEPLAINLOOSE.
     private static final String XRANGE_PLAIN_LOOSE =
-            "[v=\\s]*(" + XRANGE_ID_LOOSE + ")(?:\\.(" + XRANGE_ID_LOOSE + ")(?:\\.(" + XRANGE_ID_LOOSE + ")" +
-                    NodeSemverVersion.PRERELEASE_GROUP_LOOSE + "?" + NodeSemverVersion.BUILD + "?)?)?";
+            "[v=" + NodeSemverVersion.JS_WHITESPACE + "]*(" + XRANGE_ID_LOOSE + ")(?:\\.(" + XRANGE_ID_LOOSE +
+                    ")(?:\\.(" + XRANGE_ID_LOOSE + ")" + NodeSemverVersion.PRERELEASE_GROUP_LOOSE + "?" +
+                    NodeSemverVersion.BUILD + "?)?)?";
 
     // node-semver re.js fragments used by Range.parseRange.
     private static final Pattern BUILD_STRIP = Pattern.compile("\\+[0-9A-Za-z-]+(?:\\.[0-9A-Za-z-]+)*");
     private static final Pattern COMPARATOR_TRIM = Pattern.compile(
-            "(\\s*)((?:<|>)?=?)\\s*(" + NodeSemverVersion.LOOSE_PLAIN + "|" + XRANGE_PLAIN + ")");
-    private static final Pattern TILDE_TRIM = Pattern.compile("(\\s*)(?:~>?)\\s+");
-    private static final Pattern CARET_TRIM = Pattern.compile("(\\s*)(?:\\^)\\s+");
-    private static final Pattern STAR = Pattern.compile("(<|>)?=?\\s*\\*");
+            "(" + WS + "*)((?:<|>)?=?)" + WS + "*(" + NodeSemverVersion.LOOSE_PLAIN + "|" + XRANGE_PLAIN + ")");
+    private static final Pattern TILDE_TRIM = Pattern.compile("(" + WS + "*)(?:~>?)" + WS + "+");
+    private static final Pattern CARET_TRIM = Pattern.compile("(" + WS + "*)(?:\\^)" + WS + "+");
+    private static final Pattern STAR = Pattern.compile("(<|>)?=?" + WS + "*\\*");
     private static final Pattern DERIVED_UPPER_BOUND = Pattern.compile("(^|\\s)<([0-9]+\\.[0-9]+\\.[0-9]+)-0(?=\\s|$)");
-    private static final Pattern GTE0 = Pattern.compile("^\\s*>=\\s*0\\.0\\.0\\s*$");
-    private static final Pattern GTE0_PRE = Pattern.compile("^\\s*>=\\s*0\\.0\\.0-0\\s*$");
+    private static final Pattern GTE0 = Pattern.compile("^" + WS + "*>=" + WS + "*0\\.0\\.0" + WS + "*$");
+    private static final Pattern GTE0_PRE = Pattern.compile("^" + WS + "*>=" + WS + "*0\\.0\\.0-0" + WS + "*$");
+    private static final Pattern WHITESPACE = Pattern.compile(WS + "+");
 
     // The caret, tilde and x-range grammars; groups: (operator,) major, minor, patch, prerelease.
     private static final Pattern CARET = Pattern.compile("^(?:\\^)" + XRANGE_PLAIN + "$");
     private static final Pattern CARET_LOOSE = Pattern.compile("^(?:\\^)" + XRANGE_PLAIN_LOOSE + "$");
     private static final Pattern TILDE = Pattern.compile("^(?:~>?)" + XRANGE_PLAIN + "$");
     private static final Pattern TILDE_LOOSE = Pattern.compile("^(?:~>?)" + XRANGE_PLAIN_LOOSE + "$");
-    private static final Pattern X_RANGE = Pattern.compile("^((?:<|>)?=?)\\s*" + XRANGE_PLAIN + "$");
-    private static final Pattern X_RANGE_LOOSE = Pattern.compile("^((?:<|>)?=?)\\s*" + XRANGE_PLAIN_LOOSE + "$");
+    private static final Pattern X_RANGE = Pattern.compile("^((?:<|>)?=?)" + WS + "*" + XRANGE_PLAIN + "$");
+    private static final Pattern X_RANGE_LOOSE = Pattern.compile("^((?:<|>)?=?)" + WS + "*" + XRANGE_PLAIN_LOOSE + "$");
 
     // The hyphen grammar; groups 1-5 = "from" bound and its major/minor/patch/prerelease, 6-10 = "to".
     private static final Pattern HYPHEN = Pattern.compile(
-            "^\\s*(" + XRANGE_PLAIN + ")\\s+-\\s+(" + XRANGE_PLAIN + ")\\s*$");
+            "^" + WS + "*(" + XRANGE_PLAIN + ")" + WS + "+-" + WS + "+(" + XRANGE_PLAIN + ")" + WS + "*$");
     private static final Pattern HYPHEN_LOOSE = Pattern.compile(
-            "^\\s*(" + XRANGE_PLAIN_LOOSE + ")\\s+-\\s+(" + XRANGE_PLAIN_LOOSE + ")\\s*$");
+            "^" + WS + "*(" + XRANGE_PLAIN_LOOSE + ")" + WS + "+-" + WS + "+(" + XRANGE_PLAIN_LOOSE + ")" + WS + "*$");
 
     private static final Map<String, NodeSemverRange> CACHE = NodeSemverVersion.lru(4_096);
     private static final NodeSemverRange INVALID = new NodeSemverRange(Options.DEFAULT, new ArrayList<>());
@@ -101,10 +105,10 @@ final class NodeSemverRange {
 
     // Port of node-semver classes/range.js constructor; 5.5.0 keeps every group as parsed.
     private static @Nullable NodeSemverRange doParse(String range, Options options) {
-        String raw = range.trim().replaceAll("\\s+", " ");
+        String raw = WHITESPACE.matcher(NodeSemverVersion.jsTrim(range)).replaceAll(" ");
         List<List<NodeSemverComparator>> set = new ArrayList<>();
         for (String group : raw.split("\\|\\|", -1)) {
-            List<NodeSemverComparator> comparators = parseRange(group.trim(), options);
+            List<NodeSemverComparator> comparators = parseRange(NodeSemverVersion.jsTrim(group), options);
             if (comparators == null) {
                 return null;
             }
@@ -177,9 +181,9 @@ final class NodeSemverRange {
      * The TypeError node-semver's Range constructor throws for a range {@link #parse} rejects.
      */
     static String invalidRangeMessage(String range, Options options) {
-        String raw = range.trim().replaceAll("\\s+", " ");
+        String raw = WHITESPACE.matcher(NodeSemverVersion.jsTrim(range)).replaceAll(" ");
         for (String group : raw.split("\\|\\|", -1)) {
-            for (String comp : comparators(group.trim(), options)) {
+            for (String comp : comparators(NodeSemverVersion.jsTrim(group), options)) {
                 if (NodeSemverComparator.parse(comp, options) == null) {
                     return "Invalid comparator: " + comp;
                 }
@@ -194,7 +198,10 @@ final class NodeSemverRange {
 
     // the comparator strings parseRange makes of one group, before it parses them
     private static List<String> comparators(String range, Options options) {
-        range = BUILD_STRIP.matcher(range).replaceAll("");
+        // 7.8.1 strips build metadata from the whole range, before a hyphen range reads it
+        if (options.release == Release.V7_8_4) {
+            range = BUILD_STRIP.matcher(range).replaceAll("");
+        }
         range = derived(range, hyphenReplace(range, options), options);
         range = COMPARATOR_TRIM.matcher(range).replaceAll("$1$2$3");
         range = TILDE_TRIM.matcher(range).replaceAll("$1~");
@@ -209,9 +216,10 @@ final class NodeSemverRange {
             joined.append(parseComparator(comps[i], options));
         }
         List<String> rangeList = new ArrayList<>();
-        for (String comp : joined.toString().split("\\s+", -1)) {
-            rangeList.add(v5(options) ? comp.trim() :
-                    (options.includePrerelease ? GTE0_PRE : GTE0).matcher(comp.trim()).replaceFirst(""));
+        for (String comp : WHITESPACE.split(joined, -1)) {
+            String trimmed = NodeSemverVersion.jsTrim(comp);
+            rangeList.add(v5(options) ? trimmed :
+                    (options.includePrerelease ? GTE0_PRE : GTE0).matcher(trimmed).replaceFirst(""));
         }
         if (options.loose) {
             rangeList.removeIf(comp -> !NodeSemverComparator.COMPARATOR_LOOSE.matcher(comp).find());
@@ -220,11 +228,16 @@ final class NodeSemverRange {
     }
 
     private static String parseComparator(String comp, Options options) {
-        comp = BUILD_STRIP.matcher(comp).replaceFirst("");
-        comp = mapTokens(comp.trim(), token -> derived(token, replaceCaret(token, options), options));
-        comp = mapTokens(comp.trim(), token -> derived(token, replaceTilde(token, options), options));
+        // 7.7.3 strips build metadata from each comparator
+        if (options.release == Release.V7_8_0 || options.release == Release.V7_8_4) {
+            comp = BUILD_STRIP.matcher(comp).replaceFirst("");
+        }
+        comp = mapTokens(NodeSemverVersion.jsTrim(comp),
+                token -> derived(token, replaceCaret(token, options), options));
+        comp = mapTokens(NodeSemverVersion.jsTrim(comp),
+                token -> derived(token, replaceTilde(token, options), options));
         comp = mapTokens(comp, token -> derived(token, replaceXRange(token, options), options));
-        return STAR.matcher(comp.trim()).replaceFirst("");
+        return STAR.matcher(NodeSemverVersion.jsTrim(comp)).replaceFirst("");
     }
 
     // node-semver 5.5.0 derives `<2.0.0` where 7.x derives `<2.0.0-0`
@@ -235,7 +248,7 @@ final class NodeSemverRange {
 
     private static String mapTokens(String s, UnaryOperator<String> fn) {
         StringBuilder sb = new StringBuilder();
-        String[] parts = s.split("\\s+", -1);
+        String[] parts = WHITESPACE.split(s, -1);
         for (int i = 0; i < parts.length; i++) {
             if (i > 0) {
                 sb.append(' ');
@@ -253,6 +266,8 @@ final class NodeSemverRange {
         }
         String mj = m.group(1), mn = m.group(2), p = m.group(3), pr = m.group(4);
         String z = options.includePrerelease ? "-0" : "";
+        // before 7.8.3, the lower bound of a 0.x caret without a prerelease also carries z
+        String zeroMajorZ = options.release == Release.V7_8_4 ? "" : z;
         if (isX(mj)) {
             return "";
         }
@@ -274,8 +289,8 @@ final class NodeSemverRange {
         }
         if ("0".equals(mj)) {
             return "0".equals(mn) ?
-                    ">=" + mj + "." + mn + "." + p + " <" + mj + "." + mn + "." + incr(p) + "-0" :
-                    ">=" + mj + "." + mn + "." + p + " <" + mj + "." + incr(mn) + ".0-0";
+                    ">=" + mj + "." + mn + "." + p + zeroMajorZ + " <" + mj + "." + mn + "." + incr(p) + "-0" :
+                    ">=" + mj + "." + mn + "." + p + zeroMajorZ + " <" + mj + "." + incr(mn) + ".0-0";
         }
         return ">=" + mj + "." + mn + "." + p + " <" + incr(mj) + ".0.0-0";
     }
@@ -304,14 +319,15 @@ final class NodeSemverRange {
 
     // Port of node-semver range.js replaceXRange; tokens without wildcard or partial components pass through.
     private static String replaceXRange(String token, Options options) {
-        String comp = token.trim();
+        String comp = NodeSemverVersion.jsTrim(token);
         Matcher m = (options.loose ? X_RANGE_LOOSE : X_RANGE).matcher(comp);
         if (!m.matches()) {
             return comp;
         }
         String gtlt = m.group(1);
         String mj = m.group(2), mn = m.group(3), p = m.group(4);
-        if ((isX(mj) && !isX(mn)) || (isX(mn) && p != null && !isX(p))) {
+        // invalidXRangeOrder is 7.8.4's. Earlier releases read 5.x.1 as 5.x.
+        if (options.release == Release.V7_8_4 && ((isX(mj) && !isX(mn)) || (isX(mn) && p != null && !isX(p)))) {
             return comp;
         }
         boolean xM = isX(mj);
@@ -371,7 +387,7 @@ final class NodeSemverRange {
         }
         String from = hyphenFrom(m.group(1), m.group(2), m.group(3), m.group(4), m.group(5), options);
         String to = hyphenTo(m.group(6), m.group(7), m.group(8), m.group(9), m.group(10), options);
-        return (from + " " + to).trim();
+        return NodeSemverVersion.jsTrim(from + " " + to);
     }
 
     private static String hyphenFrom(String from, String fM, String fm, String fp, @Nullable String fpr,

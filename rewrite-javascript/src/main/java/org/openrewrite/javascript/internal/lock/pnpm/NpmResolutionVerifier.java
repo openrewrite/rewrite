@@ -154,7 +154,7 @@ final class NpmResolutionVerifier implements ResolutionVerifier {
         if (!isNpmRegistryResolution(resolution)) {
             return Result.OK;
         }
-        if (NodeSemver.valid(version, NodeSemver.Options.DEFAULT) == null) {
+        if (NodeSemver.valid(version, NodeSemver.Options.V7_8_0) == null) {
             return Result.OK;
         }
         boolean ageApplies = ageCheckActive && !PackageVersionPolicy.isExcluded(excludePolicy, name, version);

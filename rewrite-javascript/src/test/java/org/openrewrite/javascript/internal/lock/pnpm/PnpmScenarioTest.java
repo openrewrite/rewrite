@@ -16,6 +16,7 @@
 package org.openrewrite.javascript.internal.lock.pnpm;
 
 import org.jspecify.annotations.Nullable;
+import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
@@ -38,6 +39,7 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Stream;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.fail;
 
 /**
@@ -163,5 +165,16 @@ class PnpmScenarioTest extends LockScenarioTest {
             }
         }
         return true;
+    }
+
+    @Test
+    void wildcardBeforeANumberIsAnXRange() {
+        PnpmScenarios.Scenario scenario = PnpmScenarios.discover().stream()
+          .filter(s -> "open-semver-wildcard-before-number".equals(s.getName()))
+          .findFirst().orElseThrow(IllegalStateException::new);
+        Result result = new PnpmLockRegenerator(inputs(scenario, scenario.file("before")),
+          new ScenarioRegistry(recording(scenario), "after")).regenerate();
+        assertThat(result.getLockFileContent()).as(String.valueOf(result.getFailure()))
+          .isEqualTo(scenario.file("after"));
     }
 }

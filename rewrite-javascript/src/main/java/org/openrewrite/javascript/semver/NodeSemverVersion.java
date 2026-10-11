@@ -34,6 +34,11 @@ import static java.util.Collections.synchronizedMap;
  */
 final class NodeSemverVersion {
 
+    // JavaScript's WhiteSpace and LineTerminator characters, which node-semver's \s and trim() match
+    static final String JS_WHITESPACE = "\\t\\n\\u000B\\f\\r \\u00A0\\u1680\\u2000-\\u200A\\u2028\\u2029\\u202F" +
+            "\\u205F\\u3000\\uFEFF";
+    static final String JS_SPACE = "[" + JS_WHITESPACE + "]";
+
     // node-semver re.js grammar fragments, shared with the range and comparator.
     static final String NUMERIC_ID = "0|[1-9]\\d*";
     static final String PRERELEASE_ID = "(?:" + NUMERIC_ID + "|\\d*[a-zA-Z-][0-9a-zA-Z-]*)";
@@ -43,8 +48,8 @@ final class NodeSemverVersion {
     static final String PRERELEASE_ID_LOOSE = "(?:\\d*[a-zA-Z-][0-9a-zA-Z-]*|\\d+)";
     static final String PRERELEASE_GROUP_LOOSE = "(?:-?(" + PRERELEASE_ID_LOOSE + "(?:\\." + PRERELEASE_ID_LOOSE +
             ")*))";
-    static final String LOOSE_PLAIN = "[v=\\s]*(?:\\d+)\\.(?:\\d+)\\.(?:\\d+)" + PRERELEASE_GROUP_LOOSE + "?" + BUILD +
-            "?";
+    static final String LOOSE_PLAIN = "[v=" + JS_WHITESPACE + "]*(?:\\d+)\\.(?:\\d+)\\.(?:\\d+)" +
+            PRERELEASE_GROUP_LOOSE + "?" + BUILD + "?";
 
     // Port of node-semver re.js FULL (major.minor.patch, no leading zeros, prerelease and build split).
     private static final Pattern STRICT_PATTERN = Pattern.compile(
@@ -54,7 +59,7 @@ final class NodeSemverVersion {
 
     // node-semver re.js LOOSE: leading v/=/whitespace, leading zeros, and a prerelease without its hyphen.
     private static final Pattern LOOSE_PATTERN = Pattern.compile(
-            "^[v=\\s]*(\\d+)\\.(\\d+)\\.(\\d+)" +
+            "^[v=" + JS_WHITESPACE + "]*(\\d+)\\.(\\d+)\\.(\\d+)" +
                     "(?:-?(" + PRERELEASE_ID_LOOSE + "(?:\\." + PRERELEASE_ID_LOOSE + ")*))?" +
                     "(?:\\+([0-9a-zA-Z-]+(?:\\.[0-9a-zA-Z-]+)*))?$");
 
@@ -119,7 +124,7 @@ final class NodeSemverVersion {
         if (version.length() > MAX_LENGTH) {
             return null;
         }
-        Matcher m = grammar.matcher(version.trim());
+        Matcher m = grammar.matcher(jsTrim(version));
         if (!m.matches()) {
             return null;
         }
@@ -149,6 +154,25 @@ final class NodeSemverVersion {
         } catch (NumberFormatException overflow) {
             return null;
         }
+    }
+
+    // String.prototype.trim()
+    static String jsTrim(String s) {
+        int start = 0;
+        int end = s.length();
+        while (start < end && isJsWhitespace(s.charAt(start))) {
+            start++;
+        }
+        while (end > start && isJsWhitespace(s.charAt(end - 1))) {
+            end--;
+        }
+        return s.substring(start, end);
+    }
+
+    static boolean isJsWhitespace(char c) {
+        return c == '\t' || c == '\n' || c == '\u000B' || c == '\f' || c == '\r' || c == ' ' || c == '\u00A0' ||
+               c == '\u1680' || (c >= '\u2000' && c <= '\u200A') || c == '\u2028' || c == '\u2029' ||
+               c == '\u202F' || c == '\u205F' || c == '\u3000' || c == '\uFEFF';
     }
 
     private static Object numericIdentifier(String id) {

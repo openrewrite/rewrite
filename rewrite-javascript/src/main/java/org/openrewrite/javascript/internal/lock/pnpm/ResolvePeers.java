@@ -554,7 +554,7 @@ final class ResolvePeers {
                 return;
             }
             boolean newHasAlias = pkg.alias != null && !pkg.alias.equals(newAlias);
-            if (newHasAlias && NodeSemver.compare(existing.version, pkg.version, NodeSemver.Options.DEFAULT) >= 0) {
+            if (newHasAlias && NodeSemver.compare(existing.version, pkg.version, NodeSemver.Options.V7_8_0) >= 0) {
                 return;
             }
         }
@@ -1021,7 +1021,8 @@ final class ResolvePeers {
                                 optionalPeer, peerVersionRange));
                 continue;
             }
-            if (!YarnpkgSemverUtils.satisfiesWithPrereleases(resolved.version, peerVersionRange, true)) {
+            if (!YarnpkgSemverUtils.satisfiesWithPrereleases(resolved.version, peerVersionRange, true,
+                    NodeSemver.Release.V7_8_0)) {
                 List<ParentPackage> peerLocation = resolved.nodeId == null ? new ArrayList<>() :
                         getLocationFromParentNodeIds(ctx.dependenciesTree, resolved.parentNodeIds);
                 ctx.peerDependencyIssues.getBad().computeIfAbsent(peerName, k -> new ArrayList<>())

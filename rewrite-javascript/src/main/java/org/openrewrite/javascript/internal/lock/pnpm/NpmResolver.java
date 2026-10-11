@@ -191,7 +191,7 @@ final class NpmResolver {
             }
             String localVersion = pickMatchingLocalVersionOrNull(workspacePkgsMatchingName, spec);
             if (localVersion != null &&
-                (NodeSemver.compare(localVersion, pickedVersion, NodeSemver.Options.DEFAULT) > 0 ||
+                (NodeSemver.compare(localVersion, pickedVersion, NodeSemver.Options.V7_8_0) > 0 ||
                  opts.preferWorkspacePackages)) {
                 ResolveResult local = resolveFromLocalPackage(workspacePkgsMatchingName.get(localVersion), spec,
                         wantedDependency, opts);
@@ -379,7 +379,7 @@ final class NpmResolver {
                 new PickPackageFromMeta.RegistryPackageSpec("range", spec.getName(), "*", null) : spec);
         if (localVersion == null) {
             List<String> available = new ArrayList<>(matchingName.keySet());
-            NodeSemver.rsort(available, NodeSemver.Options.DEFAULT);
+            NodeSemver.rsort(available, NodeSemver.Options.V7_8_0);
             throw new PnpmError("NO_MATCHING_VERSION_INSIDE_WORKSPACE", "In " + displayDir(projectDir) +
                     ": No matching version found for " + wantedDependency.getAlias() + "@" +
                     wantedDependency.getBareSpecifier() + " inside the workspace" +
@@ -397,7 +397,7 @@ final class NpmResolver {
         List<String> localVersions = new ArrayList<>(versions.keySet());
         switch (spec.getType()) {
             case "tag":
-                return NodeSemver.maxSatisfying(localVersions, "*", NodeSemver.Options.INCLUDE_PRERELEASE);
+                return NodeSemver.maxSatisfying(localVersions, "*", NodeSemver.Options.V7_8_0_INCLUDE_PRERELEASE);
             case "version":
                 return versions.containsKey(spec.getFetchSpec()) ? spec.getFetchSpec() : null;
             case "range":
@@ -409,9 +409,9 @@ final class NpmResolver {
 
     static @Nullable String resolveWorkspaceRange(String range, List<String> versions) {
         if ("*".equals(range) || "^".equals(range) || "~".equals(range) || range.isEmpty()) {
-            return NodeSemver.maxSatisfying(versions, "*", NodeSemver.Options.INCLUDE_PRERELEASE);
+            return NodeSemver.maxSatisfying(versions, "*", NodeSemver.Options.V7_8_0_INCLUDE_PRERELEASE);
         }
-        return NodeSemver.maxSatisfying(versions, range, NodeSemver.Options.LOOSE);
+        return NodeSemver.maxSatisfying(versions, range, NodeSemver.Options.V7_8_0_LOOSE);
     }
 
     private ResolveResult resolveFromLocalPackage(Verification.Project localPackage,
@@ -483,8 +483,8 @@ final class NpmResolver {
             }
             return prefix + "^";
         }
-        List<Object> prerelease = NodeSemver.valid(version, NodeSemver.Options.DEFAULT) == null ? null :
-                NodeSemver.prerelease(version, NodeSemver.Options.DEFAULT);
+        List<Object> prerelease = NodeSemver.valid(version, NodeSemver.Options.V7_8_0) == null ? null :
+                NodeSemver.prerelease(version, NodeSemver.Options.V7_8_0);
         if (prerelease != null && !prerelease.isEmpty()) {
             return prefix + version;
         }
@@ -511,8 +511,8 @@ final class NpmResolver {
 
     private static String calcRange(String version, ResolveDependencies.WantedDependency wantedDependency,
                                     @Nullable String defaultPinnedVersion) {
-        if (NodeSemver.valid(version, NodeSemver.Options.DEFAULT) != null) {
-            List<Object> prerelease = NodeSemver.prerelease(version, NodeSemver.Options.DEFAULT);
+        if (NodeSemver.valid(version, NodeSemver.Options.V7_8_0) != null) {
+            List<Object> prerelease = NodeSemver.prerelease(version, NodeSemver.Options.V7_8_0);
             if (prerelease != null && !prerelease.isEmpty()) {
                 return version;
             }
