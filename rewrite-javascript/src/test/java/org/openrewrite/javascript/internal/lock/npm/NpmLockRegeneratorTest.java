@@ -28,6 +28,7 @@ import org.openrewrite.javascript.internal.lock.Host;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -310,66 +311,96 @@ class NpmLockRegeneratorTest {
           .getLockFileContent()).isEqualTo(LOCK);
     }
 
-    private static List<String> standsFor(NpmLockRegenerator.Install install) {
-        return install.getCandidates().stream().map(NpmRelease::toString).collect(toList());
+    /**
+     * The install that stands for each candidate, by the candidate's version. What the ports of other releases make
+     * an install ask of its release can only part the installs further, so the tests hold an install to what it
+     * must be, never to the releases it happens to share: each candidate is stood for once, by an install as a
+     * release it answers as, which is the first of those it stands for.
+     */
+    private static Map<String, NpmLockRegenerator.Install> installs(NpmLockRegenerator regenerator,
+                                                                    List<NpmRelease> candidates) {
+        Map<String, NpmLockRegenerator.Install> installs = new LinkedHashMap<>();
+        for (NpmLockRegenerator.Install install : regenerator.installs(candidates)) {
+            assertThat(install.getCandidates()).isNotEmpty();
+            assertThat(install.getCandidates().get(0)).isEqualTo(install.getRelease());
+            for (NpmRelease candidate : install.getCandidates()) {
+                assertThat(candidate.answersAs(install.getRelease())).as(candidate + " as " + install.getRelease())
+                  .isTrue();
+                assertThat(installs.put(candidate.toString(), install)).as(candidate.toString()).isNull();
+            }
+        }
+        assertThat(installs.keySet())
+          .containsExactlyInAnyOrderElementsOf(candidates.stream().map(NpmRelease::toString).collect(toList()));
+        return installs;
     }
 
+    // an install stands for the releases that answer as its own and satisfy as it does each range it read
+    private static void assertStandsForTheReleasesAlikeIn(NpmLockRegenerator.Install install, String range) {
+        String own = install.getRelease().toString();
+        for (NpmRelease release : NpmReleases.all()) {
+            assertThat(install.standsFor(release)).as(release + " as " + own)
+              .isEqualTo(release.answersAs(install.getRelease()) && NpmInstallChecks.satisfies(release.toString(),
+                range) == NpmInstallChecks.satisfies(own, range));
+        }
+    }
+
+    // a project that holds npm to nothing: the installs differ by what each asked of its release alone
     @Test
-    void anInstallThatAsksNothingOfItsReleaseStandsForEveryCandidate() {
+    void everyCandidateIsStoodForByAnInstallAsAReleaseItAnswersAs() {
         NpmLockRegenerator regenerator = regenerator(project(MANIFEST));
         List<NpmRelease> candidates = releasesBetween("7.0.0", "12.2.0");
 
-        List<NpmLockRegenerator.Install> installs = regenerator.installs(candidates);
+        Map<String, NpmLockRegenerator.Install> installs = installs(regenerator, candidates);
 
-        assertThat(installs).hasSize(1);
-        assertThat(installs.get(0).getRelease()).hasToString("12.2.0");
-        assertThat(installs.get(0).getCandidates()).isEqualTo(candidates);
-        assertThat(regenerator.regenerate(candidates).getLockFileContent()).isEqualTo(LOCK);
+        assertThat(installs.get("12.2.0").getRelease()).hasToString("12.2.0");
+        assertThat(new HashSet<>(installs.values())).hasSizeLessThan(candidates.size());
+        assertThat(regenerator.regenerate(releases("11.17.0", "11.17.0")).getLockFileContent()).isEqualTo(LOCK);
     }
 
     // npm checks devEngines from 10.9.0 and words what it finds another way from 10.9.5: three ways to install
     @Test
     void releasesThatAnswerAnInstallAnotherWayAreInstalledAgain() {
         NpmLockRegenerator regenerator = regenerator(project(devEngines("{\"runtime\":{\"name\":\"bun\"}}")));
-        List<NpmRelease> candidates = releasesBetween("10.8.0", "10.9.9");
+        List<NpmRelease> candidates = releasesBetween("10.8.3", "10.9.9");
 
-        List<NpmLockRegenerator.Install> installs = regenerator.installs(candidates);
+        Map<String, NpmLockRegenerator.Install> installs = installs(regenerator, candidates);
 
-        assertThat(installs).extracting(NpmLockRegeneratorTest::standsFor).containsExactly(
-          asList("10.9.9", "10.9.8", "10.9.7", "10.9.6", "10.9.5"),
-          asList("10.9.4", "10.9.3", "10.9.2", "10.9.1", "10.9.0"),
-          asList("10.8.3", "10.8.2", "10.8.1", "10.8.0"));
-        assertThat(installs).extracting(install -> install.getResult().getErrorMessage()).containsExactly(
-          "RESOLUTION_REQUIRED: npm rejects this edit (EBADDEVENGINES): " + DEV_ENGINES +
-          "Invalid devEngines.runtime\nInvalid name \"bun\" does not match \"node\" for \"runtime\"",
-          "RESOLUTION_REQUIRED: npm rejects this edit (EBADDEVENGINES): " + DEV_ENGINES +
-          "Invalid engine \"runtime\"\nInvalid name \"bun\" does not match \"node\" for \"runtime\"",
-          null);
-        assertThat(installs).extracting(NpmLockRegenerator.Install::isRefusing).containsOnly(false);
+        for (NpmRelease candidate : candidates) {
+            NpmLockRegenerator.Install install = installs.get(candidate.toString());
+            assertThat(install.isRefusing()).isFalse();
+            assertThat(install.getResult().getErrorMessage()).as(candidate.toString())
+              .isEqualTo(!candidate.atLeast(10, 9, 0) ? null :
+                "RESOLUTION_REQUIRED: npm rejects this edit (EBADDEVENGINES): " + DEV_ENGINES +
+                (candidate.atLeast(10, 9, 5) ? "Invalid devEngines.runtime" : "Invalid engine \"runtime\"") +
+                "\nInvalid name \"bun\" does not match \"node\" for \"runtime\"");
+        }
 
         Result result = regenerator.regenerate(candidates);
         assertThat(result.getFailure()).isNotNull();
         assertThat(result.getFailure().getKind()).isEqualTo(Kind.CANNOT_KNOW);
         assertThat(result.getErrorMessage()).isEqualTo("RESOLUTION_REQUIRED: the engine cannot know the npm release " +
-          "that installs the project: npm 10.9.0 - 10.9.9 rejects it (EBADDEVENGINES) and npm 10.8.0 - 10.8.3 " +
-          "installs it" + NAMES_NO_RELEASE);
+          "that installs the project: npm 10.9.0 - 10.9.9 rejects it (EBADDEVENGINES) and npm 10.8.3 installs it" +
+          NAMES_NO_RELEASE);
         // where every install fails, the newest one's failure
-        assertThat(regenerator.regenerate(releasesBetween("10.9.0", "10.9.9"))).isEqualTo(installs.get(0).getResult());
+        assertThat(regenerator.regenerate(releasesBetween("10.9.0", "10.9.9")))
+          .isEqualTo(installs.get("10.9.9").getResult());
     }
 
     // an npm that refuses the project for its own version is not the npm that installs it
     @Test
     void anNpmThatDevEnginesRefuseIsLeftOut() {
         NpmLockRegenerator regenerator = regenerator(project(devEngines(
-          "{\"packageManager\":{\"name\":\"npm\",\"version\":\"^11.17.0\"}}")));
-        List<NpmRelease> candidates = releases("12.2.0", "12.0.0", "11.21.0", "11.17.0", "11.16.0");
+          "{\"packageManager\":{\"name\":\"npm\",\"version\":\"11.17.0\"}}")));
+        List<NpmRelease> candidates = releases("12.2.0", "12.0.0", "11.18.0", "11.17.0", "11.16.0");
 
-        List<NpmLockRegenerator.Install> installs = regenerator.installs(candidates);
+        Map<String, NpmLockRegenerator.Install> installs = installs(regenerator, candidates);
 
-        assertThat(installs).extracting(NpmLockRegeneratorTest::standsFor).containsExactly(
-          asList("12.2.0", "12.0.0", "11.16.0"), asList("11.21.0", "11.17.0"));
-        assertThat(installs).extracting(NpmLockRegenerator.Install::isRefusing).containsExactly(true, false);
-        assertThat(installs).extracting(NpmLockRegenerator.Install::getCode).containsExactly("EBADDEVENGINES", null);
+        for (String refused : asList("12.2.0", "12.0.0", "11.18.0", "11.16.0")) {
+            assertThat(installs.get(refused).isRefusing()).as(refused).isTrue();
+            assertThat(installs.get(refused).getCode()).as(refused).isEqualTo("EBADDEVENGINES");
+        }
+        assertThat(installs.get("11.17.0").isRefusing()).isFalse();
+        assertThat(installs.get("11.17.0").getCode()).isNull();
         assertThat(regenerator.regenerate(candidates).getLockFileContent()).isEqualTo(LOCK);
     }
 
@@ -377,14 +408,16 @@ class NpmLockRegeneratorTest {
     void whereEveryNpmRefusesTheNewestOnesRejectionIsTheResult() {
         NpmLockRegenerator regenerator = regenerator(project(devEngines(
           "{\"packageManager\":{\"name\":\"npm\",\"version\":\"^9\"}}")));
+        List<NpmRelease> candidates = releases("11.17.0", "11.6.1", "11.6.0");
 
-        // 11.6.0 words it as npm-install-checks 7.1.1 does
-        List<NpmLockRegenerator.Install> installs = regenerator.installs(releases("11.17.0", "11.6.1", "11.6.0"));
-        assertThat(installs).extracting(NpmLockRegeneratorTest::standsFor)
-          .containsExactly(asList("11.17.0", "11.6.1"), singletonList("11.6.0"));
-        assertThat(installs).extracting(NpmLockRegenerator.Install::isRefusing).containsOnly(true);
+        Map<String, NpmLockRegenerator.Install> installs = installs(regenerator, candidates);
 
-        assertThat(regenerator.regenerate(releases("11.17.0", "11.6.1", "11.6.0")).getErrorMessage())
+        assertThat(installs.values()).allMatch(NpmLockRegenerator.Install::isRefusing);
+        // 11.6.0 words it as npm-install-checks 7.1.1 does: an install of its own
+        assertThat(installs.get("11.6.0")).isNotSameAs(installs.get("11.6.1"));
+        assertThat(installs.get("11.6.0").getResult().getErrorMessage())
+          .contains("Invalid engine \"packageManager\"\n");
+        assertThat(regenerator.regenerate(candidates).getErrorMessage())
           .isEqualTo("RESOLUTION_REQUIRED: npm rejects this edit (EBADDEVENGINES): " + DEV_ENGINES +
                      "Invalid devEngines.packageManager\n" +
                      "Invalid semver version \"^9\" does not match \"11.17.0\" for \"packageManager\"");
@@ -394,14 +427,15 @@ class NpmLockRegeneratorTest {
     @Test
     void anNpmTheRootsEnginesRefuseUnderEngineStrictIsLeftOut() {
         NpmLockRegenerator regenerator = regenerator(project(ENGINES_NPM_11).npmrc("engine-strict=true\n"));
-        List<NpmRelease> candidates = releases("12.2.0", "12.0.0", "11.21.0", "11.17.0");
+        List<NpmRelease> candidates = releases("12.2.0", "12.0.0", "11.17.0");
 
-        List<NpmLockRegenerator.Install> installs = regenerator.installs(candidates);
+        Map<String, NpmLockRegenerator.Install> installs = installs(regenerator, candidates);
 
-        assertThat(installs).extracting(NpmLockRegeneratorTest::standsFor).containsExactly(
-          asList("12.2.0", "12.0.0"), asList("11.21.0", "11.17.0"));
-        assertThat(installs).extracting(NpmLockRegenerator.Install::isRefusing).containsExactly(true, false);
-        assertThat(installs.get(0).getCode()).isEqualTo("EBADENGINE");
+        for (String refused : asList("12.2.0", "12.0.0")) {
+            assertThat(installs.get(refused).isRefusing()).as(refused).isTrue();
+            assertThat(installs.get(refused).getCode()).as(refused).isEqualTo("EBADENGINE");
+        }
+        assertThat(installs.get("11.17.0").isRefusing()).isFalse();
         assertThat(regenerator.regenerate(candidates).getLockFileContent()).isEqualTo(ENGINES_NPM_11_LOCK);
     }
 
@@ -410,39 +444,41 @@ class NpmLockRegeneratorTest {
     void anNpmADependencysEnginesRejectIsNotLeftOut() {
         NpmLockRegenerator regenerator = regenerator(project(DEPENDENT).lock(DEPENDENT_LOCK)
           .npmrc("engine-strict=true\n"));
-        List<NpmRelease> candidates = releases("12.2.0", "12.0.0", "11.21.0", "11.17.0");
+        List<NpmRelease> candidates = releases("12.2.0", "12.0.0", "11.17.0");
 
-        List<NpmLockRegenerator.Install> installs = regenerator.installs(candidates);
+        Map<String, NpmLockRegenerator.Install> installs = installs(regenerator, candidates);
 
-        assertThat(installs).extracting(NpmLockRegenerator.Install::isRefusing).containsExactly(false, false);
-        assertThat(installs.get(1).getResult().getLockFileContent()).isEqualTo(DEPENDENT_LOCK);
+        assertThat(installs.values()).noneMatch(NpmLockRegenerator.Install::isRefusing);
+        assertThat(installs.get("12.2.0").getCode()).isEqualTo("EBADENGINE");
+        assertThat(installs.get("11.17.0").getResult().getLockFileContent()).isEqualTo(DEPENDENT_LOCK);
         assertThat(regenerator.regenerate(candidates).getErrorMessage()).isEqualTo("RESOLUTION_REQUIRED: the engine " +
           "cannot know the npm release that installs the project: npm 12.0.0, 12.2.0 rejects it (EBADENGINE) and " +
-          "npm 11.17.0, 11.21.0 installs it" + NAMES_NO_RELEASE);
+          "npm 11.17.0 installs it" + NAMES_NO_RELEASE);
     }
 
     // without engine-strict npm only warns, and the install is still held to the range its lock names
     @Test
     void anInstallStandsOnlyForReleasesThatSatisfyTheRangesItReadAlike() {
         NpmLockRegenerator regenerator = regenerator(project(DEPENDENT).lock(DEPENDENT_LOCK));
-        List<NpmRelease> candidates = releases("11.17.0", "11.21.0", "12.2.0", "10.9.9");
 
-        List<NpmLockRegenerator.Install> installs = regenerator.installs(candidates);
+        NpmLockRegenerator.Install install = regenerator.installs(singletonList(NpmRelease.PORTED)).get(0);
 
-        assertThat(installs).extracting(NpmLockRegeneratorTest::standsFor)
-          .containsExactly(asList("11.17.0", "11.21.0"), asList("12.2.0", "10.9.9"));
-        assertThat(regenerator.regenerate(candidates).getLockFileContent()).isEqualTo(DEPENDENT_LOCK);
+        assertThat(install.getResult().getLockFileContent()).isEqualTo(DEPENDENT_LOCK);
+        assertStandsForTheReleasesAlikeIn(install, "^11.17.0");
+        assertThat(install.standsFor(NpmRelease.of("11.16.0"))).isFalse();
+        assertThat(install.standsFor(NpmRelease.of("12.0.0"))).isFalse();
     }
 
     // the ranges are read from a manifest as npm reads it, its byte order mark stripped
     @Test
     void theRangesOfAManifestWithAByteOrderMarkAreRead() {
         NpmLockRegenerator regenerator = regenerator(project("\uFEFF" + ENGINES_NPM_11));
-        List<NpmRelease> candidates = releases("12.2.0", "11.17.0");
 
-        assertThat(regenerator.installs(candidates)).extracting(NpmLockRegeneratorTest::standsFor)
-          .containsExactly(singletonList("12.2.0"), singletonList("11.17.0"));
-        assertThat(regenerator.regenerate(candidates).getLockFileContent()).isEqualTo(ENGINES_NPM_11_LOCK);
+        NpmLockRegenerator.Install install = regenerator.installs(singletonList(NpmRelease.PORTED)).get(0);
+
+        assertThat(install.getResult().getLockFileContent()).isEqualTo(ENGINES_NPM_11_LOCK);
+        assertStandsForTheReleasesAlikeIn(install, "^11.17.0");
+        assertThat(install.standsFor(NpmRelease.of("11.16.0"))).isFalse();
     }
 
     /**
@@ -475,23 +511,24 @@ class NpmLockRegeneratorTest {
         Registry registry = new Registry();
         NpmLockRegenerator regenerator = new NpmLockRegenerator(project(DEPENDENT.replace("\"1.0.0\"\n  }",
           "\"^1.0.0\"\n  }")).build(), registry);
-        List<NpmRelease> candidates = releasesBetween("11.17.0", "12.2.0");
+        List<NpmRelease> candidates = releases("12.2.0", "12.0.0", "11.21.0", "11.17.0");
 
-        List<NpmLockRegenerator.Install> installs = regenerator.installs(candidates);
+        Map<String, NpmLockRegenerator.Install> installs = installs(regenerator, candidates);
 
-        // the range comes from the registry: the install as 12.2.0 read it, and stands for the releases it admits
-        assertThat(installs).extracting(install -> NpmReleases.ranges(install.getCandidates()))
-          .containsExactly("12.0.0 - 12.2.0", "11.17.0 - 11.21.0");
-        assertThat(installs.get(0).getResult().getLockFileContent()).contains("/b/-/b-1.1.0.tgz");
-        assertThat(installs.get(1).getResult().getLockFileContent()).contains("/b/-/b-1.0.0.tgz");
+        for (NpmRelease candidate : candidates) {
+            assertThat(installs.get(candidate.toString()).getResult().getLockFileContent()).as(candidate.toString())
+              .contains(candidate.atLeast(12, 0, 0) ? "/b/-/b-1.1.0.tgz" : "/b/-/b-1.0.0.tgz");
+        }
+        // the range comes from the registry: the install that read it stands for the releases it admits as it does
+        assertStandsForTheReleasesAlikeIn(installs.get("11.17.0"), ">=12");
         // each install normalized its own copy of the documents
         assertThat(registry.packument).hasToString(registry.pristine);
 
-        assertThat(regenerator.regenerate(candidates).getErrorMessage()).isEqualTo("RESOLUTION_REQUIRED: the engine " +
-          "cannot know the npm release that installs the project: npm 12.0.0 - 12.2.0 writes one lock and npm " +
-          "11.17.0 - 11.21.0 another" + NAMES_NO_RELEASE);
-        assertThat(regenerator.regenerate(releasesBetween("11.17.0", "11.21.0")).getLockFileContent())
-          .isEqualTo(installs.get(1).getResult().getLockFileContent());
+        assertThat(regenerator.regenerate(releases("12.0.0", "11.17.0")).getErrorMessage()).isEqualTo(
+          "RESOLUTION_REQUIRED: the engine cannot know the npm release that installs the project: npm 12.0.0 writes " +
+          "one lock and npm 11.17.0 another" + NAMES_NO_RELEASE);
+        assertThat(regenerator.regenerate(singletonList(NpmRelease.PORTED)).getLockFileContent())
+          .isEqualTo(installs.get("11.17.0").getResult().getLockFileContent());
     }
 
     private static NpmLockRegenerator.Install installed(Result result, boolean refusing, @Nullable String code,
@@ -668,12 +705,10 @@ class NpmLockRegeneratorTest {
         ScenarioReplay.ScenarioRegistry http = new ScenarioReplay.ScenarioRegistry(edit.getScenario());
         NpmLockRegenerator regenerator = new NpmLockRegenerator(inputs.build(), ScenarioReplay.registry(http));
 
-        List<NpmLockRegenerator.Install> installs = regenerator.installs(releases("12.2.0", "12.0.2", "11.17.0"));
+        Map<String, NpmLockRegenerator.Install> installs = installs(regenerator, releases("12.2.0", "11.17.0"));
 
-        assertThat(installs).extracting(NpmLockRegeneratorTest::standsFor)
-          .containsExactly(asList("12.2.0", "12.0.2"), singletonList("11.17.0"));
-        assertThat(installs.get(0).getResult().isSuccess()).isTrue();
-        assertThat(installs.get(1).getResult()).isEqualTo(installs.get(0).getResult());
+        assertThat(installs.get("12.2.0")).isNotSameAs(installs.get("11.17.0"));
+        assertThat(installs.values()).allMatch(install -> install.getResult().isSuccess());
         assertThat(http.requests).isNotEmpty().doesNotHaveDuplicates();
     }
 
