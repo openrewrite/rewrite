@@ -187,6 +187,24 @@ public final class NpmRelease implements Comparable<NpmRelease> {
         return atLeast(12, 0, 0) ? "none" : "all";
     }
 
+    // @npmcli/config index.js
+
+    /**
+     * {@code validate} refuses an auth key outside a registry's scope in an npmrc file ({@code ERR_INVALID_AUTH}), and
+     * a {@code registry} that is no URL where it names that scope ({@code ERR_INVALID_URL}), from npm 9.0.0.
+     */
+    boolean refusesUnscopedAuth() {
+        return atLeast(9, 0, 0);
+    }
+
+    /**
+     * {@code validate} holds {@code email}, {@code certfile} and {@code keyfile} to a registry's scope as it does the
+     * other auth keys, from npm 12.0.0.
+     */
+    boolean refusesUnscopedEmailAndCertificate() {
+        return atLeast(12, 0, 0);
+    }
+
     // @npmcli/package-json normalize.js
 
     /**

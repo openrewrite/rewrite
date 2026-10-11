@@ -393,6 +393,180 @@ class NpmOptionsTest {
         assertThat(NpmOptions.DEFAULT.getAllowGit()).isEqualTo("all");
     }
 
+    private static final String NPMJS = "//registry.npmjs.org/";
+
+    private static String invalidAuth(String problems) {
+        return "Invalid auth configuration found: " + problems.replace("; ", ", ") +
+               "\nPlease run `npm config fix` to repair your configuration.`";
+    }
+
+    // each .npmrc installed with npm 11.17.0, the first three with 9.0.0, 10.0.0, 10.9.9 and 12.2.0 as well: the
+    // config's validate() refuses an auth key outside a registry's scope (ERR_INVALID_AUTH), ahead of arborist's own
+    // reading of lockfile-version. npm 8.19.4 writes the lock for each of the first three.
+    @ParameterizedTest
+    @CsvSource(delimiter = '|', value = {
+      "_authToken=abc | `_authToken` must be renamed to `//registry.npmjs.org/:_authToken` in project config",
+      "username=u | `username` is not allowed in project config",
+      "username=u+_password=cA== | `username` must be renamed to `//registry.npmjs.org/:username` in project config; " +
+      "`_password` must be renamed to `//registry.npmjs.org/:_password` in project config",
+      "_password=cA== | `_password` is not allowed in project config",
+      "username=u+_password=false | `username` is not allowed in project config",
+      "_auth=dTpw | `_auth` must be renamed to `//registry.npmjs.org/:_auth` in project config",
+      "_authtoken=abc | `_authtoken` is not allowed in project config",
+      "-authtoken=abc+_authtoken=def+_auth=x+_authToken=y+username=u+_password=p | " +
+      "`_authtoken` is not allowed in project config; `-authtoken` is not allowed in project config; " +
+      "`_auth` must be renamed to `//registry.npmjs.org/:_auth` in project config; " +
+      "`_authToken` must be renamed to `//registry.npmjs.org/:_authToken` in project config; " +
+      "`username` must be renamed to `//registry.npmjs.org/:username` in project config; " +
+      "`_password` must be renamed to `//registry.npmjs.org/:_password` in project config",
+      "_authToken=true | `_authToken` must be renamed to `//registry.npmjs.org/:_authToken` in project config",
+      "_authToken | `_authToken` must be renamed to `//registry.npmjs.org/:_authToken` in project config",
+      "_authToken=0 | `_authToken` must be renamed to `//registry.npmjs.org/:_authToken` in project config",
+      "[_authToken]+x=1 | `_authToken` must be renamed to `//registry.npmjs.org/:_authToken` in project config",
+      "_authToken[]=a | `_authToken` must be renamed to `//registry.npmjs.org/:_authToken` in project config",
+      "_auth=undefined | `_auth` must be renamed to `//registry.npmjs.org/:_auth` in project config",
+      "_auth | `_auth` must be renamed to `//registry.npmjs.org/:_auth` in project config",
+      "_auth[]=a | `_auth` must be renamed to `//registry.npmjs.org/:_auth` in project config",
+      "_authToken=abc+lockfile-version=7 | " +
+      "`_authToken` must be renamed to `//registry.npmjs.org/:_authToken` in project config",
+      "_authToken=abc+global=true | " +
+      "`_authToken` must be renamed to `//registry.npmjs.org/:_authToken` in project config",
+      "registry=https://r.example/npm/+_authToken=abc | " +
+      "`_authToken` must be renamed to `//r.example/npm/:_authToken` in project config",
+      "_authToken=abc+registry=https://r.example/npm | " +
+      "`_authToken` must be renamed to `//r.example/:_authToken` in project config",
+      "registry=http://localhost:4873+_authToken=abc | " +
+      "`_authToken` must be renamed to `//localhost:4873/:_authToken` in project config",
+      "registry=https://r.example/a/b/c+_authToken=abc | " +
+      "`_authToken` must be renamed to `//r.example/a/b/:_authToken` in project config",
+      "registry=https://USER:pw@R.Example:443/A/b/?q=1#f+_authToken=abc | " +
+      "`_authToken` must be renamed to `//r.example/A/b/:_authToken` in project config",
+      "registry=mailto:a@b.c+_authToken=abc | `_authToken` must be renamed to `//b.c/:_authToken` in project config",
+      "registry=https://registry.npmjs.org+_authToken=abc | " +
+      "`_authToken` must be renamed to `//registry.npmjs.org/:_authToken` in project config"
+    })
+    void anAuthKeyOutsideARegistrysScopeIsRefusedFrom9(String npmrc, String problems) {
+        String text = npmrc.replace('+', '\n') + "\n";
+        for (String release : new String[]{"9.0.0", "11.17.0", "12.2.0"}) {
+            assertThatThrownBy(() -> NpmOptions.fromNpmrc(NpmRelease.of(release), null, text))
+              .isInstanceOfSatisfying(NpmRejection.class, e -> assertThat(e.getCode()).isEqualTo("ERR_INVALID_AUTH"))
+              .hasMessage(invalidAuth(problems));
+        }
+        if (!npmrc.contains("lockfile-version")) {
+            assertThat(NpmOptions.fromNpmrc(NpmRelease.of("8.19.4"), null, text)).isNotNull();
+        }
+    }
+
+    // each .npmrc installed with npm 11.17.0, which writes the lock: a key that is unset, emptied or scoped
+    @ParameterizedTest
+    @CsvSource(delimiter = '|', quoteCharacter = '~', value = {
+      "_authToken=", "_authToken=false", "_authToken=null", "_authToken=undefined", "_authToken=\" \"", "_auth=",
+      "_auth=false", "_auth=null", "//example.invalid/:_authToken=abc", "email=a@b.c", "certfile=/tmp/c",
+      "certfile=/tmp/c+keyfile=/tmp/k", "keyfile=/tmp/k", "//example.invalid/:email=a@b.c"
+    })
+    void anAuthKeyThatIsUnsetOrScopedIsNoneOfValidates(String npmrc) {
+        assertThat(fromNpmrc(npmrc.replace('+', '\n') + "\n")).isNotNull();
+    }
+
+    // each .npmrc installed with npm 12.2.0, the first four with 12.0.0 as well, where 11.17.0 writes the lock for
+    // each: email, certfile and keyfile outside a registry's scope are refused as the other auth keys
+    @ParameterizedTest
+    @CsvSource(delimiter = '|', value = {
+      "email=a@b.c | `email` must be renamed to `//registry.npmjs.org/:email` in project config",
+      "certfile=/tmp/c | `certfile` is not allowed in project config",
+      "keyfile=/tmp/k | `keyfile` is not allowed in project config",
+      "certfile=/tmp/c+keyfile=/tmp/k | `certfile` must be renamed to `//registry.npmjs.org/:certfile` in project " +
+      "config; `keyfile` must be renamed to `//registry.npmjs.org/:keyfile` in project config",
+      "email | `email` must be renamed to `//registry.npmjs.org/:email` in project config",
+      "email=0 | `email` must be renamed to `//registry.npmjs.org/:email` in project config",
+      "[email]+x=1 | `email` must be renamed to `//registry.npmjs.org/:email` in project config",
+      "certfile=/c+keyfile=false | `certfile` is not allowed in project config"
+    })
+    void emailAndCertificateOutsideARegistrysScopeAreRefusedFrom12(String npmrc, String problems) {
+        String text = npmrc.replace('+', '\n') + "\n";
+        for (String release : new String[]{"12.0.0", "12.2.0"}) {
+            assertThatThrownBy(() -> NpmOptions.fromNpmrc(NpmRelease.of(release), null, text))
+              .isInstanceOfSatisfying(NpmRejection.class, e -> assertThat(e.getCode()).isEqualTo("ERR_INVALID_AUTH"))
+              .hasMessage(invalidAuth(problems));
+        }
+        assertThat(NpmOptions.fromNpmrc(NpmRelease.of("11.21.0"), null, text)).isNotNull();
+    }
+
+    // installed with npm 12.2.0: the keys npm 12 adds follow the others, file by file, and a value that is unset
+    // or scoped is none of validate's
+    @Test
+    void validateReadsTheUsersFileThenTheProjects() {
+        NpmRelease npm12 = NpmRelease.of("12.2.0");
+        assertThatThrownBy(() -> NpmOptions.fromNpmrc(npm12, null,
+          "email=a@b.c\ncertfile=/tmp/c\nkeyfile=/tmp/k\n_authToken=abc\n"))
+          .hasMessage(invalidAuth("`_authToken` must be renamed to `" + NPMJS + ":_authToken` in project config; " +
+                                  "`email` must be renamed to `" + NPMJS + ":email` in project config; " +
+                                  "`certfile` must be renamed to `" + NPMJS + ":certfile` in project config; " +
+                                  "`keyfile` must be renamed to `" + NPMJS + ":keyfile` in project config"));
+        assertThatThrownBy(() -> NpmOptions.fromNpmrc(npm12, "email=a@b.c\n", "certfile=/c\n"))
+          .hasMessage(invalidAuth("`email` must be renamed to `" + NPMJS + ":email` in user config; " +
+                                  "`certfile` is not allowed in project config"));
+        assertThat(NpmOptions.fromNpmrc(npm12, null, "email=false\ncertfile=\n")).isNotNull();
+        assertThat(NpmOptions.fromNpmrc(npm12, null, "//example.invalid/:email=a@b.c\n")).isNotNull();
+
+        // installed with npm 11.17.0: the registry that names the scope is the project's over the user's
+        assertThatThrownBy(() -> NpmOptions.fromNpmrc(NpmRelease.PORTED, "_authToken=abc\n", "username=u\n"))
+          .hasMessage(invalidAuth("`_authToken` must be renamed to `" + NPMJS + ":_authToken` in user config; " +
+                                  "`username` is not allowed in project config"));
+        assertThatThrownBy(() -> NpmOptions.fromNpmrc(NpmRelease.PORTED, "registry=https://user.example/\n",
+          "_authToken=abc\n"))
+          .hasMessage(invalidAuth("`_authToken` must be renamed to `//user.example/:_authToken` in project config"));
+        assertThatThrownBy(() -> NpmOptions.fromNpmrc(NpmRelease.PORTED, "_authToken=abc\n",
+          "registry=https://project.example/\n"))
+          .hasMessage(invalidAuth("`_authToken` must be renamed to `//project.example/:_authToken` in user config"));
+    }
+
+    // each .npmrc installed with npm 11.17.0 and 12.2.0, `registry=foo` with 9.0.0, 10.0.0 and 10.9.9 as well:
+    // validate() nerf-darts the registry in every file's turn, and new URL() refuses one that is none
+    // (ERR_INVALID_URL), ahead of any auth key and of npm 12's strict-npmrc. npm 8.19.4 writes the lock.
+    @ParameterizedTest
+    @CsvSource(delimiter = '|', quoteCharacter = '~', value = {
+      "registry=", "registry=foo", "registry=null", "registry=false", "registry", "registry=undefined",
+      "registry=//registry.npmjs.org/", "registry=registry.npmjs.org", "registry=foo+_authToken=abc",
+      "registry=foo+foo=bar+strict-npmrc=true"
+    })
+    void aRegistryThatIsNoUrlIsRefusedFrom9(String npmrc) {
+        String text = npmrc.replace('+', '\n') + "\n";
+        for (String release : new String[]{"9.0.0", "11.17.0", "12.2.0"}) {
+            assertThatThrownBy(() -> NpmOptions.fromNpmrc(NpmRelease.of(release), null, text))
+              .isInstanceOfSatisfying(NpmRejection.class, e -> assertThat(e.getCode()).isEqualTo("ERR_INVALID_URL"))
+              .hasMessage("Invalid URL");
+        }
+    }
+
+    // installed with npm 11.17.0 and a --userconfig: only the registry in effect is read, the project's over the
+    // user's; a section in its place has no string for new URL(), nor has one under _auth for nopt
+    @Test
+    void theRegistryInEffectIsTheOneValidateReads() {
+        assertThat(NpmOptions.fromNpmrc(NpmRelease.PORTED, "registry=foo\n", "registry=https://registry.npmjs.org/\n")
+          .getRegistry()).isEqualTo("https://registry.npmjs.org/");
+        assertThatThrownBy(() -> NpmOptions.fromNpmrc(NpmRelease.PORTED, "registry=foo\n", "legacy-peer-deps=true\n"))
+          .isInstanceOfSatisfying(NpmRejection.class, e -> assertThat(e.getCode()).isEqualTo("ERR_INVALID_URL"));
+        assertThatThrownBy(() -> fromNpmrc("[registry]\nx=1\n"))
+          .isExactlyInstanceOf(IllegalArgumentException.class)
+          .hasMessage("Cannot convert object to primitive value");
+        assertThatThrownBy(() -> fromNpmrc("[_auth]\nx=1\n"))
+          .isExactlyInstanceOf(IllegalArgumentException.class)
+          .hasMessage("Cannot convert object to primitive value");
+    }
+
+    // a value or a key of the environment's: npm 11.17.0 refuses `_authToken=${NOPE}` with the variable unset and
+    // installs with `_authToken=${NOPE?}`, so what it does is the environment's to say
+    @Test
+    void validateTheEnvironmentDecides() {
+        assertThatThrownBy(() -> fromNpmrc("_authToken=${NOPE}\n")).isInstanceOf(CannotKnow.class);
+        assertThatThrownBy(() -> fromNpmrc("_authToken=${NOPE?}\n")).isInstanceOf(CannotKnow.class);
+        assertThatThrownBy(() -> fromNpmrc("_auth${T}=abc\n")).isInstanceOf(CannotKnow.class);
+        assertThatThrownBy(() -> fromNpmrc("registry=${REG}\n")).isInstanceOf(CannotKnow.class);
+        assertThat(fromNpmrc("//${REG}/:_authToken=abc\n")).isNotNull();
+        assertThat(NpmOptions.fromNpmrc(NpmRelease.of("8.19.4"), null, "_auth${T}=abc\n")).isNotNull();
+    }
+
     // each .npmrc installed with npm 12.2.0, the first with 12.0.0 as well: validateCli names every key without a
     // definition in its EUNKNOWNCONFIG, a scoped one by its last part, ahead of arborist's own reading of
     // lockfile-version; nopt has cleaned strict-npmrc by then, so 1 and any word are true

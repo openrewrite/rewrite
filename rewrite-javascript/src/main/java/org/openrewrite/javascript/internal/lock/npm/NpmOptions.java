@@ -22,6 +22,7 @@ import org.openrewrite.javascript.internal.lock.CannotKnow;
 import org.openrewrite.javascript.internal.lock.HostEnvironment;
 import org.openrewrite.javascript.internal.lock.Ini;
 import org.openrewrite.javascript.internal.lock.V8Date;
+import org.openrewrite.javascript.internal.lock.WhatwgUrl;
 
 import java.time.Instant;
 import java.util.ArrayList;
@@ -98,6 +99,11 @@ public class NpmOptions {
     // index.js internalEnv: what npm sets for an npm it runs
     private static final List<String> INTERNAL_ENV = Arrays.asList("npm-version", "global-prefix", "local-prefix");
     private static final String STRICT_NPMRC = "strict-npmrc";
+    // index.js validate: the auth keys an npmrc file may not hold, those it may only hold scoped to a registry, and
+    // the ones npm 12.0.0 adds to these
+    private static final List<String> AUTH_NOT_ALLOWED = Arrays.asList("_authtoken", "-authtoken");
+    private static final List<String> AUTH_SCOPED = Arrays.asList("_auth", "_authToken", "username", "_password");
+    private static final List<String> AUTH_SCOPED_12 = Arrays.asList("email", "certfile", "keyfile");
     private static final Object UNSET = new Object();
 
     // the definition's type, which npm's parseField reads from types[key]: Boolean, String, Number, or a
@@ -336,6 +342,7 @@ public class NpmOptions {
             }
         }
         // what the command checks of its config before it reads any of it
+        validate(release, userNpmrc, npmrc, env);
         validateCli(release, userNpmrc, npmrc, env);
         // global-style and legacy-bundling flatten by writing install-strategy into the config they come from,
         // which install-strategy's own flatten then reads, wherever it stands in the file
@@ -492,6 +499,154 @@ public class NpmOptions {
         options.omit(buildOmitList(omit, include, only, production, dev, optional, also));
         options.scopedRegistries(scopedRegistries);
         return options.build();
+    }
+
+    /**
+     * @npmcli/config index.js {@code validate}, which a command's constructor runs over the loaded config from npm
+     * 9.0.0: an auth key outside a registry's scope in the user's or the project's file fails the install ({@code
+     * ERR_INVALID_AUTH}), and so does a {@code registry} that is no URL, as each file's turn names the scope such a
+     * key moves to ({@code ERR_INVALID_URL}). npm 12.0.0 holds {@code email}, {@code certfile} and {@code keyfile} to
+     * it as well.
+     */
+    private static void validate(NpmRelease release, @Nullable String userNpmrc, @Nullable String npmrc,
+                                 HostEnvironment env) {
+        // npm's order: the global file, the user's, the project's
+        Map<String, Map<String, @Nullable Object>> files = new LinkedHashMap<>();
+        files.put("user", userNpmrc == null ? Collections.emptyMap() : Ini.decode(userNpmrc, Ini.Release.V6_0_0));
+        files.put("project", npmrc == null ? Collections.emptyMap() : Ini.decode(npmrc, Ini.Release.V6_0_0));
+        boolean since9 = false;
+        boolean since12 = false;
+        for (Map<String, @Nullable Object> file : files.values()) {
+            since9 |= mentions(file, AUTH_NOT_ALLOWED) || mentions(file, AUTH_SCOPED);
+            since12 |= mentions(file, AUTH_SCOPED_12);
+        }
+        // nerfDart(this.get('registry')): the project's registry over the user's, as the file holds it; nopt, which
+        // drops one without a host from the project's file before that file's turn, is not ported
+        Object registry = setIn(files.get("project"), "registry", env);
+        if (registry == UNSET) {
+            registry = setIn(files.get("user"), "registry", env);
+        }
+        String nerfedReg = "";
+        RuntimeException noUrl = null;
+        try {
+            nerfedReg = nerfDart(registry == UNSET ? DEFAULT.getRegistry() : parseField(registry, Type.LITERAL, env));
+        } catch (RuntimeException e) {
+            noUrl = e;
+        }
+        if (noUrl == null && !since9 && !since12 || !release.refusesUnscopedAuth()) {
+            return;
+        }
+        if (noUrl != null) {
+            throw noUrl;
+        }
+        since12 = since12 && release.refusesUnscopedEmailAndCertificate();
+
+        List<String> problems = new ArrayList<>();
+        for (Map.Entry<String, Map<String, @Nullable Object>> file : files.entrySet()) {
+            String where = file.getKey();
+            Map<String, @Nullable Object> entries = file.getValue();
+            for (String key : AUTH_NOT_ALLOWED) {
+                if (isSet(entries, key, env)) {
+                    problems.add(notAllowed(key, where));
+                }
+            }
+            for (String key : AUTH_SCOPED) {
+                if (isSet(entries, key, env)) {
+                    // username and _password must both exist in the same file to be recognized correctly
+                    if ("username".equals(key) && !isSet(entries, "_password", env) ||
+                        "_password".equals(key) && !isSet(entries, "username", env)) {
+                        problems.add(notAllowed(key, where));
+                    } else {
+                        problems.add(mustBeRenamed(key, nerfedReg, where));
+                    }
+                }
+            }
+            if (since12) {
+                if (isSet(entries, "email", env)) {
+                    problems.add(mustBeRenamed("email", nerfedReg, where));
+                }
+                // certfile and keyfile are a pair: a lone one is dropped
+                for (String key : Arrays.asList("certfile", "keyfile")) {
+                    if (isSet(entries, key, env)) {
+                        problems.add(isSet(entries, "certfile".equals(key) ? "keyfile" : "certfile", env) ?
+                                mustBeRenamed(key, nerfedReg, where) : notAllowed(key, where));
+                    }
+                }
+            }
+        }
+        if (!problems.isEmpty()) {
+            // errors.js ErrInvalidAuth, its closing backtick as npm prints it
+            throw new NpmRejection("ERR_INVALID_AUTH", "Invalid auth configuration found: " +
+                                                       String.join(", ", problems) + "\nPlease run `npm config fix` " +
+                                                       "to repair your configuration.`", null);
+        }
+    }
+
+    private static String notAllowed(String key, String where) {
+        return "`" + key + "` is not allowed in " + where + " config";
+    }
+
+    private static String mustBeRenamed(String key, String nerfedReg, String where) {
+        return "`" + key + "` must be renamed to `" + nerfedReg + ":" + key + "` in " + where + " config";
+    }
+
+    // @npmcli/config nerf-dart.js: the registry's host and directory, as the keys scoped to it start; new URL()'s
+    // TypeError for a registry that is no URL, or that is an ini section, which has no string
+    private static String nerfDart(@Nullable Object registry) {
+        if (registry instanceof Ini.Section) {
+            throw new IllegalArgumentException("Cannot convert object to primitive value");
+        }
+        WhatwgUrl parsed = WhatwgUrl.tryParse(Js.string(registry));
+        WhatwgUrl rel = parsed == null ? null :
+                WhatwgUrl.tryParse(".", parsed.getProtocol() + "//" + parsed.getHost() + parsed.getPathname());
+        if (rel == null) {
+            throw new NpmRejection("ERR_INVALID_URL", "Invalid URL", null);
+        }
+        return "//" + rel.getHost() + rel.getPathname();
+    }
+
+    // this.get(key, where), truthy or not, once parseField has read the file's value and nopt has cleaned it: _auth
+    // is a [null, String], and none of the other keys validate asks for has a definition
+    private static boolean isSet(Map<String, @Nullable Object> file, String key, HostEnvironment env) {
+        Object raw = setIn(file, key, env);
+        boolean defined = "_auth".equals(key);
+        if (raw == UNSET || raw == null || Boolean.FALSE.equals(raw)) {
+            return false;
+        }
+        if (!(raw instanceof String)) {
+            if (defined && raw instanceof Ini.Section) {
+                // nopt reads a String as String(val), and an ini section has none
+                throw new IllegalArgumentException("Cannot convert object to primitive value");
+            }
+            return true;
+        }
+        String f = Js.trim((String) raw);
+        if (!defined && "undefined".equals(f)) {
+            return false;
+        }
+        String cleaned = Js.trim(envReplace(f, env));
+        return !cleaned.isEmpty() && !"null".equals(cleaned) && (defined || !"false".equals(cleaned));
+    }
+
+    // whether a file has an entry under one of the keys, or under a key that may expand to one
+    private static boolean mentions(Map<String, @Nullable Object> file, List<String> names) {
+        for (String name : names) {
+            if (mentions(file, name)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private static boolean mentions(Map<String, @Nullable Object> file, String name) {
+        for (String key : file.keySet()) {
+            Pattern expansions = expansions(key);
+            if (expansions != null ? expansions.matcher(name).matches() :
+                    name.equals(envReplace(key, HostEnvironment.UNKNOWN))) {
+                return true;
+            }
+        }
+        return false;
     }
 
     /**
