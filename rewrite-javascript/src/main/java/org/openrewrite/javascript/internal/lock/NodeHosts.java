@@ -16,7 +16,7 @@
 package org.openrewrite.javascript.internal.lock;
 
 import org.jspecify.annotations.Nullable;
-import org.openrewrite.semver.NodeSemver;
+import org.openrewrite.javascript.semver.NodeSemver;
 
 /**
  * The Node releases a package manager runs on, which stand for the host when its own version is unknown.
