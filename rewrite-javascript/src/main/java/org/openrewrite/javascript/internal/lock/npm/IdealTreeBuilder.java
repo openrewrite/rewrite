@@ -761,6 +761,17 @@ public final class IdealTreeBuilder {
             required.add(node);
         }
 
+        if (!options.getRelease().linksNestingLoopsWherePlaced()) {
+            // before npm 7.20.6 a nesting loop (a1 -> b1 -> a2 -> b2 -> a1 -> ...) is linked to the earlier instance
+            // here, under the dependent, or under its resolve parent for a peer
+            Node realParent = edge.isPeer() ? from.getResolveParent() : from;
+            for (Node p = from.getResolveParent(); p != null; p = p.getResolveParent()) {
+                if (p.matches(node) && !p.isTop()) {
+                    return new Link(Node.options().release(options.getRelease()).parent(realParent).target(p).build());
+                }
+            }
+        }
+
         Node src = parent.getSourceReference();
         peerSetSource.put(node, src);
 

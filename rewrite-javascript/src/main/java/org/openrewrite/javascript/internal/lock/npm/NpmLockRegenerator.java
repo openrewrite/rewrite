@@ -384,6 +384,12 @@ public final class NpmLockRegenerator {
         if (directoryName == null) {
             Object data = lockData(files.getLock());
             Object lockName = data instanceof Map ? Js.get(data, "name") : null;
+            Object rootName = rootName(files);
+            if (data instanceof Map && rootName instanceof String && !((String) rootName).isEmpty() &&
+                !inputs.getRelease().writesRootPackageName()) {
+                throw new CannotKnow("the project directory name (npm before 7.20.6 writes the package's name in " +
+                                     "the lock's root entry only when the directory it runs in has another)");
+            }
             if (lockName instanceof String && !((String) lockName).isEmpty()) {
                 directoryName = (String) lockName;
             } else if (data instanceof Map && !truthy(rootName(files))) {

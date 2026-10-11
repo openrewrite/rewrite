@@ -677,6 +677,15 @@ public final class NpmRelease implements Comparable<NpmRelease> {
     }
 
     /**
+     * {@code placeInTree}: a dependency that its target or a resolve parent of it already is (a nesting loop) is placed
+     * as a link to that one, from npm 7.20.6; before, build-ideal-tree.js's {@code #nodeFromEdge} links it under the
+     * dependent (the dependent's resolve parent for a peer) when one above the dependent is the node it loaded.
+     */
+    boolean linksNestingLoopsWherePlaced() {
+        return atLeast(7, 20, 6);
+    }
+
+    /**
      * {@code replaceOldDep}: a peer set at the target that the replacing node no longer satisfies is pruned, its
      * dependents evaluated again ({@code needEvaluation}), or its edge warned about when it cannot go deeper, from npm
      * 7.24.2; before, it stays in place with its peer edge invalid.
@@ -781,6 +790,14 @@ public final class NpmRelease implements Comparable<NpmRelease> {
      */
     boolean skipsInertNodesWithoutVersion() {
         return atLeast(11, 15, 0);
+    }
+
+    /**
+     * {@code metaFromNode} writes the root's package name in its entry whatever the name of the directory npm runs in,
+     * from npm 7.20.6; before, only where the two differ.
+     */
+    boolean writesRootPackageName() {
+        return atLeast(7, 20, 6);
     }
 
     // @npmcli/arborist yarn-lock.js
@@ -964,12 +981,14 @@ public final class NpmRelease implements Comparable<NpmRelease> {
     /**
      * The @npmcli/map-workspaces npm bundles: 3.0.6 from npm 10.5.2, which finds the members 5.0.3 finds; 3.0.4 and
      * the releases back to 2.0.2 (npm 8.5.4) that find them alike; 2.0.1 in npm 8.5.3, which refuses a duplicate name
-     * as soon as it is found; before, 2.0.0, which also reads a backslash as glob's escape.
+     * as soon as it is found; 2.0.0 from npm 8.1.0 and 1.0.4 from 7.20.6, which also read a backslash as glob's
+     * escape; before, 1.0.3, whose duplicate name's message names no paths.
      */
     MapWorkspaces.Release mapWorkspaces() {
         return atLeast(10, 5, 2) ? MapWorkspaces.Release.V5_0_3 :
                 atLeast(8, 5, 4) ? MapWorkspaces.Release.V3_0_4 :
-                        atLeast(8, 5, 3) ? MapWorkspaces.Release.V2_0_1 : MapWorkspaces.Release.V2_0_0;
+                        atLeast(8, 5, 3) ? MapWorkspaces.Release.V2_0_1 :
+                                atLeast(7, 20, 6) ? MapWorkspaces.Release.V2_0_0 : MapWorkspaces.Release.V1_0_3;
     }
 
     // @npmcli/package-json normalize.js

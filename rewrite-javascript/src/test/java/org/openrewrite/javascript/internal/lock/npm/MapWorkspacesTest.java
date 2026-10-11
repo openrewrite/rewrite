@@ -231,13 +231,16 @@ class MapWorkspacesTest {
         manifests.put("tools/a", "{\"name\":\"x\"}");
         VirtualTreeLoader.ProjectFiles files = VirtualTreeLoader.ProjectFiles.builder().manifests(manifests).build();
         Map<String, Object> negated = obj("workspaces", json("[\"packages/*\",\"!packages/a\",\"tools/*\"]"));
-        for (String release : new String[]{"8.5.2", "8.5.3"}) {
+        for (String release : new String[]{"7.20.6", "8.0.0", "8.5.2", "8.5.3"}) {
             assertThatThrownBy(() -> MapWorkspaces.mapWorkspaces(CWD, negated, files, NpmRelease.of(release)))
               .hasMessage("must not have multiple workspaces with the same name\n" +
                           "package 'x' has conflicts in the following paths:\n" +
                           "    /project/packages/a\n" +
                           "    /project/tools/a");
         }
+        // 1.0.3 (npm 7.20.3 to 7.20.5) names neither path; 1.0.4 (npm 7.20.6 to 8.0.0) answers as 2.0.0 does
+        assertThatThrownBy(() -> MapWorkspaces.mapWorkspaces(CWD, negated, files, NpmRelease.of("7.20.5")))
+          .hasMessage("must not have multiple workspaces with the same name");
         assertThat(members(MapWorkspaces.mapWorkspaces(CWD, negated, files, NpmRelease.of("8.5.4"))))
           .isEqualTo("x=tools/a b=packages/b");
         Map<String, Object> backslash = obj("workspaces", json("[\"packages\\\\*\"]"));

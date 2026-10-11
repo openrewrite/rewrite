@@ -41,10 +41,11 @@ final class MapWorkspaces {
      * The @npmcli/map-workspaces release whose answers these are: 5.0.3, which npm 11.17.0 bundles and every release
      * from 3.0.6 reads as here; 3.0.4, which applies the patterns one after another, a negated one taking away what
      * the ones before it found, as every release from 2.0.2 does; 2.0.1, which refuses a name two paths share as soon
-     * as a pattern finds the second; or 2.0.0, which also reads a backslash in a pattern as glob's escape.
+     * as a pattern finds the second; 2.0.0, which also reads a backslash in a pattern as glob's escape, as 1.0.4 does;
+     * or 1.0.3, whose refusal of a name two paths share names neither.
      */
     enum Release {
-        V2_0_0, V2_0_1, V3_0_4, V5_0_3
+        V1_0_3, V2_0_0, V2_0_1, V3_0_4, V5_0_3
     }
 
     /**
@@ -258,7 +259,7 @@ final class MapWorkspaces {
     // glob(getGlobPattern(pattern)): a leading ./ and a trailing / name nothing, and . and a lone ** find the
     // directory itself; before 2.0.1 a backslash stays glob's escape
     private static boolean globs3_0_4(String dir, String pattern, Release release) {
-        String glob = release == Release.V2_0_0 ? pattern : pattern.replace('\\', '/');
+        String glob = release == Release.V1_0_3 || release == Release.V2_0_0 ? pattern : pattern.replace('\\', '/');
         while (glob.startsWith("./")) {
             glob = glob.substring(2);
         }
@@ -285,7 +286,7 @@ final class MapWorkspaces {
         // before 2.0.2: the pathname each name was first found at, and the results by pathname
         Map<Object, String> firstSeen = new LinkedHashMap<>();
         Map<String, Object> byPathname = new LinkedHashMap<>();
-        boolean refusesAtOnce = release == Release.V2_0_0 || release == Release.V2_0_1;
+        boolean refusesAtOnce = release == Release.V1_0_3 || release == Release.V2_0_0 || release == Release.V2_0_1;
         for (Map.Entry<String, Boolean> item : patterns) {
             List<String> matches = new ArrayList<>();
             for (String location : files.manifestLocations()) {
@@ -318,7 +319,8 @@ final class MapWorkspaces {
                     }
                     String prior = firstSeen.get(name);
                     if (prior != null && !prior.equals(path)) {
-                        throw new WorkspacesException(String.join("\n",
+                        throw new WorkspacesException(release == Release.V1_0_3 ?
+                                "must not have multiple workspaces with the same name" : String.join("\n",
                                 "must not have multiple workspaces with the same name",
                                 "package '" + Js.string(name) + "' has conflicts in the following paths:",
                                 "    " + prior, "    " + path), "EDUPLICATEWORKSPACE");

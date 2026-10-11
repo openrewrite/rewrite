@@ -201,7 +201,8 @@ public final class Shrinkwrap {
             }
         }
         Object pname = node.getPackageName();
-        if (truthy(pname) && (node.isRoot() || !Js.strictEquals(pname, node.getName()) ||
+        if (truthy(pname) && (node.isRoot() && options.getRelease().writesRootPackageName() ||
+                              !Js.strictEquals(pname, node.getName()) ||
                               options.getRelease().namesEntryByFolder() &&
                               !Js.strictEquals(Node.nameFromFolder(node.getRealpath()), pname))) {
             meta.put("name", pname);

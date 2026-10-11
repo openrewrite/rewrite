@@ -514,6 +514,20 @@ class ShrinkwrapTest {
         }
     }
 
+    // arborist 2.8.1 (npm 7.20.6) names the root entry whatever the directory; before, only a package named otherwise
+    @Test
+    void rootEntryNamedOnlyAfterAnotherDirectoryBefore7_20_6() {
+        for (String release : new String[]{"7.20.5", "7.20.6"}) {
+            NpmOptions options = NpmOptions.builder().release(NpmRelease.of(release)).build();
+            Node sameName = node(opts().path("/projects/p").realpath("/projects/p").pkg(obj("name", "p")));
+            Node otherName = node(opts().path("/projects/project").realpath("/projects/project").pkg(obj("name", "p")));
+            assertThat(Shrinkwrap.metaFromNode(sameName, "/projects/p", options).get("name")).as(release)
+              .isEqualTo("7.20.5".equals(release) ? null : "p");
+            assertThat(Shrinkwrap.metaFromNode(otherName, "/projects/project", options).get("name")).as(release)
+              .isEqualTo("p");
+        }
+    }
+
     @Test
     void loadingInEmptyDirGetsEmptyLockfile() {
         String dir = "/fixtures/empty";

@@ -256,7 +256,9 @@ public final class PlaceDep {
             return;
         }
 
-        for (Node p = target; p != null; p = p.getResolveParent()) {
+        // before npm 7.20.6 the ideal tree builder links a nesting loop when it loads the node
+        for (Node p = options.getRelease().linksNestingLoopsWherePlaced() ? target : null; p != null;
+             p = p.getResolveParent()) {
             if (p.matches(dep) && !p.isTop()) {
                 placed = new Link(Node.options().release(options.getRelease()).parent(target).target(p).build());
                 return;
