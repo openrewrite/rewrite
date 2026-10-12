@@ -187,6 +187,14 @@ public final class NpmRelease implements Comparable<NpmRelease> {
     }
 
     /**
+     * {@code [_inflateAncientLockfile]} fetches a node without a version, or with a {@code file:} resolved, by its
+     * resolved, from npm 7.1.1; before, every node by {@code name@version}, read from the working directory.
+     */
+    boolean inflatesLocalNodesByResolved() {
+        return atLeast(7, 1, 1);
+    }
+
+    /**
      * {@code #nodeFromSpec}: under {@code install-links}, a directory dependency of an installed {@code file:} package
      * is installed from that package's source instead of linked, from npm 11.6.0.
      */
@@ -361,6 +369,14 @@ public final class NpmRelease implements Comparable<NpmRelease> {
      */
     boolean prunesOptionalPeers() {
         return atLeast(11, 5, 0) && !atLeast(11, 6, 3);
+    }
+
+    /**
+     * {@code [_placeDep]}: a deeper node of the placed name that it can replace is pruned where the node's parent or
+     * grandparent is missing, which masks nothing, from npm 7.1.1; before, reading the missing one fails.
+     */
+    boolean prunesReplaceableWithoutGrandparent() {
+        return atLeast(7, 1, 1);
     }
 
     /**

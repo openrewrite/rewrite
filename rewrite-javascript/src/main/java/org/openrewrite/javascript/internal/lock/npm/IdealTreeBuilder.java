@@ -524,8 +524,11 @@ public final class IdealTreeBuilder {
                 id = useResolved ? resolved : version;
                 where = node.getPath();
             }
-            Spec spec = Spec.resolve(node.getName(), id == null ? "" : Js.string(id), where,
-                    options.getRelease().npmPackageArg());
+            Spec spec = !options.getRelease().inflatesLocalNodesByResolved() ?
+                    // before npm 7.1.1 every node by `${node.name}@${node.version}`, read from the working directory
+                    Spec.npa(node.getName() + "@" + Js.string(version), path, options.getRelease().npmPackageArg()) :
+                    Spec.resolve(node.getName(), id == null ? "" : Js.string(id), where,
+                            options.getRelease().npmPackageArg());
             try {
                 Pacote.Options pacoteOptions = Pacote.Options.builder()
                         .fullMetadata(false)

@@ -293,8 +293,18 @@ final class LegacyPlacement {
             !node.isInBundle() &&
             node.canReplaceWith(newDep)) {
             Node parent = node.getParent();
-            Node mask = parent != target && parent != null && parent.getParent() != null &&
-                        parent.getParent() != target ? parent.getParent().resolve(newDep.getName()) : null;
+            Node mask;
+            if (!node.getRelease().prunesReplaceableWithoutGrandparent() && parent != target) {
+                // before npm 7.1.1 a missing parent or grandparent is read
+                if (parent == null) {
+                    throw new IllegalArgumentException("Cannot read properties of null (reading 'parent')");
+                }
+                if (parent.getParent() == null) {
+                    throw new IllegalArgumentException("Cannot read properties of undefined (reading 'resolve')");
+                }
+            }
+            mask = parent != target && parent != null && parent.getParent() != null &&
+                   parent.getParent() != target ? parent.getParent().resolve(newDep.getName()) : null;
 
             if (mask == null || mask == newDep || node.canReplaceWith(mask)) {
                 node.setParent(null);
