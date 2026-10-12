@@ -117,6 +117,14 @@ final class Install {
     }
 
     /**
+     * The env document of the lock file in the lock's directory, as the install finds it; null without one.
+     */
+    @Nullable
+    EnvLockfile readEnvLockfile() {
+        return lockFile.readEnvLockfile();
+    }
+
+    /**
      * {@code install(manifest, opts)}: with an agent configured, the agent resolves; else mutateModules over the
      * project in the lock's directory, null when installDeps found no package.json there.
      */

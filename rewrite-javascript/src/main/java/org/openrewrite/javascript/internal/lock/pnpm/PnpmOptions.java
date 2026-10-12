@@ -73,6 +73,12 @@ public final class PnpmOptions {
     private final Map<String, String> registries;
 
     /**
+     * 11.5.3's {@code packageManagerRegistries}: the registries of the user's .npmrc and the environment alone, which
+     * pnpm resolves itself from; null where a release before 11.5.3 could not read them.
+     */
+    private final @Nullable Map<String, String> packageManagerRegistries;
+
+    /**
      * The workspace's package globs; null without a pnpm-workspace.yaml (no workspace).
      */
     private final @Nullable List<String> workspacePackagePatterns;
@@ -95,6 +101,7 @@ public final class PnpmOptions {
 
     private PnpmOptions(Map<String, @Nullable Object> config, Set<String> explicitlySetKeys,
                         Map<String, @Nullable Map<String, @Nullable Object>> catalogs, Map<String, String> registries,
+                        @Nullable Map<String, String> packageManagerRegistries,
                         @Nullable List<String> workspacePackagePatterns,
                         @Nullable WantedPackageManager wantedPackageManager, String packageManagerVersion,
                         PnpmRelease release) {
@@ -102,6 +109,7 @@ public final class PnpmOptions {
         this.explicitlySetKeys = explicitlySetKeys;
         this.catalogs = catalogs;
         this.registries = registries;
+        this.packageManagerRegistries = packageManagerRegistries;
         this.workspacePackagePatterns = workspacePackagePatterns;
         this.wantedPackageManager = wantedPackageManager;
         this.packageManagerVersion = packageManagerVersion;
@@ -113,16 +121,34 @@ public final class PnpmOptions {
      * {@code packageManager.version}: {@link Main#checkWantedPackageManager}'s, a release or a range of them.
      */
     PnpmOptions withPackageManagerVersion(String version) {
-        return new PnpmOptions(config, explicitlySetKeys, catalogs, registries, workspacePackagePatterns,
-                wantedPackageManager, version, release);
+        return new PnpmOptions(config, explicitlySetKeys, catalogs, registries, packageManagerRegistries,
+                workspacePackagePatterns, wantedPackageManager, version, release);
     }
 
     /**
      * The config of {@code release}, the one that installs ({@link Main#installs}).
      */
     PnpmOptions withRelease(PnpmRelease release) {
-        return new PnpmOptions(config, explicitlySetKeys, catalogs, registries, workspacePackagePatterns,
-                wantedPackageManager, packageManagerVersion, release);
+        return new PnpmOptions(config, explicitlySetKeys, catalogs, registries, packageManagerRegistries,
+                workspacePackagePatterns, wantedPackageManager, packageManagerVersion, release);
+    }
+
+    /**
+     * The config pnpm resolves and installs itself with, {@code running} the release that runs: from 11.5.3 its
+     * registries are those of the user's .npmrc and the environment alone (getPackageManagerBootstrapConfig), the
+     * project's .npmrc and pnpm-workspace.yaml left out (PnpmRelease#resolvesThePackageManagerFromTrustedConfig),
+     * asked where the two differ.
+     */
+    PnpmOptions packageManagerBootstrap(PnpmRelease running) {
+        if (packageManagerRegistries == null || packageManagerRegistries.equals(registries) ||
+            !running.resolvesThePackageManagerFromTrustedConfig()) {
+            return this;
+        }
+        Map<String, @Nullable Object> bootstrapConfig = new LinkedHashMap<>(config);
+        bootstrapConfig.put("registries", packageManagerRegistries);
+        return new PnpmOptions(bootstrapConfig, explicitlySetKeys, catalogs, packageManagerRegistries,
+                packageManagerRegistries, workspacePackagePatterns, wantedPackageManager, packageManagerVersion,
+                release);
     }
 
     @Value
@@ -167,9 +193,9 @@ public final class PnpmOptions {
                             PnpmRelease release) {
         Map<String, @Nullable Object> defaultOptions = defaultOptions();
         Map<String, @Nullable Object> workspaceNpmrc = npmrc == null ? new LinkedHashMap<>() :
-                readAndFilterNpmrc(npmrc, env, release);
+                readAndFilterNpmrc(npmrc, env, release, true);
         Map<String, @Nullable Object> userConfig = userNpmrc == null ? new LinkedHashMap<>() :
-                readAndFilterNpmrc(userNpmrc, env, release);
+                readAndFilterNpmrc(userNpmrc, env, release, false);
         Map<String, @Nullable Object> builtin = new LinkedHashMap<>();
         builtin.put("registry", DEFAULT_REGISTRY);
         builtin.put("@jsr:registry", "https://npm.jsr.io/");
@@ -204,6 +230,7 @@ public final class PnpmOptions {
         Map<String, String> registriesFromNpmrc = new LinkedHashMap<>();
         registriesFromNpmrc.put("default", normalizeRegistryUrl(authConfig.get("registry")));
         registriesFromNpmrc.putAll(networkRegistries);
+        Map<String, String> packageManagerRegistries = trustedRegistries(builtin, defaultOptions, userConfig, release);
         if (holdsUnscopedCreds(authConfig) && !release.rescopesUnscopedCredentials()) {
             getDefaultCreds(authConfig);
         }
@@ -294,6 +321,9 @@ public final class PnpmOptions {
                                       Js.jsonStringify(pair.value));
                 }
                 registries.put("default", normalizeRegistryUrl(pair.value));
+                if (packageManagerRegistries != null) {
+                    packageManagerRegistries.put("default", normalizeRegistryUrl(pair.value));
+                }
             }
         }
         config.put("registries", registries);
@@ -310,8 +340,42 @@ public final class PnpmOptions {
         config.put("useGitBranchLockfile", gitBranchLockfile instanceof Boolean ? gitBranchLockfile : false);
         WantedPackageManager wantedPackageManager = rootManifest == null ? null :
                 withPmOnFail(getWantedPackageManager(rootManifest, release), config.get("pmOnFail"));
-        return new PnpmOptions(config, explicitlySetKeys, catalogs, registries, patterns, wantedPackageManager,
-                release.toString(), release);
+        return new PnpmOptions(config, explicitlySetKeys, catalogs, registries, packageManagerRegistries, patterns,
+                wantedPackageManager, release.toString(), release);
+    }
+
+    /**
+     * getConfig's {@code packageManagerRegistries} of 11.5.3, from its {@code trustedConfig}: pnpm's built-in config,
+     * the defaults and the user's .npmrc (the port reads no auth.ini, and no command line names a registry), with
+     * the checks getNetworkConfigs makes of their credentials; null where a release before 11.5.3, which reads none,
+     * would fail those checks.
+     */
+    private static @Nullable Map<String, String> trustedRegistries(Map<String, @Nullable Object> builtin,
+                                                                   Map<String, @Nullable Object> defaultOptions,
+                                                                   Map<String, @Nullable Object> userConfig,
+                                                                   PnpmRelease release) {
+        Map<String, @Nullable Object> trustedConfig = new LinkedHashMap<>();
+        for (Map<String, @Nullable Object> source : Arrays.asList(builtin, defaultOptions, userConfig)) {
+            for (String key : Js.keys(source)) {
+                if (isNpmrcReadableKey(key)) {
+                    trustedConfig.put(key, source.get(key));
+                }
+            }
+        }
+        Map<String, @Nullable Object> trustedAuthConfig = pickIniConfig(trustedConfig);
+        Map<String, String> trustedNetworkRegistries;
+        try {
+            trustedNetworkRegistries = getNetworkConfigs(trustedAuthConfig);
+        } catch (PnpmError e) {
+            if (release.resolvesThePackageManagerFromTrustedConfig()) {
+                throw e;
+            }
+            return null;
+        }
+        Map<String, String> packageManagerRegistries = new LinkedHashMap<>();
+        packageManagerRegistries.put("default", normalizeRegistryUrl(trustedAuthConfig.get("registry")));
+        packageManagerRegistries.putAll(trustedNetworkRegistries);
+        return packageManagerRegistries;
     }
 
     /**
@@ -545,9 +609,12 @@ public final class PnpmOptions {
     }
 
     // loadNpmrcFiles' readAndFilterNpmrc over read-ini-file 5 (ini 6 after strip-bom); from 11.4.0 it pins the
-    // file's unscoped credentials to the file's registry (PnpmRelease#rescopesUnscopedCredentials)
+    // file's unscoped credentials to the file's registry (PnpmRelease#rescopesUnscopedCredentials); from 11.5.3 the
+    // project's own file (repositoryControlled) expands no environment variable in a request destination or a
+    // credential, and leaves such an entry out (PnpmRelease#ignoresTheEnvironmentInRepositoryRequestDestinations)
     private static Map<String, @Nullable Object> readAndFilterNpmrc(String text, @Nullable Map<String, String> env,
-                                                                   PnpmRelease release) {
+                                                                   PnpmRelease release,
+                                                                   boolean repositoryControlled) {
         Map<String, @Nullable Object> result = new LinkedHashMap<>();
         Map<String, @Nullable Object> raw;
         try {
@@ -558,9 +625,23 @@ public final class PnpmOptions {
         }
         for (String rawKey : Js.keys(raw)) {
             Object rawValue = raw.get(rawKey);
+            boolean keyFromEnv = repositoryControlled && hasEnvPlaceholder(rawKey);
+            if (keyFromEnv && (isRequestDestinationKey(rawKey) || isAuthValueKey(rawKey)) &&
+                leavesOutAnEntryFromTheEnvironment(rawKey, release)) {
+                continue;
+            }
             String key = envReplaceLossy(rawKey, env);
+            if (keyFromEnv && (isRequestDestinationKey(key) || isAuthValueKey(key)) &&
+                leavesOutAnEntryFromTheEnvironment(key, release)) {
+                continue;
+            }
             Object value = rawValue;
             if (rawValue instanceof String) {
+                if (repositoryControlled && hasEnvPlaceholder((String) rawValue) &&
+                    (isRequestDestinationValueKey(key) || isAuthValueKey(key)) &&
+                    leavesOutAnEntryFromTheEnvironment(key, release)) {
+                    continue;
+                }
                 // a credential or network value reaches no lock, so an environment the host does not know is no matter
                 value = env == null && !readByALockOnlyInstall(key) ? rawValue :
                         envReplaceLossy((String) rawValue, env);
@@ -571,6 +652,44 @@ public final class PnpmOptions {
         }
         return holdsUnscopedCreds(result) && release.rescopesUnscopedCredentials() ? rescopeUnscopedCreds(result) :
                 result;
+    }
+
+    // an entry a lock-only install does not read ends the same kept or left out, so the release is asked of the others
+    private static boolean leavesOutAnEntryFromTheEnvironment(String key, PnpmRelease release) {
+        return !readByALockOnlyInstall(key) || release.ignoresTheEnvironmentInRepositoryRequestDestinations();
+    }
+
+    private static final Pattern ENV_PLACEHOLDER = Pattern.compile("\\$\\{[^}]+}");
+
+    private static final List<String> AUTH_VALUE_KEYS = Arrays.asList("_authToken", "_auth", "_password",
+            "username", "tokenHelper", "cert", "key");
+
+    static boolean hasEnvPlaceholder(String value) {
+        return ENV_PLACEHOLDER.matcher(value).find();
+    }
+
+    private static boolean isRequestDestinationKey(String key) {
+        return isRegistryKey(key) || key.startsWith("//");
+    }
+
+    private static boolean isRequestDestinationValueKey(String key) {
+        return isRegistryKey(key) || "https-proxy".equals(key) || "http-proxy".equals(key) || "proxy".equals(key);
+    }
+
+    private static boolean isRegistryKey(String key) {
+        return "registry".equals(key) || key.startsWith("@") && key.endsWith(":registry");
+    }
+
+    private static boolean isAuthValueKey(String key) {
+        if (AUTH_VALUE_KEYS.contains(key)) {
+            return true;
+        }
+        for (String authKey : AUTH_VALUE_KEYS) {
+            if (key.endsWith(":" + authKey)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     private static boolean holdsUnscopedCreds(Map<String, @Nullable Object> source) {
@@ -1028,13 +1147,25 @@ public final class PnpmOptions {
             Object value = pnpmSettings.get(key);
             String newKey = envReplace(key, env);
             if (value instanceof String) {
+                // from 11.5.3 the project's registry and pnprServer take nothing from the environment: such a value
+                // is left out (PnpmRelease#ignoresTheEnvironmentInRepositoryRequestDestinations)
+                if (("registry".equals(newKey) || "pnprServer".equals(newKey)) && hasEnvPlaceholder((String) value) &&
+                    release.ignoresTheEnvironmentInRepositoryRequestDestinations()) {
+                    continue;
+                }
                 settings.put(newKey, envReplace((String) value, env));
             } else if (("registries".equals(newKey) || "namedRegistries".equals(newKey)) &&
                        holdsAnEnvReference(value) && release.readsNamedRegistries()) {
                 if (value instanceof Map) {
+                    // and leave out an entry that would
+                    boolean leavesOut = holdsAnEnvPlaceholder((Map<String, @Nullable Object>) value) &&
+                                        release.ignoresTheEnvironmentInRepositoryRequestDestinations();
                     Map<String, @Nullable Object> out = new LinkedHashMap<>();
                     for (String k : Js.keys((Map<String, @Nullable Object>) value)) {
                         Object v = ((Map<String, @Nullable Object>) value).get(k);
+                        if (leavesOut && v instanceof String && hasEnvPlaceholder((String) v)) {
+                            continue;
+                        }
                         out.put(k, v instanceof String ? envReplace((String) v, env) : v);
                     }
                     settings.put(newKey, out);
@@ -1166,6 +1297,15 @@ public final class PnpmOptions {
     // whether a map setting holds a string env-replace would read a ${VAR} of; one that holds none reads the same
     // with the environment or without it
     @SuppressWarnings("unchecked")
+    private static boolean holdsAnEnvPlaceholder(Map<String, @Nullable Object> value) {
+        for (Object v : value.values()) {
+            if (v instanceof String && hasEnvPlaceholder((String) v)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
     private static boolean holdsAnEnvReference(@Nullable Object value) {
         if (value instanceof Map) {
             for (Object v : ((Map<String, @Nullable Object>) value).values()) {

@@ -22,6 +22,7 @@ import org.openrewrite.javascript.internal.lock.WhatwgUrl;
 
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.function.Supplier;
@@ -67,11 +68,11 @@ final class LockfileUtils {
         Object tarball = resolution.get("tarball");
         // the release is asked where its resolution differs from those of the releases around it
         Outcome current = Outcome.of(() -> keepingATarballUrl(name, version, resolution, integrity, tarball,
-                registry, lockfileIncludeTarballUrl));
-        Outcome markingGitHosted = Outcome.of(() -> keepingNoTarballUrl(name, version, resolution, integrity, tarball,
-                registry, lockfileIncludeTarballUrl, true));
-        Outcome first = Outcome.of(() -> keepingNoTarballUrl(name, version, resolution, integrity, tarball, registry,
-                lockfileIncludeTarballUrl, false));
+                release, registry, lockfileIncludeTarballUrl));
+        Outcome markingGitHosted = Outcome.of(() -> keepingNoTarballUrl(name, version, resolution, integrity,
+                tarball, release, registry, lockfileIncludeTarballUrl, true));
+        Outcome first = Outcome.of(() -> keepingNoTarballUrl(name, version, resolution, integrity, tarball, release,
+                registry, lockfileIncludeTarballUrl, false));
         if (first.same(markingGitHosted) && markingGitHosted.same(current)) {
             return current.get();
         }
@@ -88,6 +89,7 @@ final class LockfileUtils {
     private static Map<String, @Nullable Object> keepingATarballUrl(String name, String version,
                                                                     Map<String, @Nullable Object> resolution,
                                                                     Object integrity, @Nullable Object tarball,
+                                                                    PnpmRelease release,
                                                                     String registry,
                                                                     @Nullable Boolean lockfileIncludeTarballUrl) {
         if (tarball == null || tarball == Js.UNDEFINED) {
@@ -96,7 +98,7 @@ final class LockfileUtils {
             return out;
         }
         String url = tarballUrl(tarball);
-        boolean gitHosted = Boolean.TRUE.equals(resolution.get("gitHosted")) || isGitHostedTarballUrl(url);
+        boolean gitHosted = Boolean.TRUE.equals(resolution.get("gitHosted")) || isGitHostedTarballUrl(url, release);
         if (Boolean.TRUE.equals(lockfileIncludeTarballUrl) || url.startsWith("file:") || gitHosted) {
             return preservingGitHosted(integrity, url, gitHosted);
         }
@@ -115,14 +117,15 @@ final class LockfileUtils {
     private static Map<String, @Nullable Object> keepingNoTarballUrl(String name, String version,
                                                                      Map<String, @Nullable Object> resolution,
                                                                      Object integrity, @Nullable Object tarball,
+                                                                     PnpmRelease release,
                                                                      String registry,
                                                                      @Nullable Boolean lockfileIncludeTarballUrl,
                                                                      boolean marksGitHosted) {
         boolean hasTarball = tarball != null && tarball != Js.UNDEFINED;
         String url = hasTarball ? tarballUrl(tarball) : null;
-        boolean gitHosted = marksGitHosted ?
-                Boolean.TRUE.equals(resolution.get("gitHosted")) || url != null && isGitHostedTarballUrl(url) :
-                url != null && isGitHostedTarballUrl(url);
+        boolean gitHostedUrl = url != null && isGitHostedTarballUrl(url, release);
+        boolean gitHosted = marksGitHosted ? Boolean.TRUE.equals(resolution.get("gitHosted")) || gitHostedUrl :
+                gitHostedUrl;
         if (Boolean.TRUE.equals(lockfileIncludeTarballUrl)) {
             return preservingGitHosted(integrity, url, marksGitHosted && gitHosted);
         }
@@ -212,7 +215,7 @@ final class LockfileUtils {
         boolean fileTarball = tarball instanceof String && ((String) tarball).startsWith("file:");
         if (isNullish(resolution.get("type")) && isNullish(resolution.get("integrity")) && !fileTarball &&
             !(Boolean.TRUE.equals(resolution.get("gitHosted")) ||
-              tarball instanceof String && isGitHostedTarballUrl((String) tarball)) &&
+              tarball instanceof String && isGitHostedTarballUrl((String) tarball, release)) &&
             release.requiresALockedTarballsIntegrity()) {
             throw new PnpmError("MISSING_TARBALL_INTEGRITY", "Cannot install package \"" + depPath + "\": its " +
                                 "lockfile entry has no \"integrity\" field, so pnpm cannot verify the downloaded " +
@@ -222,7 +225,7 @@ final class LockfileUtils {
         }
         // from 11.0.7 the gitHosted flag tells a git-hosted tarball; before, its URL does
         boolean flagged = Boolean.TRUE.equals(resolution.get("gitHosted"));
-        boolean gitHostedUrl = tarball instanceof String && isGitHostedTarballUrl((String) tarball);
+        boolean gitHostedUrl = tarball instanceof String && isGitHostedTarballUrl((String) tarball, release);
         boolean gitHosted = flagged == gitHostedUrl || release.marksGitHostedTarballs() ? flagged : gitHostedUrl;
         if (Js.truthy(resolution.get("type")) || fileTarball || gitHosted) {
             return resolution;
@@ -299,6 +302,19 @@ final class LockfileUtils {
             out.put("gitHosted", true);
         }
         return out;
+    }
+
+    /**
+     * {@code isGitHostedTarballUrl}, which lockfile.fs shares from 11.5.3: the URL as written, and from 11.5.3 in any
+     * case (PnpmRelease#matchesGitHostedTarballUrlsInAnyCase).
+     */
+    static boolean isGitHostedTarballUrl(String url, PnpmRelease release) {
+        return isGitHostedTarballUrl(url) ||
+               isGitHostedTarballUrlInAnyCase(url) && release.matchesGitHostedTarballUrlsInAnyCase();
+    }
+
+    static boolean isGitHostedTarballUrlInAnyCase(String url) {
+        return isGitHostedTarballUrl(url.toLowerCase(Locale.ROOT));
     }
 
     private static boolean isGitHostedTarballUrl(String url) {

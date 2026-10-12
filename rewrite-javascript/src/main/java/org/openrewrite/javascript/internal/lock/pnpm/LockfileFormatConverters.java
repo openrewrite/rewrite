@@ -283,19 +283,15 @@ final class LockfileFormatConverters {
         if (tarball != null) {
             if (!(tarball instanceof String)) {
                 if (release.marksGitHostedTarballs()) {
-                    throw new TypeError("url.startsWith is not a function");
+                    throw new TypeError(release.matchesGitHostedTarballUrlsInAnyCase() ?
+                            "url.toLowerCase is not a function" : "url.startsWith is not a function");
                 }
                 return;
             }
-            if (isGitHostedTarballUrl((String) tarball) && release.marksGitHostedTarballs()) {
+            if (LockfileUtils.isGitHostedTarballUrl((String) tarball, release) && release.marksGitHostedTarballs()) {
                 resolution.put("gitHosted", true);
             }
         }
-    }
-
-    private static boolean isGitHostedTarballUrl(String url) {
-        return (url.startsWith("https://codeload.github.com/") || url.startsWith("https://bitbucket.org/") ||
-                url.startsWith("https://gitlab.com/")) && url.contains("tar.gz");
     }
 
     @SuppressWarnings("unchecked")

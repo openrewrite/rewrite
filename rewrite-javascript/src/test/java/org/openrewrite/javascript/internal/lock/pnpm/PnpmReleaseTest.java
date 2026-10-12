@@ -37,6 +37,7 @@ import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -1056,5 +1057,231 @@ class PnpmReleaseTest {
         }
         assertThat(release("11.5.1").countsLockedVersionsAsOptionalPeerCandidates()).isTrue();
         assertThat(release("11.5.0").countsLockedVersionsAsOptionalPeerCandidates()).isFalse();
+    }
+
+    /**
+     * lockfile/utils toLockfileResolution.ts (11.5.3): a tarball URL is git-hosted in any case; before, only in
+     * lower case, so that a mixed-case codeload URL is kept without the flag.
+     */
+    @Test
+    void matchesGitHostedTarballUrlsInAnyCaseFrom1153() {
+        String codeload = "https://CodeLoad.GitHub.com/u/r/tar.gz/abc";
+        Map<String, @Nullable Object> resolution = obj("{'integrity':'sha512-x','tarball':'" + codeload + "'}");
+        assertThat(json(LockfileUtils.toLockfileResolution("r", "1.0.0", resolution, REGISTRY, false,
+          release("11.5.3")))).isEqualTo("{'integrity':'sha512-x','tarball':'" + codeload + "','gitHosted':true}");
+        assertThat(json(LockfileUtils.toLockfileResolution("r", "1.0.0", resolution, REGISTRY, false,
+          release("11.5.2")))).isEqualTo("{'integrity':'sha512-x','tarball':'" + codeload + "'}");
+    }
+
+    private static DependenciesGraphNode graphNode(String depPath, String... children) {
+        DependenciesGraphNode node = new DependenciesGraphNode(depPath, peerPkg("foo", "1.0.0"));
+        for (int i = 0; i < children.length; i += 2) {
+            node.getChildren().put(children[i], children[i + 1]);
+            node.getResolvedPeerNames().add(children[i]);
+        }
+        return node;
+    }
+
+    /**
+     * installing/deps-resolver resolvePeers.ts deduplicateDepPaths (11.5.3): two variants with as many dependencies
+     * are taken in the order of their dep paths, so the greater one absorbs a variant both include; before, in the
+     * order they were made, the last made one.
+     */
+    @Test
+    void breaksPeerDedupeTiesByDepPathFrom1153() {
+        String a = "foo@1.0.0(peer@1.0.0)";
+        String b = "foo@1.0.0(other@2.0.0)(peer@1.0.0)";
+        String c = "foo@1.0.0(other@1.0.0)(peer@1.0.0)";
+        Map<String, DependenciesGraphNode> graph = new LinkedHashMap<>();
+        graph.put(a, graphNode(a, "peer", "peer@1.0.0"));
+        graph.put(b, graphNode(b, "peer", "peer@1.0.0", "other", "other@2.0.0"));
+        graph.put(c, graphNode(c, "peer", "peer@1.0.0", "other", "other@1.0.0"));
+        List<Set<String>> duplicates = Collections.singletonList(new LinkedHashSet<>(Arrays.asList(a, b, c)));
+        assertThat(ResolvePeers.deduplicateAll(graph, duplicates, release("11.5.3")))
+          .isEqualTo(Collections.singletonMap(a, b));
+        assertThat(ResolvePeers.deduplicateAll(graph, duplicates, release("11.5.2")))
+          .isEqualTo(Collections.singletonMap(a, c));
+    }
+
+    /**
+     * installing/deps-installer verifyLockfileResolutions.ts (11.5.3): a registry dep path whose resolution is a
+     * directory fails the verification, with no verifier active; before, it passes.
+     */
+    @Test
+    void rejectsARegistryDepPathWithANonRegistryResolutionFrom1153() {
+        String lock = "lockfileVersion: '9.0'\n\nsettings:\n  autoInstallPeers: true\n" +
+                      "  excludeLinksFromLockfile: false\n\nimporters:\n\n  .:\n    dependencies:\n      foo:\n" +
+                      "        specifier: 1.0.0\n        version: 1.0.0\n\npackages:\n\n  foo@1.0.0:\n" +
+                      "    resolution: {directory: ../foo, type: directory}\n\nsnapshots:\n\n  foo@1.0.0: {}\n";
+        LockfileObject lockfile = LockfileReader.read(lock, release("11.5.3")).getLockfile();
+        assertThatThrownBy(() -> VerifyLockfileResolutions.verifyLockfileResolutions(lockfile,
+          Collections.emptyList(), release("11.5.3")))
+          .isInstanceOfSatisfying(PnpmError.class, e -> {
+              assertThat(e.getCode()).isEqualTo("ERR_PNPM_RESOLUTION_SHAPE_MISMATCH");
+              assertThat(e.getMessage()).isEqualTo("1 lockfile entries failed verification:\n  foo@1.0.0 a " +
+                                                   "registry-style dependency path is backed by a non-registry " +
+                                                   "resolution");
+          });
+        VerifyLockfileResolutions.verifyLockfileResolutions(LockfileReader.read(lock, release("11.5.2"))
+          .getLockfile(), Collections.emptyList(), release("11.5.2"));
+    }
+
+    /**
+     * config/reader loadNpmrcFiles.ts and getOptionsFromRootManifest.ts (11.5.3): the project's .npmrc leaves out a
+     * registry or a credential it takes from the environment, and its pnpm-workspace.yaml a registry; before, both
+     * are expanded. The user's .npmrc expands them either way.
+     */
+    @Test
+    void ignoresTheEnvironmentInRepositoryRequestDestinationsFrom1153() {
+        Map<String, String> env = new LinkedHashMap<>();
+        env.put("H", "h.test");
+        env.put("A", "Zm9v");
+        String scoped = "@org:registry=https://${H}/\n";
+        assertThat(options("", scoped, null, env, "11.5.2").getRegistries()).containsEntry("@org", "https://h.test/");
+        assertThat(options("", scoped, null, env, "11.5.3").getRegistries()).doesNotContainKey("@org");
+        assertThat(PnpmOptions.load("", null, scoped, null, env, release("11.5.3")).getRegistries())
+          .containsEntry("@org", "https://h.test/");
+        // _auth of "foo" has no user:password separator
+        String auth = "//registry.npmjs.org/:_auth=${A}\n";
+        assertThatThrownBy(() -> options("", auth, null, env, "11.5.2"))
+          .isInstanceOfSatisfying(PnpmError.class,
+            e -> assertThat(e.getCode()).isEqualTo("ERR_PNPM_AUTH_MISSING_SEPARATOR"));
+        options("", auth, null, env, "11.5.3");
+        String workspace = "registry: ${UNSET}\n";
+        assertThatThrownBy(() -> options(workspace, null, null, env, "11.5.2"))
+          .isInstanceOf(JsError.class)
+          .hasMessageContaining("Failed to replace env in config: ${UNSET}");
+        assertThat(options(workspace, null, null, env, "11.5.3").getRegistries())
+          .containsEntry("default", REGISTRY);
+    }
+
+    /**
+     * pnpm packageManagerRegistries.ts, switchCliVersion.ts and syncEnvLockfile.ts (11.5.3): pnpm resolves itself
+     * from the registries of the user's .npmrc and the environment alone; before, from the project's too.
+     */
+    @Test
+    void resolvesThePackageManagerFromTrustedConfigFrom1153() {
+        String npmrc = "registry=https://mirror.test/\n";
+        assertThat(options("", npmrc, null, Collections.emptyMap(), "11.5.3")
+          .packageManagerBootstrap(release("11.5.3")).getRegistries()).containsEntry("default", REGISTRY);
+        assertThat(options("", npmrc, null, Collections.emptyMap(), "11.5.2")
+          .packageManagerBootstrap(release("11.5.2")).getRegistries())
+          .containsEntry("default", "https://mirror.test/");
+        assertThat(PnpmOptions.load("", npmrc, "registry=https://u.test/\n", null, Collections.emptyMap(),
+            release("11.5.3")).packageManagerBootstrap(release("11.5.3")).getRegistries())
+          .containsEntry("default", "https://u.test/");
+    }
+
+    private static String envDocument(String pnpm, String pnpmResolution) {
+        return "---\nlockfileVersion: '9.0'\n\nimporters:\n\n  .:\n    configDependencies: {}\n" +
+               "    packageManagerDependencies:\n      '@pnpm/exe':\n        specifier: " + pnpm + "\n" +
+               "        version: " + pnpm + "\n      pnpm:\n        specifier: " + pnpm + "\n" +
+               "        version: " + pnpm + "\n\npackages:\n\n  '@pnpm/exe@" + pnpm + "':\n" +
+               "    resolution: {integrity: sha512-y}\n\n  pnpm@" + pnpm + ":\n    resolution: " + pnpmResolution +
+               "\n\nsnapshots:\n\n  '@pnpm/exe@" + pnpm + "': {}\n\n  pnpm@" + pnpm + ": {}\n";
+    }
+
+    private static PnpmLockRegenerator switching(String runs, String wanted, String pnpmResolution) {
+        return new PnpmLockRegenerator(PnpmLockRegenerator.Inputs.builder()
+          .lock(envDocument(wanted, pnpmResolution) + "\n---\n" + WRAPPY_LOCK)
+          .manifest("", "{\"name\":\"p\",\"version\":\"1.0.0\",\"dependencies\":{\"wrappy\":\"1.0.2\"}," +
+                        "\"devEngines\":{\"packageManager\":{\"name\":\"pnpm\",\"version\":\"" + wanted +
+                        "\",\"onFail\":\"download\"}}}")
+          .env(Collections.emptyMap())
+          .now(NOW)
+          .host(Host.builder().nodeVersion("v24.21.0").os("darwin").cpu("arm64").build())
+          .release(release(runs))
+          .build(), WRAPPY_ONLY);
+    }
+
+    /**
+     * pnpm switchCliVersion.ts and packageManagerLockfile.ts (11.5.3): before handing the install to the release
+     * the env document locks, pnpm checks that it is a registry package locked by its integrity alone; before, it
+     * hands over without.
+     */
+    @Test
+    void checksTheEnvDocumentBeforeSwitchingFrom1153() {
+        String tarball = "{integrity: sha512-x, tarball: 'https://example.test/pnpm.tgz'}";
+        assertThatThrownBy(() -> switching("11.5.3", "11.5.2", tarball).install())
+          .isInstanceOfSatisfying(PnpmError.class, e -> {
+              assertThat(e.getCode()).isEqualTo("ERR_PNPM_INVALID_PACKAGE_MANAGER_LOCKFILE");
+              assertThat(e.getMessage()).isEqualTo("The packageManager dependency \"pnpm@11.5.2\" in " +
+                                                   "pnpm-lock.yaml must use a registry package path and an " +
+                                                   "integrity-only resolution");
+          });
+        assertThatThrownBy(() -> switching("11.5.2", "11.5.3", tarball).install())
+          .isInstanceOf(CannotKnow.class)
+          .hasMessageContaining("pnpm 11.5.3, which pnpm 11.5.2 downloads and hands the install over to");
+        assertThatThrownBy(() -> switching("11.5.3", "11.5.2", "{integrity: sha512-x}").install())
+          .isInstanceOf(CannotKnow.class)
+          .hasMessageContaining("pnpm 11.5.2, which pnpm 11.5.3 downloads and hands the install over to");
+    }
+
+    /**
+     * installing/commands installDeps.ts and verifyPacquetIdentity.ts (11.5.3): a pacquet the configDependencies
+     * name and the env document locks for the host has its registry signatures checked, which no input holds;
+     * before, a lock-only install never reads it. Without its binary for the host, pnpm uses its own engine.
+     */
+    @Test
+    void verifiesPacquetBeforeInstallingFrom1153() {
+        String env = "lockfileVersion: '9.0'\n\nimporters:\n\n  .:\n    configDependencies:\n      pacquet:\n" +
+                     "        specifier: 1.0.0\n        version: 1.0.0\n\npackages:\n\n" +
+                     "  '@pacquet/darwin-arm64@1.0.0':\n    resolution: {integrity: sha512-y}\n\n" +
+                     "  pacquet@1.0.0:\n    resolution: {integrity: sha512-x}\n\nsnapshots:\n\n" +
+                     "  '@pacquet/darwin-arm64@1.0.0': {}\n\n  pacquet@1.0.0:\n    optionalDependencies:\n" +
+                     "      '@pacquet/darwin-arm64': 1.0.0\n";
+        EnvLockfile envLockfile = EnvLockfile.readEnvLockfile("---\n" + env + "\n---\n" + EMPTY_LOCK);
+        Host darwin = Host.builder().os("darwin").cpu("arm64").build();
+        String workspace = "configDependencies:\n  pacquet: 1.0.0+sha512-x\n";
+        assertThatThrownBy(() -> InstallDeps.verifyPacquetIdentity(
+          options(workspace, null, null, Collections.emptyMap(), "11.5.3"), () -> envLockfile, darwin))
+          .isInstanceOf(CannotKnow.class)
+          .hasMessageContaining("signatures of pacquet@1.0.0 and @pacquet/darwin-arm64@1.0.0");
+        InstallDeps.verifyPacquetIdentity(options(workspace, null, null, Collections.emptyMap(), "11.5.2"),
+          () -> envLockfile, darwin);
+        InstallDeps.verifyPacquetIdentity(options(workspace, null, null, Collections.emptyMap(), "11.5.3"),
+          () -> envLockfile, Host.builder().os("linux").cpu("x64").build());
+    }
+
+    private static final RegistryMetadata NODE_22 = new RegistryMetadata() {
+        @Override
+        public @Nullable String packument(String registry, String name, boolean fullMetadata) {
+            return null;
+        }
+
+        @Override
+        public @Nullable String attestations(String registry, String name, String version) {
+            return null;
+        }
+
+        @Override
+        public @Nullable String document(String url) {
+            if (url.equals(NodeRuntimeResolver.DEFAULT_NODE_MIRROR_BASE_URL + "index.json")) {
+                return "[{\"version\":\"v22.0.0\",\"lts\":false}]";
+            }
+            if (url.equals(NodeRuntimeResolver.DEFAULT_NODE_MIRROR_BASE_URL + "v22.0.0/SHASUMS256.txt")) {
+                return "aa  node-v22.0.0-linux-x64.tar.gz\n";
+            }
+            return null;
+        }
+    };
+
+    /**
+     * engine/runtime/node-resolver and crypto/shasums-file verifyNodeShasums.ts (11.5.3): a release-channel Node.js
+     * runtime is resolved from a SHASUMS256.txt whose signature a Node.js release key made, which no input holds;
+     * before, from the file alone.
+     */
+    @Test
+    void verifiesTheNodeShasumsSignatureFrom1153() {
+        ResolveDependencies.WantedDependency node = new ResolveDependencies.WantedDependency("node", "runtime:22.0.0",
+          false, false);
+        assertThatThrownBy(() -> NodeRuntimeResolver.resolveNodeRuntime(NODE_22, node, null, null, null, "linux",
+          release("11.5.3")))
+          .isInstanceOf(CannotKnow.class)
+          .hasMessageContaining("v22.0.0/SHASUMS256.txt.sig");
+        NpmResolver.ResolveResult resolved = NodeRuntimeResolver.resolveNodeRuntime(NODE_22, node, null, null, null,
+          "linux", release("11.5.2"));
+        assertThat(resolved).isNotNull();
+        assertThat(resolved.id).isEqualTo("node@runtime:22.0.0");
     }
 }

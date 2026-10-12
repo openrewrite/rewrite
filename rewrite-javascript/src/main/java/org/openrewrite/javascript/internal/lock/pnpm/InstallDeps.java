@@ -17,6 +17,7 @@ package org.openrewrite.javascript.internal.lock.pnpm;
 
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.javascript.internal.lock.CannotKnow;
+import org.openrewrite.javascript.internal.lock.Host;
 import org.openrewrite.javascript.internal.lock.RootRelativePath;
 import org.openrewrite.javascript.internal.lock.pnpm.ExtendInstallOptions.InstallOptions;
 
@@ -25,6 +26,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.function.Consumer;
+import java.util.function.Supplier;
 
 /**
  * Port of @pnpm/installing.commands src/installDeps.ts (pnpm 11.2.2) for {@code pnpm install --lockfile-only}: the
@@ -54,6 +56,7 @@ final class InstallDeps {
     Install.Result installDeps(PnpmOptions opts, @Nullable List<Verification.Project> allProjects,
                                ProjectsGraph.@Nullable Result allProjectsGraph) {
         NpmResolver store = stores.createNewStoreController(opts, opts.getFetchFullMetadata());
+        verifyPacquetIdentity(opts, install::readEnvLockfile, inputs.getHost());
         Object runtimeOnFail = opts.get("runtimeOnFail");
         if (allProjects != null && Js.truthy(runtimeOnFail)) {
             for (Verification.Project project : allProjects) {
@@ -70,6 +73,66 @@ final class InstallDeps {
         }
         return install.install(project, new InstallOptions(opts, opts.getOverrides(), null, false, store,
                 setupPolicyHandlers(opts)));
+    }
+
+    /**
+     * installDeps.ts' pacquet check of 11.5.3 (verifyPacquetIdentity.ts), which a lock-only install makes too
+     * ({@link PnpmRelease#verifiesPacquetBeforeInstalling}): where the configDependencies name pacquet and the env
+     * document locks it and its binary for the host's platform by integrity, pnpm checks the registry's signatures of
+     * both against npm's signing keys, which no input holds; otherwise it warns and uses its own engine. The env
+     * document is the lock's directory's.
+     */
+    @SuppressWarnings("unchecked")
+    static void verifyPacquetIdentity(PnpmOptions opts, Supplier<@Nullable EnvLockfile> envLockfiles, Host host) {
+        Object configDependencies = opts.get("configDependencies");
+        if (!(configDependencies instanceof Map)) {
+            return;
+        }
+        Map<String, @Nullable Object> declared = (Map<String, @Nullable Object>) configDependencies;
+        String packageName = declared.get("@pnpm/pacquet") != null ? "@pnpm/pacquet" :
+                declared.get("pacquet") != null ? "pacquet" : null;
+        if (packageName == null || !opts.getRelease().verifiesPacquetBeforeInstalling()) {
+            return;
+        }
+        EnvLockfile envLockfile = envLockfiles.get();
+        if (envLockfile == null) {
+            return;
+        }
+        Object shim = envLockfile.configDependencies().get(packageName);
+        if (!(shim instanceof Map)) {
+            return;
+        }
+        String shimKey = packageName + "@" + Js.string(((Map<String, @Nullable Object>) shim).get("version"));
+        if (registryIntegrity(envLockfile.packages().get(shimKey)) == null) {
+            return;
+        }
+        if (host.getOs() == null || host.getCpu() == null) {
+            throw new CannotKnow("the platform and architecture of the host, whose pacquet binary pnpm checks");
+        }
+        String platformPkgName = "@pacquet/" + host.getOs() + "-" + host.getCpu();
+        Object snapshot = envLockfile.snapshots().get(shimKey);
+        Object optionalDependencies = snapshot instanceof Map ?
+                ((Map<String, @Nullable Object>) snapshot).get("optionalDependencies") : null;
+        Object platformVersion = optionalDependencies instanceof Map ?
+                ((Map<String, @Nullable Object>) optionalDependencies).get(platformPkgName) : null;
+        if (platformVersion == null) {
+            return;
+        }
+        String platformKey = platformPkgName + "@" + Js.string(platformVersion);
+        if (registryIntegrity(envLockfile.packages().get(platformKey)) == null) {
+            return;
+        }
+        throw new CannotKnow("whether the registry's signatures of " + shimKey + " and " + platformKey + " match " +
+                             "the integrities the env document locks (pnpm checks them before the install)");
+    }
+
+    @SuppressWarnings("unchecked")
+    private static @Nullable String registryIntegrity(@Nullable Object packageInfo) {
+        Object resolution = packageInfo instanceof Map ?
+                ((Map<String, @Nullable Object>) packageInfo).get("resolution") : null;
+        Object integrity = resolution instanceof Map ? ((Map<String, @Nullable Object>) resolution).get("integrity") :
+                null;
+        return integrity instanceof String && !((String) integrity).isEmpty() ? (String) integrity : null;
     }
 
     // cli.utils' tryReadProjectManifest, which checks packageIsInstallable; null without a package.json

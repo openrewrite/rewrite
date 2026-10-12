@@ -403,14 +403,15 @@ public final class Main {
         checkPackageManager(pm, underCorepack, current);
         if (rootLockFile == null) {
             if (SyncEnvLockfile.syncEnvLockfile(pm, () -> null, running()) != null) {
-                unlessLocked = stores.storeControllerFailure(options);
+                unlessLocked = stores.storeControllerFailure(options.packageManagerBootstrap(running()));
             }
             return current;
         }
         String version = SyncEnvLockfile.syncEnvLockfile(pm, rootLockFile::readEnvLockfile, running());
         if (version != null) {
+            PnpmOptions bootstrap = options.packageManagerBootstrap(running());
             envInstaller.resolvePackageManagerIntegrities(version, rootLockFile.readEnvLockfile(), true, rootLockFile,
-                    stores.createStoreController(options), options);
+                    stores.createStoreController(bootstrap), bootstrap);
         }
         return current;
     }

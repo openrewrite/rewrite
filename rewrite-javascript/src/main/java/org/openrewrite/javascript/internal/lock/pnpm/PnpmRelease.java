@@ -155,6 +155,14 @@ public final class PnpmRelease {
         return atLeast(11, 4, 0);
     }
 
+    /**
+     * A tarball URL is git-hosted in any case ({@code https://CodeLoad.GitHub.com/...}, {@code TAR.GZ}), and
+     * lockfile.fs asks lockfile.utils, from 11.5.3; before, only as written in lower case.
+     */
+    boolean matchesGitHostedTarballUrlsInAnyCase() {
+        return atLeast(11, 5, 3);
+    }
+
     // @pnpm/lockfile.fs src/yamlDocuments.ts
 
     /**
@@ -253,7 +261,26 @@ public final class PnpmRelease {
         return atLeast(11, 4, 0);
     }
 
-    // pnpm/src main.ts, syncEnvLockfile.ts
+    /**
+     * The project's own .npmrc expands no environment variable in a request destination (a registry, a {@code //}
+     * key, a proxy) or a credential, and its pnpm-workspace.yaml none in {@code registry}, {@code pnprServer},
+     * {@code registries} or {@code namedRegistries}: such an entry is left out with a warning, from 11.5.3; before,
+     * each is expanded as any other.
+     */
+    boolean ignoresTheEnvironmentInRepositoryRequestDestinations() {
+        return atLeast(11, 5, 3);
+    }
+
+    /**
+     * pnpm resolves and fetches itself (the package manager check and the switch) from {@code
+     * packageManagerRegistries}, those of its built-in config, the user's .npmrc and the environment alone, from
+     * 11.5.3 (getPackageManagerBootstrapConfig); before, from the install's registries, the project's among them.
+     */
+    boolean resolvesThePackageManagerFromTrustedConfig() {
+        return atLeast(11, 5, 3);
+    }
+
+    // pnpm/src main.ts, syncEnvLockfile.ts, switchCliVersion.ts, packageManagerLockfile.ts
 
     /**
      * devEngines.runtime and engines.runtime with {@code onFail} error or warn check the runtime's version, error
@@ -270,6 +297,38 @@ public final class PnpmRelease {
      */
     boolean recordsTheReleaseAnEnvDocumentLacks() {
         return atLeast(11, 1, 3);
+    }
+
+    /**
+     * Before it hands the install to another release, pnpm checks that each package the env document's
+     * packageManagerDependencies reach is a registry package locked by an integrity alone
+     * ({@code ERR_PNPM_INVALID_PACKAGE_MANAGER_LOCKFILE}), ahead of its store controller, from 11.5.3; before, it
+     * checks nothing.
+     */
+    boolean checksTheEnvDocumentBeforeSwitching() {
+        return atLeast(11, 5, 3);
+    }
+
+    // @pnpm/installing.commands src/installDeps.ts, verifyPacquetIdentity.ts
+
+    /**
+     * A pacquet the configDependencies name, locked with its binary for the host by integrity, has its registry
+     * signatures checked before every install, a lock-only one too, from 11.5.3; before, a lock-only install never
+     * reads it.
+     */
+    boolean verifiesPacquetBeforeInstalling() {
+        return atLeast(11, 5, 3);
+    }
+
+    // @pnpm/engine.runtime.node-resolver src/index.ts, @pnpm/crypto.shasums-file src/verifyNodeShasums.ts
+
+    /**
+     * A Node.js runtime of the release channel is resolved from a SHASUMS256.txt whose OpenPGP signature
+     * ({@code SHASUMS256.txt.sig}) a Node.js release key must have made, from 11.5.3; before, the file is read
+     * unsigned.
+     */
+    boolean verifiesTheNodeShasumsSignature() {
+        return atLeast(11, 5, 3);
     }
 
     // @pnpm/config.pick-registry-for-package src/index.ts
@@ -366,6 +425,18 @@ public final class PnpmRelease {
         return atLeast(11, 5, 2);
     }
 
+    // @pnpm/installing.deps-installer src/install/verifyLockfileResolutions.ts
+
+    /**
+     * A lock entry whose dep path is a registry version ({@code name@version}) but whose resolution is no registry
+     * tarball (typed, git-hosted, or a tarball URL neither http nor https) fails the lock's verification with
+     * {@code ERR_PNPM_RESOLUTION_SHAPE_MISMATCH}, ahead of any verifier and with none active, from 11.5.3; before, it
+     * is read as it is.
+     */
+    boolean rejectsARegistryDepPathWithANonRegistryResolution() {
+        return atLeast(11, 5, 3);
+    }
+
     // @pnpm/installing.env-installer src/resolveOptionalSubdeps.ts, resolveAndInstallConfigDeps.ts,
     // installConfigDeps.ts
 
@@ -456,6 +527,14 @@ public final class PnpmRelease {
      */
     boolean replacesAnInheritedParentThatBreaksAPeerDiamond() {
         return atLeast(11, 5, 1);
+    }
+
+    /**
+     * Variants of a package with as many dependencies are deduplicated in the order of their dep paths, from 11.5.3
+     * (deduplicateDepPaths); before, in the order the variants were made.
+     */
+    boolean breaksPeerDedupeTiesByDepPath() {
+        return atLeast(11, 5, 3);
     }
 
     // @pnpm/installing.deps-installer src/install/index.ts (installSome's catalogMode)

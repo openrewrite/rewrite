@@ -26,6 +26,7 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.regex.Pattern;
 
 /**
  * Port of @pnpm/installing.deps-installer src/install/verifyLockfileResolutions.ts (pnpm 11.2.2).
@@ -33,6 +34,8 @@ import java.util.Set;
 final class VerifyLockfileResolutions {
 
     private static final int MAX_VIOLATIONS_TO_PRINT = 20;
+
+    private static final Pattern HTTP_URL = Pattern.compile("^https?://", Pattern.CASE_INSENSITIVE);
 
     private VerifyLockfileResolutions() {
     }
@@ -69,7 +72,15 @@ final class VerifyLockfileResolutions {
      */
     static void verifyLockfileResolutions(LockfileObject lockfile, List<? extends ResolutionVerifier> verifiers,
                                           PnpmRelease release) {
-        if (verifiers.isEmpty() || lockfile.getPackages() == null) {
+        if (lockfile.getPackages() == null) {
+            return;
+        }
+        // from 11.5.3 a registry dep path backed by another resolution fails ahead of any verifier
+        List<ResolutionPolicyViolation> shapeViolations = collectShapeViolations(lockfile);
+        if (!shapeViolations.isEmpty() && release.rejectsARegistryDepPathWithANonRegistryResolution()) {
+            throw buildVerificationError(shapeViolations);
+        }
+        if (verifiers.isEmpty()) {
             return;
         }
         Map<String, Candidate> candidates = collectCandidates(lockfile, release);
@@ -139,6 +150,71 @@ final class VerifyLockfileResolutions {
             candidates.put(key, new Candidate(name, version, nonSemverVersion, snapshot.getResolution()));
         }
         return candidates;
+    }
+
+    // collectCandidates' shapeViolations of 11.5.3, one for each dep path
+    private static List<ResolutionPolicyViolation> collectShapeViolations(LockfileObject lockfile) {
+        List<ResolutionPolicyViolation> violations = new ArrayList<>();
+        Map<String, PackageSnapshot> packages = lockfile.getPackages();
+        if (packages == null) {
+            return violations;
+        }
+        for (String depPath : Js.keys(packages)) {
+            PackageSnapshot snapshot = packages.get(depPath);
+            DepPath.DependencyPath pkgInfo = DepPath.parse(depPath);
+            String name = pkgInfo.getName();
+            String version = snapshot.getVersion() != null ? snapshot.getVersion() : pkgInfo.getVersion();
+            if (name == null || name.isEmpty() || version == null || version.isEmpty()) {
+                continue;
+            }
+            if (pkgInfo.getNonSemverVersion() == null && !isRegistryShapedResolution(snapshot.getResolution())) {
+                violations.add(new ResolutionPolicyViolation(name, version, snapshot.getResolution(),
+                        "RESOLUTION_SHAPE_MISMATCH",
+                        "a registry-style dependency path is backed by a non-registry resolution"));
+            }
+        }
+        return violations;
+    }
+
+    @SuppressWarnings("unchecked")
+    private static boolean isRegistryShapedResolution(@Nullable Object resolution) {
+        if (resolution == null || resolution == Js.UNDEFINED) {
+            return true;
+        }
+        if (!(resolution instanceof Map)) {
+            return false;
+        }
+        Map<String, @Nullable Object> r = (Map<String, @Nullable Object>) resolution;
+        Object type = r.get("type");
+        if ("variations".equals(type)) {
+            Object variants = r.get("variants");
+            if (!(variants instanceof List)) {
+                return false;
+            }
+            for (Object variant : (List<Object>) variants) {
+                if (variant instanceof Map &&
+                    !isRegistryShapedResolution(((Map<String, Object>) variant).get("resolution"))) {
+                    return false;
+                }
+            }
+            return true;
+        }
+        if (type instanceof String && ((String) type).startsWith("custom:")) {
+            return true;
+        }
+        if (type != null && type != Js.UNDEFINED) {
+            return false;
+        }
+        Object gitHosted = r.get("gitHosted");
+        if (gitHosted != null && gitHosted != Js.UNDEFINED && !Boolean.FALSE.equals(gitHosted)) {
+            return false;
+        }
+        Object tarball = r.get("tarball");
+        if (tarball instanceof String && !((String) tarball).isEmpty()) {
+            return HTTP_URL.matcher((String) tarball).find() &&
+                   !LockfileUtils.isGitHostedTarballUrlInAnyCase((String) tarball);
+        }
+        return true;
     }
 
     // pnpm checks entries concurrently; each entry's verifiers run in turn and the first failure is its violation

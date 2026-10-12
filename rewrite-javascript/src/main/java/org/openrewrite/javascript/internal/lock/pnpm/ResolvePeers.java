@@ -520,7 +520,7 @@ final class ResolvePeers {
                     duplicates.add(depPaths);
                 }
             }
-            Map<String, String> allDepPathsMap = deduplicateAll(depGraph, duplicates);
+            Map<String, String> allDepPathsMap = deduplicateAll(depGraph, duplicates, release);
             for (ProjectToResolve project : projects) {
                 Map<String, String> deps = dependenciesByProjectId.get(project.getId());
                 for (Map.Entry<String, String> dep : deps.entrySet()) {
@@ -538,10 +538,10 @@ final class ResolvePeers {
         return node.getChildren().size() + node.getResolvedPeerNames().size();
     }
 
-    private static Map<String, String> deduplicateAll(Map<String, DependenciesGraphNode> depGraph,
-                                                      List<Set<String>> duplicates) {
+    static Map<String, String> deduplicateAll(Map<String, DependenciesGraphNode> depGraph,
+                                              List<Set<String>> duplicates, PnpmRelease release) {
         Map<String, String> depPathsMap = new LinkedHashMap<>();
-        List<Set<String>> remainingDuplicates = deduplicateDepPaths(duplicates, depGraph, depPathsMap);
+        List<Set<String>> remainingDuplicates = deduplicateDepPaths(duplicates, depGraph, depPathsMap, release);
         if (remainingDuplicates.size() == duplicates.size()) {
             return depPathsMap;
         }
@@ -555,7 +555,7 @@ final class ResolvePeers {
         }
         if (!depPathsMap.isEmpty()) {
             Map<String, String> all = new LinkedHashMap<>(depPathsMap);
-            all.putAll(deduplicateAll(depGraph, remainingDuplicates));
+            all.putAll(deduplicateAll(depGraph, remainingDuplicates, release));
             return all;
         }
         return depPathsMap;
@@ -563,14 +563,13 @@ final class ResolvePeers {
 
     private static List<Set<String>> deduplicateDepPaths(List<Set<String>> duplicates,
                                                          Map<String, DependenciesGraphNode> depGraph,
-                                                         Map<String, String> depPathsMap) {
+                                                         Map<String, String> depPathsMap, PnpmRelease release) {
         Comparator<String> depCountSorter = (a, b) ->
                 nodeDepsCount(depGraph.get(a)) - nodeDepsCount(depGraph.get(b));
         List<Set<String>> remainingDuplicates = new ArrayList<>();
         for (Set<String> depPaths : duplicates) {
             Set<String> unresolvedDepPaths = new LinkedHashSet<>(depPaths);
-            List<String> currentDepPaths = new ArrayList<>(depPaths);
-            currentDepPaths.sort(depCountSorter);
+            List<String> currentDepPaths = sortByDepCount(new ArrayList<>(depPaths), depCountSorter, release);
             while (!currentDepPaths.isEmpty()) {
                 String depPath1 = currentDepPaths.remove(currentDepPaths.size() - 1);
                 List<String> nextDepPaths = new ArrayList<>();
@@ -585,14 +584,23 @@ final class ResolvePeers {
                     }
                 }
                 nextDepPaths.addAll(currentDepPaths);
-                nextDepPaths.sort(depCountSorter);
-                currentDepPaths = nextDepPaths;
+                currentDepPaths = sortByDepCount(nextDepPaths, depCountSorter, release);
             }
             if (!unresolvedDepPaths.isEmpty()) {
                 remainingDuplicates.add(unresolvedDepPaths);
             }
         }
         return remainingDuplicates;
+    }
+
+    // a stable sort by the count of deps; from 11.5.3 a tie goes by dep path
+    // (PnpmRelease#breaksPeerDedupeTiesByDepPath), asked where the two orders differ
+    private static List<String> sortByDepCount(List<String> depPaths, Comparator<String> depCountSorter,
+                                               PnpmRelease release) {
+        List<String> byDepPath = new ArrayList<>(depPaths);
+        byDepPath.sort(depCountSorter.thenComparing(Comparator.naturalOrder()));
+        depPaths.sort(depCountSorter);
+        return depPaths.equals(byDepPath) || !release.breaksPeerDedupeTiesByDepPath() ? depPaths : byDepPath;
     }
 
     private static boolean isCompatibleAndHasMoreDeps(Map<String, DependenciesGraphNode> depGraph, String depPath1,

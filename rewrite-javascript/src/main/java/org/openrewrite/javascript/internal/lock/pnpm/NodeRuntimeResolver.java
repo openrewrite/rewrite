@@ -16,6 +16,7 @@
 package org.openrewrite.javascript.internal.lock.pnpm;
 
 import org.jspecify.annotations.Nullable;
+import org.openrewrite.javascript.internal.lock.CannotKnow;
 import org.openrewrite.javascript.internal.lock.JsError;
 import org.openrewrite.javascript.semver.NodeSemver;
 
@@ -53,7 +54,7 @@ final class NodeRuntimeResolver {
                                                                  ResolveDependencies.@Nullable InfoFromLockfile current,
                                                                  @Nullable String update,
                                                                  @Nullable Map<String, @Nullable Object> mirrors,
-                                                                 @Nullable String hostOs) {
+                                                                 @Nullable String hostOs, PnpmRelease release) {
         String bareSpecifier = wantedDependency.getBareSpecifier();
         if (!"node".equals(wantedDependency.getAlias()) || bareSpecifier == null ||
             !bareSpecifier.startsWith("runtime:")) {
@@ -74,7 +75,8 @@ final class NodeRuntimeResolver {
             throw new PnpmError("NODEJS_VERSION_NOT_FOUND", "Could not find a Node.js version that satisfies " +
                                                             versionSpec);
         }
-        List<Object> variants = readNodeAssets(fetch, nodeMirrorBaseUrl, version);
+        List<Object> variants = readNodeAssets(fetch, nodeMirrorBaseUrl, version,
+                "release".equals(parsed[0]) && release.verifiesTheNodeShasumsSignature());
         String range = version.equals(versionSpec) ? version : "^" + version;
         result.id = "node@runtime:" + version;
         result.normalizedBareSpecifier = "runtime:" + range;
@@ -88,7 +90,14 @@ final class NodeRuntimeResolver {
         return result;
     }
 
-    private static List<Object> readNodeAssets(RegistryMetadata fetch, String nodeMirrorBaseUrl, String version) {
+    private static List<Object> readNodeAssets(RegistryMetadata fetch, String nodeMirrorBaseUrl, String version,
+                                               boolean verifySignature) {
+        if (verifySignature) {
+            // fetchVerifiedNodeShasums: SHASUMS256.txt and its .sig at once, a failed fetch named by its HTTP status,
+            // and the signature checked against the Node.js release keys pnpm holds, none of which the inputs give
+            throw new CannotKnow("whether " + nodeMirrorBaseUrl + "v" + version + "/SHASUMS256.txt.sig is the " +
+                                 "signature of a Node.js release key");
+        }
         List<Object> assets = readNodeAssetsFromMirror(fetch, nodeMirrorBaseUrl, version, false);
         if (DEFAULT_NODE_MIRROR_BASE_URL.equals(nodeMirrorBaseUrl)) {
             try {

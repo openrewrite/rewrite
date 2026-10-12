@@ -20,6 +20,12 @@ import org.jspecify.annotations.Nullable;
 import org.openrewrite.javascript.internal.lock.CannotKnow;
 import org.openrewrite.javascript.semver.NodeSemver;
 
+import java.util.HashSet;
+import java.util.LinkedHashMap;
+import java.util.Map;
+import java.util.Set;
+import java.util.function.Supplier;
+
 /**
  * Port of pnpm/src switchCliVersion.ts and shouldPersistLockfile.ts (pnpm 11.2.2): the release that installs. Where
  * the host does not say which release runs, 11.2.2 does, and the engine follows it to the release it hands the
@@ -91,9 +97,11 @@ final class SwitchCliVersion {
         if (!persistLockfile && (version.equals(current) || follows(version))) {
             return new Switched(version, null);
         }
+        // the store controller and the resolution of pnpm itself take the release's bootstrap config
+        Supplier<PnpmOptions> bootstrap = () -> options.packageManagerBootstrap(running());
         if (lockFile == null && persistLockfile &&
             NodeSemver.satisfies(current, version, NodeSemver.Options.INCLUDE_PRERELEASE)) {
-            PnpmError failure = stores.storeControllerFailure(options);
+            PnpmError failure = stores.storeControllerFailure(bootstrap.get());
             if (failure == null && !(version.equals(current) || follows(version))) {
                 throw new CannotKnow("which pnpm release the workspace's " + LockfileReader.WANTED_LOCKFILE +
                                      " pins for " + version + " (pnpm runs that release)");
@@ -108,24 +116,24 @@ final class SwitchCliVersion {
         // the release pnpm hands over to is the locked one, else one the registry has in range: when that cannot be
         // the release that runs, resolving it only names another
         if (!Js.truthy(pmVersion) || !NodeSemver.satisfies(pmVersion, version, NodeSemver.Options.INCLUDE_PRERELEASE)) {
-            storeToUse = stores.createStoreController(options);
+            storeToUse = stores.createStoreController(bootstrap.get());
             if (!NodeSemver.satisfies(current, version, NodeSemver.Options.INCLUDE_PRERELEASE) && !follows(version)) {
                 throw switchesTo(version);
             }
-            EnvLockfile resolved = envInstaller.resolvePackageManagerIntegrities(version, envLockfile,
-                    persistLockfile, rootLockFile, storeToUse, options);
-            pmVersion = EnvInstaller.lockedVersion(resolved.packageManagerDependencies(), "pnpm");
+            envLockfile = envInstaller.resolvePackageManagerIntegrities(version, envLockfile,
+                    persistLockfile, rootLockFile, storeToUse, bootstrap.get());
+            pmVersion = EnvInstaller.lockedVersion(envLockfile.packageManagerDependencies(), "pnpm");
             if (!Js.truthy(pmVersion)) {
                 // pnpm warns that it cannot resolve the release and goes on
                 return new Switched(current, null);
             }
         } else if (!EnvInstaller.isPackageManagerResolved(envLockfile, Js.string(pmVersion))) {
-            storeToUse = stores.createStoreController(options);
+            storeToUse = stores.createStoreController(bootstrap.get());
             if (!(current.equals(pmVersion) || follows(Js.string(pmVersion)))) {
                 throw switchesTo(Js.string(pmVersion));
             }
-            envInstaller.resolvePackageManagerIntegrities(Js.string(pmVersion), envLockfile, persistLockfile,
-                    rootLockFile, storeToUse, options);
+            envLockfile = envInstaller.resolvePackageManagerIntegrities(Js.string(pmVersion), envLockfile,
+                    persistLockfile, rootLockFile, storeToUse, bootstrap.get());
         }
         if (current.equals(pmVersion)) {
             return new Switched(current, null);
@@ -134,10 +142,99 @@ final class SwitchCliVersion {
             // a root lock the inputs do not hold may pin another release of the range than the one resolved here
             return new Switched(persistLockfile && lockFile == null ? version : Js.string(pmVersion), null);
         }
+        // from 11.5.3 the env document's packageManagerDependencies must be registry packages that record only an
+        // integrity, ahead of the store controller (PnpmRelease#checksTheEnvDocumentBeforeSwitching)
+        if (envLockfile != null && running().checksTheEnvDocumentBeforeSwitching()) {
+            assertPackageManagerLockfileUsesRegistryResolutions(envLockfile);
+        }
         if (storeToUse == null) {
-            stores.createStoreController(options);
+            stores.createStoreController(bootstrap.get());
         }
         throw switchesTo(Js.string(pmVersion));
+    }
+
+    // the release that runs: the one that built the LST, else pnpm's own
+    private PnpmRelease running() {
+        return runs == null ? PnpmRelease.PORTED : runs;
+    }
+
+    /**
+     * pnpm/src packageManagerLockfile.ts (11.5.3): each package the env document's packageManagerDependencies reach is
+     * a registry package whose resolution is an integrity alone.
+     */
+    static void assertPackageManagerLockfileUsesRegistryResolutions(EnvLockfile envLockfile) {
+        Map<String, @Nullable Object> packageManagerDependencies = envLockfile.packageManagerDependencies();
+        if (packageManagerDependencies == null) {
+            throw new PnpmError("INVALID_PACKAGE_MANAGER_LOCKFILE",
+                    "The packageManager dependencies were not found in pnpm-lock.yaml");
+        }
+        Set<String> visited = new HashSet<>();
+        for (String name : Js.keys(packageManagerDependencies)) {
+            Object dependency = packageManagerDependencies.get(name);
+            Object reference = dependency instanceof Map ? ((Map<?, ?>) dependency).get("version") : null;
+            if (!(reference instanceof String)) {
+                throw new CannotKnow("what pnpm makes of the env document's packageManagerDependencies." + name +
+                                     " (no version string)");
+            }
+            String depPath = DepPath.refToRelative((String) reference, name);
+            if (depPath == null) {
+                throw invalidPackageManagerLockfile(name);
+            }
+            assertRegistryPackageManagerDependency(envLockfile, depPath, visited);
+        }
+    }
+
+    @SuppressWarnings("unchecked")
+    private static void assertRegistryPackageManagerDependency(EnvLockfile envLockfile, String depPath,
+                                                               Set<String> visited) {
+        if (!visited.add(depPath)) {
+            return;
+        }
+        Object packageInfo = envLockfile.packages().get(DepPath.removeSuffix(depPath));
+        Object snapshot = envLockfile.snapshots().get(depPath);
+        if (packageInfo == null || snapshot == null) {
+            throw invalidPackageManagerLockfile(depPath);
+        }
+        if (!(packageInfo instanceof Map) || !(snapshot instanceof Map)) {
+            throw new CannotKnow("what pnpm makes of the env document's " + depPath + " (no mapping)");
+        }
+        Map<String, @Nullable Object> info = (Map<String, @Nullable Object>) packageInfo;
+        DepPath.DependencyPath parsed = DepPath.parse(depPath);
+        if (parsed.getName() == null || parsed.getVersion() == null || parsed.getNonSemverVersion() != null ||
+            info.get("id") != null ||
+            info.get("name") != null && !Js.strictEquals(info.get("name"), parsed.getName()) ||
+            info.get("version") != null && !Js.strictEquals(info.get("version"), parsed.getVersion())) {
+            throw invalidPackageManagerLockfile(depPath);
+        }
+        Object resolution = info.get("resolution");
+        if (!(resolution instanceof Map) || ((Map<String, @Nullable Object>) resolution).size() != 1 ||
+            !(((Map<String, @Nullable Object>) resolution).get("integrity") instanceof String) ||
+            ((String) ((Map<String, @Nullable Object>) resolution).get("integrity")).isEmpty()) {
+            throw invalidPackageManagerLockfile(depPath);
+        }
+        Map<String, @Nullable Object> children = new LinkedHashMap<>();
+        for (String field : new String[]{"dependencies", "optionalDependencies"}) {
+            Object deps = ((Map<String, @Nullable Object>) snapshot).get(field);
+            if (deps instanceof Map) {
+                children.putAll((Map<String, @Nullable Object>) deps);
+            }
+        }
+        for (Map.Entry<String, @Nullable Object> child : children.entrySet()) {
+            if (!(child.getValue() instanceof String)) {
+                throw new CannotKnow("what pnpm makes of the env document's " + depPath + " " + child.getKey() +
+                                     " (no reference string)");
+            }
+            String nextDepPath = DepPath.refToRelative((String) child.getValue(), child.getKey());
+            if (nextDepPath == null) {
+                throw invalidPackageManagerLockfile(depPath);
+            }
+            assertRegistryPackageManagerDependency(envLockfile, nextDepPath, visited);
+        }
+    }
+
+    private static PnpmError invalidPackageManagerLockfile(String depPath) {
+        return new PnpmError("INVALID_PACKAGE_MANAGER_LOCKFILE", "The packageManager dependency \"" + depPath +
+                "\" in pnpm-lock.yaml must use a registry package path and an integrity-only resolution");
     }
 
     /**

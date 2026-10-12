@@ -280,7 +280,7 @@ final class PackageRequester {
             }
         }
         result = NodeRuntimeResolver.resolveNodeRuntime(fetch, wantedDependency, currentPkg, options.update,
-                nodeDownloadMirrors, host.getOs());
+                nodeDownloadMirrors, host.getOs(), release);
         if (result != null) {
             return result;
         }
