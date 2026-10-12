@@ -24,7 +24,6 @@ import org.openrewrite.TreeVisitor;
 import org.openrewrite.maven.marker.AlreadyIncremented;
 import org.openrewrite.maven.tree.GroupArtifact;
 import org.openrewrite.maven.tree.ResolvedPom;
-import org.openrewrite.xml.ChangeTagValue;
 import org.openrewrite.xml.tree.Xml;
 
 import java.util.HashMap;
@@ -170,9 +169,8 @@ public class IncrementProjectVersion extends ScanningRecipe<Map<GroupArtifact, S
                 if (newVersion == null || newVersion.equals(oldVersion)) {
                     return t;
                 }
-                t = t.withMarkers(t.getMarkers().add(new AlreadyIncremented(randomId())));
-                return (Xml.Tag) new ChangeTagValue("version", oldVersion, newVersion, null)
-                        .getVisitor().visitNonNull(t, ctx);
+                return t.withChildValue("version", newVersion)
+                        .withMarkers(t.getMarkers().add(new AlreadyIncremented(randomId())));
             }
         };
     }

@@ -158,4 +158,59 @@ class IncrementProjectVersionTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void otherVersionTagsWithSameValueAreNotIncremented() {
+        rewriteRun(
+          spec -> spec.recipe(new IncrementProjectVersion("*", "*", IncrementProjectVersion.SemverDigit.PATCH)),
+          pomXml(
+            """
+              <project>
+                  <groupId>com.example</groupId>
+                  <artifactId>app</artifactId>
+                  <version>3.12.0</version>
+                  <dependencies>
+                      <dependency>
+                          <groupId>org.apache.commons</groupId>
+                          <artifactId>commons-lang3</artifactId>
+                          <version>3.12.0</version>
+                      </dependency>
+                  </dependencies>
+                  <build>
+                      <plugins>
+                          <plugin>
+                              <groupId>org.apache.maven.plugins</groupId>
+                              <artifactId>maven-compiler-plugin</artifactId>
+                              <version>3.12.0</version>
+                          </plugin>
+                      </plugins>
+                  </build>
+              </project>
+              """,
+            """
+              <project>
+                  <groupId>com.example</groupId>
+                  <artifactId>app</artifactId>
+                  <version>3.12.1</version>
+                  <dependencies>
+                      <dependency>
+                          <groupId>org.apache.commons</groupId>
+                          <artifactId>commons-lang3</artifactId>
+                          <version>3.12.0</version>
+                      </dependency>
+                  </dependencies>
+                  <build>
+                      <plugins>
+                          <plugin>
+                              <groupId>org.apache.maven.plugins</groupId>
+                              <artifactId>maven-compiler-plugin</artifactId>
+                              <version>3.12.0</version>
+                          </plugin>
+                      </plugins>
+                  </build>
+              </project>
+              """
+          )
+        );
+    }
 }
