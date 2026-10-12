@@ -379,6 +379,17 @@ public final class PnpmRelease {
         return atLeast(11, 7, 0);
     }
 
+    /**
+     * The resolver fetches full packuments, unless the config's fetchFullMetadata says otherwise, wherever
+     * supportedArchitectures sets libc, under trustPolicy no-downgrade, and under time-based resolution where the
+     * registry has no time field, the install command passing nothing over it, from 11.13.0 (shouldFetchFullMetadata);
+     * before, the install command passes {@code supportedArchitectures.libc && true} (getFetchFullMetadata), and
+     * otherwise time-based resolution and no-downgrade fetch them only where the registry has no time field.
+     */
+    boolean fetchesFullMetadataForLibcAndNoDowngrade() {
+        return atLeast(11, 13, 0);
+    }
+
     // @pnpm/hooks.read-package-hook src/createReadPackageHook.ts
 
     /**
@@ -388,6 +399,20 @@ public final class PnpmRelease {
      */
     boolean mergesThePackageExtensionsOfASelector() {
         return atLeast(11, 7, 0);
+    }
+
+    // @pnpm/config.parse-overrides src/index.ts, @pnpm/hooks.read-package-hook src/createVersionsOverrider.ts
+
+    /**
+     * An override of a package with an empty range ({@code foo@}) converges: its value must be an exact version, and
+     * it replaces only a declared range (a peer's too) that version satisfies, where no other override matches; an
+     * empty range in a parent>child selector, and a convergence value that is no version, are
+     * {@code ERR_PNPM_INVALID_CONVERGENCE_OVERRIDE} (in allowedVersions
+     * {@code ERR_PNPM_INVALID_ALLOWED_VERSION_SELECTOR}), from 11.13.0 (markConvergeOverride, convergeDep); before, an
+     * empty range is any, and the value replaces every range.
+     */
+    boolean convergesAnEmptyRangeOverride() {
+        return atLeast(11, 13, 0);
     }
 
     /**
@@ -516,6 +541,17 @@ public final class PnpmRelease {
      */
     boolean infersAnOptionalPackagesPlatformFromItsName() {
         return atLeast(11, 6, 0);
+    }
+
+    // @pnpm/workspace.workspace-manifest-reader src/index.ts, versioning.ts
+
+    /**
+     * pnpm-workspace.yaml's {@code versioning} must be an object whose fixed, epics, ignore, maxBump, lanes and
+     * changelog are well formed ({@code ERR_PNPM_INVALID_WORKSPACE_CONFIGURATION}), from 11.13.0
+     * (assertValidWorkspaceManifestVersioning); before, the key is not read.
+     */
+    boolean validatesTheVersioningSettings() {
+        return atLeast(11, 13, 0);
     }
 
     // @pnpm/workspace.project-manifest-reader src/index.ts
@@ -1019,6 +1055,16 @@ public final class PnpmRelease {
         return atLeast(11, 8, 0);
     }
 
+    /**
+     * An injected workspace project is a link where each of its children is its own project's, or a node of the same
+     * package that its own project's child of that alias is compatible with and has as many dependencies as (a peer
+     * the injecting project does not give it), from 11.13.0 (getDedupeMap with depPathCompatibility.ts'
+     * isCompatibleAndHasMoreDeps); before, only where each child is its own project's.
+     */
+    boolean dedupesAnInjectedChildTheTargetCovers() {
+        return atLeast(11, 13, 0);
+    }
+
     // @pnpm/installing.deps-installer src/install/index.ts (installSome's catalogMode)
 
     /**
@@ -1039,11 +1085,21 @@ public final class PnpmRelease {
 
     /**
      * A missing peer's range, not only an exact version, takes the highest preferred version it satisfies, and where
-     * none does, the range itself under autoInstallPeers or nothing; the workspace root's dependencies it may be
-     * hoisted as include those wanted but not resolved, by their wanted specifier, from 11.12.0; before, a range takes
+     * none does, the range itself under autoInstallPeers or nothing, from 11.12.0 (hoistPeers); before, a range takes
      * the highest preferred version of any.
      */
     boolean hoistsAPeerInRange() {
+        return atLeast(11, 12, 0);
+    }
+
+    /**
+     * The workspace root's dependencies a missing peer may be hoisted as are a copy taken before any peer is hoisted,
+     * each by the specifier it saves, else its wanted one, with those wanted but not resolved, from 11.12.0
+     * (resolveDependencies.ts' getHoistableRootDeps); before, the root's own list as it grows, the peers hoisted into
+     * it and the providers attached to it among them, a provider saving no specifier and standing before the root's
+     * own dependency on its package where its alias sorts first.
+     */
+    boolean copiesTheRootDependenciesPeersAreHoistedAs() {
         return atLeast(11, 12, 0);
     }
 

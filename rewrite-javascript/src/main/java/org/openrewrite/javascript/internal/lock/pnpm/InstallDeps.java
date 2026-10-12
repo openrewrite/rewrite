@@ -59,7 +59,7 @@ final class InstallDeps {
             throw new PnpmError("CONFIG_CONFLICT_DRY_RUN_WITH_PNPR_SERVER", "Cannot use --dry-run with a configured " +
                     "pnpr server because the pnpr install path resolves and links through the server");
         }
-        NpmResolver store = stores.createNewStoreController(opts, opts.getFetchFullMetadata());
+        NpmResolver store = stores.createInstallStoreController(opts);
         verifyPacquetIdentity(opts, install::readEnvLockfile, inputs.getHost());
         Object runtimeOnFail = opts.get("runtimeOnFail");
         if (allProjects != null && Js.truthy(runtimeOnFail)) {

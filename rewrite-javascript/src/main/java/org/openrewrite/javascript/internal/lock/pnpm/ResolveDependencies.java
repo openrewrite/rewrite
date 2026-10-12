@@ -752,12 +752,14 @@ final class ResolveDependencies {
             if (!ctx.isHoistPeers()) {
                 return Promise.resolved(ctx.getLoop(), new RootResult(addressesOf(byImporters), time));
             }
-            List<RootDep> workspaceRootDeps = new ArrayList<>();
+            WorkspaceRootDeps workspaceRootDeps = new WorkspaceRootDeps(new ArrayList<>(), new ArrayList<>());
             if (ctx.isResolvePeersFromWorkspaceRoot()) {
                 for (int i = 0; i < importers.size(); i++) {
                     if (".".equals(importers.get(i).getOptions().getParentIds().get(0))) {
-                        workspaceRootDeps = hoistableRootDeps(importers.get(i), byImporters.get(i).getPkgAddresses(),
-                                ctx.getRelease());
+                        // 11.2.2 reads the root's own list, which the loop below grows; 11.12.0 a copy of it
+                        // (PnpmRelease#copiesTheRootDependenciesPeersAreHoistedAs)
+                        List<PkgAddress> live = byImporters.get(i).getPkgAddresses();
+                        workspaceRootDeps = new WorkspaceRootDeps(live, hoistableRootDeps(importers.get(i), live));
                         break;
                     }
                 }
@@ -770,7 +772,7 @@ final class ResolveDependencies {
     // resolveRootDependencies' while (true): every importer's required peers, then the optional peers it can hoist
     private static Promise<Void> hoistMissingPeers(ResolutionContext ctx, List<ImporterToResolve> importers,
                                                    List<PkgAddressesByImporter> byImporters,
-                                                   List<RootDep> workspaceRootDeps,
+                                                   WorkspaceRootDeps workspaceRootDeps,
                                                    @Nullable Instant publishedBy) {
         List<Promise<Map<String, List<String>>>> byImporter = new ArrayList<>();
         for (int index = 0; index < byImporters.size(); index++) {
@@ -823,7 +825,7 @@ final class ResolveDependencies {
     // the inner while (true) of one importer: hoist its missing required peers until none is left to hoist
     private static Promise<Map<String, List<String>>> hoistRequiredPeers(
             ResolutionContext ctx, ImporterToResolve importer, PkgAddressesByImporter result,
-            List<RootDep> workspaceRootDeps, @Nullable Instant publishedBy,
+            WorkspaceRootDeps workspaceRootDeps, @Nullable Instant publishedBy,
             Map<String, List<String>> allMissingOptionalPeers) {
         return Promise.async(ctx.getLoop(), () -> {
             ParentPkgAliases parentPkgAliases = importer.getParentPkgAliases();
@@ -860,8 +862,8 @@ final class ResolveDependencies {
             if (missingRequiredPeers.isEmpty()) {
                 return Promise.resolved(ctx.getLoop(), allMissingOptionalPeers);
             }
-            Map<String, String> dependencies = hoistPeers(ctx.isAutoInstallPeers(), ctx.getAllPreferredVersions(),
-                    workspaceRootDeps, missingRequiredPeers, ctx.getRelease());
+            Map<String, String> dependencies = workspaceRootDeps.hoistPeers(ctx.isAutoInstallPeers(),
+                    ctx.getAllPreferredVersions(), missingRequiredPeers, ctx.getRelease());
             if (dependencies.isEmpty()) {
                 return Promise.resolved(ctx.getLoop(), allMissingOptionalPeers);
             }
@@ -2607,38 +2609,69 @@ final class ResolveDependencies {
         String normalizedBareSpecifier;
     }
 
-    // the root's resolved dependencies; from 11.12.0 getHoistableRootDeps, which takes a dependency's wanted
-    // specifier where it saves none, and the wanted ones that resolved to nothing (PnpmRelease#hoistsAPeerInRange)
-    private static List<RootDep> hoistableRootDeps(@Nullable ImporterToResolve rootImporter,
-                                                   List<PkgAddress> rootPkgAddresses, PnpmRelease release) {
+    // getHoistableRootDeps (11.12.0): a copy of the root's resolved dependencies, each by the specifier it saves, else
+    // its wanted one, and the wanted ones that resolved to nothing
+    private static List<RootDep> hoistableRootDeps(ImporterToResolve rootImporter, List<PkgAddress> rootPkgAddresses) {
         List<RootDep> rootDeps = new ArrayList<>();
         Map<String, String> wantedSpecifierByAlias = new LinkedHashMap<>();
-        if (rootImporter != null) {
-            for (WantedDependency wanted : rootImporter.getWantedDependencies()) {
-                if (Js.truthy(wanted.getAlias()) && Js.truthy(wanted.getBareSpecifier())) {
-                    wantedSpecifierByAlias.put(wanted.getAlias(), wanted.getBareSpecifier());
-                }
+        for (WantedDependency wanted : rootImporter.getWantedDependencies()) {
+            if (Js.truthy(wanted.getAlias()) && Js.truthy(wanted.getBareSpecifier())) {
+                wantedSpecifierByAlias.put(wanted.getAlias(), wanted.getBareSpecifier());
             }
         }
-        boolean hoistable = !wantedSpecifierByAlias.isEmpty() && release.hoistsAPeerInRange();
         Set<String> coveredAliases = new LinkedHashSet<>();
         for (PkgAddress pkgAddress : rootPkgAddresses) {
             String specifier = pkgAddress.getNormalizedBareSpecifier();
-            if (specifier == null && hoistable) {
+            if (specifier == null) {
                 specifier = wantedSpecifierByAlias.get(pkgAddress.getAlias());
             }
             rootDeps.add(new RootDep(pkgAddress.getAlias(), pkgAddress.getPkg().get("name"), specifier));
             coveredAliases.add(pkgAddress.getAlias());
         }
-        if (hoistable) {
-            for (Map.Entry<String, String> wanted : wantedSpecifierByAlias.entrySet()) {
-                if (!coveredAliases.contains(wanted.getKey())) {
-                    rootDeps.add(new RootDep(wanted.getKey(), unwrapPackageName(wanted.getKey(), wanted.getValue())[0],
-                            wanted.getValue()));
-                }
+        for (Map.Entry<String, String> wanted : wantedSpecifierByAlias.entrySet()) {
+            if (!coveredAliases.contains(wanted.getKey())) {
+                rootDeps.add(new RootDep(wanted.getKey(), unwrapPackageName(wanted.getKey(), wanted.getValue())[0],
+                        wanted.getValue()));
             }
         }
         return rootDeps;
+    }
+
+    // 11.2.2's workspaceRootDeps, the root's resolved dependencies as they are read: each by the specifier it saves
+    private static List<RootDep> rootDepsOf(List<PkgAddress> rootPkgAddresses) {
+        List<RootDep> rootDeps = new ArrayList<>();
+        for (PkgAddress pkgAddress : rootPkgAddresses) {
+            rootDeps.add(new RootDep(pkgAddress.getAlias(), pkgAddress.getPkg().get("name"),
+                    pkgAddress.getNormalizedBareSpecifier()));
+        }
+        return rootDeps;
+    }
+
+    /**
+     * The workspace root's dependencies missing peers are hoisted as: 11.2.2's root's own list of resolved
+     * dependencies, which grows with the peers the loop hoists into it and the providers it attaches to it, and
+     * 11.12.0's copy, taken before the loop with the dependencies the root wants ({@link #hoistableRootDeps}).
+     */
+    @Value
+    static class WorkspaceRootDeps {
+        List<PkgAddress> live;
+        List<RootDep> copy;
+
+        /**
+         * {@code hoistPeers} over the root's list as it is now, and from 11.12.0 over the copy
+         * ({@link PnpmRelease#copiesTheRootDependenciesPeersAreHoistedAs}), asked where the two hoist otherwise.
+         */
+        Map<String, String> hoistPeers(boolean autoInstallPeers,
+                                       @Nullable Map<String, Map<String, PreferredVersions.Selector>> allPreferred,
+                                       List<Map.Entry<String, MissingPeerInfo>> missingRequiredPeers,
+                                       PnpmRelease release) {
+            Map<String, String> overCopy = ResolveDependencies.hoistPeers(autoInstallPeers, allPreferred, copy,
+                    missingRequiredPeers, release);
+            Map<String, String> overLive = ResolveDependencies.hoistPeers(autoInstallPeers, allPreferred,
+                    rootDepsOf(live), missingRequiredPeers, release);
+            return overCopy.equals(overLive) || release.copiesTheRootDependenciesPeersAreHoistedAs() ? overCopy :
+                    overLive;
+        }
     }
 
     /**
@@ -2648,8 +2681,8 @@ final class ResolveDependencies {
                                           @Nullable Map<String, Map<String, PreferredVersions.Selector>> allPreferred,
                                           List<PkgAddress> workspaceRootDeps,
                                           List<Map.Entry<String, MissingPeerInfo>> missingRequiredPeers) {
-        return hoistPeers(autoInstallPeers, allPreferred, hoistableRootDeps(null, workspaceRootDeps,
-                PnpmRelease.PORTED), missingRequiredPeers, PnpmRelease.PORTED);
+        return hoistPeers(autoInstallPeers, allPreferred, rootDepsOf(workspaceRootDeps), missingRequiredPeers,
+                PnpmRelease.PORTED);
     }
 
     /**

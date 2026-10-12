@@ -91,6 +91,15 @@ final class CreateNewStoreController {
     }
 
     /**
+     * The store controller installDeps creates for the install command: before 11.13.0 install.ts passes
+     * getFetchFullMetadata's {@code supportedArchitectures.libc && true} over the config's fetchFullMetadata, from
+     * 11.13.0 nothing ({@link PnpmRelease#fetchesFullMetadataForLibcAndNoDowngrade}).
+     */
+    NpmResolver createInstallStoreController(PnpmOptions options) {
+        return createNewStoreController(options, options.getFetchFullMetadata(), options.get("fetchFullMetadata"));
+    }
+
+    /**
      * The failure of the store controller pnpm creates, instead of throwing it; null when it is created.
      */
     @Nullable
@@ -104,13 +113,34 @@ final class CreateNewStoreController {
     }
 
     NpmResolver createNewStoreController(PnpmOptions options, @Nullable Object fetchFullMetadata) {
+        return createNewStoreController(options, fetchFullMetadata, fetchFullMetadata);
+    }
+
+    /**
+     * createNewStoreController where 11.2.2's caller passes {@code fetchFullMetadata} and 11.13.0's
+     * {@code fetchFullMetadataFrom11130}, each of which, where set, decides whether the resolver fetches full
+     * packuments: unset, 11.2.2 fetches them under time-based resolution or trustPolicy no-downgrade where the registry
+     * has no time field, 11.13.0 (shouldFetchFullMetadata) wherever supportedArchitectures sets libc, under
+     * no-downgrade, and under time-based resolution where the registry has no time field
+     * ({@link PnpmRelease#fetchesFullMetadataForLibcAndNoDowngrade}), asked where the two differ.
+     */
+    private NpmResolver createNewStoreController(PnpmOptions options, @Nullable Object fetchFullMetadata,
+                                                 @Nullable Object fetchFullMetadataFrom11130) {
         if (options.isTrue("frozenStore") && options.getRelease().opensAFrozenStoreReadOnly()) {
             openFrozenStore();
         }
-        boolean fullMetadata = fetchFullMetadata != null && fetchFullMetadata != Js.UNDEFINED ?
-                Js.truthy(fetchFullMetadata) : ("time-based".equals(options.get("resolutionMode")) ||
-                                                "no-downgrade".equals(options.get("trustPolicy"))) &&
-                                               !options.isTrue("registrySupportsTimeField");
+        boolean timeBased = "time-based".equals(options.get("resolutionMode"));
+        boolean noDowngrade = "no-downgrade".equals(options.get("trustPolicy"));
+        boolean noTimeField = !options.isTrue("registrySupportsTimeField");
+        Map<String, @Nullable Object> supportedArchitectures = options.getSupportedArchitectures();
+        Object libc = supportedArchitectures == null ? null : supportedArchitectures.get("libc");
+        boolean before = fetchFullMetadata != null && fetchFullMetadata != Js.UNDEFINED ?
+                Js.truthy(fetchFullMetadata) : (timeBased || noDowngrade) && noTimeField;
+        boolean after = fetchFullMetadataFrom11130 != null && fetchFullMetadataFrom11130 != Js.UNDEFINED ?
+                Js.truthy(fetchFullMetadataFrom11130) :
+                libc != null && libc != Js.UNDEFINED || noDowngrade || timeBased && noTimeField;
+        boolean fullMetadata = before == after || !options.getRelease().fetchesFullMetadataForLibcAndNoDowngrade() ?
+                before : after;
         PnpmRelease release = options.getRelease();
         Double minimumReleaseAge = options.getNumber("minimumReleaseAge");
         return new NpmResolver(registry, options.getRegistries(), namedRegistries(options),

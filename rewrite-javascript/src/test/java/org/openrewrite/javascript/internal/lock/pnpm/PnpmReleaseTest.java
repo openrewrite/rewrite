@@ -2637,4 +2637,274 @@ class PnpmReleaseTest {
           .hasMessageContaining("with the invalid alias \"@x/../y\" (ERR_PNPM_INVALID_DEPENDENCY_NAME");
         assertThat(placeTraversal("11.10.0")).containsExactly("@x/../y/1.0.0");
     }
+
+    // a registry of these packuments by name
+    private static RegistryMetadata registryOf(Map<String, String> packuments) {
+        return new RegistryMetadata() {
+            @Override
+            public @Nullable String packument(String registry, String name, boolean fullMetadata) {
+                String packument = packuments.get(name);
+                return packument != null ? packument : fail("fetched " + registry + name);
+            }
+
+            @Override
+            public @Nullable String attestations(String registry, String name, String version) {
+                return fail("fetched the attestations of " + name + "@" + version);
+            }
+
+            @Override
+            public @Nullable String document(String url) {
+                return fail("fetched " + url);
+            }
+        };
+    }
+
+    // packuments of these versions, each {name, version, dependencies, peerDependencies[, other fields]} as the bodies
+    // of JSON objects, the last version of a name its latest
+    private static RegistryMetadata versions(String[]... versions) {
+        Map<String, List<String>> byName = new LinkedHashMap<>();
+        Map<String, String> latest = new LinkedHashMap<>();
+        for (String[] v : versions) {
+            byName.computeIfAbsent(v[0], n -> new ArrayList<>()).add("\"" + v[1] + "\":{\"name\":\"" + v[0] +
+              "\",\"version\":\"" + v[1] + "\",\"dependencies\":{" + v[2] + "},\"peerDependencies\":{" + v[3] + "}" +
+              (v.length > 4 ? "," + v[4] : "") + ",\"dist\":{\"integrity\":\"sha512-" + v[0].replaceAll("[^a-z]", "") +
+              v[1].replaceAll("[^0-9]", "") + "\",\"tarball\":\"" + REGISTRY + v[0] + "/-/" +
+              v[0].replaceAll("^@[^/]+/", "") + "-" + v[1] + ".tgz\"}}");
+            latest.put(v[0], v[1]);
+        }
+        Map<String, String> packuments = new LinkedHashMap<>();
+        for (Map.Entry<String, List<String>> name : byName.entrySet()) {
+            packuments.put(name.getKey(), "{\"name\":\"" + name.getKey() + "\",\"dist-tags\":{\"latest\":\"" +
+                                          latest.get(name.getKey()) + "\"},\"versions\":{" +
+                                          String.join(",", name.getValue()) + "}}");
+        }
+        return registryOf(packuments);
+    }
+
+    // a's c peers on a's b 2.0.0, which the root attaches as a provider; the root's zb is b 1.0.0; proj's d peers on b
+    private static final RegistryMetadata ATTACHED_PROVIDER = versions(
+      new String[]{"a", "1.0.0", "\"b\":\"2.0.0\",\"c\":\"1.0.0\"", ""},
+      new String[]{"b", "1.0.0", "", ""},
+      new String[]{"b", "2.0.0", "", ""},
+      new String[]{"c", "1.0.0", "", "\"b\":\"*\""},
+      new String[]{"d", "1.0.0", "", "\"b\":\"*\""});
+
+    // proj's d, as the lock-only install of the root with a and zb and of proj with d writes it
+    private static String installBesideAnAttachedProvider(String release) {
+        String lock = new PnpmLockRegenerator(PnpmLockRegenerator.Inputs.builder()
+          .manifest("", "{\"name\":\"root\",\"version\":\"1.0.0\",\"dependencies\":{\"a\":\"1.0.0\"," +
+                        "\"zb\":\"npm:b@1.0.0\"}}")
+          .manifest("proj", "{\"name\":\"proj\",\"version\":\"1.0.0\",\"dependencies\":{\"d\":\"1.0.0\"}}")
+          .file("pnpm-workspace.yaml", "packages:\n  - proj\nminimumReleaseAge: 0\n")
+          .env(Collections.emptyMap())
+          .now(NOW)
+          .release(release(release))
+          .build(), ATTACHED_PROVIDER).writeLock();
+        int proj = lock.indexOf("\n  proj:\n");
+        return lock.substring(proj, lock.indexOf("\n\npackages:", proj));
+    }
+
+    /**
+     * installing/deps-resolver resolveDependencies.ts getHoistableRootDeps (11.12.0): proj's missing peer b is hoisted
+     * as the root's zb, b 1.0.0, from the copy of the root's dependencies taken before peers are hoisted; before, the
+     * root's own list holds the provider b it attached for a's c by then, whose alias sorts before zb and which saves
+     * no specifier, so that b takes the highest version the install holds, 2.0.0. pnpm 11.11.0 and 11.12.0 wrote these
+     * importers when run on it.
+     */
+    @Test
+    void copiesTheRootDependenciesPeersAreHoistedAsFrom11120() {
+        assertThat(installBesideAnAttachedProvider("11.12.0"))
+          .isEqualTo("\n  proj:\n    dependencies:\n      d:\n        specifier: 1.0.0\n" +
+                     "        version: 1.0.0(b@1.0.0)");
+        assertThat(installBesideAnAttachedProvider("11.11.0"))
+          .isEqualTo("\n  proj:\n    dependencies:\n      d:\n        specifier: 1.0.0\n" +
+                     "        version: 1.0.0(b@2.0.0)");
+    }
+
+    // foo 1.2.3 and 2.0.0; bar depends on and peers on foo ^1.0.0
+    private static final RegistryMetadata CONVERGING = versions(
+      new String[]{"foo", "1.2.3", "", ""},
+      new String[]{"foo", "2.0.0", "", ""},
+      new String[]{"bar", "1.0.0", "\"foo\":\"^1.0.0\"", "\"foo\":\"^1.0.0\""});
+
+    // the lock-only install of a root with foo ^2.0.0 and bar under the override foo@ of value
+    private static String installConverging(String value, String release) {
+        return new PnpmLockRegenerator(PnpmLockRegenerator.Inputs.builder()
+          .manifest("", "{\"name\":\"root\",\"version\":\"1.0.0\",\"dependencies\":{\"foo\":\"^2.0.0\"," +
+                        "\"bar\":\"1.0.0\"}}")
+          .file("pnpm-workspace.yaml", "minimumReleaseAge: 0\noverrides:\n  \"foo@\": " + value + "\n")
+          .env(Collections.emptyMap())
+          .now(NOW)
+          .release(release(release))
+          .build(), CONVERGING).writeLock();
+    }
+
+    // what pnpm 11.12.0 and 11.13.0 wrote: foo as the root installs it, and bar's peer range and peer
+    private static String convergedLock(String fooSpecifier, String foo, String barPeerRange) {
+        return "lockfileVersion: '9.0'\n\nsettings:\n  autoInstallPeers: true\n  excludeLinksFromLockfile: false\n\n" +
+               "overrides:\n  foo@: 1.2.3\n\nimporters:\n\n  .:\n    dependencies:\n      bar:\n" +
+               "        specifier: 1.0.0\n        version: 1.0.0(foo@" + foo + ")\n      foo:\n" +
+               "        specifier: " + fooSpecifier + "\n        version: " + foo + "\n\npackages:\n\n" +
+               "  bar@1.0.0:\n    resolution: {integrity: sha512-bar100}\n    peerDependencies:\n" +
+               "      foo: " + barPeerRange + "\n\n  foo@" + foo + ":\n    resolution: {integrity: sha512-foo" +
+               foo.replace(".", "") + "}\n\nsnapshots:\n\n  bar@1.0.0(foo@" + foo + "):\n    dependencies:\n" +
+               "      foo: " + foo + "\n\n  foo@" + foo + ": {}\n";
+    }
+
+    /**
+     * config/parse-overrides markConvergeOverride and hooks/read-package-hook createVersionsOverrider convergeDep
+     * (11.13.0): foo@ converges bar's ranges, its dependency's and its peer's, on 1.2.3, which the root's ^2.0.0 does
+     * not admit; before, it is an override of any range, the root's too. Its value must be an exact version, and its
+     * empty range is no parent>child selector's. pnpm 11.12.0 and 11.13.0 wrote these locks, and 11.13.0 failed so
+     * over ^1, when run on it.
+     */
+    @Test
+    void convergesAnEmptyRangeOverrideFrom11130() {
+        assertThat(installConverging("1.2.3", "11.13.0")).isEqualTo(convergedLock("^2.0.0", "2.0.0", "1.2.3"));
+        assertThat(installConverging("1.2.3", "11.12.0")).isEqualTo(convergedLock("1.2.3", "1.2.3", "1.2.3"));
+        assertThatThrownBy(() -> installConverging("^1", "11.13.0"))
+          .isInstanceOfSatisfying(PnpmError.class, e -> {
+              assertThat(e.getCode()).isEqualTo("ERR_PNPM_INVALID_CONVERGENCE_OVERRIDE");
+              assertThat(e.getMessage()).isEqualTo("The value of the convergence override \"foo@\" must be an " +
+                                                   "exact version, but got \"^1\"");
+          });
+        assertThat(installConverging("^1", "11.12.0")).contains("        specifier: ^1\n        version: 1.2.3\n");
+        Map<String, String> parentChild = Collections.singletonMap("bar>foo@", "1.2.3");
+        assertThatThrownBy(() -> ParseOverrides.parseOverrides(parentChild, new LinkedHashMap<>(), release("11.13.0")))
+          .hasMessage("Cannot use an empty range in the \"bar>foo@\" selector: convergence overrides (\"pkg@\") " +
+                      "cannot be combined with parent>child selectors");
+        assertThat(ParseOverrides.parseOverrides(parentChild, new LinkedHashMap<>(), release("11.12.0"))).hasSize(1);
+    }
+
+    // c peers on q
+    private static final RegistryMetadata PEERING_ON_Q = versions(
+      new String[]{"c", "1.0.0", "", "\"q\":\"*\""},
+      new String[]{"q", "1.0.0", "", ""});
+
+    // the lock-only install of a workspace whose a injects b, b depending on c and giving it q as a devDependency,
+    // where peers are neither installed nor hoisted, so that a's copy of b has c without q
+    private static String installInjectingFewerPeers(String release) {
+        return new PnpmLockRegenerator(PnpmLockRegenerator.Inputs.builder()
+          .manifest("", "{\"name\":\"root\",\"version\":\"1.0.0\"}")
+          .manifest("a", "{\"name\":\"a\",\"version\":\"1.0.0\",\"dependencies\":{\"b\":\"workspace:*\"}," +
+                         "\"dependenciesMeta\":{\"b\":{\"injected\":true}}}")
+          .manifest("b", "{\"name\":\"b\",\"version\":\"1.0.0\",\"dependencies\":{\"c\":\"1.0.0\"}," +
+                         "\"devDependencies\":{\"q\":\"1.0.0\"}}")
+          .file("pnpm-workspace.yaml", "packages:\n  - a\n  - b\nminimumReleaseAge: 0\nautoInstallPeers: false\n" +
+                                       "dedupePeerDependents: false\n")
+          .env(Collections.emptyMap())
+          .now(NOW)
+          .release(release(release))
+          .build(), PEERING_ON_Q).writeLock();
+    }
+
+    /**
+     * installing/deps-resolver dedupeInjectedDeps.ts getDedupeMap (11.13.0): a's copy of b, whose c lacks the peer q
+     * b's own c has, is a link to b, b's c 1.0.0(q@1.0.0) being of the same package and having more dependencies;
+     * before, only a copy whose children are b's own is, and this one stays file:b. pnpm 11.12.0 and 11.13.0 wrote
+     * these locks when run on it.
+     */
+    @Test
+    void dedupesAnInjectedChildTheTargetCoversFrom11130() {
+        String b = "\n\n  b:\n    dependencies:\n      c:\n        specifier: 1.0.0\n" +
+                   "        version: 1.0.0(q@1.0.0)\n    devDependencies:\n      q:\n        specifier: 1.0.0\n" +
+                   "        version: 1.0.0\n\npackages:\n\n";
+        String c = "  c@1.0.0:\n    resolution: {integrity: sha512-c100}\n    peerDependencies:\n      q: '*'\n\n" +
+                   "  q@1.0.0:\n    resolution: {integrity: sha512-q100}\n\nsnapshots:\n\n";
+        String head = "lockfileVersion: '9.0'\n\nsettings:\n  autoInstallPeers: false\n" +
+                      "  excludeLinksFromLockfile: false\n\nimporters:\n\n  .: {}\n\n  a:\n    dependencies:\n" +
+                      "      b:\n        specifier: workspace:*\n";
+        String tail = "  c@1.0.0(q@1.0.0):\n    dependencies:\n      q: 1.0.0\n\n  q@1.0.0: {}\n";
+        assertThat(installInjectingFewerPeers("11.13.0")).isEqualTo(head + "        version: link:../b" + b + c +
+                                                                   tail);
+        assertThat(installInjectingFewerPeers("11.12.0")).isEqualTo(head + "        version: file:b\n" +
+          "    dependenciesMeta:\n      b:\n        injected: true" + b + "  b@file:b:\n" +
+          "    resolution: {directory: b, type: directory}\n\n" + c + "  b@file:b:\n    dependencies:\n" +
+          "      c: 1.0.0\n    transitivePeerDependencies:\n      - q\n\n  c@1.0.0: {}\n\n" + tail);
+    }
+
+    // whether the store controller of the install command (or else of pnpm's own bootstrap) fetches foo's full
+    // packument to resolve it, under the settings
+    private static boolean fetchesFooInFull(String workspace, String release, boolean install) {
+        List<Boolean> fullMetadata = new ArrayList<>();
+        RegistryMetadata foo = new RegistryMetadata() {
+            @Override
+            public @Nullable String packument(String registry, String name, boolean full) {
+                fullMetadata.add(full);
+                return "{\"name\":\"foo\",\"dist-tags\":{\"latest\":\"1.0.0\"},\"versions\":{\"1.0.0\":{\"name\":" +
+                       "\"foo\",\"version\":\"1.0.0\",\"dist\":{\"integrity\":\"sha512-foo\",\"tarball\":\"" +
+                       REGISTRY + "foo/-/foo-1.0.0.tgz\"}}}}";
+            }
+
+            @Override
+            public @Nullable String attestations(String registry, String name, String version) {
+                return fail("fetched the attestations of " + name + "@" + version);
+            }
+
+            @Override
+            public @Nullable String document(String url) {
+                return fail("fetched " + url);
+            }
+        };
+        PnpmOptions options = options("minimumReleaseAge: 0\n" + workspace, null, null, Collections.emptyMap(),
+          release);
+        CreateNewStoreController stores = new CreateNewStoreController(foo, NOW);
+        NpmResolver resolver = install ? stores.createInstallStoreController(options) :
+          stores.createStoreController(options);
+        PackageRequester.RequestPackageOptions opts = new PackageRequester.RequestPackageOptions();
+        opts.projectDir = "";
+        opts.lockfileDir = "";
+        resolver.resolveNpm(new ResolveDependencies.WantedDependency("foo", "1.0.0", false, false), opts, null);
+        assertThat(fullMetadata).hasSize(1);
+        return fullMetadata.get(0);
+    }
+
+    /**
+     * store/connection-manager createNewStoreController.ts shouldFetchFullMetadata (11.13.0): the full packument is
+     * fetched under trustPolicy no-downgrade though the registry has a time field, for a libc of '' set, and for
+     * pnpm's own store where libc is set; before, no-downgrade fetches it only without the time field, the install
+     * command passes {@code libc && true}, which is '', and pnpm's own store reads no libc.
+     */
+    @Test
+    void fetchesFullMetadataForLibcAndNoDowngradeFrom11130() {
+        String noDowngrade = "trustPolicy: no-downgrade\nregistrySupportsTimeField: true\n";
+        assertThat(fetchesFooInFull(noDowngrade, "11.13.0", true)).isTrue();
+        assertThat(fetchesFooInFull(noDowngrade, "11.12.0", true)).isFalse();
+        String emptyLibc = "supportedArchitectures:\n  libc: ''\n";
+        assertThat(fetchesFooInFull(emptyLibc, "11.13.0", true)).isTrue();
+        assertThat(fetchesFooInFull(emptyLibc, "11.12.0", true)).isFalse();
+        String musl = "supportedArchitectures:\n  libc: [musl]\n";
+        assertThat(fetchesFooInFull(musl, "11.12.0", true)).isTrue();
+        assertThat(fetchesFooInFull(musl, "11.13.0", false)).isTrue();
+        assertThat(fetchesFooInFull(musl, "11.12.0", false)).isFalse();
+        assertThat(fetchesFooInFull("", "11.13.0", true)).isFalse();
+    }
+
+    /**
+     * workspace/workspace-manifest-reader versioning.ts assertValidWorkspaceManifestVersioning (11.13.0): an invalid
+     * versioning setting fails; before, the key is not read. pnpm 11.13.0 failed so, and 11.12.0 wrote the lock, when
+     * run on the lane of foo.
+     */
+    @Test
+    void validatesTheVersioningSettingsFrom11130() {
+        String mainLane = "versioning:\n  lanes:\n    foo: Main\n";
+        assertThatThrownBy(() -> options(mainLane, null, null, Collections.emptyMap(), "11.13.0"))
+          .isInstanceOfSatisfying(PnpmError.class, e -> {
+              assertThat(e.getCode()).isEqualTo("ERR_PNPM_INVALID_WORKSPACE_CONFIGURATION");
+              assertThat(e.getMessage()).isEqualTo("Invalid versioning.lanes entry for foo: \"main\" is the reserved " +
+                                                   "default lane. Remove the entry instead.");
+          });
+        options(mainLane, null, null, Collections.emptyMap(), "11.12.0");
+        assertThatThrownBy(() -> options("versioning: []\n", null, null, Collections.emptyMap(), "11.13.0"))
+          .hasMessage("Expected versioning field to be an object, but found - array");
+        assertThatThrownBy(() -> options("versioning:\n  maxBump: 3\n", null, null, Collections.emptyMap(),
+          "11.13.0"))
+          .hasMessage("Expected versioning.maxBump to be one of patch, minor, major, but found - 3");
+        assertThatThrownBy(() -> options("versioning:\n  epics:\n    - lead: a\n      packages: []\n", null, null,
+          Collections.emptyMap(), "11.13.0"))
+          .hasMessage("Expected versioning.epics entry for \"a\" to have a non-empty \"packages\" array of selector " +
+                      "strings");
+        options("versioning:\n  fixed: [[a, b]]\n  changelog:\n    storage: registry\n", null, null,
+          Collections.emptyMap(), "11.13.0");
+    }
 }

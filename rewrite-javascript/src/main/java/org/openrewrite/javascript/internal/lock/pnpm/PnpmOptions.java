@@ -268,7 +268,8 @@ public final class PnpmOptions {
         Map<String, @Nullable Map<String, @Nullable Object>> catalogs = new LinkedHashMap<>();
         List<String> patterns = null;
         if (workspaceManifest != null) {
-            Map<String, @Nullable Object> manifest = WorkspaceManifest.readWorkspaceManifest(workspaceManifest);
+            Map<String, @Nullable Object> manifest = WorkspaceManifest.readWorkspaceManifest(workspaceManifest,
+                    release);
             patterns = workspacePackagePatterns(manifest);
             if (manifest != null) {
                 Map<String, @Nullable Object> newSettings = getOptionsFromPnpmSettings(manifest, rootManifest, env,
@@ -1856,7 +1857,8 @@ public final class PnpmOptions {
     }
 
     /**
-     * The install command's getFetchFullMetadata.ts: {@code supportedArchitectures.libc && true}.
+     * The install command's getFetchFullMetadata.ts: {@code supportedArchitectures.libc && true}, which 11.13.0
+     * removed ({@link CreateNewStoreController#createInstallStoreController}).
      */
     @Nullable
     Object getFetchFullMetadata() {

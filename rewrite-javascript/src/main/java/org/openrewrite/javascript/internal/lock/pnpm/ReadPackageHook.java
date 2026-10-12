@@ -419,7 +419,14 @@ final class ReadPackageHook {
                                                 PnpmRelease release) {
         List<VersionOverride> versionOverrides = new ArrayList<>();
         List<VersionOverride> genericVersionOverrides = new ArrayList<>();
+        // 11.13.0's convergence overrides, by package name; only a release from 11.13.0 marks any
+        // (PnpmRelease#convergesAnEmptyRangeOverride)
+        Map<String, String> convergeVersions = new LinkedHashMap<>();
         for (ParseOverrides.VersionOverride override : overrides) {
+            if (override.isConverge()) {
+                convergeVersions.put(override.getTargetPkg().getName(), override.getNewBareSpecifier());
+                continue;
+            }
             VersionOverride withTarget = new VersionOverride(override, rootDir);
             if (override.getParentPkg() != null) {
                 versionOverrides.add(withTarget);
@@ -444,7 +451,7 @@ final class ReadPackageHook {
             Object peerDependencies = manifest.get("peerDependencies");
             for (Object deps : new Object[]{dependencies, optionalDependencies, devDependencies}) {
                 if (Js.truthy(deps)) {
-                    overrideDeps(versionOverridesWithParent, genericVersionOverrides, dir,
+                    overrideDeps(versionOverridesWithParent, genericVersionOverrides, convergeVersions, dir,
                             (Map<String, @Nullable Object>) deps, null, release);
                 }
             }
@@ -452,7 +459,7 @@ final class ReadPackageHook {
                 if (!Js.truthy(manifest.get("dependencies"))) {
                     manifest.put("dependencies", new LinkedHashMap<>());
                 }
-                overrideDeps(versionOverridesWithParent, genericVersionOverrides, dir,
+                overrideDeps(versionOverridesWithParent, genericVersionOverrides, convergeVersions, dir,
                         (Map<String, @Nullable Object>) manifest.get("dependencies"),
                         (Map<String, @Nullable Object>) peerDependencies, release);
             }
@@ -462,6 +469,7 @@ final class ReadPackageHook {
 
     private static void overrideDeps(List<VersionOverride> versionOverrides,
                                      List<VersionOverride> genericVersionOverrides,
+                                     Map<String, String> convergeVersions,
                                      @Nullable String dir, Map<String, @Nullable Object> deps,
                                      @Nullable Map<String, @Nullable Object> peerDeps, PnpmRelease release) {
         Map<String, @Nullable Object> source = peerDeps != null ? peerDeps : deps;
@@ -474,6 +482,7 @@ final class ReadPackageHook {
                         matching(genericVersionOverrides, name, bareSpecifier, release), release);
             }
             if (versionOverride == null) {
+                convergeDep(convergeVersions, deps, peerDeps, name, source.get(name), release);
                 continue;
             }
             String targetName = versionOverride.override.getTargetPkg().getName();
@@ -494,6 +503,24 @@ final class ReadPackageHook {
                 peerDeps.put(targetName, newBareSpecifier);
             }
         }
+    }
+
+    // convergeDep (11.13.0): where no other override matched, a convergence override's exact version replaces a
+    // declared range (loose) it satisfies, a peer's in the peers; the ranges it records serve only a warning
+    private static void convergeDep(Map<String, String> convergeVersions, Map<String, @Nullable Object> deps,
+                                    @Nullable Map<String, @Nullable Object> peerDeps, String name,
+                                    @Nullable Object bareSpecifier, PnpmRelease release) {
+        String convergeVersion = convergeVersions.get(name);
+        if (convergeVersion == null || !(bareSpecifier instanceof String) ||
+            release.underSemver(semver -> NodeSemver.validRange((String) bareSpecifier,
+                    NodeSemver.Options.LOOSE.release(semver))) == null) {
+            return;
+        }
+        if (!release.underSemver(semver -> NodeSemver.satisfies(convergeVersion, (String) bareSpecifier,
+                NodeSemver.Options.LOOSE.release(semver)))) {
+            return;
+        }
+        (peerDeps == null ? deps : peerDeps).put(name, convergeVersion);
     }
 
     private static List<VersionOverride> matching(List<VersionOverride> overrides, String name, String bareSpecifier,

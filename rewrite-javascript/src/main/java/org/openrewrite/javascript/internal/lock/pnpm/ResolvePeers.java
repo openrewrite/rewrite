@@ -649,8 +649,9 @@ final class ResolvePeers {
         return depPaths.equals(byDepPath) || !release.breaksPeerDedupeTiesByDepPath() ? depPaths : byDepPath;
     }
 
-    private static boolean isCompatibleAndHasMoreDeps(Map<String, DependenciesGraphNode> depGraph, String depPath1,
-                                                      String depPath2) {
+    // depPathCompatibility.ts' isCompatibleAndHasMoreDeps, which dedupeInjectedDeps asks too from 11.13.0
+    static boolean isCompatibleAndHasMoreDeps(Map<String, DependenciesGraphNode> depGraph, String depPath1,
+                                              String depPath2) {
         DependenciesGraphNode node1 = depGraph.get(depPath1);
         DependenciesGraphNode node2 = depGraph.get(depPath2);
         if (nodeDepsCount(node1) < nodeDepsCount(node2)) {

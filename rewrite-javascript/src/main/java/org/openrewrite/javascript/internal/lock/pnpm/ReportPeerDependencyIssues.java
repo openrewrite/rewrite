@@ -125,7 +125,7 @@ final class ReportPeerDependencyIssues {
         Map<String, List<String>> allowedVersionsMatchAll = new LinkedHashMap<>();
         Map<String, Map<String, List<AllowedVersionsByParent>>> allowedVersionsByParentPkgName = new LinkedHashMap<>();
         parseAllowedVersions(rules.getAllowedVersions() == null ? Collections.emptyMap() :
-                rules.getAllowedVersions(), allowedVersionsMatchAll, allowedVersionsByParentPkgName);
+                rules.getAllowedVersions(), allowedVersionsMatchAll, allowedVersionsByParentPkgName, release);
         Map<String, PeerDependencyIssues> newPeerDependencyIssuesByProjects = new LinkedHashMap<>();
         for (Map.Entry<String, PeerDependencyIssues> project : peerDependencyIssuesByProjects.entrySet()) {
             PeerDependencyIssues issuesOfProject = project.getValue();
@@ -207,12 +207,15 @@ final class ReportPeerDependencyIssues {
                        NodeSemver.Options.DEFAULT.release(semver)));
     }
 
+    // from 11.13.0 a selector of an empty range is a convergence override's, whose rules parseOverrides checks
+    // (PnpmRelease#convergesAnEmptyRangeOverride)
     private static void parseAllowedVersions(Map<String, String> allowedVersions,
                                              Map<String, List<String>> allowedVersionsMatchAll,
-                                             Map<String, Map<String, List<AllowedVersionsByParent>>> byParentPkgName) {
+                                             Map<String, Map<String, List<AllowedVersionsByParent>>> byParentPkgName,
+                                             PnpmRelease release) {
         List<ParseOverrides.VersionOverride> overrides;
         try {
-            overrides = ParseOverrides.parseOverrides(allowedVersions, Collections.emptyMap());
+            overrides = ParseOverrides.parseOverrides(allowedVersions, Collections.emptyMap(), release);
         } catch (PnpmError e) {
             throw new PnpmError("INVALID_ALLOWED_VERSION_SELECTOR", e.getMessage() +
                                                                     " in pnpm.peerDependencyRules.allowedVersions");
