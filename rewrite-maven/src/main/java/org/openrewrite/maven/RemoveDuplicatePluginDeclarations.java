@@ -41,9 +41,7 @@ public class RemoveDuplicatePluginDeclarations extends Recipe {
     private static final XPathMatcher PLUGIN_MANAGEMENT_PLUGINS_MATCHER = new XPathMatcher("//build/pluginManagement/plugins");
     private static final XPathMatcher REPORTING_PLUGINS_MATCHER = new XPathMatcher("//reporting/plugins");
 
-    /**
-     * Plugins the Maven 3.9 super POM manages, which every POM's plugin management inherits.
-     */
+    /// Plugins the Maven 3.9 super POM manages, which every POM's plugin management inherits.
     private static final Set<String> SUPER_POM_MANAGED_PLUGINS = new HashSet<>(Arrays.asList(
             "org.apache.maven.plugins:maven-antrun-plugin",
             "org.apache.maven.plugins:maven-assembly-plugin",
@@ -110,10 +108,8 @@ public class RemoveDuplicatePluginDeclarations extends Recipe {
                 return pluginKeys(management ? requested.getPluginManagement() : requested.getPlugins());
             }
 
-            /**
-             * Plugins the parent's effective model declares, which Maven 3 merged a child's duplicates into while
-             * assembling inheritance, so the child's duplicates were merged rather than the last one winning.
-             */
+            /// Plugins the parent's effective model declares, which Maven 3 merged a child's duplicates into while
+            /// assembling inheritance, so the child's duplicates were merged rather than the last one winning.
             private Set<String> inheritedKeys(boolean management, ExecutionContext ctx) {
                 if (inheritedPlugins == null || inheritedPluginManagement == null) {
                     ResolvedPom parent = parentPom(ctx);
@@ -154,10 +150,8 @@ public class RemoveDuplicatePluginDeclarations extends Recipe {
             "groupId", "artifactId", "version", "extensions", "id", "phase");
 
     private static final BinaryOperator<Xml.Tag> MERGE = (earlier, later) -> mergePlugin(later, earlier, true);
-    /**
-     * Profile injection merges each duplicate into the main build's declaration in turn, and unlike inheritance
-     * and duplicate normalization it keeps every execution, whether inherited or not.
-     */
+    /// Profile injection merges each duplicate into the main build's declaration in turn, and unlike inheritance
+    /// and duplicate normalization it keeps every execution, whether inherited or not.
     private static final BinaryOperator<Xml.Tag> MERGE_INTO_MAIN_BUILD = (earlier, later) -> mergePlugin(later, earlier, false);
     private static final BinaryOperator<Xml.Tag> KEEP_LAST = (earlier, later) -> later;
 
@@ -234,10 +228,8 @@ public class RemoveDuplicatePluginDeclarations extends Recipe {
         return plugins.withContent(collapsed);
     }
 
-    /**
-     * Keeps whether {@code <groupId>} is spelled out the way the first declaration had it, which Maven treats the
-     * same, so the diff doesn't churn on it.
-     */
+    /// Keeps whether `<groupId>` is spelled out the way the first declaration had it, which Maven treats the
+    /// same, so the diff doesn't churn on it.
     private static Xml.Tag withGroupIdOf(Xml.Tag result, Xml.Tag first) {
         Xml.Tag firstGroupId = first.getChild("groupId").orElse(null);
         Xml.Tag resultGroupId = result.getChild("groupId").orElse(null);
@@ -265,10 +257,8 @@ public class RemoveDuplicatePluginDeclarations extends Recipe {
         return trimmedChildValue(plugin, "groupId", "org.apache.maven.plugins") + ":" + artifactId;
     }
 
-    /**
-     * Mirrors {@code DuplicateMerger} in Maven 3's {@code DefaultModelNormalizer}, which merges each duplicate
-     * build plugin into the one before it with the later declaration dominant.
-     */
+    /// Mirrors `DuplicateMerger` in Maven 3's `DefaultModelNormalizer`, which merges each duplicate
+    /// build plugin into the one before it with the later declaration dominant.
     private static Xml.Tag mergePlugin(Xml.Tag dominant, Xml.Tag earlier, boolean onlyInheritedExecutions) {
         Xml.Tag recessive = reindent(earlier, Indent.of(earlier), Indent.of(dominant));
         Xml.Tag merged = inheritChild(dominant, recessive, "version");
@@ -280,10 +270,8 @@ public class RemoveDuplicatePluginDeclarations extends Recipe {
                 RemoveDuplicatePluginDeclarations::mergeExecutions);
     }
 
-    /**
-     * Maven's merge only carries over the earlier declaration's executions that are inherited, so one marked
-     * {@code <inherited>false</inherited>}, or belonging to a plugin marked so, never ran.
-     */
+    /// Maven's merge only carries over the earlier declaration's executions that are inherited, so one marked
+    /// `<inherited>false</inherited>`, or belonging to a plugin marked so, never ran.
     private static Xml.Tag withoutUninheritedExecutions(Xml.Tag plugin) {
         Xml.Tag executions = plugin.getChild("executions").orElse(null);
         if (executions == null) {
@@ -403,12 +391,10 @@ public class RemoveDuplicatePluginDeclarations extends Recipe {
         return dominant.withContent(content);
     }
 
-    /**
-     * Mirrors {@code Xpp3Dom.mergeXpp3Dom(dominant, recessive)}, including its {@code combine.self} and
-     * {@code combine.children} attributes, which is how Maven merges plugin and execution configuration.
-     * Directly inside {@code <configuration>} the elements are plugin parameters, which Maven looks up by name, so
-     * there a parameter only the earlier declaration had keeps its place instead of being appended.
-     */
+    /// Mirrors `Xpp3Dom.mergeXpp3Dom(dominant, recessive)`, including its `combine.self` and
+    /// `combine.children` attributes, which is how Maven merges plugin and execution configuration.
+    /// Directly inside `<configuration>` the elements are plugin parameters, which Maven looks up by name, so
+    /// there a parameter only the earlier declaration had keeps its place instead of being appended.
     private static Xml.Tag mergeDom(Xml.Tag dominant, Xml.Tag recessive, boolean parameters) {
         if ("override".equals(attribute(dominant, "combine.self"))) {
             return dominant;
@@ -492,10 +478,8 @@ public class RemoveDuplicatePluginDeclarations extends Recipe {
         return dominant.withContent(content);
     }
 
-    /**
-     * Places a child copied over from the earlier declaration next to the same neighbours it had there, keeping
-     * the author's element order.
-     */
+    /// Places a child copied over from the earlier declaration next to the same neighbours it had there, keeping
+    /// the author's element order.
     private static int insertionIndex(List<Content> content, Xml.Tag recessive, Xml.Tag recessiveChild) {
         List<Xml.Tag> siblings = recessive.getChildren();
         int at = siblings.indexOf(recessiveChild);
@@ -537,9 +521,7 @@ public class RemoveDuplicatePluginDeclarations extends Recipe {
         return -1;
     }
 
-    /**
-     * Comments on their own lines directly above a tag describe it, so they travel with it when it is merged.
-     */
+    /// Comments on their own lines directly above a tag describe it, so they travel with it when it is merged.
     private static Map<Content, List<Content>> leadingComments(List<? extends Content> content) {
         Map<Content, List<Content>> comments = new IdentityHashMap<>();
         List<Content> pending = new ArrayList<>();
@@ -571,11 +553,9 @@ public class RemoveDuplicatePluginDeclarations extends Recipe {
         return newline < 0 ? prefix : prefix.substring(0, newline + 1) + indent;
     }
 
-    /**
-     * Rewrites the indentation of {@code xml} from one style to another so content moved between declarations
-     * doesn't mix tabs and spaces. Each line is indented by its depth in the tree, which also straightens out a
-     * declaration that was inconsistently indented to begin with.
-     */
+    /// Rewrites the indentation of `xml` from one style to another so content moved between declarations
+    /// doesn't mix tabs and spaces. Each line is indented by its depth in the tree, which also straightens out a
+    /// declaration that was inconsistently indented to begin with.
     private static <X extends Xml> X reindent(X xml, Indent from, Indent to) {
         if (from.equals(to)) {
             return xml;
@@ -611,10 +591,8 @@ public class RemoveDuplicatePluginDeclarations extends Recipe {
         }.visitNonNull(xml, 0);
     }
 
-    /**
-     * The indentation most of the plugins in the list use, which the collapsed declaration is written in,
-     * preferring one that continues the indentation of the {@code <plugins>} element itself.
-     */
+    /// The indentation most of the plugins in the list use, which the collapsed declaration is written in,
+    /// preferring one that continues the indentation of the `<plugins>` element itself.
     private static Indent siblingIndent(Xml.Tag container) {
         List<? extends Content> plugins = contentOf(container);
         String containerIndent = indentOf(container);
