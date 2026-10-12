@@ -194,6 +194,15 @@ public final class NpmLockRegenerator {
             if (!options.isSave() || options.isDryRun()) {
                 return Result.success(Objects.requireNonNull(inputs.getLock()));
             }
+            Object rootName = Objects.requireNonNull(Objects.requireNonNull(arb.getIdealTree()).getTarget())
+                    .getPackageName();
+            if (inputs.getDirectoryName() == null && !inputs.getRelease().writesRootPackageName() &&
+                rootName instanceof String && !((String) rootName).isEmpty()) {
+                // the root entry names the package only where the directory npm runs in is named otherwise, and the
+                // host knows no name of the repository's root
+                throw new CannotKnow("the project directory name (npm before 7.20.6 writes the package's name in " +
+                                     "the lock's root entry only when the directory it runs in has another)");
+            }
             written = saveIdealTree(arb, options);
             yarnLock = Objects.requireNonNull(arb.buildIdealTree().getMeta()).yarnLockText();
         } catch (NodeRegistryException e) {
@@ -384,12 +393,6 @@ public final class NpmLockRegenerator {
         if (directoryName == null) {
             Object data = lockData(files.getLock());
             Object lockName = data instanceof Map ? Js.get(data, "name") : null;
-            Object rootName = rootName(files);
-            if (data instanceof Map && rootName instanceof String && !((String) rootName).isEmpty() &&
-                !inputs.getRelease().writesRootPackageName()) {
-                throw new CannotKnow("the project directory name (npm before 7.20.6 writes the package's name in " +
-                                     "the lock's root entry only when the directory it runs in has another)");
-            }
             if (lockName instanceof String && !((String) lockName).isEmpty()) {
                 directoryName = (String) lockName;
             } else if (data instanceof Map && !truthy(rootName(files))) {
