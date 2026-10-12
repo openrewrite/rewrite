@@ -47,7 +47,7 @@ class SpecFromLockTest {
     @ParameterizedTest(name = "{0}")
     @MethodSource("cases")
     void specFromLock(String about, String name, JsonNode lock, JsonNode expected) {
-        Spec spec = SpecFromLock.specFromLock(name, json(lock), null);
+        Spec spec = SpecFromLock.specFromLock(name, json(lock), null, Spec.Options.V13_0_2);
         if (expected.isNull()) {
             assertThat(spec).isNull();
             return;

@@ -25,6 +25,7 @@ import com.fasterxml.jackson.databind.json.JsonMapper;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.javascript.internal.lock.CannotKnow;
 import org.openrewrite.javascript.internal.lock.EcmaScript.JsonSyntaxError;
+import org.openrewrite.javascript.internal.lock.JsError;
 import org.openrewrite.javascript.internal.lock.JsYaml;
 import org.openrewrite.javascript.internal.lock.StripBom;
 
@@ -50,11 +51,20 @@ final class Manifests {
     private Manifests() {
     }
 
-    /**
-     * {@code readProjectManifest} of a package.json: {@code readJsonFile}, then {@code convertManifestAfterRead}.
-     */
     static Map<String, @Nullable Object> readProjectManifest(String text, String path) {
-        return convertManifestAfterRead(parse(text, path));
+        return readProjectManifest(text, path, PnpmRelease.PORTED);
+    }
+
+    /**
+     * {@code readProjectManifest} of a package.json as {@code release} reads it: {@code readJsonFile}, then
+     * {@code convertManifestAfterRead}.
+     */
+    static Map<String, @Nullable Object> readProjectManifest(String text, String path, PnpmRelease release) {
+        return convertManifestAfterRead(parse(text, path), release);
+    }
+
+    static Map<String, @Nullable Object> readPackageYaml(String text, String path) {
+        return readPackageYaml(text, path, PnpmRelease.PORTED);
     }
 
     /**
@@ -62,7 +72,7 @@ final class Manifests {
      * {@code ERR_PNPM_YAML_PARSE}, then {@code convertManifestAfterRead}.
      */
     @SuppressWarnings("unchecked")
-    static Map<String, @Nullable Object> readPackageYaml(String text, String path) {
+    static Map<String, @Nullable Object> readPackageYaml(String text, String path, PnpmRelease release) {
         Object value;
         try {
             value = JsYaml.load(StripBom.stripBom(text));
@@ -72,7 +82,11 @@ final class Manifests {
         if (!(value instanceof Map)) {
             throw new CannotKnow("what pnpm makes of " + path + " (YAML, but not a mapping)");
         }
-        return convertManifestAfterRead((Map<String, @Nullable Object>) value);
+        return convertManifestAfterRead((Map<String, @Nullable Object>) value, release);
+    }
+
+    static Map<String, @Nullable Object> readJson5(String text, String path) {
+        return readJson5(text, path, PnpmRelease.PORTED);
     }
 
     /**
@@ -80,7 +94,7 @@ final class Manifests {
      * then {@code convertManifestAfterRead}.
      */
     @SuppressWarnings("unchecked")
-    static Map<String, @Nullable Object> readJson5(String text, String path) {
+    static Map<String, @Nullable Object> readJson5(String text, String path, PnpmRelease release) {
         Object value;
         try {
             value = Json5.parse(StripBom.stripBom(text));
@@ -90,12 +104,47 @@ final class Manifests {
         if (!(value instanceof Map)) {
             throw new CannotKnow("what pnpm makes of " + path + " (JSON5, but not an object)");
         }
-        return convertManifestAfterRead((Map<String, @Nullable Object>) value);
+        return convertManifestAfterRead((Map<String, @Nullable Object>) value, release);
     }
 
-    static Map<String, @Nullable Object> convertManifestAfterRead(Map<String, @Nullable Object> manifest) {
-        PkgManifestUtils.convertEnginesRuntimeToDependencies(manifest, "devEngines", "devDependencies");
-        PkgManifestUtils.convertEnginesRuntimeToDependencies(manifest, "engines", "dependencies");
+    /**
+     * project-manifest-reader's createManifestWriter, which normalizes the manifest it read for every project and
+     * {@code file:} directory: from 11.3.0 a dependency field of {@code null} is read as any other value
+     * ({@link PnpmRelease#readsANullDependencyField}); before, {@code Object.keys(null)} throws.
+     */
+    static Map<String, @Nullable Object> normalizedForTheWriter(Map<String, @Nullable Object> manifest,
+                                                                PnpmRelease release) {
+        for (String key : new String[]{"dependencies", "devDependencies", "optionalDependencies",
+                "peerDependencies"}) {
+            if (manifest.containsKey(key) && manifest.get(key) == null && !release.readsANullDependencyField()) {
+                throw new JsError(JsError.TYPE_ERROR, "Cannot convert undefined or null to object");
+            }
+        }
+        return manifest;
+    }
+
+    /**
+     * What the manifest writer fails on, which a recursive install runs over each project it installs once the lock
+     * is written: from 11.9.0 its readDependenciesField over devDependencies, then dependencies, a field that is null,
+     * an array or no object {@code ERR_PNPM_INVALID_DEPENDENCIES_FIELD}
+     * ({@link PnpmRelease#rejectsANonObjectDependenciesFieldOnWrite}); before, the writer reads no such field. Null
+     * where the writer fails on nothing.
+     */
+    static @Nullable PnpmError invalidDependenciesField(Map<String, @Nullable Object> manifest, PnpmRelease release) {
+        for (String field : new String[]{"devDependencies", "dependencies"}) {
+            Object dependencies = manifest.containsKey(field) ? manifest.get(field) : Js.UNDEFINED;
+            if (dependencies != Js.UNDEFINED && !(dependencies instanceof Map) &&
+                release.rejectsANonObjectDependenciesFieldOnWrite()) {
+                return new PnpmError("INVALID_DEPENDENCIES_FIELD", "The \"" + field + "\" field must be an object.");
+            }
+        }
+        return null;
+    }
+
+    static Map<String, @Nullable Object> convertManifestAfterRead(Map<String, @Nullable Object> manifest,
+                                                                  PnpmRelease release) {
+        PkgManifestUtils.convertEnginesRuntimeToDependencies(manifest, "devEngines", "devDependencies", release);
+        PkgManifestUtils.convertEnginesRuntimeToDependencies(manifest, "engines", "dependencies", release);
         return manifest;
     }
 

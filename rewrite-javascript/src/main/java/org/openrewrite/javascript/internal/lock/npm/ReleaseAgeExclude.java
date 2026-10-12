@@ -28,18 +28,20 @@ import static org.openrewrite.javascript.internal.lock.npm.Js.truthy;
  */
 final class ReleaseAgeExclude {
 
-    private static final Minimatch.Options OPTIONS = Minimatch.Options.builder(Minimatch.Release.V10_2_5)
-            .nonegate(true).nocomment(true).build();
-
     private ReleaseAgeExclude() {
     }
 
-    static boolean isReleaseAgeExcluded(@Nullable String name, @Nullable List<Object> patterns) {
+    /**
+     * @param release the npm that bundles minimatch, for the brace-expansion beside it
+     */
+    static boolean isReleaseAgeExcluded(@Nullable String name, @Nullable List<Object> patterns, NpmRelease release) {
         if (!truthy(name) || patterns == null || patterns.isEmpty()) {
             return false;
         }
+        Minimatch.Options options = Minimatch.Options.builder(Minimatch.Release.V10_2_5)
+                .nonegate(true).nocomment(true).braceExpansion(release::braceExpansion).build();
         for (Object pattern : patterns) {
-            if (Js.strictEquals(name, pattern) || Minimatch.minimatch(name, Js.string(pattern), OPTIONS)) {
+            if (Js.strictEquals(name, pattern) || Minimatch.minimatch(name, Js.string(pattern), options)) {
                 return true;
             }
         }

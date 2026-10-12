@@ -25,11 +25,13 @@ import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 
 /**
  * Port of @pnpm/installing.deps-resolver src/updateLockfile.ts, src/depPathToRef.ts and src/getCatalogSnapshots.ts,
- * with @pnpm/lockfile.pruner's {@code pruneSharedLockfile} (pnpm 11.2.2).
+ * with @pnpm/lockfile.pruner's {@code pruneSharedLockfile} (pnpm 11.2.2); from 11.5.1 a remote tarball keeps the
+ * integrity its locked entry has ({@link PnpmRelease#keepsTheIntegrityOfALockedRemoteTarball}).
  */
 final class UpdateLockfile {
 
@@ -46,6 +48,12 @@ final class UpdateLockfile {
     static LockfileObject updateLockfile(Map<String, DependenciesGraphNode> dependenciesGraph,
                                          LockfileObject lockfile, Map<String, String> registries,
                                          boolean lockfileIncludeTarballUrl) {
+        return updateLockfile(dependenciesGraph, lockfile, registries, lockfileIncludeTarballUrl, PnpmRelease.PORTED);
+    }
+
+    static LockfileObject updateLockfile(Map<String, DependenciesGraphNode> dependenciesGraph,
+                                         LockfileObject lockfile, Map<String, String> registries,
+                                         boolean lockfileIncludeTarballUrl, PnpmRelease release) {
         if (lockfile.getPackages() == null) {
             lockfile.setPackages(new LinkedHashMap<>());
         }
@@ -60,20 +68,33 @@ final class UpdateLockfile {
                 (optional ? updatedOptionalDeps : updatedDeps).put(child.getKey(), child.getValue());
             }
             String registry = DepPath.getRegistryByPackageName(registries, depNode.getResolvedPackage().getName());
-            lockfile.getPackages().put(entry.getKey(), toLockfileDependency(depNode, entry.getKey(), registry,
-                    updatedDeps, updatedOptionalDeps, dependenciesGraph, lockfileIncludeTarballUrl));
+            lockfile.getPackages().put(entry.getKey(), toLockfileDependency(depNode, entry.getKey(),
+                    lockfile.getPackages().get(entry.getKey()), registry, updatedDeps, updatedOptionalDeps,
+                    dependenciesGraph, lockfileIncludeTarballUrl, release));
         }
         return pruneSharedLockfile(lockfile, dependenciesGraph);
     }
 
-    private static PackageSnapshot toLockfileDependency(DependenciesGraphNode pkg, String depPath, String registry,
+    private static PackageSnapshot toLockfileDependency(DependenciesGraphNode pkg, String depPath,
+                                                        @Nullable PackageSnapshot prevSnapshot, String registry,
                                                         Map<String, String> updatedDeps,
                                                         Map<String, String> updatedOptionalDeps,
                                                         Map<String, DependenciesGraphNode> depGraph,
-                                                        boolean lockfileIncludeTarballUrl) {
+                                                        boolean lockfileIncludeTarballUrl, PnpmRelease release) {
         ResolveDependencies.ResolvedPackage resolved = pkg.getResolvedPackage();
         Map<String, @Nullable Object> lockfileResolution = LockfileUtils.toLockfileResolution(resolved.getName(),
-                resolved.getVersion(), resolved.getResolution(), registry, lockfileIncludeTarballUrl);
+                resolved.getVersion(), resolved.getResolution(), registry, lockfileIncludeTarballUrl, release);
+        if (lockfileResolution.containsKey("tarball") && nullish(lockfileResolution.get("integrity")) &&
+            undefined(lockfileResolution, "type")) {
+            Map<String, @Nullable Object> prevResolution = prevSnapshot == null ? null :
+                    prevSnapshot.getResolution();
+            if (prevResolution != null && prevResolution.containsKey("tarball") && undefined(prevResolution, "type") &&
+                Objects.equals(prevResolution.get("tarball"), lockfileResolution.get("tarball")) &&
+                !nullish(prevResolution.get("integrity")) && release.keepsTheIntegrityOfALockedRemoteTarball()) {
+                lockfileResolution = new LinkedHashMap<>(lockfileResolution);
+                lockfileResolution.put("integrity", prevResolution.get("integrity"));
+            }
+        }
         Map<String, @Nullable String> newResolvedDeps = updateResolvedDeps(updatedDeps, depGraph);
         Map<String, @Nullable String> newResolvedOptionalDeps = updateResolvedDeps(updatedOptionalDeps, depGraph);
         PackageSnapshot result = new PackageSnapshot();
@@ -155,6 +176,16 @@ final class UpdateLockfile {
             result.setPatched(true);
         }
         return result;
+    }
+
+    // == null in JavaScript
+    private static boolean nullish(@Nullable Object value) {
+        return value == null || value == Js.UNDEFINED;
+    }
+
+    // map[key] === undefined
+    private static boolean undefined(Map<String, @Nullable Object> map, String key) {
+        return !map.containsKey(key) || map.get(key) == Js.UNDEFINED;
     }
 
     private static boolean present(@Nullable Object value) {

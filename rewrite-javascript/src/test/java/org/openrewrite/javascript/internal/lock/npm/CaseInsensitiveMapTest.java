@@ -56,6 +56,29 @@ class CaseInsensitiveMapTest {
         assertThat(cmap.get("A")).isNull();
     }
 
+    // before npm 7.21.0 a node's children and edges are a plain Map: a name of another case is another key, and a key
+    // set again keeps its place
+    @Test
+    void plainMapBefore7_21_0() {
+        CaseInsensitiveMap<String> map = new CaseInsensitiveMap<>(false);
+        map.set("a", "a");
+        map.set("A", "A");
+        map.set("b", "b");
+        map.set("a", "again");
+        assertThat(map.entries()).containsExactly(new SimpleEntry<>("a", "again"), new SimpleEntry<>("A", "A"),
+          new SimpleEntry<>("b", "b"));
+        map.delete("A");
+        assertThat(map.has("A")).isFalse();
+        assertThat(map.get("a")).isEqualTo("again");
+
+        Node root = NpmTreeSupport.node(NpmTreeSupport.opts().path("/root").release(NpmRelease.of("7.20.6"))
+          .pkg(NpmTreeSupport.obj("dependencies", NpmTreeSupport.obj("JSONStream", "1", "jsonstream", "1"))));
+        assertThat(root.getEdgesOut().keys()).containsExactly("JSONStream", "jsonstream");
+        Node later = NpmTreeSupport.node(NpmTreeSupport.opts().path("/root").release(NpmRelease.of("7.21.0"))
+          .pkg(NpmTreeSupport.obj("dependencies", NpmTreeSupport.obj("JSONStream", "1", "jsonstream", "1"))));
+        assertThat(later.getEdgesOut().keys()).containsExactly("jsonstream");
+    }
+
     @Test
     void doNotGetConfusedWithWeirdValues() {
         CaseInsensitiveMap<String> cmap = new CaseInsensitiveMap<>();

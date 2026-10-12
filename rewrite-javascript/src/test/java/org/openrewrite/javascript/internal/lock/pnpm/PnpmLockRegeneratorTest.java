@@ -457,9 +457,11 @@ class PnpmLockRegeneratorTest {
           .hasMessage("No separator found in the decoded form of _auth");
     }
 
+    // getConfig throws a TypeError for it in every pnpm 11 release
     @Test
     void aRegistryVariablePnpmCannotUse() {
         assertThatThrownBy(() -> install(null, null, "pnpm_config_registry", "null"))
+          .isInstanceOfSatisfying(JsError.class, e -> assertThat(e.getName()).isEqualTo("TypeError"))
           .hasMessage("Unexpected type of registry, expecting a string but received null");
         assertThatThrownBy(() -> install(null, null, "pnpm_config_registry", "not-a-url"))
           .hasMessage("Invalid URL");

@@ -21,6 +21,7 @@ import org.openrewrite.javascript.internal.lock.CannotKnow;
 import org.openrewrite.javascript.internal.lock.JsError;
 import org.openrewrite.javascript.internal.lock.UriComponent;
 import org.openrewrite.javascript.internal.lock.V8Date;
+import org.openrewrite.javascript.internal.lock.ValidateNpmPackageName;
 import org.openrewrite.javascript.internal.lock.WhatwgUrl;
 import org.openrewrite.javascript.semver.NodeSemver;
 
@@ -65,6 +66,35 @@ final class PickPackageFromMeta {
 
         @Nullable
         Map<String, PreferredVersions.Selector> preferredVersionSelectors;
+
+        /**
+         * The release whose node-semver reads the range.
+         */
+        PnpmRelease release;
+
+        // semver's range functions under the release's node-semver, the loose options npm-resolver passes
+        boolean satisfies(String version) {
+            return release.underSemver(semver -> NodeSemver.satisfies(version, versionRange,
+                    NodeSemver.Options.LOOSE.release(semver)));
+        }
+
+        @Nullable
+        String maxSatisfying(List<String> versions) {
+            return release.underSemver(semver -> NodeSemver.maxSatisfying(versions, versionRange,
+                    NodeSemver.Options.LOOSE.release(semver)));
+        }
+
+        @Nullable
+        String minSatisfying(List<String> versions) {
+            return release.underSemver(semver -> NodeSemver.minSatisfying(versions, versionRange,
+                    NodeSemver.Options.LOOSE.release(semver)));
+        }
+    }
+
+    // semver.validRange(range) under the release's node-semver
+    private static boolean validRange(String range, PnpmRelease release) {
+        return release.underSemver(semver -> NodeSemver.validRange(range,
+                NodeSemver.Options.DEFAULT.release(semver))) != null;
     }
 
     /**
@@ -73,11 +103,23 @@ final class PickPackageFromMeta {
      */
     static @Nullable RegistryPackageSpec parseBareSpecifier(String bareSpecifier, @Nullable String alias,
                                                             String defaultTag, String registry) {
+        return parseBareSpecifier(bareSpecifier, alias, defaultTag, registry, PnpmRelease.PORTED);
+    }
+
+    /**
+     * {@link #parseBareSpecifier(String, String, String, String)} over the node-semver {@code release} bundles.
+     */
+    static @Nullable RegistryPackageSpec parseBareSpecifier(String bareSpecifier, @Nullable String alias,
+                                                            String defaultTag, String registry,
+                                                            PnpmRelease release) {
         String name = alias;
         if (bareSpecifier.startsWith("npm:")) {
             bareSpecifier = bareSpecifier.substring(4);
+            // before 11.1.0 (pnpm/pnpm#11324) a range after npm: is taken for a package name, as anything without an
+            // @ past its first character (PnpmRelease#takesTheAliasAsTheNameOfAnNpmRange); the two read every such
+            // range otherwise
             if (alias != null && !alias.isEmpty() &&
-                NodeSemver.validRange(bareSpecifier, NodeSemver.Options.DEFAULT) != null) {
+                validRange(bareSpecifier, release) && release.takesTheAliasAsTheNameOfAnNpmRange()) {
                 name = alias;
             } else {
                 int index = bareSpecifier.lastIndexOf('@');
@@ -91,7 +133,7 @@ final class PickPackageFromMeta {
             }
         }
         if (name != null && !name.isEmpty()) {
-            RegistryPackageSpec spec = selectorSpec(name, bareSpecifier);
+            RegistryPackageSpec spec = selectorSpec(name, bareSpecifier, release);
             if (spec != null) {
                 return spec;
             }
@@ -106,13 +148,14 @@ final class PickPackageFromMeta {
     }
 
     // version-selector-type's {type, normalized} for a package name
-    private static @Nullable RegistryPackageSpec selectorSpec(String name, String selector) {
-        String type = Verification.versionSelectorType(selector);
+    private static @Nullable RegistryPackageSpec selectorSpec(String name, String selector, PnpmRelease release) {
+        String type = Verification.versionSelectorType(selector, release);
         if (type == null) {
             return null;
         }
         String normalized = "version".equals(type) ? NodeSemver.valid(selector, NodeSemver.Options.LOOSE) :
-                "range".equals(type) ? NodeSemver.validRange(selector, NodeSemver.Options.LOOSE) : selector;
+                "range".equals(type) ? release.underSemver(semver -> NodeSemver.validRange(selector,
+                        NodeSemver.Options.LOOSE.release(semver))) : selector;
         return new RegistryPackageSpec(type, name, normalized, null);
     }
 
@@ -133,18 +176,20 @@ final class PickPackageFromMeta {
 
     static @Nullable JsrRegistryPackageSpec parseJsrSpecifierToRegistryPackageSpec(String rawSpecifier,
                                                                                    @Nullable String alias,
-                                                                                   String defaultTag) {
-        JsrSpecifierParser.JsrSpec spec = JsrSpecifierParser.parseJsrSpecifier(rawSpecifier, alias);
+                                                                                   String defaultTag,
+                                                                                   PnpmRelease release) {
+        JsrSpecifierParser.JsrSpec spec = JsrSpecifierParser.parseJsrSpecifier(rawSpecifier, alias, release);
         if (spec == null || !Js.truthy(spec.getNpmPkgName())) {
             return null;
         }
         RegistryPackageSpec selector = selectorSpec(spec.getNpmPkgName(),
-                spec.getVersionSelector() != null ? spec.getVersionSelector() : defaultTag);
+                spec.getVersionSelector() != null ? spec.getVersionSelector() : defaultTag, release);
         return selector == null ? null : new JsrRegistryPackageSpec(selector, spec.getJsrPkgName());
     }
 
     static @Nullable NamedRegistryPackageSpec parseNamedRegistrySpecifierToRegistryPackageSpec(
-            String rawSpecifier, Set<String> knownRegistryNames, @Nullable String packageAlias, String defaultTag) {
+            String rawSpecifier, Set<String> knownRegistryNames, @Nullable String packageAlias, String defaultTag,
+            PnpmRelease release) {
         int colon = rawSpecifier.indexOf(':');
         if (colon <= 0) {
             return null;
@@ -156,7 +201,8 @@ final class PickPackageFromMeta {
         String body = rawSpecifier.substring(colon + 1);
         String pkgName;
         String versionSelector = null;
-        if (ResolveDependencies.validRange(body) != null) {
+        boolean scopeWithoutName = false;
+        if (ResolveDependencies.validRange(body, release) != null) {
             if (!Js.truthy(packageAlias)) {
                 return null;
             }
@@ -170,10 +216,7 @@ final class PickPackageFromMeta {
                 pkgName = body.substring(0, index);
                 versionSelector = body.substring(index + 1);
             }
-            if (pkgName.indexOf('/') == -1 || pkgName.endsWith("/")) {
-                throw new PnpmError("INVALID_NAMED_REGISTRY_PACKAGE_NAME", "The package name '" + pkgName +
-                        "' in named registry '" + registryName + ":' is invalid");
-            }
+            scopeWithoutName = pkgName.indexOf('/') == -1 || pkgName.endsWith("/");
         } else if (packageAlias != null && packageAlias.startsWith("@")) {
             pkgName = packageAlias;
             versionSelector = body;
@@ -189,7 +232,17 @@ final class PickPackageFromMeta {
                 return null;
             }
         }
-        RegistryPackageSpec selector = selectorSpec(pkgName, versionSelector != null ? versionSelector : defaultTag);
+        // from 11.10.0 any form's name validate-npm-package-name 7.0.2 rejects is invalid; before, only a scope's
+        // without a name (PnpmRelease#validatesANamedRegistryPackageName), asked where the two differ
+        boolean invalidName = !ValidateNpmPackageName.validForOldPackages(pkgName,
+                ValidateNpmPackageName.Release.V7_0_2);
+        if (invalidName == scopeWithoutName ? invalidName :
+                release.validatesANamedRegistryPackageName() ? invalidName : scopeWithoutName) {
+            throw new PnpmError("INVALID_NAMED_REGISTRY_PACKAGE_NAME", "The package name '" + pkgName +
+                    "' in named registry '" + registryName + ":' is invalid");
+        }
+        RegistryPackageSpec selector = selectorSpec(pkgName, versionSelector != null ? versionSelector : defaultTag,
+                release);
         return selector == null ? null : new NamedRegistryPackageSpec(selector, registryName);
     }
 
@@ -230,12 +283,26 @@ final class PickPackageFromMeta {
      * {@code pickPackageFromMeta}: the version manifest the spec selects, null when none does;
      * {@code publishedByExclude} answers true, the versions it trusts, or null.
      */
-    @SuppressWarnings("unchecked")
     static @Nullable Map<String, @Nullable Object> pickPackageFromMeta(
             Function<VersionRangeOptions, @Nullable String> pickVersionByVersionRange,
             @Nullable Map<String, PreferredVersions.Selector> preferredVersionSelectors,
             @Nullable Instant publishedBy, @Nullable Function<String, @Nullable Object> publishedByExclude,
             Map<String, @Nullable Object> meta, RegistryPackageSpec spec) {
+        return pickPackageFromMeta(pickVersionByVersionRange, preferredVersionSelectors, publishedBy,
+                publishedByExclude, meta, spec, PnpmRelease.PORTED);
+    }
+
+    /**
+     * {@link #pickPackageFromMeta(Function, Map, Instant, Function, Map, RegistryPackageSpec)} as {@code release}
+     * runs it: before 11.2.0 a packument without times modified at the cutoff has none
+     * ({@link PnpmRelease#takesAPackumentModifiedAtTheCutoffAsMature}).
+     */
+    @SuppressWarnings("unchecked")
+    static @Nullable Map<String, @Nullable Object> pickPackageFromMeta(
+            Function<VersionRangeOptions, @Nullable String> pickVersionByVersionRange,
+            @Nullable Map<String, PreferredVersions.Selector> preferredVersionSelectors,
+            @Nullable Instant publishedBy, @Nullable Function<String, @Nullable Object> publishedByExclude,
+            Map<String, @Nullable Object> meta, RegistryPackageSpec spec, PnpmRelease release) {
         if (publishedBy != null) {
             Object excludeResult = publishedByExclude == null ? null :
                     publishedByExclude.apply(Js.string(meta.get("name")));
@@ -246,7 +313,8 @@ final class PickPackageFromMeta {
                             excludeResult instanceof List ? (List<String>) excludeResult : null);
                 } else {
                     Instant modifiedDate = parseModifiedDate(meta.get("modified"));
-                    if (modifiedDate == null || modifiedDate.isAfter(publishedBy)) {
+                    if (modifiedDate == null || modifiedDate.isAfter(publishedBy) ||
+                        modifiedDate.equals(publishedBy) && !release.takesAPackumentModifiedAtTheCutoffAsMature()) {
                         assertMetaHasTime(meta);
                     }
                 }
@@ -278,7 +346,7 @@ final class PickPackageFromMeta {
                 }
                 default:
                     version = pickVersionByVersionRange.apply(new VersionRangeOptions(meta, spec.getFetchSpec(),
-                            preferredVersionSelectors));
+                            preferredVersionSelectors, release));
             }
             if (version == null || version.isEmpty()) {
                 return null;
@@ -311,12 +379,13 @@ final class PickPackageFromMeta {
         return Double.isNaN(time) ? null : Instant.ofEpochMilli((long) time);
     }
 
-    private static boolean semverSatisfiesLoose(@Nullable String version, String range) {
+    private static boolean semverSatisfiesLoose(@Nullable String version, String range, PnpmRelease release) {
         if (version == null) {
             return false;
         }
         try {
-            return NodeSemver.satisfies(version, range, NodeSemver.Options.LOOSE);
+            return release.underSemver(semver -> NodeSemver.satisfies(version, range,
+                    NodeSemver.Options.LOOSE.release(semver)));
         } catch (IllegalArgumentException e) {
             return false;
         }
@@ -332,9 +401,8 @@ final class PickPackageFromMeta {
         Map<String, PreferredVersions.Selector> selectors = options.getPreferredVersionSelectors();
         if (selectors != null && !selectors.isEmpty()) {
             for (List<String> preferredVersions : prioritizePreferredVersions(options.getMeta(),
-                    options.getVersionRange(), selectors)) {
-                String preferredVersion = NodeSemver.minSatisfying(preferredVersions, options.getVersionRange(),
-                        NodeSemver.Options.LOOSE);
+                    options.getVersionRange(), selectors, options.getRelease())) {
+                String preferredVersion = options.minSatisfying(preferredVersions);
                 if (preferredVersion != null) {
                     return preferredVersion;
                 }
@@ -346,7 +414,7 @@ final class PickPackageFromMeta {
             versions.sort((a, b) -> NodeSemver.compare(a, b, NodeSemver.Options.DEFAULT));
             return versions.isEmpty() ? null : versions.get(0);
         }
-        return NodeSemver.minSatisfying(versions, options.getVersionRange(), NodeSemver.Options.LOOSE);
+        return options.minSatisfying(versions);
     }
 
     @SuppressWarnings("unchecked")
@@ -357,23 +425,24 @@ final class PickPackageFromMeta {
         String latest = latestValue == null ? null : Js.string(latestValue);
         Map<String, PreferredVersions.Selector> selectors = options.getPreferredVersionSelectors();
         if (selectors != null && !selectors.isEmpty()) {
-            for (List<String> preferredVersions : prioritizePreferredVersions(meta, versionRange, selectors)) {
+            for (List<String> preferredVersions : prioritizePreferredVersions(meta, versionRange, selectors,
+                    options.getRelease())) {
                 if (latest != null && preferredVersions.contains(latest) &&
-                    semverSatisfiesLoose(latest, versionRange)) {
+                    semverSatisfiesLoose(latest, versionRange, options.getRelease())) {
                     return latest;
                 }
-                String preferredVersion = NodeSemver.maxSatisfying(preferredVersions, versionRange,
-                        NodeSemver.Options.LOOSE);
+                String preferredVersion = options.maxSatisfying(preferredVersions);
                 if (preferredVersion != null) {
                     return preferredVersion;
                 }
             }
         }
         List<String> versions = versionKeys(meta);
-        if (Js.truthy(latest) && ("*".equals(versionRange) || semverSatisfiesLoose(latest, versionRange))) {
+        if (Js.truthy(latest) && ("*".equals(versionRange) ||
+                                  semverSatisfiesLoose(latest, versionRange, options.getRelease()))) {
             return latest;
         }
-        String maxVersion = NodeSemver.maxSatisfying(versions, versionRange, NodeSemver.Options.LOOSE);
+        String maxVersion = options.maxSatisfying(versions);
         Map<String, Object> versionManifests = (Map<String, Object>) meta.get("versions");
         if (maxVersion != null && Js.truthy(deprecated(versionManifests.get(maxVersion))) && versions.size() > 1) {
             List<String> nonDeprecatedVersions = new ArrayList<>();
@@ -384,8 +453,7 @@ final class PickPackageFromMeta {
                     nonDeprecatedVersions.add(Js.string(v == null ? Js.UNDEFINED : v));
                 }
             }
-            String maxNonDeprecatedVersion = NodeSemver.maxSatisfying(nonDeprecatedVersions, versionRange,
-                    NodeSemver.Options.LOOSE);
+            String maxNonDeprecatedVersion = options.maxSatisfying(nonDeprecatedVersions);
             if (maxNonDeprecatedVersion != null) {
                 return maxNonDeprecatedVersion;
             }
@@ -401,10 +469,10 @@ final class PickPackageFromMeta {
     @SuppressWarnings("unchecked")
     static List<List<String>> prioritizePreferredVersions(
             Map<String, @Nullable Object> meta, String versionRange,
-            Map<String, PreferredVersions.Selector> preferredVerSelectors) {
+            Map<String, PreferredVersions.Selector> preferredVerSelectors, PnpmRelease release) {
         Map<String, Long> versionsPrioritizer = new LinkedHashMap<>();
         for (String version : versionKeys(meta)) {
-            if (semverSatisfiesLoose(version, versionRange)) {
+            if (semverSatisfiesLoose(version, versionRange, release)) {
                 add(versionsPrioritizer, version, 0);
             }
         }
@@ -422,7 +490,7 @@ final class PickPackageFromMeta {
                 }
                 case "range":
                     for (String version : versionKeys(meta)) {
-                        if (semverSatisfiesLoose(version, preferredSelector)) {
+                        if (semverSatisfiesLoose(version, preferredSelector, release)) {
                             add(versionsPrioritizer, version, weight);
                         }
                     }

@@ -59,7 +59,7 @@ public final class VirtualTreeLoader {
         private final Map<String, String> manifests;
 
         /**
-         * Manifests held parsed already: the lock's own entries, standing in for files the host did not supply.
+         * Manifests held parsed already: the lock's own entries, standing in where the host holds no package.json.
          */
         private final Map<String, Map<String, Object>> parsedManifests;
 
@@ -68,22 +68,59 @@ public final class VirtualTreeLoader {
          */
         private final Set<String> unread;
 
+        /**
+         * Locations whose package npm reads with something the engine is not given, each with what that is.
+         */
+        private final Map<String, CannotKnow> unknown;
+
+        /**
+         * How many directories the project's is below the root of what the host holds; null when it has not said.
+         */
+        private final @Nullable Integer depth;
+
+        /**
+         * The npm release that reads the files: a manifest is normalized by the @npmcli/package-json it bundles.
+         */
+        private final NpmRelease release;
+
+        /**
+         * The files the project holds, relative to its directory, when the host says; npm 12.0.0 reads the patch
+         * files among them.
+         */
+        @Getter
+        private final @Nullable Set<String> paths;
+
         private final Map<String, Object> read = new HashMap<>();
 
         @Builder
         ProjectFiles(@Nullable LockFile lock, @Nullable String yarnLock, @Singular Map<String, String> manifests,
                      @Singular Map<String, Map<String, Object>> parsedManifests,
-                     @Singular("unread") Set<String> unread) {
+                     @Singular("unread") Set<String> unread, @Singular("unknown") Map<String, CannotKnow> unknown,
+                     @Nullable Integer depth, @Nullable NpmRelease release, @Nullable Set<String> paths) {
             this.lock = lock;
             this.yarnLock = yarnLock;
             this.manifests = manifests;
             this.parsedManifests = parsedManifests;
             this.unread = unread;
+            this.unknown = unknown;
+            this.depth = depth;
+            this.release = release != null ? release : NpmRelease.PORTED;
+            this.paths = paths;
+        }
+
+        /**
+         * These files as the npm {@code release} reads them, the project holding {@code paths} (null when the host
+         * does not say).
+         */
+        ProjectFiles readBy(NpmRelease release, @Nullable Set<String> paths) {
+            return new ProjectFiles(lock, yarnLock, manifests, parsedManifests, unread, unknown, depth, release,
+                    paths);
         }
 
         /**
          * The manifest at a location, normalized as arborist reads one from disk, or as it was given parsed;
-         * null where there is none. A text that does not normalize throws the same error on every read.
+         * null where there is none. A text that does not normalize throws the same error on every read, and
+         * {@link CannotKnow} is thrown for a package.json the host holds unread or one above the root of what it holds.
          */
         public @Nullable PackageJson manifest(String location) {
             Object value = read.get(location);
@@ -91,11 +128,17 @@ public final class VirtualTreeLoader {
                 String text = manifests.get(location);
                 Map<String, Object> parsed = parsedManifests.get(location);
                 try {
+                    if (unknown.containsKey(location)) {
+                        throw unknown.get(location);
+                    }
+                    if (depth != null && climbs(location) > depth) {
+                        throw new CannotKnow("the package.json of " + location + ", which is outside the repository");
+                    }
                     if (text == null && parsed == null && unread.contains(location)) {
                         throw CannotKnow.unread((location.isEmpty() ? "" : location + "/") + "package.json");
                     }
-                    value = text != null ? PackageJson.normalize(text) : parsed != null ? PackageJson.parsed(parsed) :
-                        NONE;
+                    value = text != null ? PackageJson.normalize(text, release) :
+                        parsed != null ? PackageJson.parsed(parsed) : NONE;
                 } catch (RuntimeException e) {
                     value = e;
                 }
@@ -115,6 +158,18 @@ public final class VirtualTreeLoader {
             locations.addAll(parsedManifests.keySet());
             locations.addAll(unread);
             return locations;
+        }
+
+        // the directories a location from the project's climbs above it
+        static int climbs(String location) {
+            int up = 0;
+            for (String segment : location.split("/")) {
+                if (!"..".equals(segment)) {
+                    break;
+                }
+                up++;
+            }
+            return up;
         }
     }
 
@@ -209,7 +264,7 @@ public final class VirtualTreeLoader {
             if (manifest != null) {
                 return manifest.getContent();
             }
-        } catch (PackageJson.NeedsPackageFiles e) {
+        } catch (PackageJson.NeedsPackageFiles | CannotKnow e) {
             throw e;
         } catch (RuntimeException ignored) {
         }
@@ -219,7 +274,9 @@ public final class VirtualTreeLoader {
 
     @SuppressWarnings("unchecked")
     private void loadFromShrinkwrap(Shrinkwrap s, Node root) {
-        if (rootOptionProvided == null) {
+        // before npm 7.5.4 a root the caller provides is treated as any other
+        boolean suspectsProvidedRoot = options.getRelease().suspectsFlagsUnderProvidedRoot();
+        if (rootOptionProvided == null || !suspectsProvidedRoot) {
             root.unsetDepFlags();
         } else {
             flagsSuspect = true;
@@ -244,10 +301,18 @@ public final class VirtualTreeLoader {
             }
         }
         resolveLinks(links, nodes);
-        if (!(Js.toNumber(s.getOriginalLockfileVersion()) >= 2)) {
+        if (!options.getRelease().assignsBundlesOfOldLocksOnly()) {
+            assignEveryBundle(nodes);
+        } else if (!(Js.toNumber(s.getOriginalLockfileVersion()) >= 2)) {
             assignBundles(nodes);
         }
-        if (flagsSuspect) {
+        if (flagsSuspect && !suspectsProvidedRoot) {
+            // [reCalcDepFlags] before npm 7.5.4: every node of the tree, the root's flags calculated again too
+            for (Node node : Objects.requireNonNull(virtualTree).getInventory().values()) {
+                node.resetDepFlags();
+            }
+            DepFlags.calcDepFlags(virtualTree, true);
+        } else if (flagsSuspect) {
             for (Node node : nodes.values()) {
                 if (node.isRoot() || node == rootOptionProvided) {
                     continue;
@@ -286,9 +351,10 @@ public final class VirtualTreeLoader {
         }
 
         Map<String, Object> lockWS = new LinkedHashMap<>();
-        Map<String, String> workspaces = MapWorkspaces.virtual(path, Objects.requireNonNull(s.getData()));
+        Map<String, String> workspaces = MapWorkspaces.virtual(path, Objects.requireNonNull(s.getData()),
+                options.getRelease());
         for (Map.Entry<String, String> ws : workspaces.entrySet()) {
-            lockWS.put(ws.getKey(), "file:" + ws.getValue());
+            lockWS.put(ws.getKey(), "file:" + ConsistentResolve.escapeHash(ws.getValue(), options.getRelease()));
         }
 
         Set<String> rootNames = new LinkedHashSet<>(root.getEdgesOut().keys());
@@ -337,6 +403,10 @@ public final class VirtualTreeLoader {
             Node target = nodes.get(targetLoc);
 
             if (target == null) {
+                if (!options.getRelease().rejectsLinkWithoutTarget()) {
+                    // #loadLink reads the flags of the target it was not given
+                    throw new IllegalArgumentException("Cannot read properties of undefined (reading 'extraneous')");
+                }
                 throw new MissingTargetException(targetLoc, location);
             }
 
@@ -344,13 +414,34 @@ public final class VirtualTreeLoader {
             nodes.put(location, link);
             nodes.put(targetLoc, Objects.requireNonNull(link.getTarget()));
 
-            if (link.getTarget().getParent() == null) {
+            // before npm 7.0.9 only a lock older than version 2 has its link targets' package.json read; before 7.1.1
+            // a target in node_modules has it read too
+            Shrinkwrap lock = Objects.requireNonNull(Objects.requireNonNull(virtualTree).getMeta());
+            boolean readsTarget = options.getRelease().readsLinkTargetPackages() ||
+                                  lock.isLoadedFromDisk() && !(Js.toNumber(lock.getOriginalLockfileVersion()) >= 2);
+            boolean outsideNodeModules = link.getTarget().getParent() == null ||
+                                         !options.getRelease().readsPackagesOfTopLinkTargetsOnly();
+            if (outsideNodeModules && readsTarget) {
+                if (!options.getRelease().guardsLinkTargetPackage()) {
+                    // rpj(pj).catch(() => null): only the read is guarded, and assigning the package may throw
+                    PackageJson manifest = null;
+                    try {
+                        manifest = files.manifest(targetLoc);
+                    } catch (PackageJson.NeedsPackageFiles e) {
+                        throw e;
+                    } catch (RuntimeException ignored) {
+                    }
+                    if (manifest != null) {
+                        link.getTarget().setPackage(manifest.getContent());
+                    }
+                    continue;
+                }
                 try {
                     PackageJson manifest = files.manifest(targetLoc);
                     if (manifest != null) {
                         link.getTarget().setPackage(manifest.getContent());
                     }
-                } catch (PackageJson.NeedsPackageFiles e) {
+                } catch (PackageJson.NeedsPackageFiles | CannotKnow e) {
                     throw e;
                 } catch (RuntimeException ignored) {
                     // arborist's .catch(() => null): the package stays assigned, its edges loaded up to the failure
@@ -387,6 +478,35 @@ public final class VirtualTreeLoader {
         }
     }
 
+    // [assignBundles] before npm 7.11.0: for a lock of any version, and every flagged child, once; before 7.1.1
+    // ([assignParentage] of arborist 1), only a child its parent depends on
+    @SuppressWarnings("unchecked")
+    private void assignEveryBundle(Map<String, Node> nodes) {
+        for (Map.Entry<String, Node> entry : nodes.entrySet()) {
+            String location = entry.getKey();
+            Node node = entry.getValue();
+            if (location.isEmpty()) {
+                continue;
+            }
+            Node parent = node.getParent();
+            if (parent == null) {
+                continue;
+            }
+            Map<String, Object> ppkg = parent.getPackage();
+            if (truthy(node.getPackage().get("inBundle")) && !truthy(ppkg.get("inBundle")) &&
+                (options.getRelease().bundlesChildrenWithoutEdges() || parent.getEdgesOut().has(node.getName()))) {
+                Object bundleDependencies = ppkg.get("bundleDependencies");
+                if (!truthy(bundleDependencies)) {
+                    List<Object> list = new ArrayList<>();
+                    list.add(node.getName());
+                    ppkg.put("bundleDependencies", list);
+                } else if (!((List<Object>) bundleDependencies).contains(node.getName())) {
+                    ((List<Object>) bundleDependencies).add(node.getName());
+                }
+            }
+        }
+    }
+
     @SuppressWarnings("unchecked")
     private Node loadNode(String location, Object meta, boolean loadOverrides) {
         String p = virtualTree != null ? virtualTree.getRealpath() : path;
@@ -401,16 +521,25 @@ public final class VirtualTreeLoader {
         if (!truthy(sw.get("name"))) {
             sw.put("name", Node.nameFromFolder(nodePath));
         }
+        NpmRelease release = options.getRelease();
+        // npm 12.0.0 reads an entry's patch and manifest-extension records, and no hasShrinkwrap
+        boolean records = (truthy(sw.get("patched")) || truthy(sw.get("packageExtensionsApplied")) ||
+                           truthy(sw.get("npmExtensionApplied"))) && release.recordsPatchesAndExtensions();
+        boolean hasShrinkwrap = truthy(sw.get("hasShrinkwrap")) && release.readsNpmShrinkwrap();
         return new Node(Node.options()
+                .release(options.getRelease())
                 .installLinks(options.isInstallLinks())
                 .legacyPeerDeps(options.isLegacyPeerDeps())
                 .root(virtualTree)
                 .path(nodePath)
                 .realpath(nodePath)
                 .integrity(sw.get("integrity"))
-                .resolved(ConsistentResolve.consistentResolve(sw.get("resolved"), path, nodePath, false))
+                .patched(records ? sw.get("patched") : null)
+                .packageExtensionsApplied(records ? sw.get("packageExtensionsApplied") : null)
+                .npmExtensionApplied(records ? sw.get("npmExtensionApplied") : null)
+                .resolved(ConsistentResolve.consistentResolve(sw.get("resolved"), path, nodePath, false, release))
                 .pkg(sw)
-                .hasShrinkwrap(sw.get("hasShrinkwrap"))
+                .hasShrinkwrap(hasShrinkwrap ? sw.get("hasShrinkwrap") : null)
                 .loadOverrides(loadOverrides)
                 .extraneous(truthy(sw.get("extraneous")))
                 .devOptional(truthy(sw.get("devOptional")) || truthy(sw.get("dev")) || truthy(sw.get("optional")))
@@ -423,6 +552,7 @@ public final class VirtualTreeLoader {
     private Link loadLink(String location, String targetLoc, Node target) {
         String linkPath = PosixPath.resolve(path, location);
         Link link = new Link(Node.options()
+                .release(options.getRelease())
                 .installLinks(options.isInstallLinks())
                 .legacyPeerDeps(options.isLegacyPeerDeps())
                 .path(linkPath)

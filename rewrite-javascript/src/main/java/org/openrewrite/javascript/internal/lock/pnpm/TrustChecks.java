@@ -25,14 +25,26 @@ import java.util.Map;
 import java.util.function.Function;
 
 /**
- * Port of @pnpm/resolving.npm-resolver src/trustChecks.ts (pnpm 11.2.2).
+ * Port of @pnpm/resolving.npm-resolver src/trustChecks.ts (pnpm 11.2.2); a trusted publisher counts with a provenance
+ * attestation only from 11.4.0 ({@link PnpmRelease#requiresProvenanceOfATrustedPublisher}), and a staged publish is
+ * the strongest evidence from 11.5.0 ({@link PnpmRelease#ranksAStagedPublish}).
  */
 final class TrustChecks {
 
+    private static final String STAGED_PUBLISH = "stagedPublish";
     private static final String TRUSTED_PUBLISHER = "trustedPublisher";
     private static final String PROVENANCE = "provenance";
 
     private TrustChecks() {
+    }
+
+    /**
+     * {@link #failIfTrustDowngraded(Map, String, Function, Double, Instant, PnpmRelease)} as 11.2.2 runs it.
+     */
+    static void failIfTrustDowngraded(Map<String, @Nullable Object> meta, String version,
+                                      @Nullable Function<String, Object> trustPolicyExclude,
+                                      @Nullable Double trustPolicyIgnoreAfter, Instant now) {
+        failIfTrustDowngraded(meta, version, trustPolicyExclude, trustPolicyIgnoreAfter, now, PnpmRelease.PORTED);
     }
 
     /**
@@ -41,7 +53,7 @@ final class TrustChecks {
     @SuppressWarnings("unchecked")
     static void failIfTrustDowngraded(Map<String, @Nullable Object> meta, String version,
                                       @Nullable Function<String, Object> trustPolicyExclude,
-                                      @Nullable Double trustPolicyIgnoreAfter, Instant now) {
+                                      @Nullable Double trustPolicyIgnoreAfter, Instant now, PnpmRelease release) {
         if (trustPolicyExclude != null) {
             Object excludeResult = trustPolicyExclude.apply(Js.string(meta.get("name")));
             if (Boolean.TRUE.equals(excludeResult)) {
@@ -70,11 +82,11 @@ final class TrustChecks {
                                                     Js.string(meta.get("name")) + " in metadata");
         }
         String strongestEvidencePriorToRequestedVersion = detectStrongestTrustEvidenceBeforeDate(meta, versionDate,
-                NodeSemver.prerelease(version, NodeSemver.Options.LOOSE) == null);
+                NodeSemver.prerelease(version, NodeSemver.Options.LOOSE) == null, release);
         if (strongestEvidencePriorToRequestedVersion == null) {
             return;
         }
-        String currentTrustEvidence = getTrustEvidence(manifest);
+        String currentTrustEvidence = getTrustEvidence(manifest, release);
         if (currentTrustEvidence == null ||
             rank(strongestEvidencePriorToRequestedVersion) > rank(currentTrustEvidence)) {
             throw new PnpmError("TRUST_DOWNGRADE", "High-risk trust downgrade for \"" +
@@ -88,11 +100,15 @@ final class TrustChecks {
         }
     }
 
+    // TRUST_RANK of 11.5.0; before, a trusted publisher over anything else
     private static int rank(String trustEvidence) {
-        return TRUSTED_PUBLISHER.equals(trustEvidence) ? 2 : 1;
+        return STAGED_PUBLISH.equals(trustEvidence) ? 3 : TRUSTED_PUBLISHER.equals(trustEvidence) ? 2 : 1;
     }
 
     private static String prettyPrintTrustEvidence(@Nullable String trustEvidence) {
+        if (STAGED_PUBLISH.equals(trustEvidence)) {
+            return "staged publish";
+        }
         if (TRUSTED_PUBLISHER.equals(trustEvidence)) {
             return "trusted publisher";
         }
@@ -105,7 +121,8 @@ final class TrustChecks {
     @SuppressWarnings("unchecked")
     private static @Nullable String detectStrongestTrustEvidenceBeforeDate(Map<String, @Nullable Object> meta,
                                                                           double beforeDate,
-                                                                          boolean excludePrerelease) {
+                                                                          boolean excludePrerelease,
+                                                                          PnpmRelease release) {
         String best = null;
         Object versions = meta.get("versions");
         if (!(versions instanceof Map)) {
@@ -123,26 +140,40 @@ final class TrustChecks {
             if (!(publishedAt < beforeDate)) {
                 continue;
             }
-            String trustEvidence = getTrustEvidence(((Map<String, @Nullable Object>) versions).get(version));
+            String trustEvidence = getTrustEvidence(((Map<String, @Nullable Object>) versions).get(version), release);
             if (trustEvidence == null) {
                 continue;
             }
-            if (TRUSTED_PUBLISHER.equals(trustEvidence)) {
-                return TRUSTED_PUBLISHER;
-            }
-            if (best == null) {
-                best = PROVENANCE;
+            // 11.5.0's ranking; 11.2.2 returns at the first trusted publisher, which ranks highest of what it finds,
+            // as only a release from 11.5.0 finds a staged publish
+            if (best == null || rank(trustEvidence) > rank(best)) {
+                best = trustEvidence;
+                if (STAGED_PUBLISH.equals(best)) {
+                    return best;
+                }
             }
         }
         return best;
     }
 
+    /**
+     * {@link #getTrustEvidence(Object, PnpmRelease)} as 11.2.2 reads it.
+     */
     static @Nullable String getTrustEvidence(@Nullable Object manifest) {
+        return getTrustEvidence(manifest, PnpmRelease.PORTED);
+    }
+
+    static @Nullable String getTrustEvidence(@Nullable Object manifest, PnpmRelease release) {
         Object npmUser = property(manifest, "_npmUser");
-        if (Js.truthy(property(npmUser, TRUSTED_PUBLISHER))) {
+        Object provenance = property(property(property(manifest, "dist"), "attestations"), PROVENANCE);
+        if (Js.truthy(property(npmUser, "approver")) && release.ranksAStagedPublish()) {
+            return STAGED_PUBLISH;
+        }
+        if (Js.truthy(property(npmUser, TRUSTED_PUBLISHER)) &&
+            (Js.truthy(provenance) || !release.requiresProvenanceOfATrustedPublisher())) {
             return TRUSTED_PUBLISHER;
         }
-        if (Js.truthy(property(property(property(manifest, "dist"), "attestations"), PROVENANCE))) {
+        if (Js.truthy(provenance)) {
             return PROVENANCE;
         }
         return null;

@@ -23,6 +23,7 @@ import org.junit.jupiter.params.provider.MethodSource;
 import org.openrewrite.javascript.internal.lock.CannotKnow;
 import org.openrewrite.javascript.internal.lock.Expect;
 import org.openrewrite.javascript.internal.lock.JsError;
+import org.openrewrite.javascript.internal.lock.Rejected;
 import org.openrewrite.javascript.internal.lock.ScenarioTest;
 import org.openrewrite.javascript.internal.lock.Spec;
 import org.openrewrite.javascript.internal.lock.npm.ScenarioReplay.ScenarioRegistry;
@@ -154,6 +155,23 @@ class IdealTreeBuilderTest extends ScenarioTest {
           .doesNotThrowAnyException();
     }
 
+    // a -> (j@1, x, y), x -> PEER(j@1), y -> PEER(j@2): before npm 7.24.2 x's and y's peers replace each other at the
+    // root and leave the other's peer set where it is, so the two placements take turns without end; npm 7.24.2
+    // prunes the conflicted set and nests it under a
+    @Test
+    void peerSetsThatReplaceEachOtherNeverFinishBefore7_24_2() {
+        NpmScenarios.Edit edit = ScenarioReplay.edit("arb-peerset-loop-add");
+        String path = ScenarioReplay.projectPath(edit.getStart().getText());
+        ScenarioRegistry http = new ScenarioRegistry(edit.getScenario());
+        assertThatThrownBy(() -> ScenarioReplay.builder(edit, http, path,
+          ScenarioReplay.options(NpmRelease.of("7.24.1"), null)).buildIdealTree())
+          .isInstanceOf(Rejected.class)
+          .hasMessageContaining("it never finishes");
+        assertThatCode(() -> ScenarioReplay.builder(edit, http, path,
+          ScenarioReplay.options(NpmRelease.of("7.24.2"), null)).buildIdealTree())
+          .doesNotThrowAnyException();
+    }
+
     @ParameterizedTest(name = "{0}")
     @MethodSource("edits")
     void buildsWhatNpmWrote(String name, NpmScenarios.Edit edit) {
@@ -164,7 +182,6 @@ class IdealTreeBuilderTest extends ScenarioTest {
         skipUnlessReplayed(label, scenario, expect);
         NpmScenarios.Lock result = edit.getResult();
         String path = ScenarioReplay.projectPath(result != null ? result.getText() : edit.getStart().getText());
-        NpmOptions options = ScenarioReplay.options(scenario.npmrc());
         ScenarioRegistry http = new ScenarioRegistry(scenario);
 
         // the directory's name is the regenerator's input, not the builder's: here it is given
@@ -177,6 +194,7 @@ class IdealTreeBuilderTest extends ScenarioTest {
         boolean treeOrCannotKnow = result != null && kind.equals("cannot-know");
         Node built;
         try {
+            ScenarioReplay.checkDevEngines(edit);
             built = ScenarioReplay.builder(edit, http, path).buildIdealTree();
         } catch (RuntimeException e) {
             String code = codeOf(e);
@@ -206,6 +224,8 @@ class IdealTreeBuilderTest extends ScenarioTest {
             record(label, "exact", "bytes" + http.describe());
             return;
         }
+        // npm's own tree is loaded as the release that wrote it, whose config the build has read without a refusal
+        NpmOptions options = ScenarioReplay.options(scenario.release(), scenario.npmrc());
         Map<String, String> expected = describe(ScenarioReplay.load(result, options, path), path);
         Map<String, String> actual = describe(built, path);
         String difference = firstDifference(expected, actual);

@@ -30,7 +30,8 @@ import java.util.StringJoiner;
 
 /**
  * Port of node-semver's functions with its {@code loose} and {@code includePrerelease} options: 7.8.4, which npm
- * 11.17.0 bundles, and 5.5.0, which yarn 1.22.22 bundles.
+ * 11.17.0 bundles, 7.8.5, which npm 11.18.0 bundles, the releases npm 11 bundled before it, and 5.5.0, which yarn
+ * 1.22.22 bundles.
  */
 @UtilityClass
 public class NodeSemver {
@@ -38,11 +39,14 @@ public class NodeSemver {
     private static final int MAX_LENGTH = 256;
 
     /**
-     * The node-semver release whose answers the functions give: 7.8.4, which npm bundles, or 5.5.0, which yarn
-     * 1.22.22 bundles.
+     * The node-semver release whose answers the functions give, oldest first: 7.8.5 (npm 11.18.0); 7.8.4, which npm
+     * 11.17.0 bundles; 7.8.1 (npm 11.16.0); 7.8.0, whose answers 7.7.3 and 7.7.4 give too (npm 11.6.2 to 11.15.0);
+     * 7.7.2, whose answers 7.6.3 and 7.7.1 give too (npm 11.0.0 to 11.6.1); 7.5.2 (npm 9.7.2 to 9.8.0), which reads a
+     * range's {@code ||} groups untrimmed, so that under {@code loose} a group of none but invalid comparators keeps
+     * the empty one a space leaves and takes any version; or 5.5.0, which yarn 1.22.22 bundles.
      */
     public enum Release {
-        V5_5_0, V7_8_4
+        V5_5_0, V7_5_2, V7_7_2, V7_8_0, V7_8_1, V7_8_4, V7_8_5
     }
 
     @RequiredArgsConstructor(access = AccessLevel.PRIVATE)
@@ -61,6 +65,13 @@ public class NodeSemver {
         final boolean loose;
         final boolean includePrerelease;
         final Release release;
+
+        /**
+         * These options as another release of node-semver reads them.
+         */
+        public Options release(Release release) {
+            return release == this.release ? this : new Options(loose, includePrerelease, release);
+        }
     }
 
     /**

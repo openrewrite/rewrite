@@ -30,6 +30,21 @@ final class TarballHttpResolver implements Resolver {
 
     private static final Pattern TGZ_PATHNAME = Pattern.compile("(\\.tar\\.gz|\\.tgz|/[^.]+)$");
 
+    // Yarn 4.0.0's constants.ts
+    private static final Pattern TARBALL_REGEXP = Pattern.compile("^[^?]*\\.(?:tar\\.gz|tgz)(?:\\?.*)?(?:#.*)?$");
+    private static final Pattern PROTOCOL_REGEXP = Pattern.compile("^https?:");
+
+    /**
+     * Whether the release reads a range as a tarball's url: urlUtils {@code isTgzUrl} from 4.0.2, before an
+     * http(s) url whose path ends in {@code .tgz} or {@code .tar.gz}.
+     */
+    static boolean isTgzUrl(String url, YarnRelease release) {
+        if (!release.readsTarballUrlsByPathname()) {
+            return TARBALL_REGEXP.matcher(url).find() && PROTOCOL_REGEXP.matcher(url).find();
+        }
+        return isTgzUrl(url);
+    }
+
     static boolean isTgzUrl(String url) {
         WhatwgUrl parsed = WhatwgUrl.tryParse(url);
         if (parsed == null) {
@@ -43,12 +58,12 @@ final class TarballHttpResolver implements Resolver {
 
     @Override
     public boolean supportsDescriptor(Descriptor descriptor, ResolveOptions opts) {
-        return isTgzUrl(descriptor.range);
+        return isTgzUrl(descriptor.range, opts.getProject().configuration.getRelease());
     }
 
     @Override
     public boolean supportsLocator(Locator locator, ResolveOptions opts) {
-        return isTgzUrl(locator.reference);
+        return isTgzUrl(locator.reference, opts.getProject().configuration.getRelease());
     }
 
     @Override

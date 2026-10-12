@@ -27,16 +27,22 @@ import java.util.regex.Pattern;
 
 /**
  * Port of brace-expansion with balanced-match, {@code a{b,c}d} to {@code abd acd}: 1.1.11 with 1.0.0, which minimatch
- * 3.0.4 calls in yarn 1.22.22, and 5.0.6 with 4.0.4, which minimatch 10.2.5 calls in npm 11.17.0.
+ * 3.0.4 calls in yarn 1.22.22, and 5.0.6 and 5.0.9 with 4.0.4, which minimatch 10.2.5 calls in npm 11.17.0 and in npm
+ * 11.19.1. 5.0.7 expands as 5.0.6 does, without the depth of stack that 5.0.6 needs for a run of sets that do not
+ * expand.
  */
 public final class BraceExpansion {
 
     public enum Release {
         V1_1_11,
-        V5_0_6
+        V5_0_6,
+        V5_0_9
     }
 
     private static final int EXPANSION_MAX = 100_000;
+
+    // 5.0.9 bounds the characters an expansion may hold at any point (CVE-2026-14257)
+    private static final int EXPANSION_MAX_LENGTH = 4_000_000;
 
     private static final String ESC_SLASH = "\0SLASH\0";
     private static final String ESC_OPEN = "\0OPEN\0";
@@ -142,10 +148,169 @@ public final class BraceExpansion {
             str = "\\{\\}" + str.substring(2);
         }
         List<String> out = new ArrayList<>();
-        for (String s : expand(escapeBraces(str), true, release)) {
+        for (String s : release == Release.V5_0_9 ? expand509(escapeBraces(str), true) :
+                expand(escapeBraces(str), true, release)) {
             out.add(unescapeBraces(s));
         }
         return out;
+    }
+
+    // 5.0.9's combine: acc[a] + pre + values[v] for every pair, at most EXPANSION_MAX results and EXPANSION_MAX_LENGTH
+    // characters
+    private static List<String> combine(List<String> acc, String pre, List<String> values, boolean dropEmpties) {
+        List<String> out = new ArrayList<>();
+        int length = 0;
+        for (String a : acc) {
+            for (String v : values) {
+                if (out.size() >= EXPANSION_MAX) {
+                    return out;
+                }
+                String expansion = a + pre + v;
+                if (dropEmpties && expansion.isEmpty()) {
+                    continue;
+                }
+                if (length + expansion.length() > EXPANSION_MAX_LENGTH) {
+                    return out;
+                }
+                out.add(expansion);
+                length += expansion.length();
+            }
+        }
+        return out;
+    }
+
+    // 5.0.9's expandSequence: the values of a numeric (1..5) or alphabetic (a..e..2) sequence body
+    private static List<String> expandSequence(String body, boolean isAlphaSequence) {
+        List<String> n = Arrays.asList(DOTS.split(body, -1));
+        List<String> values = new ArrayList<>();
+        double x = numeric(n.get(0));
+        double y = numeric(n.get(1));
+        int width = Math.max(n.get(0).length(), n.get(1).length());
+        double incr = n.size() == 3 ? Math.max(Math.abs(numeric(n.get(2))), 1) : 1;
+        boolean reverse = y < x;
+        if (reverse) {
+            incr *= -1;
+        }
+        boolean pad = false;
+        for (String el : n) {
+            pad |= PADDED.matcher(el).find();
+        }
+        int length = 0;
+        for (double i = x; (reverse ? i >= y : i <= y) && values.size() < EXPANSION_MAX; i += incr) {
+            String c;
+            if (isAlphaSequence) {
+                c = String.valueOf((char) EcmaScript.toInt32(i));
+                if ("\\".equals(c)) {
+                    c = "";
+                }
+            } else {
+                c = EcmaScript.numberToString(i);
+                if (pad) {
+                    int need = width - c.length();
+                    if (need > 0) {
+                        String z = EcmaScript.repeat("0", need);
+                        c = i < 0 ? "-" + z + c.substring(1) : z + c;
+                    }
+                }
+            }
+            if (length + c.length() > EXPANSION_MAX_LENGTH) {
+                break;
+            }
+            values.add(c);
+            length += c.length();
+        }
+        return values;
+    }
+
+    // 5.0.9's expand_: the top-level sets are combined left to right into one accumulator, and an empty result is
+    // dropped by the first set alone
+    private static List<String> expand509(String str, boolean isTop) {
+        List<String> acc = new ArrayList<>(Collections.singletonList(""));
+        List<String> literal = Collections.singletonList("");
+        boolean dropEmpties = false;
+        boolean firstGroup = true;
+        while (true) {
+            Balanced m = balanced(str);
+            if (m == null) {
+                return combine(acc, str, literal, dropEmpties);
+            }
+            String pre = m.getPre();
+            boolean last = m.getPost().isEmpty();
+            if (pre.endsWith("$")) {
+                acc = combine(acc, pre + "{" + m.getBody() + "}", literal, dropEmpties && last);
+                firstGroup = false;
+                if (last) {
+                    break;
+                }
+                str = m.getPost();
+                continue;
+            }
+            boolean isNumericSequence = NUMERIC_SEQUENCE.matcher(m.getBody()).find();
+            boolean isAlphaSequence = ALPHA_SEQUENCE.matcher(m.getBody()).find();
+            boolean isSequence = isNumericSequence || isAlphaSequence;
+            boolean isOptions = m.getBody().contains(",");
+            if (!isSequence && !isOptions) {
+                if (COMMA_THEN_CLOSE_5_0_6.matcher(m.getPost()).find()) {
+                    str = pre + "{" + m.getBody() + ESC_CLOSE + m.getPost();
+                    isTop = true;
+                    continue;
+                }
+                return combine(acc, pre + "{" + m.getBody() + "}" + m.getPost(), literal, dropEmpties);
+            }
+            if (firstGroup) {
+                dropEmpties = isTop && !isSequence;
+                firstGroup = false;
+            }
+            List<String> values;
+            if (isSequence) {
+                values = expandSequence(m.getBody(), isAlphaSequence);
+            } else {
+                List<String> n = parseCommaParts(m.getBody());
+                if (n.size() == 1) {
+                    List<String> embraced = new ArrayList<>();
+                    for (String e : expand509(n.get(0), false)) {
+                        embraced.add("{" + e + "}");
+                    }
+                    n = embraced;
+                    if (n.size() == 1) {
+                        acc = combine(acc, pre + n.get(0), literal, dropEmpties && last);
+                        if (last) {
+                            break;
+                        }
+                        str = m.getPost();
+                        continue;
+                    }
+                }
+                // a value combine would drop as empty does not count against the maximum
+                boolean dropsEmpties = dropEmpties && last && pre.isEmpty();
+                for (int d = 0; dropsEmpties && d < acc.size(); d++) {
+                    if (!acc.get(d).isEmpty()) {
+                        dropsEmpties = false;
+                    }
+                }
+                values = new ArrayList<>();
+                int valuesLength = 0;
+                outer:
+                for (String part : n) {
+                    for (String v : expand509(part, false)) {
+                        if (dropsEmpties && v.isEmpty()) {
+                            continue;
+                        }
+                        if (values.size() >= EXPANSION_MAX || valuesLength + v.length() > EXPANSION_MAX_LENGTH) {
+                            break outer;
+                        }
+                        values.add(v);
+                        valuesLength += v.length();
+                    }
+                }
+            }
+            acc = combine(acc, pre, values, dropEmpties && last);
+            if (last) {
+                break;
+            }
+            str = m.getPost();
+        }
+        return acc;
     }
 
     private static List<String> expand(String str, boolean isTop, Release release) {

@@ -15,9 +15,11 @@
  */
 package org.openrewrite.javascript.internal.lock.bun;
 
+import lombok.AccessLevel;
 import lombok.Getter;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.javascript.internal.lock.HostEnvironment;
+import org.openrewrite.javascript.internal.lock.WhatwgUrl;
 
 import java.util.ArrayList;
 import java.util.Collections;
@@ -35,6 +37,12 @@ public final class BunOptions {
     static final String DEFAULT_REGISTRY = "https://registry.npmjs.org/";
 
     /**
+     * The release that installs.
+     */
+    @Getter(AccessLevel.PACKAGE)
+    private BunRelease release = BunRelease.PORTED;
+
+    /**
      * The default registry's url ({@code options.scope.url.href}).
      */
     private String registry = DEFAULT_REGISTRY;
@@ -47,6 +55,18 @@ public final class BunOptions {
     private boolean linkWorkspacePackages = true;
     private boolean frozenLockfile;
     private boolean loadLockfile = true;
+
+    /**
+     * From 1.4.1, bunfig.toml's {@code install.offline}, or {@code install.prefer = "offline"}: versions come from bun's
+     * manifest cache.
+     */
+    private boolean readsTheManifestCache;
+
+    /**
+     * From 1.2.22, bunfig.toml's {@code install.security.scanner}: the package whose code bun runs over the resolution
+     * before it saves the lock ({@link BunRelease#runsTheSecurityScannerOnInstall()}).
+     */
+    private @Nullable String securityScanner;
     private @Nullable Double minimumReleaseAgeMs;
     private List<String> minimumReleaseAgeExcludes = Collections.emptyList();
 
@@ -65,21 +85,35 @@ public final class BunOptions {
      */
     public static BunOptions load(@Nullable String bunfigToml, @Nullable String userNpmrc, @Nullable String npmrc,
                                   HostEnvironment env) {
+        return load(BunRelease.PORTED, bunfigToml, userNpmrc, npmrc, env);
+    }
+
+    /**
+     * The options as {@code release} loads them.
+     */
+    static BunOptions load(BunRelease release, @Nullable String bunfigToml, @Nullable String userNpmrc,
+                           @Nullable String npmrc, HostEnvironment env) {
         Install install = new Install();
+        Json.Expr installObj = null;
         if (bunfigToml != null) {
-            Json.Expr bunfig = Toml.parse(bunfigToml);
-            Json.Expr installObj = bunfig.getObject("install");
-            if (installObj != null) {
-                install.readBunfig(installObj);
+            Json.Expr bunfig = Toml.parse(bunfigToml, release);
+            installObj = bunfig.getObject("install");
+            if (installObj != null && !release.letsBunfigOverrideNpmrc()) {
+                install.readBunfig(installObj, release);
             }
         }
         if (userNpmrc != null) {
-            install.readNpmrc(userNpmrc, env);
+            install.readNpmrc(userNpmrc, env, release);
         }
         if (npmrc != null) {
-            install.readNpmrc(npmrc, env);
+            install.readNpmrc(npmrc, env, release);
+        }
+        if (installObj != null && release.letsBunfigOverrideNpmrc()) {
+            // PackageManager.rs init: npmrc < bunfig < CLI (overlay_bunfig_install)
+            install.readBunfig(installObj, release);
         }
         BunOptions options = new BunOptions();
+        options.release = release;
         options.apply(install, env);
         return options;
     }
@@ -100,13 +134,18 @@ public final class BunOptions {
     private void apply(Install install, HostEnvironment env) {
         String base = install.defaultRegistry != null && !install.defaultRegistry.isEmpty() ?
                 install.defaultRegistry : DEFAULT_REGISTRY;
-        registry = expandEnv(base, env);
+        registry = scopeUrl(expandEnv(base, env));
         if (install.linkWorkspacePackages != null) {
             linkWorkspacePackages = install.linkWorkspacePackages;
         }
+        readsTheManifestCache = release.readsTheManifestCacheOffline() &&
+                               (Boolean.TRUE.equals(install.offline) || install.preferOffline);
+        if (release.runsTheSecurityScannerOnInstall()) {
+            securityScanner = install.securityScanner;
+        }
         for (Map.Entry<String, String> scope : install.scoped.entrySet()) {
             String url = scope.getValue().isEmpty() ? base : scope.getValue();
-            scopes.put(scope.getKey(), expandEnv(url, env));
+            scopes.put(scope.getKey(), scopeUrl(expandEnv(url, env)));
         }
         if (install.saveDev != null) {
             localDevDependencies = install.saveDev;
@@ -126,12 +165,15 @@ public final class BunOptions {
         if (Boolean.TRUE.equals(install.frozenLockfile)) {
             frozenLockfile = true;
         }
-        minimumReleaseAgeMs = install.minimumReleaseAgeMs;
-        minimumReleaseAgeExcludes = install.minimumReleaseAgeExcludes;
+        // before 1.3.0 bunfig.toml has no minimum release age
+        if (release.readsMinimumReleaseAge()) {
+            minimumReleaseAgeMs = install.minimumReleaseAgeMs;
+            minimumReleaseAgeExcludes = install.minimumReleaseAgeExcludes;
+        }
         for (String key : new String[]{"BUN_CONFIG_REGISTRY", "NPM_CONFIG_REGISTRY", "npm_config_registry"}) {
             String value = env.setting(key);
             if (value != null && !value.isEmpty() && (value.startsWith("https://") || value.startsWith("http://"))) {
-                registry = value;
+                registry = scopeUrl(value);
                 break;
             }
         }
@@ -139,6 +181,19 @@ public final class BunOptions {
         if (skipLoad != null) {
             loadLockfile = "0".equals(skipLoad);
         }
+    }
+
+    // npm.rs Scope::set_url, from 1.4.0: the WHATWG serialization of the url, its credentials split off; the url as it
+    // is where it does not parse
+    private String scopeUrl(String href) {
+        if (!release.canonicalizesTheRegistryUrl()) {
+            return href;
+        }
+        WhatwgUrl url = WhatwgUrl.tryParse(href);
+        if (url == null || !("http:".equals(url.getProtocol()) || "https:".equals(url.getProtocol()))) {
+            return href;
+        }
+        return url.getProtocol() + "//" + url.getHost() + url.getPathname() + url.getSearch() + url.getHash();
     }
 
     // Npm.Registry.Scope.fromAPI: a url of $NAME is the environment variable's value
@@ -159,6 +214,9 @@ public final class BunOptions {
         @Nullable String defaultRegistry;
         final Map<String, String> scoped = new LinkedHashMap<>();
         @Nullable Boolean linkWorkspacePackages;
+        @Nullable Boolean offline;
+        boolean preferOffline;
+        @Nullable String securityScanner;
         @Nullable Boolean saveDev;
         @Nullable Boolean saveOptional;
         @Nullable Boolean savePeer;
@@ -167,7 +225,7 @@ public final class BunOptions {
         @Nullable Double minimumReleaseAgeMs;
         List<String> minimumReleaseAgeExcludes = Collections.emptyList();
 
-        void readBunfig(Json.Expr installObj) {
+        void readBunfig(Json.Expr installObj, BunRelease release) {
             Json.Expr registry = installObj.get("registry");
             if (registry != null) {
                 defaultRegistry = parseRegistry(registry);
@@ -187,7 +245,19 @@ public final class BunOptions {
             saveOptional = bool(installObj, "optional", saveOptional);
             savePeer = bool(installObj, "peer", savePeer);
             saveDev = bool(installObj, "dev", saveDev);
-            linkWorkspacePackages = bool(installObj, "linkWorkspacePackages", linkWorkspacePackages);
+            if (release.readsLinkWorkspacePackages()) {
+                linkWorkspacePackages = bool(installObj, "linkWorkspacePackages", linkWorkspacePackages);
+            }
+            offline = bool(installObj, "offline", offline);
+            Json.Expr prefer = installObj.get("prefer");
+            if (prefer != null && prefer.isString()) {
+                preferOffline = "offline".equals(prefer.asString());
+            }
+            Json.Expr security = installObj.get("security");
+            Json.Expr scanner = security != null && security.isObject() ? security.get("scanner") : null;
+            if (scanner != null && scanner.isString()) {
+                securityScanner = scanner.asString();
+            }
             Json.Expr minAge = installObj.get("minimumReleaseAge");
             if (minAge != null && minAge.kind == Json.Kind.NUMBER && minAge.asNumber() >= 0) {
                 minimumReleaseAgeMs = minAge.asNumber() * 1000;
@@ -221,9 +291,12 @@ public final class BunOptions {
             return b != null ? b : current;
         }
 
-        // ini.zig loadNpmrc: the top-level keys a lock-only install uses, each of the type it takes
-        void readNpmrc(String npmrc, HostEnvironment env) {
-            Map<String, @Nullable Object> out = Ini.parse(npmrc, env);
+        // ini.zig loadNpmrc: the top-level keys a lock-only install uses, each of the type it takes; from 1.2.13 the file
+        // without its byte order mark
+        void readNpmrc(String npmrc, HostEnvironment env, BunRelease release) {
+            String text = release.stripsTheByteOrderMarkOfNpmrc() && npmrc.startsWith("﻿") ? npmrc.substring(1) :
+                    npmrc;
+            Map<String, @Nullable Object> out = Ini.parse(text, env, release);
             Object registry = out.get("registry");
             if (registry instanceof String) {
                 defaultRegistry = (String) registry;
@@ -242,7 +315,7 @@ public final class BunOptions {
                     }
                 }
             }
-            Object link = out.get("link-workspace-packages");
+            Object link = release.readsLinkWorkspacePackagesFromNpmrc() ? out.get("link-workspace-packages") : null;
             if (link instanceof Boolean) {
                 linkWorkspacePackages = (Boolean) link;
             }

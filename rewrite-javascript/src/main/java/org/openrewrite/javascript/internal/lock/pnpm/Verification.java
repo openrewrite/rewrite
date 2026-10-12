@@ -18,14 +18,18 @@ package org.openrewrite.javascript.internal.lock.pnpm;
 import lombok.Value;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.javascript.internal.lock.CannotKnow;
+import org.openrewrite.javascript.internal.lock.JsError;
 import org.openrewrite.javascript.internal.lock.RootRelativePath;
 import org.openrewrite.javascript.internal.lock.UriComponent;
 import org.openrewrite.javascript.semver.NodeSemver;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
+import java.util.function.BiPredicate;
 
 /**
  * Port of @pnpm/lockfile.verification (pnpm 11.2.2), with @pnpm/lockfile.utils' refIsLocalDirectory
@@ -57,9 +61,18 @@ final class Verification {
         String detailedReason;
     }
 
-    @SuppressWarnings("unchecked")
     static boolean allCatalogsAreUpToDate(Map<String, @Nullable Map<String, @Nullable Object>> catalogsConfig,
                                           @Nullable Object snapshot) {
+        return allCatalogsAreUpToDate(catalogsConfig, snapshot, PnpmRelease.PORTED);
+    }
+
+    /**
+     * {@link #allCatalogsAreUpToDate(Map, Object)} as {@code release} compares the specifiers
+     * ({@link #specifiersAreEqual}).
+     */
+    @SuppressWarnings("unchecked")
+    static boolean allCatalogsAreUpToDate(Map<String, @Nullable Map<String, @Nullable Object>> catalogsConfig,
+                                          @Nullable Object snapshot, PnpmRelease release) {
         if (!(snapshot instanceof Map)) {
             return true;
         }
@@ -73,12 +86,181 @@ final class Verification {
                         ((Map<String, @Nullable Object>) entry.getValue()).get("specifier") : null;
                 Map<String, @Nullable Object> config = catalogsConfig.get(catalog.getKey());
                 Object configured = config == null ? null : config.get(entry.getKey());
-                if (!Js.strictEquals(specifier, configured)) {
+                if (!specifiersAreEqual(specifier, configured, release)) {
                     return false;
                 }
             }
         }
         return true;
+    }
+
+    /**
+     * Whether a specifier the lock records is the manifest's: the same, or from 11.14.0 one of
+     * {@link #dependencySpecifiersAreEqual}'s equivalent git specifiers
+     * ({@link PnpmRelease#takesEquivalentGitSpecifiersAsEqual}), asked only where that makes them equal, or where
+     * comparing them so throws.
+     */
+    static boolean specifiersAreEqual(@Nullable Object lockfileSpecifier, @Nullable Object manifestSpecifier,
+                                      PnpmRelease release) {
+        if (Js.strictEquals(lockfileSpecifier, manifestSpecifier)) {
+            return true;
+        }
+        boolean equivalent;
+        try {
+            equivalent = dependencySpecifiersAreEqual(lockfileSpecifier, manifestSpecifier);
+        } catch (JsError e) {
+            if (release.takesEquivalentGitSpecifiersAsEqual()) {
+                throw e;
+            }
+            return false;
+        }
+        return equivalent && release.takesEquivalentGitSpecifiersAsEqual();
+    }
+
+    private static final List<String> KNOWN_GIT_HOSTS = Arrays.asList("github.com", "gitlab.com", "bitbucket.org");
+
+    /**
+     * lockfile/verification gitSpecifiersAreEquivalent.ts' dependencySpecifiersAreEqual (11.14.0): the same, or git
+     * specifiers of one repository and committish ({@code github:o/r#x}, {@code o/r#x} and
+     * {@code git+https://github.com/o/r.git#x}; gitlab: and bitbucket: alike; git://, git+https:// and https:// URLs,
+     * an https one of another host ending in {@code .git}).
+     */
+    static boolean dependencySpecifiersAreEqual(@Nullable Object lockfileSpecifier,
+                                                @Nullable Object manifestSpecifier) {
+        if (Js.strictEquals(lockfileSpecifier, manifestSpecifier)) {
+            return true;
+        }
+        if (lockfileSpecifier == null || lockfileSpecifier == Js.UNDEFINED || manifestSpecifier == null ||
+            manifestSpecifier == Js.UNDEFINED) {
+            return false;
+        }
+        String normalizedLeft = normalizeGitSpecifier(lockfileSpecifier);
+        if (normalizedLeft == null) {
+            return false;
+        }
+        String normalizedRight = normalizeGitSpecifier(manifestSpecifier);
+        return normalizedRight != null && normalizedLeft.equals(normalizedRight);
+    }
+
+    private static @Nullable String normalizeGitSpecifier(Object specifier) {
+        if (!(specifier instanceof String)) {
+            return normalizeNoString(specifier);
+        }
+        String shortcut = normalizeShortcut((String) specifier);
+        return shortcut != null ? shortcut : normalizeUrl((String) specifier);
+    }
+
+    // splitCommittish and normalizeShortcut over a specifier that is no string, as V8 runs them: an array has indexOf
+    // and splits, but has no startsWith, unless a second "#" leaves it unsplit; anything else has no indexOf
+    private static @Nullable String normalizeNoString(Object specifier) {
+        if (specifier instanceof List) {
+            List<?> items = (List<?>) specifier;
+            int hashIndex = items.indexOf("#");
+            if (hashIndex != -1 && items.subList(hashIndex + 1, items.size()).contains("#")) {
+                return null;
+            }
+            throw new JsError(JsError.TYPE_ERROR, "repository.startsWith is not a function");
+        }
+        throw new JsError(JsError.TYPE_ERROR, "specifier.indexOf is not a function");
+    }
+
+    private static @Nullable String normalizeShortcut(String specifier) {
+        String[] split = splitCommittish(specifier);
+        if (split == null) {
+            return null;
+        }
+        String repository = split[0];
+        String host;
+        String path;
+        if (repository.startsWith("github:")) {
+            host = "github.com";
+            path = repository.substring("github:".length());
+        } else if (repository.startsWith("gitlab:")) {
+            host = "gitlab.com";
+            path = repository.substring("gitlab:".length());
+        } else if (repository.startsWith("bitbucket:")) {
+            host = "bitbucket.org";
+            path = repository.substring("bitbucket:".length());
+        } else if (isGithubShorthand(repository)) {
+            host = "github.com";
+            path = repository;
+        } else {
+            return null;
+        }
+        return normalizeParts(host, path, split[1]);
+    }
+
+    private static @Nullable String normalizeUrl(String specifier) {
+        String[] split = splitCommittish(specifier);
+        if (split == null) {
+            return null;
+        }
+        String repository = split[0];
+        int schemeEnd = repository.indexOf("://");
+        if (schemeEnd == -1) {
+            return null;
+        }
+        String scheme = repository.substring(0, schemeEnd).toLowerCase(Locale.ROOT);
+        if (!"git".equals(scheme) && !"git+https".equals(scheme) && !"https".equals(scheme)) {
+            return null;
+        }
+        String location = repository.substring(schemeEnd + "://".length());
+        int slash = location.indexOf('/');
+        if (slash == -1) {
+            return null;
+        }
+        String host = location.substring(0, slash).toLowerCase(Locale.ROOT);
+        String path = location.substring(slash + 1);
+        if (host.isEmpty() || host.contains("@") || host.contains("?") || hasWhiteSpace(host)) {
+            return null;
+        }
+        if ("https".equals(scheme) && !KNOWN_GIT_HOSTS.contains(host) && !path.endsWith(".git")) {
+            return null;
+        }
+        return normalizeParts(host, path, split[1]);
+    }
+
+    private static @Nullable String normalizeParts(String host, String path, @Nullable String committish) {
+        if (path.isEmpty() || path.startsWith("/") || path.endsWith("/") || path.contains("//") ||
+            path.contains("@") || path.contains("?") || hasWhiteSpace(path) ||
+            Arrays.asList(path.split("/", -1)).contains("")) {
+            return null;
+        }
+        String repositoryPath = path.endsWith(".git") ? path.substring(0, path.length() - ".git".length()) : path;
+        if (repositoryPath.isEmpty() || repositoryPath.endsWith("/")) {
+            return null;
+        }
+        return committish != null && !committish.isEmpty() ?
+                "git+https://" + host + "/" + repositoryPath + ".git#" + committish :
+                "git+https://" + host + "/" + repositoryPath + ".git";
+    }
+
+    // the repository and the committish after its #, null for one with a second #
+    private static String @Nullable [] splitCommittish(String specifier) {
+        int hashIndex = specifier.indexOf('#');
+        if (hashIndex == -1) {
+            return new String[]{specifier, null};
+        }
+        String committish = specifier.substring(hashIndex + 1);
+        if (committish.indexOf('#') != -1) {
+            return null;
+        }
+        return new String[]{specifier.substring(0, hashIndex), committish};
+    }
+
+    private static boolean isGithubShorthand(String repository) {
+        return !repository.startsWith(".") && !hasWhiteSpace(repository) && !repository.contains(":") &&
+               !repository.contains("@") && repository.split("/", -1).length == 2;
+    }
+
+    // /\s/.test(s)
+    private static boolean hasWhiteSpace(String s) {
+        for (int i = 0; i < s.length(); i++) {
+            if (Js.isWhiteSpace(s.charAt(i))) {
+                return true;
+            }
+        }
+        return false;
     }
 
     static boolean allProjectsAreUpToDate(List<Project> projects,
@@ -87,7 +269,21 @@ final class Verification {
                                           boolean linkWorkspacePackages, LockfileObject wantedLockfile,
                                           @Nullable Map<String, Map<String, Project>> workspacePackages,
                                           Map<String, String> files, String lockfileDir) {
-        if (!allCatalogsAreUpToDate(catalogs, wantedLockfile.getCatalogs())) {
+        return allProjectsAreUpToDate(projects, catalogs, autoInstallPeers, excludeLinksFromLockfile,
+                linkWorkspacePackages, wantedLockfile, workspacePackages, files, lockfileDir, PnpmRelease.PORTED);
+    }
+
+    /**
+     * {@link #allProjectsAreUpToDate(List, Map, boolean, boolean, boolean, LockfileObject, Map, Map, String)} with
+     * the version ranges read by the node-semver {@code release} bundles.
+     */
+    static boolean allProjectsAreUpToDate(List<Project> projects,
+                                          Map<String, @Nullable Map<String, @Nullable Object>> catalogs,
+                                          boolean autoInstallPeers, boolean excludeLinksFromLockfile,
+                                          boolean linkWorkspacePackages, LockfileObject wantedLockfile,
+                                          @Nullable Map<String, Map<String, Project>> workspacePackages,
+                                          Map<String, String> files, String lockfileDir, PnpmRelease release) {
+        if (!allCatalogsAreUpToDate(catalogs, wantedLockfile.getCatalogs(), release)) {
             return false;
         }
         Map<String, Map<String, @Nullable Object>> manifestsByDir = new LinkedHashMap<>();
@@ -109,11 +305,11 @@ final class Verification {
                 }
                 continue;
             }
-            if (!satisfiesPackageManifest(autoInstallPeers, excludeLinksFromLockfile, importer, project.getManifest())
-                    .isSatisfies() ||
+            if (!satisfiesPackageManifest(autoInstallPeers, excludeLinksFromLockfile, importer, project.getManifest(),
+                    release).isSatisfies() ||
                 !localTarballDepsAreUpToDate(wantedLockfile.getPackages(), importer) ||
                 !linkedPackagesAreUpToDate(linkWorkspacePackages, manifestsByDir, workspacePackages,
-                        wantedLockfile.getPackages(), project, importer, files, lockfileDir)) {
+                        wantedLockfile.getPackages(), project, importer, files, lockfileDir, release)) {
                 return false;
             }
         }
@@ -123,6 +319,13 @@ final class Verification {
     @SuppressWarnings("unchecked")
     static Satisfies satisfiesPackageManifest(boolean autoInstallPeers, boolean excludeLinksFromLockfile,
                                               @Nullable ProjectSnapshot importer, Map<String, @Nullable Object> pkg) {
+        return satisfiesPackageManifest(autoInstallPeers, excludeLinksFromLockfile, importer, pkg,
+                PnpmRelease.PORTED);
+    }
+
+    static Satisfies satisfiesPackageManifest(boolean autoInstallPeers, boolean excludeLinksFromLockfile,
+                                              @Nullable ProjectSnapshot importer, Map<String, @Nullable Object> pkg,
+                                              PnpmRelease release) {
         if (importer == null) {
             return new Satisfies(false, "no importer");
         }
@@ -149,7 +352,8 @@ final class Verification {
             existingDeps = pickNonLinkedDeps(existingDeps);
             specs = pickNonLinkedDeps(specs);
         }
-        Diff specsDiff = diffFlatRecords(specs, existingDeps);
+        Diff specsDiff = diffFlatRecords(specs, existingDeps, (lockfileSpecifier, manifestSpecifier) ->
+                specifiersAreEqual(lockfileSpecifier, manifestSpecifier, release));
         if (!specsDiff.isEqual()) {
             return new Satisfies(false, "specifiers in the lockfile don't match specifiers in package.json:\n" +
                                         specsDiff.display());
@@ -197,17 +401,20 @@ final class Verification {
             }
             for (String depName : pkgDepNames) {
                 String specifier = importer.getSpecifiers().get(depName);
-                if (!Js.truthy(importerDeps.get(depName)) || !Js.strictEquals(specifier, pkgDeps.get(depName))) {
+                if (!Js.truthy(importerDeps.get(depName)) ||
+                    !specifiersAreEqual(specifier, pkgDeps.get(depName), release)) {
                     return new Satisfies(false, "importer " + depField + "." + depName + " specifier " +
                                                 orUndefined(specifier) + " don't match package manifest specifier (" +
                                                 Js.string(pkgDeps.get(depName)) + ")");
                 }
-                if (specifier == null || NodeSemver.validRange(specifier, NodeSemver.Options.DEFAULT) == null) {
+                if (specifier == null || release.underSemver(semver -> NodeSemver.validRange(specifier,
+                        NodeSemver.Options.DEFAULT.release(semver))) == null) {
                     continue;
                 }
                 String version = DepPath.removeSuffix(importerDeps.get(depName));
                 if (NodeSemver.valid(version, NodeSemver.Options.DEFAULT) != null &&
-                    !NodeSemver.satisfies(version, specifier, NodeSemver.Options.DEFAULT)) {
+                    !release.underSemver(semver -> NodeSemver.satisfies(version, specifier,
+                            NodeSemver.Options.DEFAULT.release(semver)))) {
                     return new Satisfies(false, "The importer resolution is broken at dependency \"" + depName +
                                                 "\": version \"" + version + "\" doesn't satisfy range \"" +
                                                 specifier + "\"");
@@ -294,12 +501,20 @@ final class Verification {
     }
 
     static Diff diffFlatRecords(Map<String, @Nullable ?> left, Map<String, @Nullable ?> right) {
+        return diffFlatRecords(left, right, Js::strictEquals);
+    }
+
+    /**
+     * {@link #diffFlatRecords(Map, Map)} with the values compared by {@code areValuesEqual} (11.14.0's parameter).
+     */
+    static Diff diffFlatRecords(Map<String, @Nullable ?> left, Map<String, @Nullable ?> right,
+                                BiPredicate<@Nullable Object, @Nullable Object> areValuesEqual) {
         Diff result = new Diff(new ArrayList<>(), new ArrayList<>(), new ArrayList<>());
         for (String key : Js.keys(left)) {
             Object value = left.get(key);
             if (!right.containsKey(key)) {
                 result.getRemoved().add(new String[]{key, Js.string(value)});
-            } else if (!Js.strictEquals(value, right.get(key))) {
+            } else if (!areValuesEqual.test(value, right.get(key))) {
                 result.getModified().add(new String[]{key, Js.string(value), Js.string(right.get(key))});
             }
         }
@@ -351,7 +566,8 @@ final class Verification {
                                                      @Nullable Map<String, Map<String, Project>> workspacePackages,
                                                      @Nullable Map<String, PackageSnapshot> lockfilePackages,
                                                      Project project, ProjectSnapshot snapshot,
-                                                     Map<String, String> files, String lockfileDir) {
+                                                     Map<String, String> files, String lockfileDir,
+                                                     PnpmRelease release) {
         for (String depField : ProjectSnapshot.DEPENDENCIES_FIELDS) {
             Map<String, @Nullable String> lockfileDeps = snapshot.field(depField);
             Object manifestDeps = project.getManifest().get(depField);
@@ -376,7 +592,7 @@ final class Verification {
                     }
                     String depPath = DepPath.refToRelative(lockfileRef, depName);
                     if (depPath == null || !isLocalFileDepUpdated(lockfilePackages == null ? null :
-                            lockfilePackages.get(depPath), files, lockfileDir)) {
+                            lockfilePackages.get(depPath), files, lockfileDir, release)) {
                         return false;
                     }
                     continue;
@@ -386,7 +602,7 @@ final class Verification {
                                  currentSpec.startsWith("workspace:."))) {
                     continue;
                 }
-                if (isLinked && "tag".equals(versionSelectorType(currentSpec))) {
+                if (isLinked && "tag".equals(versionSelectorType(currentSpec, release))) {
                     continue;
                 }
                 String linkedDir;
@@ -408,11 +624,12 @@ final class Verification {
                     linkedPkg = readPackageJson(files, linkedDir);
                 }
                 String availableRange = getVersionRange(currentSpec);
+                String linkedVersion = linkedPkg == null ? null : Js.string(linkedPkg.get("version"));
                 boolean localPackageSatisfiesRange = "*".equals(availableRange) || "^".equals(availableRange) ||
                                                      "~".equals(availableRange) ||
-                                                     linkedPkg != null && NodeSemver.satisfies(
-                                                             Js.string(linkedPkg.get("version")), availableRange,
-                                                             NodeSemver.Options.LOOSE);
+                                                     linkedVersion != null && release.underSemver(semver ->
+                                                             NodeSemver.satisfies(linkedVersion, availableRange,
+                                                                     NodeSemver.Options.LOOSE.release(semver)));
                 if (isLinked != localPackageSatisfiesRange) {
                     return false;
                 }
@@ -423,7 +640,7 @@ final class Verification {
 
     @SuppressWarnings("unchecked")
     private static boolean isLocalFileDepUpdated(@Nullable PackageSnapshot pkgSnapshot, Map<String, String> files,
-                                                 String lockfileDir) {
+                                                 String lockfileDir, PnpmRelease release) {
         if (pkgSnapshot == null) {
             return false;
         }
@@ -453,8 +670,9 @@ final class Verification {
                     currentSpec.startsWith("workspace:")) {
                     continue;
                 }
-                if (!NodeSemver.satisfies(Js.string(lockfileDeps.get(depName)), getVersionRange(currentSpec),
-                        NodeSemver.Options.LOOSE)) {
+                String locked = Js.string(lockfileDeps.get(depName));
+                if (!release.underSemver(semver -> NodeSemver.satisfies(locked, getVersionRange(currentSpec),
+                        NodeSemver.Options.LOOSE.release(semver)))) {
                     return false;
                 }
             }
@@ -490,10 +708,18 @@ final class Verification {
      * version-selector-type 3.0.0 (loose): {@code version}, {@code range}, {@code tag}, or null.
      */
     static @Nullable String versionSelectorType(String selector) {
+        return versionSelectorType(selector, PnpmRelease.PORTED);
+    }
+
+    /**
+     * {@link #versionSelectorType(String)} over the node-semver {@code release} bundles.
+     */
+    static @Nullable String versionSelectorType(String selector, PnpmRelease release) {
         if (NodeSemver.valid(selector, NodeSemver.Options.LOOSE) != null) {
             return "version";
         }
-        if (NodeSemver.validRange(selector, NodeSemver.Options.LOOSE) != null) {
+        if (release.underSemver(semver -> NodeSemver.validRange(selector,
+                NodeSemver.Options.LOOSE.release(semver))) != null) {
             return "range";
         }
         if (UriComponent.encodeURIComponent(selector).equals(selector)) {

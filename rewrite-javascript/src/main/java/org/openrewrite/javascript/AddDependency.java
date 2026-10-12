@@ -164,7 +164,8 @@ public class AddDependency extends ScanningRecipe<NodeDependencyEdits> {
         }
         ManifestRules.Saved saved;
         try {
-            saved = rules.added(packageName, version, catalogs == null ? null : catalogs.getSettings());
+            saved = rules.added(packageName, version, catalogs == null ? null : catalogs.getSettings(),
+                    release == null ? null : release.getVersion());
         } catch (Rejected e) {
             declined(decision, packageName + "@" + version + " was not added: " + e.getMessage());
             return null;

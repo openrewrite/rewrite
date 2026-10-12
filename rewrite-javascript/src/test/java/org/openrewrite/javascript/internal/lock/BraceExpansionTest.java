@@ -28,22 +28,25 @@ import java.security.NoSuchAlgorithmException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.stream.Stream;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 /**
- * brace-expansion 1.1.11's and 5.0.6's own tests and the inputs where their sources differ, and balanced-match
- * 1.0.0's and 4.0.4's own tests ({@code upstream/brace-expansion-*}, {@code upstream/balanced-match-*}).
+ * brace-expansion 1.1.11's, 5.0.6's and 5.0.9's own tests and the inputs where their sources differ, and
+ * balanced-match 1.0.0's and 4.0.4's own tests ({@code upstream/brace-expansion-*}, {@code upstream/balanced-match-*}).
  */
 class BraceExpansionTest {
 
     private static final String[][] RELEASES = {
             {"V1_1_11", "brace-expansion-1.1.11.jsonl", "balanced-match-1.0.0.jsonl"},
-            {"V5_0_6", "brace-expansion-5.0.6.jsonl.gz", "balanced-match-4.0.4.jsonl"}};
+            {"V5_0_6", "brace-expansion-5.0.6.jsonl.gz", "balanced-match-4.0.4.jsonl"},
+            {"V5_0_9", "brace-expansion-5.0.9.jsonl.gz", "balanced-match-4.0.4.jsonl"}};
 
     static Stream<Arguments> calls() {
         List<Arguments> out = new ArrayList<>();
@@ -62,7 +65,7 @@ class BraceExpansionTest {
     private static @Nullable String notPorted(Call call) {
         if ("expand".equals(call.getFn())) {
             return call.has(1) && !(call.arg(1) instanceof Map && ((Map<?, ?>) call.arg(1)).isEmpty()) ?
-                    "expand with a max: minimatch 10.2.5 passes none" : null;
+                    "expand with a max or a maxLength: minimatch 10.2.5 passes none" : null;
         }
         return "{".equals(call.arg(0)) && "}".equals(call.arg(1)) ? null :
                 call.getFn() + " of other delimiters: brace-expansion asks for { and } only";
@@ -122,8 +125,12 @@ class BraceExpansionTest {
     @Test
     void namesEveryUpstreamCallItDoesNotReplay() {
         Map<String, Integer> notPorted = new LinkedHashMap<>();
+        Set<String> files = new LinkedHashSet<>();
         for (String[] release : RELEASES) {
             for (int file = 1; file < 3; file++) {
+                if (!files.add(release[file])) {
+                    continue;
+                }
                 for (Call call : UpstreamCalls.read(release[file])) {
                     String reason = notPorted(call);
                     if (reason != null) {
@@ -134,8 +141,9 @@ class BraceExpansionTest {
         }
         Map<String, Integer> expected = new LinkedHashMap<>();
         expected.put("balanced-match-1.0.0 balanced of other delimiters: brace-expansion asks for { and } only", 7);
+        expected.put("brace-expansion-5.0.6 expand with a max or a maxLength: minimatch 10.2.5 passes none", 2);
         expected.put("balanced-match-4.0.4 balanced of other delimiters: brace-expansion asks for { and } only", 9);
-        expected.put("brace-expansion-5.0.6 expand with a max: minimatch 10.2.5 passes none", 2);
+        expected.put("brace-expansion-5.0.9 expand with a max or a maxLength: minimatch 10.2.5 passes none", 8);
         assertThat(notPorted).isEqualTo(expected);
     }
 

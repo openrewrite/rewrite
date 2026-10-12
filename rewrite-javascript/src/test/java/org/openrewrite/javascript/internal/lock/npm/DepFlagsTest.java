@@ -147,6 +147,30 @@ class DepFlagsTest {
         assertThatCode(() -> DepFlags.calcDepFlags(root, false)).doesNotThrowAnyException();
     }
 
+    // calc-dep-flags.js from npm 11.18.0: a link only unsets its target's flags, so the link visited last, here the
+    // peer one, no longer sets what the prod one unset
+    @Test
+    void linksToOneTargetOnlyUnsetItsFlagsFrom1118() {
+        for (String version : new String[]{"11.17.0", "11.18.0"}) {
+            NpmRelease release = NpmRelease.of(version);
+            Node root = node(opts().release(release).path("/some/path").realpath("/some/path").pkg(obj(
+              "peerDependencies", obj("b", "file:lib"),
+              "dependencies", obj("a", "file:lib"))));
+            Node lib = node(opts().release(release).root(root).path(PosixPath.resolve(root.getPath(), "lib"))
+              .pkg(obj("name", "lib", "version", "1.2.3")));
+            Link a = link(opts().release(release).name("a").target(lib).parent(root).realpath(lib.getPath()));
+            Link b = link(opts().release(release).name("b").target(lib).parent(root).realpath(lib.getPath()));
+
+            DepFlags.calcDepFlags(root);
+
+            assertFlags(a, false, false, false, false, false);
+            assertFlags(b, false, false, false, false, true);
+            assertThat(lib.isPeer()).as("npm %s: lib.peer", version).isEqualTo("11.17.0".equals(version));
+            assertThat(lib.isExtraneous()).isFalse();
+            assertThat(lib.isDev()).isFalse();
+        }
+    }
+
     @Test
     void resetDepFlagsSetsEveryFlagOfEveryNode() {
         Node root = node(opts().path("/some/path").realpath("/some/path").pkg(obj("dependencies", obj("foo", ""))));

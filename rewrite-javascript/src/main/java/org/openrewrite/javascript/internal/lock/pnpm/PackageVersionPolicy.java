@@ -38,17 +38,57 @@ final class PackageVersionPolicy {
     }
 
     static Function<String, Object> createPackageVersionPolicy(List<String> patterns) {
+        return createPackageVersionPolicy(patterns, PnpmRelease.PORTED);
+    }
+
+    /**
+     * The policy as {@code release} evaluates it: from 11.9.0 the exact versions of every rule that matches are
+     * merged until a rule of the bare name; before, the first rule that matches decides
+     * ({@link PnpmRelease#mergesExactVersionsAcrossPolicyRules}), asked where the two differ.
+     */
+    static Function<String, Object> createPackageVersionPolicy(List<String> patterns, PnpmRelease release) {
         List<VersionPolicyRule> rules = new ArrayList<>();
         for (String pattern : patterns) {
             ParsedVersionPolicyRule parsed = parseVersionPolicyRule(pattern);
             rules.add(new VersionPolicyRule(Matcher.createMatcher(parsed.packageName), parsed.exactVersions));
         }
-        return pkgName -> evaluateVersionPolicy(rules, pkgName);
+        return pkgName -> {
+            Object first = evaluateVersionPolicy(rules, pkgName);
+            Object merged = evaluateMergedVersionPolicy(rules, pkgName);
+            return first.equals(merged) || !release.mergesExactVersionsAcrossPolicyRules() ? first : merged;
+        };
+    }
+
+    // evaluateVersionPolicy of 11.9.0
+    private static Object evaluateMergedVersionPolicy(List<VersionPolicyRule> rules, String pkgName) {
+        List<String> matchedVersions = null;
+        for (VersionPolicyRule rule : rules) {
+            if (!rule.nameMatcher.test(pkgName)) {
+                continue;
+            }
+            if (rule.exactVersions.isEmpty()) {
+                return matchedVersions == null ? Boolean.TRUE : matchedVersions;
+            }
+            if (matchedVersions == null) {
+                matchedVersions = new ArrayList<>();
+            }
+            for (String version : rule.exactVersions) {
+                if (!matchedVersions.contains(version)) {
+                    matchedVersions.add(version);
+                }
+            }
+        }
+        return matchedVersions == null ? Boolean.FALSE : matchedVersions;
     }
 
     static Function<String, Object> createPackageVersionPolicyOrThrow(List<String> patterns, String key) {
+        return createPackageVersionPolicyOrThrow(patterns, key, PnpmRelease.PORTED);
+    }
+
+    static Function<String, Object> createPackageVersionPolicyOrThrow(List<String> patterns, String key,
+                                                                      PnpmRelease release) {
         try {
-            return createPackageVersionPolicy(patterns);
+            return createPackageVersionPolicy(patterns, release);
         } catch (PnpmError e) {
             throw new PnpmError("INVALID_" + key.replaceAll("([A-Z])", "_$1").toUpperCase(Locale.ROOT),
                     "Invalid value in " + key + ": " + e.getMessage());

@@ -103,7 +103,7 @@ class PnpmLockRoundTripTest {
             assertThat(ignoredReason(readingLog)).as("pnpm ignores the lock").isEqualTo(e.getMessage().split("\n")[0]);
             return;
         } catch (CannotKnow e) {
-            String expect = lock.getScenario().expect();
+            String expect = PnpmScenarioTest.expected(lock.getScenario());
             assertThat(expect).as(e.getMessage()).startsWith("cannot-know");
             assertThat(e.getSubject()).as("the subject of " + expect).contains(subject(expect));
             return;

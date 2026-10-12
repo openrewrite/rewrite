@@ -207,6 +207,32 @@ class LockfileTest {
         Map<String, @Nullable Object> expected = entry("0.0.0", null, "http://example.com/foobar", null);
         expected.put("integrity", "sha1-foo sha512-bar");
         assertThat(defined(lockfile.getLockfile(patterns).get("foobar"))).isEqualTo(expected);
+        // yarn records no integrity before 1.10.0
+        assertThat(defined(lockfile.getLockfile(patterns, YarnClassicRelease.of("1.9.4")).get("foobar")))
+                .isEqualTo(entry("0.0.0", null, "http://example.com/foobar", null));
+    }
+
+    /**
+     * Upstream's sorting case as the releases before 1.22.22 pass it: the entry two patterns share by remote names the
+     * package their names do not infer.
+     */
+    @Test
+    void getLockfileSortingBefore12222() {
+        Lockfile lockfile = new Lockfile();
+        PackageResolver resolver = YarnClassicScenarios.resolver(YarnClassicScenarios.defaults(), lockfile);
+        Manifest foobar = manifest(resolver, "foobar", "0.0.0", null, "http://example.com/foobar", "npm");
+        Map<String, Manifest> patterns = new LinkedHashMap<>();
+        patterns.put("foobar2", foobar);
+        patterns.put("foobar1", foobar);
+
+        Map<String, @Nullable Object> actual = lockfile.getLockfile(patterns, YarnClassicRelease.of("1.22.21"));
+
+        Map<String, @Nullable Object> expected = entry("0.0.0", null, "http://example.com/foobar", null);
+        Map<String, @Nullable Object> named = new LinkedHashMap<>();
+        named.put("name", "foobar");
+        named.putAll(expected);
+        assertThat(defined(actual.get("foobar1"))).isEqualTo(named);
+        assertThat(actual.get("foobar2")).isSameAs(actual.get("foobar1"));
     }
 
     @Test

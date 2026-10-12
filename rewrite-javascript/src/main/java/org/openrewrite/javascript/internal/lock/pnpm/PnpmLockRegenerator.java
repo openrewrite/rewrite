@@ -122,6 +122,13 @@ public final class PnpmLockRegenerator {
         @Nullable
         Set<String> pathsAbove;
 
+        /**
+         * The release that runs the install, the one that built the LST ({@link PnpmReleases#runs}); null where the
+         * host recorded none, when 11.2.2 runs and hands the install to the release the project names.
+         */
+        @Nullable
+        PnpmRelease release;
+
         boolean holds(String path) {
             return files.containsKey(path) || paths != null && paths.contains(path);
         }
@@ -148,10 +155,11 @@ public final class PnpmLockRegenerator {
     public PnpmLockRegenerator(Inputs inputs, RegistryMetadata registry) {
         this.inputs = inputs;
         this.registry = registry;
-        this.lockFile = new EnvLockfile.OnDisk(inputs.getLock());
+        this.lockFile = new EnvLockfile.OnDisk(inputs.getLock(),
+                inputs.getRelease() == null ? PnpmRelease.PORTED : inputs.getRelease());
         this.now = requireNonNull(inputs.getNow(), "now");
         this.envInstaller = new EnvInstaller(registry, now, inputs.getHost());
-        this.stores = new CreateNewStoreController(registry, now);
+        this.stores = new CreateNewStoreController(registry, now, inputs.getHost().getNodeVersion());
         this.lockInstall = new Install(inputs, inputs.getLockDir(), lockFile, registry, stores, now);
     }
 
@@ -200,7 +208,9 @@ public final class PnpmLockRegenerator {
      */
     String writeLock() {
         Install.Result install = install();
-        return install.getResolution() == null ? install.getWritten() : lockInstall.installInContext(install);
+        String written = install.getResolution() == null ? install.getWritten() : lockInstall.installInContext(install);
+        lockInstall.throwFailureAfterWrite();
+        return written;
     }
 
     /**
@@ -208,12 +218,17 @@ public final class PnpmLockRegenerator {
      */
     Install.Result install() {
         Main main = new Main(inputs, envInstaller, stores, lockFile);
-        PnpmOptions options = main.config();
-        boolean workspace = options.getWorkspacePackagePatterns() != null;
-        String lockfileDir = workspace ? options.getLockfileDir(inputs.getLockDir()) : null;
-        main.checkWantedPackageManager(options);
+        PnpmOptions config = main.config();
+        boolean workspace = config.getWorkspacePackagePatterns() != null;
+        String lockfileDir = workspace ? config.getLockfileDir(inputs.getLockDir()) : null;
+        String installs = main.checkWantedPackageManager(config);
+        PnpmRelease release = main.installs(installs);
+        // the release pnpm hands the install to reads the same files into its own config
+        PnpmOptions options = (release.equals(main.running()) ? config : main.config(release))
+                .withPackageManagerVersion(installs).withRelease(release);
         Main.FilterResults filterResults;
         try {
+            main.checkRuntimes(options);
             main.installConfigDepsAndLoadHooks(options, lockfileDir);
             filterResults = workspace ? main.filterProjectsFromDir(options) : null;
             // install.ts' handler, before installDeps

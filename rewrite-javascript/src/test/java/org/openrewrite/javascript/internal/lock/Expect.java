@@ -27,6 +27,12 @@ public class Expect {
     public static final String EXACT = "exact";
 
     /**
+     * The lock byte for byte when the engine writes one, else the failure the rest of the line names: a release
+     * replayed over a scenario whose own recording the engine cannot know.
+     */
+    public static final String EXACT_OR = "exact-or";
+
+    /**
      * The engine does not reproduce what the package manager did, for the reason the line gives; the edit is skipped.
      */
     public static final String NOT_REPRODUCED = "not-reproduced";
