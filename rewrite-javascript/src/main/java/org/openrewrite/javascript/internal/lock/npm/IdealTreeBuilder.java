@@ -181,6 +181,9 @@ public final class IdealTreeBuilder {
         Node dep;
     }
 
+    // where every virtual root stands before npm 7.6.3
+    private static final String VIRTUAL_ROOT = "/virtual-root";
+
     private final String path;
     private final VirtualTreeLoader.ProjectFiles files;
     private final NpmOptions options;
@@ -822,16 +825,18 @@ public final class IdealTreeBuilder {
             return virtualRoots.get(node);
         }
 
+        // before npm 7.6.3 every virtual root stands at /virtual-root, with no copies of link targets
+        boolean atSourcePath = options.getRelease().placesVirtualRootAtSourcePath();
         Node vr = new Node(Node.options()
                 .release(options.getRelease())
-                .path(node.getRealpath())
+                .path(atSourcePath ? node.getRealpath() : VIRTUAL_ROOT)
                 .sourceReference(node)
                 .installLinks(options.isInstallLinks())
                 .legacyPeerDeps(options.isLegacyPeerDeps())
                 .overrides(node.getOverrides())
                 .build());
 
-        for (Node child : node.getChildren().values()) {
+        for (Node child : atSourcePath ? node.getChildren().values() : Collections.<Node>emptyList()) {
             if (child.isLink()) {
                 new Node(Node.options()
                         .release(options.getRelease())
@@ -1083,6 +1088,12 @@ public final class IdealTreeBuilder {
 
     // PackageJson.normalize(realpath).catch(() => ({ content: {} })) over the project's files
     private Map<String, Object> directoryManifest(String realpath, Spec spec) {
+        if (!options.getRelease().placesVirtualRootAtSourcePath() &&
+            (VIRTUAL_ROOT.equals(realpath) || realpath.startsWith(VIRTUAL_ROOT + "/"))) {
+            // a directory spec of a node in a virtual root, which stands at /virtual-root before npm 7.6.3: npm
+            // reads a package.json under that made-up path, which fails, and the link takes an empty package
+            return new LinkedHashMap<>();
+        }
         String location = Relpath.relpath(Objects.requireNonNull(idealTree).getRealpath(), realpath);
         PackageJson manifest;
         try {

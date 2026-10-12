@@ -416,6 +416,9 @@ public class NpmOptions {
                 case "prefer-dedupe":
                     if (release.definesPreferDedupe()) {
                         options.preferDedupe(booleanField(value, env, validated));
+                    } else if (release.flattensUndeclaredPreferDedupe()) {
+                        // a key no definition declares: parsed as a literal, kept by nopt, and read by arborist as !!
+                        options.preferDedupe(truthy(parseField(value, Type.LITERAL, env)));
                     }
                     break;
                 case "strict-peer-deps":

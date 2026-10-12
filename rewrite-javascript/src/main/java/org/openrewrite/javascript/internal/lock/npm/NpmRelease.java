@@ -243,6 +243,14 @@ public final class NpmRelease implements Comparable<NpmRelease> {
     }
 
     /**
+     * {@code [_virtualRoot]} stands a virtual root at its source's realpath, with a virtual copy of each link target
+     * among the source's children, from npm 7.6.3; before, at {@code /virtual-root}, with none.
+     */
+    boolean placesVirtualRootAtSourcePath() {
+        return atLeast(7, 6, 3);
+    }
+
+    /**
      * {@code #buildDepStep} places every dependency of a step before it visits any placement, until npm 9.6.6; from
      * then, each placement is visited as soon as it is made.
      */
@@ -1317,6 +1325,16 @@ public final class NpmRelease implements Comparable<NpmRelease> {
      */
     boolean explainsPeerConflictAsCurrentAndPeer() {
         return atLeast(7, 20, 3);
+    }
+
+    // npm flat-options.js
+
+    /**
+     * lib/utils/flat-options.js hands arborist the config's {@code prefer-dedupe}, which no definition declares and
+     * the config keeps as the npmrc file writes it, until npm 7.7.0; from then until 9.7.0 no flatten reads it.
+     */
+    boolean flattensUndeclaredPreferDedupe() {
+        return !atLeast(7, 7, 0);
     }
 
     // npm-install-checks
