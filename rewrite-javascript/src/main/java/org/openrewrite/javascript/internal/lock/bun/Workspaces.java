@@ -165,12 +165,12 @@ final class Workspaces {
         map.put(key, value);
     }
 
-    private static @Nullable Entry processWorkspaceName(Log log, String manifest, String inputPath) {
+    private @Nullable Entry processWorkspaceName(Log log, String manifest, String inputPath) {
         Json.Expr workspaceJson;
         try {
-            workspaceJson = Json.parse(manifest);
+            workspaceJson = Json.parse(manifest, release);
         } catch (Json.SyntaxError e) {
-            log.addError("ParserError reading package.json for workspace package \"" + inputPath + "\"");
+            log.addError(e.error + " reading package.json for workspace package \"" + inputPath + "\"");
             return null;
         }
         Json.Expr nameExpr = workspaceJson.get("name");

@@ -342,6 +342,20 @@ public final class BunRelease implements Comparable<BunRelease> {
 
     // 1.4.x: src/parsers (json.rs, toml.rs), src/dotenv, src/glob, src/js_printer
 
+    /**
+     * package.json and bun.lock are read by a JSON parser that indexes the document's structure first
+     * (src/parsers/json_index.rs) and then descends over the index (json_stage2.rs), from 1.4.0 (bun#33032): what
+     * follows the root is only looked at for a {@code /} that starts no comment or a {@code /*} without its end; an
+     * object or array open at the end of the file expects its close; a key position expects a string and a missing
+     * colon is {@code Expected ":"}; a token's text in a message is its whole run; and every error logged fails the
+     * parse, as the parser's own ParserError or SyntaxError. Before, the JavaScript lexer reads it a token at a time,
+     * one token past the root too; a missing colon is {@code Expected " ="} (js_lexer_tables.zig {@code TColon}); a
+     * token's text is the lexer's; and an error {@code expect} only logs lets the parse go on.
+     */
+    boolean indexesJsonBeforeParsingIt() {
+        return atLeast(1, 4, 0);
+    }
+
     // ----
 
     // 1.4.x: src/install (dependency.rs, integrity.rs, repository.rs, npm.rs, resolution.rs) and src/semver

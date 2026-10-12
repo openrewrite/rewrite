@@ -2028,6 +2028,147 @@ class BunReleaseTest {
         return names;
     }
 
+    // the error the release's JSON parser fails a package.json or bun.lock with, as "name: first message"; "reads past"
+    // the error 1.3.x only logs where its parse returns what it read
+    private static String jsonFailure(String release, String json) {
+        try {
+            Json.parse(json, BunRelease.of(release));
+        } catch (Json.SyntaxError e) {
+            return e.error + ": " + e.getMessage();
+        } catch (CannotKnow e) {
+            return "reads past " + e.getMessage().replaceFirst(".*JSON it reads past its own error \\((.*)\\)$", "$1");
+        }
+        return "parses";
+    }
+
+    /**
+     * json.rs, json_index.rs and json_stage2.rs (1.4.0, bun#33032): json.rs's {@code error_messages} table, with
+     * package.json's options.
+     */
+    @ParameterizedTest
+    @org.junit.jupiter.params.provider.CsvSource(delimiter = '|', quoteCharacter = '`', value = {
+      "`   `|ParserError: Unexpected end of file",
+      "{|ParserError: Expected \"}\" but found end of file",
+      "[1|ParserError: Expected \"]\" but found end of file",
+      "\"abc|SyntaxError: Unterminated string literal",
+      "\"ab\\ncd\"|SyntaxError: Unterminated string literal",
+      "\"ab\\tcd\"|SyntaxError: Syntax Error",
+      "{\"a\" 1}|ParserError: Expected \":\" but found \"1\"",
+      "{1: 2}|ParserError: Expected string but found \"1\"",
+      "[truthy]|ParserError: Unexpected truthy",
+      "[truex]|ParserError: Unexpected truex",
+      "nul|ParserError: Unexpected nul",
+      "[1n]|SyntaxError: Syntax Error",
+      "[123abc]|SyntaxError: Syntax Error",
+      "[@]|SyntaxError: Unsupported syntax: Decorators are not allowed in JSON",
+      "[;]|SyntaxError: Unsupported syntax: Semicolons are not allowed in JSON",
+      "[1 + 2]|SyntaxError: Unsupported syntax: Operators are not allowed in JSON",
+      "[\"a\\q\"]|SyntaxError: Syntax Error",
+      "[\"\\u12\"]|SyntaxError: Syntax Error",
+      "{\"a\": }|ParserError: Unexpected }",
+      "{\"a\": 1/2}|SyntaxError: Unsupported syntax: Operators are not allowed in JSON",
+      "[1] /* unterminated|SyntaxError: Expected \"*/\" to terminate multi-line comment",
+      "[@] /* unterminated|SyntaxError: Unsupported syntax: Decorators are not allowed in JSON",
+      "[1 /* never|SyntaxError: Expected \"*/\" to terminate multi-line comment",
+      "[@] 1/2|SyntaxError: Unsupported syntax: Decorators are not allowed in JSON",
+      "/ [1]|SyntaxError: Unsupported syntax: Operators are not allowed in JSON",
+      "{\"v\": 1.0.0}|ParserError: Unexpected 1.0.0",
+      "[a+1]|ParserError: Unexpected a+1",
+      "{\"a\":1 \"b\":2}|ParserError: Expected \",\" but found \"\"b\"\"",
+      "{\"a\":1,|ParserError: Expected string but found end of file",
+      "{\\n<<<<<<< HEAD\\n|ParserError: Expected string but found \"<<<<<<<\"",
+      "[\\x]|SyntaxError: Syntax Error",
+      "{\"a\": [\"x\" \"y\"]}|ParserError: Expected \",\" but found \"\"y\"\"",
+    })
+    void readsJsonOverAStructuralIndexFrom140(String json, String failure) {
+        assertThat(jsonFailure("1.4.0", unescape(json))).isEqualTo(failure);
+    }
+
+    /**
+     * json.zig over js_lexer.zig's JSON mode (1.3.10): a token's text is the lexer's, a missing colon
+     * {@code Expected " ="}, and the lexer reads one token past the root.
+     */
+    @ParameterizedTest
+    @org.junit.jupiter.params.provider.CsvSource(delimiter = '|', quoteCharacter = '`', value = {
+      "{|ParserError: Expected string but found end of file",
+      "[|ParserError: Unexpected end of file",
+      "[1|ParserError: Expected \",\" but found end of file",
+      "{\"a\":1|ParserError: Expected \",\" but found end of file",
+      "{\"a\"|ParserError: Expected \" =\" but found end of file",
+      "{\"a\" 1}|ParserError: Expected \" =\" but found \"1\"",
+      "{1:2}|reads past Expected string but found \"1\"",
+      "{\"v\": 1.0.0}|reads past Expected \",\" but found \".0\"",
+      "{\"a\": [\"x\" \"y\"]}|reads past Expected \",\" but found \"\"y\"\"",
+      "[a+1]|ParserError: Unexpected a",
+      "[1n]|ParserError: Unexpected 1n",
+      "[\\x]|SyntaxError: Unexpected escape sequence",
+      "[truthy]|ParserError: Unexpected truthy",
+      "\"abc|SyntaxError: Unterminated string literal",
+      "\"ab\\tcd\"|SyntaxError: Syntax Error",
+      "{\\n<<<<<<< HEAD\\n|SyntaxError: Unsupported syntax: Operators are not allowed in JSON",
+      "[1] /* unterminated|SyntaxError: Expected \"*/\" to terminate multi-line comment",
+      "{} ;|SyntaxError: Unsupported syntax: Semicolons are not allowed in JSON",
+      "{} 1x|SyntaxError: Syntax Error",
+      "{} \"abc|SyntaxError: Unterminated string literal",
+      "{} /|parses",
+      "{} x y z ;|parses",
+    })
+    void readsJsonThroughTheJavaScriptLexerBefore140(String json, String failure) {
+        assertThat(jsonFailure("1.3.14", unescape(json))).isEqualTo(failure);
+    }
+
+    @Test
+    void looksPastTheRootOnlyForASlashFrom140() {
+        assertThat(jsonFailure("1.4.0", "{} ;")).isEqualTo("parses");
+        assertThat(jsonFailure("1.4.0", "{} 1x \"abc")).isEqualTo("parses");
+        assertThat(jsonFailure("1.4.0", "{} /")).isEqualTo("SyntaxError: Unsupported syntax: Operators are not allowed in JSON");
+        // the indexer reads on in 8 KiB chunks: a slash past the chunk the root ends in is never seen
+        String padded = "{\"a\": \"" + repeat('x', 9000) + "\"}";
+        assertThat(jsonFailure("1.4.0", padded + " /")).isEqualTo("SyntaxError: Unsupported syntax: Operators are not allowed in JSON");
+        String far = "{}" + repeat(' ', 9000) + "/";
+        assertThat(jsonFailure("1.4.0", far)).isEqualTo("parses");
+    }
+
+    @Test
+    void readsPastAnErrorItOnlyLogsBefore140() {
+        // the array is ["x"] and the install goes on with it, which the engine does not reproduce
+        assertThatThrownBy(() -> Json.parse("{\"a\": [\"x\" \"y\"]}", BunRelease.of("1.3.14")))
+          .isInstanceOf(CannotKnow.class)
+          .hasMessageContaining("Expected \",\" but found \"\"y\"\"");
+    }
+
+    @Test
+    void readsTheSameValuesEitherWay() {
+        String json = "\uFEFF{\"a\": [1, -2.5e3, 0x10, 017, .5, true, null, \"\\u00e9\\n\\uD83D\\uDE00\", 'q'], // c\n" +
+                      "  /* d */ \"b\": {\"c\": \"\u00a0x\",},}";
+        for (String release : new String[]{"1.3.14", "1.4.0"}) {
+            Json.Expr root = Json.parse(json, BunRelease.of(release));
+            List<Json.Expr> a = requireNonNull(root.get("a")).items();
+            assertThat(a).hasSize(9);
+            assertThat(a.get(0).asNumber()).isEqualTo(1.0);
+            assertThat(a.get(1).asNumber()).isEqualTo(-2500.0);
+            assertThat(a.get(2).asNumber()).isEqualTo(16.0);
+            assertThat(a.get(3).asNumber()).isEqualTo(15.0);
+            assertThat(a.get(4).asNumber()).isEqualTo(0.5);
+            assertThat(a.get(5).asBool()).isTrue();
+            assertThat(a.get(6).kind).isEqualTo(Json.Kind.NULL);
+            assertThat(a.get(7).asString()).isEqualTo("\u00e9\n\uD83D\uDE00");
+            assertThat(a.get(8).asString()).isEqualTo("q");
+            assertThat(requireNonNull(requireNonNull(root.get("b")).get("c")).asString()).isEqualTo("\u00a0x");
+        }
+    }
+
+    private static String repeat(char c, int n) {
+        char[] chars = new char[n];
+        java.util.Arrays.fill(chars, c);
+        return new String(chars);
+    }
+
+    // the table's \n, \t and \\ escapes
+    private static String unescape(String s) {
+        return s.replace("\\n", "\n").replace("\\t", "\t");
+    }
+
     private static PackageManifest.PackageVersion version(BunRelease release, String packument) {
         PackageManifest manifest = requireNonNull(PackageManifest.parse(release, new Log(), packument, "debug", false));
         PackageManifest.FindResult pick = requireNonNull(manifest.findBestVersion(

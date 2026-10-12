@@ -266,7 +266,7 @@ public final class BunLockRegenerator {
             return 0;
         }
         for (Map.Entry<String, String> parent : parentManifests.entrySet()) {
-            Json.Expr workspaces = Json.parse(parent.getValue()).get("workspaces");
+            Json.Expr workspaces = Json.parse(parent.getValue(), release).get("workspaces");
             if (workspaces == null) {
                 continue;
             }
@@ -441,10 +441,16 @@ public final class BunLockRegenerator {
         return Reason.RESOLUTION_REQUIRED;
     }
 
+    // the parser's error, which bun prints after its log: install_with_manager's "failed to parse" for a package.json,
+    // Arguments.zig loadConfig's "failed to load bunfig" for bunfig.toml
     private static Failure failure(RuntimeException e) {
+        if (e instanceof Toml.SyntaxError) {
+            return INSTALL.failure(Rejected.rejects(Reason.MALFORMED_MANIFEST,
+                    ((Json.SyntaxError) e).error + ": failed to load bunfig: " + e.getMessage()));
+        }
         if (e instanceof Json.SyntaxError) {
             return INSTALL.failure(Rejected.rejects(Reason.MALFORMED_MANIFEST,
-                    "ParserError: failed to parse package.json: " + e.getMessage()));
+                    ((Json.SyntaxError) e).error + ": failed to parse package.json: " + e.getMessage()));
         }
         return INSTALL.failure(e);
     }
@@ -507,7 +513,7 @@ public final class BunLockRegenerator {
             if (root == null || root.dependenciesLen == 0) {
                 needsNewLockfile = true;
             } else {
-                Json.Expr rootJson = Json.parse(rootManifest);
+                Json.Expr rootJson = Json.parse(rootManifest, release);
                 Lockfile lockfile = new Lockfile(release);
                 Package maybeRoot = new Package();
                 maybeRoot.parseWithJSON(lockfile, options, log, "", rootJson, Features.MAIN, manifests);
@@ -529,7 +535,7 @@ public final class BunLockRegenerator {
             if (options.isFrozenLockfile() && inputs.getLock() != null) {
                 throw Rejected.rejects(Reason.RESOLUTION_REQUIRED, "lockfile had changes, but lockfile is frozen");
             }
-            Json.Expr rootJson = Json.parse(rootManifest);
+            Json.Expr rootJson = Json.parse(rootManifest, release);
             manager.lockfile = new Lockfile(release);
             if (release.keepsTheLockfileVersionItRead() && loaded != null) {
                 manager.lockfile.textLockfileVersion = loaded.textLockfileVersion;

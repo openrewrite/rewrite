@@ -16,45 +16,233 @@
 package org.openrewrite.javascript.internal.lock.bun;
 
 import org.jspecify.annotations.Nullable;
+import org.openrewrite.javascript.internal.lock.CannotKnow;
 
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 
+import static java.nio.charset.StandardCharsets.UTF_8;
+
 /**
- * JSON as bun's src/interchange/json.zig {@code parsePackageJSONUTF8} reads it (bun 1.3.10): comments and trailing
- * commas allowed, every property kept in source order, a repeated key too, {@link Expr#get} answering the first.
+ * JSON as bun reads package.json and bun.lock, comments and trailing commas allowed, every property kept in source
+ * order, a repeated key too, {@link Expr#get} answering the first: port of src/interchange/json.zig
+ * {@code parsePackageJSONUTF8} over the JavaScript lexer ({@link JsonLexer}) (bun 1.3.10), and from 1.4.0 of
+ * src/parsers/json.rs {@code ParsedJson::parse_package_json} over a structural index ({@link JsonIndex},
+ * {@link JsonStage2}).
  */
 final class Json {
 
-    private final String source;
-    private int pos;
+    static final String PARSER_ERROR = "ParserError";
+    static final String SYNTAX_ERROR = "SyntaxError";
 
-    private Json(String source) {
-        this.source = source;
+    private final JsonLexer lexer;
+
+    private Json(JsonLexer lexer) {
+        this.lexer = lexer;
     }
 
-    static final class SyntaxError extends IllegalArgumentException {
-        SyntaxError(String message) {
+    /**
+     * A document bun does not parse: {@link #error} names the parser's error ({@code ParserError} or
+     * {@code SyntaxError}), the message is the first error it logged.
+     */
+    static class SyntaxError extends IllegalArgumentException {
+        final String error;
+
+        SyntaxError(String error, String message) {
             super(message);
+            this.error = error;
+        }
+    }
+
+    /**
+     * An error a parser returns once it has logged it, which ends the parse.
+     */
+    static final class Failure extends RuntimeException {
+        final String error;
+
+        Failure(String error) {
+            super(error, null, false, false);
+            this.error = error;
+        }
+    }
+
+    /**
+     * The errors a parse logs, in order, each with where it is.
+     */
+    static final class Log {
+        private final List<String> texts = new ArrayList<>();
+        private final List<int[]> locations = new ArrayList<>();
+
+        void add(String text, int offset, int length) {
+            texts.add(text);
+            locations.add(new int[]{offset, length});
+        }
+
+        boolean hasErrors() {
+            return !texts.isEmpty();
+        }
+
+        int size() {
+            return texts.size();
+        }
+
+        int offset(int i) {
+            return locations.get(i)[0];
+        }
+
+        int length(int i) {
+            return locations.get(i)[1];
+        }
+
+        void truncate(int size) {
+            while (texts.size() > size) {
+                texts.remove(texts.size() - 1);
+                locations.remove(locations.size() - 1);
+            }
+        }
+
+        String first(String otherwise) {
+            return texts.isEmpty() ? otherwise : texts.get(0);
         }
     }
 
     static Expr parse(String source) {
+        return parse(source, BunRelease.PORTED);
+    }
+
+    /**
+     * The document as {@code release} reads it.
+     */
+    static Expr parse(String source, BunRelease release) {
         if (source.isEmpty()) {
             return new Expr(Kind.OBJECT, new ArrayList<Property>());
         }
-        Json p = new Json(source);
-        if (source.charAt(0) == '\uFEFF') {
-            p.pos = 1;
+        Log log = new Log();
+        if (release.indexesJsonBeforeParsingIt()) {
+            try {
+                return parseImpl(source.getBytes(UTF_8), log);
+            } catch (Failure f) {
+                throw new SyntaxError(f.error, log.first(f.error));
+            }
         }
-        p.skipWhitespace();
-        Expr value = p.value();
-        p.skipWhitespace();
-        if (p.pos < source.length()) {
-            throw p.error("Expected end of file");
+        Expr root;
+        try {
+            root = new Json(JsonLexer.init(source, log)).parseExpr();
+        } catch (Failure f) {
+            throw new SyntaxError(f.error, log.first(f.error));
         }
-        return value;
+        if (log.hasErrors()) {
+            // the parse returned what it read past an error it only logged, and an install goes on with it
+            throw new CannotKnow("what bun " + release + " makes of JSON it reads past its own error (" +
+                                 log.first("") + ")");
+        }
+        return root;
+    }
+
+    // json.rs parse_impl with PACKAGE_JSON_OPTS: what stage 1 found wrong is the error unless stage 2 logged an earlier
+    // one, and any error logged fails the parse
+    private static Expr parseImpl(byte[] contents, Log log) {
+        JsonIndex sidx = new JsonIndex(contents);
+        Expr result = null;
+        Failure failure = null;
+        try {
+            result = new JsonStage2(contents, log, sidx).parseValue();
+        } catch (Failure f) {
+            failure = f;
+        }
+        if (sidx.indexError != null) {
+            int pos = sidx.indexErrorPos;
+            boolean earlierStage2Err = false;
+            for (int i = 0; i < log.size(); i++) {
+                if (log.offset(i) + Math.max(log.length(i), 1) <= pos) {
+                    earlierStage2Err = true;
+                    break;
+                }
+            }
+            if (!earlierStage2Err) {
+                log.truncate(0);
+                if (sidx.indexError == JsonIndex.Error.UNTERMINATED_BLOCK_COMMENT) {
+                    log.add("Expected \"*/\" to terminate multi-line comment", contents.length, 0);
+                } else {
+                    log.add("Unsupported syntax: Operators are not allowed in JSON", pos + 1, 0);
+                }
+            }
+            throw new Failure(SYNTAX_ERROR);
+        }
+        if (failure != null) {
+            throw failure;
+        }
+        if (log.hasErrors()) {
+            throw new Failure(SYNTAX_ERROR);
+        }
+        return result;
+    }
+
+    // json.zig JSONLikeParser.parseExpr (force_utf8)
+    private Expr parseExpr() {
+        switch (lexer.token) {
+            case FALSE:
+                lexer.next();
+                return new Expr(Kind.BOOLEAN, false);
+            case TRUE:
+                lexer.next();
+                return new Expr(Kind.BOOLEAN, true);
+            case NULL:
+                lexer.next();
+                return new Expr(Kind.NULL, null);
+            case STRING_LITERAL: {
+                String str = lexer.toEString();
+                lexer.next();
+                return Expr.string(str);
+            }
+            case NUMERIC_LITERAL: {
+                double value = lexer.number;
+                lexer.next();
+                return new Expr(Kind.NUMBER, value);
+            }
+            case MINUS: {
+                lexer.next();
+                double value = lexer.number;
+                lexer.expect(JsonLexer.T.NUMERIC_LITERAL);
+                return new Expr(Kind.NUMBER, -value);
+            }
+            case OPEN_BRACKET: {
+                lexer.next();
+                List<Expr> exprs = new ArrayList<>();
+                while (lexer.token != JsonLexer.T.CLOSE_BRACKET) {
+                    if (!exprs.isEmpty() && !parseMaybeTrailingComma(JsonLexer.T.CLOSE_BRACKET)) {
+                        break;
+                    }
+                    exprs.add(parseExpr());
+                }
+                lexer.expect(JsonLexer.T.CLOSE_BRACKET);
+                return new Expr(Kind.ARRAY, exprs);
+            }
+            case OPEN_BRACE: {
+                lexer.next();
+                List<Property> properties = new ArrayList<>();
+                while (lexer.token != JsonLexer.T.CLOSE_BRACE) {
+                    if (!properties.isEmpty() && !parseMaybeTrailingComma(JsonLexer.T.CLOSE_BRACE)) {
+                        break;
+                    }
+                    Expr key = Expr.string(lexer.toEString());
+                    lexer.expect(JsonLexer.T.STRING_LITERAL);
+                    lexer.expect(JsonLexer.T.COLON);
+                    properties.add(new Property(key, parseExpr()));
+                }
+                lexer.expect(JsonLexer.T.CLOSE_BRACE);
+                return new Expr(Kind.OBJECT, properties);
+            }
+            default:
+                lexer.unexpected();
+                throw new Failure(PARSER_ERROR);
+        }
+    }
+
+    private boolean parseMaybeTrailingComma(JsonLexer.T closer) {
+        lexer.expect(JsonLexer.T.COMMA);
+        return lexer.token != closer;
     }
 
     enum Kind {
@@ -134,215 +322,6 @@ final class Json {
 
         double asNumber() {
             return kind == Kind.NUMBER ? (Double) data : Double.NaN;
-        }
-    }
-
-    private SyntaxError error(String message) {
-        return new SyntaxError(message);
-    }
-
-    private void skipWhitespace() {
-        while (pos < source.length()) {
-            char c = source.charAt(pos);
-            if (c == ' ' || c == '\t' || c == '\n' || c == '\r' || c == '\u000B' || c == '\u000C' ||
-                c == '\u00A0' || c == '\uFEFF' || c == '\u2028' || c == '\u2029') {
-                pos++;
-            } else if (c == '/' && pos + 1 < source.length() && source.charAt(pos + 1) == '/') {
-                while (pos < source.length() && source.charAt(pos) != '\n' && source.charAt(pos) != '\r') {
-                    pos++;
-                }
-            } else if (c == '/' && pos + 1 < source.length() && source.charAt(pos + 1) == '*') {
-                int end = source.indexOf("*/", pos + 2);
-                if (end < 0) {
-                    throw error("Expected \"*/\" to terminate multi-line comment");
-                }
-                pos = end + 2;
-            } else {
-                break;
-            }
-        }
-    }
-
-    private Expr value() {
-        if (pos >= source.length()) {
-            throw error("Unexpected end of file");
-        }
-        char c = source.charAt(pos);
-        switch (c) {
-            case '{':
-                return object();
-            case '[':
-                return array();
-            case '"':
-                return Expr.string(string());
-            case 't':
-                keyword("true");
-                return new Expr(Kind.BOOLEAN, true);
-            case 'f':
-                keyword("false");
-                return new Expr(Kind.BOOLEAN, false);
-            case 'n':
-                keyword("null");
-                return new Expr(Kind.NULL, null);
-            default:
-                if (c == '-' || c >= '0' && c <= '9') {
-                    return number();
-                }
-                throw error("Unexpected " + c);
-        }
-    }
-
-    private void keyword(String word) {
-        if (!source.startsWith(word, pos)) {
-            throw error("Unexpected " + source.charAt(pos));
-        }
-        pos += word.length();
-    }
-
-    private Expr object() {
-        pos++;
-        List<Property> properties = new ArrayList<>();
-        skipWhitespace();
-        while (!at('}')) {
-            if (!properties.isEmpty()) {
-                trailingComma();
-                if (at('}')) {
-                    break;
-                }
-            }
-            if (!at('"')) {
-                throw error("Expected string but found " + found());
-            }
-            Expr key = Expr.string(string());
-            skipWhitespace();
-            expect(':');
-            skipWhitespace();
-            properties.add(new Property(key, value()));
-            skipWhitespace();
-        }
-        expect('}');
-        return new Expr(Kind.OBJECT, properties);
-    }
-
-    private Expr array() {
-        pos++;
-        List<Expr> items = new ArrayList<>();
-        skipWhitespace();
-        while (!at(']')) {
-            if (!items.isEmpty()) {
-                trailingComma();
-                if (at(']')) {
-                    break;
-                }
-            }
-            items.add(value());
-            skipWhitespace();
-        }
-        expect(']');
-        return new Expr(Kind.ARRAY, items);
-    }
-
-    // parseMaybeTrailingComma: a comma is required between members and allowed before the close
-    private void trailingComma() {
-        if (!at(',')) {
-            throw error("Expected \",\" but found " + found());
-        }
-        pos++;
-        skipWhitespace();
-    }
-
-    private boolean at(char c) {
-        return pos < source.length() && source.charAt(pos) == c;
-    }
-
-    private String found() {
-        return pos >= source.length() ? "end of file" : "\"" + source.charAt(pos) + "\"";
-    }
-
-    private void expect(char c) {
-        if (!at(c)) {
-            throw error("Expected \"" + c + "\" but found " + found());
-        }
-        pos++;
-    }
-
-    private String string() {
-        pos++;
-        StringBuilder out = new StringBuilder();
-        while (true) {
-            if (pos >= source.length()) {
-                throw error("Unterminated string literal");
-            }
-            char c = source.charAt(pos++);
-            if (c == '"') {
-                return out.toString();
-            }
-            if (c == '\n' || c == '\r') {
-                throw error("Unterminated string literal");
-            }
-            if (c != '\\') {
-                out.append(c);
-                continue;
-            }
-            if (pos >= source.length()) {
-                throw error("Unterminated string literal");
-            }
-            char e = source.charAt(pos++);
-            switch (e) {
-                case 'b':
-                    out.append('\b');
-                    break;
-                case 'f':
-                    out.append('\f');
-                    break;
-                case 'n':
-                    out.append('\n');
-                    break;
-                case 'r':
-                    out.append('\r');
-                    break;
-                case 't':
-                    out.append('\t');
-                    break;
-                case 'u':
-                    if (pos + 4 > source.length()) {
-                        throw error("Invalid unicode escape");
-                    }
-                    try {
-                        out.append((char) Integer.parseInt(source.substring(pos, pos + 4), 16));
-                    } catch (NumberFormatException ex) {
-                        throw error("Invalid unicode escape");
-                    }
-                    pos += 4;
-                    break;
-                case '"':
-                case '\\':
-                case '/':
-                    out.append(e);
-                    break;
-                default:
-                    throw error("Invalid escape sequence");
-            }
-        }
-    }
-
-    private Expr number() {
-        int start = pos;
-        if (source.charAt(pos) == '-') {
-            pos++;
-        }
-        while (pos < source.length()) {
-            char c = source.charAt(pos);
-            if (c >= '0' && c <= '9' || c == '.' || c == 'e' || c == 'E' || c == '+' || c == '-') {
-                pos++;
-            } else {
-                break;
-            }
-        }
-        try {
-            return new Expr(Kind.NUMBER, Double.parseDouble(source.substring(start, pos)));
-        } catch (NumberFormatException e) {
-            throw error("Invalid number");
         }
     }
 }

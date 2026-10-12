@@ -103,8 +103,17 @@ final class Toml {
         return props;
     }
 
-    private Json.SyntaxError error(String message) {
-        return new Json.SyntaxError(message + " at offset " + pos);
+    /**
+     * A bunfig.toml bun does not parse.
+     */
+    static final class SyntaxError extends Json.SyntaxError {
+        SyntaxError(String error, String message) {
+            super(error, message);
+        }
+    }
+
+    private SyntaxError error(String message) {
+        return new SyntaxError(Json.SYNTAX_ERROR, message + " at offset " + pos);
     }
 
     private void expect(char c) {

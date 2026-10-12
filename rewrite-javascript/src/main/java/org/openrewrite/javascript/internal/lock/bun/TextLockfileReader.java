@@ -57,14 +57,15 @@ final class TextLockfileReader {
     }
 
     /**
-     * {@code loadFromDir} for a bun.lock: a text that does not parse is a {@code parse_file} error like any other.
+     * {@code loadFromDir} for a bun.lock: a text that does not parse is a {@code parse_file} error like any other, the
+     * parser's own.
      */
     static Lockfile load(String text, BunOptions options) {
         Json.Expr root;
         try {
-            root = Json.parse(text);
+            root = Json.parse(text, options.getRelease());
         } catch (Json.SyntaxError e) {
-            throw new ParseError("ParserError", e.getMessage());
+            throw new ParseError(e.error, e.getMessage());
         }
         return new TextLockfileReader(options).parseIntoBinaryLockfile(root);
     }
