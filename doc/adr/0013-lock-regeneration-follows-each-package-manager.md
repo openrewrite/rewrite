@@ -10,7 +10,7 @@ what `internal.lock` holds, and how the recipes write overrides and follow catal
 again: one port per library, the host's registries as the user's config, corepack, the regenerators by module.
 Amended 2026-10-11: later releases of the ported pnpm and Yarn majors; the npm release that built the LST,
 with every npm release from 7.1.1 reproduced beside the one ported; every Yarn 4.x release reproduced beside
-4.10.3; and Bun releases reproduced beside 1.3.10.
+4.10.3; Bun releases reproduced beside 1.3.10; and Yarn 1 releases reproduced beside 1.22.22.
 
 ## Context
 
@@ -251,8 +251,8 @@ allow write different locks for the plainest edit (every release before 10.8.0 d
   registry: the scenario's own `http/`, a full packument it kept abbreviated rebuilt from today's registry cut back to
   the versions, tags and deprecations the recording saw, and an abbreviated packument whose versions an older
   recording kept bare filled from today's the same way (`http/<name>@abbreviated`, which the replays serve to a
-  release before 10.4.0, the ones that read the abbreviated packument alone). The release that recorded a scenario is its control and must
-  reproduce it byte for byte. Each run keeps the recorder's phases, the second install over every lock it writes, and
+  release before 10.4.0, the ones that read the abbreviated packument alone). The release that recorded a scenario
+  is its control and must reproduce it byte for byte. Each run keeps the recorder's phases, the second install over every lock it writes, and
   `cross`: the edit installed over the scenario's own `before`. A scenario's `releases` file names the releases that
   write its recorded outcome, and each `release/<first>/` another outcome with the releases that write it;
   `NpmScenarioTest` replays the first and last release of every range. An expect line `exact-or <failure>` holds a
@@ -317,3 +317,30 @@ The Bun port follows Bun 1.3.10 and reproduces other releases beside it, as the 
   scenario replays as 1.2.0 to 1.3.1 too, but those miss questions still (the git and GitHub specs before 1.3.2, and
   changes before 1.2.13 in bun.lock's writer and reader, the overrides and the globs), so they stay cannot-know.
   1.4.x, a Rust translation that writes lockfileVersion 2, is not reproduced.
+
+## Amendment 2026-10-11: Yarn classic releases
+
+The Yarn classic port follows yarn 1.22.22 and reproduces the 1.x releases beside it, as the npm port does npm's.
+
+- **The release that installs** is the one the `NodeRuntime` marker names; without one, 1.22.22 as before. A
+  yarn-path hands the install to the file it names: a file named as a release (`yarn-<version>.js`, `.cjs`, `.mjs`)
+  is the release the marker names, whose `--version` answered through the same hand-off, and only 1.22.22's own file
+  without a marker; any other file is a script whose install the engine cannot know. A release outside
+  `YarnClassicReleases.PROVEN`, or one the registry does not publish as yarn 1, is cannot-know.
+- **One question per upstream change.** `YarnClassicRelease` holds each difference as a question named for what yarn
+  does, answered through `atLeast` alone by the tag of yarnpkg/yarn that made it. The release names itself where yarn
+  does: the header `yarn-enable-lockfile-versions` writes, `engines.yarn`, the `packageManager` message. An error that
+  is no MessageError is worded as the release reports it: `An unexpected error occurred: "<message>".` before 1.22.20,
+  its stack from 1.22.21; 1.22.20 prints none, and the engine words it as 1.22.21 does. What ends yarn before `main`
+  reports (an rc file it cannot read, a yarn-path that does not load, the manifest 1.22.20 reads first) is printed as
+  its stack by every release. The questions cover every change between two releases of `PROVEN` in the modules the
+  port names, those no scenario reaches among them (each tested as the release did it when run), and the libraries
+  yarn bundles: ini 1.3.4 and tar-fs 1.16.0 before 1.10.0 are options of their one port.
+- **How a release is proven.** Every stable 1.x release was swept over every Yarn classic scenario as npm's were;
+  1.22.12, which the registry publishes without its bundle, never ran and is not reproduced. The export's failure of a
+  phase is the error that ended it, yarn's last `error` line (the steps go to stdout, which interleaves with stderr
+  from run to run), none where 1.22.20 printed none. A recording's `cannot-know` or `malformed` line is `exact-or`
+  that line for a release that writes a lock, in the export's outcomes and in the replays of the recorded outcome as
+  another release. `YarnClassicScenarioTest` replays the first and last release of every range, and every release
+  with `REWRITE_LOCK_EVERY_RELEASE`. `PROVEN` is 1.7.0 to 1.22.22 but 1.22.12; 1.6.0 knows no `--focus`, and the
+  releases before it word many failures otherwise.

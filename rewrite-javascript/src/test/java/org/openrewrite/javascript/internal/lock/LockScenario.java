@@ -16,6 +16,7 @@
 package org.openrewrite.javascript.internal.lock;
 
 import lombok.Getter;
+import lombok.Value;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.javascript.semver.NodeSemver;
 
@@ -315,6 +316,51 @@ public abstract class LockScenario {
             }
         }
         return endpoints;
+    }
+
+    /**
+     * A release a scenario is replayed as, and where the outcome it writes is kept: the scenario's own directory, or
+     * its {@code release/<first>/}.
+     */
+    @Value
+    public static class Replay {
+        String release;
+        Path outcome;
+    }
+
+    /**
+     * This scenario replayed as each release its {@code releases} files name ({@link #releaseEndpoints}): of the
+     * scenario's own outcome every one but {@code recorded}, the release that recorded it, and of each other outcome
+     * under {@code release/} every one.
+     */
+    public List<Replay> releaseReplays(List<String> all, String proven, @Nullable String recorded) {
+        List<Replay> replays = new ArrayList<>();
+        for (String release : releaseEndpoints(dir.resolve("releases"), all, proven)) {
+            if (!release.equals(recorded)) {
+                replays.add(new Replay(release, dir));
+            }
+        }
+        Path others = dir.resolve("release");
+        if (Files.isDirectory(others)) {
+            try (Stream<Path> list = Files.list(others)) {
+                list.filter(Files::isDirectory).sorted().forEach(outcome -> {
+                    for (String release : releaseEndpoints(outcome.resolve("releases"), all, proven)) {
+                        replays.add(new Replay(release, outcome));
+                    }
+                });
+            } catch (IOException e) {
+                throw new UncheckedIOException(e);
+            }
+        }
+        return replays;
+    }
+
+    /**
+     * A file of an outcome's directory, null where it holds none.
+     */
+    public static @Nullable String read(Path outcome, String file) {
+        Path path = outcome.resolve(file);
+        return Files.isRegularFile(path) ? read(path) : null;
     }
 
     /**

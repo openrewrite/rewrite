@@ -8,7 +8,7 @@ is how the ports are written and tested.
 |---|---|
 | `npm` | `@npmcli/arborist` and its libraries, npm 11.17.0; every release in `NpmReleases.PROVEN` beside it (`NpmRelease`) |
 | `bun` | Bun 1.3.10; every release in `BunReleases.PROVEN` beside it (`BunRelease`) |
-| `yarnclassic` | Yarn 1.22.22 |
+| `yarnclassic` | Yarn 1.22.22; every release in `YarnClassicReleases.PROVEN` beside it (`YarnClassicRelease`) |
 | `berry` | Yarn 4.10.3; every release in `YarnReleases.PROVEN` beside it (`YarnRelease`) |
 | `pnpm` | pnpm 11.2.2; releases from 11.0.6 to below 12 run as it (`Main.RUNS_AS_PORTED`) |
 | this package | what the ports share: JavaScript and Node behavior, never resolution |
@@ -39,12 +39,12 @@ package manager writes, byte for byte, or a failure of a `LockFileRegeneration.K
 - **Round trips:** `<Pm>LockRoundTripTest` installs over every recorded lock with nothing changed, and expects the
   lock's own bytes, or what the package manager was recorded rewriting it to.
 - **Scenarios:** `<Pm>ScenarioTest` replays every scenario offline and expects `after` byte for byte, or the
-  recorded `expect` line (`Expect`). For npm, Yarn Berry and Bun, also as every other release: a scenario's `releases`
-  file names the releases that write its recorded outcome, and each `release/<first>/` holds another outcome with its
-  own `releases`; the first and last release of each range are replayed (`LockScenario.releaseEndpoints`). A Berry
-  outcome holds the `.yarnrc.yml` a release's lockfile migration rules write, which the regeneration writes too. A Bun
-  outcome holds the edit over the release's own `before` and over the scenario's (`cross`), never a lock written
-  from scratch, which no regeneration does.
+  recorded `expect` line (`Expect`). For npm, Yarn Berry, Bun and Yarn classic, also as every other release: a
+  scenario's `releases` file names the releases that write its recorded outcome, and each `release/<first>/` holds
+  another outcome with its own `releases`; the first and last release of each range are replayed
+  (`LockScenario.releaseEndpoints`). A Berry outcome holds the `.yarnrc.yml` a release's lockfile migration rules
+  write, which the regeneration writes too. A Bun outcome holds the edit over the release's own `before` and over the
+  scenario's (`cross`), never a lock written from scratch, which no regeneration does.
 - **Recipes:** `*Dependency*Test`, `*LockRegenTest` and `*CatalogTest` in `org.openrewrite.javascript` run the
   recipes over the same scenarios.
 
@@ -71,7 +71,8 @@ The npm port reproduces each release in `NpmReleases.PROVEN`; the release that i
 (`YarnRelease` holds its questions beside each release's data); the marker's release installs, else the one
 `yarnPath` or corepack starts. The Bun port reproduces each release in `BunReleases.PROVEN` (`BunRelease`, the
 upstream source being the tag `bun-v<release>` of oven-sh/bun); the marker's release installs, 1.3.10 without one.
-To add releases:
+The Yarn classic port reproduces each release in `YarnClassicReleases.PROVEN` (`YarnClassicRelease`); the marker's
+release installs, 1.22.22 without one. To add releases:
 
 1. Sweep them: the fixtures repository's sweep runs each real release over every scenario against the scenario's
    recorded registry, and its export writes what each release wrote into the `releases` files and `release/`
@@ -80,9 +81,12 @@ To add releases:
    `NpmRelease`, named for what npm does and answered through `atLeast` by the release that made the change, and
    branch on it in the ported class where upstream changed, keeping 11.17.0's code as it is. Take the threshold
    from the source, never from the releases the sweep sampled. A library npm bundles at several releases takes its
-   release as an option of its one port.
+   release as an option of its one port. Diff every pair of releases in the range too, not only the boundaries, and
+   the libraries each bundles: a change no scenario reaches is a question all the same, its unit test what the
+   release did when run.
 3. Widen `NpmReleases.PROVEN` once every replay of the new releases passes. Yarn Berry (`YarnRelease`,
-   `YarnReleases.PROVEN`) and Bun (`BunRelease`, `BunReleases.PROVEN`) take releases the same way.
+   `YarnReleases.PROVEN`), Bun (`BunRelease`, `BunReleases.PROVEN`) and Yarn classic (`YarnClassicRelease`,
+   `YarnClassicReleases.PROVEN`) take releases the same way.
 
 The other ports follow one release each: diff the upstream source between the ported tag and the new one, limited
 to the modules the port's classes name, port the differences, update the release in each class's Javadoc, then

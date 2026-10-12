@@ -15,7 +15,6 @@
  */
 package org.openrewrite.javascript.internal.lock.bun;
 
-import lombok.Value;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.javascript.internal.lock.Host;
 import org.openrewrite.javascript.internal.lock.HostInputs;
@@ -24,8 +23,6 @@ import org.openrewrite.javascript.internal.lock.LockScenario.Phase;
 import org.openrewrite.javascript.internal.lock.LockScenario;
 import org.openrewrite.javascript.internal.lock.RootRelativePath;
 
-import java.io.IOException;
-import java.io.UncheckedIOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Instant;
@@ -39,7 +36,6 @@ import java.util.TreeMap;
 import java.util.TreeSet;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
-import java.util.stream.Stream;
 
 /**
  * The recorded Bun scenarios ({@link LockScenario#discover}) in the recorder's layout: each lock with the manifests,
@@ -131,16 +127,6 @@ final class BunScenarios {
         }
     }
 
-    /**
-     * A release a scenario is replayed as, and where the outcome it writes is kept: the scenario's own directory, or
-     * its {@code release/<first>/}.
-     */
-    @Value
-    static class Replay {
-        String release;
-        Path outcome;
-    }
-
     static final class Scenario extends LockScenario {
         Scenario(String name, String label, Path dir, @Nullable Path httpCache) {
             super(name, label, dir, httpCache);
@@ -169,37 +155,7 @@ final class BunScenarios {
          * {@code release/}.
          */
         List<Replay> releases() {
-            List<String> all = BunReleases.all();
-            List<Replay> replays = new ArrayList<>();
-            String recorded = recordedRelease();
-            for (String release : LockScenario.releaseEndpoints(getDir().resolve("releases"), all,
-                    BunReleases.PROVEN)) {
-                if (!release.equals(recorded)) {
-                    replays.add(new Replay(release, getDir()));
-                }
-            }
-            Path others = getDir().resolve("release");
-            if (Files.isDirectory(others)) {
-                try (Stream<Path> list = Files.list(others)) {
-                    list.filter(Files::isDirectory).sorted().forEach(dir -> {
-                        for (String release : LockScenario.releaseEndpoints(dir.resolve("releases"), all,
-                                BunReleases.PROVEN)) {
-                            replays.add(new Replay(release, dir));
-                        }
-                    });
-                } catch (IOException e) {
-                    throw new UncheckedIOException(e);
-                }
-            }
-            return replays;
-        }
-
-        /**
-         * A file of another release's outcome directory; null where it holds none.
-         */
-        static @Nullable String read(Path outcome, String file) {
-            Path path = outcome.resolve(file);
-            return Files.isRegularFile(path) ? LockScenario.read(path) : null;
+            return releaseReplays(BunReleases.all(), BunReleases.PROVEN, recordedRelease());
         }
 
         /**

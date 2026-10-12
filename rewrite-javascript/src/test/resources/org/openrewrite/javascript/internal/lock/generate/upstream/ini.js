@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-// ini 1.3.5 and 6.0.0 for upstream-calls.js: decode, encode, safe and unsafe.
+// ini 1.3.4, 1.3.5 and 6.0.0 for upstream-calls.js: decode, encode, safe and unsafe.
 const fs = require('fs')
 const path = require('path')
 
@@ -33,6 +33,9 @@ module.exports = {
     ini => ini.decode('a[]=1\n[a.b]\nc=d'),
     ini => ini.decode('a=1\n[a]\nb=c\n[d]\ne[]=f\n[d.g]\nh=i'),
     ini => ini.decode("'null'=x"),
-    ini => ini.decode("'12'=x\n'[1,2]'=y\n[\"3\"]\nz=1")
+    ini => ini.decode("'12'=x\n'[1,2]'=y\n[\"3\"]\nz=1"),
+    // 1.3.4 keeps what precedes an inline comment untrimmed
+    ini => ini.decode('a=b ;c\n[d #e]\nf =g\t#h'),
+    ini => ini.unsafe('b ;c')
   ]
 }

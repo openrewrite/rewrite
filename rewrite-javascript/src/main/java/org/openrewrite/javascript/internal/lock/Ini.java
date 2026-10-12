@@ -27,12 +27,17 @@ import java.util.regex.Pattern;
 import static org.openrewrite.javascript.internal.lock.EcmaScript.truthy;
 
 /**
- * Port of ini {@code decode}: 1.3.5, which yarn 1.22.22 reads an .npmrc with, and 6.0.0, which npm 11.17.0 and pnpm
- * 11.2.2 (read-ini-file 5.0.0) read one with; {@code encode} of a flat map as 6.0.0 writes it.
+ * Port of ini {@code decode}: 1.3.5, which yarn 1.22.22 reads an .npmrc with, 1.3.4, which yarn before 1.10.0 reads
+ * one with, and 6.0.0, which npm 11.17.0 and pnpm 11.2.2 (read-ini-file 5.0.0) read one with; {@code encode} of a flat
+ * map as 6.0.0 writes it.
  */
 public final class Ini {
 
     public enum Release {
+        /**
+         * 1.3.5 without its trim of a value cut at an inline comment.
+         */
+        V1_3_4,
         V1_3_5,
         V6_0_0
     }
@@ -72,7 +77,7 @@ public final class Ini {
                 continue;
             }
             if (match.group(1) != null) {
-                Object section = unsafe(match.group(1));
+                Object section = unsafe(match.group(1), release);
                 if (v6 && "__proto__".equals(section)) {
                     p = new Section();
                     continue;
@@ -83,7 +88,7 @@ public final class Ini {
                 out.put(name, p);
                 continue;
             }
-            Object keyRaw = unsafe(match.group(2));
+            Object keyRaw = unsafe(match.group(2), release);
             if (keyRaw == null) {
                 throw new IllegalArgumentException("Cannot read properties of null (reading 'length')");
             }
@@ -93,7 +98,7 @@ public final class Ini {
             if (v6 && "__proto__".equals(key)) {
                 continue;
             }
-            Object valueRaw = match.group(3) != null ? unsafe(match.group(4)) : Boolean.TRUE;
+            Object valueRaw = match.group(3) != null ? unsafe(match.group(4), release) : Boolean.TRUE;
             Object value = "true".equals(valueRaw) ? Boolean.TRUE : "false".equals(valueRaw) ? Boolean.FALSE :
                     "null".equals(valueRaw) ? null : valueRaw;
 
@@ -221,7 +226,7 @@ public final class Ini {
         return val.replace(";", "\\;").replace("#", "\\#");
     }
 
-    static @Nullable Object unsafe(@Nullable String raw) {
+    static @Nullable Object unsafe(@Nullable String raw, Release release) {
         String val = EcmaScript.trim(raw == null ? "" : raw);
         if (isQuoted(val)) {
             if (val.charAt(0) == '\'') {
@@ -255,6 +260,6 @@ public final class Ini {
         if (esc) {
             unesc.append('\\');
         }
-        return EcmaScript.trim(unesc.toString());
+        return release == Release.V1_3_4 ? unesc.toString() : EcmaScript.trim(unesc.toString());
     }
 }

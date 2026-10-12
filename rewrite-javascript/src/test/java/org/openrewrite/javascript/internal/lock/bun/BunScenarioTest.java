@@ -25,6 +25,7 @@ import org.openrewrite.javascript.internal.LockFileRegeneration.Kind;
 import org.openrewrite.javascript.internal.LockFileRegeneration.Reason;
 import org.openrewrite.javascript.internal.LockFileRegeneration.Result;
 import org.openrewrite.javascript.internal.lock.Expect;
+import org.openrewrite.javascript.internal.lock.LockScenario;
 import org.openrewrite.javascript.internal.lock.LockScenario.Phase;
 import org.openrewrite.javascript.internal.lock.LockScenarioTest;
 import org.openrewrite.javascript.internal.lock.RecordedRegistry;
@@ -101,7 +102,7 @@ class BunScenarioTest extends LockScenarioTest {
             if (!scenario.isEdit()) {
                 continue;
             }
-            for (BunScenarios.Replay replay : scenario.releases()) {
+            for (LockScenario.Replay replay : scenario.releases()) {
                 String label = scenario.getLabel() + "@" + replay.getRelease();
                 List<Edit> edits = new ArrayList<>();
                 if (replay.getOutcome().equals(scenario.getDir())) {

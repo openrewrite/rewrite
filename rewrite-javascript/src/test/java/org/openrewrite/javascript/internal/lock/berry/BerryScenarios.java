@@ -17,7 +17,6 @@ package org.openrewrite.javascript.internal.lock.berry;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import lombok.Value;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.javascript.internal.lock.Host;
 import org.openrewrite.javascript.internal.lock.LockScenario.Phase;
@@ -144,16 +143,6 @@ final class BerryScenarios {
         }
     }
 
-    /**
-     * A release a scenario is replayed as, and where the outcome it writes is kept: the scenario's own directory, or
-     * its {@code release/<first>/}.
-     */
-    @Value
-    static class Replay {
-        String release;
-        Path outcome;
-    }
-
     static final class Scenario extends LockScenario {
         Scenario(String name, String label, Path dir, @Nullable Path httpCache) {
             super(name, label, dir, httpCache);
@@ -180,28 +169,7 @@ final class BerryScenarios {
          * {@code release/}.
          */
         List<Replay> releases() {
-            List<String> all = YarnReleases.all();
-            List<Replay> replays = new ArrayList<>();
-            String recorded = recordedRelease();
-            for (String release : LockScenario.releaseEndpoints(getDir().resolve("releases"), all, YarnReleases.PROVEN)) {
-                if (!release.equals(recorded)) {
-                    replays.add(new Replay(release, getDir()));
-                }
-            }
-            Path others = getDir().resolve("release");
-            if (Files.isDirectory(others)) {
-                try (Stream<Path> list = Files.list(others)) {
-                    list.filter(Files::isDirectory).sorted().forEach(dir -> {
-                        for (String release : LockScenario.releaseEndpoints(dir.resolve("releases"), all,
-                                YarnReleases.PROVEN)) {
-                            replays.add(new Replay(release, dir));
-                        }
-                    });
-                } catch (IOException e) {
-                    throw new UncheckedIOException(e);
-                }
-            }
-            return replays;
+            return releaseReplays(YarnReleases.all(), YarnReleases.PROVEN, recordedRelease());
         }
 
         /**
@@ -282,11 +250,6 @@ final class BerryScenarios {
             String recorded = outcome.equals(getDir()) ? null : read(outcome, "recorded-with");
             Matcher m = recorded == null ? null : CLOCK.matcher(recorded);
             return m != null && m.find() ? Instant.parse(m.group(1)) : now();
-        }
-
-        static @Nullable String read(Path outcome, String file) {
-            Path path = outcome.resolve(file);
-            return Files.isRegularFile(path) ? LockScenario.read(path) : null;
         }
 
         /**
