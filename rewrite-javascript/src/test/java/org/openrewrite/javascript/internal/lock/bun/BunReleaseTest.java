@@ -445,7 +445,8 @@ class BunReleaseTest {
 
     /**
      * bun.lock.zig Stringifier (1.2.3): overrides and patched dependencies are JSON-escaped; before, written as they
-     * are.
+     * are (an override {@code "x": "file:./a\"b"} the tree uses: 1.2.2 writes {@code "x": "file:./a"b",}, 1.2.3
+     * {@code "x": "file:./a\"b",}).
      */
     @Test
     void escapesOverridesAndPatchedDependenciesFrom123() {
@@ -473,6 +474,50 @@ class BunReleaseTest {
         assertThat(writtenBack("1.2.8", lock)).contains("    \"zz\": \"1.0.0\",\n");
         assertThat(writtenBack("1.2.7", lock)).contains("  \"overrides\": {\n    \"ms\": \"2.1.3\",\n  },\n")
           .doesNotContain("zz");
+    }
+
+    /**
+     * bun.lock.zig Stringifier over an install: three folder dependencies each overridden and an override nothing uses,
+     * in package.json's order zz, c, a, b. As the real releases wrote it: 1.2.7 a, c, b (the used ones in their hash
+     * map's slot order), 1.2.8 and 1.2.13 zz, c, a, b, 1.2.14 a, b, c, zz. A second install of 1.2.8 rewrites its lock
+     * with a, b, c, zz, the diff having sorted the overrides in place, so that the engine declines the edit there.
+     */
+    @Test
+    void writesTheOverridesOfAnInstallAsEachReleaseDid() {
+        java.util.Map<String, String> manifests = new java.util.LinkedHashMap<>();
+        manifests.put("", "{\"name\":\"p\",\"dependencies\":{\"a\":\"file:./a\",\"b\":\"file:./b\",\"c\":\"file:./c\"}," +
+                          "\"overrides\":{\"zz\":\"1.0.0\",\"c\":\"file:./c\",\"a\":\"file:./a\",\"b\":\"file:./b\"}}");
+        for (String name : new String[]{"a", "b", "c"}) {
+            manifests.put(name, "{\"name\":\"" + name + "\",\"version\":\"1.0.0\"}");
+        }
+        String lock = "{\n  \"lockfileVersion\": 1,\n  \"workspaces\": {\n    \"\": {\n      \"name\": \"p\",\n    },\n" +
+                      "  },\n  \"packages\": {}\n}\n";
+        java.util.Map<String, String> none = java.util.Collections.emptyMap();
+        assertThat(overridesOf(written(install("1.2.7", lock, manifests, none)))).containsExactly("a", "c", "b");
+        for (String release : new String[]{"1.2.8", "1.2.13"}) {
+            assertThat(failure(install(release, lock, manifests, none))).isEqualTo("SECOND_INSTALL a second bun " +
+              "install over the lock written for this edit would rewrite it: line 14 \"\"zz\": \"1.0.0\",\" becomes " +
+              "\"\"a\": \"file:./a\",\"");
+        }
+        assertThat(overridesOf(written(install("1.2.14", lock, manifests, none)))).containsExactly("a", "b", "c", "zz");
+    }
+
+    // the keys of a written lock's overrides, in order
+    private static List<String> overridesOf(String lock) {
+        List<String> keys = new java.util.ArrayList<>();
+        int start = lock.indexOf("  \"overrides\": {\n");
+        if (start < 0) {
+            return keys;
+        }
+        for (String line : lock.substring(start).split("\n")) {
+            if (line.equals("  },")) {
+                break;
+            }
+            if (line.startsWith("    \"")) {
+                keys.add(line.substring(5, line.indexOf('"', 5)));
+            }
+        }
+        return keys;
     }
 
     /**
@@ -567,6 +612,26 @@ class BunReleaseTest {
         assertThat(multiLine(map, "1.2.2")).isEqualTo("{\n      \"a\": \"a.js\",      \"b\": \"b.js\"    }");
         assertThat(multiLine(named, "1.2.3")).isEqualTo("{\n      \"a\": \"a.js\",\n    }");
         assertThat(multiLine(named, "1.2.2")).isEqualTo("{\n      \"a\": \"a.js\"\n    }");
+    }
+
+    /**
+     * As 1.2.2 and 1.2.3 wrote the workspaces m, of bins m1 and m2, and n, of the bin n1.
+     */
+    @Test
+    void writesAWorkspacesBinAsEachReleaseDid() {
+        java.util.Map<String, String> manifests = new java.util.LinkedHashMap<>();
+        manifests.put("", "{\"name\":\"p\",\"workspaces\":[\"packages/*\"]}");
+        manifests.put("packages/m", "{\"name\":\"m\",\"version\":\"1.0.0\",\"bin\":{\"m1\":\"m1.js\",\"m2\":\"m2.js\"}}");
+        manifests.put("packages/n", "{\"name\":\"n\",\"version\":\"1.0.0\",\"bin\":{\"n1\":\"n1.js\"}}");
+        String lock = "{\n  \"lockfileVersion\": 1,\n  \"workspaces\": {\n    \"\": {\n      \"name\": \"p\",\n    },\n" +
+                      "  },\n  \"packages\": {}\n}\n";
+        java.util.Map<String, String> none = java.util.Collections.emptyMap();
+        assertThat(written(install("1.2.2", lock, manifests, none)))
+          .contains("      \"bin\": {\n        \"m1\": \"m1.js\",        \"m2\": \"m2.js\"      },\n")
+          .contains("      \"bin\": {\n        \"n1\": \"n1.js\"\n      },\n");
+        assertThat(written(install("1.2.3", lock, manifests, none)))
+          .contains("      \"bin\": {\n        \"m1\": \"m1.js\",\n        \"m2\": \"m2.js\",\n      },\n")
+          .contains("      \"bin\": {\n        \"n1\": \"n1.js\",\n      },\n");
     }
 
     // a bin as a workspace's in bun.lock, two levels in
