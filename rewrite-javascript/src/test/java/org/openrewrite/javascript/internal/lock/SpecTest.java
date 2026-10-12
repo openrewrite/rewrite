@@ -404,7 +404,7 @@ class SpecTest {
         for (Spec.Release release : Spec.Release.values()) {
             for (Call call : UpstreamCalls.read(resource(release))) {
                 if (!"toPurl".equals(call.getFn()) && !madeByTheTest(call) && !relativeWhere(release, call) &&
-                    !strict8909(call) && !urlParse(release, call)) {
+                    !strict8909(call) && !urlParse(release, call) && !paddedVersion(release, call)) {
                     out.add(Arguments.of(release, call));
                 }
             }
@@ -500,16 +500,27 @@ class SpecTest {
     // both as an invalid URL; npm cannot clone either, so neither reaches a lock
     private static boolean urlParse(Spec.Release release, Call call) {
         Object arg = call.arg(0);
-        return (release == Spec.Release.V8_1_5 || release == Spec.Release.V9_0_0 || release == Spec.Release.V9_1_0 ||
+        return (release == Spec.Release.V8_1_1 || release == Spec.Release.V8_1_4 || release == Spec.Release.V8_1_5 ||
+                release == Spec.Release.V9_0_0 || release == Spec.Release.V9_1_0 ||
                 release == Spec.Release.V10_1_0) && "npa".equals(call.getFn()) &&
                ("git+ssh://git@host:12abc/repo".equals(arg) || "gopher://yea right".equals(arg));
     }
 
+    // node-semver 7.3, which npm 7 bundles, finds no version in a padded one that 7.7.2 trims: npm-package-arg 8.1.1,
+    // which trims no registry spec, then reads foo@ 1.2.3 as a range rather than a version, which picks the same
+    // version, so no lock differs
+    private static boolean paddedVersion(Spec.Release release, Call call) {
+        return release == Spec.Release.V8_1_1 && "npa".equals(call.getFn()) && "foo@ 1.2.3 ".equals(call.arg(0));
+    }
+
     @Test
     void namesEveryUpstreamCallItDoesNotReplay() {
-        for (Spec.Release release : new Spec.Release[]{Spec.Release.V8_1_5, Spec.Release.V9_0_0, Spec.Release.V9_1_0,
-          Spec.Release.V10_1_0, Spec.Release.V12_0_1, Spec.Release.V13_0_0, Spec.Release.V13_0_2}) {
-            boolean before10 = release == Spec.Release.V8_1_5 || release == Spec.Release.V9_0_0 ||
+        for (Spec.Release release : new Spec.Release[]{Spec.Release.V8_1_1, Spec.Release.V8_1_4, Spec.Release.V8_1_5,
+          Spec.Release.V9_0_0, Spec.Release.V9_1_0, Spec.Release.V10_1_0, Spec.Release.V12_0_1, Spec.Release.V13_0_0,
+          Spec.Release.V13_0_2}) {
+            // 8.1.4 and before read a file: spec as a path, and their tests ask no Windows where or RFC 8909 mode
+            boolean path = release == Spec.Release.V8_1_1 || release == Spec.Release.V8_1_4;
+            boolean before10 = path || release == Spec.Release.V8_1_5 || release == Spec.Release.V9_0_0 ||
                                release == Spec.Release.V9_1_0;
             boolean before11 = before10 || release == Spec.Release.V10_1_0;
             assertThat(UpstreamCalls.read(resource(release)).stream()
@@ -519,11 +530,13 @@ class SpecTest {
               .as("toString of a Result the test constructs").hasSize(3);
             assertThat(UpstreamCalls.read(resource(release)).stream().filter(call -> relativeWhere(release, call)))
               .as("a Windows where before 12.0.2 on POSIX")
-              .hasSize(before11 || release == Spec.Release.V12_0_1 ? 8 : 0);
+              .hasSize(!path && (before11 || release == Spec.Release.V12_0_1) ? 8 : 0);
             assertThat(UpstreamCalls.read(resource(release)).stream().filter(SpecTest::strict8909))
-              .as("a call under NPM_PACKAGE_ARG_8909_STRICT").hasSize(before11 ? 2 : 0);
+              .as("a call under NPM_PACKAGE_ARG_8909_STRICT").hasSize(before11 && !path ? 2 : 0);
             assertThat(UpstreamCalls.read(resource(release)).stream().filter(call -> urlParse(release, call)))
               .as("a URL url.parse reads apart from WHATWG URL").hasSize(before11 ? 2 : 0);
+            assertThat(UpstreamCalls.read(resource(release)).stream().filter(call -> paddedVersion(release, call)))
+              .as("a padded version node-semver 7.3 does not trim").hasSize(release == Spec.Release.V8_1_1 ? 1 : 0);
         }
         assertThat(UpstreamCalls.read(resource(Spec.Release.PNPM_2_0_0)).stream()
           .filter(call -> "toPurl".equals(call.getFn()) || madeByTheTest(call))).isEmpty();

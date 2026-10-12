@@ -1542,8 +1542,10 @@ public final class NpmRelease implements Comparable<NpmRelease> {
      * 10.9.3, which escapes a file path before the URL parser reads it; 12.0.1 and the 11.x and 12.0.0 that answer
      * nearly as it does from npm 10.0.0; 10.0.0 and 10.1.0 from npm 9.0.0, which refuse a file: URL with a host and
      * need no name of an alias; 9.1.0 from npm 8.14.0, which reads a bare name as the default tag; 9.0.0 to 9.0.2
-     * from npm 8.5.2, which read a git committish as a ref or a semver: range alone; before, 8.1.5, whose messages
-     * name no package.
+     * from npm 8.5.2, which read a git committish as a ref or a semver: range alone; 8.1.5 from npm 7.18.0, whose
+     * messages name no package; 8.1.4 from npm 7.16.0, which reads a file: spec as a path, its #, ? and % as they
+     * are; before, 8.1.0 to 8.1.2, which also trim no registry spec (8.1.0, before npm 7.5.5, also reads a whole
+     * scp-style git string as a name and a spec, which no lock asks of it).
      */
     Spec.Options npmPackageArg() {
         return Spec.Options.of(
@@ -1552,7 +1554,10 @@ public final class NpmRelease implements Comparable<NpmRelease> {
                                 atLeast(10, 0, 0) ? Spec.Release.V12_0_1 :
                                         atLeast(9, 0, 0) ? Spec.Release.V10_1_0 :
                                                 atLeast(8, 14, 0) ? Spec.Release.V9_1_0 :
-                                                        atLeast(8, 5, 2) ? Spec.Release.V9_0_0 : Spec.Release.V8_1_5,
+                                                        atLeast(8, 5, 2) ? Spec.Release.V9_0_0 :
+                                                                atLeast(7, 18, 0) ? Spec.Release.V8_1_5 :
+                                                                        atLeast(7, 16, 0) ? Spec.Release.V8_1_4 :
+                                                                                Spec.Release.V8_1_1,
                 validateNpmPackageName(), hostedGitInfo(), semver());
     }
 

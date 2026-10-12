@@ -15,7 +15,8 @@
  */
 // npm-package-arg 13.0.2 and the releases npm bundled before it, and @pnpm/npm-package-arg 2.0.0 (release pnpm-2.0.0)
 // for upstream-calls.js: npa, resolve, toPurl and Result#toString, a Result with its fields and its hosted's; the home
-// directory as <home>. Run each release with NODE_PATH naming the node_modules of an npm that bundles it.
+// directory as <home>. Run each release with NODE_PATH naming the node_modules of an npm that bundles it (8.1.1 with
+// npm 7.15.1's, which bundles 8.1.2, whose npa.js is 8.1.1's, beside the hosted-git-info 4.0.2 the port gives it).
 const fs = require('fs')
 const os = require('os')
 const path = require('path')
