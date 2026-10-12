@@ -25,8 +25,12 @@ import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.StringUtils;
 import org.openrewrite.maven.internal.MavenPomDownloader;
 import org.openrewrite.maven.tree.*;
+import org.openrewrite.style.Style;
 import org.openrewrite.xml.XPathMatcher;
 import org.openrewrite.xml.XmlVisitor;
+import org.openrewrite.xml.format.TabsAndIndentsVisitor;
+import org.openrewrite.xml.style.Autodetect;
+import org.openrewrite.xml.style.TabsAndIndentsStyle;
 import org.openrewrite.xml.tree.Content;
 import org.openrewrite.xml.tree.Xml;
 
@@ -71,9 +75,13 @@ public class RemoveDuplicatePluginDeclarations extends Recipe {
             @Nullable
             InheritedKeys inherited;
 
+            @Nullable
+            TabsAndIndentsStyle indentation;
+
             @Override
             public Xml.Document visitDocument(Xml.Document document, ExecutionContext ctx) {
                 inherited = null;
+                indentation = null;
                 return super.visitDocument(document, ctx);
             }
 
@@ -85,20 +93,39 @@ public class RemoveDuplicatePluginDeclarations extends Recipe {
                 }
 
                 if (BUILD_PLUGINS.matches(getCursor())) {
-                    return collapseDuplicates(t, key -> Collapse.MERGE);
+                    return collapseDuplicates(t, key -> Collapse.MERGE, this::format);
                 } else if (PROFILE_BUILD_PLUGINS.matches(getCursor())) {
                     return collapseDuplicates(t, key -> mainBuildKeys(false).contains(key) ?
                             Collapse.MERGE_INTO_MAIN_BUILD :
-                            inheritedKeys(ctx).plugins.contains(key) ? Collapse.MERGE : Collapse.KEEP_LAST);
+                            inheritedKeys(ctx).plugins.contains(key) ? Collapse.MERGE : Collapse.KEEP_LAST,
+                            this::format);
                 } else if (MANAGED_PLUGINS.matches(getCursor())) {
-                    return collapseDuplicates(t, key -> managedPluginCollapse(key, ctx));
+                    return collapseDuplicates(t, key -> managedPluginCollapse(key, ctx), this::format);
                 } else if (PROFILE_MANAGED_PLUGINS.matches(getCursor())) {
                     return collapseDuplicates(t, key -> mainBuildKeys(true).contains(key) ?
-                            Collapse.MERGE_INTO_MAIN_BUILD : managedPluginCollapse(key, ctx));
+                            Collapse.MERGE_INTO_MAIN_BUILD : managedPluginCollapse(key, ctx), this::format);
                 } else if (REPORTING_PLUGINS.matches(getCursor()) || PROFILE_REPORTING_PLUGINS.matches(getCursor())) {
-                    return collapseDuplicates(t, key -> Collapse.KEEP_FIRST);
+                    return collapseDuplicates(t, key -> Collapse.KEEP_FIRST, this::format);
                 }
                 return t;
+            }
+
+            /// Indents content placed in the `<plugins>` element being visited the way the document is, then shifts it
+            /// to the indentation of the declaration it replaces when that slot uses the same indent character but
+            /// sits at a different depth, so it lines up with its neighbours.
+            private Content format(Content content, Content slot) {
+                if (indentation == null) {
+                    Xml.Document document = getCursor().firstEnclosingOrThrow(Xml.Document.class);
+                    indentation = Style.from(TabsAndIndentsStyle.class, document, () ->
+                            Autodetect.detector().sample(document).build().getStyle(TabsAndIndentsStyle.class));
+                }
+                Content formatted = (Content) new TabsAndIndentsVisitor<Integer>(indentation)
+                        .visitNonNull(content, 0, getCursor());
+                String from = indentOf(formatted);
+                String to = indentOf(slot);
+                boolean sameCharacter = !to.contains(indentation.getUseTabCharacter() ? " " : "\t");
+                return sameCharacter && !from.equals(to) && formatted.getPrefix().contains("\n") ?
+                        shift(formatted, from, to) : formatted;
             }
 
             private Collapse managedPluginCollapse(String key, ExecutionContext ctx) {
@@ -174,7 +201,8 @@ public class RemoveDuplicatePluginDeclarations extends Recipe {
         return plugins.map(p -> p.getGroupId() + ":" + p.getArtifactId()).collect(toSet());
     }
 
-    private static Xml.Tag collapseDuplicates(Xml.Tag plugins, Function<String, Collapse> collapseFor) {
+    private static Xml.Tag collapseDuplicates(Xml.Tag plugins, Function<String, Collapse> collapseFor,
+                                              BinaryOperator<Content> format) {
         if (plugins.getContent() == null) {
             return plugins;
         }
@@ -192,7 +220,6 @@ public class RemoveDuplicatePluginDeclarations extends Recipe {
             return plugins;
         }
 
-        Indent style = siblingIndent(plugins);
         Map<Content, List<Content>> comments = leadingComments(plugins.getContent());
         Map<Content, @Nullable Object> replacements = new IdentityHashMap<>();
         occurrences.forEach((key, duplicates) -> {
@@ -206,26 +233,25 @@ public class RemoveDuplicatePluginDeclarations extends Recipe {
                 replacements.put(duplicate, null);
                 for (Content comment : comments.get(duplicate)) {
                     replacements.put(comment, null);
-                    moved.add(reindent(comment, Indent.of(duplicate), style));
+                    moved.add(comment);
                 }
             }
-            Xml.Tag result = withGroupIdOf(collapse(duplicates, collapseFor.apply(key), style), first, style);
-            replacements.put(first, afterMovedComments(moved, !comments.get(first).isEmpty(),
-                    withIndent(first.getPrefix(), style.base), result));
+            Xml.Tag result = withGroupIdOf(collapse(duplicates, collapseFor.apply(key)), first);
+            List<Content> placed = afterMovedComments(moved, !comments.get(first).isEmpty(), first.getPrefix(), result);
+            boolean unchanged = result == first;
+            replacements.put(first, ListUtils.map(placed, c -> unchanged && c == result ? c : format.apply(c, first)));
         });
         return plugins.withContent(ListUtils.flatMap(children(plugins),
                 c -> replacements.containsKey(c) ? replacements.get(c) : c));
     }
 
-    private static Xml.Tag collapse(List<Xml.Tag> duplicates, Collapse collapse, Indent style) {
+    private static Xml.Tag collapse(List<Xml.Tag> duplicates, Collapse collapse) {
         if (collapse == Collapse.KEEP_FIRST || collapse == Collapse.KEEP_LAST) {
-            Xml.Tag kept = duplicates.get(collapse == Collapse.KEEP_FIRST ? 0 : duplicates.size() - 1);
-            return reindent(kept, Indent.of(kept), style);
+            return duplicates.get(collapse == Collapse.KEEP_FIRST ? 0 : duplicates.size() - 1);
         }
-        Xml.Tag result = null;
-        for (Xml.Tag duplicate : duplicates) {
-            Xml.Tag declaration = reindent(duplicate, Indent.of(duplicate), style);
-            result = result == null ? declaration : mergePlugin(declaration, result, collapse == Collapse.MERGE);
+        Xml.Tag result = duplicates.get(0);
+        for (Xml.Tag later : duplicates.subList(1, duplicates.size())) {
+            result = mergePlugin(later, result, collapse == Collapse.MERGE);
         }
         return result;
     }
@@ -246,14 +272,13 @@ public class RemoveDuplicatePluginDeclarations extends Recipe {
 
     /// Keeps whether `<groupId>` is spelled out the way the first declaration had it, which Maven treats the
     /// same, so the diff doesn't churn on it.
-    private static Xml.Tag withGroupIdOf(Xml.Tag result, Xml.Tag first, Indent style) {
+    private static Xml.Tag withGroupIdOf(Xml.Tag result, Xml.Tag first) {
         boolean firstHasGroupId = first.getChild("groupId").isPresent();
         Xml.Tag resultGroupId = result.getChild("groupId").orElse(null);
         if (firstHasGroupId && resultGroupId == null) {
-            Xml.Tag reindented = reindent(first, Indent.of(first), style);
-            Xml.Tag firstGroupId = reindented.getChild("groupId").get();
+            Xml.Tag firstGroupId = first.getChild("groupId").get();
             return result.withContent(ListUtils.insert(children(result), firstGroupId,
-                    insertionIndex(children(result), reindented, firstGroupId)));
+                    insertionIndex(children(result), first, firstGroupId)));
         } else if (!firstHasGroupId && resultGroupId != null &&
                    PLUGIN_DEFAULT_GROUPID.equals(trimmedChildValue(result, "groupId", null))) {
             return result.withContent(ListUtils.map(children(result), c -> c == resultGroupId ? null : c));
@@ -359,7 +384,7 @@ public class RemoveDuplicatePluginDeclarations extends Recipe {
             moved.add(sameId);
             moved.addAll(dominantComments.get(sameId));
             return afterMovedComments(dominantComments.get(sameId), !recessiveComments.get(c).isEmpty(),
-                    withIndent(c.getPrefix(), indentOf(sameId)), mergeExecution(sameId, (Xml.Tag) c));
+                    c.getPrefix(), mergeExecution(sameId, (Xml.Tag) c));
         });
         return dominant.withContent(ListUtils.concatAll(recessiveFirst,
                 ListUtils.filter(children(dominant), c -> !moved.contains(c))));
@@ -533,102 +558,30 @@ public class RemoveDuplicatePluginDeclarations extends Recipe {
         return comments;
     }
 
-    private static String indentOf(Content content) {
-        String prefix = content.getPrefix();
-        return prefix.substring(prefix.lastIndexOf('\n') + 1);
-    }
-
     private static String singleLine(String prefix) {
         int newline = prefix.lastIndexOf('\n');
         return newline < 0 ? prefix : prefix.substring(newline);
     }
 
-    private static String withIndent(String prefix, String indent) {
-        int newline = prefix.lastIndexOf('\n');
-        return newline < 0 ? prefix : prefix.substring(0, newline + 1) + indent;
-    }
-
-    /// Rewrites the indentation of `xml` from one style to another so content moved between declarations
-    /// doesn't mix tabs and spaces. Each line is indented by its depth in the tree, which also straightens out a
-    /// declaration that was inconsistently indented to begin with.
-    private static <X extends Xml> X reindent(X xml, Indent from, Indent to) {
-        if (from.equals(to)) {
-            return xml;
-        }
-        String unit = to.unit.isEmpty() ? from.unit : to.unit;
+    private static <X extends Xml> X shift(X xml, String from, String to) {
         //noinspection unchecked
         return (X) new XmlVisitor<Integer>() {
             @Override
             public Xml preVisit(Xml tree, Integer p) {
                 String prefix = tree.getPrefix();
                 int lineStart = prefix.lastIndexOf('\n') + 1;
-                if (lineStart == 0 || tree instanceof Xml.CharData) {
+                if (lineStart == 0 || !prefix.startsWith(from, lineStart)) {
                     return tree;
                 }
-                String indent;
-                if (unit.isEmpty() || tree instanceof Xml.Attribute) {
-                    String current = prefix.substring(lineStart);
-                    indent = current.startsWith(from.base) ? to.base + current.substring(from.base.length()) : current;
-                } else {
-                    indent = to.base + StringUtils.repeat(unit, depth(tree));
-                }
-                return tree.withPrefix(prefix.substring(0, lineStart) + indent);
-            }
-
-            private int depth(Xml tree) {
-                int enclosingTags = (int) getCursor().getPathAsStream(Xml.Tag.class::isInstance).count();
-                return tree instanceof Xml.Tag || tree instanceof Xml.Tag.Closing ? enclosingTags - 1 : enclosingTags;
+                String rest = prefix.substring(lineStart + from.length());
+                return tree.withPrefix(prefix.substring(0, lineStart) + to + rest);
             }
         }.visitNonNull(xml, 0);
     }
 
-    /// The indentation most of the plugins in the list use, which the collapsed declaration is written in,
-    /// preferring one that continues the indentation of the `<plugins>` element itself.
-    private static Indent siblingIndent(Xml.Tag container) {
-        List<? extends Content> plugins = container.getContent() == null ?
-                Collections.emptyList() : container.getContent();
-        String containerIndent = indentOf(container);
-        Map<String, Integer> counts = new LinkedHashMap<>();
-        for (Content plugin : plugins) {
-            if (plugin instanceof Xml.Tag && plugin.getPrefix().contains("\n")) {
-                String indent = indentOf(plugin);
-                counts.merge(indent, indent.startsWith(containerIndent) ? plugins.size() + 1 : 1, Integer::sum);
-            }
-        }
-        String base = counts.entrySet().stream()
-                .max(Comparator.comparingInt(Map.Entry::getValue))
-                .map(Map.Entry::getKey)
-                .orElse("");
-        for (Content plugin : plugins) {
-            if (plugin instanceof Xml.Tag && plugin.getPrefix().contains("\n") && indentOf(plugin).equals(base)) {
-                String unit = indentUnit((Xml.Tag) plugin);
-                if (!unit.isEmpty()) {
-                    return new Indent(base, unit);
-                }
-            }
-        }
-        return new Indent(base, "");
-    }
-
-    @Value
-    private static class Indent {
-        String base;
-        String unit;
-
-        static Indent of(Xml.Tag tag) {
-            return new Indent(indentOf(tag), indentUnit(tag));
-        }
-    }
-
-    private static String indentUnit(Xml.Tag tag) {
-        String indent = indentOf(tag);
-        for (Content child : tag.getContent() == null ? Collections.<Content>emptyList() : tag.getContent()) {
-            if (child.getPrefix().contains("\n")) {
-                String childIndent = indentOf(child);
-                return childIndent.startsWith(indent) ? childIndent.substring(indent.length()) : "";
-            }
-        }
-        return "";
+    private static String indentOf(Content content) {
+        String prefix = content.getPrefix();
+        return prefix.substring(prefix.lastIndexOf('\n') + 1);
     }
 
     /// The tag's own content list, uncopied, so `ListUtils` can hand it back unchanged and `withContent` can
