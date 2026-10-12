@@ -184,6 +184,19 @@ public final class BunRelease implements Comparable<BunRelease> {
         return atLeast(1, 2, 3);
     }
 
+    // src/js_printer.zig writePreQuotedString, src/string_immutable.zig indexOfNeedsEscapeForJavaScriptString
+
+    /**
+     * The printer quoting a string writes what follows a character it prints as it is, up to the next byte its escape
+     * search flags; from 1.2.11 that search is src/bun.js/bindings/highway_strings.cpp's, whose vectors flag a tab
+     * but whose scalar loop over the last {@code len % N} bytes does not, N being the lane count of the CPU's widest
+     * vector (16 on NEON and SSE, 32 on AVX2, 64 on AVX-512), so that a tab there is written as it is, until 1.3.0
+     * (bun#23298). Before 1.2.11 the search flags every tab.
+     */
+    boolean leavesATabInTheEscapeSearchsTail() {
+        return atLeast(1, 2, 11) && !atLeast(1, 3, 0);
+    }
+
     // src/install/lockfile.zig Package.Diff.generate, src/install/install.zig enqueueDependencyWithMainAndSuccessFn
 
     /**

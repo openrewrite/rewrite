@@ -225,6 +225,37 @@ class BunReleaseTest {
     }
 
     /**
+     * js_printer.zig writePreQuotedString over highway_strings.cpp's escape search (1.2.11 until 1.3.0): a tab in the
+     * last {@code len % N} bytes after a printed character is written as it is. As the darwin-arm64 releases (N = 16)
+     * write a root named {@code p<tab>q}: 1.2.10 and 1.3.0 {@code "p\tq"}, 1.2.11 and 1.2.23 the tab itself; and
+     * {@code p<tab>} and 20 {@code q}s escaped by 1.2.11, the tab in its vectors, which wider ones would not hold.
+     */
+    @Test
+    void leavesATabInTheEscapeSearchsTailFrom1211Until130() {
+        assertThat(json("p\tq", "1.3.0")).isEqualTo("\"p\\tq\"");
+        assertThat(json("p\tq", "1.2.10")).isEqualTo("\"p\\tq\"");
+        assertThat(json("p\tq", "1.2.11")).isEqualTo("\"p\tq\"");
+        assertThat(json("p\tq", "1.2.23")).isEqualTo("\"p\tq\"");
+        assertThat(json("\tq", "1.2.11")).isEqualTo("\"\\tq\"");
+        StringBuilder q = new StringBuilder();
+        for (int i = 0; i < 80; i++) {
+            q.append('q');
+        }
+        // 81 bytes after the p: the tab is in the vectors of every width
+        assertThat(json("p\t" + q, "1.2.11")).startsWith("\"p\\tq");
+        // 21 bytes: in 16 lanes' vectors, in 32 lanes' scalar tail
+        assertThatThrownBy(() -> json("p\t" + q.substring(0, 20), "1.2.11"))
+          .isInstanceOf(CannotKnow.class)
+          .hasMessageContaining("vector width");
+    }
+
+    private static String json(String text, String release) {
+        StringBuilder out = new StringBuilder();
+        Strings.appendJsonString(out, text, true, BunRelease.of(release));
+        return out.toString();
+    }
+
+    /**
      * bun.lock.zig Stringifier (1.2.3): overrides and patched dependencies are JSON-escaped; before, written as they
      * are.
      */
