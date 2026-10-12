@@ -225,6 +225,159 @@ class BunReleaseTest {
     }
 
     /**
+     * bun.lock.zig Stringifier (1.2.3): overrides and patched dependencies are JSON-escaped; before, written as they
+     * are.
+     */
+    @Test
+    void escapesOverridesAndPatchedDependenciesFrom123() {
+        String lock = lock("  \"patchedDependencies\": {\n    \"ms@2.1.3\": \"patches\\\\ms.patch\",\n  },\n" +
+                           "  \"overrides\": {\n    \"ms\": \"file:..\\\\ms\",\n  },\n", MS);
+        assertThat(writtenBack("1.2.3", lock))
+          .contains("    \"ms@2.1.3\": \"patches\\\\ms.patch\",\n")
+          .contains("    \"ms\": \"file:..\\\\ms\",\n");
+        assertThat(writtenBack("1.2.2", lock))
+          .contains("    \"ms@2.1.3\": \"patches\\ms.patch\",\n")
+          .contains("    \"ms\": \"file:..\\ms\",\n");
+    }
+
+    /**
+     * bun.lock.zig Stringifier (1.2.8, 1.2.14): bun.lock lists every override from 1.2.8, sorted by name from 1.2.14;
+     * before 1.2.8 only those the hoisted tree's dependencies are named for.
+     */
+    @Test
+    void writesEveryOverrideFrom128SortedFrom1214() {
+        String lock = lock("  \"overrides\": {\n    \"zz\": \"1.0.0\",\n    \"ms\": \"2.1.3\",\n  },\n", MS);
+        assertThat(writtenBack("1.2.14", lock)).contains("  \"overrides\": {\n    \"ms\": \"2.1.3\",\n" +
+                                                         "    \"zz\": \"1.0.0\",\n  },\n");
+        assertThat(writtenBack("1.2.13", lock)).contains("  \"overrides\": {\n    \"zz\": \"1.0.0\",\n" +
+                                                         "    \"ms\": \"2.1.3\",\n  },\n");
+        assertThat(writtenBack("1.2.8", lock)).contains("    \"zz\": \"1.0.0\",\n");
+        assertThat(writtenBack("1.2.7", lock)).contains("  \"overrides\": {\n    \"ms\": \"2.1.3\",\n  },\n")
+          .doesNotContain("zz");
+    }
+
+    /**
+     * lockfile.zig Package.Diff.generate (1.2.8): both sides' overrides are sorted before they are compared; before,
+     * compared as read, so that the same overrides in another order are a change.
+     */
+    @Test
+    void sortsOverridesBeforeComparingThemFrom128() {
+        BunRelease later = BunRelease.of("1.2.8");
+        BunRelease earlier = BunRelease.of("1.2.7");
+        assertThat(OverrideMap.changed(overrideMap("ms", "zz"), overrideMap("zz", "ms"), later)).isFalse();
+        assertThat(OverrideMap.changed(overrideMap("ms", "zz"), overrideMap("zz", "ms"), earlier)).isTrue();
+        assertThat(OverrideMap.changed(overrideMap("ms", "zz"), overrideMap("ms", "zz"), earlier)).isFalse();
+    }
+
+    // plain overrides of the names, each to 1.0.0, in that order
+    private static OverrideMap overrideMap(String... names) {
+        OverrideMap overrides = new OverrideMap();
+        for (String name : names) {
+            long nameHash = Wyhash11.stringHash(name);
+            overrides.map.put(nameHash, new Dependency(nameHash, name,
+              requireNonNull(DependencyVersion.parse(name, nameHash, "1.0.0", BunRelease.PORTED)), Behavior.NONE));
+        }
+        return overrides;
+    }
+
+    /**
+     * bun.lock.zig parseIntoBinaryLockfile (1.2.3 only): each package entry is a package of its own; before and after,
+     * an entry equal to an earlier one is that package.
+     */
+    @Test
+    void readsEveryPackageEntryAsItsOwnPackageIn123() {
+        String lock = lockWith(rootWith("{ \"a\": \"1.0.0\", \"b\": \"1.0.0\" }"),
+          npm("a", "a@1.0.0", "{ \"dependencies\": { \"b\": \"1.0.0\" } }") +
+          npm("b", "b@1.0.0", "{}") +
+          npm("a/b", "b@1.0.0", "{}"));
+        assertThat(TextLockfileReader.load(lock, options("1.2.3", null)).packages).hasSize(4);
+        assertThat(TextLockfileReader.load(lock, options("1.2.2", null)).packages).hasSize(3);
+        assertThat(TextLockfileReader.load(lock, options("1.2.4", null)).packages).hasSize(3);
+    }
+
+    /**
+     * bun.lock.zig parseIntoBinaryLockfile and mapDepToPkg (1.2.4): a dependency is bundled where its own key is
+     * marked so; before, wherever the entry it binds to is, and a mark that is no boolean fails.
+     */
+    @Test
+    void bundlesADependencyByItsOwnKeyFrom124() {
+        String lock = lockWith(rootWith("{ \"a\": \"1.0.0\" }"),
+          npm("a", "a@1.0.0", "{ \"dependencies\": { \"b\": \"1.0.0\", \"c\": \"1.0.0\" } }") +
+          npm("a/b", "b@1.0.0", "{ \"bundled\": true }") +
+          npm("a/c", "c@1.0.0", "{ \"dependencies\": { \"b\": \"1.0.0\" }, \"bundled\": true }"));
+        Lockfile later = TextLockfileReader.load(lock, options("1.2.4", null));
+        assertThat(dependencyOf(later, "a", "b").behavior.isBundled()).isTrue();
+        assertThat(dependencyOf(later, "c", "b").behavior.isBundled()).isFalse();
+        Lockfile earlier = TextLockfileReader.load(lock, options("1.2.3", null));
+        assertThat(dependencyOf(earlier, "a", "b").behavior.isBundled()).isTrue();
+        assertThat(dependencyOf(earlier, "c", "b").behavior.isBundled()).isTrue();
+
+        String notABoolean = lock.replace("{ \"bundled\": true }", "{ \"bundled\": \"yes\" }");
+        TextLockfileReader.load(notABoolean, options("1.2.4", null));
+        assertThatThrownBy(() -> TextLockfileReader.load(notABoolean, options("1.2.3", null)))
+          .isInstanceOf(TextLockfileReader.ParseError.class)
+          .hasMessage("Expected a boolean");
+    }
+
+    /**
+     * bun.lock.zig parseIntoBinaryLockfile (1.2.5): a workspace entry under a key no member took is bound to its
+     * member; before, it is {@code Unknown workspace}.
+     */
+    @Test
+    void readsAWorkspaceEntryUnderAnotherKeyFrom125() {
+        String lock = "{\n  \"lockfileVersion\": 1,\n  \"workspaces\": {\n" +
+                      rootWith("{ \"x\": \"workspace:*\" }") +
+                      "    \"packages/a\": {\n      \"name\": \"a\",\n    },\n" +
+                      "  },\n  \"packages\": {\n    \"a\": [\"a@workspace:packages/a\"],\n" +
+                      "    \"x\": [\"a@workspace:packages/a\"],\n  }\n}\n";
+        TextLockfileReader.load(lock, options("1.2.5", null));
+        assertThatThrownBy(() -> TextLockfileReader.load(lock, options("1.2.4", null)))
+          .isInstanceOf(TextLockfileReader.ParseError.class)
+          .hasMessage("Unknown workspace: 'packages/a'");
+    }
+
+    /**
+     * bin.zig Bin.toJson(.multi_line) (1.2.3): a workspace's bin map has an entry a line; before, the entries follow
+     * one another.
+     */
+    @Test
+    void writesAWorkspaceBinAnEntryALineFrom123() {
+        Bin map = new Bin(Bin.Tag.MAP, java.util.Arrays.asList("a", "a.js", "b", "b.js"));
+        Bin named = new Bin(Bin.Tag.NAMED_FILE, java.util.Arrays.asList("a", "a.js"));
+        assertThat(multiLine(map, "1.2.3")).isEqualTo("{\n      \"a\": \"a.js\",\n      \"b\": \"b.js\",\n    }");
+        assertThat(multiLine(map, "1.2.2")).isEqualTo("{\n      \"a\": \"a.js\",      \"b\": \"b.js\"    }");
+        assertThat(multiLine(named, "1.2.3")).isEqualTo("{\n      \"a\": \"a.js\",\n    }");
+        assertThat(multiLine(named, "1.2.2")).isEqualTo("{\n      \"a\": \"a.js\"\n    }");
+    }
+
+    // a bin as a workspace's in bun.lock, two levels in
+    private static String multiLine(Bin bin, String release) {
+        StringBuilder out = new StringBuilder();
+        bin.toJsonMultiLine(out, new int[]{2}, BunRelease.of(release));
+        return out.toString();
+    }
+
+    /**
+     * install.zig enqueueDependencyWithMainAndSuccessFn (1.2.3): no override applies to the root's edge to a member;
+     * before, an override of the member's name replaces it.
+     */
+    @Test
+    void keepsOverridesOffTheRootsEdgeToAMemberFrom123() {
+        java.util.Map<String, String> manifests = new java.util.LinkedHashMap<>();
+        manifests.put("", "{\"name\":\"r\",\"workspaces\":[\"packages/a\"],\"overrides\":{\"a\":\"1.0.0\"}}");
+        manifests.put("packages/a", "{\"name\":\"a\",\"version\":\"2.0.0\"}");
+        java.util.Map<String, String> packuments = java.util.Collections.singletonMap("a",
+          registryPackument("a", "1.0.0", registryVersion("a", "1.0.0", "")));
+        String lock = "{\n  \"lockfileVersion\": 1,\n  \"workspaces\": {\n    \"\": {\n      \"name\": \"r\",\n    },\n" +
+                      "    \"packages/a\": {\n      \"name\": \"a\",\n      \"version\": \"2.0.0\",\n    },\n  },\n" +
+                      "  \"packages\": {\n    \"a\": [\"a@workspace:packages/a\"],\n  }\n}\n";
+        assertThat(written(install("1.2.3", lock, manifests, packuments)))
+          .contains("\"a\": [\"a@workspace:packages/a\"]");
+        assertThat(written(install("1.2.2", lock, manifests, packuments)))
+          .contains("\"a\": [\"a@1.0.0\", \"\", {}, \"" + INTEGRITY + "\"]");
+    }
+
+    /**
      * npm.zig PackageManifest.parse (1.3.14): a name peerDependenciesMeta marks optional and the peers do not list is
      * an optional peer of {@code "*"}, at the front of the peers; the peers no longer reset the bundled names.
      */

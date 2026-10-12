@@ -285,7 +285,8 @@ final class OverrideMap {
 
     /**
      * Whether the rules differ ({@code OverrideMap::changed}): as {@code Diff.generate} compares them, by count, then
-     * sorted, pairwise; from 1.4.0 the scoped rules too, by parent, target range and rule.
+     * sorted in place (from 1.2.8, {@link BunRelease#sortsOverridesBeforeComparingThem()}), pairwise; from 1.4.0 the
+     * scoped rules too, by parent, target range and rule.
      */
     static boolean changed(OverrideMap from, OverrideMap to, BunRelease release) {
         if (from.map.size() != to.map.size() || from.scoped.size() != to.scoped.size()) {
@@ -294,8 +295,10 @@ final class OverrideMap {
         if (from.isEmpty()) {
             return false;
         }
-        from.sort();
-        to.sort();
+        if (release.sortsOverridesBeforeComparingThem()) {
+            from.sort();
+            to.sort();
+        }
         Iterator<Map.Entry<Long, Dependency>> fromIt = from.map.entrySet().iterator();
         Iterator<Map.Entry<Long, Dependency>> toIt = to.map.entrySet().iterator();
         while (fromIt.hasNext()) {

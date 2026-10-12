@@ -199,8 +199,10 @@ final class PackageManager {
                 }
             }
         }
+        // before 1.2.3 an override applies to the root's edge to a member too
         if (version == null &&
-            !dependency.behavior.isWorkspace(options.getRelease()) &&
+            (!options.getRelease().keepsOverridesOffWorkspaceEdges() ||
+             !dependency.behavior.isWorkspace(options.getRelease())) &&
             (dependency.version.tag != DependencyVersion.Tag.NPM || !dependency.version.npm().isAlias)) {
             // from 1.4.0 a scoped rule the edge's parent and declared range match comes first
             DependencyVersion override = lockfile.overrides.get(lockfile, id, nameHash);

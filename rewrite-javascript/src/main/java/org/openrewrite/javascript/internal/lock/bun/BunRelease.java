@@ -120,6 +120,89 @@ public final class BunRelease implements Comparable<BunRelease> {
         return atLeast(1, 3, 2);
     }
 
+    /**
+     * bun.lock's overrides and patched dependencies are written JSON-escaped ({@code fmtJson}), from 1.2.3; before,
+     * as they are ({@code "{s}": "{s}"}), so that a {@code "} or {@code \} in a name, range or patch path is written
+     * bare.
+     */
+    boolean escapesOverridesAndPatchesInBunLock() {
+        return atLeast(1, 2, 3);
+    }
+
+    /**
+     * The text lockfile's parser reads each package entry as a package of its own ({@code appendPackageNoDedupe}),
+     * in 1.2.3 alone (bun#16952); before and after, an entry whose name and resolution equal an earlier entry's is
+     * that package ({@code appendPackageDedupe}), so that its dependencies are bound once per key it stands at.
+     */
+    boolean readsEveryPackageEntryAsItsOwnPackage() {
+        return atLeast(1, 2, 3) && !atLeast(1, 2, 4);
+    }
+
+    /**
+     * A package's dependency is bundled where bun.lock marks the key {@code <package's key>/<name>} {@code "bundled":
+     * true}, read from each entry's third element in a pass of its own ({@code bundled_pkgs}), from 1.2.4; before,
+     * every dependency the parser binds to an entry takes that entry's own {@code "bundled"} ({@code mapDepToPkg}),
+     * read from its info object, where anything but a boolean is {@code Expected a boolean}.
+     */
+    boolean bundlesADependencyByItsOwnKey() {
+        return atLeast(1, 2, 4);
+    }
+
+    /**
+     * The text lockfile's parser binds a {@code workspace:} entry under a key no member took (an alias of a member) to
+     * the member its resolution names and goes on, from 1.2.5; before, it falls through to {@code Unknown workspace:
+     * '<path>'}, and bun ignores the lock.
+     */
+    boolean readsAWorkspaceEntryUnderAnotherKey() {
+        return atLeast(1, 2, 5);
+    }
+
+    /**
+     * bun.lock lists every override, from 1.2.8; before, only those a dependency of the hoisted tree is named for,
+     * under the dependency's name, in the slot order of a hash map keyed by the name's hash ({@code found_overrides}).
+     */
+    boolean writesEveryOverride() {
+        return atLeast(1, 2, 8);
+    }
+
+    /**
+     * bun.lock's overrides are sorted by name before they are written ({@code overrides.sort}), from 1.2.14; 1.2.8 to
+     * 1.2.13 write them in the order the lockfile holds them.
+     */
+    boolean sortsOverridesInBunLock() {
+        return atLeast(1, 2, 14);
+    }
+
+    // src/install/bin.zig
+
+    /**
+     * A workspace's {@code bin} object in bun.lock has an entry a line ({@code Bin.toJson(.multi_line)}, bun#17041),
+     * from 1.2.3; before, a named file's entry ends without a comma, and a map's entries follow its first line with a
+     * {@code ,} and the indentation between them, the last followed by the indentation of the close.
+     */
+    boolean writesAWorkspaceBinAnEntryALine() {
+        return atLeast(1, 2, 3);
+    }
+
+    // src/install/lockfile.zig Package.Diff.generate, src/install/install.zig enqueueDependencyWithMainAndSuccessFn
+
+    /**
+     * The root's diff sorts both sides' overrides by name, in place, before it compares them pair by pair
+     * ({@code OverrideMap.sort}), from 1.2.8; before, it compares them in the orders they were read in, so that the
+     * same overrides in another order are a change, and the dependencies they name are resolved again.
+     */
+    boolean sortsOverridesBeforeComparingThem() {
+        return atLeast(1, 2, 8);
+    }
+
+    /**
+     * No override applies to the root's dependency on a member ({@code isWorkspaceOnly}), from 1.2.3; before, an
+     * override named as the member replaces that dependency's version.
+     */
+    boolean keepsOverridesOffWorkspaceEdges() {
+        return atLeast(1, 2, 3);
+    }
+
     // src/install/lockfile/bun.lock.rs
 
     /**

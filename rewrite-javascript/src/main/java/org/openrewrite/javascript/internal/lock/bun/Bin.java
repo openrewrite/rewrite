@@ -149,7 +149,31 @@ final class Bin {
         }
     }
 
+    /**
+     * {@code toJson(.multi_line)}, before 1.2.3 without a line break after each entry of a named file or a map
+     * ({@link BunRelease#writesAWorkspaceBinAnEntryALine()}).
+     */
     void toJsonMultiLine(StringBuilder out, int[] indent, BunRelease release) {
+        if (!release.writesAWorkspaceBinAnEntryALine() && (tag == Tag.NAMED_FILE || tag == Tag.MAP)) {
+            out.append("{\n");
+            indent[0]++;
+            for (int i = 0; i < value.size(); i += 2) {
+                if (i > 0) {
+                    out.append(',');
+                }
+                TextLockfileWriter.writeIndent(out, indent);
+                Strings.appendJsonString(out, value.get(i), true, release);
+                out.append(": ");
+                Strings.appendJsonString(out, value.get(i + 1), true, release);
+            }
+            if (tag == Tag.NAMED_FILE) {
+                out.append('\n');
+            }
+            indent[0]--;
+            TextLockfileWriter.writeIndent(out, indent);
+            out.append('}');
+            return;
+        }
         switch (tag) {
             case FILE:
             case DIR:

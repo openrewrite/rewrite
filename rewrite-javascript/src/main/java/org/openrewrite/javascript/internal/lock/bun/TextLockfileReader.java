@@ -51,9 +51,23 @@ final class TextLockfileReader {
     private final Lockfile lockfile;
     private final BunOptions options;
 
+    /**
+     * Before 1.2.4, the package keys whose own entry is {@code "bundled": true}
+     * ({@link BunRelease#bundlesADependencyByItsOwnKey()}).
+     */
+    private final Set<String> bundledEntries = new HashSet<>();
+
     private TextLockfileReader(BunOptions options) {
         this.options = options;
         this.lockfile = new Lockfile(options.getRelease());
+    }
+
+    // appendPackageDedupe; in 1.2.3 appendPackageNoDedupe, every entry a package of its own
+    private int appendPackage(Package pkg) {
+        if (options.getRelease().readsEveryPackageEntryAsItsOwnPackage()) {
+            return lockfile.appendPackage(pkg).meta.id;
+        }
+        return lockfile.appendPackageDedupe(pkg);
     }
 
     /**
@@ -328,7 +342,7 @@ final class TextLockfileReader {
                     } else if (binDirExpr != null) {
                         pkg.bin = Bin.parseAppendFromDirectories(binDirExpr);
                     }
-                    int pkgId = lockfile.appendPackageDedupe(pkg);
+                    int pkgId = appendPackage(pkg);
                     if (pkgMap.containsKey(name)) {
                         throw error("InvalidWorkspaceObject", "Duplicate workspace name: '" + name + "'");
                     }
@@ -354,8 +368,11 @@ final class TextLockfileReader {
         List<Json.Property> pkgRows = pkgsExpr == null ? Collections.<Json.Property>emptyList() :
                 pkgsExpr.properties();
 
+        // from 1.2.4 the keys marked bundled, whose dependency of that name is; before, the keys whose own entry is,
+        // which every dependency bound to them is
+        boolean bundlesByKey = release.bundlesADependencyByItsOwnKey();
         Set<String> bundledPkgs = new HashSet<>();
-        for (Json.Property prop : pkgRows) {
+        for (Json.Property prop : bundlesByKey ? pkgRows : Collections.<Json.Property>emptyList()) {
             if (!prop.value.isArray()) {
                 throw error("InvalidPackageInfo", "Expected an array");
             }
@@ -455,7 +472,10 @@ final class TextLockfileReader {
                 for (int workspacePkgId = workspacePkgsOff; workspacePkgId < workspacePkgsEnd; workspacePkgId++) {
                     if (res.eql(lockfile.packages.get(workspacePkgId).resolution)) {
                         pkgMap.put(pkgPath, workspacePkgId);
-                        continue nextPkgKey;
+                        // before 1.2.5 the match falls through to the error
+                        if (release.readsAWorkspaceEntryUnderAnotherKey()) {
+                            continue nextPkgKey;
+                        }
                     }
                 }
                 throw error("InvalidPackageInfo", "Unknown workspace: '" + res.value + "'");
@@ -480,6 +500,16 @@ final class TextLockfileReader {
                     Json.Expr infoObj = pkgInfo.get(i++);
                     if (!infoObj.isObject()) {
                         throw error("InvalidPackageInfo", "Expected an object");
+                    }
+                    Json.Expr bundledExpr = bundlesByKey ? null : infoObj.get("bundled");
+                    if (bundledExpr != null) {
+                        Boolean bundled = bundledExpr.asBool();
+                        if (bundled == null) {
+                            throw error("InvalidPackageInfo", "Expected a boolean");
+                        }
+                        if (bundled) {
+                            bundledEntries.add(pkgPath);
+                        }
                     }
                     int[] offLen = parseAppendDependencies(infoObj, true, pkgPath, bundledPkgs, null,
                             res.tag == Resolution.Tag.WORKSPACE);
@@ -584,7 +614,7 @@ final class TextLockfileReader {
             pkg.name = nameStr;
             pkg.nameHash = nameHash;
             pkg.resolution = res;
-            int pkgId = lockfile.appendPackageDedupe(pkg);
+            int pkgId = appendPackage(pkg);
             if (pkgMap.containsKey(pkgPath)) {
                 throw error("InvalidPackageKey", "Duplicate package path");
             }
@@ -606,8 +636,10 @@ final class TextLockfileReader {
         for (int depId = rootPkg.dependenciesOff; depId < rootPkg.dependenciesEnd(); depId++) {
             Dependency dep = lockfile.dependencies.get(depId);
             Integer resId = resolvePeerDepVersionBased(dep);
+            String key = null;
             if (resId == null) {
-                resId = pkgMap.get(dep.name);
+                key = dep.name;
+                resId = pkgMap.get(key);
             }
             if (resId == null) {
                 if (mayStayUnresolved(dep)) {
@@ -619,7 +651,7 @@ final class TextLockfileReader {
                 lockfile.resolutions.set(depId, resId);
                 continue;
             }
-            mapDepToPkg(dep, depId, resId);
+            mapDepToPkg(dep, depId, resId, key);
         }
 
         if (lockfileVersion != 0) {
@@ -629,11 +661,14 @@ final class TextLockfileReader {
                 for (int depId = workspace.dependenciesOff; depId < workspace.dependenciesEnd(); depId++) {
                     Dependency dep = lockfile.dependencies.get(depId);
                     Integer resId = resolvePeerDepVersionBased(dep);
+                    String key = null;
                     if (resId == null) {
-                        resId = pkgMap.get(workspace.name + "/" + dep.name);
+                        key = workspace.name + "/" + dep.name;
+                        resId = pkgMap.get(key);
                     }
                     if (resId == null) {
-                        resId = pkgMap.get(dep.name);
+                        key = dep.name;
+                        resId = pkgMap.get(key);
                     }
                     if (resId == null) {
                         if (mayStayUnresolved(dep)) {
@@ -645,7 +680,7 @@ final class TextLockfileReader {
                         lockfile.resolutions.set(depId, resId);
                         continue;
                     }
-                    mapDepToPkg(dep, depId, resId);
+                    mapDepToPkg(dep, depId, resId, key);
                 }
             }
         }
@@ -668,15 +703,17 @@ final class TextLockfileReader {
                     continue;
                 }
                 Integer resId = resolvePeerDepVersionBased(dep);
+                String key = null;
                 if (resId == null) {
                     try {
                         // from 1.4.0 an optional peer is looked up no higher than its bundle's, as the hoist does
-                        resId = findResolution(pkgMap, pkgPath, dep.name,
+                        key = findResolution(pkgMap, pkgPath, dep.name,
                                 dep.behavior.isOptionalPeer() && release.boundsTheOptionalPeersOfABundle() ?
                                         bundledPkgs : null);
                     } catch (InvalidPackageKey e) {
                         throw error("InvalidPackageKey", "Invalid package path");
                     }
+                    resId = key == null ? null : pkgMap.get(key);
                 }
                 if (resId == null) {
                     if (mayStayUnresolved(dep)) {
@@ -688,7 +725,7 @@ final class TextLockfileReader {
                     lockfile.resolutions.set(depId, resId);
                     continue;
                 }
-                mapDepToPkg(dep, depId, resId);
+                mapDepToPkg(dep, depId, resId, key);
             }
         }
 
@@ -836,8 +873,15 @@ final class TextLockfileReader {
         }
     }
 
-    private void mapDepToPkg(Dependency dep, int depId, int pkgId) {
+    /**
+     * @param key the package key the dependency was found under; before 1.2.4 the dependency is bundled as that
+     *            entry is ({@link BunRelease#bundlesADependencyByItsOwnKey()})
+     */
+    private void mapDepToPkg(Dependency dep, int depId, int pkgId, @Nullable String key) {
         lockfile.resolutions.set(depId, pkgId);
+        if (!options.getRelease().bundlesADependencyByItsOwnKey()) {
+            dep.behavior = dep.behavior.set(Behavior.BUNDLED, key != null && bundledEntries.contains(key));
+        }
         if (lockfile.textLockfileVersion != 0) {
             Resolution res = lockfile.packages.get(pkgId).resolution;
             if (res.tag == Resolution.Tag.WORKSPACE) {
@@ -867,13 +911,13 @@ final class TextLockfileReader {
 
     /**
      * {@code PkgMap.findResolution}: the dependency's name under the key, then under each ancestor key, a scoped
-     * name counting as one folder.
+     * name counting as one folder; the key the entry stands at, whose own bundled mark counts before 1.2.4.
      *
      * @param bundledPkgs the keys marked {@code "bundled": true}, above whose parent the walk stops
      *                    ({@code find_resolution_bounded_at_bundle}, from 1.4.0); null for no bound
      */
-    static @Nullable Integer findResolution(Map<String, Integer> map, String pkgPath, String depName,
-                                            @Nullable Set<String> bundledPkgs) {
+    static @Nullable String findResolution(Map<String, Integer> map, String pkgPath, String depName,
+                                           @Nullable Set<String> bundledPkgs) {
         StringBuilder pathBuf = new StringBuilder(pkgPath).append('/');
         int offset = pkgPath.length() + 1;
         boolean atBundleRoot = false;
@@ -881,9 +925,9 @@ final class TextLockfileReader {
         while (valid) {
             pathBuf.setLength(offset);
             pathBuf.append(depName);
-            Integer entry = map.get(pathBuf.toString());
-            if (entry != null) {
-                return entry;
+            String candidate = pathBuf.toString();
+            if (map.containsKey(candidate)) {
+                return candidate;
             }
             if (offset == 0 || atBundleRoot) {
                 return null;
