@@ -276,7 +276,8 @@ class NpmInputsTest {
         HostInputs host = HostInputs.builder().now(Instant.EPOCH).npmrc(Arrays.asList(marker))
           .system(HostRegistries.environment(home)).build();
         Inputs inputs = NpmInputs.from(LockDirectory.of(request), host);
-        return NpmOptions.fromNpmrc(inputs.getUserNpmrc(), inputs.getNpmrc()).registryFor("is-number");
+        return NpmOptions.fromNpmrc(inputs.getRelease(), inputs.getUserNpmrc(), inputs.getNpmrc())
+          .registryFor("is-number");
     }
 
     private static Request.RequestBuilder member() {

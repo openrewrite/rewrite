@@ -18,6 +18,7 @@ package org.openrewrite.javascript.internal.lock.npm;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.javascript.internal.lock.EcmaScript.JsonReplacer;
 import org.openrewrite.javascript.internal.lock.LocaleCompare;
+import org.openrewrite.javascript.internal.lock.V8Sort;
 
 import java.util.ArrayList;
 import java.util.Collections;
@@ -28,9 +29,18 @@ import java.util.Map;
 
 /**
  * Port of json-stringify-nice 1.1.4, a {@code JSON.stringify} replacer: scalars before objects, preferred keys
- * first, the rest in {@code localeCompare('en')} order.
+ * first, the rest in {@code localeCompare('en')} order; with its release as an option.
  */
 final class JsonStringifyNice {
+
+    /**
+     * The json-stringify-nice release: 1.1.4, as 1.1.3 sorts; or 1.1.1, whose {@code isObj} answers a falsy value
+     * with that value, so that the sort compares an empty string or a {@code false} as neither a scalar nor an object
+     * and the order it leaves is V8's sort's.
+     */
+    enum Release {
+        V1_1_1, V1_1_4
+    }
 
     private JsonStringifyNice() {
     }
@@ -44,16 +54,22 @@ final class JsonStringifyNice {
      *              {@code null}, {@code 0}, {@code false} or {@code ""}
      */
     static String stringify(@Nullable Object obj, List<String> prefKeys, @Nullable Object space) {
-        String json = Js.jsonStringify(obj, new Sorter(prefKeys), space);
+        return stringify(obj, prefKeys, space, Release.V1_1_4);
+    }
+
+    static String stringify(@Nullable Object obj, List<String> prefKeys, @Nullable Object space, Release release) {
+        String json = Js.jsonStringify(obj, new Sorter(prefKeys, release), space);
         return (json == null ? "undefined" : json) + (Js.truthy(space) ? "\n" : "");
     }
 
     private static final class Sorter implements JsonReplacer {
         private final List<String> prefKeys;
+        private final Release release;
         private final Map<Object, Map<String, Object>> seen = new IdentityHashMap<>();
 
-        Sorter(List<String> prefKeys) {
+        Sorter(List<String> prefKeys, Release release) {
             this.prefKeys = prefKeys;
+            this.release = release;
         }
 
         @Override
@@ -66,8 +82,14 @@ final class JsonStringifyNice {
                 return cached;
             }
             List<Map.Entry<String, Object>> entries = new ArrayList<>(Js.entries(val));
-            entries.sort((a, b) -> isObj(a.getValue()) == isObj(b.getValue()) ? compare(a.getKey(), b.getKey()) :
-                    isObj(a.getValue()) ? 1 : -1);
+            if (release == Release.V1_1_1) {
+                // isObj(av) === isObj(bv): a falsy value is its own answer, unequal to any other kind's
+                V8Sort.sort(entries, (a, b) -> Js.strictEquals(isObj111(a.getValue()), isObj111(b.getValue())) ?
+                        compare(a.getKey(), b.getKey()) : Js.truthy(isObj111(a.getValue())) ? 1 : -1);
+            } else {
+                entries.sort((a, b) -> isObj(a.getValue()) == isObj(b.getValue()) ?
+                        compare(a.getKey(), b.getKey()) : isObj(a.getValue()) ? 1 : -1);
+            }
             Map<String, Object> ret = new LinkedHashMap<>();
             for (Map.Entry<String, Object> e : entries) {
                 // the reduce's set[k] = v makes an own __proto__ the new object's prototype, or nothing
@@ -97,5 +119,10 @@ final class JsonStringifyNice {
 
     private static boolean isObj(@Nullable Object val) {
         return val instanceof Map;
+    }
+
+    // 1.1.1: val && !Array.isArray(val) && typeof val === 'object'
+    private static @Nullable Object isObj111(@Nullable Object val) {
+        return !Js.truthy(val) ? val : val instanceof Map;
     }
 }

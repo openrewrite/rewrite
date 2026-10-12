@@ -191,8 +191,17 @@ final class LockfileFormatConverters {
     /**
      * {@code convertToLockfileObject} of the value js-yaml read.
      */
-    @SuppressWarnings("unchecked")
     static LockfileObject convertToLockfileObject(@Nullable Object file) {
+        return convertToLockfileObject(file, PnpmRelease.PORTED);
+    }
+
+    /**
+     * {@code convertToLockfileObject} as {@code release} reads the lock: a {@code file:} directory's resolution from
+     * its dep path from 11.2.0 ({@link PnpmRelease#readsADirectoryResolutionFromItsDepPath}), the git-hosted flag from
+     * 11.0.7 ({@link PnpmRelease#marksGitHostedTarballs}).
+     */
+    @SuppressWarnings("unchecked")
+    static LockfileObject convertToLockfileObject(@Nullable Object file, PnpmRelease release) {
         if (file == null || file == Js.UNDEFINED) {
             throw new TypeError("Cannot destructure property 'importers' of 'lockfile' as it is " +
                                 (file == null ? "null" : "undefined") + ".");
@@ -223,7 +232,8 @@ final class LockfileFormatConverters {
                 }
                 if (snapshot.getResolution() == null) {
                     String ref = DepPath.parse(depPath).getNonSemverVersion();
-                    if (ref != null && ref.startsWith("file:") && !LOCAL_TARBALL_RE.matcher(ref).find()) {
+                    if (ref != null && ref.startsWith("file:") && !LOCAL_TARBALL_RE.matcher(ref).find() &&
+                        release.readsADirectoryResolutionFromItsDepPath()) {
                         Map<String, @Nullable Object> resolution = new LinkedHashMap<>();
                         resolution.put("directory", ref.substring("file:".length()));
                         resolution.put("type", "directory");
@@ -231,7 +241,7 @@ final class LockfileFormatConverters {
                     }
                 }
                 packages.put(depPath, snapshot);
-                enrichGitHostedFlag(snapshot.getResolution());
+                enrichGitHostedFlag(snapshot.getResolution(), release);
             }
         }
         for (String key : Js.keys(map)) {
@@ -258,7 +268,8 @@ final class LockfileFormatConverters {
     }
 
     @SuppressWarnings("unchecked")
-    private static void enrichGitHostedFlag(@Nullable Map<String, @Nullable Object> resolution) {
+    // enrichGitHostedFlag, which a release makes from 11.0.7 on (PnpmRelease#marksGitHostedTarballs)
+    private static void enrichGitHostedFlag(@Nullable Map<String, @Nullable Object> resolution, PnpmRelease release) {
         if (resolution == null) {
             return;
         }
@@ -271,17 +282,18 @@ final class LockfileFormatConverters {
         Object tarball = resolution.get("tarball");
         if (tarball != null) {
             if (!(tarball instanceof String)) {
-                throw new TypeError("url.startsWith is not a function");
+                // from 11.9.0 a tarball that is no string is no git-hosted one
+                // (PnpmRelease#recognizesOnlyCommitArchivesAsGitHosted)
+                if (release.marksGitHostedTarballs() && !release.recognizesOnlyCommitArchivesAsGitHosted()) {
+                    throw new TypeError(release.matchesGitHostedTarballUrlsInAnyCase() ?
+                            "url.toLowerCase is not a function" : "url.startsWith is not a function");
+                }
+                return;
             }
-            if (isGitHostedTarballUrl((String) tarball)) {
+            if (LockfileUtils.isGitHostedTarball((String) tarball, release) && release.marksGitHostedTarballs()) {
                 resolution.put("gitHosted", true);
             }
         }
-    }
-
-    private static boolean isGitHostedTarballUrl(String url) {
-        return (url.startsWith("https://codeload.github.com/") || url.startsWith("https://bitbucket.org/") ||
-                url.startsWith("https://gitlab.com/")) && url.contains("tar.gz");
     }
 
     @SuppressWarnings("unchecked")

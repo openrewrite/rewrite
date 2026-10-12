@@ -32,6 +32,9 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.openrewrite.javascript.internal.lock.npm.CanPlaceDep.Result.KEEP;
 import static org.openrewrite.javascript.internal.lock.npm.NpmTreeSupport.json;
+import static org.openrewrite.javascript.internal.lock.npm.NpmTreeSupport.node;
+import static org.openrewrite.javascript.internal.lock.npm.NpmTreeSupport.obj;
+import static org.openrewrite.javascript.internal.lock.npm.NpmTreeSupport.opts;
 import static org.openrewrite.javascript.internal.lock.npm.PlacementCases.describe;
 import static org.openrewrite.javascript.internal.lock.npm.PlacementCases.plain;
 
@@ -203,6 +206,36 @@ class PlaceDepTest {
     @Test
     void everyCaseWithItsOwnAssertionsIsPorted() {
         assertThat(TESTS.keySet()).containsExactlyElementsOf(CASES.names("test"));
+    }
+
+    // upstream's "prune competing peerSet that can be nested, 2": arborist 2.9.0 (npm 7.24.2) prunes x, whose peer j@1
+    // the replacing j@2 no longer satisfies, and has a evaluated again; before, x stays with its peer edge invalid
+    @Test
+    void competingPeerSetStaysBefore7_24_2() {
+        for (String release : new String[]{"7.24.1", "7.24.2"}) {
+            Node tree = node(opts().path("/some/path").pkg(obj("dependencies", obj("a", "")))
+              .child(opts().pkg(obj("name", "a", "version", "1.0.0",
+                "dependencies", obj("j", "1", "x", "", "y", ""))).build())
+              .child(opts().pkg(obj("name", "j", "version", "1.0.0")).build())
+              .child(opts().pkg(obj("name", "x", "version", "1.0.0", "peerDependencies", obj("j", "1"))).build())
+              .child(opts().pkg(obj("name", "y", "version", "1.0.0", "peerDependencies", obj("j", "2"))).build()));
+            Node y = tree.getChildren().get("y");
+            Node vr = node(opts().sourceReference(y).path(y.getPath()).pkg(new LinkedHashMap<>(y.getPackage())));
+            Node dep = node(opts().pkg(obj("name", "j", "version", "2.0.0")).parent(vr));
+            NpmOptions options = NpmOptions.builder().release(NpmRelease.of(release)).build();
+
+            PlaceDep pd = new PlaceDep(y.getEdgesOut().get("j"), dep, options);
+
+            assertThat(tree.getChildren().get("j").getVersion()).as(release).isEqualTo("2.0.0");
+            if ("7.24.1".equals(release)) {
+                assertThat(tree.getChildren().get("x")).as(release).isNotNull();
+                assertThat(tree.getChildren().get("x").getEdgesOut().get("j").isValid()).as(release).isFalse();
+                assertThat(pd.getNeedEvaluation()).as(release).isEmpty();
+            } else {
+                assertThat(tree.getChildren().get("x")).as(release).isNull();
+                assertThat(pd.getNeedEvaluation()).as(release).containsExactly(tree.getChildren().get("a"));
+            }
+        }
     }
 
     private static List<Object> placements(PlaceDep pd) {

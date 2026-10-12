@@ -39,6 +39,9 @@ final class NpmResolver {
     static final String NPM_REGISTRY_ID = "npm";
 
     private static final Pattern NPM_REGISTRY_RE = Pattern.compile("https?://registry\\.npmjs\\.org");
+
+    // before 1.10.0: /http[s]:\/\/registry.npmjs.org/g, an https url only, whose dots match any character
+    private static final Pattern HTTPS_NPM_REGISTRY = Pattern.compile("https://registry.npmjs.org");
     private static final Object NOT_A_TAG = new Object();
 
     private final PackageRequest request;
@@ -66,7 +69,9 @@ final class NpmResolver {
         }
         if (!Js.truthy(distTags) || !Js.truthy(versions)) {
             throw new MessageError(Lang.format("Received malformed response from registry for $0. " +
-                                               "The registry may be down.", name));
+                                               "The registry may be down.",
+                    config.getRelease().namesTheRequestedPackageOfAMalformedResponse() ? name :
+                            Js.get(body, "name")));
         }
         Object wanted = range;
         Object tag = distTag(distTags, range);
@@ -124,7 +129,8 @@ final class NpmResolver {
 
     static String cleanRegistry(Config config, String url) {
         if (Config.YARN_REGISTRY.equals(config.getOption("registry"))) {
-            return NPM_REGISTRY_RE.matcher(url).replaceAll(Config.YARN_REGISTRY);
+            return (config.getRelease().cleansHttpNpmRegistryUrls() ? NPM_REGISTRY_RE : HTTPS_NPM_REGISTRY)
+                    .matcher(url).replaceAll(Config.YARN_REGISTRY);
         }
         return url;
     }
@@ -174,8 +180,10 @@ final class NpmResolver {
                                      " for " + request.pattern);
             }
         }
-        if (shrunk != null && shrunk.remote != null &&
-            (Js.truthy(shrunk.remote.integrity) || !config.isAutoAddIntegrity())) {
+        // before 1.10.0 no entry lacks the integrity yarn does not record
+        if (shrunk != null && shrunk.remote != null && (!config.getRelease().recordsIntegrity() ||
+                                                         Js.truthy(shrunk.remote.integrity) ||
+                                                         !config.isAutoAddIntegrity())) {
             return Promise.resolved(loop, shrunk);
         }
 
@@ -207,8 +215,9 @@ final class NpmResolver {
                 remote.type = "tarball";
                 remote.reference = tarball;
                 remote.hash = shasum instanceof String ? (String) shasum : null;
-                remote.integrity = Js.truthy(integrity) ? Ssri.parse(integrity, Ssri.Release.V5_3_0,
-                        Js::templateString) : Ssri.fromHex(shasum, "sha1", Ssri.Release.V5_3_0);
+                remote.integrity = !config.getRelease().recordsIntegrity() ? null : Js.truthy(integrity) ?
+                        Ssri.parse(integrity, Ssri.Release.V5_3_0, Js::templateString) :
+                        Ssri.fromHex(shasum, "sha1", Ssri.Release.V5_3_0);
                 remote.registry = NPM_REGISTRY_ID;
                 remote.packageName = data.get("name");
                 info.remote = remote;

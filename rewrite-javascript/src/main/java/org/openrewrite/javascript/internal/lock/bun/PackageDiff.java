@@ -16,8 +16,11 @@
 package org.openrewrite.javascript.internal.lock.bun;
 
 import org.jspecify.annotations.Nullable;
+import org.openrewrite.javascript.internal.LockFileRegeneration.Reason;
+import org.openrewrite.javascript.internal.lock.Rejected;
 import org.openrewrite.javascript.internal.lock.RootRelativePath;
 
+import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
@@ -27,7 +30,7 @@ import java.util.Set;
 
 /**
  * Port of bun's src/install/lockfile/Package.zig {@code Diff.generate} (bun 1.3.10), for an install without update
- * requests.
+ * requests, as the release that installs diffs ({@link BunRelease}).
  */
 final class PackageDiff {
 
@@ -41,10 +44,28 @@ final class PackageDiff {
         final Set<Integer> removedTrustedDependencies = new LinkedHashSet<>();
         boolean patchedDependenciesChanged;
 
+        /**
+         * From 1.4.1, a workspace's version changed: no edge changed with it, but bun.lock records it.
+         */
+        boolean workspaceVersionsChanged;
+
+        /**
+         * From 1.4.0, the workspaces bun.lock lists whose package.json is gone, which a frozen install does not count
+         * removed.
+         */
+        final List<Long> prunedWorkspaces = new ArrayList<>();
+
+        /**
+         * {@code changes_resolutions} (from 1.4.0): a dependency added, removed or updated, or the overrides or the
+         * catalogs changed.
+         */
+        boolean changesResolutions() {
+            return add > 0 || remove > 0 || update > 0 || overridesChanged || catalogsChanged;
+        }
+
         boolean hasDiffs() {
-            return add > 0 || remove > 0 || update > 0 || overridesChanged || catalogsChanged ||
-                   !addedTrustedDependencies.isEmpty() || !removedTrustedDependencies.isEmpty() ||
-                   patchedDependenciesChanged;
+            return changesResolutions() || !addedTrustedDependencies.isEmpty() ||
+                   !removedTrustedDependencies.isEmpty() || patchedDependenciesChanged || workspaceVersionsChanged;
         }
     }
 
@@ -64,61 +85,66 @@ final class PackageDiff {
         List<Integer> fromResolutions = fromLockfile.resolutionsOf(from);
         int toI = 0;
 
-        if (fromLockfile.overrides.map.size() != toLockfile.overrides.map.size()) {
-            summary.overridesChanged = true;
-        } else {
-            fromLockfile.overrides.sort();
-            toLockfile.overrides.sort();
-            Iterator<Map.Entry<Long, Dependency>> fromIt = fromLockfile.overrides.map.entrySet().iterator();
-            Iterator<Map.Entry<Long, Dependency>> toIt = toLockfile.overrides.map.entrySet().iterator();
-            while (fromIt.hasNext()) {
-                Map.Entry<Long, Dependency> f = fromIt.next();
-                Map.Entry<Long, Dependency> t = toIt.next();
-                if (!f.getKey().equals(t.getKey()) || !f.getValue().eql(t.getValue())) {
-                    summary.overridesChanged = true;
-                    break;
-                }
-            }
-        }
+        // from 1.4.0 the scoped rules count too
+        summary.overridesChanged = OverrideMap.changed(fromLockfile.overrides, toLockfile.overrides, options.getRelease());
 
         if (isRoot) {
-            summary.catalogsChanged = catalogsChanged(fromLockfile.catalogs, toLockfile.catalogs);
+            summary.catalogsChanged = catalogsChanged(fromLockfile.catalogs, toLockfile.catalogs, options.getRelease());
         }
 
-        trustedDependencies(fromLockfile, toLockfile, summary);
+        trustedDependencies(fromLockfile, toLockfile, summary, options.getRelease());
 
         summary.patchedDependenciesChanged = patchedDependenciesChanged(fromLockfile, toLockfile);
 
+        BunRelease release = options.getRelease();
+        if (isRoot && release.diffsWorkspaceVersions()) {
+            summary.workspaceVersionsChanged = workspaceVersionsChanged(fromLockfile, toLockfile);
+        }
+
+        List<Integer> missingWorkspaces = new ArrayList<>();
+        List<Package> survivors = new ArrayList<>();
         for (int i = 0; i < fromDeps.size(); i++) {
             Dependency fromDep = fromDeps.get(i);
             int prevI = toI;
             boolean found = false;
             for (; toI < toDeps.size(); toI++) {
-                if (fromDep.nameHash == toDeps.get(toI).nameHash && fromDep.behavior.eq(toDeps.get(toI).behavior)) {
+                if (matches(fromDep, toDeps.get(toI), release)) {
                     found = true;
                     break;
                 }
             }
             if (!found) {
                 for (toI = 0; toI < prevI; toI++) {
-                    if (fromDep.nameHash == toDeps.get(toI).nameHash && fromDep.behavior.eq(toDeps.get(toI).behavior)) {
+                    if (matches(fromDep, toDeps.get(toI), release)) {
                         found = true;
                         break;
                     }
                 }
             }
             if (!found) {
+                if (isRoot && fromDep.behavior.isWorkspace() && release.failsOnAWorkspaceMissingFromDisk() &&
+                    workspaceIsMissingOnDisk(fromLockfile, fromDep.nameHash, manifests)) {
+                    if (fromResolutions.get(i) < fromLockfile.packages.size()) {
+                        missingWorkspaces.add(fromResolutions.get(i));
+                    }
+                    if (options.isFrozenLockfile() && !summary.overridesChanged && !summary.catalogsChanged) {
+                        summary.prunedWorkspaces.add(fromDep.nameHash);
+                        continue;
+                    }
+                }
                 summary.remove++;
                 continue;
             }
             int matched = toI;
             toI++;
-            if (toDeps.get(matched).eql(fromDep)) {
+            if (toDeps.get(matched).eql(fromDep, release)) {
                 if (idMapping != null) {
                     boolean updateMapping = true;
-                    if (isRoot && fromDep.behavior.isWorkspace()) {
+                    // before 1.2.19 a member is diffed again where the dependency is a workspace spec
+                    if (release.tellsDependencyGroupsApart() ? isRoot && fromDep.behavior.isWorkspace() :
+                            toDeps.get(matched).version.tag == DependencyVersion.Tag.WORKSPACE) {
                         updateMapping = workspaceUnchanged(options, log, fromLockfile, toLockfile,
-                                fromResolutions.get(i), fromDep, manifests);
+                                fromResolutions.get(i), fromDep, manifests, survivors);
                         toDeps = toLockfile.dependenciesOf(to);
                     }
                     if (updateMapping) {
@@ -129,10 +155,28 @@ final class PackageDiff {
                     continue;
                 }
             }
+            // from 1.4.0 a changed literal keeps the locked resolution while it still satisfies the new range
+            if (idMapping != null && release.keepsALockedVersionTheNewRangeAccepts()) {
+                int fromResId = fromResolutions.get(i);
+                if (fromResId < fromLockfile.packages.size()) {
+                    Resolution fromPkgResolution = fromLockfile.packages.get(fromResId).resolution;
+                    Dependency toDep = toDeps.get(matched);
+                    if (toDep.version.tag == DependencyVersion.Tag.NPM && fromPkgResolution.tag == Resolution.Tag.NPM &&
+                        toDep.version.npm().version.satisfies(fromPkgResolution.version)) {
+                        // still counted an update, so that the root is replaced; only its resolution is kept
+                        idMapping[matched] = i;
+                    }
+                }
+            }
             summary.update++;
         }
 
-        summary.add = Math.max(0, toDeps.size() - Math.max(0, fromDeps.size() - summary.remove));
+        summary.add = Math.max(0, toDeps.size() - Math.max(0, fromDeps.size() -
+                                                               (summary.remove + summary.prunedWorkspaces.size())));
+
+        if (!missingWorkspaces.isEmpty()) {
+            failIfSurvivorDependsOnMissing(fromLockfile, missingWorkspaces, toLockfile, to, survivors);
+        }
 
         if (from.resolution.tag != Resolution.Tag.ROOT && !to.scripts.eql(from.scripts)) {
             for (int h = 0; h < Package.Scripts.NAMES.length; h++) {
@@ -144,8 +188,26 @@ final class PackageDiff {
         return summary;
     }
 
+    /**
+     * The dependency of {@code to} a dependency of {@code from} is diffed against: of the same name and behavior, or
+     * before 1.2.19 of the same name unless only one of the two is a workspace alone.
+     */
+    private static boolean matches(Dependency from, Dependency to, BunRelease release) {
+        if (from.nameHash != to.nameHash) {
+            return false;
+        }
+        if (release.tellsDependencyGroupsApart()) {
+            return from.behavior.eq(to.behavior);
+        }
+        return from.behavior.isWorkspaceOnly() == to.behavior.isWorkspaceOnly();
+    }
+
+    /**
+     * @param survivors the workspaces read from disk, to which this one is added once read
+     */
     private static boolean workspaceUnchanged(BunOptions options, Log log, Lockfile fromLockfile, Lockfile toLockfile,
-                                              int fromResolution, Dependency fromDep, Map<String, String> manifests) {
+                                              int fromResolution, Dependency fromDep, Map<String, String> manifests,
+                                              List<Package> survivors) {
         String workspacePath = toLockfile.workspacePaths.get(fromDep.nameHash);
         if (workspacePath == null) {
             return false;
@@ -164,12 +226,87 @@ final class PackageDiff {
         workspacePkg.parseWithJSON(toLockfile, options, log,
                 RootRelativePath.normalize(workspacePath.replace('\\', '/')), json,
                 Features.WORKSPACE, manifests);
+        survivors.add(workspacePkg);
         Package fromPkg = fromLockfile.packages.get(fromResolution);
         Summary diff = generate(options, log, fromLockfile, toLockfile, fromPkg, workspacePkg, null, manifests);
-        return !diff.hasDiffs();
+        // from 1.4.0 a trusted or patched dependency's change alone keeps the workspace
+        return options.getRelease().keepsAWorkspaceWhoseDiffChangesNoResolution() ? !diff.changesResolutions() :
+                !diff.hasDiffs();
     }
 
-    private static boolean catalogsChanged(CatalogMap from, CatalogMap to) {
+    /**
+     * {@code workspace_versions_changed} (from 1.4.1): the workspaces' versions compared as bun.lock prints them, so
+     * that one rewrite settles the file.
+     */
+    private static boolean workspaceVersionsChanged(Lockfile fromLockfile, Lockfile toLockfile) {
+        if (fromLockfile.workspaceVersions.size() != toLockfile.workspaceVersions.size()) {
+            return true;
+        }
+        for (Map.Entry<Long, SemverVersion> entry : toLockfile.workspaceVersions.entrySet()) {
+            SemverVersion from = fromLockfile.workspaceVersions.get(entry.getKey());
+            SemverVersion to = entry.getValue();
+            if (from == null || from.major != to.major || from.minor != to.minor || from.patch != to.patch ||
+                !from.pre.equals(to.pre) || !from.build.equals(to.build)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /**
+     * {@code workspace_is_missing_on_disk} (from 1.4.0): bun.lock lists the workspace, and the project holds no
+     * package.json where it says.
+     */
+    private static boolean workspaceIsMissingOnDisk(Lockfile lockfile, long workspaceNameHash,
+                                                    Map<String, String> manifests) {
+        String workspacePath = lockfile.workspacePaths.get(workspaceNameHash);
+        return workspacePath != null &&
+               !manifests.containsKey(RootRelativePath.normalize(workspacePath.replace('\\', '/')));
+    }
+
+    /**
+     * {@code exit_if_survivor_depends_on_missing} (from 1.4.0): the root or a workspace read from disk that depends by
+     * {@code workspace:} on a workspace missing from disk fails the install.
+     */
+    private static void failIfSurvivorDependsOnMissing(Lockfile fromLockfile, List<Integer> missing,
+                                                       Lockfile toLockfile, Package toRoot, List<Package> survivors) {
+        for (Dependency dep : toLockfile.dependenciesOf(toRoot)) {
+            if (dep.behavior.isWorkspace()) {
+                continue;
+            }
+            Package target = missingTarget(fromLockfile, missing, dep);
+            if (target != null) {
+                throw Rejected.rejects(Reason.RESOLUTION_REQUIRED, target.name, "the root package depends on " +
+                        "workspace \"" + target.name + "\" (" + target.resolution.value + "), which is listed in " +
+                        "bun.lock but not on disk");
+            }
+        }
+        for (Package survivor : survivors) {
+            for (Dependency dep : toLockfile.dependenciesOf(survivor)) {
+                Package target = missingTarget(fromLockfile, missing, dep);
+                if (target != null) {
+                    throw Rejected.rejects(Reason.RESOLUTION_REQUIRED, target.name, "workspace \"" + survivor.name +
+                            "\" depends on workspace \"" + target.name + "\" (" + target.resolution.value + "), " +
+                            "which is listed in bun.lock but not on disk");
+                }
+            }
+        }
+    }
+
+    private static @Nullable Package missingTarget(Lockfile fromLockfile, List<Integer> missing, Dependency dep) {
+        if (dep.version.tag != DependencyVersion.Tag.WORKSPACE) {
+            return null;
+        }
+        for (int id : missing) {
+            Package pkg = fromLockfile.packages.get(id);
+            if (pkg.nameHash == dep.nameHash) {
+                return pkg;
+            }
+        }
+        return null;
+    }
+
+    private static boolean catalogsChanged(CatalogMap from, CatalogMap to, BunRelease release) {
         if (from.defaultMap.size() != to.defaultMap.size()) {
             return true;
         }
@@ -178,7 +315,7 @@ final class PackageDiff {
         }
         from.sort();
         to.sort();
-        if (!sameDeps(from.defaultMap, to.defaultMap)) {
+        if (!sameDeps(from.defaultMap, to.defaultMap, release)) {
             return true;
         }
         Iterator<Map.Entry<String, LinkedHashMap<String, Dependency>>> fromIt = from.groups.entrySet().iterator();
@@ -192,27 +329,30 @@ final class PackageDiff {
             if (f.getValue().size() != t.getValue().size()) {
                 return true;
             }
-            if (!sameDeps(f.getValue(), t.getValue())) {
+            if (!sameDeps(f.getValue(), t.getValue(), release)) {
                 return true;
             }
         }
         return false;
     }
 
-    private static boolean sameDeps(Map<String, Dependency> from, Map<String, Dependency> to) {
+    private static boolean sameDeps(Map<String, Dependency> from, Map<String, Dependency> to,
+                                    BunRelease release) {
         Iterator<Map.Entry<String, Dependency>> fromIt = from.entrySet().iterator();
         Iterator<Map.Entry<String, Dependency>> toIt = to.entrySet().iterator();
         while (fromIt.hasNext() && toIt.hasNext()) {
             Map.Entry<String, Dependency> f = fromIt.next();
             Map.Entry<String, Dependency> t = toIt.next();
-            if (!f.getKey().equals(t.getKey()) || !f.getValue().eql(t.getValue())) {
+            if (!f.getKey().equals(t.getKey()) || !f.getValue().eql(t.getValue(), release)) {
                 return false;
             }
         }
         return true;
     }
 
-    private static void trustedDependencies(Lockfile fromLockfile, Lockfile toLockfile, Summary summary) {
+    // against the release's default list where package.json lists none
+    private static void trustedDependencies(Lockfile fromLockfile, Lockfile toLockfile, Summary summary,
+                                            BunRelease release) {
         Set<Integer> from = fromLockfile.trustedDependencies;
         Set<Integer> to = toLockfile.trustedDependencies;
         if (from == null && to == null) {
@@ -232,13 +372,14 @@ final class PackageDiff {
             return;
         }
         if (from != null) {
-            for (int hash : DefaultTrustedDependencies.HASHES) {
+            Set<Integer> defaults = DefaultTrustedDependencies.of(release);
+            for (int hash : defaults) {
                 if (!from.contains(hash)) {
                     summary.addedTrustedDependencies.put(hash, false);
                 }
             }
             for (int f : from) {
-                if (!DefaultTrustedDependencies.HASHES.contains(f)) {
+                if (!defaults.contains(f)) {
                     summary.removedTrustedDependencies.add(f);
                 }
             }

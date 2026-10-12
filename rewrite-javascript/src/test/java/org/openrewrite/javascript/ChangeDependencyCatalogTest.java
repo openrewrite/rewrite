@@ -113,8 +113,8 @@ class ChangeDependencyCatalogTest implements RewriteTest {
             }
           }
           """;
-        String why = "acme-logger was not renamed: pnpm 10.0.0 is not a release whose writes are recorded (9.5.0 - " +
-          "9.15.9, 10.32.1 - 10.34.6, 11.0.6 - 11)";
+        String why = "acme-logger was not renamed: pnpm 10.0.0 is not a release whose writes are recorded (" +
+          org.openrewrite.javascript.internal.PnpmRelease.recorded() + ")";
         rewriteRun(
           spec -> spec.recipe(new ChangeDependency("acme-logger", "acme-log", null, null))
             .dataTable(NodeDependencyEditsDeclined.Row.class, rows -> assertThat(rows).singleElement()

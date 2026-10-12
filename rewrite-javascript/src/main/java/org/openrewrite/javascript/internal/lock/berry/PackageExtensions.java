@@ -162,6 +162,7 @@ final class PackageExtensions {
             String stringifiedTypesIdent = StructUtils.stringifyIdent(typesIdent);
             if (pkg.peerDependencies.containsKey(typesIdent.identHash) ||
                 pkg.peerDependenciesMeta.containsKey(stringifiedTypesIdent) ||
+                configuration.getRelease().skipsTypesPeerOfATypesDependency() &&
                 pkg.dependencies.containsKey(typesIdent.identHash)) {
                 continue;
             }

@@ -8,7 +8,10 @@ Accepted. Supersedes [ADR 0011](0011-native-node-lock-regeneration.md). Amended 
 regenerates through the port of its own resolver, and the shared engine of ADR 0011 is removed. Amended 2026-10-10:
 what `internal.lock` holds, and how the recipes write overrides and follow catalogs for each package manager; and
 again: one port per library, the host's registries as the user's config, corepack, the regenerators by module.
-Amended 2026-10-11: later releases of the ported pnpm and Yarn majors; and the manifests a port is given.
+Amended 2026-10-11: later releases of the ported pnpm and Yarn majors; the npm release that built the LST,
+with every npm release from 7.1.1 reproduced beside the one ported; every Yarn 4.x release reproduced beside
+4.10.3; Bun releases reproduced beside 1.3.10; and Yarn 1 releases reproduced beside 1.22.22. Amended 2026-10-12:
+pnpm releases reproduced beside 11.2.2; and the manifests a port is given.
 
 ## Context
 
@@ -126,8 +129,8 @@ Overrides are written where the project's package manager reads them, at the wor
   range open between majors, or a release whose writes are not recorded, is declined): 11 reads
   pnpm-workspace.yaml only; 10 reads package.json's `pnpm.overrides` and `resolutions` instead of the workspace's when
   they hold any; 9 reads package.json only. The recipe writes where that release's own writer would, editing
-  pnpm-workspace.yaml in place or creating the key or file as pnpm places it; a release outside 11.0.6 - 11 makes
-  the regeneration cannot-know.
+  pnpm-workspace.yaml in place or creating the key or file as pnpm places it; a release outside
+  `PnpmReleases.PROVEN` makes the regeneration cannot-know.
 - An override the package manager cannot read (its own parser's answer: pnpm's `parsePkgAndParentSelector`, Berry's
   `parseResolution`), or one that would win over a declaration through a value that is no version range (a catalog or
   workspace reference), is declined with a `NodeDependencyEditsDeclined` row and writes nothing; an override scoped to
@@ -212,7 +215,8 @@ and read only afterwards, beside `Rc`, `Cli` and `Install`; Berry's Configuratio
 
 pnpm-workspace.yaml is printed as pnpm 10 and 11 print it, through `YamlDocument` and `WorkspaceManifestWriter`
 (pnpm 10's sortKeysByPriority, pnpm 11's reorderRecursive and propagateBlankLinesToNewPairs), for the releases whose
-writes are recorded (9.5.0 - 9.15.9, 10.32.1 - 10.34.6, 11.0.6 - 11); pnpm 9's catalogs and Yarn's .yarnrc.yml
+writes are recorded (9.5.0 - 9.15.9, 10.32.1 - 10.34.6, and the 11.x releases of `PnpmReleases.PROVEN`); pnpm 9's
+catalogs and Yarn's .yarnrc.yml
 are edited in place, and a layout the port does not read (document markers, CR line ends, a tab before a comment, a
 flow mapping with entries) is declined. A workspace pnpm rejects (`catalog` beside `catalogs.default`, recorded) is
 declined. AddDependency sorts the dependency fields as each package manager's add saves them, and still keeps inline
@@ -250,11 +254,207 @@ package manager only and again with every manifest that has no lock beside it ma
 
 ## Amendment 2026-10-11: later releases of the ported majors
 
-- pnpm: a release from 11.0.6 to below 12 (`Main.RUNS_AS_PORTED`) runs as 11.2.2, for the port (`SwitchCliVersion`,
-  `Main.release`) and the recipes (`PnpmRelease`) alike. Recordings with 11.13.0 and 11.28.5 write the locks 11.2.2
-  writes; 11.0.5 sorts what 11.0.6 appends. Another major stays cannot-know.
-- Yarn Berry: every 4.x release the release data holds (4.0.0 to 4.18.1) runs as 4.10.3, with its own data and
-  lockfile version (8, 9 from 4.14.0, 10 from 4.15.0: `YarnRelease.getLockfileVersion`). Recordings with 4.11.0 to
-  4.18.1 write the entries 4.10.3 writes, but for one: a `npmPreapprovedPackages` entry that makes micromatch throw
-  under the age gate fails 4.18.1's install, where 4.10.3 skips that version. Yarn 2 and 3, and a release after the
-  data's, stay cannot-know.
+- pnpm (superseded by the amendment on pnpm releases below, which replaces `Main.RUNS_AS_PORTED` with
+  `PnpmReleases.PROVEN`): a release from 11.0.6 to below 12 (`Main.RUNS_AS_PORTED`) runs as the port of 11.2.2,
+  for the port
+  (`SwitchCliVersion`, `Main.release`) and the recipes (`PnpmRelease`) alike; 11.0.5 sorts what 11.0.6 appends, and
+  another major stays cannot-know. What a later 11.x release changed in a ported module is an option of that module's
+  class, a range of releases asked of the release that installs (`Main.releaseIn`): the package manager check names
+  that release (`Main.checkWantedPackageManager`: the one pnpm hands the install to, else 11.2.2), and the install's
+  config carries it as pnpm's own `packageManager.version`, the resolver's `pnpmVersion`. Where the inputs do not say
+  which side of an option it is on (a range of which the root's lock pins one, corepack starting another release than
+  pnpm run directly), both sides are computed and a difference is cannot-know. One option so far: from 11.5.1 a
+  missing optional peer is hoisted at a version only the lock holds
+  (`ResolveDependencies.LOCKED_OPTIONAL_PEER_CANDIDATES`, pnpm/pnpm#12075), recorded with 11.2.2 and 11.5.0 dropping
+  the peer and 11.5.1, 11.15.1 and 11.28.5 keeping it. The other changes of 11.3.0 to 11.28.5 to the ported modules
+  are work items, so a later release is byte-exact per recording, not per release: recordings with 11.13.0 and
+  11.28.5 write the locks 11.2.2 writes for the scenarios taken with them, while seek-oss/playroom's lock after one
+  version bump, recorded with every release from 11.2.2 to 11.28.5, is the port's up to 11.5.1 and another one from
+  each of 11.5.2, 11.7.0, 11.15.0, 11.28.0 and 11.28.1. Their changesets name what those releases changed (read, not
+  recorded apart): the peer contexts the lock records are preferred (pnpm/pnpm#12083) and kept from a node's
+  siblings (pnpm/pnpm#12320), an optional peer only `peerDependenciesMeta` declares is hoisted (pnpm/pnpm#13120), a
+  name a package lists as a dependency and as an optional peer stays a dependency (pnpm/pnpm#15503), and a candidate
+  for an optional peer is skipped when the importer provides one of its own peers at a version it rejects
+  (pnpm/pnpm#15573).
+- Yarn Berry: every 4.x release the release data holds (4.0.0 to 4.18.1) is reproduced beside 4.10.3, as the
+  amendment on Yarn Berry releases below has it. Yarn 2 and 3, and a release after the data's, stay cannot-know.
+
+## Amendment 2026-10-11: the npm release that built the LST
+
+The npm port follows npm 11.17.0 and reproduces other releases beside it. A release is not inferred from the project:
+npm reads `packageManager` for nothing, and a sweep of every npm release showed that releases a project's declarations
+allow write different locks for the plainest edit (every release before 10.8.0 drops `license` from a new entry).
+
+- **The release that installs** is the one that built the LST. The JavaScript parser records it in a marker beside
+  `NodeResolutionResult`, `NodeRuntime`, as `JavaVersion` records the JDK that built a Java LST: the package manager it
+  found, what that package manager's `--version` answers in the project's root directory, and the Node version and
+  platform the parser ran on. The npm port installs as the marker's release, and as 11.17.0 without one. The machine
+  engines and platforms are checked against is the execution context's where the host gives one, else the marker's.
+  npm's own `devEngines` check (`lib/base-cmd.js`, from npm 10.9.0) runs for that release and rejects as npm does.
+- **One question per upstream change.** `NpmRelease` holds each difference between 11.17.0 and another release as a
+  question named for what npm does, answered through `atLeast` by the release that made the change; the ported module
+  branches on it where upstream changed, 11.17.0's code unchanged beside it. A library npm bundles at several releases
+  is ported once with its release as an option (`NodeSemver`, `Ssri`, `PickManifest`, `PackageJson`, `MapWorkspaces`),
+  and `NpmRelease` names the one each npm bundles.
+- **What is reproduced.** `NpmReleases.PROVEN` is the range of releases for which every recorded scenario replays as
+  that release wrote it. A marker naming a release outside it, or one npm never published, is cannot-know.
+- **How a release is proven.** Every npm release from 7.0.0 is run over every recorded scenario against a frozen
+  registry: the scenario's own `http/`, a full packument it kept abbreviated rebuilt from today's registry cut back to
+  the versions, tags and deprecations the recording saw, and an abbreviated packument whose versions an older
+  recording kept bare filled from today's the same way (`http/<name>@abbreviated`, which the replays serve to a
+  release before 10.4.0, the ones that read the abbreviated packument alone). The release that recorded a scenario
+  is its control and must reproduce it byte for byte. Each run keeps the recorder's phases, the second install over every lock it writes, and
+  `cross`: the edit installed over the scenario's own `before`. A scenario's `releases` file names the releases that
+  write its recorded outcome, and each `release/<first>/` another outcome with the releases that write it;
+  `NpmScenarioTest` replays the first and last release of every range. An expect line `exact-or <failure>` holds a
+  release to the lock byte for byte where the engine writes one, and to the failure otherwise: a recording the engine
+  cannot know may be one another release, reading less, writes plainly.
+
+## Amendment 2026-10-11: Yarn Berry releases
+
+The Berry port follows Yarn 4.10.3 and reproduces every 4.x release beside it, as the npm port does npm's.
+
+- **The release that installs** is the one the `NodeRuntime` marker names, else the one `yarnPath` or corepack starts;
+  one outside `YarnReleases.PROVEN`, or one the release data does not hold (Yarn 2 and 3), is cannot-know.
+- **One question per upstream change.** `YarnRelease` holds each difference beside the release's data (package
+  extensions, builtin patches, plugins, settings) as a question named for what Yarn does, answered through `atLeast`
+  alone. Settings, their defaults and types are the release's: a setting it does not define is unknown to it, and
+  `npmMinimalAgeGate` is minutes until 4.11.0, a duration after, `1d` by default from 4.15.0, per scope from 4.17.0.
+  The lockfile migration rules (`approvedGitRepositories` and `enableScripts` over a lock older than version 9 from
+  4.14.0, `npmMinimalAgeGate: 0` older than 10 from 4.15.0) set what the install writes to `.yarnrc.yml`, which the
+  regeneration returns beside the lock. A builtin compat patch's `hash=` is the release's: the data holds, per patch,
+  its semver ranges and the hash each gives, and a lock holding another release's patch is cannot-know, since the
+  checksum is that of the patch applied to the source's archive.
+- **How a release is proven.** Every stable release from 2.1.0 was swept over every Berry scenario as npm's were. The
+  export (the fixtures repository's `releases` and `release/<first>/`) holds Yarn 4.x only; Yarn 2 and 3 write
+  another lockfile format, which no port reads. A release's outcome is its locks and the `.yarnrc.yml` it writes; a
+  lock with a builtin compat patch entry its start lock does not hold is `exact-or cannot-know builtin compat patch
+  changed`, as the scenarios recorded over such an entry say. `YarnBerryScenarioTest` replays the first and last
+  release of every range, and every release with `REWRITE_LOCK_EVERY_RELEASE`.
+
+## Amendment 2026-10-11: Bun releases
+
+The Bun port follows Bun 1.3.10 and reproduces other releases beside it, as the npm port does npm's.
+
+- **The release that installs** is the one the `NodeRuntime` marker names (what `bun --version` answered), else
+  1.3.10. One outside `BunReleases.PROVEN`, or one that writes no bun.lock (before 1.1.39), is cannot-know.
+- **One question per upstream change.** `BunRelease` holds each difference as a question named for what Bun does,
+  answered through `atLeast` alone by the release whose tag (`bun-v<release>` of oven-sh/bun) made it; the ported Zig
+  module branches on it beside 1.3.10's code, the release reaching it through `BunOptions` and the `Lockfile`. bun.lock
+  is read and written as the release does it: `configVersion` from 1.3.2, a `""` registry expanded to the package's
+  scope registry from 1.3.7, the integrity of a git, github or tarball package from 1.3.10, an unnamed root's entry
+  from 1.3.0, catalogs from 1.2.14. A name `peerDependenciesMeta` alone lists is an optional peer of `"*"` from
+  1.3.14; the peer queue is drained before the wait for the peers from 1.3.11, processed once before it from 1.3.1;
+  a workspaces glob a later `!` pattern negates is no workspace from 1.3.0; a git or GitHub spec is told and read as
+  hosted-git-info does from 1.3.2; bunfig's minimum release age is read
+  from 1.3.0, a quoted .npmrc value expanded from 1.3.5, the root's own catalogs from 1.2.19; and before 1.2.19 a
+  package's dependency groups are not told apart (their order, the root's diff, the workspace bit). The patch file
+  errors are worded as each release words them.
+- **A release that never finishes.** From 1.2.21 (`--lockfile-only` no longer prefetches tarballs) to 1.3.9, a pass
+  of the wait for the peers that leaves peers queued and no request pending is never followed by another: nothing
+  wakes bun's event loop. The port fails there, as npm's does where npm never finishes. Installs over a lock that
+  holds the packages never reach that state; an install from a lock whose root lists nothing can.
+- **How a release is proven.** Every release that writes bun.lock (1.1.39 to 1.4.3) was swept over every recorded Bun
+  scenario through a frozen registry, as npm's were; the release that recorded a scenario (1.3.10) is its control. The
+  export (the fixtures repository's `releases` and `release/<first>/`) holds 1.2.0 on, since 1.1.x writes
+  lockfileVersion 0 and reads none of the fixtures' version 1 locks. A release's outcome is the lock of the edit over
+  its own `before`, of the edit over the scenario's `before` (`cross`), and the second install over each; a lock bun
+  wrote from scratch is no outcome, since a regeneration installs over a lock, so that a from-scratch install that
+  never finishes (1.2.21 to 1.3.9 over two peer graphs) leaves the edits over a lock, which finish, to be replayed.
+  A `git clone` bun failed is `cannot-know`: what git reaches over the network is not the engine's to know, as npm's
+  export takes the filesystem npm ran on. `BunScenarioTest` replays the first and last release of every range, and
+  every release with `REWRITE_LOCK_EVERY_RELEASE`; a release replay answers only for the registries that release
+  asked (its outcome's `requests.log`), since 1.4.0 asks bunfig's registry where 1.3.x asked .npmrc's.
+- **1.4.x, a Rust translation.** 1.4.0 translated every Zig file the port names to Rust and changed much on the way;
+  each change is a question beside 1.3.10's code like any other, the Java classes still following their modules (the
+  Rust file named beside the Zig one). bun.lock holds versions 0 to 3: a lock keeps the version it was read with, a
+  new one is 2, held at 1 where a package would not read back at 2, and 3 where the overrides hold rules scoped to a
+  parent or a range, which 1.4.0 reads, matches and writes. Among the rest: the JSON and TOML parsers are new (their
+  errors and what they accept), bunfig's registry wins over .npmrc's, registry urls are canonical, catalogs compare and
+  look up by name, a frozen `--lockfile-only` install writes nothing, the resolver dedupes and redirects otherwise
+  (`get_package_id`'s guard, `update_transitive.rs`), the reader binds peers by version, the hoist dedupes a
+  package's second edge to a name, and the clean drops what only optional peers hold. What the engine cannot see is
+  cannot-know: bun's manifest cache (`install.offline`, from 1.4.1), a frozen install over a pruned checkout, and two
+  1.4.0 bugs whose bytes depend on memory or response headers.
+- **1.2.x.** Every consecutive pair from 1.2.0 to 1.3.0 was diffed in the files the port names and in what Bun builds
+  into them (its semver, glob matcher, .npmrc and TOML parsers and bunfig reader, Zig's standard library, Highway's
+  string search), each change written down before it was ported. Among the questions: a version's numbers are u32s
+  before 1.2.23; workspaces globs are matched by glob-match before 1.2.3; bun.lock lists only the overrides its tree
+  uses before 1.2.8 and sorts them from 1.2.14, escapes overrides and patches from 1.2.3, keeps duplicate entries apart
+  in 1.2.3 alone, takes a dependency's bundled mark from the entry it binds to before 1.2.4, and reads a workspace entry
+  under another key from 1.2.5; an integrity is decoded past its algorithm from 1.2.20 and refused past its digest from
+  1.2.21; .npmrc loses its byte order mark from 1.2.13; `linkWorkspacePackages` is read from bunfig from 1.2.16 and
+  from .npmrc from 1.2.19; bunfig's security scanner runs on install from 1.2.22. What a release build leaves
+  undefined (code it takes for unreachable, a write past a buffer) or to the CPU (1.2.11 to 1.2.23 leave a tab in the
+  escape search's scalar tail unescaped, the tail's length set by the vector width) is cannot-know.
+- **What is reproduced.** `BunReleases.PROVEN` is 1.2.0 to 1.4.3: every scenario replays as each of them, and every
+  upstream change in the files the port names between them and 1.3.10 that reaches a lock is a question. 1.1.39 to
+  1.1.45 write and read bun.lock's version 0 alone, which no recording holds, so they stay cannot-know.
+
+## Amendment 2026-10-11: Yarn classic releases
+
+The Yarn classic port follows yarn 1.22.22 and reproduces the 1.x releases beside it, as the npm port does npm's.
+
+- **The release that installs** is the one the `NodeRuntime` marker names; without one, 1.22.22 as before. A
+  yarn-path hands the install to the file it names: a file named as a release (`yarn-<version>.js`, `.cjs`, `.mjs`)
+  is the release the marker names, whose `--version` answered through the same hand-off, and only 1.22.22's own file
+  without a marker; any other file is a script whose install the engine cannot know. A release outside
+  `YarnClassicReleases.PROVEN`, or one the registry does not publish as yarn 1, is cannot-know.
+- **One question per upstream change.** `YarnClassicRelease` holds each difference as a question named for what yarn
+  does, answered through `atLeast` alone by the tag of yarnpkg/yarn that made it. The release names itself where yarn
+  does: the header `yarn-enable-lockfile-versions` writes, `engines.yarn`, the `packageManager` message. An error that
+  is no MessageError is worded as the release reports it: `An unexpected error occurred: "<message>".` before 1.22.20,
+  its stack from 1.22.21; 1.22.20 prints none, and the engine words it as 1.22.21 does. What ends yarn before `main`
+  reports (an rc file it cannot read, a yarn-path that does not load, the manifest 1.22.20 reads first) is printed as
+  its stack by every release. The questions cover every change between two releases of `PROVEN` in the modules the
+  port names, those no scenario reaches among them (each tested as the release did it when run), and the libraries
+  yarn bundles: ini 1.3.4 and tar-fs 1.16.0 before 1.10.0 are options of their one port.
+- **How a release is proven.** Every stable 1.x release was swept over every Yarn classic scenario as npm's were;
+  1.22.12, which the registry publishes without its bundle, never ran and is not reproduced. The export's failure of a
+  phase is the error that ended it, yarn's last `error` line (the steps go to stdout, which interleaves with stderr
+  from run to run), none where 1.22.20 printed none. A recording's `cannot-know` or `malformed` line is `exact-or`
+  that line for a release that writes a lock, in the export's outcomes and in the replays of the recorded outcome as
+  another release. `YarnClassicScenarioTest` replays the first and last release of every range, and every release
+  with `REWRITE_LOCK_EVERY_RELEASE`. `PROVEN` is 1.7.0 to 1.22.22 but 1.22.12; 1.6.0 knows no `--focus`, and the
+  releases before it word many failures otherwise.
+
+## Amendment 2026-10-12: pnpm releases
+
+The pnpm port follows pnpm 11.2.2 and reproduces the releases of `PnpmReleases.PROVEN` beside it, as the npm port does
+npm's; `Main.RUNS_AS_PORTED`, which let every 11.x release run as 11.2.2, is gone.
+
+- **The release that installs** is the one the `NodeRuntime` marker names, what `pnpm --version` answered in the
+  project's root: the release on the path or the one corepack starts, which main.ts answers before any switch. It runs
+  its own package manager check; a hand-over to another release is cannot-know, since the release that runs may write
+  the env document before it hands over. Without a marker 11.2.2 runs as before and hands the install to the release
+  the project names, which the engine follows where it reproduces it. Where the inputs leave the release at a range
+  (corepack or pnpm run directly, a range the root's lock pins one of), it is every reproduced release of the range,
+  and a question their answers differ on for the inputs is cannot-know; each question is asked only where its answers
+  differ. A release outside `PROVEN` is cannot-know, worded as the other package managers word it.
+- **One question per upstream change.** `PnpmRelease` holds each difference as a question named for what pnpm does,
+  answered through `atLeast` alone by the tag `v<release>` of pnpm/pnpm that made it, the ported class branching where
+  upstream changed with 11.2.2's code beside the other release's. pnpm names its own release only where it does (its
+  `packageManager.version`, `engines.pnpm`). The resolver's `LOCKED_OPTIONAL_PEER_CANDIDATES` (pnpm/pnpm#12075) stays
+  as #9151 wrote it, and `countsLockedVersionsAsOptionalPeerCandidates` answers the same for every reproduced release.
+  A change no scenario reaches is a question all the same, its unit test what the release did when run: pnpm before
+  11.5.0 writes a locked remote tarball without its integrity beside an edit (pnpm/pnpm#12001), where the port of
+  11.2.2 had filled in the locked one.
+- **How a release is proven.** Every stable release from 9.0.0 to 12.12.1 was swept over every pnpm scenario, and the
+  export wrote what each wrote into the scenarios' `releases` files and `release/` outcomes, with the registry
+  documents its replays need; pnpm's own packuments, which six scenarios that pin a release would copy (81 MB), are
+  left out, every release's replay of every scenario being the same without them. `PnpmScenarioTest` replays the
+  first and last release of every range, and every release with `REWRITE_LOCK_EVERY_RELEASE`. A recording a release
+  outside `PROVEN` made is held to cannot-know until the engine reproduces that release. `PROVEN` widens a boundary at
+  a time, once every replay of its releases passes and every pair of releases in it is reviewed, every module of the
+  bundle and every library it bundles: 11.0.3 to 11.16.0 so far. 11.5.2 resolves peers a second time from the peer
+  contexts the lock records, reads a locked package it does not update from its snapshot, and binds each locked
+  tarball URL to the registry's; 11.7.0 resolves the children of a package several occurrences reach in the context of
+  the lowest of them (pnpm/pnpm#12358); a pnpm 11 release before 11.0.6 writes pnpm-workspace.yaml as pnpm 10 does,
+  which the recipes follow.
+- **A bundled library is a question too.** Each release bundles its own node-semver (7.7.4 to 11.1.3, 7.8.0, 7.8.1
+  from 11.3.0, 7.8.4 from 11.7.0, 7.8.5 from 11.9.0), whose range functions the port asks through
+  `PnpmRelease.underSemver`, only where the node-semvers of the releases the install may be answer otherwise; yaml
+  2.8.4 (11.0.7) prints a negative number's fraction digits, which the recipes' pnpm-workspace.yaml writer asks the
+  release that installs. Where pnpm writes a file the regeneration does not (loose minimumReleaseAge adding immature
+  picks to pnpm-workspace.yaml from 11.1.3) or reads one the host does not give (a user .npmrc the environment names,
+  from 11.0.6), the regeneration is cannot-know.

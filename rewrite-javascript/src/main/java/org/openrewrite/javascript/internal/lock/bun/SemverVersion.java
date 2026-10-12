@@ -16,14 +16,18 @@
 package org.openrewrite.javascript.internal.lock.bun;
 
 import org.jspecify.annotations.Nullable;
+import org.openrewrite.javascript.internal.lock.CannotKnow;
 
 /**
- * Port of bun's src/semver/Version.zig (bun 1.3.10). The core numbers are u64: compared unsigned, saturating at
- * {@code -1L}, printed unsigned. The tag's {@code pre} and {@code build} are empty when absent.
+ * Port of bun's src/semver/Version.zig (bun 1.3.10), with Version.rs (1.4.0) beside it. The core numbers are u64:
+ * compared unsigned, saturating at {@code -1L}, printed unsigned; before 1.2.23 u32s, saturating at
+ * {@link #MAX_U32} ({@link BunRelease#readsSixtyFourBitVersionNumbers()}). The tag's {@code pre} and {@code build} are
+ * empty when absent.
  */
 final class SemverVersion {
 
     static final long MAX = -1L;
+    static final long MAX_U32 = 0xFFFFFFFFL;
     static final SemverVersion ZERO = new SemverVersion(0, 0, 0, "", "");
 
     final long major;
@@ -48,8 +52,15 @@ final class SemverVersion {
         return new SemverVersion(major, minor, patch, pre, build);
     }
 
-    static long saturatingIncrement(long n) {
-        return n == MAX ? MAX : n + 1;
+    /**
+     * The ceiling of a major, minor or patch: the u64 maximum, before 1.2.23 the u32 maximum.
+     */
+    static long max(BunRelease release) {
+        return release.readsSixtyFourBitVersionNumbers() ? MAX : MAX_U32;
+    }
+
+    static long saturatingIncrement(long n, BunRelease release) {
+        return n == max(release) ? n : n + 1;
     }
 
     boolean hasPre() {
@@ -91,13 +102,13 @@ final class SemverVersion {
         return 0;
     }
 
-    int order(SemverVersion rhs) {
+    int order(SemverVersion rhs, BunRelease release) {
         int o = orderWithoutTag(rhs);
         if (o != 0) {
             return o;
         }
         if (hasPre() && rhs.hasPre()) {
-            return orderPre(pre, rhs.pre);
+            return orderPre(pre, rhs.pre, release);
         }
         int preOrder = Strings.order(pre, rhs.pre);
         if (preOrder != 0) {
@@ -106,20 +117,25 @@ final class SemverVersion {
         return Strings.order(build, rhs.build);
     }
 
-    int orderWithoutBuild(SemverVersion rhs) {
+    int orderWithoutBuild(SemverVersion rhs, BunRelease release) {
         int o = orderWithoutTag(rhs);
         if (o != 0) {
             return o;
         }
         if (hasPre() && rhs.hasPre()) {
-            return orderPre(pre, rhs.pre);
+            return orderPre(pre, rhs.pre, release);
         }
         return Strings.order(pre, rhs.pre);
     }
 
-    static int orderPre(String lhs, String rhs) {
+    /**
+     * {@code Tag.orderPre}: identifiers that parse as numbers of the release's width compare as numbers, before the
+     * others, which compare as text.
+     */
+    static int orderPre(String lhs, String rhs, BunRelease release) {
         String[] l = lhs.split("\\.", -1);
         String[] r = rhs.split("\\.", -1);
+        long max = max(release);
         int i = 0;
         while (true) {
             String lp = i < l.length ? l[i] : null;
@@ -134,8 +150,8 @@ final class SemverVersion {
             if (lp == null) {
                 return -1;
             }
-            Long lu = parseUnsigned(lp);
-            Long ru = parseUnsigned(rp);
+            Long lu = parseUnsigned(lp, max);
+            Long ru = parseUnsigned(rp, max);
             if (lu != null && ru == null) {
                 return -1;
             }
@@ -156,7 +172,12 @@ final class SemverVersion {
         }
     }
 
-    // std.fmt.parseUnsigned(u64, s, 10): digits and '_' between digits, no sign
+    // std.fmt.parseUnsigned(u64, s, 10), or u32's where max is its maximum: digits and '_' between digits, no sign
+    private static @Nullable Long parseUnsigned(String s, long max) {
+        Long v = parseUnsigned(s);
+        return v == null || Long.compareUnsigned(v, max) > 0 ? null : v;
+    }
+
     private static @Nullable Long parseUnsigned(String s) {
         if (s.isEmpty() || s.charAt(0) == '_' || s.charAt(s.length() - 1) == '_') {
             return null;
@@ -312,6 +333,20 @@ final class SemverVersion {
     }
 
     static ParseResult parse(String input) {
+        return parse(input, BunRelease.PORTED);
+    }
+
+    /**
+     * {@code parse} as the release reads a version: from 1.4.0 one of whitespace, {@code v} and {@code =} alone is
+     * invalid ({@link BunRelease#rejectsAVersionOfSeparatorsAlone()}), and a number of more than 20 digits is its
+     * value ({@link BunRelease#readsALongVersionNumberByItsValue()}); before 1.2.23 a number is a u32
+     * ({@link BunRelease#readsSixtyFourBitVersionNumbers()}).
+     *
+     * @throws CannotKnow before 1.2.2 for a wildcard right after the patch number
+     *                    ({@link BunRelease#skipsAWildcardAfterThePatchNumber()}), where bun reaches code it takes for
+     *                    unreachable
+     */
+    static ParseResult parse(String input, BunRelease release) {
         ParseResult result = new ParseResult();
         int partI = 0;
         int partStartI;
@@ -321,7 +356,8 @@ final class SemverVersion {
             return result;
         }
         boolean isDone = false;
-        int i = 0;
+        // before 1.4.0 the index stays 0 when only separators are found, which reads one starting with a space as 0.0.0
+        int i = release.rejectsAVersionOfSeparatorsAlone() ? input.length() : 0;
         for (int c = 0; c < input.length(); c++) {
             char ch = input.charAt(c);
             if (ch == ' ' || ch == '\t' || ch == '\n' || ch == '\r' || ch == '\u000B' || ch == '\u000C' || ch == 'v' ||
@@ -333,6 +369,10 @@ final class SemverVersion {
         }
         if (i == input.length()) {
             result.valid = false;
+            if (release.rejectsAVersionOfSeparatorsAlone()) {
+                result.wildcard = SemverQuery.Wildcard.MAJOR;
+                result.len = i;
+            }
             return result;
         }
         while (i < input.length()) {
@@ -354,7 +394,7 @@ final class SemverVersion {
                     i++;
                 }
                 lastCharI = i;
-                Long number = parseVersionNumber(input.substring(partStartI, lastCharI));
+                Long number = parseVersionNumber(input.substring(partStartI, lastCharI), release);
                 if (partI == 0) {
                     result.version.major = number;
                     partI = 1;
@@ -404,6 +444,10 @@ final class SemverVersion {
                     } else if (partI == 2) {
                         result.wildcard = SemverQuery.Wildcard.PATCH;
                         partI = 3;
+                    } else if (!release.skipsAWildcardAfterThePatchNumber()) {
+                        throw new CannotKnow("what bun " + release + " makes of the version \"" + input + "\": a " +
+                                             "wildcard right after its patch number has its parser reach code it " +
+                                             "takes for unreachable");
                     }
                 }
             } else {
@@ -435,7 +479,20 @@ final class SemverVersion {
         return result;
     }
 
-    private static @Nullable Long parseVersionNumber(String input) {
+    /**
+     * {@code parseVersionNumber} of the digits the parser scanned: missing past 20 digits, 0 past the u64 maximum; from
+     * 1.4.0 the value of any count of digits, 0 past the maximum; before 1.2.23 missing past 10 digits, 0 past the u32
+     * maximum.
+     */
+    private static @Nullable Long parseVersionNumber(String input, BunRelease release) {
+        if (release.readsALongVersionNumberByItsValue()) {
+            try {
+                return Long.parseUnsignedLong(input);
+            } catch (NumberFormatException e) {
+                return 0L;
+            }
+        }
+        int digits = release.readsSixtyFourBitVersionNumbers() ? 20 : 10;
         StringBuilder bytes = new StringBuilder();
         for (int k = 0; k < input.length(); k++) {
             char c = input.charAt(k);
@@ -443,7 +500,7 @@ final class SemverVersion {
                 return null;
             }
             if (c >= '0' && c <= '9') {
-                if (bytes.length() + 1 > 20) {
+                if (bytes.length() + 1 > digits) {
                     return null;
                 }
                 bytes.append(c);
@@ -455,7 +512,8 @@ final class SemverVersion {
             return null;
         }
         try {
-            return Long.parseUnsignedLong(bytes.toString());
+            long value = Long.parseUnsignedLong(bytes.toString());
+            return Long.compareUnsigned(value, max(release)) > 0 ? 0L : value;
         } catch (NumberFormatException e) {
             return 0L;
         }

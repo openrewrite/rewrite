@@ -68,6 +68,21 @@ final class Behavior {
         return (bits & WORKSPACE) != 0;
     }
 
+    /**
+     * {@code isWorkspaceOnly} (before 1.2.19): a workspace and nothing else, where a member's own dependencies also
+     * carry the workspace bit.
+     */
+    boolean isWorkspaceOnly() {
+        return isWorkspace() && (bits & (DEV | PROD | OPTIONAL | PEER)) == 0;
+    }
+
+    /**
+     * The release's workspace test: {@link #isWorkspace()}, or {@link #isWorkspaceOnly()} before 1.2.19.
+     */
+    boolean isWorkspace(BunRelease release) {
+        return release.tellsDependencyGroupsApart() ? isWorkspace() : isWorkspaceOnly();
+    }
+
     boolean isBundled() {
         return (bits & BUNDLED) != 0;
     }
@@ -90,6 +105,33 @@ final class Behavior {
 
     boolean isRequired() {
         return !isOptional();
+    }
+
+    /**
+     * {@code cmp} as the release orders behaviors: from 1.2.19 a workspace, then dev, optional, prod and peer
+     * dependencies first ({@link #cmp(Behavior)}); before, each of prod, dev, optional, peer and workspace last, in
+     * that order of precedence.
+     */
+    int cmp(Behavior rhs, BunRelease release) {
+        if (release.tellsDependencyGroupsApart() || eq(rhs)) {
+            return cmp(rhs);
+        }
+        if (isProd() != rhs.isProd()) {
+            return isProd() ? 1 : -1;
+        }
+        if (isDev() != rhs.isDev()) {
+            return isDev() ? 1 : -1;
+        }
+        if (isOptional() != rhs.isOptional()) {
+            return isOptional() ? 1 : -1;
+        }
+        if (isPeer() != rhs.isPeer()) {
+            return isPeer() ? 1 : -1;
+        }
+        if (isWorkspace() != rhs.isWorkspace()) {
+            return isWorkspace() ? 1 : -1;
+        }
+        return 0;
     }
 
     int cmp(Behavior rhs) {

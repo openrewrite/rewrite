@@ -21,7 +21,10 @@ import org.openrewrite.javascript.internal.LockFileRegeneration.Result;
 import org.openrewrite.javascript.internal.lock.yarnclassic.YarnClassicLockRegenerator;
 import org.openrewrite.javascript.internal.lock.yarnclassic.YarnClassicLockRegenerator.Inputs;
 import org.openrewrite.javascript.internal.lock.yarnclassic.YarnClassicManifestRules;
+import org.openrewrite.javascript.internal.lock.yarnclassic.YarnClassicRelease;
+import org.openrewrite.javascript.internal.lock.yarnclassic.YarnClassicReleases;
 import org.openrewrite.javascript.internal.registry.NpmRegistryClient;
+import org.openrewrite.javascript.marker.NodeResolutionResult.PackageManager;
 
 import java.util.Arrays;
 import java.util.LinkedHashMap;
@@ -64,21 +67,42 @@ final class YarnClassicInputs implements Port {
 
     @Override
     public InstallRoot installRoot(LockDirectory dir) {
-        return YarnClassicLockRegenerator.installRoot(project(dir).build());
+        // the release from(...) installs as; the regeneration reports one the engine does not reproduce
+        YarnClassicRelease release;
+        try {
+            release = release(dir.packageManagerVersion(PackageManager.YarnClassic));
+        } catch (CannotKnow e) {
+            return InstallRoot.STOPS_HERE;
+        }
+        return YarnClassicLockRegenerator.installRoot(project(dir).release(release).build());
+    }
+
+    // the release the NodeRuntime marker records, none without one
+    private static @Nullable YarnClassicRelease release(@Nullable String version) {
+        return version == null ? null : YarnClassicReleases.installedAs(version);
     }
 
     @Override
     public Result regenerate(LockDirectory dir, HostInputs host, NpmRegistryClient client) {
-        return new YarnClassicLockRegenerator(from(dir, host), new HostRegistrySource(host.transport(), client))
-                .regenerate();
+        Inputs inputs;
+        try {
+            inputs = from(dir, host);
+        } catch (CannotKnow e) {
+            return Result.failure(LockOnlyInstall.cannotKnow(e));
+        }
+        return new YarnClassicLockRegenerator(inputs, new HostRegistrySource(host.transport(), client)).regenerate();
     }
 
     /**
-     * With the home .npmrc yarn reads under the project's: the host's registries as the user's global and user
-     * npmrc, with the host's credentials for the registries the project names too.
+     * As the Yarn release that built the LST, 1.22.22 where the host recorded none. With the home .npmrc yarn reads
+     * under the project's: the host's registries as the user's global and user npmrc, with the host's credentials for
+     * the registries the project names too.
+     *
+     * @throws CannotKnow where the yarn that built the LST is a release the engine does not reproduce
      */
     static Inputs from(LockDirectory dir, HostInputs host) {
         return project(dir)
+                .release(release(host.packageManagerVersion(PackageManager.YarnClassic)))
                 .host(host.getHost())
                 .env(host.getEnvironment().process())
                 .homeFile(".npmrc", host.userNpmrc(HostInputs.GLOBAL_AND_USER))

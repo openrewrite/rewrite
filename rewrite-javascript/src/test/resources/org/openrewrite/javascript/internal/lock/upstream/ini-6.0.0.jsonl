@@ -44,3 +44,5 @@
 {"test":"differences","fn":"decode","args":["a=1\n[a]\nb=c\n[d]\ne[]=f\n[d.g]\nh=i"],"out":{"$":"nullproto","value":{"a":"1","d":{"$":"nullproto","value":{"e":["f"],"g":{"$":"nullproto","value":{"h":"i"}}}}}}}
 {"test":"differences","fn":"decode","args":["'null'=x"],"threw":{"$":"error","name":"TypeError","message":"Cannot read properties of null (reading 'length')"}}
 {"test":"differences","fn":"decode","args":["'12'=x\n'[1,2]'=y\n[\"3\"]\nz=1"],"out":{"$":"nullproto","value":{"3":{"$":"nullproto","value":{"z":"1"}},"12":"x","1,2":"y"}}}
+{"test":"differences","fn":"decode","args":["a=b ;c\n[d #e]\nf =g\t#h"],"out":{"$":"nullproto","value":{"a":"b","d":{"$":"nullproto","value":{"f":"g"}}}}}
+{"test":"differences","fn":"unsafe","args":["b ;c"],"out":"b"}

@@ -80,16 +80,23 @@ final class NpmTagResolver implements Resolver {
             throw new ReportError(ReportError.REMOTE_NOT_FOUND, "Registry failed to return tag \"" + tag + "\"");
         }
         Object times = registryData.get("time");
-        if ("latest".equals(tag) && !NpmHttpUtils.isPackageApproved(project, descriptor, version, times)) {
-            if (!(version instanceof String)) {
-                throw new JsError(JsError.TYPE_ERROR, "version.includes is not a function");
-            }
-            String latest = (String) version;
-            boolean toleratePrereleases = latest.contains("-");
+        if ("latest".equals(tag) && project.configuration.getRelease().approvesPackagesByAge() &&
+            !NpmHttpUtils.isPackageApproved(project, descriptor, version, times)) {
+            boolean skipsPrereleases = project.configuration.getRelease().skipsPrereleasesBelowLatest();
             List<String> versions = new ArrayList<>();
             for (Map.Entry<String, @Nullable Object> entry : Js.entries(registryData.get("versions"))) {
                 versions.add(entry.getKey());
             }
+            if (!(version instanceof String)) {
+                // 4.10.3 asks version.includes first; before, semver.lt the first candidate it compares
+                if (skipsPrereleases || !versions.isEmpty()) {
+                    throw new JsError(JsError.TYPE_ERROR, skipsPrereleases ? "version.includes is not a function" :
+                            "Invalid version. Must be a string. Got type \"" + Js.typeOf(version) + "\".");
+                }
+                version = "";
+            }
+            String latest = (String) version;
+            boolean toleratePrereleases = !skipsPrereleases || latest.contains("-");
             String nextVersion = null;
             try {
                 NodeSemver.rsort(versions, NodeSemver.Options.DEFAULT);

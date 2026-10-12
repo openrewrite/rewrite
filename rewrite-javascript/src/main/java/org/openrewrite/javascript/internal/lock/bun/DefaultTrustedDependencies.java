@@ -26,13 +26,36 @@ import java.util.Set;
 
 /**
  * Port of bun's src/install/lockfile.zig {@code default_trusted_dependencies} (bun 1.3.10), from bun's
- * {@code default-trusted-dependencies.txt}, by truncated name hash.
+ * {@code default-trusted-dependencies.txt}, by truncated name hash, with the names other releases add or drop.
  */
 final class DefaultTrustedDependencies {
 
     static final Set<Integer> HASHES = load();
 
     private DefaultTrustedDependencies() {
+    }
+
+    /**
+     * The list as {@code release} has it: 1.3.10's, but {@code opencode-ai} only from 1.2.16
+     * ({@link BunRelease#trustsOpencodeAiByDefault()}), {@code yarn} before 1.2.19
+     * ({@link BunRelease#trustsYarnByDefault()}) and {@code @anthropic-ai/claude-code} from 1.3.12
+     * ({@link BunRelease#trustsClaudeCodeByDefault()}).
+     */
+    static Set<Integer> of(BunRelease release) {
+        Set<Integer> hashes = new LinkedHashSet<>(HASHES);
+        listed(hashes, "opencode-ai", release.trustsOpencodeAiByDefault());
+        listed(hashes, "yarn", release.trustsYarnByDefault());
+        listed(hashes, "@anthropic-ai/claude-code", release.trustsClaudeCodeByDefault());
+        return hashes;
+    }
+
+    private static void listed(Set<Integer> hashes, String name, boolean listed) {
+        int hash = (int) Wyhash11.stringHash(name);
+        if (listed) {
+            hashes.add(hash);
+        } else {
+            hashes.remove(hash);
+        }
     }
 
     private static Set<Integer> load() {

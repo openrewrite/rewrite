@@ -29,25 +29,40 @@ final class SyncEnvLockfile {
     }
 
     /**
-     * The release pnpm records into packageManagerDependencies with {@code resolvePackageManagerIntegrities}; null
-     * where it records nothing.
+     * The release pnpm records into packageManagerDependencies with {@code resolvePackageManagerIntegrities}, the one
+     * that runs; null where it records nothing. Before 11.1.3 it records only over an env document whose pnpm entry
+     * the wanted range does not satisfy ({@link PnpmRelease#recordsTheReleaseAnEnvDocumentLacks}).
      */
     static @Nullable String syncEnvLockfile(PnpmOptions.WantedPackageManager pm,
-                                            Supplier<@Nullable EnvLockfile> envLockfile) {
+                                            Supplier<@Nullable EnvLockfile> envLockfile, PnpmRelease running) {
         if (!"pnpm".equals(pm.getName()) || pm.getVersion() == null || !SwitchCliVersion.shouldPersistLockfile(pm)) {
             return null;
         }
         String version = Js.string(pm.getVersion());
-        if (!NodeSemver.satisfies(Main.PNPM_VERSION, version, NodeSemver.Options.INCLUDE_PRERELEASE)) {
+        String current = running.version();
+        if (!running.underSemver(semver -> NodeSemver.satisfies(current, version,
+                NodeSemver.Options.INCLUDE_PRERELEASE.release(semver)))) {
             return null;
         }
         EnvLockfile locked = envLockfile.get();
         Object lockedVersion = EnvInstaller.lockedVersion(locked == null ? null : locked.packageManagerDependencies(),
                 "pnpm");
-        if (lockedVersion != null && lockedVersion != Js.UNDEFINED &&
-            NodeSemver.satisfies(lockedVersion, version, NodeSemver.Options.INCLUDE_PRERELEASE)) {
+        boolean hasLockedVersion = lockedVersion != null && lockedVersion != Js.UNDEFINED;
+        if ((locked == null || !hasLockedVersion) && !running.recordsTheReleaseAnEnvDocumentLacks()) {
             return null;
         }
-        return Main.PNPM_VERSION;
+        if (hasLockedVersion && running.underSemver(semver -> NodeSemver.satisfies(lockedVersion, version,
+                NodeSemver.Options.INCLUDE_PRERELEASE.release(semver)))) {
+            return null;
+        }
+        return current;
+    }
+
+    /**
+     * {@link #syncEnvLockfile(PnpmOptions.WantedPackageManager, Supplier, PnpmRelease)} with pnpm 11.2.2 running.
+     */
+    static @Nullable String syncEnvLockfile(PnpmOptions.WantedPackageManager pm,
+                                            Supplier<@Nullable EnvLockfile> envLockfile) {
+        return syncEnvLockfile(pm, envLockfile, PnpmRelease.PORTED);
     }
 }

@@ -93,14 +93,23 @@ final class LockfileParser {
      */
     static final class Tokenizer {
         private String input;
+        private final YarnClassicRelease release;
         private boolean lastNewline;
         private int line = 1;
         private int col;
         private final Deque<Token> pending = new ArrayDeque<>();
         private boolean done;
 
-        Tokenizer(String input) {
+        Tokenizer(String input, YarnClassicRelease release) {
             this.input = input;
+            this.release = release;
+        }
+
+        // 1.12.0's loops past the end of the input, which add `undefined` to the token until V8 refuses its length
+        private void readPastTheEnd() {
+            if (!release.endsTokensAtTheEndOfInput()) {
+                throw new JsError(JsError.RANGE_ERROR, "Invalid string length");
+            }
         }
 
         @Nullable
@@ -134,6 +143,7 @@ final class LockfileParser {
                 chop++;
                 int nextNewline = input.indexOf('\n', chop);
                 if (nextNewline == -1) {
+                    readPastTheEnd();
                     nextNewline = input.length();
                 }
                 String val = input.substring(chop, nextNewline);
@@ -155,14 +165,19 @@ final class LockfileParser {
                 }
             } else if (c0 == '"') {
                 int i = 1;
+                boolean closed = false;
                 for (; i < input.length(); i++) {
                     if (input.charAt(i) == '"') {
                         boolean isEscaped = input.charAt(i - 1) == '\\' && (i < 2 || input.charAt(i - 2) != '\\');
                         if (!isEscaped) {
                             i++;
+                            closed = true;
                             break;
                         }
                     }
+                }
+                if (!closed) {
+                    readPastTheEnd();
                 }
                 String val = input.substring(0, i);
                 chop = i;
@@ -191,7 +206,8 @@ final class LockfileParser {
             } else if (c0 == ',') {
                 pending.add(buildToken(TokenType.COMMA, null));
                 chop++;
-            } else if ((c0 >= 'a' && c0 <= 'z') || (c0 >= 'A' && c0 <= 'Z') || c0 == '/' || c0 == '.' || c0 == '-') {
+            } else if ((c0 >= 'a' && c0 <= 'z') || (c0 >= 'A' && c0 <= 'Z') || c0 == '/' || c0 == '-' ||
+                       c0 == '.' && release.readsAValueAfterAColon()) {
                 int i = 0;
                 for (; i < input.length(); i++) {
                     char c = input.charAt(i);
@@ -224,12 +240,14 @@ final class LockfileParser {
         final List<String> comments = new ArrayList<>();
         private final Tokenizer tokens;
         private final String fileLoc;
+        private final YarnClassicRelease release;
         @SuppressWarnings("NotNullFieldNotInitialized")
         private Token token;
 
-        Parser(String input, String fileLoc) {
-            this.tokens = new Tokenizer(input);
+        Parser(String input, String fileLoc, YarnClassicRelease release) {
+            this.tokens = new Tokenizer(input, release);
             this.fileLoc = fileLoc;
+            this.release = release;
         }
 
         private void onComment(Token token) {
@@ -309,7 +327,8 @@ final class LockfileParser {
                     if (wasColon) {
                         next();
                     }
-                    if (token.isValidPropValue()) {
+                    // before 1.16.0 a colon opens an object whatever follows it
+                    if (token.isValidPropValue() && (!wasColon || release.readsAValueAfterAColon())) {
                         for (String k : keys) {
                             obj.put(k, token.getValue());
                         }
@@ -379,10 +398,13 @@ final class LockfileParser {
                str.contains(MERGE_CONFLICT_END);
     }
 
-    static @Nullable Object parse(String str, String fileLoc) {
-        Parser parser = new Parser(str, fileLoc);
+    static @Nullable Object parse(String str, String fileLoc, YarnClassicRelease release) {
+        Parser parser = new Parser(str, fileLoc, release);
         parser.next();
-        if (!fileLoc.endsWith(".yml")) {
+        if (!fileLoc.endsWith(".yml") || !release.parsesYmlAsYaml()) {
+            if (!release.readsWithYamlWhatTheLockfileParserCannot()) {
+                return parser.parse(0);
+            }
             try {
                 return parser.parse(0);
             } catch (RuntimeException error1) {
@@ -394,7 +416,11 @@ final class LockfileParser {
             }
         }
         Object result = safeLoadFailsafe(str);
-        return result == null || result instanceof Map || result instanceof List ? result : new PlainObject();
+        if (!release.readsYmlOfNoObjectAsEmpty()) {
+            return result;
+        }
+        // typeof result === 'object': a failsafe document holds no null, and none is undefined
+        return result instanceof Map || result instanceof List ? result : new PlainObject();
     }
 
     // js-yaml's errors as yarn's JavaScript sees them
@@ -406,12 +432,12 @@ final class LockfileParser {
         }
     }
 
-    static ParseResult parseWithConflict(String str, String fileLoc) {
+    static ParseResult parseWithConflict(String str, String fileLoc, YarnClassicRelease release) {
         String[] variants = extractConflictVariants(str);
         try {
             Map<String, @Nullable Object> merged = new PlainObject();
-            Object first = parse(variants[0], fileLoc);
-            Object second = parse(variants[1], fileLoc);
+            Object first = parse(variants[0], fileLoc, release);
+            Object second = parse(variants[1], fileLoc, release);
             Js.assign(merged, first);
             Js.assign(merged, second);
             return new ParseResult(MERGE, merged);
@@ -427,8 +453,16 @@ final class LockfileParser {
      * The module's default export.
      */
     static ParseResult parseLockfile(String str, String fileLoc) {
+        return parseLockfile(str, fileLoc, YarnClassicRelease.PORTED);
+    }
+
+    /**
+     * The module's default export as {@code release} parses.
+     */
+    static ParseResult parseLockfile(String str, String fileLoc, YarnClassicRelease release) {
         str = StripBom.stripBom(str);
-        return hasMergeConflicts(str) ? parseWithConflict(str, fileLoc) : new ParseResult(SUCCESS, parse(str, fileLoc));
+        return hasMergeConflicts(str) ? parseWithConflict(str, fileLoc, release) :
+                new ParseResult(SUCCESS, parse(str, fileLoc, release));
     }
 
     static ParseResult parseLockfile(String str) {

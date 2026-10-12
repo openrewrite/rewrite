@@ -31,8 +31,9 @@ import java.util.stream.Stream;
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**
- * validate-npm-package-name 4.0.0's and 7.0.2's own tests and the inputs where their sources differ
- * ({@code upstream/validate-npm-package-name-*}): each answer's errors and {@code validForOldPackages}.
+ * The own tests of every validate-npm-package-name release ported (4.0.0, 6.0.0, 6.0.1, 6.0.2, 7.0.2) and the inputs
+ * where their sources differ ({@code upstream/validate-npm-package-name-*}): each answer's errors and {@code
+ * validForOldPackages}.
  */
 class ValidateNpmPackageNameTest {
 
@@ -74,6 +75,9 @@ class ValidateNpmPackageNameTest {
             }
         }
         Map<String, Integer> expected = new LinkedHashMap<>();
+        expected.put("V6_0_0 a value that is not a string: every caller passes one", 3);
+        expected.put("V6_0_1 a value that is not a string: every caller passes one", 3);
+        expected.put("V6_0_2 a value that is not a string: every caller passes one", 3);
         expected.put("V7_0_2 a value that is not a string: every caller passes one", 3);
         assertThat(notPorted).isEqualTo(expected);
     }

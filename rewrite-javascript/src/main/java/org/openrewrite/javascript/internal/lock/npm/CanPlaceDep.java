@@ -119,7 +119,8 @@ public final class CanPlaceDep {
             return CONFLICT;
         }
 
-        if (current == null && targetEdge != null && !dep.satisfies(targetEdge) && targetEdge != edge) {
+        if ((current == null || !target.getRelease().skipsTargetEdgeCheckWithCurrent()) && targetEdge != null &&
+            !dep.satisfies(targetEdge) && targetEdge != edge) {
             return CONFLICT;
         }
 

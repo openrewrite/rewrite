@@ -50,6 +50,7 @@ final class EnvInstaller {
     @SuppressWarnings("unchecked")
     void resolveAndInstallConfigDeps(Map<String, @Nullable Object> configDeps, EnvLockfile.OnDisk lockFile,
                                      PnpmOptions options) {
+        PnpmRelease release = options.getRelease();
         Map<String, String> registries = options.getRegistries();
         EnvLockfile read = lockFile.readEnvLockfile();
         EnvLockfile envLockfile = read != null ? read : EnvLockfile.createEnvLockfile();
@@ -70,7 +71,7 @@ final class EnvInstaller {
                     Object tarball = value instanceof Map ? ((Map<String, @Nullable Object>) value).get("tarball") :
                             null;
                     migrate(envLockfile, name, parsed, tarball == null || tarball == Js.UNDEFINED ?
-                            LockfileUtils.getNpmTarballUrl(name, parsed[0], registry) : tarball, registry);
+                            LockfileUtils.getNpmTarballUrl(name, parsed[0], registry) : tarball, registry, release);
                     lockfileChanged = true;
                 }
                 continue;
@@ -85,7 +86,7 @@ final class EnvInstaller {
                     String registry = PickRegistryForPackage.pickRegistryForPackage(registries, name, null);
                     String[] parsed = parseIntegrity(name, specifier);
                     migrate(envLockfile, name, parsed, LockfileUtils.getNpmTarballUrl(name, parsed[0], registry),
-                            registry);
+                            registry, release);
                     lockfileChanged = true;
                 }
                 continue;
@@ -102,13 +103,14 @@ final class EnvInstaller {
         }
         if (depsToResolve.isEmpty()) {
             if (lockfileChanged) {
+                verifyEnvLockfile(envLockfile, release);
                 lockFile.writeEnvLockfile(envLockfile);
             }
-            normalizeFromLockfile(envLockfile);
+            normalizeFromLockfile(envLockfile, release);
             return;
         }
         NpmResolver resolveFromNpm = new NpmResolver(registry, registries,
-                NpmResolver.mergeNamedRegistries(options.getNamedRegistries()), null, true, false, now);
+                CreateNewStoreController.namedRegistries(options), null, true, false, now, release, false);
         for (Map.Entry<String, String> dep : depsToResolve.entrySet()) {
             String name = dep.getKey();
             String specifier = dep.getValue();
@@ -129,10 +131,12 @@ final class EnvInstaller {
             lockfileConfigDeps.put(name, locked);
             Map<String, @Nullable Object> entry = new LinkedHashMap<>();
             entry.put("resolution", LockfileUtils.toLockfileResolution(name, version, resolution.resolution, registry,
-                    false));
+                    null, release));
             envLockfile.packages().put(pkgKey, entry);
-            Map<String, @Nullable Object> optionalSubdeps = resolveOptionalSubdeps(name, manifest, envLockfile,
-                    registries, resolveFromNpm);
+            // the config dependency's optionalDependencies, from 11.2.0
+            Map<String, @Nullable Object> optionalSubdeps = Js.truthy(manifest.get("optionalDependencies")) &&
+                                                            release.resolvesTheOptionalDependenciesOfAConfigDependency() ?
+                    resolveOptionalSubdeps(name, manifest, envLockfile, registries, resolveFromNpm, release) : null;
             Map<String, @Nullable Object> snapshot = new LinkedHashMap<>();
             if (optionalSubdeps != null) {
                 snapshot.put("optionalDependencies", optionalSubdeps);
@@ -140,12 +144,13 @@ final class EnvInstaller {
             envLockfile.snapshots().put(pkgKey, snapshot);
         }
         PruneEnvLockfile.pruneEnvLockfile(envLockfile);
+        verifyEnvLockfile(envLockfile, release);
         lockFile.writeEnvLockfile(envLockfile);
-        normalizeFromLockfile(envLockfile);
+        normalizeFromLockfile(envLockfile, release);
     }
 
     private static void migrate(EnvLockfile envLockfile, String name, String[] parsed, Object tarball,
-                                String registry) {
+                                String registry, PnpmRelease release) {
         String version = parsed[0];
         String pkgKey = name + "@" + version;
         Map<String, @Nullable Object> locked = new LinkedHashMap<>();
@@ -156,15 +161,17 @@ final class EnvInstaller {
         resolution.put("integrity", parsed[1]);
         resolution.put("tarball", tarball);
         Map<String, @Nullable Object> pkg = new LinkedHashMap<>();
-        pkg.put("resolution", LockfileUtils.toLockfileResolution(name, version, resolution, registry, false));
+        pkg.put("resolution", LockfileUtils.toLockfileResolution(name, version, resolution, registry, null,
+                release));
         envLockfile.packages().put(pkgKey, pkg);
         envLockfile.snapshots().put(pkgKey, new LinkedHashMap<String, @Nullable Object>());
     }
 
-    // resolveOptionalSubdeps.ts: the config dependency's optional dependencies, each an exact version; null for none
+    // resolveOptionalSubdeps.ts (11.2.0): the config dependency's optional dependencies, each an exact version; null
+    // for none
     private static @Nullable Map<String, @Nullable Object> resolveOptionalSubdeps(
             String parentName, Map<String, @Nullable Object> parentManifest, EnvLockfile envLockfile,
-            Map<String, String> registries, NpmResolver resolveFromNpm) {
+            Map<String, String> registries, NpmResolver resolveFromNpm, PnpmRelease release) {
         Map<String, @Nullable Object> optionalDeps =
                 ResolveDependencies.asMap(parentManifest.get("optionalDependencies"));
         if (Js.keys(optionalDeps).isEmpty()) {
@@ -199,7 +206,7 @@ final class EnvInstaller {
             Map<String, @Nullable Object> entry = new LinkedHashMap<>();
             entry.put("resolution", LockfileUtils.toLockfileResolution(subdepName, subdepVersion,
                     resolution.resolution, PickRegistryForPackage.pickRegistryForPackage(registries, subdepName,
-                            null), false));
+                            null), null, release));
             for (String field : new String[]{"os", "cpu", "libc"}) {
                 Object value = resolution.manifest.get(field);
                 if (value instanceof List && !((List<?>) value).isEmpty() ||
@@ -209,9 +216,12 @@ final class EnvInstaller {
             }
             envLockfile.packages().put(subdepKey, entry);
             if (envLockfile.snapshots().get(subdepKey) == null) {
-                Map<String, @Nullable Object> optional = new LinkedHashMap<>();
-                optional.put("optional", true);
-                envLockfile.snapshots().put(subdepKey, optional);
+                Map<String, @Nullable Object> snapshot = new LinkedHashMap<>();
+                // empty before 11.2.1
+                if (release.marksAConfigDependencysOptionalDependenciesOptional()) {
+                    snapshot.put("optional", true);
+                }
+                envLockfile.snapshots().put(subdepKey, snapshot);
             }
             resolved.put(subdepName, subdepVersion);
         }
@@ -311,6 +321,7 @@ final class EnvInstaller {
         merged.getPackages().putAll(lockfile.getPackages());
         PruneEnvLockfile.replacePrunedEntries(lockfileToUpdate, merged);
         if (save) {
+            verifyEnvLockfile(lockfileToUpdate, options.getRelease());
             lockFile.writeEnvLockfile(lockfileToUpdate);
         }
         return lockfileToUpdate;
@@ -323,7 +334,7 @@ final class EnvInstaller {
         emptyLockfile.set("lockfileVersion", LockfileObject.LOCKFILE_VERSION);
         emptyLockfile.getImporters().put(".", new ProjectSnapshot());
         List<ResolveDependencies.WantedDependency> wantedDependencies =
-                ResolveDependencyTree.getWantedDependencies(manifest, false);
+                ResolveDependencyTree.getWantedDependencies(manifest, false, options.getRelease());
         for (ResolveDependencies.WantedDependency dep : wantedDependencies) {
             dep.setUpdateSpec(true);
         }
@@ -333,6 +344,7 @@ final class EnvInstaller {
                 options.getNodeDownloadMirrors());
         ResolveDependencies.ResolutionContext ctx = new ResolveDependencies.ResolutionContext(emptyLockfile, "",
                 requester);
+        ctx.setRelease(options.getRelease());
         ctx.setForceFullResolution(true);
         ctx.setRegistries(registries);
         ctx.setNamedRegistryPrefixes(options.getNamedRegistryPrefixes());
@@ -349,10 +361,67 @@ final class EnvInstaller {
                 resolverOptions).getNewLockfile();
     }
 
-    // installConfigDeps' normalizeFromLockfile: every locked config dependency and optional subdependency must have
-    // its packages entry and integrity
+    /**
+     * verifyEnvLockfile.ts of 11.8.0, before each write of the env document and each install of its config
+     * dependencies ({@link PnpmRelease#verifiesTheEnvDocumentsConfigDependencies}): their names and those of their
+     * optional dependencies are package names, and each version exact; asked where the check fails.
+     */
+    static void verifyEnvLockfile(EnvLockfile envLockfile, PnpmRelease release) {
+        try {
+            verifyEnvLockfile(envLockfile);
+        } catch (PnpmError | JsError e) {
+            if (release.verifiesTheEnvDocumentsConfigDependencies()) {
+                throw e;
+            }
+        }
+    }
+
     @SuppressWarnings("unchecked")
-    private static void normalizeFromLockfile(EnvLockfile lockfile) {
+    private static void verifyEnvLockfile(EnvLockfile envLockfile) {
+        Object configDeps = envLockfile.importer().get("configDependencies");
+        ResolveDependencies.assertValidDependencyAliases(configDeps, "The configDependencies in pnpm-lock.yaml");
+        if (!(configDeps instanceof Map)) {
+            return;
+        }
+        for (String name : Js.keys((Map<String, @Nullable Object>) configDeps)) {
+            Object entry = ((Map<String, @Nullable Object>) configDeps).get(name);
+            if (entry == null || entry == Js.UNDEFINED) {
+                throw new JsError(JsError.TYPE_ERROR, "Cannot read properties of " + Js.string(entry) +
+                                                      " (reading 'version')");
+            }
+            Object version = entry instanceof Map ? ((Map<String, @Nullable Object>) entry).get("version") : null;
+            assertValidConfigDepVersion(name, version);
+            Object snapshot = envLockfile.snapshots().get(name + "@" + Js.string(version == null ? Js.UNDEFINED :
+                    version));
+            Object optionalDeps = snapshot instanceof Map ?
+                    ((Map<String, @Nullable Object>) snapshot).get("optionalDependencies") : null;
+            if (optionalDeps == null || optionalDeps == Js.UNDEFINED) {
+                continue;
+            }
+            ResolveDependencies.assertValidDependencyAliases(optionalDeps, "The optionalDependencies of config " +
+                    "dependency \"" + name + "\" in pnpm-lock.yaml");
+            if (optionalDeps instanceof Map) {
+                for (String subdepName : Js.keys((Map<String, @Nullable Object>) optionalDeps)) {
+                    assertValidConfigDepVersion(subdepName, ((Map<String, @Nullable Object>) optionalDeps)
+                            .get(subdepName));
+                }
+            }
+        }
+    }
+
+    private static void assertValidConfigDepVersion(String name, @Nullable Object version) {
+        if (!(version instanceof String) || NodeSemver.valid((String) version, NodeSemver.Options.DEFAULT) == null) {
+            throw new PnpmError("INVALID_CONFIG_DEP_VERSION", "The config dependency \"" + name + "\" has an " +
+                    "invalid version \"" + Js.string(version == null ? Js.UNDEFINED : version) + "\"",
+                    "A config dependency version must be an exact semver version.");
+        }
+    }
+
+    // installConfigDeps' normalizeFromLockfile: every locked config dependency and, from 11.2.0, optional
+    // subdependency must have its packages entry and integrity
+    @SuppressWarnings("unchecked")
+    private static void normalizeFromLockfile(EnvLockfile lockfile, PnpmRelease release) {
+        verifyEnvLockfile(lockfile, release);
         Map<String, @Nullable Object> configDeps = lockfile.configDependencies();
         for (String pkgName : Js.keys(configDeps)) {
             Object entry = configDeps.get(pkgName);
@@ -367,7 +436,7 @@ final class EnvInstaller {
             Object snapshot = lockfile.snapshots().get(pkgKey);
             Object optionalDependencies = snapshot instanceof Map ?
                     ((Map<String, @Nullable Object>) snapshot).get("optionalDependencies") : null;
-            if (Js.truthy(optionalDependencies)) {
+            if (Js.truthy(optionalDependencies) && release.resolvesTheOptionalDependenciesOfAConfigDependency()) {
                 if (!(optionalDependencies instanceof Map)) {
                     throw new CannotKnow("what pnpm makes of the optionalDependencies of config dependency " +
                                          pkgName + " (" + Js.typeOf(optionalDependencies) +

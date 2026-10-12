@@ -22,6 +22,7 @@ import org.openrewrite.SourceFile;
 import org.openrewrite.javascript.internal.lock.Spec;
 import org.openrewrite.javascript.marker.NodeResolutionResult;
 import org.openrewrite.javascript.marker.NodeResolutionResult.PackageManager;
+import org.openrewrite.javascript.marker.NodeRuntime;
 import org.openrewrite.quark.Quark;
 import org.openrewrite.tree.ParseError;
 
@@ -320,6 +321,7 @@ public final class NodeDependencyScan {
                 .packageJson(manifest)
                 .lock(lock == null ? null : acc.locks.get(lock))
                 .marker(marker)
+                .runtime(requireNonNull(ps.capturedPackageJson).getMarkers().findFirst(NodeRuntime.class).orElse(null))
                 .packageJsonPath(packageJsonPath)
                 .manifests(files.getManifests())
                 .packageManagerFiles(files.getPackageManagerFiles())

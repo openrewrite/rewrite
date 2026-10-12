@@ -67,7 +67,7 @@ final class FileResolver {
                                      "manifests do not include");
             }
             Manifest manifest = Config.tryManifest(location, text, request.config.isLooseSemver(),
-                    false, "");
+                    false, "", request.config.getRelease());
             PackageRemote remote = new PackageRemote();
             remote.type = "copy";
             remote.registry = manifest.get("_registry");

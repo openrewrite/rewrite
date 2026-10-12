@@ -37,7 +37,8 @@ import static org.openrewrite.javascript.internal.lock.EcmaScript.repeat;
 
 /**
  * Port of js-yaml's loader: {@code safeLoad} under {@code FAILSAFE_SCHEMA} of 3.13.1 (yarn 1.22.22) and 3.14.1
- * (@yarnpkg/parsers 3.0.3), {@code load} under {@code DEFAULT_SCHEMA} of @zkochan/js-yaml 0.0.11 (pnpm 11.2.2).
+ * (@yarnpkg/parsers 3.0.3), {@code load} under {@code DEFAULT_SCHEMA} of @zkochan/js-yaml 0.0.11 (pnpm 11.2.2), whose
+ * loader stands for js-yaml 4's {@code load} under {@code FAILSAFE_SCHEMA} too (@yarnpkg/parsers from Yarn 4.18.0).
  */
 public final class JsYaml {
 
@@ -209,7 +210,7 @@ public final class JsYaml {
      * The fork's {@code load}: the stream's one document, {@link EcmaScript#UNDEFINED} for a stream without documents.
      */
     public static @Nullable Object load(String input) {
-        List<@Nullable Object> documents = loadDocuments(input, PNPM);
+        List<@Nullable Object> documents = loadDocuments(input, PNPM, false);
         if (documents.isEmpty()) {
             return EcmaScript.UNDEFINED;
         }
@@ -217,10 +218,11 @@ public final class JsYaml {
     }
 
     /**
-     * 3.x's {@code safeLoad} under {@code FAILSAFE_SCHEMA}: the stream's one document, null for a stream without any.
+     * 3.x's {@code safeLoad}, or 4.x's {@code load}, under {@code FAILSAFE_SCHEMA}: the stream's one document, null for
+     * a stream without any.
      */
     public static @Nullable Object safeLoadFailsafe(String input, Options options) {
-        List<@Nullable Object> documents = loadDocuments(input, options);
+        List<@Nullable Object> documents = loadDocuments(input, options, true);
         return documents.isEmpty() ? null : single(documents);
     }
 
@@ -232,7 +234,7 @@ public final class JsYaml {
                 "expected a single document in the stream, but found more");
     }
 
-    private static List<@Nullable Object> loadDocuments(String input, Options options) {
+    private static List<@Nullable Object> loadDocuments(String input, Options options, boolean failsafe) {
         if (!input.isEmpty()) {
             char last = input.charAt(input.length() - 1);
             if (last != '\n' && last != '\r') {
@@ -242,7 +244,7 @@ public final class JsYaml {
                 input = input.substring(1);
             }
         }
-        State state = new State(input, options);
+        State state = new State(input, options, !failsafe);
         int nullpos = input.indexOf('\0');
         if (options.getRelease() != Release.V3_13_1 && nullpos != -1) {
             state.position = nullpos;
@@ -263,6 +265,12 @@ public final class JsYaml {
         final String input;
         final Options options;
         final boolean v4;
+
+        /**
+         * {@code DEFAULT_SCHEMA}'s implicit types and tags, where {@code FAILSAFE_SCHEMA} reads strings only.
+         */
+        final boolean defaultSchema;
+
         final int length;
         int position;
         int line;
@@ -286,9 +294,10 @@ public final class JsYaml {
         @Nullable
         Object result;
 
-        State(String input, Options options) {
+        State(String input, Options options, boolean defaultSchema) {
             this.options = options;
             this.v4 = options.getRelease() == Release.ZKOCHAN_0_0_11;
+            this.defaultSchema = defaultSchema;
             this.length = input.length();
             this.input = input + '\0';
         }
@@ -1279,7 +1288,7 @@ public final class JsYaml {
                 if (options.getRelease() != Release.V3_13_1 && result != null && !"scalar".equals(kind)) {
                     throw error("unacceptable node kind for !<?> tag; it should be \"scalar\", not \"" + kind + "\"");
                 }
-                for (String type : v4 ? IMPLICIT : Collections.<String>emptyList()) {
+                for (String type : defaultSchema ? IMPLICIT : Collections.<String>emptyList()) {
                     if (resolve(type, result)) {
                         result = construct(type, result);
                         tag = type;
@@ -1290,7 +1299,8 @@ public final class JsYaml {
                     }
                 }
             } else if (!"!".equals(tag)) {
-                String typeKind = (v4 ? TYPE_MAP : FAILSAFE_TYPE_MAP).get(kind == null ? "fallback" : kind).get(tag);
+                String typeKind = (defaultSchema ? TYPE_MAP : FAILSAFE_TYPE_MAP).get(kind == null ? "fallback" : kind)
+                        .get(tag);
                 if (typeKind == null) {
                     throw error("unknown tag !<" + tag + ">");
                 }

@@ -62,7 +62,8 @@ final class TarballFetcher {
      */
     @Nullable
     Object fetch() {
-        return manifest(fetchTarball(), dest, Js.string(remote.registry), name, version, config.isLooseSemver());
+        return manifest(fetchTarball(), dest, Js.string(remote.registry), name, version, config.isLooseSemver(),
+                config.getRelease());
     }
 
     /**
@@ -70,15 +71,34 @@ final class TarballFetcher {
      */
     static @Nullable Object manifest(TarFs extracted, String dest, String registry, @Nullable Object name,
                                      @Nullable Object version, boolean looseSemver) {
-        Object pkg = Config.readManifest(extracted, dest, registry, looseSemver);
+        return manifest(extracted, dest, registry, name, version, looseSemver, YarnClassicRelease.PORTED);
+    }
+
+    /**
+     * The package base-fetcher.js of {@code release} reads from an extracted directory: from 1.11.0 its bins' targets
+     * are checked as it links them.
+     */
+    static @Nullable Object manifest(TarFs extracted, String dest, String registry, @Nullable Object name,
+                                     @Nullable Object version, boolean looseSemver, YarnClassicRelease release) {
+        Object pkg = Config.readManifest(extracted, dest, registry, looseSemver, release);
         if (pkg == Config.NO_MANIFEST) {
             Manifest defaultManifest = new Manifest();
             defaultManifest.put("name", name);
             defaultManifest.put("version", version);
-            pkg = NormalizeManifest.normalizeManifest(defaultManifest, null, "", false, looseSemver);
+            pkg = NormalizeManifest.normalizeManifest(defaultManifest, null, "", false, looseSemver, release);
         }
-        Object data = pkg instanceof Manifest ? ((Manifest) pkg).data : pkg;
-        Object bin = Js.get(data, "bin");
+        if (release.linksBinsWhenFetched()) {
+            linkBins(pkg instanceof Manifest ? ((Manifest) pkg).data : pkg);
+        }
+        return pkg;
+    }
+
+    /**
+     * base-fetcher.js {@code fetch} from 1.11.0: each bin of the package fetched is linked in its cache folder, where
+     * {@code path.resolve} throws for a target that is no string.
+     */
+    static void linkBins(@Nullable Object pkg) {
+        Object bin = Js.get(pkg, "bin");
         if (Js.truthy(bin)) {
             for (String binName : Js.keys(bin)) {
                 Object target = Js.get(bin, binName);
@@ -87,13 +107,12 @@ final class TarballFetcher {
                 }
             }
         }
-        return pkg;
     }
 
     // _fetch: a local path is the filesystem's; any other reference is the registry's, verified, gunzipped, untarred
     private TarFs fetchTarball() {
         byte[] tarball = download();
-        TarFs extracted = untar(reference(), tarball);
+        TarFs extracted = untar(reference(), tarball, config.getRelease());
         Ssri.Integrity integrity = integrity(remote);
         if (integrity != null && integrity.getHashes().isEmpty()) {
             throw new MessageError(reference() + ": " + Lang.format("Integrity checked failed for $0 (none of " +
@@ -141,9 +160,12 @@ final class TarballFetcher {
                !mismatches(tarball, other);
     }
 
+    // the sha1 hash and the integrity both; before 1.19.0 the integrity, else the hash (_findIntegrity)
     private boolean mismatches(byte[] tarball, PackageRemote expected) {
         Ssri.Integrity integrity = integrity(expected);
-        return Js.truthy(expected.hash) &&
+        boolean checksHash = Js.truthy(expected.hash) &&
+                             (config.getRelease().checksTheHashBesideTheIntegrity() || !Js.truthy(expected.integrity));
+        return checksHash &&
                !matches(tarball, Objects.requireNonNull(Ssri.fromHex(expected.hash, "sha1", Ssri.Release.V5_3_0))) ||
                integrity != null && !integrity.getHashes().isEmpty() && !matches(tarball, integrity);
     }
@@ -162,6 +184,13 @@ final class TarballFetcher {
      * {@code createExtractor}'s gunzip and tar-fs extract, their errors as request-manager rejects them, the url first.
      */
     static TarFs untar(String url, byte[] tarball) {
+        return untar(url, tarball, YarnClassicRelease.PORTED);
+    }
+
+    /**
+     * {@code untar} as {@code release} extracts.
+     */
+    static TarFs untar(String url, byte[] tarball, YarnClassicRelease release) {
         byte[] tar;
         try {
             tar = GunzipMaybe.gunzip(tarball);
@@ -169,8 +198,11 @@ final class TarballFetcher {
             throw new JsError(e.getName(), url + ": " + e.getMessage());
         }
         try {
-            return TarFs.extract(tar);
+            return TarFs.extract(tar, release.jailsTarballLinks(), release.tarFs());
         } catch (JsError e) {
+            if (!release.reportsCorruptArchives()) {
+                throw new JsError(e.getName(), url + ": " + e.getMessage());
+            }
             throw new MessageError(url + ": " + Lang.format("Extracting tar content of $1 failed, the file appears " +
                                                             "to be corrupt: $0", e.getMessage(), null));
         }

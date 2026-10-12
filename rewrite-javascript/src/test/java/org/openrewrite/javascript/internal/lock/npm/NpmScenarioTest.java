@@ -44,6 +44,10 @@ class NpmScenarioTest extends LockScenarioTest {
         return ScenarioReplay.edits();
     }
 
+    static Stream<Arguments> releaseEdits() {
+        return ScenarioReplay.releaseEdits();
+    }
+
     /**
      * The bytes npm wrote for the edit. A fixture recorded by another npm than the one ported carries npm
      * 11.17.0's rewrite of its lock beside it; that is the expectation then.
@@ -60,8 +64,22 @@ class NpmScenarioTest extends LockScenarioTest {
     @ParameterizedTest(name = "{0}")
     @MethodSource("edits")
     void regeneratesWhatNpmWrote(String name, NpmScenarios.Edit edit) {
+        replay(edit);
+    }
+
+    /**
+     * Every scenario as each other npm release installs it: the releases its {@code releases} files name write the
+     * recorded outcome, or the one under {@code release/}.
+     */
+    @ParameterizedTest(name = "{0}")
+    @MethodSource("releaseEdits")
+    void regeneratesWhatEachReleaseWrote(String name, NpmScenarios.Edit edit) {
+        replay(edit);
+    }
+
+    private void replay(NpmScenarios.Edit edit) {
         NpmScenarios.Scenario scenario = edit.getScenario();
-        Expect expect = Expect.of(scenario.expect());
+        Expect expect = Expect.of(edit.expect());
         String label = scenario.getLabel() + "/" + edit.getStart().getFileName();
         skipUnlessReplayed(label, scenario, expect);
         if (expect.isExact() && edit.getResult() == null) {
@@ -77,7 +95,7 @@ class NpmScenarioTest extends LockScenarioTest {
             failed(label, http, "mismatch", "yarn.lock " + firstDifference(yarnLock,
                     String.valueOf(result.getFiles().get("yarn.lock"))), " wrote another yarn.lock than npm");
         }
-        check(label, expect, expectedLock(edit, scenario.expect()), result, http);
+        check(label, expect, expectedLock(edit, edit.expect()), result, http);
     }
 
     @Override

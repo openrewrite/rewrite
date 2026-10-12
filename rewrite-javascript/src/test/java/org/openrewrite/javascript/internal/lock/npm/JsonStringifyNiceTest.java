@@ -107,6 +107,16 @@ class JsonStringifyNiceTest {
         assertThat(JsonStringifyNice.stringify(spacesObj(), Collections.emptyList(), null)).isEqualTo(minified);
     }
 
+    @Test
+    void emptyStringsSortAsNeitherScalarsNorObjectsInRelease1_1_1() {
+        // what json-stringify-nice 1.1.1 and 1.1.3 print on Node 24 for the same object
+        Map<String, Object> o = obj("c", "1", "b", "", "a", "x", "obj", obj("y", "", "x", ""), "d", "2", "e", "");
+        assertThat(JsonStringifyNice.stringify(o, Collections.emptyList(), 0, JsonStringifyNice.Release.V1_1_1))
+          .isEqualTo("{\"a\":\"x\",\"b\":\"\",\"e\":\"\",\"c\":\"1\",\"d\":\"2\",\"obj\":{\"x\":\"\",\"y\":\"\"}}");
+        assertThat(JsonStringifyNice.stringify(o, Collections.emptyList(), 0, JsonStringifyNice.Release.V1_1_4))
+          .isEqualTo("{\"a\":\"x\",\"b\":\"\",\"c\":\"1\",\"d\":\"2\",\"e\":\"\",\"obj\":{\"x\":\"\",\"y\":\"\"}}");
+    }
+
     // the replacer-function case is not ported: shrinkwrap.js passes only a key list
 
     @Test

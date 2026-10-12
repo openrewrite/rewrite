@@ -32,7 +32,9 @@ final class ReportError extends RuntimeException {
     static final int AUTHENTICATION_NOT_FOUND = 33;
     static final int NETWORK_ERROR = 35;
     static final int STACK_OVERFLOW_RESOLUTION = 45;
+    static final int INVALID_MANIFEST = 57;
     static final int RESOLUTION_MISMATCH = 78;
+    static final int NETWORK_DISABLED = 80;
     static final int RESOLUTION_FAILED = 82;
 
     private final int code;

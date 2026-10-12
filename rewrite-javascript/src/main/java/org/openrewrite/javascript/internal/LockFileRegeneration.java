@@ -27,6 +27,7 @@ import org.openrewrite.javascript.internal.lock.NativeLockEngine;
 import org.openrewrite.javascript.internal.lock.Port;
 import org.openrewrite.javascript.marker.NodeResolutionResult;
 import org.openrewrite.javascript.marker.NodeResolutionResult.PackageManager;
+import org.openrewrite.javascript.marker.NodeRuntime;
 import org.openrewrite.javascript.table.NodeLockRegenerationFailures;
 
 import java.nio.file.Path;
@@ -119,6 +120,13 @@ public final class LockFileRegeneration {
         String packageJson;
         @Nullable String lock;
         @Nullable NodeResolutionResult marker;
+
+        /**
+         * The {@link NodeRuntime} of the package.json the request is for: the package manager release that built the
+         * LST, and the Node and platform the parser ran on; null without one.
+         */
+        @Nullable NodeRuntime runtime;
+
         @Nullable Path packageJsonPath;
         Map<Path, String> manifests;
         Map<Path, String> packageManagerFiles;
@@ -127,12 +135,14 @@ public final class LockFileRegeneration {
         // editedFiles: the files the edit changes or creates beside the manifest, which the other fields then hold
         @Builder
         private Request(String packageJson, @Nullable String lock, @Nullable NodeResolutionResult marker,
-                        @Nullable Path packageJsonPath, @Singular("manifest") Map<Path, String> manifests,
+                        @Nullable NodeRuntime runtime, @Nullable Path packageJsonPath,
+                        @Singular("manifest") Map<Path, String> manifests,
                         @Singular("packageManagerFile") Map<Path, String> packageManagerFiles,
                         @Singular("editedFile") Map<Path, String> editedFiles, @Nullable Set<Path> projectPaths) {
             this.packageJson = packageJson;
             this.lock = lock;
             this.marker = marker;
+            this.runtime = runtime;
             this.packageJsonPath = packageJsonPath;
             if (editedFiles.isEmpty()) {
                 this.manifests = manifests;

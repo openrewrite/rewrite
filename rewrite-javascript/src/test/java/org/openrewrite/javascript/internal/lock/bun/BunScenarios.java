@@ -49,8 +49,9 @@ final class BunScenarios {
     private static final Pattern LOAD_ERROR_NAME = Pattern.compile("(?m)^(\\w+): failed to parse lockfile");
     private static final Pattern EDIT_STARTED = Pattern.compile("(?m)^edit started (\\S+)$");
     private static final Pattern PLATFORM = Pattern.compile("(?m)^platform os=(\\S+) cpu=(\\S+) libc=(\\S*)$");
-    private static final Pattern REQUEST = Pattern.compile("(?m)^GET ([a-z]+://[^/ ]+)");
+    private static final Pattern REQUEST = Pattern.compile("(?m)^GET ([a-z]+://[^/ ]+)\\S* (?!tarball )");
     private static final Pattern ORIGIN = Pattern.compile("^[a-z]+://[^/]+");
+    private static final Pattern RECORDED_RELEASE = Pattern.compile("^bun (\\d+\\.\\d+\\.\\d+)");
 
     private BunScenarios() {
     }
@@ -139,6 +140,25 @@ final class BunScenarios {
         }
 
         /**
+         * The release that recorded the scenario, {@code recorded-with}'s; null for a downloaded fixture.
+         */
+        @Nullable
+        String recordedRelease() {
+            String recorded = recordedWith();
+            Matcher m = recorded == null ? null : RECORDED_RELEASE.matcher(recorded);
+            return m != null && m.find() ? m.group(1) : null;
+        }
+
+        /**
+         * This scenario replayed as each release its {@code releases} files name: the first and last of every range of
+         * the scenario's own outcome but the release that recorded it, and of each other outcome under
+         * {@code release/}.
+         */
+        List<Replay> releases() {
+            return releaseReplays(BunReleases.all(), BunReleases.PROVEN, recordedRelease());
+        }
+
+        /**
          * When bun ran the edit, as the open-question recorder writes it ({@code edit started <instant>}), else now.
          */
         Instant now() {
@@ -167,13 +187,15 @@ final class BunScenarios {
         }
 
         /**
-         * Whether the edit's install, rerun from an empty cache, asked the host of {@code registry}: any host when
-         * {@code requests-after.log} names none.
+         * Whether bun asked the host of {@code registry} for a document: in {@code requests}, a release's requests in
+         * the phases a replay of its outcome reads ({@code release/<first>/requests.log}), or where no outcome keeps
+         * them in the edit's install rerun from an empty cache ({@code requests-after.log}); any host when they name
+         * none. A tarball is no document (releases before 1.2.21 fetch them even with {@code --lockfile-only}).
          */
-        boolean asked(String registry) {
-            String requests = file("requests-after.log");
+        boolean asked(String registry, @Nullable String requests) {
+            String log = requests == null ? file("requests-after.log") : requests;
             Set<String> origins = new TreeSet<>();
-            Matcher request = REQUEST.matcher(requests == null ? "" : requests);
+            Matcher request = REQUEST.matcher(log == null ? "" : log);
             while (request.find()) {
                 origins.add(request.group(1));
             }

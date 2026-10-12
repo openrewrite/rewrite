@@ -117,6 +117,40 @@ final class Install {
     }
 
     /**
+     * What the run fails on once the lock is written (the manifest writes of a recursive install), the first one.
+     */
+    private @Nullable RuntimeException failureAfterWrite;
+
+    void failAfterWrite(RuntimeException failure) {
+        if (failureAfterWrite == null) {
+            failureAfterWrite = failure;
+        }
+    }
+
+    /**
+     * Fails as the run does once it wrote the lock, where it does.
+     */
+    void throwFailureAfterWrite() {
+        if (failureAfterWrite != null) {
+            throw failureAfterWrite;
+        }
+    }
+
+    // the install command's dryRun of 11.8.0, which resolves without writing the lock
+    // (PnpmRelease#stopsTheLockWriteOnADryRun); before, pnpm install does not read it
+    static boolean dryRun(PnpmOptions options) {
+        return options.isTrue("dryRun") && options.getRelease().stopsTheLockWriteOnADryRun();
+    }
+
+    /**
+     * The env document of the lock file in the lock's directory, as the install finds it; null without one.
+     */
+    @Nullable
+    EnvLockfile readEnvLockfile() {
+        return lockFile.readEnvLockfile();
+    }
+
+    /**
      * {@code install(manifest, opts)}: with an agent configured, the agent resolves; else mutateModules over the
      * project in the lock's directory, null when installDeps found no package.json there.
      */
@@ -162,7 +196,7 @@ final class Install {
         String lockText = lockFile.text();
         LockfileReader.ReadResult read = lockText == null ?
                 new LockfileReader.ReadResult(createLockfileObject(projects, options), false) :
-                LockfileReader.read(lockText);
+                LockfileReader.read(lockText, options.getRelease());
         if (read.getLockfile() == null) {
             throw new LockfileReader.IgnoredLockfile("no " + LockfileReader.WANTED_LOCKFILE);
         }
@@ -174,7 +208,23 @@ final class Install {
             }
         }
         boolean existsNonEmptyWantedLockfile = existsWantedLockfile && !LockfileWriter.isEmptyLockfile(wantedLockfile);
-        VerifyLockfileResolutions.verifyLockfileResolutions(wantedLockfile, stores.resolutionVerifiers(options));
+        // from 11.1.3 the lock's resolutions are verified, unless trustLockfile (from 11.3.0) trusts it
+        PnpmRelease release = options.getRelease();
+        RuntimeException verification = null;
+        if (release.checksTheReleaseAgeAsAPolicy() &&
+            !(options.isTrue("trustLockfile") && release.readsTrustLockfile())) {
+            try {
+                VerifyLockfileResolutions.verifyLockfileResolutions(wantedLockfile,
+                        stores.resolutionVerifiers(options), release);
+            } catch (RuntimeException e) {
+                verification = e;
+            }
+        }
+        // from 11.7.0 the verification runs beside the install, which fails first without a package.json
+        // (PnpmRelease#verifiesTheLockBesideTheInstall)
+        if (verification != null && (missingManifest == null || !release.verifiesTheLockBesideTheInstall())) {
+            throw verification;
+        }
         if (missingManifest != null) {
             throw new JsError(JsError.ERROR,
                     "No package.json found in \"" + (missingManifest.isEmpty() ? "." : missingManifest) + "\"");
@@ -203,11 +253,14 @@ final class Install {
                         .peersSuffixMaxLength(options.get("peersSuffixMaxLength"))
                         .pnpmfileChecksum(null)
                         .injectWorkspacePackages(options.get("injectWorkspacePackages"))
-                        .build());
+                        .build(), options.getRelease());
         boolean outdatedLockfileSettings = outdatedLockfileSettingName != null;
         boolean upToDateLockfileMajorVersion = Js.string(wantedLockfile.getLockfileVersion())
                 .startsWith(LockfileObject.LOCKFILE_MAJOR_VERSION + ".");
-        boolean needsFullResolution = outdatedLockfileSettings || !upToDateLockfileMajorVersion;
+        // from 11.4.0 updateChecksums resolves in full (PnpmRelease#resolvesInFullToUpdateChecksums)
+        boolean updateChecksums = options.isTrue("updateChecksums") &&
+                                  options.getRelease().resolvesInFullToUpdateChecksums();
+        boolean needsFullResolution = outdatedLockfileSettings || updateChecksums || !upToDateLockfileMajorVersion;
         wantedLockfile.set("settings", options.getLockfileSettings());
         if (needsFullResolution) {
             wantedLockfile.set("overrides", overridesMap);
@@ -219,7 +272,8 @@ final class Install {
             wantedLockfile.set("pnpmfileChecksum", Js.UNDEFINED);
             wantedLockfile.set("patchedDependencies", patchedDependencies);
             return new Result(null, outdatedLockfileSettings ? outdatedLockfileSettingName :
-                    "lockfileVersion " + Js.string(wantedLockfile.getLockfileVersion()), ctx, opts,
+                    updateChecksums ? "updateChecksums" :
+                            "lockfileVersion " + Js.string(wantedLockfile.getLockfileVersion()), ctx, opts,
                     workspaceProjects, patchHashes(patchedDependencies));
         }
 
@@ -229,6 +283,9 @@ final class Install {
         String reason = null;
         if (read.isHadConflicts()) {
             reason = "merge conflicts";
+        } else if (dryRun(options)) {
+            // a check-only install resolves in full (isCheckOnlyInstall)
+            reason = "a dry run";
         } else if (!options.isTrue("preferFrozenLockfile")) {
             reason = "preferFrozenLockfile off";
         } else if (pruneLockfileImporters && wantedLockfile.getImporters().size() != projects.size()) {
@@ -240,14 +297,15 @@ final class Install {
         } else if (!Verification.allProjectsAreUpToDate(projects, options.getCatalogs(),
                 options.isTrue("autoInstallPeers"), options.isTrue("excludeLinksFromLockfile"),
                 options.getLinkWorkspacePackagesDepth() >= 0, wantedLockfile, workspacePackages, inputs.getFiles(),
-                lockDir)) {
+                lockDir, options.getRelease())) {
             reason = "projects not up to date with the lock";
         }
         Map<String, String> patches = patchHashes(patchedDependencies);
         if (reason != null) {
             return new Result(null, reason, ctx, opts, workspaceProjects, patches);
         }
-        return new Result(lockFile.writeWantedLockfile(wantedLockfile), null, ctx, opts, workspaceProjects, patches);
+        return new Result(lockFile.writeWantedLockfile(wantedLockfile, release), null, ctx, opts, workspaceProjects,
+                patches);
     }
 
     /**
@@ -264,7 +322,8 @@ final class Install {
         List<ResolveDependencyTree.Importer> importers = new ArrayList<>();
         for (Verification.Project project : projects) {
             List<ResolveDependencies.WantedDependency> wantedDependencies =
-                    ResolveDependencyTree.getWantedDependencies(project.getManifest(), autoInstallPeers);
+                    ResolveDependencyTree.getWantedDependencies(project.getManifest(), autoInstallPeers,
+                            options.getRelease());
             for (ResolveDependencies.WantedDependency dep : wantedDependencies) {
                 dep.setUpdateSpec(true);
             }
@@ -292,7 +351,7 @@ final class Install {
         }
         PreferredVersions.ByName preferredVersions = PreferredVersions.ByName.of(
                 PreferredVersions.getPreferredVersionsFromLockfileAndManifests(wantedLockfile.getPackages(),
-                        manifests));
+                        manifests, options.getRelease()));
 
         Map<String, String> registries = options.getRegistries();
         Map<String, String> files = new LinkedHashMap<>(inputs.getFiles());
@@ -315,6 +374,8 @@ final class Install {
         ctx.setLinkWorkspacePackagesDepth(options.getLinkWorkspacePackagesDepth());
         ctx.setPreferWorkspacePackages(options.isTrue("preferWorkspacePackages"));
         ctx.setReadPackageHook(opts.getReadPackageHook());
+        ctx.setPnpmVersion(options.getPackageManagerVersion());
+        ctx.setRelease(options.getRelease());
         ctx.setRegistries(registries);
         ctx.setNamedRegistryPrefixes(options.getNamedRegistryPrefixes());
         Object resolutionMode = options.get("resolutionMode");
@@ -323,7 +384,8 @@ final class Install {
         ctx.setHoistPeers(autoInstallPeers || options.isTrue("dedupePeerDependents"));
         ctx.setResolvePeersFromWorkspaceRoot(options.isTrue("resolvePeersFromWorkspaceRoot"));
         ctx.setBlockExoticSubdeps(options.isTrue("blockExoticSubdeps"));
-        ctx.setPatchedDependencies(PatchingConfig.groupPatchedDependencies(install.getPatchedDependencies()));
+        ctx.setPatchedDependencies(PatchingConfig.groupPatchedDependencies(install.getPatchedDependencies(),
+                options.getRelease()));
         Double minimumReleaseAge = options.getNumber("minimumReleaseAge");
         List<String> minimumReleaseAgeExclude = options.getStrings("minimumReleaseAgeExclude");
         if (minimumReleaseAge != null && minimumReleaseAge != 0) {
@@ -331,14 +393,14 @@ final class Install {
         }
         if (minimumReleaseAgeExclude != null) {
             ctx.setPublishedByExclude(PackageVersionPolicy.createPackageVersionPolicyOrThrow(minimumReleaseAgeExclude,
-                    "minimumReleaseAgeExclude"));
+                    "minimumReleaseAgeExclude", options.getRelease()));
         }
         Object trustPolicy = options.get("trustPolicy");
         ctx.setTrustPolicy(trustPolicy == null || trustPolicy == Js.UNDEFINED ? null : Js.string(trustPolicy));
         List<String> trustPolicyExclude = options.getStrings("trustPolicyExclude");
         if (trustPolicyExclude != null) {
             ctx.setTrustPolicyExclude(PackageVersionPolicy.createPackageVersionPolicyOrThrow(trustPolicyExclude,
-                    "trustPolicyExclude"));
+                    "trustPolicyExclude", options.getRelease()));
         }
         ctx.setTrustPolicyIgnoreAfter(options.getNumber("trustPolicyIgnoreAfter"));
         Object peersSuffixMaxLength = options.get("peersSuffixMaxLength");
@@ -360,9 +422,19 @@ final class Install {
 
         LockfileObject newLockfile = result.getNewLockfile();
         newLockfile.set("lockfileVersion", LockfileObject.LOCKFILE_VERSION);
-        String written = lockFile.writeWantedLockfile(newLockfile);
+        String written;
+        if (dryRun(options)) {
+            // a dry run writes no lock: the file is as the run found it, its env document as main.ts wrote it
+            written = lockFile.text();
+            if (written == null) {
+                throw new CannotKnow("what the regeneration ends with where a dry run writes no " +
+                                     LockfileReader.WANTED_LOCKFILE);
+            }
+        } else {
+            written = lockFile.writeWantedLockfile(newLockfile, options.getRelease());
+        }
         ReportPeerDependencyIssues.reportPeerDependencyIssues(result.getPeerDependencyIssuesByProjects(),
-                options.getPeerDependencyRules(), options.isTrue("strictPeerDependencies"));
+                options.getPeerDependencyRules(), options.isTrue("strictPeerDependencies"), options.getRelease());
         return written;
     }
 
@@ -445,17 +517,34 @@ final class Install {
     // install / mutateModules: with an agent configured, the agent server resolves the install
     private static void agent(PnpmOptions options) {
         Object agent = options.get("agent");
-        if (!Js.truthy(agent)) {
+        Object pnprServer = options.get("pnprServer");
+        if (!Js.truthy(agent) && !Js.truthy(pnprServer)) {
             return;
         }
-        if ("no-downgrade".equals(options.get("trustPolicy"))) {
+        PnpmRelease release = options.getRelease();
+        // from 11.5.2 a pnpr server replaces the agent (PnpmRelease#resolvesThroughAPnprServer)
+        boolean pnpr = release.resolvesThroughAPnprServer();
+        Object server = pnpr ? pnprServer : agent;
+        if (!Js.truthy(server)) {
+            return;
+        }
+        // from 11.1.3 neither enforces trustPolicy no-downgrade (PnpmRelease#checksTheReleaseAgeAsAPolicy)
+        if ("no-downgrade".equals(options.get("trustPolicy")) && release.checksTheReleaseAgeAsAPolicy()) {
+            if (pnpr) {
+                throw new PnpmError("TRUST_POLICY_INCOMPATIBLE_WITH_PNPR", "The pnpr server does not yet enforce " +
+                        "`trustPolicy: no-downgrade`, so running an install through it under this policy would " +
+                        "produce a lockfile that the local verifier rejects.", "Unset `trustPolicy` for this " +
+                        "install, or disable the pnpr server (unset `--pnpr-server` / `pnprServer` in " +
+                        "pnpm-workspace.yaml) so resolution runs locally and the trust check applies.");
+            }
             throw new PnpmError("TRUST_POLICY_INCOMPATIBLE_WITH_AGENT", "The pnpm agent does not yet enforce " +
                     "`trustPolicy: no-downgrade`, so running an install through the agent under this policy would " +
                     "produce a lockfile that the local verifier rejects.", "Unset `trustPolicy` for this install, or " +
                     "disable the agent (unset `--agent` / `agent` in pnpm-workspace.yaml) so resolution runs locally " +
                     "and the trust check applies.");
         }
-        throw new CannotKnow("what the pnpm agent at " + Js.string(agent) + " resolves");
+        throw new CannotKnow("what the " + (pnpr ? "pnpr server" : "pnpm agent") + " at " + Js.string(server) +
+                             " resolves");
     }
 
     /**
@@ -517,6 +606,16 @@ final class Install {
      * ResolveDependencyTree: what it saves, under the workspace manifest as its reader reads it (null without one).
      */
     static Saved installSome(String alias, String bareSpecifier, @Nullable Map<String, @Nullable Object> workspace) {
+        return installSome(alias, bareSpecifier, workspace, PnpmRelease.PORTED);
+    }
+
+    /**
+     * {@link #installSome(String, String, Map)} as {@code release} makes the check: from 11.5.2 a {@code runtime:}
+     * dependency skips it ({@link PnpmRelease#keepsARuntimeDependencyOutOfTheCatalog}) and the specifiers compare as
+     * versions only ({@link PnpmRelease#comparesCatalogSpecifiersAsVersionsOnly}).
+     */
+    static Saved installSome(String alias, String bareSpecifier, @Nullable Map<String, @Nullable Object> workspace,
+                             PnpmRelease release) {
         Map<String, @Nullable Map<String, @Nullable Object>> catalogs;
         try {
             catalogs = Catalogs.getCatalogsFromWorkspaceManifest(workspace);
@@ -526,14 +625,15 @@ final class Install {
         Map<String, @Nullable Object> defaultCatalog = catalogs.get(DEFAULT_CATALOG);
         String wanted = ParseWantedDependencies.bareSpecifier(alias, bareSpecifier, defaultCatalog);
         String saveCatalogName = saveCatalogName(workspace);
-        if (!"manual".equals(catalogMode(workspace))) {
+        if (!"manual".equals(catalogMode(workspace)) &&
+            !(wanted.startsWith("runtime:") && release.keepsARuntimeDependencyOutOfTheCatalog())) {
             String perDepCatalogName = saveCatalogName == null ? DEFAULT_CATALOG : saveCatalogName;
             String catalogBareSpecifier = CATALOG_PROTOCOL + (DEFAULT_CATALOG.equals(perDepCatalogName) ? "" :
                     perDepCatalogName);
             Catalogs.Resolution catalog = Catalogs.resolveFromCatalog(catalogs, alias, catalogBareSpecifier);
             String catalogDepSpecifier = "found".equals(catalog.getType()) ? catalog.getSpecifier() : null;
             if (catalogDepSpecifier == null || wanted.equals(catalogBareSpecifier) || eq(alias, wanted,
-                    catalogDepSpecifier)) {
+                    catalogDepSpecifier, release)) {
                 saveCatalogName = perDepCatalogName;
             } else if ("strict".equals(catalogMode(workspace))) {
                 throw Rejected.rejects(Reason.RESOLUTION_REQUIRED, alias, "[ERR_PNPM_CATALOG_VERSION_MISMATCH] " +
@@ -546,10 +646,17 @@ final class Install {
         return lookup == null ? new Saved(wanted, null) : new Saved(lookup, saveCatalogName);
     }
 
-    // semver.validRange of both, then semver.eq, which takes versions only
-    private static boolean eq(String alias, String wanted, String catalogDepSpecifier) {
-        if (NodeSemver.validRange(wanted, NodeSemver.Options.DEFAULT) == null ||
-            NodeSemver.validRange(catalogDepSpecifier, NodeSemver.Options.DEFAULT) == null) {
+    // semver.validRange of both, then semver.eq, which takes versions only; from 11.5.2 semver.valid of both
+    private static boolean eq(String alias, String wanted, String catalogDepSpecifier, PnpmRelease release) {
+        if (release.underSemver(semver -> NodeSemver.validRange(wanted, NodeSemver.Options.DEFAULT.release(semver)) ==
+                                          null ||
+                                          NodeSemver.validRange(catalogDepSpecifier,
+                                                  NodeSemver.Options.DEFAULT.release(semver)) == null)) {
+            return false;
+        }
+        if ((NodeSemver.valid(wanted, NodeSemver.Options.DEFAULT) == null ||
+             NodeSemver.valid(catalogDepSpecifier, NodeSemver.Options.DEFAULT) == null) &&
+            release.comparesCatalogSpecifiersAsVersionsOnly()) {
             return false;
         }
         try {

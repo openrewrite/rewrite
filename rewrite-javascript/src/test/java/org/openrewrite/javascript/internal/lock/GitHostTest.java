@@ -35,12 +35,15 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.TreeMap;
+import java.util.function.Supplier;
 import java.util.stream.Stream;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 /**
- * hosted-git-info 9.0.3's and 4.1.0's own tests ({@code upstream/hosted-git-info-*}), and 9.0.3's URL tables
+ * hosted-git-info's own tests of each release the port answers as ({@code upstream/hosted-git-info-*}), 3.0.7's and
+ * 3.0.8's readings of git specs of every form ({@code upstream/hosted-git-info-3}), and 9.0.3's URL tables
  * ({@code npm-arborist/generate/hosted-git-tables.js}), invalid.js, parse-url.js and string-method cases.
  */
 class GitHostTest {
@@ -144,14 +147,27 @@ class GitHostTest {
         }
         Map<String, Integer> expected = new TreeMap<>();
         for (GitHost.Release release : GitHost.Release.values()) {
-            boolean v9 = release == GitHost.Release.V9_0_3;
             String never = ": npm-package-arg never calls it";
-            expected.put(release + " GitHost#browse" + never, v9 ? 36 : 30);
-            expected.put(release + " GitHost#bugs" + never, 5);
-            expected.put(release + " GitHost#docs" + never, 14);
-            expected.put(release + " GitHost#file" + never, 20);
-            expected.put(release + " GitHost#tarball" + never, v9 ? 9 : 8);
-            if (v9) {
+            if (release == GitHost.Release.V3_0_7 || release == GitHost.Release.V3_0_8) {
+                // 3's tests run each fixture's checks on the last host their loop parses, and add a host with
+                // methods of its own
+                expected.put(release + " GitHost#browse" + never, 540);
+                expected.put(release + " GitHost#bugs" + never, 12);
+                expected.put(release + " GitHost#docs" + never, 252);
+                expected.put(release + " GitHost#file" + never, 264);
+                expected.put(release + " GitHost#tarball" + never, 160);
+                expected.put(release + " a host the test adds to hosted-git-info's own table", 9);
+                continue;
+            }
+            // 4.0.2 has no sourcehut tests
+            boolean v4 = release == GitHost.Release.V4_0_2 || release == GitHost.Release.V4_1_0;
+            boolean sourcehut = release != GitHost.Release.V4_0_2;
+            expected.put(release + " GitHost#browse" + never, !sourcehut ? 24 : v4 ? 30 : 36);
+            expected.put(release + " GitHost#bugs" + never, sourcehut ? 5 : 4);
+            expected.put(release + " GitHost#docs" + never, sourcehut ? 14 : 11);
+            expected.put(release + " GitHost#file" + never, sourcehut ? 20 : 16);
+            expected.put(release + " GitHost#tarball" + never, release == GitHost.Release.V9_0_3 ? 9 : sourcehut ? 8 : 7);
+            if (!v4) {
                 expected.put(release + " GitHost#browseFile" + never, 4);
                 expected.put(release + " GitHost#edit" + never, 11);
             }
@@ -159,6 +175,68 @@ class GitHostTest {
             expected.put(release + " options npm-package-arg never passes (committish)", 1);
         }
         assertThat(notReplayed).isEqualTo(expected);
+    }
+
+    static Stream<Arguments> threeRows() {
+        List<Arguments> out = new ArrayList<>();
+        for (Call call : UpstreamCalls.read("hosted-git-info-3.jsonl.gz")) {
+            Map<?, ?> byRelease = (Map<?, ?>) call.getOut();
+            Object spec = call.arg(1);
+            out.add(Arguments.of(GitHost.Release.V3_0_7, spec, ((Map<?, ?>) byRelease.get("7.4.3")).get("hosted")));
+            out.add(Arguments.of(GitHost.Release.V3_0_8, spec, ((Map<?, ?>) byRelease.get("7.6.3")).get("hosted")));
+        }
+        return out.stream();
+    }
+
+    /**
+     * How hosted-git-info 3.0.7 (npm 7.4.3) and 3.0.8 (npm 7.6.3) read git specs of every form, as npm-package-arg
+     * asks them, and write them as npm-package-arg and arborist do (rows written by generate/hosted-git-info-3.js).
+     */
+    @ParameterizedTest(name = "{0} {1}")
+    @MethodSource("threeRows")
+    void readsAsThreeDoes(GitHost.Release release, String spec, @Nullable Object expected) {
+        if (expected instanceof Map) {
+            assertThatThrownBy(() -> GitHost.fromUrl(spec, Opts.of(true, true), release))
+              .isInstanceOf(JsError.class).hasToString(error(expected));
+            return;
+        }
+        GitHost host = GitHost.fromUrl(spec, Opts.of(true, true), release);
+        if (expected == null) {
+            assertThat(host).isNull();
+            return;
+        }
+        assertThat(host).isNotNull();
+        Opts withCommittish = Opts.of(null, false);
+        List<@Nullable Object> got = new ArrayList<>(Arrays.asList(host.getType(), host.getUser(), host.getAuth(),
+          host.getProject(), host.getCommittish(), host.getDefaultRepresentation()));
+        got.add(rendered(() -> host.sshurl(withCommittish)));
+        got.add(rendered(() -> host.https(withCommittish)));
+        got.add(rendered(() -> host.ssh(Opts.of(null, false))));
+        got.add(rendered(() -> host.ssh(Opts.of(null, true))));
+        got.add(rendered(() -> host.shortcut(withCommittish)));
+        got.add(rendered(() -> host.git(withCommittish)));
+        got.add(rendered(() -> host.path(withCommittish)));
+        got.add(rendered(() -> host.toString(Opts.of(false, false))));
+        got.add(rendered(() -> host.toString(Opts.NONE)));
+        List<@Nullable Object> want = new ArrayList<>();
+        for (Object field : (List<?>) expected) {
+            want.add(field instanceof Map ? error(field) : field);
+        }
+        assertThat(got).isEqualTo(want);
+    }
+
+    private static String error(Object thrown) {
+        Map<?, ?> error = (Map<?, ?>) thrown;
+        return error.get("name") + ": " + error.get("message");
+    }
+
+    // a rendering, or the URIError of encodeURIComponent
+    private static @Nullable Object rendered(Supplier<@Nullable String> rendering) {
+        try {
+            return rendering.get();
+        } catch (IllegalArgumentException e) {
+            return "URIError: " + e.getMessage();
+        }
     }
 
     static Stream<Arguments> tables() {

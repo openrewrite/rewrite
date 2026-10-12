@@ -37,6 +37,10 @@ final class Syml {
 
     private static final JsYaml.Options OPTIONS = new JsYaml.Options(JsYaml.Release.V3_14_1, true, LinkedHashMap::new);
 
+    // js-yaml 4, which pnpm's fork @zkochan/js-yaml 0.0.11 stands for
+    private static final JsYaml.Options OPTIONS_V4 =
+            new JsYaml.Options(JsYaml.Release.ZKOCHAN_0_0_11, true, LinkedHashMap::new);
+
     private static final Pattern SIMPLE_STRING =
             V8RegExp.of("^(?![-?:,\\][{}#&*!|>'\"%@` \\t\\r\\n]).([ \\t]*(?![,\\][{}:# \\t\\r\\n]).)*$");
     private static final List<String> SPECIAL_OBJECT_KEYS = Arrays.asList("__metadata", "version", "resolution",
@@ -169,12 +173,24 @@ final class Syml {
      * {@code parseSyml}: a Yarn 1 lockfile through the legacy grammar, anything else through js-yaml; an empty
      * document is an empty mapping.
      */
-    @SuppressWarnings("unchecked")
     static Map<String, @Nullable Object> parseSyml(String source) {
+        return parseSyml(source, OPTIONS);
+    }
+
+    /**
+     * {@code parseSyml} as the release parses: js-yaml 4's {@code load} from 4.18.0 (its errors name the position
+     * {@code (line:column)}), js-yaml 3.14.1's {@code safeLoad} before.
+     */
+    static Map<String, @Nullable Object> parseSyml(String source, @Nullable YarnRelease release) {
+        return parseSyml(source, release != null && release.parsesWithJsYaml4() ? OPTIONS_V4 : OPTIONS);
+    }
+
+    @SuppressWarnings("unchecked")
+    private static Map<String, @Nullable Object> parseSyml(String source, JsYaml.Options options) {
         if (LEGACY.matcher(source).find()) {
             return parseViaPeg(source);
         }
-        Object value = JsYaml.safeLoadFailsafe(source, OPTIONS);
+        Object value = JsYaml.safeLoadFailsafe(source, options);
         if (value == null) {
             return new LinkedHashMap<>();
         }

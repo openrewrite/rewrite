@@ -95,11 +95,20 @@ public final class YarnpkgSemverUtils {
      * Under includePrerelease, or else with the version's prerelease dropped against each comparator set.
      */
     public static boolean satisfiesWithPrereleases(@Nullable String version, String range, boolean loose) {
+        return satisfiesWithPrereleases(version, range, loose, NodeSemver.Release.V7_8_4);
+    }
+
+    /**
+     * {@link #satisfiesWithPrereleases(String, String, boolean)} over the node-semver release {@code semver}, the one
+     * the package manager bundles.
+     */
+    public static boolean satisfiesWithPrereleases(@Nullable String version, String range, boolean loose,
+                                                   NodeSemver.Release semver) {
         if (version == null || version.isEmpty()) {
             return false;
         }
-        NodeSemver.Options options = loose ? NodeSemver.Options.LOOSE_INCLUDE_PRERELEASE :
-                NodeSemver.Options.INCLUDE_PRERELEASE;
+        NodeSemver.Options options = (loose ? NodeSemver.Options.LOOSE_INCLUDE_PRERELEASE :
+                NodeSemver.Options.INCLUDE_PRERELEASE).release(semver);
         String formatted;
         try {
             formatted = NodeSemver.validRange(range, options);

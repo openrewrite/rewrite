@@ -17,6 +17,7 @@ package org.openrewrite.javascript.internal.lock.pnpm;
 
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.javascript.internal.LockFileRegeneration.Reason;
+import org.openrewrite.javascript.internal.lock.CannotKnow;
 import org.openrewrite.javascript.internal.lock.DependencyPathSegment;
 import org.openrewrite.javascript.internal.lock.EcmaScript;
 import org.openrewrite.javascript.internal.lock.HostEnvironment;
@@ -209,11 +210,25 @@ public final class PnpmManifestRules implements ManifestRules {
 
     @Override
     public Saved added(String alias, String specifier, @Nullable Map<String, @Nullable Object> workspace) {
+        return added(alias, specifier, workspace, null);
+    }
+
+    /**
+     * installSome's catalogMode check as {@code release} makes it: a pnpm release the engine reproduces, else 11.2.2's,
+     * which the other releases whose writes are recorded follow.
+     */
+    @Override
+    public Saved added(String alias, String specifier, @Nullable Map<String, @Nullable Object> workspace,
+                       @Nullable String release) {
         Install.Saved saved;
         try {
-            saved = Install.installSome(alias, specifier, workspace);
+            saved = Install.installSome(alias, specifier, workspace, release == null || release.isEmpty() ||
+                                                                     !PnpmReleases.isProven(release) ?
+                    PnpmRelease.PORTED : PnpmReleases.installs(release));
         } catch (Rejected e) {
             throw Rejected.rejects(e.getReason(), e.getPackageName(), LockOnlyInstall.PNPM.failure(e).getDetail());
+        } catch (CannotKnow e) {
+            throw Rejected.rejects(Reason.RESOLUTION_REQUIRED, alias, LockOnlyInstall.PNPM.failure(e).getDetail());
         }
         return new Saved(saved.getBareSpecifier(), saved.getCatalogName());
     }
