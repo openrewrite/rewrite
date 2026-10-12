@@ -1130,15 +1130,18 @@ def handle_dependency_types(params: dict) -> List[dict]:
     its pip coordinate (a null version names a standard-library module), streamed back terminated
     by END_OF_OBJECT. Built once, returned in ``_DEPENDENCY_TYPES_BATCH_SIZE`` slices across the
     client's repeated pulls. An optional ``pythonVersion`` ("3.12") picks the stdlib stub surface.
+    An optional ``path`` is a site-packages-shaped directory holding the distribution, used in
+    place of the last parse's dependency environment.
     """
     name = params.get('name')
     version = params.get('version')
+    path = params.get('path')
     # Stdlib stubs are version-conditioned; a malformed value falls back to the interpreter minor.
     python_version = requested_python_version(params.get('pythonVersion'))
     if not name:
         raise ValueError("DependencyTypes requires a dependency name")
 
-    key = (name, version, python_version)
+    key = (name, version, python_version, path)
     data = _dependency_types_pending.get(key)
     if data is None:
         if version is None:
@@ -1150,6 +1153,9 @@ def handle_dependency_types(params: dict) -> List[dict]:
                     raise ValueError(f"standard-library module {name!r} not found in typeshed at {stdlib}")
             data = _build_exported_types_data([str(artifact)], str(stdlib), None, stdlib,
                                               python_version=python_version)
+        elif path:
+            own_artifacts = _resolve_dist_artifacts(name, version, Path(path))
+            data = _build_exported_types_data(own_artifacts, path, None, None)
         else:
             dependency_path = _last_dependency_path or os.environ.get('VIRTUAL_ENV')
             if not dependency_path:
