@@ -63,6 +63,27 @@ public final class BunRelease implements Comparable<BunRelease> {
         return compareTo(new BunRelease(major, minor, patch)) >= 0;
     }
 
+    // src/semver: Version.zig, SemverQuery.zig, SemverRange.zig (src/install/semver.zig before 1.2.3)
+
+    /**
+     * A version whose {@code x}, {@code X} or {@code *} directly follows its patch number ({@code 1.2.3x}) is that
+     * version, the wildcard skipped ({@code Version.parse}), from 1.2.2; before, the parser reaches code it takes for
+     * unreachable ({@code else => unreachable}), which its release build does not check.
+     */
+    boolean skipsAWildcardAfterThePatchNumber() {
+        return atLeast(1, 2, 2);
+    }
+
+    /**
+     * A version's major, minor and patch are u64s ({@code VersionType(u64)}), from 1.2.23: read from up to 20 digits,
+     * 0 past the u64 maximum. Before, u32s: more than 10 digits is a missing number, a value past 4294967295 is 0, the
+     * ceilings of a range and a saturated bound are 4294967295, and a numeric prerelease identifier past it compares
+     * as text ({@code Tag.orderPre}'s {@code parseUnsigned(u32)}).
+     */
+    boolean readsSixtyFourBitVersionNumbers() {
+        return atLeast(1, 2, 23);
+    }
+
     // src/install/lockfile/bun.lock.zig
 
     /**

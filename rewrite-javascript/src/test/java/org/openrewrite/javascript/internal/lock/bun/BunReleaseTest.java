@@ -2014,6 +2014,60 @@ class BunReleaseTest {
         assertThat(SemverQuery.parse("^0.0." + max, earlier).satisfies(patch)).isFalse();
     }
 
+    /**
+     * semver.zig Version.parse (1.2.2): a wildcard right after the patch number is skipped; before, the parser reaches
+     * code it takes for unreachable. The darwin-arm64 builds of 1.2.0 and 1.2.1 skip it as 1.2.2 does
+     * ({@code Bun.semver.satisfies("1.2.4", "^1.2.3x")} is true), which another target's build need not.
+     */
+    @Test
+    void skipsAWildcardAfterThePatchNumberFrom122() {
+        SemverVersion.ParseResult later = SemverVersion.parse("1.2.3x", BunRelease.of("1.2.2"));
+        assertThat(later.valid).isTrue();
+        assertThat(later.wildcard).isEqualTo(SemverQuery.Wildcard.NONE);
+        assertThat(later.version.min()).hasToString("1.2.3");
+        assertThat(SemverQuery.parse("^1.2.3x", BunRelease.of("1.2.2")).satisfies(SemverVersion.of(1, 2, 4))).isTrue();
+        assertThatThrownBy(() -> SemverQuery.parse("^1.2.3*", BunRelease.of("1.2.1")))
+          .isInstanceOf(CannotKnow.class)
+          .hasMessageContaining("takes for unreachable");
+    }
+
+    /**
+     * Version.zig {@code VersionType(u64)} (1.2.23): a version's numbers are u64s; before, u32s, as
+     * {@code Bun.semver} of 1.2.22 and 1.2.23 answer: {@code satisfies("1.0.0", "1.0.4294967296")} is true before and
+     * false after, as is {@code satisfies("1.0.0", "1.0.12345678901")}; {@code satisfies("4294967295.0.0",
+     * "^4294967295")} is false before and true after; {@code order("1.0.0-alpha.10000000000",
+     * "1.0.0-alpha.5000000000")} is -1 before and 1 after.
+     */
+    @Test
+    void readsSixtyFourBitVersionNumbersFrom1223() {
+        BunRelease later = BunRelease.of("1.2.23");
+        BunRelease earlier = BunRelease.of("1.2.22");
+        assertThat(SemverVersion.parse("1.0.4294967296", later).version.patch).isEqualTo(4294967296L);
+        assertThat(SemverVersion.parse("1.0.4294967296", earlier).version.patch).isZero();
+        assertThat(SemverVersion.parse("1.0.12345678901", later).version.patch).isEqualTo(12345678901L);
+        assertThat(SemverVersion.parse("1.0.12345678901", earlier).version.patch).isNull();
+        assertThat(SemverVersion.parse("1.0.1709012345678", earlier).version.min()).hasToString("1.0.0");
+
+        SemverVersion one = SemverVersion.of(1, 0, 0);
+        assertThat(SemverQuery.parse("1.0.4294967296", later).satisfies(one)).isFalse();
+        assertThat(SemverQuery.parse("1.0.4294967296", earlier).satisfies(one)).isTrue();
+        assertThat(SemverQuery.parse("1.0.12345678901", later).satisfies(one)).isFalse();
+        assertThat(SemverQuery.parse("1.0.12345678901", earlier).satisfies(one)).isTrue();
+
+        SemverVersion top = SemverVersion.of(SemverVersion.MAX_U32, 0, 0);
+        assertThat(SemverQuery.parse("^4294967295", later).satisfies(top)).isTrue();
+        assertThat(SemverQuery.parse("^4294967295", earlier).satisfies(top)).isFalse();
+        assertThat(SemverQuery.parse("<=1", earlier).head.head.range.left.version)
+          .hasToString("1.4294967295.4294967295");
+
+        SemverVersion big = SemverVersion.parse("1.0.0-alpha.10000000000", later).version.min();
+        SemverVersion small = SemverVersion.parse("1.0.0-alpha.5000000000", later).version.min();
+        assertThat(big.order(small, later)).isPositive();
+        assertThat(big.order(small, earlier)).isNegative();
+        assertThat(SemverQuery.parse(">1.0.0-alpha.5000000000", later).satisfies(big)).isTrue();
+        assertThat(SemverQuery.parse(">1.0.0-alpha.5000000000", earlier).satisfies(big)).isFalse();
+    }
+
     private static PackageManifest.PackageVersion picked(BunRelease release, String packument, String name) {
         PackageManifest manifest = requireNonNull(PackageManifest.parse(release, new Log(), packument, name, false));
         return requireNonNull(manifest.findByDistTag("latest")).packageVersion;

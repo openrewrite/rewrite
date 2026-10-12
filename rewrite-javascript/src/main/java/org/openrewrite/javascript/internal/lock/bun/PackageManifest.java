@@ -112,6 +112,10 @@ final class PackageManifest {
     private static final double SEVEN_DAYS_MS = 7 * 24 * 60 * 60 * 1000.0;
 
     final String name;
+    /**
+     * The release that parsed the packument, which orders its versions ({@link SemverVersion#orderPre}).
+     */
+    final BunRelease release;
     final List<SemverVersion> releaseVersions = new ArrayList<>();
     final List<PackageVersion> releasePackages = new ArrayList<>();
     final List<SemverVersion> prereleaseVersions = new ArrayList<>();
@@ -120,8 +124,9 @@ final class PackageManifest {
     final List<SemverVersion> distTagVersions = new ArrayList<>();
     boolean hasExtendedManifest;
 
-    private PackageManifest(String name) {
+    private PackageManifest(String name, BunRelease release) {
         this.name = name;
+        this.release = release;
     }
 
     @Nullable
@@ -163,7 +168,7 @@ final class PackageManifest {
         FindResult latest = findByDistTag("latest");
         if (latest != null && group.satisfies(latest.version)) {
             if ((group.flags & SemverQuery.Group.FLAG_PRE) != 0) {
-                if (left.version.order(latest.version) == 0) {
+                if (left.version.order(latest.version, release) == 0) {
                     return latest;
                 }
             } else {
@@ -218,7 +223,7 @@ final class PackageManifest {
             }
             if (newestFiltered[0] == null) {
                 if ((group.flags & SemverQuery.Group.FLAG_PRE) != 0) {
-                    if (left.version.order(latest.version) == 0) {
+                    if (left.version.order(latest.version, release) == 0) {
                         return FindVersionResult.found(latest);
                     }
                 } else {
@@ -319,7 +324,7 @@ final class PackageManifest {
         for (int i = versions.size(); i > 0; i--) {
             SemverVersion version = versions.get(i - 1);
             PackageVersion pkg = packages.get(i - 1);
-            if (version.order(latestVersion) > 0) {
+            if (version.order(latestVersion, release) > 0) {
                 continue;
             }
             if (latestVersionTagBeforeDot != null) {
@@ -389,7 +394,7 @@ final class PackageManifest {
             return null;
         }
 
-        PackageManifest result = new PackageManifest(expectedName);
+        PackageManifest result = new PackageManifest(expectedName, release);
         ManifestBuffer buffer = new ManifestBuffer(release, expectedName);
         buffer.count(expectedName);
         buffer.append(expectedName);
@@ -621,8 +626,8 @@ final class PackageManifest {
         }
         buffer.requireItHoldsWhatItLeftUncounted();
 
-        sortByVersion(result.releaseVersions, result.releasePackages);
-        sortByVersion(result.prereleaseVersions, result.prereleasePackages);
+        sortByVersion(result.releaseVersions, result.releasePackages, release);
+        sortByVersion(result.prereleaseVersions, result.prereleasePackages, release);
         result.hasExtendedManifest = isExtendedManifest;
         return result;
     }
@@ -733,12 +738,13 @@ final class PackageManifest {
         }
     }
 
-    private static void sortByVersion(List<SemverVersion> versions, List<PackageVersion> packages) {
+    private static void sortByVersion(List<SemverVersion> versions, List<PackageVersion> packages,
+                                      BunRelease release) {
         List<Integer> indices = new ArrayList<>(versions.size());
         for (int i = 0; i < versions.size(); i++) {
             indices.add(i);
         }
-        indices.sort((l, r) -> versions.get(l).order(versions.get(r)));
+        indices.sort((l, r) -> versions.get(l).order(versions.get(r), release));
         List<SemverVersion> sortedVersions = new ArrayList<>(versions.size());
         List<PackageVersion> sortedPackages = new ArrayList<>(packages.size());
         for (int i : indices) {

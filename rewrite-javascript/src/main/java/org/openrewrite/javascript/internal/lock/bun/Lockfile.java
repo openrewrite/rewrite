@@ -250,14 +250,14 @@ public final class Lockfile {
             return false;
         }
         return isBelowAndOfAnotherMajor(requireNonNull(packages.get(id).resolution.version),
-                requireNonNull(resolution.version));
+                requireNonNull(resolution.version), release);
     }
 
     /**
      * Whether a version orders below the pick and has another major.
      */
-    static boolean isBelowAndOfAnotherMajor(SemverVersion version, SemverVersion pick) {
-        return version.order(pick) < 0 && version.major != pick.major;
+    static boolean isBelowAndOfAnotherMajor(SemverVersion version, SemverVersion pick, BunRelease release) {
+        return version.order(pick, release) < 0 && version.major != pick.major;
     }
 
     int appendPackageDedupe(Package pkg) {

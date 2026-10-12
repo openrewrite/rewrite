@@ -130,12 +130,9 @@ final class Resolution {
         }
     }
 
-    int order(Resolution rhs) {
-        return order(rhs, BunRelease.PORTED);
-    }
-
     /**
-     * {@code order} as the release orders repositories ({@link Repository#order(Repository, BunRelease)}).
+     * {@code order} as the release orders versions ({@link SemverVersion#orderPre}) and repositories
+     * ({@link Repository#order(Repository, BunRelease)}).
      */
     int order(Resolution rhs, BunRelease release) {
         if (tag != rhs.tag) {
@@ -143,7 +140,7 @@ final class Resolution {
         }
         switch (tag) {
             case NPM:
-                return version.order(rhs.version);
+                return version.order(rhs.version, release);
             case LOCAL_TARBALL:
             case FOLDER:
             case REMOTE_TARBALL:

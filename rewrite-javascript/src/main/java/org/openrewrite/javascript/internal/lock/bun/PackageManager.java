@@ -879,7 +879,8 @@ final class PackageManager {
             return false;
         }
         Resolution first = existing(packagesBefore, edge);
-        return first == null ? !other.resolution.eql(edge.resolution) : other.resolution.order(first) > 0;
+        return first == null ? !other.resolution.eql(edge.resolution) :
+                other.resolution.order(first, options.getRelease()) > 0;
     }
 
     // whether `edge` accepts the pick `other` appended; from 1.4.0 getPackageID refuses one below edge's own pick and
@@ -894,7 +895,7 @@ final class PackageManager {
             return true;
         }
         return !Lockfile.isBelowAndOfAnotherMajor(requireNonNull(other.resolution.version),
-                requireNonNull(edge.resolution.version));
+                requireNonNull(edge.resolution.version), options.getRelease());
     }
 
     @Nullable

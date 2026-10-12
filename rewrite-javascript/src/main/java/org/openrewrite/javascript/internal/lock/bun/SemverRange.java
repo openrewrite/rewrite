@@ -36,14 +36,15 @@ final class SemverRange {
         }
 
         /**
-         * {@code < major+1.0.0}, the major saturating; from 1.4.0 {@code <=} the ceiling where it would pass it
-         * ({@code lt_next_major}, {@link BunRelease#boundsARangeAtTheCeilingInclusively()}).
+         * {@code < major+1.0.0}, the major saturating at the release's ceiling ({@link SemverVersion#max}); from 1.4.0
+         * {@code <=} the ceiling where it would pass it ({@code lt_next_major},
+         * {@link BunRelease#boundsARangeAtTheCeilingInclusively()}).
          */
         static Comparator ltNextMajor(long major, BunRelease release) {
             if (major == SemverVersion.MAX && release.boundsARangeAtTheCeilingInclusively()) {
                 return new Comparator(Op.LTE, SemverVersion.of(SemverVersion.MAX, SemverVersion.MAX, SemverVersion.MAX));
             }
-            return new Comparator(Op.LT, SemverVersion.of(SemverVersion.saturatingIncrement(major), 0, 0));
+            return new Comparator(Op.LT, SemverVersion.of(SemverVersion.saturatingIncrement(major, release), 0, 0));
         }
 
         /**
@@ -53,7 +54,7 @@ final class SemverRange {
             if (minor == SemverVersion.MAX && release.boundsARangeAtTheCeilingInclusively()) {
                 return new Comparator(Op.LTE, SemverVersion.of(major, SemverVersion.MAX, SemverVersion.MAX));
             }
-            return new Comparator(Op.LT, SemverVersion.of(major, SemverVersion.saturatingIncrement(minor), 0));
+            return new Comparator(Op.LT, SemverVersion.of(major, SemverVersion.saturatingIncrement(minor, release), 0));
         }
 
         /**
@@ -63,15 +64,16 @@ final class SemverRange {
             if (patch == SemverVersion.MAX && release.boundsARangeAtTheCeilingInclusively()) {
                 return new Comparator(Op.LTE, SemverVersion.of(major, minor, SemverVersion.MAX));
             }
-            return new Comparator(Op.LT, SemverVersion.of(major, minor, SemverVersion.saturatingIncrement(patch)));
+            return new Comparator(Op.LT,
+                    SemverVersion.of(major, minor, SemverVersion.saturatingIncrement(patch, release)));
         }
 
         boolean eql(Comparator rhs) {
             return op == rhs.op && version.eql(rhs.version);
         }
 
-        boolean satisfies(SemverVersion version) {
-            int order = version.orderWithoutBuild(this.version);
+        boolean satisfies(SemverVersion version, BunRelease release) {
+            int order = version.orderWithoutBuild(this.version, release);
             if (order == 0) {
                 return op == Op.LTE || op == Op.GTE || op == Op.EQL;
             } else if (order > 0) {
@@ -140,17 +142,17 @@ final class SemverRange {
         return left.eql(rhs.left) && right.eql(rhs.right);
     }
 
-    boolean satisfies(SemverVersion version) {
+    boolean satisfies(SemverVersion version, BunRelease release) {
         if (!hasLeft()) {
             return true;
         }
-        if (!left.satisfies(version)) {
+        if (!left.satisfies(version, release)) {
             return false;
         }
-        return !hasRight() || right.satisfies(version);
+        return !hasRight() || right.satisfies(version, release);
     }
 
-    boolean satisfiesPre(SemverVersion version, boolean[] preMatched) {
+    boolean satisfiesPre(SemverVersion version, boolean[] preMatched, BunRelease release) {
         if (!hasLeft()) {
             return true;
         }
@@ -159,10 +161,10 @@ final class SemverRange {
                         version.minor == left.version.minor && version.major == left.version.major ||
                         hasRight() && right.version.hasPre() && version.patch == right.version.patch &&
                         version.minor == right.version.minor && version.major == right.version.major;
-        if (!left.satisfies(version)) {
+        if (!left.satisfies(version, release)) {
             return false;
         }
-        return !hasRight() || right.satisfies(version);
+        return !hasRight() || right.satisfies(version, release);
     }
 
     @Override

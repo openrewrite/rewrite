@@ -37,11 +37,16 @@ final class SemverIntersects {
     }
 
     private static final class Interval {
+        final BunRelease release;
         @Nullable Bound lower;
         @Nullable Bound upper;
 
+        Interval(BunRelease release) {
+            this.release = release;
+        }
+
         Interval copy() {
-            Interval i = new Interval();
+            Interval i = new Interval(release);
             i.lower = lower;
             i.upper = upper;
             return i;
@@ -52,7 +57,7 @@ final class SemverIntersects {
             if (lower == null) {
                 replace = true;
             } else {
-                int order = b.version.orderWithoutBuild(lower.version);
+                int order = b.version.orderWithoutBuild(lower.version, release);
                 replace = order > 0 || order == 0 && !b.inclusive;
             }
             if (replace) {
@@ -65,7 +70,7 @@ final class SemverIntersects {
             if (upper == null) {
                 replace = true;
             } else {
-                int order = b.version.orderWithoutBuild(upper.version);
+                int order = b.version.orderWithoutBuild(upper.version, release);
                 replace = order < 0 || order == 0 && !b.inclusive;
             }
             if (replace) {
@@ -107,7 +112,7 @@ final class SemverIntersects {
             if (lower == null || upper == null) {
                 return true;
             }
-            int order = lower.version.orderWithoutBuild(upper.version);
+            int order = lower.version.orderWithoutBuild(upper.version, release);
             return order < 0 || order == 0 && lower.inclusive && upper.inclusive;
         }
     }
@@ -118,7 +123,7 @@ final class SemverIntersects {
      */
     static boolean intersects(SemverQuery.Group self, SemverQuery.Group other) {
         for (SemverQuery.List listA = self.head; listA != null; listA = listA.next) {
-            Interval base = new Interval();
+            Interval base = new Interval(self.release);
             base.andQuery(listA.head);
             if (!base.isNonEmpty()) {
                 continue;
