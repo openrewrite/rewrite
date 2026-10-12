@@ -20,6 +20,7 @@ import org.openrewrite.java.JavaTypeVisitor;
 import org.openrewrite.java.internal.DefaultJavaTypeSignatureBuilder;
 import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.rpc.Reference;
+import org.openrewrite.rpc.RpcCodec;
 import org.openrewrite.rpc.RpcSendQueue;
 
 import java.util.Arrays;
@@ -70,6 +71,13 @@ public class JavaTypeSender extends JavaTypeVisitor<RpcSendQueue> {
 
     @Override
     public JavaType visitClass(JavaType.Class aClass, RpcSendQueue q) {
+        // A Class carrying its own codec declares a compact, body-less wire form;
+        // the structural walk below would resolve the body it stands in for.
+        if (aClass instanceof RpcCodec) {
+            //noinspection unchecked
+            ((RpcCodec<JavaType.Class>) aClass).rpcSend(aClass, q);
+            return aClass;
+        }
         q.getAndSend(aClass, JavaType.Class::getFlagsBitMap);
         q.getAndSend(aClass, JavaType.Class::getKind);
         q.getAndSend(aClass, JavaType.Class::getFullyQualifiedName);
