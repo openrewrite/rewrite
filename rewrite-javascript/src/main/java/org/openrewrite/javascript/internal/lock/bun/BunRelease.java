@@ -383,6 +383,42 @@ public final class BunRelease implements Comparable<BunRelease> {
         return atLeast(1, 4, 0);
     }
 
+    /**
+     * A quoted .env value ends at its first unescaped closing quote and the rest of its line is dropped, from 1.4.0
+     * (bun#34003); before, a closing quote ends it only where whitespace and then a newline, a {@code #} or the end
+     * of the file follow, else the scan goes on to the next one, past the end of the line.
+     */
+    boolean endsAQuotedEnvValueAtItsFirstClosingQuote() {
+        return atLeast(1, 4, 0);
+    }
+
+    /**
+     * The whitespace a .env key and value are trimmed of is ASCII's alone, from 1.4.0 (bun#34001); before, the byte
+     * 0xA0 too, the last of a UTF-8 no-break space's two.
+     */
+    boolean keepsNoBreakSpacesInEnvValues() {
+        return atLeast(1, 4, 0);
+    }
+
+    /**
+     * A .env file's leading UTF-8 byte order mark is dropped, from 1.4.0 (bun#34002); before, it is the first line's,
+     * whose key then does not read, so that the line is skipped.
+     */
+    boolean stripsTheByteOrderMarkOfEnvFiles() {
+        return atLeast(1, 4, 0);
+    }
+
+    /**
+     * A .env value's {@code $NAME}, {@code ${NAME}} and {@code ${NAME:-default}} are expanded left to right, a
+     * default in turn, {@code \$} is {@code $}, and a {@code $} that starts neither is itself (env_loader.rs
+     * {@code expand_into}), from 1.4.0 (bun#36199); before, right to left, a {@code $} before any other character
+     * expands the empty name, and a default ends at its first closing brace or backslash, so that bun crashes on
+     * {@code ${A:-$B}}.
+     */
+    boolean expandsEnvValuesLeftToRight() {
+        return atLeast(1, 4, 0);
+    }
+
     // ----
 
     // 1.4.x: src/install (dependency.rs, integrity.rs, repository.rs, npm.rs, resolution.rs) and src/semver

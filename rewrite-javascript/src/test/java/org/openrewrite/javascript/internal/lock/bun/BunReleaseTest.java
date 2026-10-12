@@ -2192,6 +2192,60 @@ class BunReleaseTest {
         assertThat(earlier).contains("\"https://r.example/a b/ms/-/ms-2.1.3.tgz\"");
     }
 
+    private static java.util.Map<String, String> dotEnv(String release, String env) {
+        java.util.Map<String, String> process = new java.util.HashMap<>();
+        process.put("B", "x");
+        return DotEnv.load(BunRelease.of(release), HostEnvironment.of(process), Collections.singletonMap(".env", env))
+          .known();
+    }
+
+    /**
+     * env_loader.rs parse_quoted (1.4.0, bun#34003): the first closing quote ends a value, the rest of its line
+     * dropped; before, a closing quote followed by more of its line is passed over.
+     */
+    @Test
+    void endsAQuotedEnvValueAtItsFirstClosingQuoteFrom140() {
+        String env = "X='it's'\nY=\"x\" junk\nZ=z\n";
+        assertThat(dotEnv("1.4.0", env)).containsEntry("X", "it").containsEntry("Y", "x").containsEntry("Z", "z");
+        assertThat(dotEnv("1.3.14", env)).containsEntry("X", "it's").containsEntry("Y", "\"x\" junk")
+          .containsEntry("Z", "z");
+    }
+
+    /**
+     * env_loader.rs WHITESPACE_CHARS (1.4.0, bun#34001): 0xA0, the last byte of a UTF-8 no-break space, is not
+     * trimmed.
+     */
+    @Test
+    void keepsANoBreakSpaceAtTheEndOfAnEnvValueFrom140() {
+        String env = "A= x\nK=x \n C=x\n";
+        assertThat(dotEnv("1.4.0", env)).containsEntry("A", " x").containsEntry("K", "x ")
+          .doesNotContainKey("C");
+        assertThat(dotEnv("1.3.14", env)).containsEntry("K", "x�");
+    }
+
+    /**
+     * env_loader.rs parse_bytes (1.4.0, bun#34002): a leading byte order mark is dropped; before, the first line is.
+     */
+    @Test
+    void stripsAnEnvFilesByteOrderMarkFrom140() {
+        String env = "﻿A=1\nZ=2\n";
+        assertThat(dotEnv("1.4.0", env)).containsEntry("A", "1").containsEntry("Z", "2");
+        assertThat(dotEnv("1.3.14", env)).doesNotContainKey("A").containsEntry("Z", "2");
+    }
+
+    /**
+     * env_loader.rs expand_into (1.4.0, bun#36199): left to right, a lone {@code $} itself and {@code \$} a
+     * {@code $}; before, right to left (B is set to x).
+     */
+    @Test
+    void expandsEnvValuesLeftToRightFrom140() {
+        String env = "P=pa$$w0rd\nQ=a$-b\nR=${H\nS=a\\$\nT=${A:-$B}\nU=$B-${B}\n";
+        assertThat(dotEnv("1.4.0", env)).containsEntry("P", "pa$").containsEntry("Q", "a$-b")
+          .containsEntry("R", "${H").containsEntry("S", "a$").containsEntry("T", "x").containsEntry("U", "x-x");
+        assertThat(dotEnv("1.3.14", env.replace("T=${A:-$B}\n", ""))).containsEntry("P", "pa")
+          .containsEntry("Q", "a-b").containsEntry("R", "").containsEntry("S", "a\\$").containsEntry("U", "x-x");
+    }
+
     private static String repeat(char c, int n) {
         char[] chars = new char[n];
         java.util.Arrays.fill(chars, c);

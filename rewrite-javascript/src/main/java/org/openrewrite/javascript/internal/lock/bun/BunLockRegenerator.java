@@ -472,7 +472,7 @@ public final class BunLockRegenerator {
     private static PendingInstall installWithManager(BunRelease release, Inputs inputs, ManifestSource registry,
                                                      Log log) {
         BunOptions options = BunOptions.load(release, inputs.getBunfig(), inputs.getUserNpmrc(), inputs.getNpmrc(),
-                DotEnv.load(HostEnvironment.UNKNOWN, inputs.getFiles()));
+                DotEnv.load(release, HostEnvironment.UNKNOWN, inputs.getFiles()));
         if (options.isReadsTheManifestCache()) {
             throw new CannotKnow("what bun " + release + " resolves from its manifest cache, which bunfig.toml's " +
                                  "install.offline or install.prefer = \"offline\" has it read");
