@@ -178,6 +178,15 @@ public final class PnpmRelease {
         return atLeast(11, 7, 0);
     }
 
+    /**
+     * A registry tarball URL with an escaped slash in any case ({@code @s%2Fp}) is the registry's own and left out
+     * of the lock, only an http(s) protocol removed before comparing, from 11.9.0 (tarball-url's
+     * isCanonicalRegistryTarballUrl); before, only {@code %2f} is unescaped, and the URL is kept.
+     */
+    boolean unescapesAnyCaseSlashInATarballUrl() {
+        return atLeast(11, 9, 0);
+    }
+
     // @pnpm/lockfile.fs src/yamlDocuments.ts
 
     /**

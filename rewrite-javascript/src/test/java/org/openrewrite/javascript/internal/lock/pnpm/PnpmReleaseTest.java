@@ -1338,6 +1338,21 @@ class PnpmReleaseTest {
     }
 
     /**
+     * resolving/tarball-url isCanonicalRegistryTarballUrl (11.9.0): a scoped tarball URL escaped as %2F is the
+     * registry's own and left out of the lock; before, it is kept.
+     */
+    @Test
+    void unescapesAnyCaseSlashInATarballUrlFrom1190() {
+        Map<String, @Nullable Object> resolution = obj("{'integrity':'sha512-x','tarball':" +
+                                                       "'https://registry.npmjs.org/@s%2Fp/-/p-1.0.0.tgz'}");
+        assertThat(json(LockfileUtils.toLockfileResolution("@s/p", "1.0.0", resolution, REGISTRY, false,
+          release("11.9.0")))).isEqualTo("{'integrity':'sha512-x'}");
+        assertThat(json(LockfileUtils.toLockfileResolution("@s/p", "1.0.0", resolution, REGISTRY, false,
+          release("11.8.0")))).isEqualTo("{'integrity':'sha512-x','tarball':" +
+                                         "'https://registry.npmjs.org/@s%2Fp/-/p-1.0.0.tgz'}");
+    }
+
+    /**
      * config/version-policy evaluateVersionPolicy (11.9.0): the exact versions of every rule that matches are merged;
      * before, the first rule that matches decides.
      */

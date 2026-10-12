@@ -26,6 +26,7 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.function.Supplier;
+import java.util.regex.Pattern;
 
 import static java.util.Objects.requireNonNull;
 
@@ -123,7 +124,15 @@ final class LockfileUtils {
         }
         String expectedTarball = getNpmTarballUrl(name, version, registry);
         String actualTarball = url.replace("%2f", "/");
-        if (!Objects.equals(removeProtocol(expectedTarball), removeProtocol(actualTarball))) {
+        boolean canonical = Objects.equals(removeProtocol(expectedTarball), removeProtocol(actualTarball));
+        // from 11.9.0 (tarball-url's isCanonicalRegistryTarballUrl) a %2f in any case is unescaped and only an
+        // http(s) protocol is removed (PnpmRelease#unescapesAnyCaseSlashInATarballUrl)
+        boolean canonicalInAnyCase = removeHttpProtocol(expectedTarball).equals(
+                removeHttpProtocol(ANY_CASE_ESCAPED_SLASH.matcher(url).replaceAll("/")));
+        if (canonical != canonicalInAnyCase && release.unescapesAnyCaseSlashInATarballUrl()) {
+            canonical = canonicalInAnyCase;
+        }
+        if (!canonical) {
             return preservingGitHosted(integrity, url, gitHosted);
         }
         Map<String, @Nullable Object> out = new LinkedHashMap<>();
@@ -342,6 +351,14 @@ final class LockfileUtils {
     }
 
     // url.split('://')[1]
+    private static final Pattern ANY_CASE_ESCAPED_SLASH = Pattern.compile("%2f", Pattern.CASE_INSENSITIVE);
+    private static final Pattern HTTP_PROTOCOL = Pattern.compile("^https?://", Pattern.CASE_INSENSITIVE);
+
+    // tarball-url's removeProtocol (11.9.0)
+    private static String removeHttpProtocol(String url) {
+        return HTTP_PROTOCOL.matcher(url).replaceFirst("");
+    }
+
     private static @Nullable String removeProtocol(String url) {
         int at = url.indexOf("://");
         if (at == -1) {
