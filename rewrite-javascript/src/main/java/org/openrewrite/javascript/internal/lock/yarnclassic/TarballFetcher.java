@@ -181,6 +181,9 @@ final class TarballFetcher {
         try {
             return TarFs.extract(tar, release.jailsTarballLinks());
         } catch (JsError e) {
+            if (!release.reportsCorruptArchives()) {
+                throw new JsError(e.getName(), url + ": " + e.getMessage());
+            }
             throw new MessageError(url + ": " + Lang.format("Extracting tar content of $1 failed, the file appears " +
                                                             "to be corrupt: $0", e.getMessage(), null));
         }

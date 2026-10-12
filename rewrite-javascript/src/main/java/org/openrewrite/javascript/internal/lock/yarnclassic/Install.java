@@ -120,6 +120,9 @@ final class Install {
      */
     @Nullable
     String init(Lockfile lockfile) {
+        if (!config.getRelease().focusesByPackageName()) {
+            config.requireFocusInAWorkspace();
+        }
         if (lockfile.getLockfilev2() != null) {
             throw Rejected.discardsLock("the lock is a Yarn Berry lock (__metadata)");
         }

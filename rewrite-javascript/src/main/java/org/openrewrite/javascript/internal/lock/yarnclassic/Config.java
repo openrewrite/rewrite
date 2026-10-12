@@ -157,14 +157,16 @@ final class Config {
 
         requireWorkspaceRootAbove(inputs, looseSemver);
         workspaceRoot = findWorkspaceRoot(inputs, looseSemver);
-        if (focus && (workspaceRoot < 0 || workspaceRoot == 0 && inputs.getCwd().isEmpty())) {
-            throw new MessageError("This command can only be run inside an individual workspace.");
+        if (release.focusesByPackageName()) {
+            requireFocusInAWorkspace();
         }
-        if (workspaceRoot < 0 && !inputs.getCwd().isEmpty()) {
+        // before 1.8.0 install's init stops a focus outside a workspace before yarn writes that lock
+        if (workspaceRoot < 0 && !inputs.getCwd().isEmpty() && !(focus && !release.focusesByPackageName())) {
             throw new CannotKnow("the lock yarn writes: run in " + inputs.getCwd() + ", which no workspaces list, it " +
                                  "makes that directory its lockfileFolder and writes its yarn.lock, not this lock");
         }
-        focusedWorkspaceName = focus ? readRootManifest().getName() : null;
+        focusedWorkspaceName = !focus ? null : release.focusesByPackageName() ? readRootManifest().getName() :
+                PosixPath.basename(inputs.getCwd());
 
         Map<String, String> configFiles = inputs.configFilesFromCwd();
         Map<String, String> env = inputs.getEnv();
@@ -201,6 +203,16 @@ final class Config {
         if (workspaceRoot >= 0 && !workspacesEnabled) {
             throw new MessageError("Your project root defines workspaces but the feature is disabled in your Yarn " +
                                    "config. Please check \"workspaces-experimental\" in your .yarnrc file.");
+        }
+    }
+
+    /**
+     * A focused install runs in a workspace below its root: config.js {@code init}, install.js {@code init} before
+     * 1.8.0.
+     */
+    void requireFocusInAWorkspace() {
+        if (focus && (workspaceRoot < 0 || workspaceRoot == 0 && inputs.getCwd().isEmpty())) {
+            throw new MessageError("This command can only be run inside an individual workspace.");
         }
     }
 

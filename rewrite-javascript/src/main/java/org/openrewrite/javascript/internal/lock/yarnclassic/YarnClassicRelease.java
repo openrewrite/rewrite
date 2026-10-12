@@ -109,6 +109,15 @@ public final class YarnClassicRelease implements Comparable<YarnClassicRelease> 
     // yarn src/config.js
 
     /**
+     * {@code init} holds a focused install's workspace by its package name ({@code focusedWorkspaceName}) and stops a
+     * focus at the workspace root before it loads the registries, from 1.8.0; 1.7.0 takes the workspace whose package
+     * the directory yarn runs in names, and stops a focus at the root in install's {@code init}.
+     */
+    boolean focusesByPackageName() {
+        return atLeast(1, 8, 0);
+    }
+
+    /**
      * {@code unsafe-disable-integrity-migration} is a boolean that defaults to true, so that a lock entry without
      * integrity stays without it, from 1.12.0; before, the migration adds the integrity unless the option holds a
      * truthy value.
@@ -224,6 +233,14 @@ public final class YarnClassicRelease implements Comparable<YarnClassicRelease> 
      */
     boolean jailsTarballLinks() {
         return atLeast(1, 22, 0);
+    }
+
+    /**
+     * {@code createExtractor} reports an archive tar cannot extract as corrupt ({@code errorExtractingTarball}), a
+     * MessageError, from 1.8.0; before, by the extraction's own error.
+     */
+    boolean reportsCorruptArchives() {
+        return atLeast(1, 8, 0);
     }
 
     /**
