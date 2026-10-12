@@ -16,7 +16,9 @@
 package org.openrewrite.javascript.internal.lock.bun;
 
 import org.jspecify.annotations.Nullable;
+import org.openrewrite.javascript.internal.lock.CannotKnow;
 
+import java.nio.charset.StandardCharsets;
 import java.time.OffsetDateTime;
 import java.time.format.DateTimeParseException;
 import java.util.ArrayList;
@@ -388,15 +390,24 @@ final class PackageManifest {
         }
 
         PackageManifest result = new PackageManifest(expectedName);
+        ManifestBuffer buffer = new ManifestBuffer(release, expectedName);
+        buffer.count(expectedName);
+        buffer.append(expectedName);
         Json.Expr versionsExpr = json.get("versions");
         if (versionsExpr != null && versionsExpr.isObject()) {
             Json.Expr timeObj = json.get("time");
             for (Json.Property prop : versionsExpr.properties()) {
                 String versionName = prop.key.asString();
-                SemverVersion.ParseResult parsedVersion = SemverVersion.parse(versionName);
+                SemverVersion.ParseResult parsedVersion = SemverVersion.parse(versionName, release);
                 if (!parsedVersion.valid) {
-                    log.addError("Failed to parse dependency " + versionName);
+                    if (!release.skipsAVersionKeyThatIsNoVersionSilently()) {
+                        log.addError("Failed to parse dependency " + versionName);
+                    }
                     continue;
+                }
+                buffer.count(versionName);
+                if (parsedVersion.version.min().hasPre() || parsedVersion.version.min().hasBuild()) {
+                    buffer.append(versionName);
                 }
                 Json.Expr value = prop.value;
                 Set<String> bundledDepsSet = new LinkedHashSet<>();
@@ -435,24 +446,30 @@ final class PackageManifest {
                     packageVersion.hasInstallScript = Boolean.TRUE.equals(hasInstallScript.asBool());
                 }
                 packageVersion.bin = parseBin(value);
+                buffer.appendAll(packageVersion.bin.value);
+                buffer.leaveUncountedTheDirectoryOfAnEmptyBin(value, versionName);
 
                 Json.Expr dist = value.get("dist");
                 if (dist != null && dist.isObject()) {
                     Json.Expr tarball = dist.get("tarball");
+                    if (tarball != null && tarball.isString()) {
+                        buffer.count(tarball.asString());
+                    }
                     if (tarball != null && tarball.isString() && !tarball.asString().isEmpty()) {
                         packageVersion.tarballUrl = tarball.asString();
+                        buffer.append(packageVersion.tarballUrl);
                     }
                     boolean done = false;
                     Json.Expr integrity = dist.get("integrity");
                     if (integrity != null && integrity.asString() != null) {
-                        packageVersion.integrity = Integrity.parse(integrity.asString());
+                        packageVersion.integrity = Integrity.parse(integrity.asString(), release);
                         done = packageVersion.integrity.tag.isSupported();
                     }
                     if (!done) {
                         Json.Expr shasum = dist.get("shasum");
                         if (shasum != null && shasum.asString() != null) {
                             try {
-                                packageVersion.integrity = Integrity.parseSHASum(shasum.asString());
+                                packageVersion.integrity = Integrity.parseSHASum(shasum.asString(), release);
                             } catch (IllegalArgumentException e) {
                                 packageVersion.integrity = Integrity.UNKNOWN;
                             }
@@ -497,6 +514,8 @@ final class PackageManifest {
                     for (Json.Property item : items) {
                         String nameStr = item.key.asString();
                         String versionStr = item.value.asString();
+                        buffer.count(nameStr);
+                        buffer.count(versionStr);
                         if (nameStr == null || versionStr == null) {
                             continue;
                         }
@@ -552,6 +571,7 @@ final class PackageManifest {
                         pairs.add(names.get(i));
                         pairs.add(versions.get(i));
                     }
+                    buffer.appendAll(pairs);
                     if ("dependencies".equals(group)) {
                         packageVersion.dependencies = pairs;
                     } else if ("optionalDependencies".equals(group)) {
@@ -593,15 +613,124 @@ final class PackageManifest {
                 if (versionName == null) {
                     continue;
                 }
+                buffer.append(key);
+                buffer.append(versionName);
                 result.distTags.add(key);
-                result.distTagVersions.add(SemverVersion.parse(versionName).version.min());
+                result.distTagVersions.add(SemverVersion.parse(versionName, release).version.min());
             }
         }
+        buffer.requireItHoldsWhatItLeftUncounted();
 
         sortByVersion(result.releaseVersions, result.releasePackages);
         sortByVersion(result.prereleaseVersions, result.prereleasePackages);
         result.hasExtendedManifest = isExtendedManifest;
         return result;
+    }
+
+    /**
+     * The string buffer 1.4's manifest parser fills ({@code semver::Builder}), as far as a release's port of it tells
+     * apart: its counting pass sums the strings it cannot inline (the registry's ETag and Last-Modified headers too,
+     * which the engine is not given), and the build pass appends into twice that and more.
+     */
+    private static final class ManifestBuffer {
+        // the slack the buffer has besides twice what its counting pass counts: (cap + cap % 64 + 64) * 2
+        private static final long SLACK = 128;
+
+        private final BunRelease release;
+        private final String name;
+
+        /**
+         * At most what the counting pass counts: the bytes of the expected name, the versions, their tarballs and
+         * their dependencies' names and specs that it does not inline.
+         */
+        private long counted;
+
+        /**
+         * The bytes of each {@code directories.bin} the counting pass leaves out beside an empty {@code bin}.
+         */
+        private long uncounted;
+
+        private @Nullable String firstUncounted;
+
+        ManifestBuffer(BunRelease release, String name) {
+            this.release = release;
+            this.name = name;
+        }
+
+        void count(@Nullable String s) {
+            if (s != null) {
+                int length = s.getBytes(StandardCharsets.UTF_8).length;
+                if (length > 8) {
+                    counted += length;
+                }
+            }
+        }
+
+        /**
+         * A string the build pass appends, which 1.4.0 misplaces where it is 8 bytes whose last is not ASCII
+         * ({@link BunRelease#misplacesAnEightByteNonAsciiManifestString()}).
+         */
+        void append(String s) {
+            if (release.misplacesAnEightByteNonAsciiManifestString() && endsAnEightByteStringOutOfLine(s)) {
+                throw new CannotKnow("what bun " + release + " reads back of the string \"" + s + "\" in " + name +
+                                     "'s packument: its manifest string builder takes these 8 bytes, the last not " +
+                                     "ASCII, for a string it inlines, and keeps the offset of where they stood in " +
+                                     "the packument, which reads whatever its buffer holds there");
+            }
+        }
+
+        void appendAll(List<String> strings) {
+            for (String s : strings) {
+                append(s);
+            }
+        }
+
+        /**
+         * A version whose {@code bin} is {@code ""} has its {@code directories.bin} appended but not counted where the
+         * release leaves it out ({@link BunRelease#leavesAnEmptyBinsDirectoryUncounted()}).
+         */
+        void leaveUncountedTheDirectoryOfAnEmptyBin(Json.Expr version, String versionName) {
+            if (!release.leavesAnEmptyBinsDirectoryUncounted()) {
+                return;
+            }
+            Json.Expr bin = version.get("bin");
+            if (bin == null || !bin.isString() || !bin.asString().isEmpty()) {
+                return;
+            }
+            Json.Expr directories = version.get("directories");
+            Json.Expr directoriesBin = directories == null || !directories.isObject() ? null : directories.get("bin");
+            String directory = directoriesBin == null ? null : directoriesBin.asString();
+            if (directory == null) {
+                return;
+            }
+            int length = directory.getBytes(StandardCharsets.UTF_8).length;
+            if (length > 8 || endsAnEightByteStringOutOfLine(directory)) {
+                uncounted += length;
+                if (firstUncounted == null) {
+                    firstUncounted = versionName;
+                }
+            }
+        }
+
+        /**
+         * The build pass panics ({@code range end index out of range}) where what the counting pass left out does not
+         * fit the buffer's slack, which ends past the counted bytes and {@link #SLACK}: within that it cannot panic,
+         * beyond it whether it does turns on the response's headers as well.
+         */
+        void requireItHoldsWhatItLeftUncounted() {
+            if (uncounted > counted + SLACK) {
+                throw new CannotKnow("whether bun " + release + " holds the directories.bin of " + name + "@" +
+                                     firstUncounted + " in its manifest buffer: beside an empty bin its counting " +
+                                     "pass leaves the path out, and where the buffer cannot hold it bun panics; the " +
+                                     "registry's ETag and Last-Modified headers size the buffer too");
+            }
+        }
+
+        // String::can_inline does not hold 8 bytes whose last has its high bit set
+        private static boolean endsAnEightByteStringOutOfLine(String s) {
+            byte[] bytes = s.getBytes(StandardCharsets.UTF_8);
+            return bytes.length == 8 && (bytes[7] & 0x80) != 0;
+        }
     }
 
     private static void sortByVersion(List<SemverVersion> versions, List<PackageVersion> packages) {

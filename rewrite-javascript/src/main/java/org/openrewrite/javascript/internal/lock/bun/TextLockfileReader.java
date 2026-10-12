@@ -262,7 +262,7 @@ final class TextLockfileReader {
                 if (!versionExpr.isString()) {
                     throw error("InvalidWorkspaceObject", "Expected a string version property");
                 }
-                SemverVersion.ParseResult parsed = SemverVersion.parse(versionExpr.asString());
+                SemverVersion.ParseResult parsed = SemverVersion.parse(versionExpr.asString(), options.getRelease());
                 if (!parsed.valid) {
                     throw error("InvalidSemver", "Invalid semver version");
                 }
@@ -413,11 +413,15 @@ final class TextLockfileReader {
                 nameStr = split[0];
                 resStr = split[1];
             }
+            if (!nameStr.isEmpty() && options.getRelease().rejectsAnUnsafePackageName() &&
+                !Dependency.isSafeInstallFolderName(nameStr)) {
+                throw error("InvalidPackageResolution", "Invalid package name");
+            }
             long nameHash = Wyhash11.stringHash(nameStr);
 
             Resolution res;
             try {
-                res = Resolution.fromTextLockfile(resStr);
+                res = Resolution.fromTextLockfile(resStr, options.getRelease());
             } catch (Resolution.UnexpectedResolution e) {
                 throw error("UnexpectedResolution", e.getMessage());
             }
@@ -529,7 +533,7 @@ final class TextLockfileReader {
                     if (integrityStr == null) {
                         throw error("InvalidPackageInfo", "Expected a string");
                     }
-                    pkg.meta.integrity = Integrity.parse(integrityStr);
+                    pkg.meta.integrity = Integrity.parse(integrityStr, options.getRelease());
                     if (lockfileVersion >= Lockfile.TEXT_LOCKFILE_VERSION_STRICT && npmUrlNeedsIntegrity &&
                         !pkg.meta.integrity.tag.isSupported()) {
                         throw error("InvalidPackageInfo", "Missing integrity hash for npm package resolved to a " +
@@ -542,7 +546,7 @@ final class TextLockfileReader {
                     if (options.getRelease().carriesTarballIntegrity() && i < pkgInfo.size()) {
                         String integrityStr = pkgInfo.get(i).asString();
                         if (integrityStr != null) {
-                            pkg.meta.integrity = Integrity.parse(integrityStr);
+                            pkg.meta.integrity = Integrity.parse(integrityStr, options.getRelease());
                             i++;
                         }
                     }
@@ -566,7 +570,7 @@ final class TextLockfileReader {
                     if (options.getRelease().carriesTarballIntegrity() && i < pkgInfo.size()) {
                         String integrityStr = pkgInfo.get(i).asString();
                         if (integrityStr != null) {
-                            pkg.meta.integrity = Integrity.parse(integrityStr);
+                            pkg.meta.integrity = Integrity.parse(integrityStr, options.getRelease());
                             i++;
                         }
                     }

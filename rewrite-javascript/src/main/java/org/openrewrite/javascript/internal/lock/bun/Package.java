@@ -335,7 +335,7 @@ final class Package {
                     }
                     SemverVersion workspaceVersion = null;
                     if (entry.version != null) {
-                        SemverVersion.ParseResult result = SemverVersion.parse(entry.version);
+                        SemverVersion.ParseResult result = SemverVersion.parse(entry.version, options.getRelease());
                         if (result.valid && result.wildcard == SemverQuery.Wildcard.NONE) {
                             workspaceVersion = result.version.min();
                         }
@@ -572,10 +572,10 @@ final class Package {
                         trimmed.charAt(0) != '*' && trimmed.charAt(0) != '^' && trimmed.charAt(0) != '~') {
                         int at = Math.max(input.lastIndexOf('@'), 0);
                         if (at > 0) {
-                            workspaceRange = SemverQuery.parse(input.substring(at + 1));
+                            workspaceRange = SemverQuery.parse(input.substring(at + 1), options.getRelease());
                             nameHash = Wyhash11.stringHash(input.substring(0, at));
                         } else {
-                            workspaceRange = SemverQuery.parse(input);
+                            workspaceRange = SemverQuery.parse(input, options.getRelease());
                         }
                     }
                 }

@@ -346,6 +346,146 @@ public final class BunRelease implements Comparable<BunRelease> {
 
     // 1.4.x: src/install (dependency.rs, integrity.rs, repository.rs, npm.rs, resolution.rs) and src/semver
 
+    /**
+     * A spec or resolution is a tarball when it ends in {@code .tgz}, {@code .tar.gz} or {@code .tar}, in any case
+     * ({@code dependency::is_tarball}), from 1.4.0 (bun#38333); before, when it ends in {@code .tgz} or
+     * {@code .tar.gz} as written, so that {@code ./x.tar} is a folder and {@code user/repo.tar} a GitHub repo.
+     */
+    boolean tellsTarballsByTheirSuffixInAnyCase() {
+        return atLeast(1, 4, 0);
+    }
+
+    /**
+     * The text lockfile's parser rejects a package whose name is no safe {@code node_modules} folder name
+     * ({@code dependency::is_safe_install_folder_name}: a {@code /} component that is empty, {@code .} or {@code ..},
+     * or that holds {@code \}, {@code :} or NUL) as {@code Invalid package name}, at every lockfile version, from 1.4.0
+     * (bun#31339); before, it reads any name.
+     */
+    boolean rejectsAnUnsafePackageName() {
+        return atLeast(1, 4, 0);
+    }
+
+    /**
+     * The hoisting skips a dependency whose name is no safe {@code node_modules} folder name, logging
+     * {@code Invalid dependency name "<name>"} (Tree.rs {@code process_subtree}), from 1.4.0 (bun#31221, an empty name
+     * passing from bun#31655); before, it hoists it.
+     */
+    boolean skipsAnUnsafeDependencyName() {
+        return atLeast(1, 4, 0);
+    }
+
+    /**
+     * An integrity of several hashes separated by ASCII whitespace is its strongest supported one, each read up to a
+     * {@code ?} ({@code Integrity::parse}), from 1.4.0 (bun#33072); before, the whole string is one hash, which a
+     * second hash or a {@code ?} makes unknown, so that an npm version falls back to its {@code shasum}.
+     */
+    boolean keepsTheStrongestOfSeveralHashes() {
+        return atLeast(1, 4, 0);
+    }
+
+    /**
+     * A packument's {@code shasum} is pairs of hexadecimal digits, anything else or an odd count of them making it
+     * unknown ({@code Integrity::parse_sha_sum}), from 1.4.0 (bun#30412); before, {@code g} to {@code z} read as the
+     * digits 16 to 35.
+     */
+    boolean readsAShasumAsHexadecimal() {
+        return atLeast(1, 4, 0);
+    }
+
+    /**
+     * Git and GitHub resolutions of one owner, repo and committish order by their resolved tag
+     * ({@code Repository::order}), from 1.4.0 (bun#36578); before, they are equal.
+     */
+    boolean ordersRepositoriesByTheirResolvedTag() {
+        return atLeast(1, 4, 0);
+    }
+
+    /**
+     * A {@code github:} resolution of bun.lock splits at its last {@code #}, and its owner from its repo at the last
+     * {@code /} before that, an owner being empty without one ({@code Repository::parse_append_github}), from 1.4.0
+     * (bun#36165); before, at its last {@code /} and its last {@code #} wherever they stand, so that a repo without an
+     * owner loses its first character ({@code github:repo} names {@code epo}) and a {@code /} after the {@code #}
+     * slices the repo from past its end.
+     */
+    boolean splitsAGitHubResolutionAtTheSlashBeforeItsHash() {
+        return atLeast(1, 4, 0);
+    }
+
+    /**
+     * A workspace dependency cloned into another lockfile keeps its path ({@code clone_with_different_buffers}), from
+     * 1.4.1 (bun#41302); before, the clone reads its literal again as a workspace spec, so that an npm range the
+     * dependency was linked to a member by ({@code "a": "^1.0.0"}) becomes its path.
+     */
+    boolean keepsAWorkspaceDependencysPathWhenCloned() {
+        return atLeast(1, 4, 1);
+    }
+
+    /**
+     * A packument's {@code versions} key that is no version is skipped without an error (with {@code --verbose}, the
+     * warning {@code Skipping version "<key>" of "<name>": not a valid semver version}), from 1.4.3 (bun#43035, which
+     * holds bun#43115); before, the install logs {@code Failed to parse dependency <key>}.
+     */
+    boolean skipsAVersionKeyThatIsNoVersionSilently() {
+        return atLeast(1, 4, 3);
+    }
+
+    /**
+     * 1.4.0's manifest string builder takes a string of 8 bytes whose last byte is not ASCII for one it stores inline
+     * ({@code len <= 8} where {@code String::can_inline} holds it out of line) and keeps an offset to where the string
+     * stood in the packument, which it reads back as whatever its buffer holds there, an empty string where the
+     * offset falls outside it (bun#40406 counts and copies such a string from 1.4.1). Before 1.4.0, Zig's builder did
+     * likewise, and the port reads the string as written there.
+     */
+    boolean misplacesAnEightByteNonAsciiManifestString() {
+        return atLeast(1, 4, 0) && !atLeast(1, 4, 1);
+    }
+
+    /**
+     * The manifest parser's counting pass leaves out the {@code directories.bin} of a version whose {@code bin} is
+     * {@code ""}, which the build pass appends, so that it panics ({@code range end index out of range}) where the
+     * buffer's slack cannot hold it, from 1.4.0 until 1.4.3 (bun#43145) counts it; Zig's builder (before 1.4.0) wrote
+     * past its buffer unchecked, which the port reads as the install going on.
+     */
+    boolean leavesAnEmptyBinsDirectoryUncounted() {
+        return atLeast(1, 4, 0) && !atLeast(1, 4, 3);
+    }
+
+    /**
+     * A range skips a chunk without a comparator, such as the {@code - foo} of {@code 1 || - foo}, wherever it stands
+     * and keeping a pending {@code ||} (src/semver/SemverQuery.rs {@code parse}), from 1.4.0 (bun#31234); before, only
+     * ahead of the first comparator, where it drops a pending {@code ||}, and after it bun reaches code it takes for
+     * unreachable.
+     */
+    boolean skipsARangeChunkWithoutAComparator() {
+        return atLeast(1, 4, 0);
+    }
+
+    /**
+     * A version of whitespace, {@code v} and {@code =} alone is invalid, all of it read (src/semver/Version.rs
+     * {@code parse}), from 1.4.0 (bun#33072); before, none of it is read, and one starting with a space is a valid
+     * {@code 0.0.0}.
+     */
+    boolean rejectsAVersionOfSeparatorsAlone() {
+        return atLeast(1, 4, 0);
+    }
+
+    /**
+     * A version's number of more than 20 digits is its value, or 0 past the u64 maximum ({@code parse_version_number}),
+     * from 1.4.0 (bun#34521); before, it is missing, as an {@code x} is.
+     */
+    boolean readsALongVersionNumberByItsValue() {
+        return atLeast(1, 4, 0);
+    }
+
+    /**
+     * A caret, tilde, x, partial or hyphen range whose upper bound would pass the u64 maximum ends at {@code <=} that
+     * ceiling ({@code Comparator::lt_next_major}, {@code lt_next_minor}, {@code lt_next_patch}), from 1.4.0
+     * (bun#34600); before, at {@code <} the saturated bound, which leaves {@code ^18446744073709551615} empty.
+     */
+    boolean boundsARangeAtTheCeilingInclusively() {
+        return atLeast(1, 4, 0);
+    }
+
     // ----
 
     // 1.4.x: src/install (PackageManagerEnqueue.rs, lockfile.rs, Tree.rs, Package.rs, bun.lock.rs's reader)

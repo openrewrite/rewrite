@@ -299,7 +299,7 @@ public final class Lockfile {
     private void insertSorted(List<Integer> ids, int id) {
         Resolution resolution = packages.get(id).resolution;
         for (int i = 0; i < ids.size(); i++) {
-            if (resolution.order(packages.get(ids.get(i)).resolution) > 0) {
+            if (resolution.order(packages.get(ids.get(i)).resolution, release) > 0) {
                 ids.add(i, id);
                 return;
             }

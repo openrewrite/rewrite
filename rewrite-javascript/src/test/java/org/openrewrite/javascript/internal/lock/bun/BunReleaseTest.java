@@ -1703,6 +1703,331 @@ class BunReleaseTest {
         }
     }
 
+    /**
+     * dependency.rs is_tarball (1.4.0, bun#38333): {@code .tar} and any case end a tarball; before, {@code .tgz} or
+     * {@code .tar.gz} as written.
+     */
+    @Test
+    void tellsATarballByItsSuffixInAnyCaseFrom140() {
+        BunRelease later = BunRelease.of("1.4.0");
+        BunRelease earlier = BunRelease.of("1.3.14");
+        DependencyVersion.Tag tarball = DependencyVersion.Tag.TARBALL;
+        assertThat(DependencyVersion.Tag.infer("./vendor/x.tar", later)).isEqualTo(tarball);
+        assertThat(DependencyVersion.Tag.infer("./vendor/x.tar", earlier)).isEqualTo(DependencyVersion.Tag.FOLDER);
+        assertThat(DependencyVersion.Tag.infer("file:x.tar", later)).isEqualTo(tarball);
+        assertThat(DependencyVersion.Tag.infer("file:x.tar", earlier)).isEqualTo(DependencyVersion.Tag.FOLDER);
+        assertThat(DependencyVersion.Tag.infer("./x.TGZ", later)).isEqualTo(tarball);
+        assertThat(DependencyVersion.Tag.infer("./x.TGZ", earlier)).isEqualTo(DependencyVersion.Tag.FOLDER);
+        assertThat(DependencyVersion.Tag.infer("user/repo.tar", later)).isEqualTo(tarball);
+        assertThat(DependencyVersion.Tag.infer("user/repo.tar", earlier)).isEqualTo(DependencyVersion.Tag.GITHUB);
+        assertThat(DependencyVersion.Tag.infer("https://github.com/u/r.tar", later)).isEqualTo(tarball);
+        assertThat(DependencyVersion.Tag.infer("https://github.com/u/r.tar", earlier))
+          .isEqualTo(DependencyVersion.Tag.GITHUB);
+        assertThat(DependencyVersion.Tag.infer("beta.tar", later)).isEqualTo(tarball);
+        assertThat(DependencyVersion.Tag.infer("beta.tar", earlier)).isEqualTo(DependencyVersion.Tag.DIST_TAG);
+
+        DependencyVersion.TarballInfo local = requireNonNull(DependencyVersion.parse("x", null, "./vendor/x.tar", later))
+          .tarball();
+        assertThat(local.remote).isFalse();
+        assertThat(local.uri).isEqualTo("./vendor/x.tar");
+        assertThat(Resolution.fromTextLockfile("./vendor/x.tar", later).tag).isEqualTo(Resolution.Tag.LOCAL_TARBALL);
+        assertThatThrownBy(() -> Resolution.fromTextLockfile("./vendor/x.tar", earlier))
+          .isInstanceOf(Resolution.UnexpectedResolution.class);
+    }
+
+    /**
+     * bun.lock.rs (1.4.0, bun#31339): a package whose name would leave node_modules is an invalid package; before, it
+     * is read.
+     */
+    @Test
+    void rejectsAnUnsafePackageNameFrom140() {
+        String lock = lock("", MS.replace("[\"ms@2.1.3\"", "[\"../ms@2.1.3\""));
+        TextLockfileReader.load(lock, options("1.3.14", null));
+        assertThatThrownBy(() -> TextLockfileReader.load(lock, options("1.4.0", null)))
+          .isInstanceOf(TextLockfileReader.ParseError.class)
+          .hasMessage("Invalid package name");
+
+        assertThat(Dependency.isSafeInstallFolderName("ms")).isTrue();
+        assertThat(Dependency.isSafeInstallFolderName("@scope/ms")).isTrue();
+        assertThat(Dependency.isSafeInstallFolderName("..ms")).isTrue();
+        for (String unsafe : new String[]{"", "..", "../ms", "a/../b", "a//b", "/a", "a/", ".", "a:b", "a\\b", "a\0"}) {
+            assertThat(Dependency.isSafeInstallFolderName(unsafe)).as(unsafe).isFalse();
+        }
+    }
+
+    /**
+     * Tree.rs process_subtree (1.4.0, bun#31221): a dependency whose name would leave node_modules is not hoisted;
+     * before, it is.
+     */
+    @Test
+    void skipsAnUnsafeDependencyNameFrom140() {
+        String lock = "{\n  \"lockfileVersion\": 1,\n  \"workspaces\": {\n    \"\": {\n      \"name\": \"p\",\n" +
+                      "      \"dependencies\": {\n        \"a:b\": \"npm:ms@2.1.3\",\n      },\n    },\n  },\n" +
+                      "  \"packages\": {\n    " + MS.replace("\"ms\": [", "\"a:b\": [") + "\n  }\n}\n";
+        assertThat(hoisted(TextLockfileReader.load(lock, options("1.3.14", null)))).containsExactly("a:b");
+        assertThat(hoisted(TextLockfileReader.load(lock, options("1.4.0", null)))).isEmpty();
+    }
+
+    /**
+     * integrity.rs Integrity::parse (1.4.0, bun#33072): the strongest of several hashes, each up to a {@code ?};
+     * before, the whole string is one hash, so that a packument's {@code shasum} stands in for it.
+     */
+    @Test
+    void keepsTheStrongestOfSeveralHashesFrom140() {
+        String sha1 = "sha1-" + java.util.Base64.getEncoder().encodeToString(new byte[20]);
+        BunRelease later = BunRelease.of("1.4.0");
+        BunRelease earlier = BunRelease.of("1.3.14");
+        assertThat(Integrity.parse(INTEGRITY + " " + sha1, later)).hasToString(INTEGRITY);
+        assertThat(Integrity.parse(sha1 + "\n" + INTEGRITY, later)).hasToString(INTEGRITY);
+        assertThat(Integrity.parse(INTEGRITY + "?x=1", later)).hasToString(INTEGRITY);
+        assertThat(Integrity.parse(INTEGRITY + " " + sha1, earlier).tag).isEqualTo(Integrity.Tag.UNKNOWN);
+        assertThat(Integrity.parse(INTEGRITY + "?x=1", earlier).tag).isEqualTo(Integrity.Tag.UNKNOWN);
+
+        String packument = "{\"name\":\"ms\",\"modified\":\"2026-01-01T00:00:00.000Z\",\"dist-tags\":{\"latest\":" +
+                           "\"1.0.0\"},\"versions\":{\"1.0.0\":{\"name\":\"ms\",\"version\":\"1.0.0\",\"dist\":{" +
+                           "\"integrity\":\"" + INTEGRITY + " " + sha1 + "\",\"shasum\":\"" +
+                           "3cd0599b099384b815c10f7fa7df0092b62d534f\"}}}}";
+        assertThat(picked(later, packument, "ms").integrity).hasToString(INTEGRITY);
+        assertThat(picked(earlier, packument, "ms").integrity).hasToString("sha1-PNBZmwmThLgVwQ9/p98AkrYtU08=");
+    }
+
+    /**
+     * integrity.rs parse_sha_sum (1.4.0, bun#30412): hexadecimal digits only; before, {@code g} to {@code z} read as
+     * 16 to 35.
+     */
+    @Test
+    void readsAShasumAsHexadecimalFrom140() {
+        String shasum = "3cd0599b099384b815c10f7fa7df0092b62d534g";
+        assertThat(Integrity.parseSHASum(shasum, BunRelease.of("1.3.14")).tag).isEqualTo(Integrity.Tag.SHA1);
+        assertThatThrownBy(() -> Integrity.parseSHASum(shasum, BunRelease.of("1.4.0")))
+          .isInstanceOf(IllegalArgumentException.class)
+          .hasMessage("InvalidCharacter");
+        assertThat(Integrity.parseSHASum("3CD0599B099384B815C10F7FA7DF0092B62D534F", BunRelease.of("1.4.0")))
+          .hasToString("sha1-PNBZmwmThLgVwQ9/p98AkrYtU08=");
+
+        String packument = "{\"name\":\"ms\",\"modified\":\"2026-01-01T00:00:00.000Z\",\"dist-tags\":{\"latest\":" +
+                           "\"1.0.0\"},\"versions\":{\"1.0.0\":{\"name\":\"ms\",\"version\":\"1.0.0\",\"dist\":{" +
+                           "\"shasum\":\"" + shasum + "\"}}}}";
+        assertThat(picked(BunRelease.of("1.4.0"), packument, "ms").integrity.tag).isEqualTo(Integrity.Tag.UNKNOWN);
+        assertThat(picked(BunRelease.of("1.3.14"), packument, "ms").integrity.tag).isEqualTo(Integrity.Tag.SHA1);
+    }
+
+    /**
+     * resolver_hooks.rs Repository::order (1.4.0, bun#36578): two resolutions of one repo and committish order by
+     * their resolved tag; before, they are equal.
+     */
+    @Test
+    void ordersRepositoriesByTheirResolvedTagFrom140() {
+        Repository first = new Repository("o", "r", "main", "o-r-1111111", "");
+        Repository second = new Repository("o", "r", "main", "o-r-2222222", "");
+        assertThat(first.order(second, BunRelease.of("1.4.0"))).isNegative();
+        assertThat(first.order(second, BunRelease.of("1.3.14"))).isZero();
+        Resolution l = Resolution.repository(Resolution.Tag.GITHUB, second);
+        Resolution r = Resolution.repository(Resolution.Tag.GITHUB, first);
+        assertThat(l.order(r, BunRelease.of("1.4.0"))).isPositive();
+        assertThat(l.order(r, BunRelease.of("1.3.14"))).isZero();
+    }
+
+    /**
+     * repository.rs parse_append_github (1.4.0, bun#36165): the owner splits off at the last slash before the
+     * {@code #}; before, at the last slash, which leaves a repo without an owner its first character dropped, and one
+     * after the {@code #} has bun slice the repo from past its end.
+     */
+    @Test
+    void splitsAGitHubResolutionAtTheSlashBeforeItsHashFrom140() {
+        BunRelease later = BunRelease.of("1.4.0");
+        BunRelease earlier = BunRelease.of("1.3.14");
+        Repository branch = Repository.parseAppendGithub("github:o/r#feat/x", later);
+        assertThat(branch.owner).isEqualTo("o");
+        assertThat(branch.repo).isEqualTo("r");
+        assertThat(branch.committish).isEqualTo("feat/x");
+        assertThatThrownBy(() -> Resolution.fromTextLockfile("github:o/r#feat/x", earlier))
+          .isInstanceOf(CannotKnow.class)
+          .hasMessageContaining("slices from past its end");
+        Repository ownerless = Repository.parseAppendGithub("github:repo", later);
+        assertThat(ownerless.owner).isEmpty();
+        assertThat(ownerless.repo).isEqualTo("repo");
+        assertThat(Repository.parseAppendGithub("github:repo", earlier).repo).isEqualTo("epo");
+        Repository plain = Repository.parseAppendGithub("github:o/r#v1", later);
+        assertThat(plain.owner + " " + plain.repo + " " + plain.committish).isEqualTo("o r v1");
+        Repository plainBefore = Repository.parseAppendGithub("github:o/r#v1", earlier);
+        assertThat(plainBefore.owner + " " + plainBefore.repo + " " + plainBefore.committish).isEqualTo("o r v1");
+    }
+
+    /**
+     * dependency.rs clone_with_different_buffers (1.4.1, bun#41302): a workspace dependency keeps its path; before,
+     * the clone reads its literal as the path.
+     */
+    @Test
+    void keepsAWorkspaceDependencysPathWhenClonedFrom141() {
+        DependencyVersion linked = requireNonNull(DependencyVersion.parse("a", null, "^1.0.0")).asWorkspace("packages/a");
+        Dependency dependency = new Dependency("a", linked, Behavior.of(Behavior.PROD));
+        DependencyVersion later = dependency.cloneDependency(BunRelease.of("1.4.1")).version;
+        assertThat(later.tag).isEqualTo(DependencyVersion.Tag.WORKSPACE);
+        assertThat(later.literal).isEqualTo("^1.0.0");
+        assertThat(later.string()).isEqualTo("packages/a");
+        assertThat(dependency.cloneDependency(BunRelease.of("1.4.0")).version.string()).isEqualTo("^1.0.0");
+    }
+
+    /**
+     * npm.rs PackageManifest::parse (1.4.3, bun#43035 with bun#43115): a versions key that is no version is skipped
+     * without an error; before, with {@code Failed to parse dependency <key>}.
+     */
+    @Test
+    void skipsAVersionKeyThatIsNoVersionSilentlyFrom143() {
+        String packument = "{\"name\":\"ms\",\"modified\":\"2026-01-01T00:00:00.000Z\",\"dist-tags\":{\"latest\":" +
+                           "\"1.0.0\"},\"versions\":{\"next\":{\"name\":\"ms\"},\"1.0.0\":{\"name\":\"ms\"," +
+                           "\"version\":\"1.0.0\"}}}";
+        Log later = new Log();
+        PackageManifest manifest = requireNonNull(PackageManifest.parse(BunRelease.of("1.4.3"), later, packument, "ms",
+          false));
+        assertThat(later.errors).isEmpty();
+        assertThat(manifest.releaseVersions).hasSize(1);
+        Log earlier = new Log();
+        PackageManifest.parse(BunRelease.of("1.4.2"), earlier, packument, "ms", false);
+        assertThat(earlier.errors).containsExactly("Failed to parse dependency next");
+    }
+
+    /**
+     * semver lib.rs Builder (1.4.0 only; bun#40406 from 1.4.1): an 8-byte packument string whose last byte is not
+     * ASCII is kept as an offset into the packument, which reads whatever the buffer holds there.
+     */
+    @Test
+    void misplacesAnEightByteNonAsciiManifestStringIn140() {
+        String packument = "{\"name\":\"p\",\"modified\":\"2026-01-01T00:00:00.000Z\",\"dist-tags\":{\"latest\":" +
+                           "\"1.0.0\"},\"versions\":{\"1.0.0\":{\"name\":\"p\",\"version\":\"1.0.0\"," +
+                           "\"peerDependencies\":{\"quux\":\"1.0.0-é\"}}}}";
+        assertThatThrownBy(() -> PackageManifest.parse(BunRelease.of("1.4.0"), new Log(), packument, "p", false))
+          .isInstanceOf(CannotKnow.class)
+          .hasMessageContaining("\"1.0.0-é\"");
+        assertThat(picked(BunRelease.of("1.4.1"), packument, "p").peerDependencies).containsExactly("quux", "1.0.0-é");
+        assertThat(picked(BunRelease.of("1.3.14"), packument, "p").peerDependencies)
+          .containsExactly("quux", "1.0.0-é");
+    }
+
+    /**
+     * npm.rs PackageManifest::parse (1.4.0 until 1.4.3, bun#43145): beside an empty bin the counting pass leaves a
+     * directories.bin out, which panics the build pass where the buffer cannot hold it; within the buffer's least
+     * slack it fits.
+     */
+    @Test
+    void leavesAnEmptyBinsDirectoryUncountedFrom140Until143() {
+        StringBuilder longPath = new StringBuilder();
+        for (int i = 0; i < 100; i++) {
+            longPath.append("./");
+        }
+        String uncounted = binPackument(longPath + "bin");
+        assertThatThrownBy(() -> PackageManifest.parse(BunRelease.of("1.4.2"), new Log(), uncounted, "p", false))
+          .isInstanceOf(CannotKnow.class)
+          .hasMessageContaining("directories.bin of p@1.0.0");
+        assertThatThrownBy(() -> PackageManifest.parse(BunRelease.of("1.4.0"), new Log(), uncounted, "p", false))
+          .isInstanceOf(CannotKnow.class);
+        assertThat(picked(BunRelease.of("1.4.3"), uncounted, "p").bin.tag).isEqualTo(Bin.Tag.DIR);
+        assertThat(picked(BunRelease.of("1.3.14"), uncounted, "p").bin.tag).isEqualTo(Bin.Tag.DIR);
+        assertThat(picked(BunRelease.of("1.4.2"), binPackument("./node_modules/.bin"), "p").bin.value)
+          .containsExactly("./node_modules/.bin");
+    }
+
+    private static String binPackument(String directory) {
+        return "{\"name\":\"p\",\"modified\":\"2026-01-01T00:00:00.000Z\",\"dist-tags\":{\"latest\":\"1.0.0\"}," +
+               "\"versions\":{\"1.0.0\":{\"name\":\"p\",\"version\":\"1.0.0\",\"bin\":\"\",\"directories\":{" +
+               "\"bin\":\"" + directory + "\"},\"dist\":{\"tarball\":\"https://registry.npmjs.org/p/-/p-1.0.0.tgz\"}}}}";
+    }
+
+    /**
+     * SemverQuery.rs parse (1.4.0, bun#31234): a chunk without a comparator after the first is skipped; before, bun
+     * reaches code it takes for unreachable.
+     */
+    @Test
+    void skipsARangeChunkWithoutAComparatorFrom140() {
+        BunRelease later = BunRelease.of("1.4.0");
+        SemverQuery.Group dangling = SemverQuery.parse("1 || - foo", later);
+        assertThat(dangling.satisfies(SemverVersion.of(1, 2, 3))).isTrue();
+        assertThat(dangling.satisfies(SemverVersion.of(2, 0, 0))).isFalse();
+        assertThat(SemverQuery.parse("1 || - 2", later).satisfies(SemverVersion.of(2, 5, 0))).isFalse();
+        assertThatThrownBy(() -> SemverQuery.parse("1 || - foo", BunRelease.of("1.3.14")))
+          .isInstanceOf(CannotKnow.class)
+          .hasMessageContaining("takes for unreachable");
+        assertThat(SemverQuery.parse("--canary.24 1.2.3", BunRelease.of("1.3.14")).satisfies(SemverVersion.of(1, 2, 3)))
+          .isTrue();
+    }
+
+    /**
+     * Version.rs parse (1.4.0, bun#33072): separators alone are no version; before, one starting with a space is
+     * 0.0.0. A bun.lock's workspace {@code "version": " "} is an invalid semver version from 1.4.0.
+     */
+    @Test
+    void rejectsAVersionOfSeparatorsAloneFrom140() {
+        assertThat(SemverVersion.parse(" ", BunRelease.of("1.4.0")).valid).isFalse();
+        SemverVersion.ParseResult earlier = SemverVersion.parse(" ", BunRelease.of("1.3.14"));
+        assertThat(earlier.valid).isTrue();
+        assertThat(earlier.version.min()).hasToString("0.0.0");
+        assertThat(SemverVersion.parse("v =", BunRelease.of("1.4.0")).len).isEqualTo(3);
+        assertThat(SemverVersion.parse("v =", BunRelease.of("1.3.14")).len).isZero();
+
+        String lock = "{\n  \"lockfileVersion\": 1,\n  \"workspaces\": {\n    \"\": {\n      \"name\": \"p\",\n" +
+                      "    },\n    \"packages/a\": {\n      \"name\": \"a\",\n      \"version\": \" \",\n    },\n" +
+                      "  },\n  \"packages\": {\n    \"a\": [\"a@workspace:packages/a\"],\n  }\n}\n";
+        TextLockfileReader.load(lock, options("1.3.14", null));
+        assertThatThrownBy(() -> TextLockfileReader.load(lock, options("1.4.0", null)))
+          .isInstanceOf(TextLockfileReader.ParseError.class)
+          .hasMessage("Invalid semver version");
+    }
+
+    /**
+     * Version.rs parse_version_number (1.4.0, bun#34521): a number of more than 20 digits is its value; before,
+     * missing, so that {@code ^} and 21 nines take any version.
+     */
+    @Test
+    void readsALongVersionNumberByItsValueFrom140() {
+        StringBuilder nines = new StringBuilder();
+        for (int i = 0; i < 21; i++) {
+            nines.append('9');
+        }
+        String caret = "^" + nines;
+        assertThat(SemverQuery.parse(caret, BunRelease.of("1.4.0")).satisfies(SemverVersion.of(1, 0, 0))).isFalse();
+        assertThat(SemverQuery.parse(caret, BunRelease.of("1.3.14")).satisfies(SemverVersion.of(1, 0, 0))).isTrue();
+        String padded = "1.0.0000000000000000000005";
+        assertThat(SemverVersion.parse(padded, BunRelease.of("1.4.0")).version.patch).isEqualTo(5L);
+        assertThat(SemverVersion.parse(padded, BunRelease.of("1.3.14")).version.patch).isNull();
+    }
+
+    /**
+     * SemverQuery.rs and SemverRange.rs (1.4.0, bun#34600): an upper bound past the u64 maximum ends at {@code <=} it;
+     * before, the range is empty.
+     */
+    @Test
+    void boundsARangeAtTheCeilingInclusivelyFrom140() {
+        String max = "18446744073709551615";
+        BunRelease later = BunRelease.of("1.4.0");
+        BunRelease earlier = BunRelease.of("1.3.14");
+        SemverVersion top = SemverVersion.of(SemverVersion.MAX, 0, 0);
+        for (String range : new String[]{"^" + max, "~" + max, max, max + ".x", "1.0.0 - " + max}) {
+            assertThat(SemverQuery.parse(range, later).satisfies(top)).as(range).isTrue();
+            assertThat(SemverQuery.parse(range, earlier).satisfies(top)).as(range).isFalse();
+        }
+        SemverVersion minor = SemverVersion.of(1, SemverVersion.MAX, 3);
+        assertThat(SemverQuery.parse("~1." + max + ".3", later).satisfies(minor)).isTrue();
+        assertThat(SemverQuery.parse("~1." + max + ".3", earlier).satisfies(minor)).isFalse();
+        SemverVersion patch = SemverVersion.of(0, 0, SemverVersion.MAX);
+        assertThat(SemverQuery.parse("^0.0." + max, later).satisfies(patch)).isTrue();
+        assertThat(SemverQuery.parse("^0.0." + max, earlier).satisfies(patch)).isFalse();
+    }
+
+    private static PackageManifest.PackageVersion picked(BunRelease release, String packument, String name) {
+        PackageManifest manifest = requireNonNull(PackageManifest.parse(release, new Log(), packument, name, false));
+        return requireNonNull(manifest.findByDistTag("latest")).packageVersion;
+    }
+
+    // the names of the dependencies the hoisting placed
+    private static List<String> hoisted(Lockfile lockfile) {
+        List<String> names = new java.util.ArrayList<>();
+        for (int id : lockfile.hoistedDependencies) {
+            names.add(lockfile.dependencies.get(id).name);
+        }
+        return names;
+    }
+
     private static PackageManifest.PackageVersion version(BunRelease release, String packument) {
         PackageManifest manifest = requireNonNull(PackageManifest.parse(release, new Log(), packument, "debug", false));
         PackageManifest.FindResult pick = requireNonNull(manifest.findBestVersion(

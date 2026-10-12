@@ -16,13 +16,14 @@
 package org.openrewrite.javascript.internal.lock.bun;
 
 import org.jspecify.annotations.Nullable;
+import org.openrewrite.javascript.internal.lock.CannotKnow;
 
 import static org.openrewrite.javascript.internal.lock.bun.SemverVersion.MAX;
 import static org.openrewrite.javascript.internal.lock.bun.SemverVersion.saturatingIncrement;
 
 /**
- * Port of bun's src/semver/SemverQuery.zig (bun 1.3.10): a range is a {@link Group} of OR'd {@link List}s of
- * AND'd queries.
+ * Port of bun's src/semver/SemverQuery.zig (bun 1.3.10), with SemverQuery.rs (1.4.0) beside it: a range is a
+ * {@link Group} of OR'd {@link List}s of AND'd queries.
  */
 final class SemverQuery {
 
@@ -195,7 +196,11 @@ final class SemverQuery {
             return new SemverRange(new SemverRange.Comparator(op, version));
         }
 
-        SemverRange toRange(SemverVersion.Partial version) {
+        /**
+         * {@code toRange}, an upper bound that would pass the ceiling ending at it from 1.4.0
+         * ({@link SemverRange.Comparator#ltNextMajor}).
+         */
+        SemverRange toRange(SemverVersion.Partial version, BunRelease release) {
             switch (tag) {
                 case CARET: {
                     if (version.major == null) {
@@ -203,10 +208,7 @@ final class SemverQuery {
                     }
                     long major = version.major;
                     SemverVersion left = SemverVersion.of(major, 0, 0);
-                    long rightMajor = 0;
-                    long rightMinor = 0;
-                    long rightPatch = 0;
-                    boolean done = false;
+                    SemverRange.Comparator right = null;
                     if (version.minor != null) {
                         long minor = version.minor;
                         left = SemverVersion.of(major, minor, 0);
@@ -214,24 +216,17 @@ final class SemverQuery {
                             long patch = version.patch;
                             left = new SemverVersion(major, minor, patch, version.pre, version.build);
                             if (major == 0) {
-                                if (minor == 0) {
-                                    rightPatch = saturatingIncrement(patch);
-                                } else {
-                                    rightMinor = saturatingIncrement(minor);
-                                }
-                                done = true;
+                                right = minor == 0 ? SemverRange.Comparator.ltNextPatch(0, 0, patch, release) :
+                                        SemverRange.Comparator.ltNextMinor(0, minor, release);
                             }
                         } else if (major == 0) {
-                            rightMinor = saturatingIncrement(minor);
-                            done = true;
+                            right = SemverRange.Comparator.ltNextMinor(0, minor, release);
                         }
                     }
-                    if (!done) {
-                        rightMajor = saturatingIncrement(major);
+                    if (right == null) {
+                        right = SemverRange.Comparator.ltNextMajor(major, release);
                     }
-                    SemverVersion right = SemverVersion.of(rightMajor, rightMinor, rightPatch);
-                    return new SemverRange(new SemverRange.Comparator(SemverRange.Op.GTE, left),
-                            new SemverRange.Comparator(SemverRange.Op.LT, right));
+                    return new SemverRange(new SemverRange.Comparator(SemverRange.Op.GTE, left), right);
                 }
                 case TILDA: {
                     if (version.major == null) {
@@ -239,25 +234,24 @@ final class SemverQuery {
                     }
                     long major = version.major;
                     SemverVersion left = SemverVersion.of(major, 0, 0);
-                    SemverVersion right;
+                    SemverRange.Comparator right;
                     if (version.minor != null) {
                         long minor = version.minor;
                         left = SemverVersion.of(major, minor, 0);
                         if (version.patch != null) {
                             left = new SemverVersion(major, minor, version.patch, version.pre, version.build);
                         }
-                        right = SemverVersion.of(major, saturatingIncrement(minor), 0);
+                        right = SemverRange.Comparator.ltNextMinor(major, minor, release);
                     } else {
-                        right = SemverVersion.of(saturatingIncrement(major), 0, 0);
+                        right = SemverRange.Comparator.ltNextMajor(major, release);
                     }
-                    return new SemverRange(new SemverRange.Comparator(SemverRange.Op.GTE, left),
-                            new SemverRange.Comparator(SemverRange.Op.LT, right));
+                    return new SemverRange(new SemverRange.Comparator(SemverRange.Op.GTE, left), right);
                 }
                 case NONE:
                     throw new IllegalStateException("unreachable");
                 case VERSION:
                     if (wildcard != Wildcard.NONE) {
-                        return SemverRange.initWildcard(version.min(), wildcard);
+                        return SemverRange.initWildcard(version.min(), wildcard, release);
                     }
                     return new SemverRange(new SemverRange.Comparator(SemverRange.Op.EQL, version.min()));
                 default:
@@ -314,6 +308,18 @@ final class SemverQuery {
     }
 
     static Group parse(String input) {
+        return parse(input, BunRelease.PORTED);
+    }
+
+    /**
+     * {@code parse} as the release reads a range: from 1.4.0 a chunk without a comparator is skipped wherever it stands
+     * ({@link BunRelease#skipsARangeChunkWithoutAComparator()}), and versions and bounds are read as
+     * {@link SemverVersion#parse(String, BunRelease)} and {@link SemverRange.Comparator#ltNextMajor} read them.
+     *
+     * @throws CannotKnow before 1.4.0 for such a chunk after a comparator, where bun reaches code it takes for
+     *                    unreachable, which its release build does not check
+     */
+    static Group parse(String input, BunRelease release) {
         int i = 0;
         Group list = new Group(input);
         Token token = new Token();
@@ -403,7 +409,7 @@ final class SemverQuery {
             if (skipRound) {
                 continue;
             }
-            SemverVersion.ParseResult parseResult = SemverVersion.parse(input.substring(i));
+            SemverVersion.ParseResult parseResult = SemverVersion.parse(input.substring(i), release);
             SemverVersion version = parseResult.version.min();
             if (version.hasBuild()) {
                 list.flags |= Group.FLAG_BUILD;
@@ -452,7 +458,7 @@ final class SemverQuery {
             i += hyphenate ? 0 : 1;
 
             if (hyphenate) {
-                SemverVersion.ParseResult secondParsed = SemverVersion.parse(input.substring(i));
+                SemverVersion.ParseResult secondParsed = SemverVersion.parse(input.substring(i), release);
                 SemverVersion second = secondParsed.version.min();
                 if (second.hasBuild()) {
                     list.flags |= Group.FLAG_BUILD;
@@ -460,20 +466,26 @@ final class SemverQuery {
                 if (second.hasPre()) {
                     list.flags |= Group.FLAG_PRE;
                 }
+                boolean inclusiveCeiling = release.boundsARangeAtTheCeilingInclusively();
                 SemverRange range;
                 switch (secondParsed.wildcard) {
                     case MAJOR:
                         range = new SemverRange(new SemverRange.Comparator(SemverRange.Op.GTE, version));
                         break;
                     case MINOR:
+                        // the bound keeps the second version's tag, but not at the ceiling
                         range = new SemverRange(new SemverRange.Comparator(SemverRange.Op.GTE, version),
-                                new SemverRange.Comparator(SemverRange.Op.LT,
-                                        second.with(saturatingIncrement(second.major), 0, 0)));
+                                inclusiveCeiling && second.major == MAX ?
+                                        SemverRange.Comparator.ltNextMajor(second.major, release) :
+                                        new SemverRange.Comparator(SemverRange.Op.LT,
+                                                second.with(saturatingIncrement(second.major), 0, 0)));
                         break;
                     case PATCH:
                         range = new SemverRange(new SemverRange.Comparator(SemverRange.Op.GTE, version),
-                                new SemverRange.Comparator(SemverRange.Op.LT,
-                                        second.with(second.major, saturatingIncrement(second.minor), 0)));
+                                inclusiveCeiling && second.minor == MAX ?
+                                        SemverRange.Comparator.ltNextMinor(second.major, second.minor, release) :
+                                        new SemverRange.Comparator(SemverRange.Op.LT,
+                                                second.with(second.major, saturatingIncrement(second.minor), 0)));
                         break;
                     default:
                         range = new SemverRange(new SemverRange.Comparator(SemverRange.Op.GTE, version),
@@ -486,11 +498,15 @@ final class SemverQuery {
                     list.andRange(range);
                 }
                 i += secondParsed.len + 1;
+            } else if (token.tag == TokenTag.NONE && release.skipsARangeChunkWithoutAComparator()) {
+                // like "boop" in "1.0.0 || boop", keeping a pending "||": "--foo", and the "- foo" of "1 || - foo"
+                token.wildcard = Wildcard.NONE;
+                continue;
             } else if (count == 0 && token.tag == TokenTag.VERSION) {
                 if (parseResult.wildcard == Wildcard.NONE) {
                     list.orVersion(version);
                 } else {
-                    list.orRange(token.toRange(parseResult.version));
+                    list.orRange(token.toRange(parseResult.version, release));
                 }
             } else if (count == 0) {
                 if (token.tag == TokenTag.NONE) {
@@ -499,11 +515,15 @@ final class SemverQuery {
                     prevToken.tag = TokenTag.NONE;
                     continue;
                 }
-                list.andRange(token.toRange(parseResult.version));
+                list.andRange(token.toRange(parseResult.version, release));
+            } else if (token.tag == TokenTag.NONE) {
+                throw new CannotKnow("what bun " + release + " makes of the range \"" + input + "\": a chunk " +
+                                     "without a comparator after the first has its parser reach code it takes for " +
+                                     "unreachable");
             } else if (isOr) {
-                list.orRange(token.toRange(parseResult.version));
+                list.orRange(token.toRange(parseResult.version, release));
             } else {
-                list.andRange(token.toRange(parseResult.version));
+                list.andRange(token.toRange(parseResult.version, release));
             }
 
             isOr = false;

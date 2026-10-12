@@ -36,7 +36,8 @@ final class DependencyVersion {
 
         /**
          * {@code Tag.infer} as the release infers a spec's kind: before 1.2.14 no {@code catalog:} spec, which then
-         * reads as a git one.
+         * reads as a git one; from 1.4.0 a tarball by its {@code .tar} too, in any case
+         * ({@link Dependency#isTarball(String, BunRelease)}).
          */
         static Tag infer(String dependency, BunRelease release) {
             if (dependency.isEmpty()) {
@@ -44,7 +45,7 @@ final class DependencyVersion {
             }
             if (startsWithWindowsDriveLetter(dependency) &&
                 (dependency.charAt(2) == '/' || dependency.charAt(2) == '\\')) {
-                return Dependency.isTarball(dependency) ? TARBALL : FOLDER;
+                return Dependency.isTarball(dependency, release) ? TARBALL : FOLDER;
             }
             char first = dependency.charAt(0);
             switch (first) {
@@ -56,17 +57,17 @@ final class DependencyVersion {
                 case '|':
                     return NPM;
                 case '.':
-                    return Dependency.isTarball(dependency) ? TARBALL : FOLDER;
+                    return Dependency.isTarball(dependency, release) ? TARBALL : FOLDER;
                 case '~':
                     if (dependency.length() > 1 && dependency.charAt(1) == '/') {
-                        return Dependency.isTarball(dependency) ? TARBALL : FOLDER;
+                        return Dependency.isTarball(dependency, release) ? TARBALL : FOLDER;
                     }
                     return NPM;
                 case '/':
-                    return Dependency.isTarball(dependency) ? TARBALL : FOLDER;
+                    return Dependency.isTarball(dependency, release) ? TARBALL : FOLDER;
                 case 'f':
                     if (dependency.startsWith("file:")) {
-                        return Dependency.isTarball(dependency) ? TARBALL : FOLDER;
+                        return Dependency.isTarball(dependency, release) ? TARBALL : FOLDER;
                     }
                     break;
                 case 'c':
@@ -138,7 +139,7 @@ final class DependencyVersion {
                             }
                             if (url.startsWith("github.com/")) {
                                 String path = url.substring("github.com/".length());
-                                if (Dependency.isGitHubTarballPath(path)) {
+                                if (Dependency.isGitHubTarballPath(path, release)) {
                                     return TARBALL;
                                 }
                                 if (isGitHubShorthand(path, release)) {
@@ -190,7 +191,7 @@ final class DependencyVersion {
                     }
                     break;
                 case 'v':
-                    if (Dependency.isTarball(dependency)) {
+                    if (Dependency.isTarball(dependency, release)) {
                         return TARBALL;
                     }
                     if (isGitHubShorthand(dependency, release)) {
@@ -224,11 +225,11 @@ final class DependencyVersion {
                     break;
                 default:
                     if (first >= '0' && first <= '9') {
-                        return Dependency.isTarball(dependency) ? TARBALL : NPM;
+                        return Dependency.isTarball(dependency, release) ? TARBALL : NPM;
                     }
                     break;
             }
-            if (Dependency.isTarball(dependency)) {
+            if (Dependency.isTarball(dependency, release)) {
                 return TARBALL;
             }
             if (isGitHubShorthand(dependency, release)) {
@@ -430,7 +431,8 @@ final class DependencyVersion {
                 if (input.length() > 1 && input.charAt(0) == 'v') {
                     input = input.substring(1);
                 }
-                return new DependencyVersion(Tag.NPM, literal, new NpmInfo(name, SemverQuery.parse(input), isAlias));
+                return new DependencyVersion(Tag.NPM, literal,
+                        new NpmInfo(name, SemverQuery.parse(input, release), isAlias));
             }
             case DIST_TAG: {
                 String tagToUse = literal;

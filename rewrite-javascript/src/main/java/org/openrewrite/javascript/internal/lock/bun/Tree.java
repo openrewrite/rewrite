@@ -120,6 +120,13 @@ final class Tree {
      */
     static final class Builder {
         private final Lockfile lockfile;
+
+        /**
+         * What the hoisting logs. bun hoists into the install's log, which a {@code --lockfile-only} install prints
+         * and clears before it saves, so that nothing here changes what it writes or how it ends.
+         */
+        final Log log = new Log();
+
         private final List<Tree> trees = new ArrayList<>();
         private final List<List<Integer>> dependencyLists = new ArrayList<>();
         private final Deque<FillItem> queue = new ArrayDeque<>();
@@ -193,6 +200,12 @@ final class Tree {
         for (int depId : sortBuf) {
             int pkgId = builder.lockfile.resolutions.get(depId);
             Dependency dependency = builder.lockfile.dependencies.get(depId);
+            // from 1.4.0 a name that would leave node_modules is skipped; an empty one has no folder to leave
+            if (!dependency.name.isEmpty() && builder.lockfile.release.skipsAnUnsafeDependencyName() &&
+                !Dependency.isSafeInstallFolderName(dependency.name)) {
+                builder.log.addError("Invalid dependency name \"" + dependency.name + "\"");
+                continue;
+            }
             HoistResult hoisted;
             if (dependency.behavior.isBundled()) {
                 hoisted = HoistResult.placement(next.id, true);

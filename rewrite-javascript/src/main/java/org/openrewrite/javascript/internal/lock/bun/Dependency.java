@@ -64,9 +64,13 @@ final class Dependency {
 
     /**
      * The clone parses the spec again with the tag it had: a dependency that was linked to a workspace parses its
-     * literal as a workspace spec.
+     * literal as a workspace spec. From 1.4.1 a workspace dependency keeps its path
+     * ({@link BunRelease#keepsAWorkspaceDependencysPathWhenCloned()}).
      */
     Dependency cloneDependency(BunRelease release) {
+        if (version.tag == DependencyVersion.Tag.WORKSPACE && release.keepsAWorkspaceDependencysPathWhenCloned()) {
+            return new Dependency(nameHash, name, version.asWorkspace(version.string()), behavior);
+        }
         DependencyVersion parsed = DependencyVersion.parseWithTag(name, Wyhash11.stringHash(name), version.literal,
                 version.tag, version.literal, release);
         return new Dependency(nameHash, name, parsed == null ? DependencyVersion.ZEROED : parsed, behavior);
@@ -160,8 +164,8 @@ final class Dependency {
                firstSlashIndex != dependency.length() - 1;
     }
 
-    static boolean isGitHubTarballPath(String dependency) {
-        if (isTarball(dependency)) {
+    static boolean isGitHubTarballPath(String dependency, BunRelease release) {
+        if (isTarball(dependency, release)) {
             return true;
         }
         String[] parts = dependency.split("/", -1);
@@ -169,7 +173,59 @@ final class Dependency {
     }
 
     static boolean isTarball(String dependency) {
+        return isTarball(dependency, BunRelease.PORTED);
+    }
+
+    /**
+     * {@code isTarball}: {@code .tgz} or {@code .tar.gz} as written; from 1.4.0 {@code .tar} too, in any case
+     * ({@link BunRelease#tellsTarballsByTheirSuffixInAnyCase()}).
+     */
+    static boolean isTarball(String dependency, BunRelease release) {
+        if (release.tellsTarballsByTheirSuffixInAnyCase()) {
+            return hasSuffixIgnoringAsciiCase(dependency, ".tgz") ||
+                   hasSuffixIgnoringAsciiCase(dependency, ".tar.gz") ||
+                   hasSuffixIgnoringAsciiCase(dependency, ".tar");
+        }
         return dependency.endsWith(".tgz") || dependency.endsWith(".tar.gz");
+    }
+
+    // has_suffix_ignore_ascii_case, the suffix in lower case
+    private static boolean hasSuffixIgnoringAsciiCase(String s, String suffix) {
+        int offset = s.length() - suffix.length();
+        if (offset < 0) {
+            return false;
+        }
+        for (int i = 0; i < suffix.length(); i++) {
+            char c = s.charAt(offset + i);
+            char lower = c >= 'A' && c <= 'Z' ? (char) (c + ('a' - 'A')) : c;
+            if (lower != suffix.charAt(i)) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    /**
+     * {@code is_safe_install_folder_name} (src/install/dependency.rs, from 1.4.0): a name that becomes a directory under
+     * {@code node_modules/} stays inside it, each {@code /} component neither empty nor {@code .} or {@code ..}, and
+     * without {@code \}, {@code :} or NUL.
+     */
+    static boolean isSafeInstallFolderName(String name) {
+        if (name.isEmpty()) {
+            return false;
+        }
+        for (String component : name.split("/", -1)) {
+            if (component.isEmpty() || ".".equals(component) || "..".equals(component)) {
+                return false;
+            }
+            for (int i = 0; i < component.length(); i++) {
+                char c = component.charAt(i);
+                if (c == '\\' || c == ':' || c == '\0') {
+                    return false;
+                }
+            }
+        }
+        return true;
     }
 
     static boolean isRemoteTarball(String dependency) {
