@@ -27,7 +27,7 @@ class PnpmError extends RuntimeException {
 
     private final String code;
 
-    private final @Nullable String hint;
+    private @Nullable String hint;
 
     PnpmError(String code, String message) {
         this(code, message, null);
@@ -37,6 +37,13 @@ class PnpmError extends RuntimeException {
         super(message);
         this.code = "ERR_PNPM_" + code;
         this.hint = hint;
+    }
+
+    // err.hint ??= hint, as pnpm adds one to an error it rethrows
+    void hintIfNone(String hint) {
+        if (this.hint == null) {
+            this.hint = hint;
+        }
     }
 
     /**

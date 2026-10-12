@@ -20,6 +20,8 @@ import lombok.Getter;
 import lombok.Setter;
 import lombok.Value;
 import org.jspecify.annotations.Nullable;
+import org.openrewrite.javascript.internal.lock.CannotKnow;
+import org.openrewrite.javascript.internal.lock.ValidateNpmPackageName;
 import org.openrewrite.javascript.internal.lock.YarnpkgSemverUtils;
 import org.openrewrite.javascript.internal.lock.pnpm.ResolveDependencies.DependenciesTreeNode;
 import org.openrewrite.javascript.internal.lock.pnpm.ResolveDependencies.MissingPeerInfo;
@@ -97,9 +99,23 @@ final class ResolvePeers {
         @Nullable
         Set<String> explicitlyRequestedDirectDependencies;
 
+        /**
+         * From 11.11.0: the direct dependencies' nodes that are peer providers attached for reuse, resolved after the
+         * project's own ({@link PnpmRelease#resolvesHoistedPeerProvidersAfterOwnDependencies}).
+         */
+        @Nullable
+        Set<NodeId> hoistedPeerProviderNodeIds;
+
         ProjectToResolve(String id, String rootDir, Map<String, NodeId> directNodeIdsByAlias,
                          List<TopParent> topParents) {
             this(id, rootDir, directNodeIdsByAlias, topParents, null, null);
+        }
+
+        ProjectToResolve(String id, String rootDir, Map<String, NodeId> directNodeIdsByAlias,
+                         List<TopParent> topParents, @Nullable Set<String> declaredDirectDependencies,
+                         @Nullable Set<String> explicitlyRequestedDirectDependencies) {
+            this(id, rootDir, directNodeIdsByAlias, topParents, declaredDirectDependencies,
+                    explicitlyRequestedDirectDependencies, null);
         }
     }
 
@@ -308,6 +324,10 @@ final class ResolvePeers {
         final Set<NodeId> cycleBrokenNodeIds = new LinkedHashSet<>();
         @Nullable Ctx run;
 
+        // 11.11.0: the nodes the project's walk gave their parents' context, what pnpm's parentPkgsOfNode of the
+        // project holds (the port shares one of them across projects)
+        Set<NodeId> projectNodeIds = new LinkedHashSet<>();
+
         Ctx(Set<String> allPeerDepNames, Map<NodeId, Map<String, ParentPkgInfo>> parentPkgsOfNode,
             Map<NodeId, DependenciesTreeNode> dependenciesTree, Map<String, DependenciesGraphNode> depGraph,
             Map<NodeId, String> pathsByNodeId, Map<NodeId, Deferred> pathsByNodeIdPromises,
@@ -345,6 +365,7 @@ final class ResolvePeers {
                     peersSuffixMaxLength, microtasks, parentNodeIds, parentDepPathsChain, pending, release,
                     nodeIdsByPreviousDepPath, resolvedPeerProviderPaths, currentProviderSources);
             copy.run = shared();
+            copy.projectNodeIds = projectNodeIds;
             return copy;
         }
 
@@ -477,8 +498,33 @@ final class ResolvePeers {
                 }
             }
             Ctx ctx = base.forProject(peerDependencyIssues, currentProviderSources);
-            resolvePeersOfChildren(new LinkedHashMap<>(project.getDirectNodeIdsByAlias()), pkgsByName, ctx);
-            ctx.drain();
+            // from 11.11.0 the peer providers attached to the project for reuse are resolved after its own direct
+            // dependencies, and only those their walk did not reach (pnpm/pnpm#4993); before, with them at once
+            // (PnpmRelease#resolvesHoistedPeerProvidersAfterOwnDependencies)
+            Map<String, NodeId> ownDirectChildren = new LinkedHashMap<>();
+            Map<String, NodeId> hoistedProviderChildren = new LinkedHashMap<>();
+            Set<NodeId> hoistedPeerProviderNodeIds = project.getHoistedPeerProviderNodeIds();
+            for (Map.Entry<String, NodeId> direct : project.getDirectNodeIdsByAlias().entrySet()) {
+                (hoistedPeerProviderNodeIds != null && hoistedPeerProviderNodeIds.contains(direct.getValue()) ?
+                        hoistedProviderChildren : ownDirectChildren).put(direct.getKey(), direct.getValue());
+            }
+            if (hoistedProviderChildren.isEmpty() || !release.resolvesHoistedPeerProvidersAfterOwnDependencies()) {
+                resolvePeersOfChildren(new LinkedHashMap<>(project.getDirectNodeIdsByAlias()), pkgsByName, ctx);
+                ctx.drain();
+            } else {
+                resolvePeersOfChildren(ownDirectChildren, pkgsByName, ctx);
+                ctx.drain();
+                Map<String, NodeId> prunedProviderChildren = new LinkedHashMap<>();
+                for (Map.Entry<String, NodeId> provider : hoistedProviderChildren.entrySet()) {
+                    if (!ctx.projectNodeIds.contains(provider.getValue())) {
+                        prunedProviderChildren.put(provider.getKey(), provider.getValue());
+                    }
+                }
+                if (!prunedProviderChildren.isEmpty()) {
+                    resolvePeersOfChildren(prunedProviderChildren, pkgsByName, ctx);
+                    ctx.drain();
+                }
+            }
             if (!peerDependencyIssues.getBad().isEmpty() || !peerDependencyIssues.getMissing().isEmpty()) {
                 peerDependencyIssuesByProjects.put(project.getId(), mergePeers(peerDependencyIssues));
             }
@@ -1088,6 +1134,16 @@ final class ResolvePeers {
         Map<String, PeerDependency> peerDependencies = new LinkedHashMap<>(resolvedPackage.getPeerDependencies());
         DependenciesGraphNode existing = ctx.depGraph.get(depPath);
         if (existing == null || existing.getDepth() > node.getDepth()) {
+            // from 11.11.0 the package's directory is safeJoinModulesDir's, which refuses a name
+            // validate-npm-package-name 7.0.2 rejects (ERR_PNPM_INVALID_DEPENDENCY_NAME), one it accepts staying under
+            // the virtual store; the error names the virtual store's absolute path, which no input holds
+            // (PnpmRelease#placesAPackageOnlyUnderAValidName)
+            if (!ValidateNpmPackageName.validForOldPackages(resolvedPackage.getName(),
+                    ValidateNpmPackageName.Release.V7_0_2) && ctx.release.placesAPackageOnlyUnderAValidName()) {
+                throw new CannotKnow("the virtual store directory under which pnpm refuses to place " + depPath +
+                                     " with the invalid alias " + Js.jsonStringify(resolvedPackage.getName()) +
+                                     " (ERR_PNPM_INVALID_DEPENDENCY_NAME names its absolute path)");
+            }
             Set<String> transitivePeerDependencies = new LinkedHashSet<>();
             for (String unknownPeer : allResolvedPeers.keySet()) {
                 if (!peerDependencies.containsKey(unknownPeer)) {
@@ -1363,6 +1419,7 @@ final class ResolvePeers {
         }
         for (NodeId childNodeId : nodeIds) {
             ctx.parentPkgsOfNode.put(childNodeId, parentDepPaths);
+            ctx.projectNodeIds.add(childNodeId);
         }
         for (NodeId childNodeId : nodeIds) {
             String currentAlias = aliasByNodeId.get(childNodeId);

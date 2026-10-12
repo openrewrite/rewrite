@@ -26,6 +26,7 @@ import org.openrewrite.javascript.internal.lock.pnpm.ResolveDependencies.WantedD
 
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -100,6 +101,11 @@ final class ResolveDependencyTree {
         List<ResolvedDirectDependency> directDependencies;
         Map<String, NodeId> directNodeIdsByAlias;
         List<ResolvedDirectDependency> linkedDependencies;
+
+        /**
+         * From 11.11.0: the nodes of the direct dependencies that are peer providers attached for reuse.
+         */
+        Set<NodeId> hoistedPeerProviderNodeIds;
     }
 
     @Value
@@ -275,6 +281,7 @@ final class ResolveDependencyTree {
             List<ResolvedDirectDependency> directDependencies = new ArrayList<>();
             List<ResolvedDirectDependency> linkedDependencies = new ArrayList<>();
             Map<String, NodeId> directNodeIdsByAlias = new LinkedHashMap<>();
+            Set<NodeId> hoistedPeerProviderNodeIds = new LinkedHashSet<>();
             for (PkgAddress dep : directDeps) {
                 if (dep.isLinkedDependency()) {
                     ResolvedDirectDependency linked = new ResolvedDirectDependency(dep.getAlias(), dep.isOptional(),
@@ -292,9 +299,12 @@ final class ResolveDependencyTree {
                         resolvedPackage.getVersion(), resolvedPackage.getName(), dep.getCatalogLookup(),
                         dep.getNormalizedBareSpecifier(), false));
                 directNodeIdsByAlias.put(dep.getAlias(), dep.getNodeId());
+                if (dep.isHoistedPeerProvider()) {
+                    hoistedPeerProviderNodeIds.add(dep.getNodeId());
+                }
             }
             resolvedImporters.put(importer.getId(), new ResolvedImporter(directDependencies, directNodeIdsByAlias,
-                    linkedDependencies));
+                    linkedDependencies, hoistedPeerProviderNodeIds));
         }
         return new Result(ctx.getDependenciesTree(), resolvedImporters, root.getTime(), ctx.getAllPeerDepNames(),
                 ctx.getResolutionPolicyViolations());

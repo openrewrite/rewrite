@@ -2531,4 +2531,105 @@ class PnpmReleaseTest {
             e -> assertThat(e.getCode()).isEqualTo("ERR_PNPM_NO_MATCHING_VERSION"));
         assertThat(resolveFooBesideTheWorkspace("^2.0.0", "11.10.0", NOT_FOUND)).isNotNull();
     }
+
+    // a lock of no dependency beside the orphan opt 1.0.0
+    private static final String ORPHAN_OPT_LOCK = "lockfileVersion: '9.0'\n\nsettings:\n  autoInstallPeers: true\n" +
+                                                  "  excludeLinksFromLockfile: false\n\nimporters:\n\n  .: {}\n\n" +
+                                                  "packages:\n\n  opt@1.0.0:\n    resolution: {integrity: sha512-x}" +
+                                                  "\n\nsnapshots:\n\n  opt@1.0.0: {}\n";
+
+    // the lock-only install of a root wanting opt in range as optional, from a registry without it
+    private static String installMissingOptional(String range, String release) {
+        return new PnpmLockRegenerator(PnpmLockRegenerator.Inputs.builder()
+          .lock(ORPHAN_OPT_LOCK)
+          .manifest("", "{\"name\":\"p\",\"version\":\"1.0.0\",\"optionalDependencies\":{\"opt\":\"" + range +
+                        "\"}}")
+          .file("pnpm-workspace.yaml", "minimumReleaseAge: 0\n")
+          .env(Collections.emptyMap())
+          .now(NOW)
+          .release(release(release))
+          .build(), NOT_FOUND).writeLock();
+    }
+
+    /**
+     * installing/deps-resolver resolveDependencies.ts wantedLockfileContainsSatisfyingEntry (11.11.0, pnpm/pnpm#12853):
+     * an optional dependency the registry lacks, which the lock holds in range, fails the install; before, it is
+     * skipped and its locked entry left out. pnpm 11.10.0 wrote this lock, and 11.11.0 failed so, when run on it.
+     */
+    @Test
+    void keepsAFailingOptionalDependencyTheLockResolvesFrom11110() {
+        assertThatThrownBy(() -> installMissingOptional("^1.0.0", "11.11.0"))
+          .isInstanceOfSatisfying(PnpmError.class, e -> {
+              assertThat(e.getCode()).isEqualTo("ERR_PNPM_FETCH_404");
+              assertThat(e.getHint()).isEqualTo("opt is not in the npm registry, or you have no permission to " +
+                                                "fetch it.");
+          });
+        String skipped = "lockfileVersion: '9.0'\n\nsettings:\n  autoInstallPeers: true\n" +
+                         "  excludeLinksFromLockfile: false\n\nimporters:\n\n  .: {}\n";
+        assertThat(installMissingOptional("^1.0.0", "11.10.0")).isEqualTo(skipped);
+        assertThat(installMissingOptional("^2.0.0", "11.11.0")).isEqualTo(skipped);
+    }
+
+    // a's c peers on a's b, which peers on x: a's x 1.0.0, where the root's x is x2
+    private static final RegistryMetadata HOISTED_PEER_PROVIDER = registry(
+      new String[]{"a", "\"b\":\"1.0.0\",\"x\":\"1.0.0\",\"c\":\"1.0.0\"", ""},
+      new String[]{"b", "", "\"x\":\"*\""},
+      new String[]{"c", "", "\"b\":\"1.0.0\""},
+      new String[]{"x", "", ""},
+      new String[]{"x2", "", ""});
+
+    // the snapshots of the lock-only install of a root with a and x as npm:x2@1.0.0
+    private static String installHoistedPeerProvider(String release) {
+        String lock = new PnpmLockRegenerator(PnpmLockRegenerator.Inputs.builder()
+          .manifest("", "{\"name\":\"root\",\"version\":\"1.0.0\",\"dependencies\":{\"a\":\"1.0.0\"," +
+                        "\"x\":\"npm:x2@1.0.0\"}}")
+          .file("pnpm-workspace.yaml", "minimumReleaseAge: 0\n")
+          .env(Collections.emptyMap())
+          .now(NOW)
+          .release(release(release))
+          .build(), HOISTED_PEER_PROVIDER).writeLock();
+        return lock.substring(lock.indexOf("\nsnapshots:\n"));
+    }
+
+    // c's dep path naming the x its b takes
+    private static String hoistedPeerProviderSnapshots(String x) {
+        return "\nsnapshots:\n\n  a@1.0.0:\n    dependencies:\n      b: 1.0.0(x@1.0.0)\n" +
+               "      c: 1.0.0(b@1.0.0(" + x + "))\n      x: 1.0.0\n\n  b@1.0.0(x@1.0.0):\n    dependencies:\n" +
+               "      x: 1.0.0\n\n  c@1.0.0(b@1.0.0(" + x + ")):\n    dependencies:\n      b: 1.0.0(x@1.0.0)\n\n" +
+               "  x2@1.0.0: {}\n\n  x@1.0.0: {}\n";
+    }
+
+    /**
+     * installing/deps-resolver resolvePeers.ts (11.11.0, pnpm/pnpm#4993): b, the peer a's c resolves inside a, is
+     * attached to the root for reuse and no longer peer-resolved again there, so that c's path names the x a gives b;
+     * before, the root's walk binds it to the root's x, x2. pnpm 11.10.0 and 11.11.0 wrote these snapshots when run
+     * on it.
+     */
+    @Test
+    void resolvesHoistedPeerProvidersAfterOwnDependenciesFrom11110() {
+        assertThat(installHoistedPeerProvider("11.11.0")).isEqualTo(hoistedPeerProviderSnapshots("x@1.0.0"));
+        assertThat(installHoistedPeerProvider("11.10.0")).isEqualTo(hoistedPeerProviderSnapshots("x2@1.0.0"));
+    }
+
+    // the dependency graph resolvePeers gives a root whose y is a package named @x/../y
+    private static Set<String> placeTraversal(String release) {
+        Map<NodeId, DependenciesTreeNode> tree = new LinkedHashMap<>();
+        treeNode(tree, ">@x/../y/1.0.0>", peerPkg("@x/../y", "1.0.0"), 0);
+        List<ProjectToResolve> projects = Collections.singletonList(new ProjectToResolve(".", "",
+          Collections.singletonMap("y", NodeId.of(">@x/../y/1.0.0>")), Collections.emptyList()));
+        return ResolvePeers.resolvePeers(new LinkedHashSet<>(), projects, tree, false, false, false, false, 1000, "",
+          new LinkedHashMap<>(), new LinkedHashSet<>(), release(release)).getDependenciesGraph().keySet();
+    }
+
+    /**
+     * installing/deps-resolver resolvePeers.ts and fs/symlink-dependency safeJoinModulesDir (11.11.0): a package named
+     * @x/../y is refused a directory in the virtual store, whose absolute path the error names; before, it is placed.
+     */
+    @Test
+    void placesAPackageOnlyUnderAValidNameFrom11110() {
+        assertThatThrownBy(() -> placeTraversal("11.11.0"))
+          .isInstanceOf(CannotKnow.class)
+          .hasMessageContaining("with the invalid alias \"@x/../y\" (ERR_PNPM_INVALID_DEPENDENCY_NAME");
+        assertThat(placeTraversal("11.10.0")).containsExactly("@x/../y/1.0.0");
+    }
 }

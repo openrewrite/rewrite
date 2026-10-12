@@ -109,7 +109,7 @@ final class DepsResolver {
             }
             projectsToLink.add(new ResolvePeers.ProjectToResolve(project.getId(), project.getRootDir(),
                     resolvedImporter.getDirectNodeIdsByAlias(), topParents, declaredDirectDependencies,
-                    explicitlyRequestedDirectDependencies));
+                    explicitlyRequestedDirectDependencies, resolvedImporter.getHoistedPeerProviderNodeIds()));
         }
 
         Set<String> workspaceProjectIds = new LinkedHashSet<>();

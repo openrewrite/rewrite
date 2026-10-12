@@ -894,6 +894,16 @@ public final class PnpmRelease {
     }
 
     /**
+     * An optional dependency whose resolution fails (but by a trust downgrade) is not skipped where the lock holds a
+     * package of its name, an npm: alias's real one, in its range, the error rethrown with a hint where it has none,
+     * from 11.11.0 (wantedLockfileContainsSatisfyingEntry, pnpm/pnpm#12853); before, it is skipped, and its locked
+     * entries are left out.
+     */
+    boolean keepsAFailingOptionalDependencyTheLockResolves() {
+        return atLeast(11, 11, 0);
+    }
+
+    /**
      * Peers are resolved a second time from the peer contexts the lock records, where their providers are still in
      * the graph, satisfy the ranges and no current manifest choice must win, from 11.5.2 (pnpm/pnpm#12083); before,
      * once, from the current graph alone.
@@ -978,6 +988,25 @@ public final class PnpmRelease {
      */
     boolean providesPeersUnderAnAliasedChildsName() {
         return atLeast(11, 8, 0);
+    }
+
+    /**
+     * The peer providers autoInstallPeers attaches to a project for reuse (peers resolved inside a dependency's own
+     * closure) are peer-resolved after the project's own direct dependencies, and only those that walk did not reach,
+     * from 11.11.0 (pnpm/pnpm#4993); before, with them at once, so that a provider inside such a closure takes its
+     * peers from the project.
+     */
+    boolean resolvesHoistedPeerProvidersAfterOwnDependencies() {
+        return atLeast(11, 11, 0);
+    }
+
+    /**
+     * A package's directory in the virtual store is safeJoinModulesDir's, which refuses a name
+     * validate-npm-package-name rejects ({@code ERR_PNPM_INVALID_DEPENDENCY_NAME}, naming the directory's absolute
+     * path), from 11.11.0; before, any name is joined as it is.
+     */
+    boolean placesAPackageOnlyUnderAValidName() {
+        return atLeast(11, 11, 0);
     }
 
     // @pnpm/installing.deps-resolver src/dedupeInjectedDeps.ts

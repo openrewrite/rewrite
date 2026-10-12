@@ -236,9 +236,46 @@ final class ResolveDependencies {
         private @Nullable String previousDepPath;
         private @Nullable Map<String, String> lockedPeerContext;
 
+        /**
+         * From 11.11.0: a resolved peer attached to its importer for reuse under autoInstallPeers, which resolvePeers
+         * resolves after the importer's own dependencies
+         * ({@link PnpmRelease#resolvesHoistedPeerProvidersAfterOwnDependencies}).
+         */
+        private boolean hoistedPeerProvider;
+
         PkgAddress(String alias, String pkgId) {
             this.alias = alias;
             this.pkgId = pkgId;
+        }
+
+        // {...address, hoistedPeerProvider: true}
+        PkgAddress asHoistedPeerProvider() {
+            PkgAddress copy = new PkgAddress(alias, pkgId);
+            copy.optional = optional;
+            copy.pkg = pkg;
+            copy.normalizedBareSpecifier = normalizedBareSpecifier;
+            copy.catalogLookup = catalogLookup;
+            copy.nodeId = nodeId;
+            copy.depIsLinked = depIsLinked;
+            copy.isNew = isNew;
+            copy.isLinkedDependency = isLinkedDependency;
+            copy.resolvedVia = resolvedVia;
+            copy.installable = installable;
+            copy.version = version;
+            copy.updated = updated;
+            copy.rootDir = rootDir;
+            copy.missingPeers = missingPeers;
+            copy.missingPeersOfChildren = missingPeersOfChildren;
+            copy.childrenResolutionId = childrenResolutionId;
+            copy.publishedAt = publishedAt;
+            copy.saveCatalogName = saveCatalogName;
+            copy.dev = dev;
+            copy.resolution = resolution;
+            copy.name = name;
+            copy.previousDepPath = previousDepPath;
+            copy.lockedPeerContext = lockedPeerContext;
+            copy.hoistedPeerProvider = true;
+            return copy;
         }
     }
 
@@ -806,7 +843,8 @@ final class ResolveDependencies {
             if (ctx.isAutoInstallPeers()) {
                 for (Map.Entry<String, PkgAddress> resolved : result.getResolvedPeers().entrySet()) {
                     if (!Js.truthy(parentPkgAliases.get(resolved.getKey()))) {
-                        result.getPkgAddresses().add(resolved.getValue());
+                        // 11.11.0 marks a copy, which no release before reads apart from the address itself
+                        result.getPkgAddresses().add(resolved.getValue().asHoistedPeerProvider());
                     }
                 }
             }
@@ -2019,7 +2057,15 @@ final class ResolveDependencies {
                                    "ERR_PNPM_NO_MATURE_MATCHING_VERSION".equals(code) &&
                                    !ctx.getRelease().checksTheReleaseAgeAsAPolicy();
                     if ((e instanceof PnpmError || e instanceof JsError) && wanted.isOptional() && !kept) {
-                        return Promise.resolved(ctx.getLoop(), null);
+                        // from 11.11.0 one the lock holds a satisfying entry of fails all the same, with a hint
+                        // where it has none (PnpmRelease#keepsAFailingOptionalDependencyTheLockResolves)
+                        if (!wantedLockfileContainsSatisfyingEntry(ctx, wanted) ||
+                            !ctx.getRelease().keepsAFailingOptionalDependencyTheLockResolves()) {
+                            return Promise.resolved(ctx.getLoop(), null);
+                        }
+                        if (e instanceof PnpmError) {
+                            ((PnpmError) e).hintIfNone(OPTIONAL_DEPENDENCY_NOT_SKIPPED);
+                        }
                     }
                     throw e;
                 })
@@ -2035,6 +2081,46 @@ final class ResolveDependencies {
                         throw e;
                     }
                 });
+    }
+
+    private static final String OPTIONAL_DEPENDENCY_NOT_SKIPPED = "This optional dependency is not skipped, because " +
+            "the lockfile contains a resolution for it. Skipping it would remove the locked entries, making the " +
+            "lockfile differ depending on which machine ran the install. If the version was intentionally removed " +
+            "from the registry, update the dependent package or remove the entries from the lockfile.";
+
+    // wantedLockfileContainsSatisfyingEntry (11.11.0): whether the lock holds a package of the dependency's name, an
+    // npm: alias's real one, in its range
+    private static boolean wantedLockfileContainsSatisfyingEntry(ResolutionContext ctx,
+                                                                 WantedDependency wantedDependency) {
+        String alias = wantedDependency.getAlias();
+        if (alias == null || alias.isEmpty()) {
+            return false;
+        }
+        String[] unwrapped = unwrapPackageName(alias, wantedDependency.getBareSpecifier());
+        String pkgName = unwrapped[0];
+        String bareSpecifier = unwrapped[1];
+        PnpmRelease release = ctx.getRelease();
+        if (validRange(bareSpecifier, release) == null) {
+            return false;
+        }
+        Map<String, PackageSnapshot> packages = ctx.getWantedLockfile().getPackages();
+        if (packages == null) {
+            return false;
+        }
+        for (String depPath : packages.keySet()) {
+            DepPath.DependencyPath parsed = DepPath.parse(depPath);
+            String version = parsed.getVersion();
+            if (pkgName.equals(parsed.getName()) && version != null && release.underSemver(semver -> {
+                try {
+                    return NodeSemver.satisfies(version, bareSpecifier, NodeSemver.Options.DEFAULT.release(semver));
+                } catch (IllegalArgumentException e) {
+                    return false;
+                }
+            })) {
+                return true;
+            }
+        }
+        return false;
     }
 
     private static Promise<PackageRequester.PackageResponse> requestPackage(
