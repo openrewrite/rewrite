@@ -1289,6 +1289,55 @@ class PnpmReleaseTest {
     }
 
     /**
+     * config/version-policy evaluateVersionPolicy (11.9.0): the exact versions of every rule that matches are merged;
+     * before, the first rule that matches decides.
+     */
+    @Test
+    void mergesExactVersionsAcrossPolicyRulesFrom1190() {
+        List<String> rules = Arrays.asList("foo@1.0.0", "foo@2.0.0");
+        assertThat(PackageVersionPolicy.isExcluded(PackageVersionPolicy.createPackageVersionPolicy(rules,
+          release("11.9.0")), "foo", "2.0.0")).isTrue();
+        assertThat(PackageVersionPolicy.isExcluded(PackageVersionPolicy.createPackageVersionPolicy(rules,
+          release("11.8.0")), "foo", "2.0.0")).isFalse();
+    }
+
+    /**
+     * resolving/npm-resolver pickPackage.ts getPkgMetaCacheKey (11.9.0): a name fetched from a second registry is
+     * fetched again; before, the first registry's packument is reused.
+     */
+    @Test
+    void keysThePackumentCacheByRegistryFrom1190() {
+        List<String> fetched = new ArrayList<>();
+        RegistryMetadata registries = new RegistryMetadata() {
+            @Override
+            public @Nullable String packument(String registry, String name, boolean fullMetadata) {
+                fetched.add(registry + name);
+                return WRAPPY;
+            }
+
+            @Override
+            public @Nullable String attestations(String registry, String name, String version) {
+                return null;
+            }
+
+            @Override
+            public @Nullable String document(String url) {
+                return null;
+            }
+        };
+        for (String release : Arrays.asList("11.9.0", "11.8.0")) {
+            Map<String, Map<String, @Nullable Object>> metaCache = new LinkedHashMap<>();
+            PickPackageFromMeta.RegistryPackageSpec spec = PickPackageFromMeta.parseBareSpecifier("1.0.2", "wrappy",
+              "latest", REGISTRY, release(release));
+            PickPackage.pickPackage(metaCache, registries, spec, picker("2026-01-01T00:00:00Z", false, release),
+              REGISTRY, false, false);
+            PickPackage.pickPackage(metaCache, registries, spec, picker("2026-01-01T00:00:00Z", false, release),
+              "https://mirror.test/", false, false);
+        }
+        assertThat(fetched).containsExactly(REGISTRY + "wrappy", "https://mirror.test/wrappy", REGISTRY + "wrappy");
+    }
+
+    /**
      * lockfile/preferred-versions (11.10.0): a lock package named constructor is a package as any other; before,
      * pnpm finds Object.prototype.constructor and throws.
      */
