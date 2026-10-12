@@ -683,7 +683,9 @@ public final class IdealTreeBuilder {
                 }
             }
 
-            for (Edge edge : node.getEdgesOut().values()) {
+            // before npm 7.0.9 only the links the build makes are resolved
+            for (Edge edge : options.getRelease().resolvesLinksOfDependencies() ? node.getEdgesOut().values() :
+                    Collections.<Edge>emptyList()) {
                 Node to = edge.getTo();
                 // before npm 7.20.0 a link that lost its target is queued too
                 if (to != null && to.isLink() &&

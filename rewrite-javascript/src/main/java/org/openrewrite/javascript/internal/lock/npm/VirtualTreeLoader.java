@@ -382,7 +382,14 @@ public final class VirtualTreeLoader {
             nodes.put(location, link);
             nodes.put(targetLoc, Objects.requireNonNull(link.getTarget()));
 
-            if (link.getTarget().getParent() == null) {
+            // before npm 7.0.9 only a lock older than version 2 has its link targets' package.json read; before 7.1.1
+            // a target in node_modules has it read too
+            Shrinkwrap lock = Objects.requireNonNull(Objects.requireNonNull(virtualTree).getMeta());
+            boolean readsTarget = options.getRelease().readsLinkTargetPackages() ||
+                                  lock.isLoadedFromDisk() && !(Js.toNumber(lock.getOriginalLockfileVersion()) >= 2);
+            boolean outsideNodeModules = link.getTarget().getParent() == null ||
+                                         !options.getRelease().readsPackagesOfTopLinkTargetsOnly();
+            if (outsideNodeModules && readsTarget) {
                 if (!options.getRelease().guardsLinkTargetPackage()) {
                     // rpj(pj).catch(() => null): only the read is guarded, and assigning the package may throw
                     PackageJson manifest = null;

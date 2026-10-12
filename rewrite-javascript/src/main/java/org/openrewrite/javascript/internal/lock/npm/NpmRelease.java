@@ -427,6 +427,14 @@ public final class NpmRelease implements Comparable<NpmRelease> {
     }
 
     /**
+     * {@code [_buildDepStep]} hands {@code [_resolveLinks]} the links among each built node's dependencies, which
+     * queues a target not yet built, from npm 7.0.9; before, only the links the build makes.
+     */
+    boolean resolvesLinksOfDependencies() {
+        return atLeast(7, 0, 9);
+    }
+
+    /**
      * The root's {@code patchedDependencies} are resolved against the tree once it is built
      * (patched-dependencies.js), from npm 12.0.0.
      */
@@ -761,6 +769,22 @@ public final class NpmRelease implements Comparable<NpmRelease> {
      */
     boolean guardsLinkTargetPackage() {
         return atLeast(11, 6, 1);
+    }
+
+    /**
+     * {@code [resolveLinks]} reads each link target's package.json, which its user may have changed, from npm 7.0.9;
+     * before, only for a lock older than version 2.
+     */
+    boolean readsLinkTargetPackages() {
+        return atLeast(7, 0, 9);
+    }
+
+    /**
+     * {@code [resolveLinks]} reads the package.json of a link target that has no parent, outside node_modules, from
+     * npm 7.1.1; before, of a target in node_modules too.
+     */
+    boolean readsPackagesOfTopLinkTargetsOnly() {
+        return atLeast(7, 1, 1);
     }
 
     /**
