@@ -1,0 +1,228 @@
+[
+ {
+  "about": "version and integrity",
+  "name": "x",
+  "lock": {
+   "version": "1.2.3",
+   "integrity": "integral"
+  },
+  "expected": {
+   "type": "version",
+   "registry": true,
+   "where": null,
+   "raw": "x@1.2.3",
+   "name": "x",
+   "escapedName": "x",
+   "scope": null,
+   "rawSpec": "1.2.3",
+   "saveSpec": null,
+   "fetchSpec": "1.2.3",
+   "gitRange": null,
+   "gitCommittish": null,
+   "gitSubdir": null,
+   "hosted": null
+  }
+ },
+ {
+  "about": "git repo with resolved value",
+  "name": "gitthing",
+  "lock": {
+   "version": "git+ssh://git@github.com/isaacs/abbrev-js#a9ee72ebc8fe3975f1b0c7aeb3a8f2a806a432eb",
+   "from": "github:isaacs/abbrev-js#some-ref"
+  },
+  "expected": {
+   "type": "git",
+   "registry": null,
+   "where": null,
+   "raw": "gitthing@git+ssh://git@github.com/isaacs/abbrev-js#a9ee72ebc8fe3975f1b0c7aeb3a8f2a806a432eb",
+   "name": "gitthing",
+   "escapedName": "gitthing",
+   "scope": null,
+   "rawSpec": "git+ssh://git@github.com/isaacs/abbrev-js#a9ee72ebc8fe3975f1b0c7aeb3a8f2a806a432eb",
+   "saveSpec": "git+ssh://git@github.com/isaacs/abbrev-js.git#a9ee72ebc8fe3975f1b0c7aeb3a8f2a806a432eb",
+   "fetchSpec": "ssh://git@github.com/isaacs/abbrev-js.git",
+   "gitRange": null,
+   "gitCommittish": "a9ee72ebc8fe3975f1b0c7aeb3a8f2a806a432eb",
+   "gitSubdir": null,
+   "hosted": "ssh://git@github.com/isaacs/abbrev-js.git"
+  }
+ },
+ {
+  "about": "legacy metadata with \"from\" and no integrity",
+  "name": "legacy",
+  "lock": {
+   "from": "1.2.3"
+  },
+  "expected": {
+   "type": "version",
+   "registry": true,
+   "where": null,
+   "raw": "legacy@1.2.3",
+   "name": "legacy",
+   "escapedName": "legacy",
+   "scope": null,
+   "rawSpec": "1.2.3",
+   "saveSpec": null,
+   "fetchSpec": "1.2.3",
+   "gitRange": null,
+   "gitCommittish": null,
+   "gitSubdir": null,
+   "hosted": null
+  }
+ },
+ {
+  "about": "version (file) and integrity set",
+  "name": "x",
+  "lock": {
+   "version": "foo.tgz",
+   "integrity": "integral"
+  },
+  "expected": {
+   "type": "file",
+   "registry": null,
+   "where": "/",
+   "raw": "x@foo.tgz",
+   "name": "x",
+   "escapedName": "x",
+   "scope": null,
+   "rawSpec": "foo.tgz",
+   "saveSpec": "file:foo.tgz",
+   "fetchSpec": "/foo.tgz",
+   "gitRange": null,
+   "gitCommittish": null,
+   "gitSubdir": null,
+   "hosted": null
+  }
+ },
+ {
+  "about": "version and range, no integrity",
+  "name": "x",
+  "lock": {
+   "version": "1.2.3",
+   "from": "^1.2.0",
+   "shasum": "deadbeef0cafebad",
+   "resolved": "https://registry.npmjs.org/x/-/x-1.2.3.tgz"
+  },
+  "expected": {
+   "type": "version",
+   "registry": true,
+   "where": null,
+   "raw": "x@1.2.3",
+   "name": "x",
+   "escapedName": "x",
+   "scope": null,
+   "rawSpec": "1.2.3",
+   "saveSpec": null,
+   "fetchSpec": "1.2.3",
+   "gitRange": null,
+   "gitCommittish": null,
+   "gitSubdir": null,
+   "hosted": null
+  }
+ },
+ {
+  "about": "file with from, no integrity",
+  "name": "x",
+  "lock": {
+   "version": "file:x-1.2.3.tgz",
+   "from": "x-1.2.3.tgz"
+  },
+  "expected": {
+   "type": "file",
+   "registry": null,
+   "where": "/",
+   "raw": "x@x-1.2.3.tgz",
+   "name": "x",
+   "escapedName": "x",
+   "scope": null,
+   "rawSpec": "x-1.2.3.tgz",
+   "saveSpec": "file:x-1.2.3.tgz",
+   "fetchSpec": "/x-1.2.3.tgz",
+   "gitRange": null,
+   "gitCommittish": null,
+   "gitSubdir": null,
+   "hosted": null
+  }
+ },
+ {
+  "about": "file with resolved, no integrity",
+  "name": "x",
+  "lock": {
+   "version": "file:x-1.2.3.tgz",
+   "resolved": "/path/to/x-1.2.3.tgz"
+  },
+  "expected": {
+   "type": "file",
+   "registry": null,
+   "where": "/",
+   "raw": "x@/path/to/x-1.2.3.tgz",
+   "name": "x",
+   "escapedName": "x",
+   "scope": null,
+   "rawSpec": "/path/to/x-1.2.3.tgz",
+   "saveSpec": "file:/path/to/x-1.2.3.tgz",
+   "fetchSpec": "/path/to/x-1.2.3.tgz",
+   "gitRange": null,
+   "gitCommittish": null,
+   "gitSubdir": null,
+   "hosted": null
+  }
+ },
+ {
+  "about": "file with resolved and from",
+  "name": "x",
+  "lock": {
+   "version": "file:x-1.2.3.tgz",
+   "from": "file:x-1.2.3.tgz",
+   "resolved": "/path/to/x-1.2.3.tgz"
+  },
+  "expected": {
+   "type": "file",
+   "registry": null,
+   "where": "/",
+   "raw": "x@/path/to/x-1.2.3.tgz",
+   "name": "x",
+   "escapedName": "x",
+   "scope": null,
+   "rawSpec": "/path/to/x-1.2.3.tgz",
+   "saveSpec": "file:/path/to/x-1.2.3.tgz",
+   "fetchSpec": "/path/to/x-1.2.3.tgz",
+   "gitRange": null,
+   "gitCommittish": null,
+   "gitSubdir": null,
+   "hosted": null
+  }
+ },
+ {
+  "about": "directory symlink",
+  "name": "x",
+  "lock": {
+   "version": "file:../some/path"
+  },
+  "expected": {
+   "type": "directory",
+   "registry": null,
+   "where": "/",
+   "raw": "x@file:../some/path",
+   "name": "x",
+   "escapedName": "x",
+   "scope": null,
+   "rawSpec": "file:../some/path",
+   "saveSpec": "file:some/path",
+   "fetchSpec": "/some/path",
+   "gitRange": null,
+   "gitCommittish": null,
+   "gitSubdir": null,
+   "hosted": null
+  }
+ },
+ {
+  "about": "completely invalid, return empty object",
+  "name": "really bad and invalid",
+  "lock": {
+   "version": "url:// not even close to a ! valid @ npm @ specifier",
+   "resolved": "this: is: also: not: valid!"
+  },
+  "expected": null
+ }
+]

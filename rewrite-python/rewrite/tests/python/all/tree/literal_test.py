@@ -48,7 +48,7 @@ def test_int_above_int32_is_long():
 
 def test_byte_string_concatenation():
     # language=python
-    RecipeSpec().rewrite_run(python("assert b'hello' b'world'", after_recipe=check_first_literal_type(JavaType.Primitive.String)))
+    RecipeSpec().rewrite_run(python("assert b'hello' b'world'", after_recipe=check_first_literal_type(JavaType.Primitive.None_)))
 
 
 def test_int_above_int64_has_no_primitive():

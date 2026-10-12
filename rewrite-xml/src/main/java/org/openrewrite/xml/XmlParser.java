@@ -77,6 +77,15 @@ public class XmlParser implements Parser {
             "props",
             "targets",
             "slnx",
+            // Other MSBuild project types. Bare `proj` and `dcproj` are deliberately absent:
+            // both extensions are also used for files that are not MSBuild XML.
+            "projitems",
+            "shproj",
+            "vcxproj",
+            "sqlproj",
+            "njsproj",
+            "pyproj",
+            "wapproj",
             "ruleset",
             "dotsettings",
             // JasperReports files

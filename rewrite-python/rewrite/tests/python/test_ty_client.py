@@ -14,7 +14,8 @@
 """TyTypesClient protocol tests against a fake `ty-types --serve`.
 
 The fake server answers per the requested file's name: "slow-<seconds>" delays
-the response and "big" pads it to ~64KB. Every request also writes to stderr,
+the response and "big" pads it to ~64KB. It rejects a project root containing
+"reject" and reports the VIRTUAL_ENV it was started with. Every request also writes to stderr,
 so an undrained stderr pipe would wedge it just like the real binary can.
 """
 import os
@@ -28,6 +29,7 @@ from rewrite.python.ty_client import TyTypesClient
 FAKE_SERVER = textwrap.dedent('''\
     #!/usr/bin/env python3
     import json
+    import os
     import re
     import sys
     import time
@@ -39,14 +41,15 @@ FAKE_SERVER = textwrap.dedent('''\
         if req["method"] == "shutdown":
             break
         if req["method"] == "initialize":
-            result = {"ok": True}
+            result = {"ok": "reject" not in params.get("projectRoot", "")}
         else:
             name = params.get("file", "")
             slow = re.search(r"slow-(\\d+(?:\\.\\d+)?)", name)
             if slow:
                 time.sleep(float(slow.group(1)))
             padding = "x" * 65536 if "big" in name else ""
-            result = {"types": {"1": {"kind": "class", "name": "str"}}, "pad": padding}
+            result = {"types": {"1": {"kind": "class", "name": "str"}}, "pad": padding,
+                      "virtualEnv": os.environ.get("VIRTUAL_ENV")}
         sys.stdout.write(json.dumps({"jsonrpc": "2.0", "id": req["id"], "result": result}) + "\\n")
         sys.stdout.flush()
 ''')
@@ -95,6 +98,26 @@ def test_round_trip(client):
     result = client.get_types("/some/project/app.py")
     assert result is not None
     assert result["types"]["1"]["name"] == "str"
+
+
+def test_failed_initialize_restarts_for_another_roots_venv(client, tmp_path, monkeypatch):
+    monkeypatch.setenv("VIRTUAL_ENV", "/inherited/.venv")
+    venv = tmp_path / "project" / ".venv"
+    venv.mkdir(parents=True)
+    (venv / "pyvenv.cfg").write_text("home = /usr/bin\n")
+
+    assert not client.initialize(str(tmp_path / "reject"))
+    assert client.initialize(str(venv.parent))
+    assert client.get_types(str(venv.parent / "app.py"))["virtualEnv"] == str(venv)
+
+
+def test_restarted_session_drops_the_previous_sessions_types(client):
+    assert client.initialize("/some/project")
+    assert client.get_types("/some/project/app.py") is not None
+    client._kill()
+
+    assert client.initialize("/some/project")
+    assert client.session_types == {}
 
 
 def test_timeout_returns_none_then_recovers(client):

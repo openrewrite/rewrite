@@ -223,6 +223,8 @@ class Template:
         # Phase 3: apply coordinates (prefix preservation, statement wrapping, auto-format)
         if effective_coords is not None and result is not None:
             result = TemplateEngine.apply_coordinates(result, cursor, effective_coords, format)
+        elif result is not None:
+            result = TemplateEngine.unmark_substituted(result)
 
         return result
 
