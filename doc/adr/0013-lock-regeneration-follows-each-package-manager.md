@@ -404,19 +404,23 @@ The Yarn classic port follows yarn 1.22.22 and reproduces the 1.x releases besid
   does, answered through `atLeast` alone by the tag of yarnpkg/yarn that made it. The release names itself where yarn
   does: the header `yarn-enable-lockfile-versions` writes, `engines.yarn`, the `packageManager` message. An error that
   is no MessageError is worded as the release reports it: `An unexpected error occurred: "<message>".` before 1.22.20,
-  its stack from 1.22.21; 1.22.20 prints none, and the engine words it as 1.22.21 does. What ends yarn before `main`
-  reports (an rc file it cannot read, a yarn-path that does not load, the manifest 1.22.20 reads first) is printed as
-  its stack by every release. The questions cover every change between two releases of `PROVEN` in the modules the
-  port names, those no scenario reaches among them (each tested as the release did it when run), and the libraries
-  yarn bundles: ini 1.3.4 and tar-fs 1.16.0 before 1.10.0 are options of their one port.
+  its stack from 1.22.21; 1.22.20 prints none, and the engine words it as 1.22.21 does. From 1.4.0 to 1.5.1 yarn's
+  bundle makes none of its own errors a MessageError, so those releases word every error as unexpected. What ends
+  yarn before `main` reports (an rc file it cannot read, a yarn-path that does not load, the manifest 1.22.20 reads
+  first) is printed as its stack by every release. The questions cover every change between two releases of `PROVEN`
+  in the modules the port names, those no scenario reaches among them (each tested as the release did it when run),
+  and the libraries yarn bundles: ini 1.3.4 and tar-fs 1.16.0 before 1.10.0, and tar-stream 1.5.4 before 1.7.0 (with
+  readable-stream's `_final`, from 1.8.0), are options of their one port.
 - **How a release is proven.** Every stable 1.x release was swept over every Yarn classic scenario as npm's were;
   1.22.12, which the registry publishes without its bundle, never ran and is not reproduced. The export's failure of a
   phase is the error that ended it, yarn's last `error` line (the steps go to stdout, which interleaves with stderr
   from run to run), none where 1.22.20 printed none. A recording's `cannot-know` or `malformed` line is `exact-or`
   that line for a release that writes a lock, in the export's outcomes and in the replays of the recorded outcome as
-  another release. `YarnClassicScenarioTest` replays the first and last release of every range, and every release
-  with `REWRITE_LOCK_EVERY_RELEASE`. `PROVEN` is 1.7.0 to 1.22.22 but 1.22.12; 1.6.0 knows no `--focus`, and the
-  releases before it word many failures otherwise.
+  another release; where a release writes what the recorders say the engine cannot know and the recording release
+  does not (a member directory's own lock, a lock that names yarn's cache folder), the export's line is the
+  recorders' `cannot-know` for it. A registry's `Not found` is yarn rejecting the edit however a release words it.
+  `YarnClassicScenarioTest` replays the first and last release of every range, and every release with
+  `REWRITE_LOCK_EVERY_RELEASE`. `PROVEN` is every 1.x release but 1.22.12.
 
 ## Amendment 2026-10-12: pnpm releases
 

@@ -20,10 +20,14 @@ import org.openrewrite.javascript.internal.lock.CannotKnow;
 import org.openrewrite.javascript.internal.lock.JsError;
 import org.openrewrite.javascript.internal.lock.PosixPath;
 
+import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.HashMap;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -106,7 +110,9 @@ final class Rc {
     @SuppressWarnings("unchecked")
     static @Nullable Object loadRcFile(String text, String filePath, YarnClassicRelease release) {
         String fileLoc = release.parsesRcFilesByTheirPath() ? PosixPath.basename(filePath) : "yarnrc";
-        Object values = LockfileParser.parseLockfile(text.replace("\r\n", "\n"), fileLoc, release).getObject();
+        // rc.js reads the file raw: the tokenizer reads its \r (an invalid token before 1.1.0), and an error names the
+        // raw file's lines and columns
+        Object values = LockfileParser.parseLockfile(text, fileLoc, release).getObject();
         if (filePath.endsWith(".yml")) {
             if (!release.keepsYarnrcYmlSettings()) {
                 Map<String, @Nullable Object> path = new LinkedHashMap<>();
@@ -161,6 +167,18 @@ final class Rc {
      * a flag passes itself when the value is true.
      */
     static Map<String, @Nullable Object> getRcArgs(Map<String, @Nullable Object> rc) {
+        return getRcArgs(rc, YarnClassicRelease.PORTED);
+    }
+
+    /**
+     * {@code getRcArgs} as {@code release}'s commander sets the flags: an option the release does not declare is one
+     * commander drops with the value after it. Before 1.1.0, the args by their values, parsed before the command line
+     * with what they leave of it; the arguments no option takes are under {@link #ARGS}.
+     */
+    static Map<String, @Nullable Object> getRcArgs(Map<String, @Nullable Object> rc, YarnClassicRelease release) {
+        if (!release.buildsRcArgsByTheirOption()) {
+            return parseArgs(buildRcArgsByTheirValue(rc), release);
+        }
         Map<String, @Nullable Object> args = new LinkedHashMap<>();
         for (String command : Arrays.asList("*", "install")) {
             for (String key : Js.keys(rc)) {
@@ -174,10 +192,13 @@ final class Rc {
                 }
                 String arg = keyMatch.group(2);
                 Object value = rc.get(key);
+                if (!declares(arg, release)) {
+                    continue;
+                }
                 switch (arg) {
                     case "prod":
                     case "production":
-                        args.put("production", Config.boolify(value));
+                        args.put("production", Config.boolify(value, release));
                         break;
                     case "registry":
                     case "modules-folder":
@@ -201,6 +222,152 @@ final class Rc {
         }
         return args;
     }
+
+    // whether the release's commander knows an option the port reads: cli/index.js's and install.js setFlags'
+    private static boolean declares(String arg, YarnClassicRelease release) {
+        switch (arg) {
+            case "focus":
+                return release.declaresFocus();
+            case "registry":
+                return release.declaresRegistry();
+            case "update-checksums":
+                return release.declaresUpdateChecksums();
+            default:
+                return true;
+        }
+    }
+
+    /**
+     * {@code buildRcArgs} before 1.1.0: each {@code --<arg>} of the chain, the wildcard's then install's, by its
+     * value's type.
+     */
+    private static List<String> buildRcArgsByTheirValue(Map<String, @Nullable Object> rc) {
+        List<String> argv = new ArrayList<>();
+        for (String command : Arrays.asList("*", "install")) {
+            for (String key : Js.keys(rc)) {
+                Matcher keyMatch = RC_ARG.matcher(key);
+                if (!keyMatch.find() || !command.equals(keyMatch.group(1) == null ? "*" : keyMatch.group(1))) {
+                    continue;
+                }
+                String arg = keyMatch.group(2);
+                Object value = rc.get(key);
+                if (value instanceof String) {
+                    argv.add("--" + arg);
+                    argv.add((String) value);
+                } else if (Boolean.TRUE.equals(value)) {
+                    argv.add("--" + arg);
+                } else if (Boolean.FALSE.equals(value)) {
+                    argv.add("--no-" + arg);
+                }
+            }
+        }
+        return argv;
+    }
+
+    // the options of cli/index.js and install.js setFlags before 1.1.0, by what commander 2.9.0 reads after them
+    private static final Set<String> FLAGS_BEFORE_1_1_0 = new HashSet<>(Arrays.asList("--verbose", "--offline",
+            "--prefer-offline", "--strict-semver", "--json", "--ignore-scripts", "--har", "--ignore-platform",
+            "--ignore-engines", "--ignore-optional", "--force", "--skip-integrity-check", "--check-files",
+            "--no-bin-links", "--flat", "--no-lockfile", "--pure-lockfile", "--frozen-lockfile", "--link-duplicates",
+            "-s", "--silent", "--no-progress", "--non-interactive", "-g", "--global", "-S", "--save", "-D",
+            "--save-dev", "-P", "--save-peer", "-O", "--save-optional", "-E", "--save-exact", "-T", "--save-tilde"));
+    private static final Set<String> OPTIONAL_VALUES_BEFORE_1_1_0 = new HashSet<>(Arrays.asList("--prod",
+            "--production", "--emoji", "--scripts-prepend-node-path"));
+    private static final Set<String> REQUIRED_VALUES_BEFORE_1_1_0 = new HashSet<>(Arrays.asList("--link-folder",
+            "--global-folder", "--modules-folder", "--preferred-cache-folder", "--cache-folder", "--mutex", "--cwd",
+            "--proxy", "--https-proxy", "--network-concurrency", "--network-timeout"));
+    private static final Map<String, String> SHORT_FLAGS = new HashMap<>();
+
+    static {
+        String[][] shorts = {{"-s", "silent"}, {"-g", "global"}, {"-S", "save"}, {"-D", "save-dev"},
+                {"-P", "save-peer"}, {"-O", "save-optional"}, {"-E", "save-exact"}, {"-T", "save-tilde"}};
+        for (String[] s : shorts) {
+            SHORT_FLAGS.put(s[0], s[1]);
+        }
+    }
+
+    // the command line the engine stands for, after its command: yarn install --ignore-scripts ...
+    private static final List<String> COMMAND_LINE = Arrays.asList("--ignore-scripts", "--non-interactive",
+            "--no-progress");
+
+    /**
+     * commander 2.9.0's {@code normalize} and {@code parseOptions} of the rc args before the command line, as the
+     * options before 1.1.0 read them: each option's value, and the arguments no option takes under {@code args},
+     * which install refuses.
+     */
+    private static Map<String, @Nullable Object> parseArgs(List<String> rcArgs, YarnClassicRelease release) {
+        List<String> given = new ArrayList<>(rcArgs);
+        given.addAll(COMMAND_LINE);
+        List<String> argv = new ArrayList<>();
+        for (int i = 0; i < given.size(); i++) {
+            String arg = given.get(i);
+            boolean afterRequired = i > 0 && REQUIRED_VALUES_BEFORE_1_1_0.contains(given.get(i - 1));
+            int equals = arg.indexOf('=');
+            if ("--".equals(arg)) {
+                argv.addAll(given.subList(i, given.size()));
+                break;
+            } else if (afterRequired) {
+                argv.add(arg);
+            } else if (arg.length() > 1 && arg.charAt(0) == '-' && arg.charAt(1) != '-') {
+                for (char c : arg.substring(1).toCharArray()) {
+                    argv.add("-" + c);
+                }
+            } else if (arg.startsWith("--") && equals >= 0) {
+                argv.add(arg.substring(0, equals));
+                argv.add(arg.substring(equals + 1));
+            } else {
+                argv.add(arg);
+            }
+        }
+
+        Map<String, @Nullable Object> flags = new LinkedHashMap<>();
+        List<String> args = new ArrayList<>();
+        boolean literal = false;
+        for (int i = 0; i < argv.size(); i++) {
+            String arg = argv.get(i);
+            if (literal) {
+                args.add(arg);
+            } else if ("--".equals(arg)) {
+                literal = true;
+            } else if (FLAGS_BEFORE_1_1_0.contains(arg)) {
+                String name = SHORT_FLAGS.containsKey(arg) ? SHORT_FLAGS.get(arg) : arg.substring(2);
+                flags.put(camelCase(name.startsWith("no-") ? name.substring(3) : name), !name.startsWith("no-"));
+            } else if (OPTIONAL_VALUES_BEFORE_1_1_0.contains(arg)) {
+                String next = i + 1 < argv.size() ? argv.get(i + 1) : null;
+                boolean takesNext = next != null && !(next.startsWith("-") && !"-".equals(next));
+                String name = "--prod".equals(arg) ? "production" : camelCase(arg.substring(2));
+                // the bare option sets true where no value was given before
+                if (takesNext || !(flags.get(name) instanceof String)) {
+                    Object value = takesNext ? argv.get(++i) : Boolean.TRUE;
+                    flags.put(name, takesNext && "production".equals(name) &&
+                                    release.boolifiesTheProductionFlag() ? Config.boolify(value, release) : value);
+                }
+            } else if (REQUIRED_VALUES_BEFORE_1_1_0.contains(arg)) {
+                // the command line follows the rc args, so a value always does
+                flags.put(camelCase(arg.substring(2)), argv.get(++i));
+            } else if (arg.length() > 1 && arg.charAt(0) == '-') {
+                // an option commander does not know takes what follows it unless that looks like an option
+                if (i + 1 < argv.size() && !argv.get(i + 1).isEmpty() && argv.get(i + 1).charAt(0) != '-') {
+                    i++;
+                }
+            } else {
+                args.add(arg);
+            }
+        }
+        if (flags.containsKey("cwd")) {
+            throw new CannotKnow("the project yarn installs in the directory the .yarnrc's --cwd " +
+                                 Js.string(flags.get("cwd")) + " names");
+        }
+        if (!args.isEmpty()) {
+            flags.put(ARGS, args);
+        }
+        return flags;
+    }
+
+    /**
+     * The arguments of install the rc args leave, which install refuses.
+     */
+    static final String ARGS = "args";
 
     private static String camelCase(String flag) {
         StringBuilder out = new StringBuilder();

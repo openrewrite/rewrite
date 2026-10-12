@@ -51,6 +51,11 @@ final class ResolutionMap {
     final Config config;
     final Set<DependencyRequestPattern> delayQueue = new LinkedHashSet<>();
 
+    /**
+     * The root's patterns, whose lock entries a resolution keeps from 1.3.1 to 1.5.1 ({@code setTopLevelPatterns}).
+     */
+    Set<String> topLevelPatterns = new LinkedHashSet<>();
+
     ResolutionMap(Config config) {
         this.config = config;
     }
@@ -85,7 +90,11 @@ final class ResolutionMap {
 
         boolean validRange = range instanceof String &&
                              NodeSemver.validRange((String) range, Config.SEMVER) != null;
-        if (!validRange && ExoticResolvers.getExoticResolver(range) == null) {
+        // the field's own null, which fix.js empties from 1.3.1, is JSON's for the git resolver's url.parse
+        if (range == null) {
+            throw new JsError(Js.INVALID_ARG_TYPE, "The \"url\" argument must be of type string. Received null");
+        }
+        if (!validRange && ExoticResolvers.getExoticResolver(range, config.getRelease()) == null) {
             return null;
         }
         String r = Js.string(range);
