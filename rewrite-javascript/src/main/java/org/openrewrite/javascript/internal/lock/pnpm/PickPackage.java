@@ -109,9 +109,13 @@ final class PickPackage {
             PickerOptions pickerOpts, PickPackageFromMeta.RegistryPackageSpec spec,
             Map<String, @Nullable Object> meta) {
         return runPicker(pickerOpts, spec, targetSpec -> {
-            Map<String, @Nullable Object> highest = pickHighest(pickerOpts.getPreferredVersionSelectors(),
-                    pickerOpts.getPublishedBy(), pickerOpts.getPublishedByExclude(), meta, targetSpec,
-                    pickerOpts.getRelease());
+            // from 11.22.0 the lowest mature version where the resolution picks the lowest
+            Map<String, @Nullable Object> highest = pickerOpts.isPickLowestVersion() &&
+                                                    pickerOpts.getRelease().picksTheLowestMatureVersion() ?
+                    pickLowest(pickerOpts.getPreferredVersionSelectors(), pickerOpts.getPublishedBy(),
+                            pickerOpts.getPublishedByExclude(), meta, targetSpec, pickerOpts.getRelease()) :
+                    pickHighest(pickerOpts.getPreferredVersionSelectors(), pickerOpts.getPublishedBy(),
+                            pickerOpts.getPublishedByExclude(), meta, targetSpec, pickerOpts.getRelease());
             // before 11.1.3 a strict check leaves an immature range unpicked
             if (highest != null || pickerOpts.isStrictPublishedByCheck() &&
                                    !pickerOpts.getRelease().checksTheReleaseAgeAsAPolicy()) {

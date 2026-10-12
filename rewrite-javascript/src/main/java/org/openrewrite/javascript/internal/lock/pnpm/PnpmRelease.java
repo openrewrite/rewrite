@@ -303,6 +303,14 @@ public final class PnpmRelease {
     }
 
     /**
+     * Under a release-age cutoff, a resolution that picks the lowest version (resolution-mode lowest-direct or
+     * time-based) picks the lowest mature one, from 11.22.0; before, the highest mature one.
+     */
+    boolean picksTheLowestMatureVersion() {
+        return atLeast(11, 22, 0);
+    }
+
+    /**
      * An abbreviated packument modified exactly at the release-age cutoff counts as mature, from 11.2.0; before, it
      * is fetched in full (and without a time field is {@code ERR_PNPM_MISSING_TIME}).
      */
