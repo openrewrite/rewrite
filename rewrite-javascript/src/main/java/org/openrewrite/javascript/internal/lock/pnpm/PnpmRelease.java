@@ -298,6 +298,24 @@ public final class PnpmRelease {
         return atLeast(11, 5, 0);
     }
 
+    /**
+     * The lock's resolutions are verified on every install, and a registry entry's explicit tarball URL must be the
+     * one the registry's metadata lists for that version ({@code ERR_PNPM_TARBALL_URL_MISMATCH}), a version with a
+     * non-semver dep path not checked, from 11.5.2; before, only under minimumReleaseAge or trustPolicy, and the URL
+     * not at all.
+     */
+    boolean bindsALockedTarballUrlToTheRegistry() {
+        return atLeast(11, 5, 2);
+    }
+
+    /**
+     * A tarball whose URL is neither http nor https ({@code file:}) is no registry resolution to verify, from 11.5.2;
+     * before, it is checked against the registry's metadata.
+     */
+    boolean verifiesOnlyHttpTarballs() {
+        return atLeast(11, 5, 2);
+    }
+
     // @pnpm/installing.env-installer src/resolveOptionalSubdeps.ts, resolveAndInstallConfigDeps.ts,
     // installConfigDeps.ts
 
@@ -343,6 +361,25 @@ public final class PnpmRelease {
         return atLeast(11, 5, 1);
     }
 
+    /**
+     * A locked package the install does not update, whose snapshot records no peers, is read from its snapshot under
+     * the manifest: {@code hasBin} as the lock records it, no git {@code prepare}, from 11.5.2, whose
+     * getInfoFromLockfile names the package's dep path; before, the manifest decides, the lock's {@code hasBin} only
+     * where the manifest has no {@code bin}.
+     */
+    boolean readsALockedPackageFromItsSnapshot() {
+        return atLeast(11, 5, 2);
+    }
+
+    /**
+     * Peers are resolved a second time from the peer contexts the lock records, where their providers are still in
+     * the graph, satisfy the ranges and no current manifest choice must win, from 11.5.2 (pnpm/pnpm#12083); before,
+     * once, from the current graph alone.
+     */
+    boolean prefersThePeerContextsTheLockRecords() {
+        return atLeast(11, 5, 2);
+    }
+
     // @pnpm/installing.package-requester src/packageRequester.ts
 
     /**
@@ -369,6 +406,24 @@ public final class PnpmRelease {
      */
     boolean replacesAnInheritedParentThatBreaksAPeerDiamond() {
         return atLeast(11, 5, 1);
+    }
+
+    // @pnpm/installing.deps-installer src/install/index.ts (installSome's catalogMode)
+
+    /**
+     * A {@code runtime:} dependency is never saved to a catalog under catalogMode strict or prefer, from 11.5.2;
+     * before, it is checked against the catalog as any other.
+     */
+    boolean keepsARuntimeDependencyOutOfTheCatalog() {
+        return atLeast(11, 5, 2);
+    }
+
+    /**
+     * catalogMode compares a wanted specifier with the catalog's as versions only, so a range is a mismatch, from
+     * 11.5.2 (pnpm/pnpm#11570); before, a range passes to semver.eq, which throws {@code Invalid Version}.
+     */
+    boolean comparesCatalogSpecifiersAsVersionsOnly() {
+        return atLeast(11, 5, 2);
     }
 
     // @pnpm/installing.deps-resolver src/hoistPeers.ts (ResolveDependencies.LOCKED_OPTIONAL_PEER_CANDIDATES)

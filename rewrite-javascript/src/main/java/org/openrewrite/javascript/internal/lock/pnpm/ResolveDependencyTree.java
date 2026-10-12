@@ -249,6 +249,8 @@ final class ResolveDependencyTree {
             DependenciesTreeNode node = new DependenciesTreeNode(pendingNode.getResolvedPackage(),
                     pendingNode.getDepth());
             node.setInstallable(pendingNode.isInstallable());
+            node.setLockedPeerContext(pendingNode.getLockedPeerContext());
+            node.setPreviousDepPath(pendingNode.getPreviousDepPath());
             String id = pendingNode.getResolvedPackage().getId();
             node.setLazyChildren(() -> buildTree(ctx, id, pendingNode.getParentIds(),
                     ctx.getChildrenByParentId().get(id), pendingNode.getDepth() + 1, pendingNode.isInstallable()));

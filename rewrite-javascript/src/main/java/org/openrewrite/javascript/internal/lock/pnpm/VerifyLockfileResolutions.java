@@ -51,15 +51,28 @@ final class VerifyLockfileResolutions {
     private static class Candidate {
         String name;
         String version;
+
+        @Nullable
+        String nonSemverVersion;
+
         @Nullable
         Map<String, @Nullable Object> resolution;
     }
 
     static void verifyLockfileResolutions(LockfileObject lockfile, List<? extends ResolutionVerifier> verifiers) {
+        verifyLockfileResolutions(lockfile, verifiers, PnpmRelease.PORTED);
+    }
+
+    /**
+     * The verification as {@code release} makes it: from 11.5.2 an entry's non-semver version (a tarball's URL) tells
+     * it from a registry version of the same name ({@link PnpmRelease#bindsALockedTarballUrlToTheRegistry}).
+     */
+    static void verifyLockfileResolutions(LockfileObject lockfile, List<? extends ResolutionVerifier> verifiers,
+                                          PnpmRelease release) {
         if (verifiers.isEmpty() || lockfile.getPackages() == null) {
             return;
         }
-        Map<String, Candidate> candidates = collectCandidates(lockfile);
+        Map<String, Candidate> candidates = collectCandidates(lockfile, release);
         if (candidates.isEmpty()) {
             return;
         }
@@ -103,7 +116,7 @@ final class VerifyLockfileResolutions {
                 "them.");
     }
 
-    private static Map<String, Candidate> collectCandidates(LockfileObject lockfile) {
+    private static Map<String, Candidate> collectCandidates(LockfileObject lockfile, PnpmRelease release) {
         Map<String, Candidate> candidates = new LinkedHashMap<>();
         Map<String, PackageSnapshot> packages = lockfile.getPackages();
         if (packages == null) {
@@ -117,9 +130,13 @@ final class VerifyLockfileResolutions {
             if (name == null || name.isEmpty() || version == null || version.isEmpty()) {
                 continue;
             }
+            String nonSemverVersion = pkgInfo.getNonSemverVersion();
+            // 11.5.2's key also names the non-semver version, which tells apart only entries that have one
             String key = name + "@" + version + "@" +
+                         (nonSemverVersion != null && release.bindsALockedTarballUrlToTheRegistry() ?
+                                 nonSemverVersion + "@" : "") +
                          (snapshot.getResolution() == null ? "undefined" : Js.jsonStringify(snapshot.getResolution()));
-            candidates.put(key, new Candidate(name, version, snapshot.getResolution()));
+            candidates.put(key, new Candidate(name, version, nonSemverVersion, snapshot.getResolution()));
         }
         return candidates;
     }
@@ -131,7 +148,7 @@ final class VerifyLockfileResolutions {
         for (Candidate candidate : candidates.values()) {
             for (ResolutionVerifier verifier : verifiers) {
                 ResolutionVerifier.Result result = verifier.verify(candidate.getResolution(), candidate.getName(),
-                        candidate.getVersion());
+                        candidate.getVersion(), candidate.getNonSemverVersion());
                 if (!result.isOk()) {
                     violations.add(new ResolutionPolicyViolation(candidate.getName(), candidate.getVersion(),
                             candidate.getResolution(), result.getCode(), result.getReason()));

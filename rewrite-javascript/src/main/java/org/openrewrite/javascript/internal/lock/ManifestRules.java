@@ -160,6 +160,15 @@ public interface ManifestRules {
     }
 
     /**
+     * {@link #added(String, String, Map)} as {@code release} of the package manager adds, a version or a range of
+     * them (null where the package manager's add does not depend on it).
+     */
+    default Saved added(String alias, String specifier, @Nullable Map<String, @Nullable Object> workspace,
+                        @Nullable String release) {
+        return added(alias, specifier, workspace);
+    }
+
+    /**
      * The dependency fields its add sorts when it saves a dependency in {@code field}.
      */
     default List<String> sortedOnAdd(String field) {

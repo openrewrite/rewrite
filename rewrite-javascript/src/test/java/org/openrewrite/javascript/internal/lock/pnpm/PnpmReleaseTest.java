@@ -803,6 +803,128 @@ class PnpmReleaseTest {
         return written;
     }
 
+    // upstream's resolvePeers.ts test of 11.5.2, "locked peer provider preferences": the consumer, under wrapper,
+    // the lock records with peer 2.0.0, which retainer keeps in the graph; the project's own peer is 1.0.0
+    private static List<String> lockedPeerProvider(boolean secondPass, boolean nestedPeerMustWin) {
+        ResolvedPackage peer1 = peerPkg("peer", "1.0.0");
+        ResolvedPackage peer2 = peerPkg("peer", "2.0.0");
+        ResolvedPackage consumer = peerPkg("consumer", "1.0.0");
+        consumer.getPeerDependencies().put("peer", new PeerDependency(">=1"));
+        Map<NodeId, DependenciesTreeNode> tree = new LinkedHashMap<>();
+        treeNode(tree, ">peer/1.0.0>", peer1, 0);
+        tree.get(NodeId.of(">peer/1.0.0>")).setPreviousDepPath("peer/1.0.0");
+        treeNode(tree, ">retainer/1.0.0>", peerPkg("retainer", "1.0.0"), 0, "peer", ">retainer/1.0.0>peer/2.0.0>");
+        treeNode(tree, ">retainer/1.0.0>peer/2.0.0>", peer2, 1);
+        tree.get(NodeId.of(">retainer/1.0.0>peer/2.0.0>")).setPreviousDepPath("peer/2.0.0");
+        if (nestedPeerMustWin) {
+            treeNode(tree, ">wrapper/1.0.0>", peerPkg("wrapper", "1.0.0"), 0, "consumer",
+              ">wrapper/1.0.0>consumer/1.0.0>", "peer", ">peer/1.0.0>");
+            tree.get(NodeId.of(">wrapper/1.0.0>")).setDependencyNamesWhoseCurrentProviderMustWin(
+              new LinkedHashSet<>(Collections.singletonList("peer")));
+        } else {
+            treeNode(tree, ">wrapper/1.0.0>", peerPkg("wrapper", "1.0.0"), 0, "consumer",
+              ">wrapper/1.0.0>consumer/1.0.0>");
+        }
+        treeNode(tree, ">wrapper/1.0.0>consumer/1.0.0>", consumer, 1);
+        tree.get(NodeId.of(">wrapper/1.0.0>consumer/1.0.0>")).setLockedPeerContext(
+          Collections.singletonMap("peer", "peer/2.0.0"));
+        Map<String, NodeId> direct = new LinkedHashMap<>();
+        if (!nestedPeerMustWin) {
+            direct.put("peer", NodeId.of(">peer/1.0.0>"));
+        }
+        direct.put("retainer", NodeId.of(">retainer/1.0.0>"));
+        direct.put("wrapper", NodeId.of(">wrapper/1.0.0>"));
+        List<ProjectToResolve> projects = Collections.singletonList(new ProjectToResolve("", "", direct,
+          Collections.emptyList(), new LinkedHashSet<>(), new LinkedHashSet<>()));
+        ResolvePeers.Result first = ResolvePeers.resolvePeers(new LinkedHashSet<>(Collections.singletonList("peer")),
+          projects, tree, false, false, false, false, 1000, "", new LinkedHashMap<>(), new LinkedHashSet<>(),
+          release("11.5.2"));
+        ResolvePeers.Result result = !secondPass ? first : ResolvePeers.resolvePeers(
+          new LinkedHashSet<>(Collections.singletonList("peer")), projects, tree, false, false, false, false, 1000,
+          "", new LinkedHashMap<>(), new LinkedHashSet<>(), release("11.5.2"), first.getPathsByNodeId());
+        return new ArrayList<>(result.getDependenciesGraph().keySet());
+    }
+
+    /**
+     * installing/deps-resolver index.ts and resolvePeers.ts (11.5.2, pnpm/pnpm#12083): peers are resolved again from
+     * the peer contexts the lock records, a provider still in the graph and in range kept unless a current choice
+     * must win; before, once. Upstream's resolvePeers.ts test of 11.5.2.
+     */
+    @Test
+    void prefersThePeerContextsTheLockRecordsFrom1152() {
+        assertThat(release("11.5.2").prefersThePeerContextsTheLockRecords()).isTrue();
+        assertThat(release("11.5.1").prefersThePeerContextsTheLockRecords()).isFalse();
+        assertThat(lockedPeerProvider(false, false)).contains("consumer/1.0.0(peer/1.0.0)");
+        assertThat(lockedPeerProvider(true, false)).contains("consumer/1.0.0(peer/2.0.0)");
+        assertThat(lockedPeerProvider(true, true)).contains("consumer/1.0.0(peer/1.0.0)")
+          .doesNotContain("consumer/1.0.0(peer/2.0.0)");
+    }
+
+    private static ResolutionVerifier.Result verifyTarball(String release, String lockedTarball) {
+        RegistryMetadata registry = registry(new String[]{"foo", "", ""});
+        NpmResolutionVerifier verifier = NpmResolutionVerifier.createNpmResolutionVerifier(
+          NpmResolutionVerifier.Options.builder()
+            .minimumReleaseAge(0.0)
+            .registries(Collections.singletonMap("default", REGISTRY))
+            .fetch(registry)
+            .now(NOW)
+            .release(release(release))
+            .build());
+        return verifier == null ? ResolutionVerifier.Result.OK :
+          verifier.verify(obj("{'integrity':'sha512-x','tarball':'" + lockedTarball + "'}"), "foo", "1.0.0", null);
+    }
+
+    /**
+     * resolving/npm-resolver createNpmResolutionVerifier.ts (11.5.2): every install verifies the lock's resolutions,
+     * and a registry entry's explicit tarball URL must be the one the registry's metadata lists; before, nothing is
+     * verified without minimumReleaseAge or trustPolicy.
+     */
+    @Test
+    void bindsALockedTarballUrlToTheRegistryFrom1152() {
+        assertThat(verifyTarball("11.5.2", REGISTRY + "foo/-/x-1.0.0.tgz").isOk()).isTrue();
+        ResolutionVerifier.Result mismatch = verifyTarball("11.5.2", "https://evil.example/foo-1.0.0.tgz");
+        assertThat(mismatch.getCode()).isEqualTo("TARBALL_URL_MISMATCH");
+        assertThat(mismatch.getReason()).isEqualTo("has a tarball URL (https://evil.example/foo-1.0.0.tgz) that does " +
+                                                   "not match the registry's published metadata (" + REGISTRY +
+                                                   "foo/-/x-1.0.0.tgz)");
+        assertThat(verifyTarball("11.5.1", "https://evil.example/foo-1.0.0.tgz").isOk()).isTrue();
+    }
+
+    /**
+     * resolving/npm-resolver createNpmResolutionVerifier.ts isNpmRegistryResolution (11.5.2): a tarball neither http
+     * nor https is no registry resolution to verify; before, it is.
+     */
+    @Test
+    void verifiesOnlyHttpTarballsFrom1152() {
+        Map<String, @Nullable Object> local = obj("{'integrity':'sha512-x','tarball':'file:foo-1.0.0.tgz'}");
+        assertThat(NpmResolutionVerifier.isNpmRegistryResolution(local, release("11.5.2"))).isFalse();
+        assertThat(NpmResolutionVerifier.isNpmRegistryResolution(local, release("11.5.1"))).isTrue();
+    }
+
+    private static Map<String, @Nullable Object> catalogPrefer(String entry) {
+        return WorkspaceManifest.readWorkspaceManifest("catalogMode: prefer\ncatalog:\n  wrappy: " + entry + "\n");
+    }
+
+    /**
+     * installing/deps-installer install/index.ts installSome (11.5.2, pnpm/pnpm#11570): catalogMode compares a range
+     * as no version, a mismatch; before, semver.eq throws Invalid Version. And a {@code runtime:} dependency is
+     * never saved to the catalog.
+     */
+    @Test
+    void comparesCatalogSpecifiersAsVersionsOnlyFrom1152() {
+        assertThat(Install.installSome("wrappy", "^1.0.0", catalogPrefer("^1.0.2"), release("11.5.2")))
+          .isEqualTo(new Install.Saved("^1.0.0", null));
+        assertThatThrownBy(() -> Install.installSome("wrappy", "^1.0.0", catalogPrefer("^1.0.2"), release("11.5.1")))
+          .isInstanceOf(org.openrewrite.javascript.internal.lock.Rejected.class)
+          .hasMessageContaining("Invalid Version");
+        Map<String, @Nullable Object> runtime = WorkspaceManifest.readWorkspaceManifest(
+          "catalogMode: strict\ncatalog:\n  node: 20.0.0\n");
+        assertThat(Install.installSome("node", "runtime:22.0.0", runtime, release("11.5.2")))
+          .isEqualTo(new Install.Saved("runtime:22.0.0", null));
+        assertThatThrownBy(() -> Install.installSome("node", "runtime:22.0.0", runtime, release("11.5.1")))
+          .hasMessageContaining("ERR_PNPM_CATALOG_VERSION_MISMATCH");
+    }
+
     /**
      * installing/deps-resolver hoistPeers.ts (11.5.1, pnpm/pnpm#12075): a version only the lock holds is a candidate
      * for a missing optional peer. #9151 asks it through {@link ResolveDependencies#LOCKED_OPTIONAL_PEER_CANDIDATES},

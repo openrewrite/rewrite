@@ -27,8 +27,10 @@ import org.openrewrite.javascript.semver.NodeSemver;
 
 import java.time.Instant;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -119,10 +121,12 @@ final class NpmResolutionVerifier implements ResolutionVerifier {
     }
 
     /**
-     * {@code createNpmResolutionVerifier}: null when no policy is active.
+     * {@code createNpmResolutionVerifier}: null when no policy is active, which from 11.5.2 the tarball URL binding
+     * always is ({@link PnpmRelease#bindsALockedTarballUrlToTheRegistry}).
      */
     static @Nullable NpmResolutionVerifier createNpmResolutionVerifier(Options opts) {
-        if (!isActive(opts.getMinimumReleaseAge()) && !"no-downgrade".equals(opts.getTrustPolicy())) {
+        if (!isActive(opts.getMinimumReleaseAge()) && !"no-downgrade".equals(opts.getTrustPolicy()) &&
+            !opts.getRelease().bindsALockedTarballUrlToTheRegistry()) {
             return null;
         }
         return new NpmResolutionVerifier(opts);
@@ -154,11 +158,30 @@ final class NpmResolutionVerifier implements ResolutionVerifier {
 
     @Override
     public Result verify(@Nullable Object resolution, String name, String version) {
-        if (!isNpmRegistryResolution(resolution)) {
+        return verify(resolution, name, version, null);
+    }
+
+    @Override
+    public Result verify(@Nullable Object resolution, String name, String version,
+                         @Nullable String nonSemverVersion) {
+        if (!isNpmRegistryResolution(resolution, opts.getRelease())) {
+            return Result.OK;
+        }
+        PnpmRelease release = opts.getRelease();
+        if (nonSemverVersion != null && release.bindsALockedTarballUrlToTheRegistry()) {
             return Result.OK;
         }
         if (NodeSemver.valid(version, NodeSemver.Options.DEFAULT) == null) {
             return Result.OK;
+        }
+        @SuppressWarnings("unchecked")
+        Object tarballUrl = ((Map<String, @Nullable Object>) resolution).get("tarball");
+        if (tarballUrl instanceof String && release.bindsALockedTarballUrlToTheRegistry()) {
+            Result urlViolation = runTarballUrlCheck(pickRegistryForVersion(name, tarballUrl), name, version,
+                    (String) tarballUrl);
+            if (urlViolation != null) {
+                return urlViolation;
+            }
         }
         boolean ageApplies = ageCheckActive && !PackageVersionPolicy.isExcluded(excludePolicy, name, version);
         boolean trustApplies = trustCheckActive &&
@@ -166,8 +189,6 @@ final class NpmResolutionVerifier implements ResolutionVerifier {
         if (!ageApplies && !trustApplies) {
             return Result.OK;
         }
-        @SuppressWarnings("unchecked")
-        Object tarballUrl = ((Map<String, @Nullable Object>) resolution).get("tarball");
         String registry = pickRegistryForVersion(name, tarballUrl);
         if (ageApplies) {
             Result ageViolation = runAgeCheck(registry, name, version);
@@ -182,6 +203,35 @@ final class NpmResolutionVerifier implements ResolutionVerifier {
             }
         }
         return Result.OK;
+    }
+
+    static final String TARBALL_URL_MISMATCH_VIOLATION_CODE = "TARBALL_URL_MISMATCH";
+
+    // runTarballUrlCheck (11.5.2): the lock's tarball URL is the one the registry's metadata lists for the version
+    @SuppressWarnings("unchecked")
+    private @Nullable Result runTarballUrlCheck(String registry, String name, String version,
+                                                String lockfileTarball) {
+        Map<String, @Nullable Object> meta = fetchAbbreviatedMeta(registry, name);
+        Object versions = meta == null ? null : meta.get("versions");
+        Object manifest = versions instanceof Map ? ((Map<String, @Nullable Object>) versions).get(version) : null;
+        Object registryTarball = property(property(manifest, "dist"), "tarball");
+        if (registryTarball != null && registryTarball != Js.UNDEFINED &&
+            canonicalTarballUrl(lockfileTarball).equals(canonicalTarballUrl(Js.string(registryTarball)))) {
+            return null;
+        }
+        return new Result(false, TARBALL_URL_MISMATCH_VIOLATION_CODE, registryTarball == null ||
+                                                                      registryTarball == Js.UNDEFINED ?
+                "could not be verified against the registry's published metadata" :
+                "has a tarball URL (" + lockfileTarball + ") that does not match the registry's published " +
+                "metadata (" + Js.string(registryTarball) + ")");
+    }
+
+    // canonicalTarballUrl (11.5.2): normalizeRegistryUrl, %2f as /, and the scheme dropped
+    private static String canonicalTarballUrl(String url) {
+        WhatwgUrl parsed = WhatwgUrl.tryParse(url);
+        String normalized = (parsed == null ? url : parsed.toString()).replaceAll("(?i)%2f", "/");
+        int schemeEnd = normalized.indexOf("://");
+        return schemeEnd == -1 ? normalized : normalized.substring(schemeEnd + 3);
     }
 
     private @Nullable Result runAgeCheck(String registry, String name, String version) {
@@ -294,7 +344,10 @@ final class NpmResolutionVerifier implements ResolutionVerifier {
         if (!abbreviatedMetaCache.containsKey(cacheKey)) {
             Map<String, @Nullable Object> meta;
             try {
-                meta = fetchMetadata(registry, name, false, MODIFIED, VERSIONS);
+                // from 11.5.2 each version's tarball URL is kept, which the URL binding compares
+                meta = opts.getRelease().bindsALockedTarballUrlToTheRegistry() ?
+                        fetchMetadata(registry, name, false, MODIFIED_AND_VERSIONS, Collections.emptySet()) :
+                        fetchMetadata(registry, name, false, MODIFIED, VERSIONS);
             } catch (PnpmError e) {
                 meta = null;
             }
@@ -315,6 +368,7 @@ final class NpmResolutionVerifier implements ResolutionVerifier {
 
     private static final Set<String> MODIFIED = Collections.singleton("modified");
     private static final Set<String> VERSIONS = Collections.singleton("versions");
+    private static final Set<String> MODIFIED_AND_VERSIONS = new HashSet<>(Arrays.asList("modified", "versions"));
     private static final Set<String> TIME = Collections.singleton("time");
 
     /**
@@ -432,7 +486,15 @@ final class NpmResolutionVerifier implements ResolutionVerifier {
     }
 
     private String pickRegistryForVersion(String name, @Nullable Object tarballUrl) {
-        if (Js.truthy(tarballUrl)) {
+        if (Js.truthy(tarballUrl) && opts.getRelease().bindsALockedTarballUrlToTheRegistry()) {
+            // 11.5.2 compares the canonical URLs, scheme and %2f aside
+            String normalized = canonicalTarballUrl(Js.string(tarballUrl));
+            for (String prefix : namedRegistryPrefixes) {
+                if (normalized.startsWith(canonicalTarballUrl(prefix))) {
+                    return prefix;
+                }
+            }
+        } else if (Js.truthy(tarballUrl)) {
             WhatwgUrl parsed = WhatwgUrl.tryParse(Js.string(tarballUrl));
             if (parsed != null) {
                 String normalized = parsed.toString();
@@ -451,6 +513,14 @@ final class NpmResolutionVerifier implements ResolutionVerifier {
     }
 
     static boolean isNpmRegistryResolution(@Nullable Object resolution) {
+        return isNpmRegistryResolution(resolution, PnpmRelease.PORTED);
+    }
+
+    /**
+     * {@code isNpmRegistryResolution} as {@code release} reads it: from 11.5.2 a tarball that is neither http nor https
+     * is none ({@link PnpmRelease#verifiesOnlyHttpTarballs}).
+     */
+    static boolean isNpmRegistryResolution(@Nullable Object resolution, PnpmRelease release) {
         if (!(resolution instanceof Map)) {
             return false;
         }
@@ -460,6 +530,15 @@ final class NpmResolutionVerifier implements ResolutionVerifier {
         }
         if (map.containsKey("gitHosted") && Js.truthy(map.get("gitHosted"))) {
             return false;
+        }
+        Object tarball = map.get("tarball");
+        if (tarball instanceof String) {
+            WhatwgUrl url = WhatwgUrl.tryParse((String) tarball);
+            String protocol = url == null ? null : url.getProtocol();
+            if (protocol != null && !"http:".equals(protocol) && !"https:".equals(protocol) &&
+                release.verifiesOnlyHttpTarballs()) {
+                return false;
+            }
         }
         return map.containsKey("tarball") || map.containsKey("integrity");
     }

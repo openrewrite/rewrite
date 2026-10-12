@@ -142,7 +142,8 @@ class RemoveDependencyCatalogTest implements RewriteTest {
           }
           """;
         String why = "cleanupUnusedCatalogs makes pnpm rewrite pnpm-workspace.yaml, and pnpm 10.0.0 is not a release " +
-          "whose writes are recorded (9.5.0 - 9.15.9, 10.32.1 - 10.34.6, 11.0.6 - 11.5.1), so this edit was not made";
+          "whose writes are recorded (" + org.openrewrite.javascript.internal.PnpmRelease.recorded() +
+          "), so this edit was not made";
         rewriteRun(
           spec -> spec.recipe(new RemoveDependency("wrappy", null))
             .dataTable(NodeDependencyEditsDeclined.Row.class, rows -> assertThat(rows).singleElement()

@@ -97,7 +97,7 @@ public final class PnpmRelease {
                 return new PnpmRelease(version, Integer.parseInt(recorded.substring(0, recorded.indexOf('.'))), null);
             }
         }
-        String ranges = String.join(", ", RECORDED);
+        String ranges = recorded();
         return new PnpmRelease(version, exact == null ? -1 : Integer.parseInt(exact.substring(0, exact.indexOf('.'))),
                 exact != null ? "pnpm " + exact + " is not a release whose writes are recorded (" + ranges + ")" :
                         "the pnpm release the project names, " + version + ", is one the registry picks, not " +
@@ -105,10 +105,25 @@ public final class PnpmRelease {
     }
 
     /**
+     * The releases whose writes are recorded, as a declined edit names them: each range, the pnpm 11 ones those the
+     * engine reproduces ({@code PnpmReleases.PROVEN}).
+     */
+    public static String recorded() {
+        return String.join(", ", RECORDED);
+    }
+
+    /**
      * The major of a release whose writes are recorded; for another, its major, or -1 for a range.
      */
     public int getMajor() {
         return major;
+    }
+
+    /**
+     * The release, a version or a range the registry picks from; empty where pnpm cannot read the one it names.
+     */
+    public String getVersion() {
+        return version;
     }
 
     /**

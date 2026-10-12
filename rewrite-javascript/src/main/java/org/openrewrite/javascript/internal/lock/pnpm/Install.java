@@ -178,7 +178,8 @@ final class Install {
         PnpmRelease release = options.getRelease();
         if (release.checksTheReleaseAgeAsAPolicy() &&
             !(options.isTrue("trustLockfile") && release.readsTrustLockfile())) {
-            VerifyLockfileResolutions.verifyLockfileResolutions(wantedLockfile, stores.resolutionVerifiers(options));
+            VerifyLockfileResolutions.verifyLockfileResolutions(wantedLockfile, stores.resolutionVerifiers(options),
+                    release);
         }
         if (missingManifest != null) {
             throw new JsError(JsError.ERROR,
@@ -525,6 +526,16 @@ final class Install {
      * ResolveDependencyTree: what it saves, under the workspace manifest as its reader reads it (null without one).
      */
     static Saved installSome(String alias, String bareSpecifier, @Nullable Map<String, @Nullable Object> workspace) {
+        return installSome(alias, bareSpecifier, workspace, PnpmRelease.PORTED);
+    }
+
+    /**
+     * {@link #installSome(String, String, Map)} as {@code release} makes the check: from 11.5.2 a {@code runtime:}
+     * dependency skips it ({@link PnpmRelease#keepsARuntimeDependencyOutOfTheCatalog}) and the specifiers compare as
+     * versions only ({@link PnpmRelease#comparesCatalogSpecifiersAsVersionsOnly}).
+     */
+    static Saved installSome(String alias, String bareSpecifier, @Nullable Map<String, @Nullable Object> workspace,
+                             PnpmRelease release) {
         Map<String, @Nullable Map<String, @Nullable Object>> catalogs;
         try {
             catalogs = Catalogs.getCatalogsFromWorkspaceManifest(workspace);
@@ -534,14 +545,15 @@ final class Install {
         Map<String, @Nullable Object> defaultCatalog = catalogs.get(DEFAULT_CATALOG);
         String wanted = ParseWantedDependencies.bareSpecifier(alias, bareSpecifier, defaultCatalog);
         String saveCatalogName = saveCatalogName(workspace);
-        if (!"manual".equals(catalogMode(workspace))) {
+        if (!"manual".equals(catalogMode(workspace)) &&
+            !(wanted.startsWith("runtime:") && release.keepsARuntimeDependencyOutOfTheCatalog())) {
             String perDepCatalogName = saveCatalogName == null ? DEFAULT_CATALOG : saveCatalogName;
             String catalogBareSpecifier = CATALOG_PROTOCOL + (DEFAULT_CATALOG.equals(perDepCatalogName) ? "" :
                     perDepCatalogName);
             Catalogs.Resolution catalog = Catalogs.resolveFromCatalog(catalogs, alias, catalogBareSpecifier);
             String catalogDepSpecifier = "found".equals(catalog.getType()) ? catalog.getSpecifier() : null;
             if (catalogDepSpecifier == null || wanted.equals(catalogBareSpecifier) || eq(alias, wanted,
-                    catalogDepSpecifier)) {
+                    catalogDepSpecifier, release)) {
                 saveCatalogName = perDepCatalogName;
             } else if ("strict".equals(catalogMode(workspace))) {
                 throw Rejected.rejects(Reason.RESOLUTION_REQUIRED, alias, "[ERR_PNPM_CATALOG_VERSION_MISMATCH] " +
@@ -554,10 +566,15 @@ final class Install {
         return lookup == null ? new Saved(wanted, null) : new Saved(lookup, saveCatalogName);
     }
 
-    // semver.validRange of both, then semver.eq, which takes versions only
-    private static boolean eq(String alias, String wanted, String catalogDepSpecifier) {
+    // semver.validRange of both, then semver.eq, which takes versions only; from 11.5.2 semver.valid of both
+    private static boolean eq(String alias, String wanted, String catalogDepSpecifier, PnpmRelease release) {
         if (NodeSemver.validRange(wanted, NodeSemver.Options.DEFAULT) == null ||
             NodeSemver.validRange(catalogDepSpecifier, NodeSemver.Options.DEFAULT) == null) {
+            return false;
+        }
+        if ((NodeSemver.valid(wanted, NodeSemver.Options.DEFAULT) == null ||
+             NodeSemver.valid(catalogDepSpecifier, NodeSemver.Options.DEFAULT) == null) &&
+            release.comparesCatalogSpecifiersAsVersionsOnly()) {
             return false;
         }
         try {

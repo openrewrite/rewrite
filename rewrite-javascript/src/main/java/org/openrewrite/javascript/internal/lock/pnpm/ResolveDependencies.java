@@ -36,6 +36,7 @@ import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import java.util.function.Function;
 import java.util.function.Supplier;
@@ -217,6 +218,13 @@ final class ResolveDependencies {
         private @Nullable Map<String, @Nullable Object> resolution;
         private @Nullable String name;
 
+        /**
+         * From 11.5.2: the dep path the lock records for a package the install does not update, and the peers it
+         * records it with ({@link PnpmRelease#prefersThePeerContextsTheLockRecords}).
+         */
+        private @Nullable String previousDepPath;
+        private @Nullable Map<String, String> lockedPeerContext;
+
         PkgAddress(String alias, String pkgId) {
             this.alias = alias;
             this.pkgId = pkgId;
@@ -289,11 +297,18 @@ final class ResolveDependencies {
         int depth;
         boolean installable;
         List<String> parentIds;
+
+        @Nullable
+        Map<String, String> lockedPeerContext;
+
+        @Nullable
+        String previousDepPath;
     }
 
     /**
      * {@code DependenciesTreeNode}: the children by alias (computed when first asked for), installability, the package
-     * and the depth it was first reached at ({@code -1} for a link).
+     * and the depth it was first reached at ({@code -1} for a link). From 11.5.2 it carries the dep path the lock
+     * records for it, the peers the lock records it with, and the children whose provider the manifests changed.
      */
     @Getter
     @Setter
@@ -303,6 +318,9 @@ final class ResolveDependencies {
         private boolean installable;
         private final ResolvedPackage resolvedPackage;
         private int depth;
+        private @Nullable Map<String, String> lockedPeerContext;
+        private @Nullable String previousDepPath;
+        private @Nullable Set<String> dependencyNamesWhoseCurrentProviderMustWin;
 
         DependenciesTreeNode(ResolvedPackage resolvedPackage, int depth) {
             this.resolvedPackage = resolvedPackage;
@@ -431,6 +449,13 @@ final class ResolveDependencies {
         private @Nullable String name;
         private @Nullable String version;
         private @Nullable Map<String, @Nullable Object> resolution;
+
+        /**
+         * From 11.5.2 (pnpm 11.2.2's getInfoFromLockfile names none): the dep path, and the peers the lock records
+         * the package with.
+         */
+        private @Nullable String depPath;
+        private @Nullable Map<String, String> lockedPeerContext;
 
         InfoFromLockfile(String pkgId) {
             this.pkgId = pkgId;
@@ -1201,6 +1226,11 @@ final class ResolveDependencies {
                 ctx.getDependenciesTree().put(createNodeIdForLinkedLocalPkg(ctx.getLockfileDir(), directory), node);
                 return Promise.resolved(ctx.getLoop(), new DependencyResolution(resolveDependencyResult, null, null));
             }
+            // 11.5.2: what the lock records of a package the install does not update
+            if (!update && info != null) {
+                resolveDependencyResult.setPreviousDepPath(info.getDepPath());
+                resolveDependencyResult.setLockedPeerContext(info.getLockedPeerContext());
+            }
             if (!resolveDependencyResult.isNew()) {
                 MissingPeersOfChildren missingPeersOfChildren = resolveDependencyResult.getMissingPeersOfChildren();
                 return Promise.resolved(ctx.getLoop(), new DependencyResolution(resolveDependencyResult, null,
@@ -1293,9 +1323,35 @@ final class ResolveDependencies {
                     ctx.getResolvedPkgsById().get(parentPkg.getPkgId()), parentDepth);
             node.setChildren(childNodeIds);
             node.setInstallable(parentPkg.isInstallable());
+            node.setDependencyNamesWhoseCurrentProviderMustWin(
+                    dependencyNamesWhoseCurrentProviderMustWin(result.getPkgAddresses(), dependencyLockfile));
+            node.setLockedPeerContext(parentPkg.getLockedPeerContext());
+            node.setPreviousDepPath(parentPkg.getPreviousDepPath());
             ctx.getDependenciesTree().put(parentPkg.getNodeId(), node);
             return result.getResolvingPeers();
         });
+    }
+
+    // the children whose provider is not the one the lock records under the parent (11.5.2): a new child, a linked
+    // one, or one resolved to another dep path
+    private static Set<String> dependencyNamesWhoseCurrentProviderMustWin(List<PkgAddress> pkgAddresses,
+                                                                          @Nullable PackageSnapshot dependencyLockfile) {
+        Set<String> names = new LinkedHashSet<>();
+        for (PkgAddress child : pkgAddresses) {
+            String previousRef = null;
+            if (dependencyLockfile != null && dependencyLockfile.getDependencies() != null) {
+                previousRef = dependencyLockfile.getDependencies().get(child.getAlias());
+            }
+            if (previousRef == null && dependencyLockfile != null &&
+                dependencyLockfile.getOptionalDependencies() != null) {
+                previousRef = dependencyLockfile.getOptionalDependencies().get(child.getAlias());
+            }
+            if (previousRef == null || child.isLinkedDependency() ||
+                !Objects.equals(child.getPreviousDepPath(), DepPath.refToRelative(previousRef, child.getAlias()))) {
+                names.add(child.getAlias());
+            }
+        }
+        return names;
     }
 
     static List<ExtendedWantedDependency> getDepsToResolve(List<WantedDependency> wantedDependencies,
@@ -1392,6 +1448,7 @@ final class ResolveDependencies {
         PackageSnapshot dependencyLockfile = lockfile.getPackages() == null ? null :
                 lockfile.getPackages().get(depPath);
         if (dependencyLockfile != null) {
+            Map<String, String> lockedPeerContext = getLockedPeerContext(dependencyLockfile);
             if (dependencyLockfile.getPeerDependencies() != null && dependencyLockfile.getDependencies() != null) {
                 @SuppressWarnings("unchecked")
                 Map<String, @Nullable Object> peerDependencies =
@@ -1409,9 +1466,11 @@ final class ResolveDependencies {
             String[] nameVer = nameVerFromPkgSnapshot(depPath, dependencyLockfile);
             InfoFromLockfile info = new InfoFromLockfile(nameVer[2] != null ? nameVer[2] :
                     nameVer[0] + "@" + nameVer[1]);
+            info.setDepPath(depPath);
             info.setName(nameVer[0]);
             info.setVersion(nameVer[1]);
             info.setDependencyLockfile(dependencyLockfile);
+            info.setLockedPeerContext(lockedPeerContext);
             info.setResolution(dependencyLockfile.getResolution() == null ? null :
                     LockfileUtils.pkgSnapshotToResolution(depPath, dependencyLockfile, registries, release));
             return info;
@@ -1420,7 +1479,62 @@ final class ResolveDependencies {
         String pkgId = parsed.getNonSemverVersion() != null ? parsed.getNonSemverVersion() :
                 parsed.getName() != null && parsed.getVersion() != null ? parsed.getName() + "@" + parsed.getVersion() :
                         depPath;
-        return new InfoFromLockfile(pkgId);
+        InfoFromLockfile info = new InfoFromLockfile(pkgId);
+        info.setDepPath(depPath);
+        return info;
+    }
+
+    // {...nameVerFromPkgSnapshot(depPath, snapshot), ...omitDepsFields(snapshot), ...pkg} (11.5.2): the manifest over
+    // what the lock records of the package, but its dependency fields
+    private static Map<String, @Nullable Object> underSnapshot(String depPath, PackageSnapshot snapshot,
+                                                               Map<String, @Nullable Object> pkg) {
+        Map<String, @Nullable Object> merged = new LinkedHashMap<>();
+        String[] nameVer = nameVerFromPkgSnapshot(depPath, snapshot);
+        merged.put("name", nameVer[0] == null ? Js.UNDEFINED : nameVer[0]);
+        merged.put("version", nameVer[1] == null ? Js.UNDEFINED : nameVer[1]);
+        merged.put("nonSemverVersion", nameVer[2] == null ? Js.UNDEFINED : nameVer[2]);
+        putDefined(merged, "id", snapshot.getId());
+        putDefined(merged, "name", snapshot.getName());
+        putDefined(merged, "version", snapshot.getVersion());
+        putDefined(merged, "resolution", snapshot.getResolution());
+        putDefined(merged, "engines", snapshot.getEngines());
+        putDefined(merged, "cpu", snapshot.getCpu());
+        putDefined(merged, "os", snapshot.getOs());
+        putDefined(merged, "libc", snapshot.getLibc());
+        putDefined(merged, "deprecated", snapshot.getDeprecated());
+        putDefined(merged, "hasBin", snapshot.getHasBin());
+        putDefined(merged, "bundledDependencies", snapshot.getBundledDependencies());
+        putDefined(merged, "transitivePeerDependencies", snapshot.getTransitivePeerDependencies());
+        putDefined(merged, "optional", snapshot.getOptional());
+        putDefined(merged, "patched", snapshot.getPatched());
+        merged.putAll(pkg);
+        return merged;
+    }
+
+    private static void putDefined(Map<String, @Nullable Object> map, String key, @Nullable Object value) {
+        if (value != null && value != Js.UNDEFINED) {
+            map.put(key, value);
+        }
+    }
+
+    // getLockedPeerContext (11.5.2): each peer the lock records the package with, by the dep path it resolved to
+    private static @Nullable Map<String, String> getLockedPeerContext(PackageSnapshot dependencyLockfile) {
+        if (dependencyLockfile.getPeerDependencies() == null) {
+            return null;
+        }
+        Map<String, String> lockedPeerContext = new LinkedHashMap<>();
+        for (String peerName : Js.ownKeys(dependencyLockfile.getPeerDependencies())) {
+            String ref = dependencyLockfile.getDependencies() == null ? null :
+                    dependencyLockfile.getDependencies().get(peerName);
+            if (ref == null && dependencyLockfile.getOptionalDependencies() != null) {
+                ref = dependencyLockfile.getOptionalDependencies().get(peerName);
+            }
+            String depPath = ref == null ? null : DepPath.refToRelative(ref, peerName);
+            if (depPath != null) {
+                lockedPeerContext.put(peerName, depPath);
+            }
+        }
+        return lockedPeerContext.isEmpty() ? null : lockedPeerContext;
     }
 
     /**
@@ -1612,19 +1726,28 @@ final class ResolveDependencies {
         }
 
         PackageSnapshot dependencyLockfile = currentPkg == null ? null : currentPkg.getDependencyLockfile();
-        prepare = "git-repository".equals(pkgResponse.getResolvedVia()) &&
-                  asMap(pkg.get("scripts")).get("prepare") instanceof String;
-        if (dependencyLockfile != null && Js.truthy(dependencyLockfile.getDeprecated()) &&
-            !pkgResponse.isUpdated() && !Js.truthy(pkg.get("deprecated"))) {
-            pkg.put("deprecated", dependencyLockfile.getDeprecated());
-        }
-        Object bin = pkg.get("bin");
-        if (dependencyLockfile != null && dependencyLockfile.getHasBin() != null && !Js.truthy(bin)) {
-            hasBin = Js.truthy(dependencyLockfile.getHasBin());
+        if (options.update == null && dependencyLockfile != null && currentPkg.getDepPath() != null &&
+            !pkgResponse.isUpdated() && dependencyLockfile.getPeerDependencies() == null &&
+            ctx.getRelease().readsALockedPackageFromItsSnapshot()) {
+            // 11.5.2 names the dep path, which 11.2.2's getInfoFromLockfile left out, and so takes this branch
+            prepare = false;
+            hasBin = Boolean.TRUE.equals(dependencyLockfile.getHasBin());
+            pkg = underSnapshot(currentPkg.getDepPath(), dependencyLockfile, pkg);
         } else {
-            boolean binPresent = Js.truthy(bin) &&
-                                 !("".equals(bin) || bin instanceof Map && ((Map<?, ?>) bin).isEmpty());
-            hasBin = binPresent || Js.truthy(asMap(pkg.get("directories")).get("bin"));
+            prepare = "git-repository".equals(pkgResponse.getResolvedVia()) &&
+                      asMap(pkg.get("scripts")).get("prepare") instanceof String;
+            if (dependencyLockfile != null && Js.truthy(dependencyLockfile.getDeprecated()) &&
+                !pkgResponse.isUpdated() && !Js.truthy(pkg.get("deprecated"))) {
+                pkg.put("deprecated", dependencyLockfile.getDeprecated());
+            }
+            Object bin = pkg.get("bin");
+            if (dependencyLockfile != null && dependencyLockfile.getHasBin() != null && !Js.truthy(bin)) {
+                hasBin = Js.truthy(dependencyLockfile.getHasBin());
+            } else {
+                boolean binPresent = Js.truthy(bin) &&
+                                     !("".equals(bin) || bin instanceof Map && ((Map<?, ?>) bin).isEmpty());
+                hasBin = binPresent || Js.truthy(asMap(pkg.get("directories")).get("bin"));
+            }
         }
 
         for (String name : Js.ownKeys(pkg.get("peerDependencies"))) {
@@ -1659,7 +1782,8 @@ final class ResolveDependencies {
                 String alias = wantedDependency.getAlias() != null ? wantedDependency.getAlias() :
                         pkgResponse.getAlias() != null ? pkgResponse.getAlias() : pkgName;
                 ctx.getPendingNodes().add(new PendingNode(alias, nodeId, existing, options.currentDepth, installable,
-                        options.parentIds));
+                        options.parentIds, currentPkg == null ? null : currentPkg.getLockedPeerContext(),
+                        currentPkg == null ? null : currentPkg.getDepPath()));
             }
         }
 
