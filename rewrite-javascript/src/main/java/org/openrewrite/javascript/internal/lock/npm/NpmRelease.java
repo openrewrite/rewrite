@@ -571,6 +571,13 @@ public final class NpmRelease implements Comparable<NpmRelease> {
     }
 
     /**
+     * A hosted git URL that carries credentials resolves to https, from npm 7.4.3; before, every one to ssh.
+     */
+    boolean keepsHttpsOfHostedGitWithAuth() {
+        return atLeast(7, 4, 3);
+    }
+
+    /**
      * A hosted git URL written as https resolves to https ({@code hosted.default}), from npm 12.0.0; before, only one
      * that carries credentials, and every other to ssh.
      */
@@ -1081,6 +1088,14 @@ public final class NpmRelease implements Comparable<NpmRelease> {
      */
     boolean namesEntryByFolder() {
         return atLeast(10, 8, 2);
+    }
+
+    /**
+     * {@code load} reads and writes a project's npm-shrinkwrap.json in place of a package-lock.json beside it, from
+     * npm 7.4.2; before, it reads the npm-shrinkwrap.json only where there is no package-lock.json.
+     */
+    boolean prefersShrinkwrapToLock() {
+        return atLeast(7, 4, 2);
     }
 
     /**

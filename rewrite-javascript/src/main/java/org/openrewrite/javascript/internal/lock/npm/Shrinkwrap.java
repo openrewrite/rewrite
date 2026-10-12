@@ -46,7 +46,9 @@ public final class Shrinkwrap {
      * by an npm {@code release} before 12.0.0.
      */
     public static boolean readsShrinkwrap(NpmRelease release, Predicate<String> holds) {
-        return holds.test("npm-shrinkwrap.json") && release.readsNpmShrinkwrap();
+        // before npm 7.4.2 a package-lock.json beside it is read and written instead
+        return holds.test("npm-shrinkwrap.json") && release.readsNpmShrinkwrap() &&
+               (release.prefersShrinkwrapToLock() || !holds.test("package-lock.json"));
     }
 
     /**
