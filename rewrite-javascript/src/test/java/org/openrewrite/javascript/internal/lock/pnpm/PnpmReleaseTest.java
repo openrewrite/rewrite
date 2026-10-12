@@ -459,6 +459,159 @@ class PnpmReleaseTest {
           .hasMessageContaining("the integrity of the git-hosted tarball " + CODELOAD + ", which pnpm fetches");
     }
 
+    // a registry of one packument, which records what it is asked for
+    private static final class OnePackument implements RegistryMetadata {
+        final String name;
+        final String packument;
+        final List<String> fetched = new ArrayList<>();
+
+        OnePackument(String name, String packument) {
+            this.name = name;
+            this.packument = packument;
+        }
+
+        @Override
+        public @Nullable String packument(String registry, String name, boolean fullMetadata) {
+            fetched.add(registry + name + (fullMetadata ? " (full)" : ""));
+            return this.name.equals(name) ? packument : fail("fetched " + registry + name);
+        }
+
+        @Override
+        public @Nullable String attestations(String registry, String name, String version) {
+            return fail("fetched the attestations of " + name + "@" + version);
+        }
+
+        @Override
+        public @Nullable String document(String url) {
+            return fail("fetched " + url);
+        }
+    }
+
+    // the message of the ERR_PNPM_NO_MATURE_MATCHING_VERSION release's resolver throws under minimumReleaseAgeStrict
+    // for foo@^1.0.0, whose one version was released at released, under a cutoff 30 days back
+    private static String immatureMessage(String released, PnpmRelease release) {
+        RegistryMetadata registry = new OnePackument("foo", "{\"name\":\"foo\",\"dist-tags\":{\"latest\":\"1.0.0\"}," +
+                                                            "\"versions\":{\"1.0.0\":{\"name\":\"foo\",\"version\":" +
+                                                            "\"1.0.0\",\"dist\":{\"integrity\":\"sha512-x\"," +
+                                                            "\"tarball\":\"" + REGISTRY + "foo/-/foo-1.0.0.tgz\"}}}," +
+                                                            "\"time\":{\"1.0.0\":\"" + released + "\"}}");
+        NpmResolver resolver = new NpmResolver(registry, Collections.singletonMap("default", REGISTRY),
+          Collections.emptyMap(), null, false, false, NOW, release, true);
+        PackageRequester.RequestPackageOptions opts = new PackageRequester.RequestPackageOptions();
+        opts.publishedBy = NOW.minusSeconds(30L * 24 * 60 * 60);
+        try {
+            resolver.resolveNpm(new ResolveDependencies.WantedDependency("foo", "^1.0.0", false, false), opts, null);
+        } catch (PnpmError e) {
+            assertThat(e.getCode()).isEqualTo("ERR_PNPM_NO_MATURE_MATCHING_VERSION");
+            return e.getMessage();
+        }
+        return fail("resolved foo");
+    }
+
+    /**
+     * resolving/npm-resolver index.ts formatTimeAgo (11.1.0, pnpm/pnpm#11532): the age of an immature version is told
+     * in its largest whole unit; before, in minutes under 90 of them, hours under 48 and days after. A range across
+     * 11.1.0 is asked only of an age the two tell otherwise.
+     */
+    @Test
+    void tellsAReleaseAgeInItsLargestWholeUnitFrom1110() {
+        String thirtyHours = "2026-10-10T18:00:00.000Z";
+        assertThat(immatureMessage(thirtyHours, release("11.1.0")))
+          .isEqualTo("Version 1.0.0 (released 1 day ago) of foo does not meet the minimumReleaseAge constraint");
+        assertThat(immatureMessage(thirtyHours, release("11.0.9")))
+          .isEqualTo("Version 1.0.0 (released 30 hours ago) of foo does not meet the minimumReleaseAge constraint");
+        String seventyFiveMinutes = "2026-10-11T22:45:00.000Z";
+        assertThat(immatureMessage(seventyFiveMinutes, release("11.1.0"))).contains("(released 1 hour ago)");
+        assertThat(immatureMessage(seventyFiveMinutes, release("11.0.9"))).contains("(released 75 minutes ago)");
+        String thirtySeconds = "2026-10-11T23:59:30.000Z";
+        assertThat(immatureMessage(thirtySeconds, release("11.1.0"))).contains("(released a few seconds ago)");
+        assertThat(immatureMessage(thirtySeconds, release("11.0.9"))).contains("(released just now)");
+        PnpmRelease straddling = PnpmRelease.oneOf("11.0.9 || 11.1.0", Arrays.asList("11.0.9", "11.1.0"));
+        assertThat(immatureMessage("2026-10-09T00:00:00.000Z", straddling)).contains("(released 3 days ago)");
+        assertThatThrownBy(() -> immatureMessage(seventyFiveMinutes, straddling))
+          .isInstanceOf(CannotKnow.class)
+          .hasMessageContaining("where the releases from 11.1.0 install it otherwise");
+    }
+
+    /**
+     * resolving/npm-resolver parseBareSpecifier.ts (11.1.0, pnpm/pnpm#11324): foo: npm:^1.0.0 is a range of foo;
+     * before, it names a package "^1.0.0" at the default tag, which no registry has. A range across 11.1.0 is asked
+     * only of a range after npm:.
+     */
+    @Test
+    void takesTheAliasAsTheNameOfAnNpmRangeFrom1110() {
+        PickPackageFromMeta.RegistryPackageSpec later = PickPackageFromMeta.parseBareSpecifier("npm:^1.0.0", "foo",
+          "latest", REGISTRY, release("11.1.0"));
+        assertThat(later).isNotNull();
+        assertThat(later.getName()).isEqualTo("foo");
+        assertThat(later.getType()).isEqualTo("range");
+        PickPackageFromMeta.RegistryPackageSpec earlier = PickPackageFromMeta.parseBareSpecifier("npm:^1.0.0", "foo",
+          "latest", REGISTRY, release("11.0.9"));
+        assertThat(earlier).isEqualTo(new PickPackageFromMeta.RegistryPackageSpec("tag", "^1.0.0", "latest", null));
+        PnpmRelease straddling = PnpmRelease.oneOf("11.0.9 || 11.1.0", Arrays.asList("11.0.9", "11.1.0"));
+        PickPackageFromMeta.RegistryPackageSpec named = PickPackageFromMeta.parseBareSpecifier("npm:bar@^1.0.0",
+          "foo", "latest", REGISTRY, straddling);
+        assertThat(named).isNotNull();
+        assertThat(named.getName()).isEqualTo("bar");
+        assertThatThrownBy(() -> PickPackageFromMeta.parseBareSpecifier("npm:^1.0.0", "foo", "latest", REGISTRY,
+          straddling))
+          .isInstanceOf(CannotKnow.class);
+    }
+
+    private static final String STD_PATH = "{\"name\":\"@jsr/std__path\",\"dist-tags\":{\"latest\":\"1.1.0\"}," +
+                                           "\"versions\":{\"1.0.0\":{\"name\":\"@jsr/std__path\",\"version\":" +
+                                           "\"1.0.0\",\"dist\":{\"integrity\":\"sha512-a\",\"tarball\":" +
+                                           "\"https://npm.jsr.io/~/11/@jsr/std__path/1.0.0.tgz\"}},\"1.1.0\":{" +
+                                           "\"name\":\"@jsr/std__path\",\"version\":\"1.1.0\",\"dist\":{" +
+                                           "\"integrity\":\"sha512-b\",\"tarball\":\"https://npm.jsr.io/~/11/" +
+                                           "@jsr/std__path/1.1.0.tgz\"}}},\"time\":{\"1.0.0\":" +
+                                           "\"2026-01-01T00:00:00.000Z\",\"1.1.0\":\"2026-10-11T23:00:00.000Z\"}}";
+
+    // the id release's jsr resolver picks for @std/path: jsr:^1.0.0 under a cutoff (null for none) that 1.1.0, an
+    // hour old, does not meet, and @jsr/std__path in minimumReleaseAgeExclude; what it fetched last in fetched
+    private static String pickStdPath(PnpmRelease release, @Nullable Instant cutoff, boolean optional,
+                                      List<String> fetched) {
+        OnePackument registry = new OnePackument("@jsr/std__path", STD_PATH);
+        Map<String, String> registries = new LinkedHashMap<>();
+        registries.put("default", REGISTRY);
+        registries.put("@jsr", "https://npm.jsr.io/");
+        NpmResolver resolver = new NpmResolver(registry, registries, Collections.emptyMap(), null, false, false, NOW,
+          release, false);
+        PackageRequester.RequestPackageOptions opts = new PackageRequester.RequestPackageOptions();
+        opts.publishedBy = cutoff;
+        opts.publishedByExclude = name -> "@jsr/std__path".equals(name) ? Boolean.TRUE : null;
+        NpmResolver.ResolveResult picked = resolver.resolveJsr(new ResolveDependencies.WantedDependency("@std/path",
+          "jsr:^1.0.0", false, optional), opts, null);
+        fetched.addAll(registry.fetched);
+        assertThat(picked).isNotNull();
+        return picked.id;
+    }
+
+    /**
+     * resolving/npm-resolver index.ts pickFromSimpleRegistry (11.1.0, pnpm/pnpm#11324): a jsr package in
+     * minimumReleaseAgeExclude is picked without the cutoff, and an optional one from the full packument; before, the
+     * cutoff holds it to its newest mature version, and the abbreviated packument is fetched. A range across 11.1.0
+     * is asked only where either reaches the pick.
+     */
+    @Test
+    void picksAJsrPackageWithItsExclusionsAndOptionalityFrom1110() {
+        Instant aDayBack = NOW.minusSeconds(24 * 60 * 60);
+        List<String> fetched = new ArrayList<>();
+        assertThat(pickStdPath(release("11.1.0"), aDayBack, false, fetched)).isEqualTo("@jsr/std__path@1.1.0");
+        assertThat(pickStdPath(release("11.0.9"), aDayBack, false, fetched)).isEqualTo("@jsr/std__path@1.0.0");
+        fetched.clear();
+        pickStdPath(release("11.1.0"), null, true, fetched);
+        pickStdPath(release("11.0.9"), null, true, fetched);
+        assertThat(fetched).containsExactly("https://npm.jsr.io/@jsr/std__path (full)",
+          "https://npm.jsr.io/@jsr/std__path");
+        PnpmRelease straddling = PnpmRelease.oneOf("11.0.9 || 11.1.0", Arrays.asList("11.0.9", "11.1.0"));
+        assertThat(pickStdPath(straddling, null, false, fetched)).isEqualTo("@jsr/std__path@1.1.0");
+        assertThatThrownBy(() -> pickStdPath(straddling, aDayBack, false, new ArrayList<>()))
+          .isInstanceOf(CannotKnow.class);
+        assertThatThrownBy(() -> pickStdPath(straddling, null, true, new ArrayList<>()))
+          .isInstanceOf(CannotKnow.class);
+    }
+
     /**
      * installing/deps-installer install/index.ts (11.4.0): updateChecksums resolves in full; before, the lock is up
      * to date.

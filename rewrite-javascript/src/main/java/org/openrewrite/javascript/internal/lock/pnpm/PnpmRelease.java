@@ -572,6 +572,39 @@ public final class PnpmRelease {
         return atLeast(11, 1, 3);
     }
 
+    // @pnpm/resolving.npm-resolver src/index.ts, parseBareSpecifier.ts
+
+    /**
+     * The release age ERR_PNPM_NO_MATURE_MATCHING_VERSION tells is the largest whole unit of years, months of 30 days,
+     * days, hours and minutes ({@code 1 day ago}), else {@code a few seconds ago}, and {@code just now} for a date
+     * ahead or none, from 11.1.0 (formatTimeAgo, pnpm/pnpm#11532); before, minutes under 90 of them, hours under 48 and
+     * days after ({@code 30 hours ago}), {@code just now} under a minute and for a date ahead, and {@code NaN minutes
+     * ago} for none.
+     */
+    boolean tellsAReleaseAgeInItsLargestWholeUnit() {
+        return atLeast(11, 1, 0);
+    }
+
+    /**
+     * An {@code npm:} specifier that is a range alone ({@code foo: npm:^1.0.0}) is a range of the dependency's alias,
+     * which the locked version replaces as {@code npm:1.2.3}, from 11.1.0 (pnpm/pnpm#11324, parseBareSpecifier and
+     * replaceVersionInBareSpecifier); before, it names a package {@code ^1.0.0} at the default tag, which the registry
+     * does not have, and the locked version is appended to it ({@code npm:^1.0.0@1.2.3}).
+     */
+    boolean takesTheAliasAsTheNameOfAnNpmRange() {
+        return atLeast(11, 1, 0);
+    }
+
+    /**
+     * A jsr package is picked as an npm one is, under the release-age exclusions (minimumReleaseAgeExclude) and, for a
+     * dependency that is optional, from the full packument, from 11.1.0 (pickFromSimpleRegistry, pnpm/pnpm#11324);
+     * before, an excluded jsr package is held to the cutoff all the same, and an optional one is picked from the
+     * abbreviated packument.
+     */
+    boolean picksAJsrPackageWithItsExclusionsAndOptionality() {
+        return atLeast(11, 1, 0);
+    }
+
     // @pnpm/resolving.npm-resolver src/trustChecks.ts, createNpmResolutionVerifier.ts
 
     /**

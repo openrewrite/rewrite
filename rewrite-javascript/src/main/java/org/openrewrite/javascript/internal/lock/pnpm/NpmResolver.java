@@ -272,13 +272,21 @@ final class NpmResolver {
         Object time = meta.get("time");
         if (Js.truthy(time)) {
             Object releasedAt = time instanceof Map ? ((Map<?, ?>) time).get(immatureVersion) : null;
-            String releaseAgeText = formatTimeAgo(V8Date.dateParse(Js.string(releasedAt == null ? Js.UNDEFINED :
-                    releasedAt)));
+            double released = V8Date.dateParse(Js.string(releasedAt == null ? Js.UNDEFINED : releasedAt));
+            String releaseAgeText = formatTimeAgo(released);
+            if (releaseAgeText == null) {
+                releaseAgeText = "just now";
+            }
+            // before 11.1.0 (pnpm/pnpm#11532) the age is told in minutes, hours or days
+            // (PnpmRelease#tellsAReleaseAgeInItsLargestWholeUnit), asked where the two tell it otherwise
+            String inMinutesHoursOrDays = formatTimeAgoInMinutesHoursOrDays(released);
+            if (!inMinutesHoursOrDays.equals(releaseAgeText) && !release.tellsAReleaseAgeInItsLargestWholeUnit()) {
+                releaseAgeText = inMinutesHoursOrDays;
+            }
             String pkgName = Js.truthy(wantedDependency.getAlias()) ? wantedDependency.getAlias() :
                     Js.string(meta.get("name"));
             return new PnpmError("NO_MATURE_MATCHING_VERSION", "Version " + immatureVersion + " (released " +
-                    (releaseAgeText == null ? "just now" : releaseAgeText) + ") of " + pkgName +
-                    " does not meet the minimumReleaseAge constraint");
+                    releaseAgeText + ") of " + pkgName + " does not meet the minimumReleaseAge constraint");
         }
         return new PnpmError("NO_MATURE_MATCHING_VERSION", "No matching version found for " + dep +
                                                            " while fetching it from " + registryUrl);
@@ -317,6 +325,25 @@ final class NpmResolver {
         return "a few seconds ago";
     }
 
+    // formatTimeAgo of npm-resolver before 11.1.0: "just now" under a minute and for a date ahead, then minutes under
+    // 90 of them, hours under 48 and days; "NaN minutes ago" for a date that does not parse
+    private String formatTimeAgoInMinutesHoursOrDays(double ts) {
+        double diffMs = now.toEpochMilli() - ts;
+        if (diffMs < 60 * 1e3) {
+            return "just now";
+        }
+        double diffMinutes = Math.floor(diffMs / (60 * 1e3));
+        double diffHours = Math.floor(diffMs / (60 * 60 * 1e3));
+        double diffDays = Math.floor(diffMs / (24 * 60 * 60 * 1e3));
+        if (diffHours >= 48) {
+            return Js.numberToString(diffDays) + " day" + (diffDays == 1 ? "" : "s") + " ago";
+        }
+        if (diffMinutes >= 90) {
+            return Js.numberToString(diffHours) + " hour" + (diffHours == 1 ? "" : "s") + " ago";
+        }
+        return Js.numberToString(diffMinutes) + " minute" + (diffMinutes == 1 ? "" : "s") + " ago";
+    }
+
     @Nullable
     ResolveResult resolveJsr(ResolveDependencies.WantedDependency wantedDependency,
                              PackageRequester.RequestPackageOptions opts,
@@ -330,8 +357,19 @@ final class NpmResolver {
         if (spec == null) {
             return null;
         }
+        Function<String, @Nullable Object> publishedByExclude = opts.publishedByExclude;
+        boolean optional = wantedDependency.isOptional();
+        // before 11.1.0 the jsr resolver passes pickPackage neither the release-age exclusions nor the dependency's
+        // optional (PnpmRelease#picksAJsrPackageWithItsExclusionsAndOptionality), asked where either reaches the
+        // pick: an exclusion of the package under a cutoff, or an optional dependency without full metadata
+        boolean excluded = opts.publishedBy != null && publishedByExclude != null &&
+                           Js.truthy(publishedByExclude.apply(spec.getSpec().getName()));
+        if ((excluded || optional && !fullMetadata) && !release.picksAJsrPackageWithItsExclusionsAndOptionality()) {
+            publishedByExclude = null;
+            optional = false;
+        }
         ResolveResult picked = pickFromSimpleRegistry(wantedDependency, opts, preferredVersions, spec.getSpec(),
-                registries.get("@jsr"));
+                registries.get("@jsr"), publishedByExclude, optional);
         if (opts.calcSpecifier) {
             picked.normalizedBareSpecifier = calcPrefixedSpecifier("jsr:", spec.getJsrPkgName(), wantedDependency,
                     versionOf(picked), opts.pinnedVersion);
@@ -360,7 +398,7 @@ final class NpmResolver {
             return null;
         }
         ResolveResult picked = pickFromSimpleRegistry(wantedDependency, opts, preferredVersions, spec.getSpec(),
-                registryUrl);
+                registryUrl, opts.publishedByExclude, wantedDependency.isOptional());
         if (opts.calcSpecifier) {
             picked.normalizedBareSpecifier = calcPrefixedSpecifier(spec.getRegistryName() + ":",
                     spec.getSpec().getName(), wantedDependency, versionOf(picked), opts.pinnedVersion);
@@ -374,15 +412,18 @@ final class NpmResolver {
         return Js.string(picked.manifest == null ? null : picked.manifest.get("version"));
     }
 
-    // the pick of the jsr and named-registry resolvers from one registry: no workspace or trust check
+    // the pick of the jsr and named-registry resolvers from one registry: no workspace or trust check; the
+    // publishedByExclude and optional pickPackage takes, which before 11.1.0 the jsr resolver passes none of
     private ResolveResult pickFromSimpleRegistry(ResolveDependencies.WantedDependency wantedDependency,
                                                  PackageRequester.RequestPackageOptions opts,
                                                  PreferredVersions.@Nullable ByName preferredVersions,
-                                                 PickPackageFromMeta.RegistryPackageSpec spec, String registryUrl) {
+                                                 PickPackageFromMeta.RegistryPackageSpec spec, String registryUrl,
+                                                 @Nullable Function<String, @Nullable Object> publishedByExclude,
+                                                 boolean optional) {
         PickPackage.PickerOptions pickerOpts = PickPackage.PickerOptions.builder()
                 .preferredVersionSelectors(preferredVersions == null ? null : preferredVersions.get(spec.getName()))
                 .publishedBy(opts.publishedBy)
-                .publishedByExclude(opts.publishedByExclude)
+                .publishedByExclude(publishedByExclude)
                 .pickLowestVersion(opts.pickLowestVersion)
                 .includeLatestTag("latest".equals(opts.update))
                 .ignoreMissingTimeField(ignoreMissingTimeField)
@@ -390,7 +431,7 @@ final class NpmResolver {
                 .release(release)
                 .build();
         PickPackage.PickResult pickResult = PickPackage.pickPackage(metaCache, registry, spec, pickerOpts,
-                registryUrl, wantedDependency.isOptional(), fullMetadata);
+                registryUrl, optional, fullMetadata);
         Map<String, @Nullable Object> pickedPackage = pickResult.getPickedPackage();
         Map<String, @Nullable Object> meta = pickResult.getMeta();
         if (pickedPackage == null) {

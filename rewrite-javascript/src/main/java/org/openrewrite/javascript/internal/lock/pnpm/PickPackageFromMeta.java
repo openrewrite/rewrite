@@ -114,8 +114,11 @@ final class PickPackageFromMeta {
         String name = alias;
         if (bareSpecifier.startsWith("npm:")) {
             bareSpecifier = bareSpecifier.substring(4);
+            // before 11.1.0 (pnpm/pnpm#11324) a range after npm: is taken for a package name, as anything without an
+            // @ past its first character (PnpmRelease#takesTheAliasAsTheNameOfAnNpmRange); the two read every such
+            // range otherwise
             if (alias != null && !alias.isEmpty() &&
-                validRange(bareSpecifier, release)) {
+                validRange(bareSpecifier, release) && release.takesTheAliasAsTheNameOfAnNpmRange()) {
                 name = alias;
             } else {
                 int index = bareSpecifier.lastIndexOf('@');
