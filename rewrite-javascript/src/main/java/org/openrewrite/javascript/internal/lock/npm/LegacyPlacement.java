@@ -121,7 +121,9 @@ final class LegacyPlacement {
                 continue;
             }
 
-            CanPlaceDep.Result cp = canPlaceDep(dep, check, edge, peerEntryEdge, peerPath, isSource);
+            // before npm 7.0.11 only the source itself is checked as the source
+            CanPlaceDep.Result cp = canPlaceDep(dep, check, edge, peerEntryEdge, peerPath,
+                    options.getRelease().treatsFirstPlaceAsPeerSetSource() && isSource);
             isSource = false;
 
             if (cp != CONFLICT) {
@@ -210,7 +212,12 @@ final class LegacyPlacement {
                 Edge e = entry.getValue();
                 if (!newDep.getEdgesOut().has(entry.getKey()) && e.getTo() != null) {
                     Node oldDep = e.getTo();
-                    oldDeps.addAll(gatherDepSet(singletonList(oldDep), x -> x.getTo() != oldDep));
+                    if (options.getRelease().prunesReplacedDepsByValidEdges()) {
+                        oldDeps.addAll(gatherDepSet(singletonList(oldDep), x -> x.getTo() != oldDep));
+                    } else {
+                        // before npm 7.0.11 the dropped dependency alone
+                        oldDeps.add(oldDep);
+                    }
                 }
             }
             newDep.replace(oldChild);
@@ -352,12 +359,18 @@ final class LegacyPlacement {
                 invalidDeps.add(e.getTo());
             }
         }
+        // before npm 7.0.11 each old dependency alone, and any edge from outside, valid or not, holds a node
+        boolean byValidEdges = options.getRelease().prunesReplacedDepsByValidEdges();
         for (Node dep : oldDeps) {
-            invalidDeps.addAll(gatherDepSet(singletonList(dep), e -> e.getTo() != dep && e.isValid()));
+            if (byValidEdges) {
+                invalidDeps.addAll(gatherDepSet(singletonList(dep), e -> e.getTo() != dep && e.isValid()));
+            } else {
+                invalidDeps.add(dep);
+            }
         }
 
         Set<Node> deps = gatherDepSet(invalidDeps, edge ->
-                edge.getFrom() != node && edge.getTo() != node && edge.isValid());
+                edge.getFrom() != node && edge.getTo() != node && (!byValidEdges || edge.isValid()));
 
         for (Node dep : deps) {
             dep.setParent(null);
@@ -608,7 +621,8 @@ final class LegacyPlacement {
                 continue;
             }
             Node peer = peerEdge.getTo();
-            CanPlaceDep.Result canPlacePeer = canPlaceDep(peer, target, peerEdge, entryEdge, path, isSource);
+            CanPlaceDep.Result canPlacePeer = canPlaceDep(peer, target, peerEdge, entryEdge, path,
+                    options.getRelease().treatsFirstPlaceAsPeerSetSource() && isSource);
             if (canPlacePeer != CONFLICT) {
                 continue;
             }

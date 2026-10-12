@@ -1280,6 +1280,20 @@ class NodeTest {
         assertThat(rep.canReplace(child(root, "foo"))).as("an alias can replace the actual node").isTrue();
     }
 
+    // node.js canReplaceWith from npm 7.0.11 leaves out the edges into a node from its own dependencies, which go with
+    // it; before, b's edge back to a holds a in place
+    @Test
+    void canReplaceWithCountsItsOwnDependentsBeforeNpm7_0_11() {
+        for (String version : new String[]{"7.0.10", "7.0.11"}) {
+            NpmRelease release = NpmRelease.of(version);
+            Node root = node(opts().release(release).path("/some/path").pkg(obj("dependencies", obj("a", "1 || 2")))
+              .child(opts().pkg(obj("name", "a", "version", "1.0.0", "dependencies", obj("b", "1"))).build())
+              .child(opts().pkg(obj("name", "b", "version", "1.0.0", "dependencies", obj("a", "1"))).build()));
+            Node rep = node(opts().release(release).pkg(obj("name", "a", "version", "2.0.0")));
+            assertThat(rep.canReplace(child(root, "a"))).as("npm %s", version).isEqualTo("7.0.11".equals(version));
+        }
+    }
+
     @Test
     void canReplaceWhileIgnoringCertainPeerDeps() {
         Node tree = node(opts().path("/some/path").pkg(obj("dependencies", obj("a", "1||2", "b", "")))

@@ -380,6 +380,15 @@ public final class NpmRelease implements Comparable<NpmRelease> {
     }
 
     /**
+     * {@code [_pruneForReplacement]}: what the replaced node alone held is pruned, with what only it reaches, unless a
+     * valid edge from outside holds it, from npm 7.0.11; before, its direct dependencies alone, any edge from outside,
+     * valid or not, holding one.
+     */
+    boolean prunesReplacedDepsByValidEdges() {
+        return atLeast(7, 0, 11);
+    }
+
+    /**
      * {@code DepsQueue} keeps one list per depth, each sorted by path alone, in place of one list sorted when it is
      * popped: npm 10.4.0 until 10.8.0.
      */
@@ -540,6 +549,15 @@ public final class NpmRelease implements Comparable<NpmRelease> {
      */
     boolean stopsPeerSetOfDetachedNode() {
         return atLeast(11, 6, 0);
+    }
+
+    /**
+     * {@code [_placeDep]}: past a source that peer-depends on the name, the next place up is checked as the peer set's
+     * source, its peers too, and whether a conflict there is the project's is read from that place, from npm 7.0.11;
+     * before, only the source itself, the conflict the project's where the source is the root or a workspace.
+     */
+    boolean treatsFirstPlaceAsPeerSetSource() {
+        return atLeast(7, 0, 11);
     }
 
     /**
@@ -947,6 +965,14 @@ public final class NpmRelease implements Comparable<NpmRelease> {
      */
     boolean ignoresNodeAsOwnParent() {
         return atLeast(7, 0, 10);
+    }
+
+    /**
+     * {@code canReplaceWith} leaves out the edges into the node from its own dependencies, which are replaced with it,
+     * from npm 7.0.11; before, every edge in must accept the replacement, so a dependency cycle holds a node in place.
+     */
+    boolean ignoresOwnDepSetToReplace() {
+        return atLeast(7, 0, 11);
     }
 
     /**

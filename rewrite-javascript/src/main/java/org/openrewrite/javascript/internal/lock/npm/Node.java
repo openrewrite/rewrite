@@ -1142,8 +1142,10 @@ public class Node {
         }
 
         Set<String> ignore = new LinkedHashSet<>(ignorePeers);
-        Set<Node> depSet = GatherDepSet.gatherDepSet(Collections.singletonList(this),
-                e -> e.getTo() != this && e.isValid());
+        // before npm 7.0.11 every edge in counts, from this node's own dependencies too
+        Set<Node> depSet = release.ignoresOwnDepSetToReplace() ?
+                GatherDepSet.gatherDepSet(Collections.singletonList(this), e -> e.getTo() != this && e.isValid()) :
+                Collections.emptySet();
 
         for (Edge edge : edgesIn) {
             if (!isTop() && edge.getFrom().parent == parent && edge.isPeer() && ignore.contains(edge.getFrom().name)) {
