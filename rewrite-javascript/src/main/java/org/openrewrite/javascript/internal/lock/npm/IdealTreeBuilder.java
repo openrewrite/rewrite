@@ -292,6 +292,10 @@ public final class IdealTreeBuilder {
 
         NpmRelease release = options.getRelease();
         for (Node node : tree.getInventory().values()) {
+            // before npm 7.1.1 (arborist 2.0.0) the root is not in its own inventory
+            if (node.isRoot() && !release.inventoriesRoot()) {
+                continue;
+            }
             if (!node.isOptional() && !(release.skipsEngineCheckOfOmitted() && node.shouldOmit(omitSet))) {
                 try {
                     if (!(options.getRelease().devEnginesReplaceRootEngines() && node.isRoot() &&

@@ -1132,7 +1132,8 @@ public final class Shrinkwrap {
                         continue;
                     }
                     String edgeSpec = v.getSpec();
-                    if (edgeSpec.startsWith("file:")) {
+                    // before npm 7.1.1 a file: spec is written as the manifest has it
+                    if (edgeSpec.startsWith("file:") && resolveOptions.getRelease().relativizesFileRequires()) {
                         String p = PosixPath.resolve(node.getRealpath(), edgeSpec.substring("file:".length()));
                         requires.put(entry.getKey(), "file:" + ConsistentResolve.escapeHash(
                                 Relpath.relpath(node.getRealpath(), p), resolveOptions.getRelease()));

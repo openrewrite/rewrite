@@ -816,6 +816,14 @@ public final class NpmRelease implements Comparable<NpmRelease> {
     }
 
     /**
+     * The root is in its own inventory, so that what walks the inventory, as {@code [_checkEngineAndPlatform]} does,
+     * reaches it, from npm 7.1.1 (arborist 2.0.0); before, the root setter returns before it lists the root.
+     */
+    boolean inventoriesRoot() {
+        return atLeast(7, 1, 1);
+    }
+
+    /**
      * The {@code root} setter brings along the target a link lost only where the link joins another tree, from npm
      * 7.8.0; before, also where the link is taken out of its tree, which takes the target out with it.
      */
@@ -1120,6 +1128,14 @@ public final class NpmRelease implements Comparable<NpmRelease> {
      */
     boolean refusesNewerLockfile() {
         return atLeast(12, 0, 0);
+    }
+
+    /**
+     * {@code [_buildLegacyLockfile]}: a {@code file:} spec in an entry's {@code requires} is written relative to the
+     * node, from npm 7.1.1; before, as the manifest has it.
+     */
+    boolean relativizesFileRequires() {
+        return atLeast(7, 1, 1);
     }
 
     /**
