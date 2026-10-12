@@ -249,7 +249,9 @@ allow write different locks for the plainest edit (every release before 10.8.0 d
   that release wrote it. A marker naming a release outside it, or one npm never published, is cannot-know.
 - **How a release is proven.** Every npm release from 7.0.0 is run over every recorded scenario against a frozen
   registry: the scenario's own `http/`, a full packument it kept abbreviated rebuilt from today's registry cut back to
-  the versions, tags and deprecations the recording saw. The release that recorded a scenario is its control and must
+  the versions, tags and deprecations the recording saw, and an abbreviated packument whose versions an older
+  recording kept bare filled from today's the same way (`http/<name>@abbreviated`, which the replays serve to a
+  release before 10.4.0, the ones that read the abbreviated packument alone). The release that recorded a scenario is its control and must
   reproduce it byte for byte. Each run keeps the recorder's phases, the second install over every lock it writes, and
   `cross`: the edit installed over the scenario's own `before`. A scenario's `releases` file names the releases that
   write its recorded outcome, and each `release/<first>/` another outcome with the releases that write it;
