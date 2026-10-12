@@ -19,6 +19,7 @@ import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
+import org.openrewrite.javascript.internal.LockFileRegeneration;
 import org.openrewrite.javascript.internal.lock.CannotKnow;
 import org.openrewrite.javascript.internal.lock.Host;
 import org.openrewrite.javascript.internal.lock.JsError;
@@ -420,17 +421,393 @@ class YarnClassicReleaseTest {
                 .hasMessageContaining("a link of the archive leads to");
     }
 
+    /**
+     * parse.js {@code tokenise}: 1.12.0 reads a comment or a string past the end of the input, until V8 refuses the
+     * token's length (what yarn 1.12.0 printed: {@code An unexpected error occurred: "Invalid string length".}); 1.12.1
+     * ends them there.
+     */
+    @Test
+    void endsTokensAtTheEndOfInputFrom1121() {
+        String comment = "# yarn lockfile v1\n\n# trailing";
+        assertThatThrownBy(() -> LockfileParser.parseLockfile(comment, "yarn.lock", release("1.12.0")))
+                .isInstanceOfSatisfying(JsError.class, e -> assertThat(e).hasToString(
+                        "RangeError: Invalid string length"));
+        assertThat(LockfileParser.parseLockfile(comment, "yarn.lock", release("1.12.1")).getObject())
+                .isEqualTo(Collections.emptyMap());
+        String string = "# yarn lockfile v1\n\n\"a@1\":\n  version \"1.0.0\n";
+        assertThatThrownBy(() -> LockfileParser.parseLockfile(string, "yarn.lock", release("1.12.0")))
+                .hasMessage("Invalid string length");
+        assertThatThrownBy(() -> LockfileParser.parseLockfile(string, "yarn.lock", release("1.12.1")))
+                .isInstanceOfSatisfying(JsError.class, e -> assertThat(e.isSyntaxError()).isTrue());
+    }
+
+    /**
+     * parse.js: a colon opens an object whatever follows it before 1.16.0, and a word that starts with a dot is no
+     * token (what yarn 1.15.2 printed of {@code registry: "x"}: {@code Invalid value type 2:0 in <.yarnrc>}).
+     */
+    @ParameterizedTest(name = "{0}: {1}")
+    @CsvSource(delimiter = '|', value = {
+            "1.15.2|registry: \"x\"|SyntaxError: Invalid value type 2:0 in .yarnrc",
+            "1.16.0|registry: \"x\"|{registry=x}",
+            "1.15.2|yarn-offline-mirror ./m|SyntaxError: Invalid value type 1:20 in .yarnrc",
+            "1.16.0|yarn-offline-mirror ./m|{yarn-offline-mirror=./m}",
+    })
+    void readsAValueAfterAColonFrom1160(String version, String line, String parsed) {
+        assertThat(parse(line + "\n", version)).isEqualTo(parsed);
+    }
+
+    private static String parse(String text, String version) {
+        try {
+            return String.valueOf(LockfileParser.parseLockfile(text, ".yarnrc", release(version)).getObject());
+        } catch (JsError e) {
+            return e.toString();
+        }
+    }
+
+    /**
+     * yarn-registry.js {@code loadConfig} parses each .yarnrc as its release does: what only js-yaml reads ends the
+     * install before 1.17.0 (yarn 1.16.0 printed {@code Unknown token: { line: 1, col: 5, type: 'INVALID', value:
+     * undefined } 1:5 in <.yarnrc>}).
+     */
+    @Test
+    void readsTheYarnrcAsItsReleaseParsesIt() {
+        Map<String, String> yarnrc = Collections.singletonMap(".yarnrc", "foo: [bar]\n");
+        assertThat(load("1.16.0", yarnrc, Collections.emptyMap())).isEqualTo("SyntaxError: Unknown token: { line: " +
+                                                                           "1, col: 5, type: 'INVALID', value: " +
+                                                                           "undefined } 1:5 in .yarnrc");
+        assertThat(load("1.17.0", yarnrc, Collections.emptyMap())).isEqualTo("reads");
+    }
+
+    /**
+     * yarn-registry.js {@code loadConfig} resolves the paths of {@code RELATIVE_KEYS} where no file before or
+     * variable set them, and {@code path.resolve} throws for a value that is no string: {@code cache-folder} from
+     * 1.9.0, {@code offline-cache-folder} from 1.11.0, {@code yarn-path} from 1.13.0, {@code global-folder} from
+     * 1.15.0, {@code yarn-offline-mirror} in every release (as each release printed these, without
+     * {@code YARN_CACHE_FOLDER} for {@code cache-folder}).
+     */
+    @ParameterizedTest(name = "{0}: {1}")
+    @CsvSource(delimiter = '|', nullValues = "-", value = {
+            "1.8.0|cache-folder true|-|reads",
+            "1.9.1|cache-folder true|-|TypeError [ERR_INVALID_ARG_TYPE]: The \"paths[1]\" argument must be of type " +
+            "string. Received type boolean (true)",
+            "1.22.0|cache-folder true|/cache|reads",
+            "1.10.1|offline-cache-folder 1|-|reads",
+            "1.11.0|offline-cache-folder 1|-|TypeError [ERR_INVALID_ARG_TYPE]: The \"paths[1]\" argument must be of " +
+            "type string. Received type number (1)",
+            "1.12.3|yarn-path true|-|reads",
+            "1.13.0|yarn-path true|-|TypeError [ERR_INVALID_ARG_TYPE]: The \"paths[1]\" argument must be of type " +
+            "string. Received type boolean (true)",
+            "1.14.0|global-folder true|-|reads",
+            "1.15.0|global-folder true|-|TypeError [ERR_INVALID_ARG_TYPE]: The \"paths[1]\" argument must be of " +
+            "type string. Received type boolean (true)",
+            "1.22.22|yarn-offline-mirror 5|-|TypeError [ERR_INVALID_ARG_TYPE]: The \"paths[1]\" argument must be of " +
+            "type string. Received type number (5)",
+    })
+    void resolvesTheYarnrcPathsOfItsRelease(String version, String line, @Nullable String cacheFolder,
+                                            String outcome) {
+        assertThat(load(version, Collections.singletonMap(".yarnrc", line + "\n"), cacheFolder == null ?
+                Collections.emptyMap() : Collections.singletonMap("YARN_CACHE_FOLDER", cacheFolder)))
+                .isEqualTo(outcome);
+    }
+
+    private static String load(String version, Map<String, String> configFiles, Map<String, String> env) {
+        try {
+            config(version, configFiles, env);
+            return "reads";
+        } catch (JsError e) {
+            return e.toString();
+        }
+    }
+
+    private static Config config(String version, Map<String, String> configFiles, Map<String, String> env) {
+        YarnClassicLockRegenerator.Inputs inputs = YarnClassicLockRegenerator.Inputs.builder()
+                .release(release(version)).manifest("", ROOT).configFiles(configFiles).env(env).build();
+        return new Config(inputs, YarnClassicLockRegenerator.start(inputs));
+    }
+
+    /**
+     * rc.js {@code PATH_KEYS}: an rc file's {@code offline-cache-folder} is resolved against its directory from
+     * 1.11.0.
+     */
+    @ParameterizedTest(name = "{0}")
+    @CsvSource(delimiter = '|', value = {
+            "1.10.1|{offline-cache-folder=m}",
+            "1.11.0|{offline-cache-folder=../m}",
+    })
+    void resolvesAnRcOfflineCacheFolderFrom1110(String version, String rc) {
+        assertThat(rc(version, Collections.singletonMap("../.yarnrc", "offline-cache-folder \"m\"\n"))).isEqualTo(rc);
+    }
+
+    /**
+     * The ini an .npmrc is read with: 1.3.4 before 1.10.0 keeps the whitespace before an inline comment.
+     */
+    @ParameterizedTest(name = "{0}")
+    @CsvSource(delimiter = '|', value = {
+            "1.9.4|'https://r.example/ '",
+            "1.10.0|https://r.example/",
+    })
+    void readsAnNpmrcWithTheIniOfItsRelease(String version, String registry) {
+        assertThat(config(version, Collections.singletonMap(".npmrc", "registry=https://r.example/ # mirror\n"),
+                Collections.emptyMap()).getRegistry("x")).isEqualTo(registry);
+    }
+
+    /**
+     * base-registry.js {@code mergeEnv}: a variable whose name holds the prefix past its start sets a key of its whole
+     * name before 1.12.1; a leading underscore becomes a dash before 1.15.0.
+     */
+    @ParameterizedTest(name = "{0} {1}")
+    @CsvSource(delimiter = '|', nullValues = "-", value = {
+            "1.12.0|FOO_YARN_REGISTRY|foo-yarn-registry|x",
+            "1.12.1|FOO_YARN_REGISTRY|foo-yarn-registry|-",
+            "1.14.0|NPM_CONFIG__AUTH|-auth|x",
+            "1.14.0|NPM_CONFIG__AUTH|_auth|-",
+            "1.15.0|NPM_CONFIG__AUTH|_auth|x",
+    })
+    void mergesTheEnvironmentAsItsReleaseDoes(String version, String variable, String key, @Nullable String value) {
+        assertThat(config(version, Collections.emptyMap(), Collections.singletonMap(variable, "x")).getOption(key))
+                .isEqualTo(value);
+    }
+
+    /**
+     * npm-registry.js {@code requestNeedsAuth}: a request to a host an .npmrc gives a {@code _password} carries the
+     * package's registry's credentials from 1.12.1.
+     */
+    @ParameterizedTest(name = "{0}")
+    @CsvSource(delimiter = '|', nullValues = "-", value = {
+            "1.12.0|-",
+            "1.12.1|Bearer t",
+    })
+    void authenticatesToARegistryOfAPasswordFrom1121(String version, @Nullable String authorization) {
+        String npmrc = "@s:registry=https://r.example/\n//r.example/:_authToken=t\n//o.example/:_password=cA==\n";
+        assertThat(config(version, Collections.singletonMap(".npmrc", npmrc), Collections.emptyMap())
+                .getAuthorization("@s/x", "https://o.example/x/-/x-1.0.0.tgz")).isEqualTo(authorization);
+    }
+
+    /**
+     * cli/index.js {@code start}: a .yarnrc's {@code yarnPath} hands the install over from 1.16.0.
+     */
+    @ParameterizedTest(name = "{0}")
+    @CsvSource(delimiter = '|', value = {
+            "1.15.2|installs",
+            "1.16.0|cannot-know what the release yarn-path names (.yarn/releases/yarn-wrapper.cjs) writes: yarn " +
+            "1.16.0 hands the install to it",
+    })
+    void followsAYarnrcsYarnPathFrom1160(String version, String outcome) {
+        YarnClassicLockRegenerator.Inputs inputs = YarnClassicLockRegenerator.Inputs.builder()
+                .release(release(version))
+                .manifest("", ROOT)
+                .lock("# yarn lockfile v1\n\n\n")
+                .configFile(".yarnrc", "yarnPath \".yarn/releases/yarn-wrapper.cjs\"\n")
+                .paths(new LinkedHashSet<>(Arrays.asList("package.json", "yarn.lock", ".yarnrc",
+                        ".yarn/releases/yarn-wrapper.cjs")))
+                .env(Collections.emptyMap())
+                .build();
+        assertThat(start(inputs)).isEqualTo(outcome);
+    }
+
+    /**
+     * package-compatibility.js and en.js: the engine's message names the version it has from 1.10.0, and the failure
+     * ends with a period from 1.16.0.
+     */
+    @ParameterizedTest(name = "{0}")
+    @CsvSource(delimiter = '|', value = {
+            "1.9.4|.|Found incompatible module",
+            "1.15.2|. Got \"1.15.2\"|Found incompatible module",
+            "1.16.0|. Got \"1.16.0\"|Found incompatible module.",
+    })
+    void reportsAnIncompatibleEngineAsItsReleaseDoes(String version, String got, String found) {
+        Manifest manifest = new Manifest();
+        manifest.put("name", "x");
+        manifest.put("version", "1.0.0");
+        manifest.put("engines", Collections.singletonMap("yarn", ">=1.22.20"));
+        List<String> errors = new ArrayList<>();
+        assertThatThrownBy(() -> new PackageCompatibility(config(version), Host.UNKNOWN, errors)
+                .checkOne(manifest, false)).isInstanceOf(MessageError.class).hasMessage(found);
+        assertThat(errors).containsExactly("x@1.0.0: The engine \"yarn\" is incompatible with this module. " +
+                                           "Expected version \">=1.22.20\"" + got);
+    }
+
+    /**
+     * install.js {@code init}: the root's os is checked without an engines object from 1.15.0; before, where its
+     * engines is an object or null (as yarn 1.14.0 and 1.15.0 installed or refused these on darwin).
+     */
+    @ParameterizedTest(name = "{0} {1}")
+    @CsvSource(delimiter = '|', value = {
+            "1.14.0|{\"name\":\"p\",\"version\":\"1.0.0\",\"os\":[\"win32\"]}|installs",
+            "1.15.0|{\"name\":\"p\",\"version\":\"1.0.0\",\"os\":[\"win32\"]}|UNSUPPORTED_ENTRY_TYPE: yarn rejects " +
+            "this edit: p@1.0.0: The platform \"darwin\" is incompatible with this module. Found incompatible module",
+            "1.14.0|{\"name\":\"p\",\"version\":\"1.0.0\",\"os\":[\"win32\"],\"engines\":null}|" +
+            "UNSUPPORTED_ENTRY_TYPE: yarn rejects this edit: p@1.0.0: The platform \"darwin\" is incompatible with " +
+            "this module. Found incompatible module",
+    })
+    void checksTheRootsPlatformAsItsReleaseDoes(String version, String manifest, String outcome) {
+        YarnClassicLockRegenerator.Inputs inputs = YarnClassicLockRegenerator.Inputs.builder()
+                .release(release(version))
+                .manifest("", manifest)
+                .lock("# yarn lockfile v1\n\n\n")
+                .host(Host.builder().os("darwin").cpu("arm64").build())
+                .env(Collections.emptyMap())
+                .build();
+        LockFileRegeneration.Result result = new YarnClassicLockRegenerator(inputs, YarnClassicScenarios.NO_REGISTRY)
+                .regenerate();
+        assertThat(result.isSuccess() ? "installs" : result.getErrorMessage()).isEqualTo(outcome);
+    }
+
+    /**
+     * install.js {@code fetchRequestFromCwd}: each workspace is asked for from the root beside the aggregator from
+     * 1.11.0.
+     */
+    @Test
+    void requestsTheWorkspacesFromTheRootFrom1110() {
+        assertThat(workspacePatterns("1.10.1")).noneMatch(p -> p.startsWith("a@"));
+        assertThat(workspacePatterns("1.11.0")).contains("a@1.0.0");
+    }
+
+    private static List<String> workspacePatterns(String version) {
+        YarnClassicLockRegenerator.Inputs inputs = YarnClassicLockRegenerator.Inputs.builder()
+                .release(release(version))
+                .manifest("", "{\"name\":\"r\",\"version\":\"1.0.0\",\"private\":true,\"workspaces\":[\"a\"]}")
+                .manifest("a", "{\"name\":\"a\",\"version\":\"1.0.0\"}")
+                .lock("# yarn lockfile v1\n\n\n")
+                .paths(new LinkedHashSet<>(Arrays.asList("package.json", "yarn.lock", "a/package.json")))
+                .env(Collections.emptyMap())
+                .build();
+        Map<String, @Nullable Object> flags = YarnClassicLockRegenerator.start(inputs);
+        Config config = new Config(inputs, flags);
+        return new Install(inputs, config, flags, YarnClassicScenarios.NO_REGISTRY)
+                .fetchRequestFromCwd(Lockfile.fromDirectory(inputs.getLock(), config.getRelease()),
+                        new ResolutionMap(config)).getPatterns();
+    }
+
+    /**
+     * config.js {@code generateModuleCachePath}: from 1.11.0 a package's cache folder is a slug of its name, whose
+     * {@code replace} a lock entry's name of no string does not have.
+     */
+    @ParameterizedTest(name = "{0}")
+    @CsvSource({"1.10.1,false", "1.11.0,true"})
+    void slugsTheCacheFolderFrom1110(String version, boolean throwsOnTheName) {
+        YarnClassicLockRegenerator.Inputs inputs = YarnClassicLockRegenerator.Inputs.builder()
+                .release(release(version))
+                .manifest("", "{\"name\":\"p\",\"version\":\"1.0.0\",\"dependencies\":{\"x\":\"1.0.0\"}}")
+                .lock("# yarn lockfile v1\n\n\nx@1.0.0:\n  name 123\n  version \"1.0.0\"\n  resolved " +
+                      "\"https://registry.yarnpkg.com/x/-/x-1.0.0.tgz#0000000000000000000000000000000000000000\"\n")
+                .configFile(".yarnrc", "unsafe-disable-integrity-migration true\n")
+                .env(Collections.emptyMap())
+                .build();
+        LockFileRegeneration.Result result = new YarnClassicLockRegenerator(inputs, YarnClassicScenarios.NO_REGISTRY)
+                .regenerate();
+        assertThat(String.valueOf(result.getErrorMessage()).contains("slug.replace is not a function"))
+                .as(String.valueOf(result.getErrorMessage())).isEqualTo(throwsOnTheName);
+    }
+
+    /**
+     * fix.js: from 1.21.1 a bin whose name or target is invalid is dropped, and {@code path.isAbsolute} throws for a
+     * target that is no string; 1.22.0 takes names with dots.
+     */
+    @ParameterizedTest(name = "{0} {1}")
+    @CsvSource(delimiter = '|', value = {
+            "1.21.0|{\"x\": 1}|normalizes",
+            "1.21.1|{\"x\": 1}|TypeError [ERR_INVALID_ARG_TYPE]: The \"path\" argument must be of type string. " +
+            "Received type number (1)",
+            "1.21.1|{\"a.b\": 1}|normalizes",
+            "1.22.0|{\"a.b\": 1}|TypeError [ERR_INVALID_ARG_TYPE]: The \"path\" argument must be of type string. " +
+            "Received type number (1)",
+            "1.22.22|{\"a/b\": 1}|normalizes",
+            "1.22.22|[\"cli.js\", true]|TypeError [ERR_INVALID_ARG_TYPE]: The \"path\" argument must be of type " +
+            "string. Received type boolean (true)",
+    })
+    void validatesTheBinsAsItsReleaseDoes(String version, String bin, String outcome) {
+        Manifest info = new Manifest(object("{\"name\": \"x\", \"version\": \"1.0.0\", \"bin\": " + bin + "}"));
+        String normalized;
+        try {
+            NormalizeManifest.normalizeManifest(info, "", "", false, true, release(version));
+            normalized = "normalizes";
+        } catch (JsError e) {
+            normalized = e.toString();
+        }
+        assertThat(normalized).isEqualTo(outcome);
+    }
+
+    /**
+     * A directory dependency's bin of no string ends the install in every release, where each release links it: the
+     * link step before 1.11.0, the fetch (copy-fetcher.js is a base-fetcher.js) from 1.11.0, fix.js from 1.21.1 (as
+     * each printed it).
+     */
+    @ParameterizedTest(name = "{0}")
+    @CsvSource(delimiter = '|', value = {
+            "1.10.1|An unexpected error occurred: \"The \\\"path\\\" argument must be of type string. Received type " +
+            "number (1)\".",
+            "1.11.0|An unexpected error occurred: \"The \\\"paths[1]\\\" argument must be of type string. Received " +
+            "type number (1)\".",
+            "1.21.0|An unexpected error occurred: \"The \\\"paths[1]\\\" argument must be of type string. Received " +
+            "type number (1)\".",
+            "1.21.1|An unexpected error occurred: \"The \\\"path\\\" argument must be of type string. Received type " +
+            "number (1)\".",
+    })
+    void linksTheBinsAsItsReleaseDoes(String version, String error) {
+        YarnClassicLockRegenerator.Inputs inputs = YarnClassicLockRegenerator.Inputs.builder()
+                .release(release(version))
+                .manifest("", "{\"name\":\"p\",\"version\":\"1.0.0\",\"dependencies\":{\"dep\":\"file:./dep\"}}")
+                .manifest("dep", "{\"name\":\"dep\",\"version\":\"1.0.0\",\"bin\":{\"x\":1}}")
+                .lock("# yarn lockfile v1\n\n\n")
+                .paths(new LinkedHashSet<>(Arrays.asList("package.json", "yarn.lock", "dep/package.json")))
+                .env(Collections.emptyMap())
+                .build();
+        LockFileRegeneration.Result result = new YarnClassicLockRegenerator(inputs, YarnClassicScenarios.NO_REGISTRY)
+                .regenerate();
+        assertThat(result.getErrorMessage()).endsWith(": yarn fails on this edit: " + error);
+    }
+
+    @SuppressWarnings("unchecked")
+    private static Map<String, @Nullable Object> object(String json) {
+        return (Map<String, @Nullable Object>) Js.jsonParse(json);
+    }
+
+    /**
+     * The tar-fs of each release: 1.16.0 (before 1.10.0) writes through a directory that is a link of the archive,
+     * 1.16.3 refuses it ({@code validate}), which yarn reports as a corrupt archive.
+     */
+    @Test
+    void writesThroughALinkedDirectoryBefore1100() {
+        ByteArrayOutputStream archive = new ByteArrayOutputStream();
+        byte[][] entries = {
+                entry("package/package.json", "{\"name\":\"x\",\"version\":\"1.0.0\"}", null),
+                entry("package/src/", null, null),
+                entry("package/lib", null, "src"),
+                entry("package/lib/x.js", "x", null),
+                new byte[1024]
+        };
+        for (byte[] entry : entries) {
+            archive.write(entry, 0, entry.length);
+        }
+        byte[] tar = archive.toByteArray();
+        assertThat(TarballFetcher.untar("<url>", tar, release("1.9.4")).get("src/x.js")).isNotNull();
+        assertThatThrownBy(() -> TarballFetcher.untar("<url>", tar, release("1.10.0")))
+                .isInstanceOf(MessageError.class)
+                .hasMessageEndingWith("the file appears to be corrupt: \"lib is not a valid path\"");
+    }
+
     // an uncompressed ustar archive of one file, or of one symbolic link to a target
     private static byte[] tar(String name, @Nullable String content, @Nullable String target) {
+        byte[] entry = entry(name, content, target);
+        ByteArrayOutputStream out = new ByteArrayOutputStream();
+        out.write(entry, 0, entry.length);
+        out.write(new byte[1024], 0, 1024);
+        return out.toByteArray();
+    }
+
+    // a ustar entry: a directory where the name ends with a slash, else a file or a symbolic link to a target
+    private static byte[] entry(String name, @Nullable String content, @Nullable String target) {
         byte[] data = content == null ? new byte[0] : content.getBytes(StandardCharsets.UTF_8);
+        boolean directory = name.endsWith("/");
         byte[] header = new byte[512];
         put(header, 0, name);
-        put(header, 100, target == null ? "0000644" : "0000777");
+        put(header, 100, target == null && !directory ? "0000644" : "0000777");
         put(header, 108, "0000000");
         put(header, 116, "0000000");
         put(header, 124, String.format("%011o", data.length));
         put(header, 136, "00000000000");
-        header[156] = (byte) (target == null ? '0' : '2');
+        header[156] = (byte) (directory ? '5' : target == null ? '0' : '2');
         if (target != null) {
             put(header, 157, target);
         }
@@ -446,7 +823,7 @@ class YarnClassicReleaseTest {
         ByteArrayOutputStream out = new ByteArrayOutputStream();
         out.write(header, 0, header.length);
         out.write(data, 0, data.length);
-        out.write(new byte[(512 - data.length % 512) % 512 + 1024], 0, (512 - data.length % 512) % 512 + 1024);
+        out.write(new byte[(512 - data.length % 512) % 512], 0, (512 - data.length % 512) % 512);
         return out.toByteArray();
     }
 

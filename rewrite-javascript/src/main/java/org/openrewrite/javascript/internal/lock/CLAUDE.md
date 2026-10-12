@@ -78,7 +78,9 @@ The npm port reproduces each release in `NpmReleases.PROVEN`; the release that i
    `NpmRelease`, named for what npm does and answered through `atLeast` by the release that made the change, and
    branch on it in the ported class where upstream changed, keeping 11.17.0's code as it is. Take the threshold
    from the source, never from the releases the sweep sampled. A library npm bundles at several releases takes its
-   release as an option of its one port.
+   release as an option of its one port. Diff every pair of releases in the range too, not only the boundaries, and
+   the libraries each bundles: a change no scenario reaches is a question all the same, its unit test what the
+   release did when run.
 3. Widen `NpmReleases.PROVEN` once every replay of the new releases passes.
 
 The other ports follow one release each: diff the upstream source between the ported tag and the new one, limited

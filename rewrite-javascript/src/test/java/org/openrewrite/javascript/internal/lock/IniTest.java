@@ -32,7 +32,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 /**
- * ini 1.3.5's and 6.0.0's own tests and the inputs where their sources differ ({@code upstream/ini-*.jsonl}).
+ * ini 1.3.4's, 1.3.5's and 6.0.0's own tests and the inputs where their sources differ ({@code upstream/ini-*.jsonl}).
  */
 class IniTest {
 
@@ -82,7 +82,7 @@ class IniTest {
                 }
                 break;
             case "unsafe":
-                assertThat(Ini.unsafe((String) call.arg(0))).isEqualTo(call.getOut());
+                assertThat(Ini.unsafe((String) call.arg(0), release)).isEqualTo(call.getOut());
                 break;
             default:
                 Map<String, @Nullable String> properties = new LinkedHashMap<>();
@@ -104,6 +104,8 @@ class IniTest {
         }
         Map<String, Integer> expected = new LinkedHashMap<>();
         // yarn never writes an ini file
+        expected.put("1.3.4 encode", 6);
+        expected.put("1.3.4 encode with options", 2);
         expected.put("1.3.5 encode", 7);
         expected.put("1.3.5 encode with options", 3);
         // bracketedArray: false, which neither npm nor read-ini-file passes

@@ -140,8 +140,10 @@ final class Install {
         List<String> errors = new ArrayList<>();
         PackageCompatibility compatibility = new PackageCompatibility(config, inputs.getHost(), errors);
         try {
-            if (PackageCompatibility.shouldCheck(request.getManifest(), flags.isIgnoreEngines(),
-                    flags.isIgnorePlatform())) {
+            if (config.getRelease().checksTheRootsPlatform() ?
+                    PackageCompatibility.shouldCheck(request.getManifest(), flags.isIgnoreEngines(),
+                            flags.isIgnorePlatform()) :
+                    PackageCompatibility.checksRootEngines(request.getManifest(), flags.isIgnoreEngines())) {
                 compatibility.checkOne(request.getManifest(), flags.isIgnoreEngines());
             }
 
@@ -163,7 +165,8 @@ final class Install {
                     lockfile, inputs.getLock(), inputs.getHost());
         } catch (MessageError e) {
             if (!errors.isEmpty()) {
-                throw Rejected.rejects(errors.get(0).startsWith("The engine ") ? SharedError.UNSUPPORTED_ENGINE :
+                // each error is the package's name and version, then the message
+                throw Rejected.rejects(errors.get(0).contains(": The engine ") ? SharedError.UNSUPPORTED_ENGINE :
                         SharedError.UNSUPPORTED_PLATFORM, null, errors.get(0) + " " + e.getMessage());
             }
             throw e;
@@ -173,15 +176,58 @@ final class Install {
     // the fetch step, then the link step's read of each package's .yarn-metadata.json in yarn's cache
     private void fetchStep(PackageResolver resolver, PackageCompatibility compatibility) {
         Set<String> unfetched = new HashSet<>();
+        YarnClassicRelease release = config.getRelease();
         resolver.updateManifests(PackageFetcher.fetch(resolver.getManifests(), PackageFetcher.remote(resolver,
-                registry, config), unfetched));
+                registry, config), unfetched, release));
         compatibility.check(resolver.getManifests(), flags.isIgnoreEngines());
         for (Manifest manifest : resolver.getManifests()) {
             PackageReference ref = manifest.reference;
-            if (ref != null && !ref.ignore && unfetched.contains(PackageFetcher.generateModuleCachePath(ref))) {
-                throw new JsError(JsError.ERROR, "ENOENT: no such file or directory, open '" +
-                                                 PackageFetcher.generateModuleCachePath(ref) + "/.yarn-metadata.json'");
+            if (ref == null || ref.ignore) {
+                continue;
             }
+            String dest = PackageFetcher.generateModuleCachePath(ref, release);
+            if (unfetched.contains(dest)) {
+                throw new JsError(JsError.ERROR, "ENOENT: no such file or directory, open '" + dest +
+                                                 "/.yarn-metadata.json'");
+            }
+        }
+        if (!release.linksBinsWhenFetched()) {
+            linkBins(resolver);
+        }
+    }
+
+    /**
+     * The link step's links of each installed package's bins before 1.11.0, where {@code path.join} throws for a
+     * target that is no string; yarn links them several at a time, so which of two such packages it reaches first is
+     * not known.
+     */
+    private static void linkBins(PackageResolver resolver) {
+        JsError first = null;
+        String firstPackage = null;
+        for (Manifest manifest : resolver.getManifests()) {
+            PackageReference ref = manifest.reference;
+            if (ref == null || ref.ignore) {
+                continue;
+            }
+            Object bin = manifest.get("bin");
+            for (String name : Js.keys(bin)) {
+                Object target = Js.get(bin, name);
+                if (target instanceof String) {
+                    continue;
+                }
+                JsError error = Js.invalidArgType("The \"path\" argument must be of type string", target);
+                String pkg = Js.templateString(manifest.getName()) + "@" + Js.templateString(manifest.getVersion());
+                if (first == null) {
+                    first = error;
+                    firstPackage = pkg;
+                } else if (!first.getMessage().equals(error.getMessage())) {
+                    throw new CannotKnow("which of the bins of " + firstPackage + " and " + pkg + " yarn " +
+                                         "links first: the link step fails at it");
+                }
+            }
+        }
+        if (first != null) {
+            throw first;
         }
     }
 
@@ -365,15 +411,18 @@ final class Install {
             virtualDep.put("workspaces", virtualDeps);
             pushDeps.push("workspaces", virtualDep, "workspaces", false, true);
 
-            Map<String, @Nullable Object> implicitWorkspaceDependencies = new LinkedHashMap<>(workspaceDependencies);
-            for (String type : OWNED_DEPENDENCY_TYPES) {
-                for (String dependencyName : Js.keys(projectManifestJson.get(type))) {
-                    implicitWorkspaceDependencies.remove(dependencyName);
+            if (config.getRelease().requestsWorkspacesFromTheRoot()) {
+                Map<String, @Nullable Object> implicitWorkspaceDependencies =
+                        new LinkedHashMap<>(workspaceDependencies);
+                for (String type : OWNED_DEPENDENCY_TYPES) {
+                    for (String dependencyName : Js.keys(projectManifestJson.get(type))) {
+                        implicitWorkspaceDependencies.remove(dependencyName);
+                    }
                 }
+                Manifest implicit = new Manifest();
+                implicit.put("dependencies", implicitWorkspaceDependencies);
+                pushDeps.push("dependencies", implicit, "workspaces", false, true);
             }
-            Manifest implicit = new Manifest();
-            implicit.put("dependencies", implicitWorkspaceDependencies);
-            pushDeps.push("dependencies", implicit, "workspaces", false, true);
         }
 
         List<DependencyRequestPattern> requests = new ArrayList<>(resolutionDeps);

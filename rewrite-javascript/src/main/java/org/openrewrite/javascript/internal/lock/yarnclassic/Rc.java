@@ -123,7 +123,8 @@ final class Rc {
             Map<String, @Nullable Object> map = (Map<String, @Nullable Object>) values;
             for (String key : Js.keys(map)) {
                 String name = PATH_KEY_PREFIX.matcher(key).replaceFirst("");
-                if (!PATH_KEYS.contains(name)) {
+                if (!PATH_KEYS.contains(name) ||
+                    "offline-cache-folder".equals(name) && !release.resolvesOfflineCacheFolder()) {
                     continue;
                 }
                 if (filePath.startsWith(HOME) && "yarn-path".equals(name) && map.get(key) instanceof String) {

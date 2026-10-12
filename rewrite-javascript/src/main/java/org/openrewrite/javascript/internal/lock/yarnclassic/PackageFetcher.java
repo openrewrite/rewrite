@@ -66,7 +66,7 @@ final class PackageFetcher {
                 return linkMock();
             }
             Manifest pkg = resolver.patterns.get(ref.patterns.get(0));
-            String dest = generateModuleCachePath(ref);
+            String dest = generateModuleCachePath(ref, config.getRelease());
             if ("workspace".equals(ref.remote.type)) {
                 PackageRemote registryRemote = ref.remote.registryRemote;
                 if (registryRemote == null) {
@@ -84,6 +84,10 @@ final class PackageFetcher {
             if ("copy".equals(ref.remote.type)) {
                 Manifest copy = pkg.copy();
                 copy.data.remove("_uid");
+                // copy-fetcher.js is a base-fetcher.js, which reads the copied directory's manifest again
+                if (config.getRelease().linksBinsWhenFetched()) {
+                    TarballFetcher.linkBins(copy.data);
+                }
                 return copy;
             }
             Map<String, @Nullable Object> entry = pkg.locked;
@@ -131,7 +135,8 @@ final class PackageFetcher {
         if (remote == null || side.locked == null && !"tarball".equals(remote.type)) {
             throw race.cannotKnow(RACED_FETCH + "one of them is not a registry tarball");
         }
-        return new TarballFetcher(remote, ref.name, ref.version, generateModuleCachePath(ref), registry, config);
+        return new TarballFetcher(remote, ref.name, ref.version, generateModuleCachePath(ref, config.getRelease()),
+                registry, config);
     }
 
     private static byte @Nullable [] download(PackageResolver.Race race, Manifest side, TarballFetcher fetcher) {
@@ -160,6 +165,14 @@ final class PackageFetcher {
      * keeps the resolver's, and its cache directory, which yarn removes, goes into {@code unfetched}.
      */
     static List<Manifest> fetch(List<Manifest> pkgs, Fetcher fetcher, Set<String> unfetched) {
+        return fetch(pkgs, fetcher, unfetched, YarnClassicRelease.PORTED);
+    }
+
+    /**
+     * {@code fetch} as {@code release} names each package's cache folder.
+     */
+    static List<Manifest> fetch(List<Manifest> pkgs, Fetcher fetcher, Set<String> unfetched,
+                                YarnClassicRelease release) {
         Map<String, PackageReference> pkgsPerDest = new HashMap<>();
         List<Manifest> kept = new ArrayList<>();
         for (Manifest pkg : pkgs) {
@@ -167,7 +180,7 @@ final class PackageFetcher {
             if (ref == null) {
                 continue;
             }
-            String dest = generateModuleCachePath(ref);
+            String dest = generateModuleCachePath(ref, release);
             PackageReference otherPkg = pkgsPerDest.get(dest);
             if (otherPkg != null) {
                 continue;
@@ -186,7 +199,7 @@ final class PackageFetcher {
                 if (!Js.truthy(ref.optional)) {
                     throw e;
                 }
-                unfetched.add(generateModuleCachePath(ref));
+                unfetched.add(generateModuleCachePath(ref, release));
                 fetched = null;
             }
             if (!Js.truthy(fetched)) {
@@ -213,6 +226,28 @@ final class PackageFetcher {
     }
 
     static String generateModuleCachePath(PackageReference pkg) {
+        return generateModuleCachePath(pkg, YarnClassicRelease.PORTED);
+    }
+
+    /**
+     * {@code generateModuleCachePath} of {@code release}, relative to yarn's cache: before 1.11.0, the registry, name,
+     * version and uid of the package as a template literal writes them.
+     */
+    static String generateModuleCachePath(PackageReference pkg, YarnClassicRelease release) {
+        if (!release.slugsCacheFolders()) {
+            String name = Js.templateString(pkg.name);
+            if (Js.truthy(pkg.registry)) {
+                name = Js.templateString(pkg.registry) + "-" + name;
+            }
+            String uid = Js.templateString(pkg.uid);
+            String hash = pkg.remote.hash;
+            if (Js.truthy(pkg.version) && !equal(pkg.version, pkg.uid)) {
+                uid = Js.templateString(pkg.version) + "-" + uid;
+            } else if (Js.truthy(hash)) {
+                uid += "-" + hash;
+            }
+            return name + "-" + uid;
+        }
         return generateUniquePackageSlug(pkg) + "/node_modules/" + Js.string(pkg.name);
     }
 

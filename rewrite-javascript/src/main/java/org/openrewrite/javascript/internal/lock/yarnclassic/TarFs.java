@@ -29,7 +29,8 @@ import java.util.Map;
 
 /**
  * Port of tar-fs 1.16.3 {@code extract} on POSIX as yarn 1.22.22's tarball fetcher calls it ({@code strip: 1} and its
- * {@code map} of link targets): the directory an archive extracts into.
+ * {@code map} of link targets), and of 1.16.0, which yarn bundles before 1.10.0: the directory an archive extracts
+ * into.
  */
 final class TarFs {
 
@@ -59,12 +60,24 @@ final class TarFs {
     private final Map<String, Node> tree = new HashMap<>();
 
     /**
+     * The tar-fs yarn bundles: 1.16.3 from yarn 1.10.0; before, 1.16.0, which neither refuses an entry whose directory
+     * is a link ({@code validate}) nor keeps a hard link's target inside the directory.
+     */
+    enum Release {
+        V1_16_0,
+        V1_16_3
+    }
+
+    /**
      * Whether yarn's map keeps every link inside the directory (from yarn 1.22.0).
      */
     private final boolean jail;
 
-    private TarFs(boolean jail) {
+    private final Release release;
+
+    private TarFs(boolean jail, Release release) {
         this.jail = jail;
+        this.release = release;
         tree.put("", new Node(true, null));
     }
 
@@ -72,15 +85,15 @@ final class TarFs {
      * @throws JsError the error the extraction stops with: an entry type it does not write, a path through a file.
      */
     static TarFs extract(byte[] tar) {
-        return extract(tar, true);
+        return extract(tar, true, Release.V1_16_3);
     }
 
     /**
-     * {@code extract} with yarn's map of link targets into the directory ({@code jail}), as yarn 1.22.0 and later
-     * extract; before, a link out of the directory reaches the disk around yarn's cache.
+     * {@code extract} of tar-fs {@code release} with yarn's map of link targets into the directory ({@code jail}), as
+     * yarn 1.22.0 and later extract; before, a link out of the directory reaches the disk around yarn's cache.
      */
-    static TarFs extract(byte[] tar, boolean jail) {
-        TarFs fs = new TarFs(jail);
+    static TarFs extract(byte[] tar, boolean jail, Release release) {
+        TarFs fs = new TarFs(jail, release);
         TarStream.extract(tar, fs::entry);
         return fs;
     }
@@ -101,7 +114,9 @@ final class TarFs {
             return;
         }
         String dir = parent(name);
-        validate(dir);
+        if (release == Release.V1_16_3) {
+            validate(dir);
+        }
         mkdirp(dir);
         if ("file".equals(header.type)) {
             write(name, archive, offset, size);
@@ -112,13 +127,33 @@ final class TarFs {
             }
             unlink(name);
             if ("link".equals(header.type)) {
-                link(PosixPath.join("/", header.linkname).substring(1), name);
+                link(hardLinkTarget(header.linkname), name);
             } else {
                 create(name, new Node(false, header.linkname), "symlink");
             }
         } else {
             throw new JsError(JsError.ERROR, "unsupported type for " + name + " (" + header.type + ")");
         }
+    }
+
+    /**
+     * A hard link's source: 1.16.3 joins its target to the directory as a path from its root; 1.16.0 resolves it from
+     * the directory, out of it where it climbs out or is absolute.
+     */
+    private String hardLinkTarget(String linkname) {
+        if (release == Release.V1_16_3) {
+            return PosixPath.join("/", linkname).substring(1);
+        }
+        String target = PosixPath.normalize(linkname);
+        if (PosixPath.isAbsolute(target) || "..".equals(target) || target.startsWith("../")) {
+            throw outside(linkname);
+        }
+        return ".".equals(target) ? "" : target;
+    }
+
+    private static CannotKnow outside(String location) {
+        return new CannotKnow("what the files outside yarn's cache directory hold that a link of the archive leads " +
+                              "to (" + location + ")");
     }
 
     private static String strip(String name) {
@@ -144,8 +179,7 @@ final class TarFs {
             if ("..".equals(segment)) {
                 if (done.isEmpty()) {
                     if (!jail && links > 0) {
-                        throw new CannotKnow("what the files outside yarn's cache directory hold that a link of " +
-                                             "the archive leads to (" + location + ")");
+                        throw outside(location);
                     }
                     return null;
                 }
@@ -196,6 +230,10 @@ final class TarFs {
         mkdirp(parent(dir));
         String real = real(dir, true);
         Node node = node(real);
+        // without validate, 1.16.0 makes the directories a link leads to, an absolute one on the disk around the cache
+        if (real == null && release == Release.V1_16_0) {
+            throw outside(dir);
+        }
         if (real == null || node != null && !node.directory) {
             throw error("EEXIST: file already exists, mkdir '" + dir + "'");
         }

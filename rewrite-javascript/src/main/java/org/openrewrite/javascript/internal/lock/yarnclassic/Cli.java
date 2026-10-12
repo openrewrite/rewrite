@@ -67,7 +67,8 @@ final class Cli {
      * install the engine cannot know.
      */
     void start(Map<String, @Nullable Object> rc) {
-        Object yarnPath = Js.truthy(rc.get("yarn-path")) ? rc.get("yarn-path") : rc.get("yarnPath");
+        Object yarnPath = Js.truthy(rc.get("yarn-path")) || !release.followsAYarnrcsYarnPath() ? rc.get("yarn-path") :
+                rc.get("yarnPath");
         Map<String, String> env = inputs.getEnv();
         if (!Js.truthy(yarnPath) ||
             Config.boolifyWithDefault(env == null ? null : env.get("YARN_IGNORE_PATH"), false)) {

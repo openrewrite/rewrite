@@ -62,7 +62,8 @@ final class TarballFetcher {
      */
     @Nullable
     Object fetch() {
-        return manifest(fetchTarball(), dest, Js.string(remote.registry), name, version, config.isLooseSemver());
+        return manifest(fetchTarball(), dest, Js.string(remote.registry), name, version, config.isLooseSemver(),
+                config.getRelease());
     }
 
     /**
@@ -70,15 +71,34 @@ final class TarballFetcher {
      */
     static @Nullable Object manifest(TarFs extracted, String dest, String registry, @Nullable Object name,
                                      @Nullable Object version, boolean looseSemver) {
-        Object pkg = Config.readManifest(extracted, dest, registry, looseSemver);
+        return manifest(extracted, dest, registry, name, version, looseSemver, YarnClassicRelease.PORTED);
+    }
+
+    /**
+     * The package base-fetcher.js of {@code release} reads from an extracted directory: from 1.11.0 its bins' targets
+     * are checked as it links them.
+     */
+    static @Nullable Object manifest(TarFs extracted, String dest, String registry, @Nullable Object name,
+                                     @Nullable Object version, boolean looseSemver, YarnClassicRelease release) {
+        Object pkg = Config.readManifest(extracted, dest, registry, looseSemver, release);
         if (pkg == Config.NO_MANIFEST) {
             Manifest defaultManifest = new Manifest();
             defaultManifest.put("name", name);
             defaultManifest.put("version", version);
-            pkg = NormalizeManifest.normalizeManifest(defaultManifest, null, "", false, looseSemver);
+            pkg = NormalizeManifest.normalizeManifest(defaultManifest, null, "", false, looseSemver, release);
         }
-        Object data = pkg instanceof Manifest ? ((Manifest) pkg).data : pkg;
-        Object bin = Js.get(data, "bin");
+        if (release.linksBinsWhenFetched()) {
+            linkBins(pkg instanceof Manifest ? ((Manifest) pkg).data : pkg);
+        }
+        return pkg;
+    }
+
+    /**
+     * base-fetcher.js {@code fetch} from 1.11.0: each bin of the package fetched is linked in its cache folder, where
+     * {@code path.resolve} throws for a target that is no string.
+     */
+    static void linkBins(@Nullable Object pkg) {
+        Object bin = Js.get(pkg, "bin");
         if (Js.truthy(bin)) {
             for (String binName : Js.keys(bin)) {
                 Object target = Js.get(bin, binName);
@@ -87,7 +107,6 @@ final class TarballFetcher {
                 }
             }
         }
-        return pkg;
     }
 
     // _fetch: a local path is the filesystem's; any other reference is the registry's, verified, gunzipped, untarred
@@ -179,7 +198,7 @@ final class TarballFetcher {
             throw new JsError(e.getName(), url + ": " + e.getMessage());
         }
         try {
-            return TarFs.extract(tar, release.jailsTarballLinks());
+            return TarFs.extract(tar, release.jailsTarballLinks(), release.tarFs());
         } catch (JsError e) {
             if (!release.reportsCorruptArchives()) {
                 throw new JsError(e.getName(), url + ": " + e.getMessage());

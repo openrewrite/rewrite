@@ -93,14 +93,23 @@ final class LockfileParser {
      */
     static final class Tokenizer {
         private String input;
+        private final YarnClassicRelease release;
         private boolean lastNewline;
         private int line = 1;
         private int col;
         private final Deque<Token> pending = new ArrayDeque<>();
         private boolean done;
 
-        Tokenizer(String input) {
+        Tokenizer(String input, YarnClassicRelease release) {
             this.input = input;
+            this.release = release;
+        }
+
+        // 1.12.0's loops past the end of the input, which add `undefined` to the token until V8 refuses its length
+        private void readPastTheEnd() {
+            if (!release.endsTokensAtTheEndOfInput()) {
+                throw new JsError(JsError.RANGE_ERROR, "Invalid string length");
+            }
         }
 
         @Nullable
@@ -134,6 +143,7 @@ final class LockfileParser {
                 chop++;
                 int nextNewline = input.indexOf('\n', chop);
                 if (nextNewline == -1) {
+                    readPastTheEnd();
                     nextNewline = input.length();
                 }
                 String val = input.substring(chop, nextNewline);
@@ -155,14 +165,19 @@ final class LockfileParser {
                 }
             } else if (c0 == '"') {
                 int i = 1;
+                boolean closed = false;
                 for (; i < input.length(); i++) {
                     if (input.charAt(i) == '"') {
                         boolean isEscaped = input.charAt(i - 1) == '\\' && (i < 2 || input.charAt(i - 2) != '\\');
                         if (!isEscaped) {
                             i++;
+                            closed = true;
                             break;
                         }
                     }
+                }
+                if (!closed) {
+                    readPastTheEnd();
                 }
                 String val = input.substring(0, i);
                 chop = i;
@@ -191,7 +206,8 @@ final class LockfileParser {
             } else if (c0 == ',') {
                 pending.add(buildToken(TokenType.COMMA, null));
                 chop++;
-            } else if ((c0 >= 'a' && c0 <= 'z') || (c0 >= 'A' && c0 <= 'Z') || c0 == '/' || c0 == '.' || c0 == '-') {
+            } else if ((c0 >= 'a' && c0 <= 'z') || (c0 >= 'A' && c0 <= 'Z') || c0 == '/' || c0 == '-' ||
+                       c0 == '.' && release.readsAValueAfterAColon()) {
                 int i = 0;
                 for (; i < input.length(); i++) {
                     char c = input.charAt(i);
@@ -224,12 +240,14 @@ final class LockfileParser {
         final List<String> comments = new ArrayList<>();
         private final Tokenizer tokens;
         private final String fileLoc;
+        private final YarnClassicRelease release;
         @SuppressWarnings("NotNullFieldNotInitialized")
         private Token token;
 
-        Parser(String input, String fileLoc) {
-            this.tokens = new Tokenizer(input);
+        Parser(String input, String fileLoc, YarnClassicRelease release) {
+            this.tokens = new Tokenizer(input, release);
             this.fileLoc = fileLoc;
+            this.release = release;
         }
 
         private void onComment(Token token) {
@@ -309,7 +327,8 @@ final class LockfileParser {
                     if (wasColon) {
                         next();
                     }
-                    if (token.isValidPropValue()) {
+                    // before 1.16.0 a colon opens an object whatever follows it
+                    if (token.isValidPropValue() && (!wasColon || release.readsAValueAfterAColon())) {
                         for (String k : keys) {
                             obj.put(k, token.getValue());
                         }
@@ -380,7 +399,7 @@ final class LockfileParser {
     }
 
     static @Nullable Object parse(String str, String fileLoc, YarnClassicRelease release) {
-        Parser parser = new Parser(str, fileLoc);
+        Parser parser = new Parser(str, fileLoc, release);
         parser.next();
         if (!fileLoc.endsWith(".yml") || !release.parsesYmlAsYaml()) {
             if (!release.readsWithYamlWhatTheLockfileParserCannot()) {

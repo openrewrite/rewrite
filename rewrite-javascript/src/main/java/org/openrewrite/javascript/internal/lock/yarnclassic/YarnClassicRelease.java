@@ -16,6 +16,7 @@
 package org.openrewrite.javascript.internal.lock.yarnclassic;
 
 import org.jspecify.annotations.Nullable;
+import org.openrewrite.javascript.internal.lock.Ini;
 
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -96,6 +97,14 @@ public final class YarnClassicRelease implements Comparable<YarnClassicRelease> 
         return !atLeast(1, 22, 20);
     }
 
+    /**
+     * {@code start} hands the install to the release a .yarnrc's {@code yarnPath} names, as it does its
+     * {@code yarn-path}, from 1.16.0; before, its {@code yarn-path} alone.
+     */
+    boolean followsAYarnrcsYarnPath() {
+        return atLeast(1, 16, 0);
+    }
+
     // yarn src/cli/commands/install.js
 
     /**
@@ -104,6 +113,23 @@ public final class YarnClassicRelease implements Comparable<YarnClassicRelease> 
      */
     boolean resolvesOptionalDependenciesOptionally() {
         return atLeast(1, 17, 0);
+    }
+
+    /**
+     * {@code fetchRequestFromCwd} asks for every workspace the root's own dependencies do not name as a dependency of
+     * the root, beside the workspace aggregator, from 1.11.0; before, the aggregator alone asks for them.
+     */
+    boolean requestsWorkspacesFromTheRoot() {
+        return atLeast(1, 11, 0);
+    }
+
+    /**
+     * {@code init} checks the root's compatibility wherever its os, cpu or engines would be checked
+     * ({@code shouldCheck}), from 1.15.0; before, only where its engines is an object, null among them, and
+     * {@code --ignore-engines} is not given.
+     */
+    boolean checksTheRootsPlatform() {
+        return atLeast(1, 15, 0);
     }
 
     // yarn src/config.js
@@ -124,6 +150,25 @@ public final class YarnClassicRelease implements Comparable<YarnClassicRelease> 
      */
     boolean keepsEntriesWithoutIntegrity() {
         return atLeast(1, 12, 0);
+    }
+
+    /**
+     * {@code generateModuleCachePath} names a package's cache folder by {@code generateUniquePackageSlug}, whose
+     * {@code replace} needs a string name, from 1.11.0; before, by its registry, name, version and uid, whatever their
+     * type.
+     */
+    boolean slugsCacheFolders() {
+        return atLeast(1, 11, 0);
+    }
+
+    // yarn src/rc.js, src/registries/yarn-registry.js
+
+    /**
+     * {@code offline-cache-folder} is a path an rc file's directory resolves, among rc.js's {@code PATH_KEYS} and
+     * yarn-registry.js's {@code RELATIVE_KEYS}, from 1.11.0.
+     */
+    boolean resolvesOfflineCacheFolder() {
+        return atLeast(1, 11, 0);
     }
 
     // yarn src/rc.js
@@ -185,7 +230,65 @@ public final class YarnClassicRelease implements Comparable<YarnClassicRelease> 
         return atLeast(1, 17, 2);
     }
 
+    // yarn src/registries/yarn-registry.js
+
+    /**
+     * {@code loadConfig} resolves a .yarnrc's {@code cache-folder} against the file's directory, as it does its
+     * {@code yarn-offline-mirror}, from 1.9.0 ({@code RELATIVE_KEYS}).
+     */
+    boolean resolvesCacheFolder() {
+        return atLeast(1, 9, 0);
+    }
+
+    /**
+     * {@code loadConfig} resolves a .yarnrc's {@code yarn-path} too, from 1.13.0.
+     */
+    boolean resolvesYarnPath() {
+        return atLeast(1, 13, 0);
+    }
+
+    /**
+     * {@code loadConfig} resolves a .yarnrc's {@code global-folder} too, from 1.15.0.
+     */
+    boolean resolvesGlobalFolder() {
+        return atLeast(1, 15, 0);
+    }
+
+    // yarn src/registries/base-registry.js
+
+    /**
+     * {@code mergeEnv} takes the variables whose name starts with its prefix, from 1.12.1; before, every one whose
+     * name holds it, a name that does not start with it kept whole.
+     */
+    boolean mergesEnvOfItsPrefixOnly() {
+        return atLeast(1, 12, 1);
+    }
+
+    /**
+     * {@code mergeEnv} keeps the underscores a key starts with ({@code _auth}) and turns the others into dashes, from
+     * 1.15.0; before, every underscore.
+     */
+    boolean keepsTheLeadingUnderscoresOfEnvKeys() {
+        return atLeast(1, 15, 0);
+    }
+
     // yarn src/lockfile/parse.js
+
+    /**
+     * {@code tokenise} ends a comment or a string at the end of the input, from 1.12.1; 1.12.0 reads on past it,
+     * adding {@code undefined} to it until V8 refuses the string's length.
+     */
+    boolean endsTokensAtTheEndOfInput() {
+        return atLeast(1, 12, 1);
+    }
+
+    /**
+     * {@code parse} reads the plain value after a key and its colon, and {@code tokenise} a word that starts with a
+     * dot, from 1.16.0; before, a colon always opens an object and a dot starts no token.
+     */
+    boolean readsAValueAfterAColon() {
+        return atLeast(1, 16, 0);
+    }
 
     /**
      * {@code parse} reads with js-yaml's failsafe schema what the lockfile parser cannot read, from 1.17.0.
@@ -251,6 +354,34 @@ public final class YarnClassicRelease implements Comparable<YarnClassicRelease> 
         return atLeast(1, 19, 0);
     }
 
+    // yarn src/fetchers/base-fetcher.js
+
+    /**
+     * {@code fetch} links each bin of a package in its cache folder, where {@code path.resolve} throws for a target
+     * that is no string, from 1.11.0; before, the link step links them, where {@code path.join} throws for it.
+     */
+    boolean linksBinsWhenFetched() {
+        return atLeast(1, 11, 0);
+    }
+
+    // yarn src/util/normalize-manifest/fix.js
+
+    /**
+     * {@code fix} drops a bin whose name or target is invalid, and {@code path.isAbsolute} throws for a target that is
+     * no string, from 1.21.1 ({@code isValidBin}).
+     */
+    boolean validatesBins() {
+        return atLeast(1, 21, 1);
+    }
+
+    /**
+     * {@code VALID_BIN_KEYS} takes a name with dots but {@code .} and {@code ..}, from 1.22.0; 1.21.1 takes letters,
+     * digits, {@code _} and {@code -} only.
+     */
+    boolean takesBinNamesWithDots() {
+        return atLeast(1, 22, 0);
+    }
+
     // yarn src/registries/npm-registry.js
 
     /**
@@ -259,6 +390,14 @@ public final class YarnClassicRelease implements Comparable<YarnClassicRelease> 
      */
     boolean requestsPublicRegistriesOverHttps() {
         return atLeast(1, 17, 3);
+    }
+
+    /**
+     * {@code requestNeedsAuth} sends credentials to a registry an rc file gives a {@code _password}, as to one it
+     * gives an {@code _authToken}, from 1.12.1.
+     */
+    boolean authenticatesToARegistryOfAPassword() {
+        return atLeast(1, 12, 1);
     }
 
     // yarn src/lockfile/index.js, src/package-request.js, src/resolvers/registries/npm-resolver.js (the integrity)
@@ -325,6 +464,42 @@ public final class YarnClassicRelease implements Comparable<YarnClassicRelease> 
      */
     boolean writesTheLockfileFolderAsDot() {
         return atLeast(1, 18, 0);
+    }
+
+    // yarn src/package-compatibility.js, src/reporters/lang/en.js
+
+    /**
+     * {@code checkOne}'s {@code incompatibleEngine} names the version the engine has ({@code Got $2}), from 1.10.0.
+     */
+    boolean namesTheEngineVersion() {
+        return atLeast(1, 10, 0);
+    }
+
+    /**
+     * {@code foundIncompatible} ends with a period, from 1.16.0.
+     */
+    boolean endsFoundIncompatibleWithAPeriod() {
+        return atLeast(1, 16, 0);
+    }
+
+    // ini
+
+    /**
+     * The ini yarn reads an .npmrc with: 1.3.5 from 1.10.0, which trims a value cut at an inline comment; before,
+     * 1.3.4, which keeps the whitespace before the comment.
+     */
+    Ini.Release ini() {
+        return atLeast(1, 10, 0) ? Ini.Release.V1_3_5 : Ini.Release.V1_3_4;
+    }
+
+    // tar-fs
+
+    /**
+     * The tar-fs yarn extracts a tarball with: 1.16.3 from 1.10.0; before, 1.16.0, which writes through a directory
+     * that is a link of the archive and resolves a hard link's target from the package's directory, out of it too.
+     */
+    TarFs.Release tarFs() {
+        return atLeast(1, 10, 0) ? TarFs.Release.V1_16_3 : TarFs.Release.V1_16_0;
     }
 
     @Override

@@ -47,6 +47,11 @@ final class NormalizeManifest {
     private static final Pattern PATH_PREFIX = Pattern.compile("^\\.(/|\\z)");
     private static final Pattern RELATIVE_PREFIX = Pattern.compile("^\\.{0,2}/");
     private static final Pattern ENGINES_SPLIT = Pattern.compile(" +");
+    private static final Pattern SCOPE = Pattern.compile("^@[^/]+/");
+    private static final Pattern VALID_BIN_KEYS = Pattern.compile("^(?!\\.{0,2}\\z)[a-z0-9._-]+\\z",
+            Pattern.CASE_INSENSITIVE);
+    private static final Pattern VALID_BIN_KEYS_1_21_1 = Pattern.compile("^[a-z0-9_-]+\\z", Pattern.CASE_INSENSITIVE);
+    private static final Pattern PARENT_PATH = Pattern.compile("^\\.\\.([\\\\/]|\\z)");
 
     private NormalizeManifest() {
     }
@@ -79,7 +84,7 @@ final class NormalizeManifest {
         }
         String prefix = Js.truthy(human) ? human + ": " : "";
 
-        fix(info, looseSemver);
+        fix(info, looseSemver, release);
         resolveRelative(info, moduleLoc, lockfileFolder, release);
         try {
             validate(info);
@@ -89,8 +94,12 @@ final class NormalizeManifest {
         return info;
     }
 
-    @SuppressWarnings("unchecked")
     static void fix(Manifest info, boolean looseSemver) {
+        fix(info, looseSemver, YarnClassicRelease.PORTED);
+    }
+
+    @SuppressWarnings("unchecked")
+    static void fix(Manifest info, boolean looseSemver, YarnClassicRelease release) {
         Object version = info.getVersion();
         if (version instanceof String) {
             String cleaned = NodeSemver.clean((String) version,
@@ -112,6 +121,10 @@ final class NormalizeManifest {
             info.put("engines", expanded);
         }
 
+        if (release.validatesBins()) {
+            validateBins(info, release);
+        }
+
         if (Js.truthy(info.get("bundledDependencies"))) {
             info.put("bundleDependencies", info.get("bundledDependencies"));
             info.data.remove("bundledDependencies");
@@ -127,6 +140,49 @@ final class NormalizeManifest {
                 }
             }
         }
+    }
+
+    /**
+     * fix.js from 1.21.1: a named package's string bin becomes one of its unscoped name; a bin whose name or target is
+     * invalid is dropped, {@code path.isAbsolute} throwing for a target that is no string; a bin field of no object is
+     * dropped. The targets the engine keeps are as the manifest gives them.
+     */
+    @SuppressWarnings("unchecked")
+    private static void validateBins(Manifest info, YarnClassicRelease release) {
+        Object name = info.getName();
+        Object bin = info.get("bin");
+        if (name instanceof String && bin instanceof String && !((String) bin).isEmpty()) {
+            Map<String, @Nullable Object> named = new LinkedHashMap<>();
+            named.put(SCOPE.matcher((String) name).replaceFirst(""), bin);
+            info.put("bin", named);
+            bin = named;
+        }
+        if (bin instanceof Map || bin instanceof List) {
+            Pattern validBinKeys = release.takesBinNamesWithDots() ? VALID_BIN_KEYS : VALID_BIN_KEYS_1_21_1;
+            List<String> invalid = new ArrayList<>();
+            for (String key : Js.keys(bin)) {
+                if (!validBinKeys.matcher(key).find() || !isValidBin(Js.get(bin, key))) {
+                    invalid.add(key);
+                }
+            }
+            // an array's entry is deleted as a hole, which no later step reads as a target
+            if (bin instanceof Map) {
+                for (String key : invalid) {
+                    ((Map<String, @Nullable Object>) bin).remove(key);
+                }
+            }
+        } else if (info.data.containsKey("bin")) {
+            info.data.remove("bin");
+        }
+    }
+
+    // util.js isValidBin
+    private static boolean isValidBin(@Nullable Object bin) {
+        if (!(bin instanceof String)) {
+            throw Js.invalidArgType("The \"path\" argument must be of type string", bin);
+        }
+        String path = (String) bin;
+        return !PosixPath.isAbsolute(path) && !PARENT_PATH.matcher(PosixPath.normalize(path)).find();
     }
 
     // typeof === 'object': an array is one too, and yarn reads it by its indices from here on

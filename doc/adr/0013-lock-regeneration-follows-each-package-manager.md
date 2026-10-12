@@ -294,7 +294,9 @@ The Yarn classic port follows yarn 1.22.22 and reproduces the 1.x releases besid
   is no MessageError is worded as the release reports it: `An unexpected error occurred: "<message>".` before 1.22.20,
   its stack from 1.22.21; 1.22.20 prints none, and the engine words it as 1.22.21 does. What ends yarn before `main`
   reports (an rc file it cannot read, a yarn-path that does not load, the manifest 1.22.20 reads first) is printed as
-  its stack by every release.
+  its stack by every release. The questions cover every change between two releases of `PROVEN` in the modules the
+  port names, those no scenario reaches among them (each tested as the release did it when run), and the libraries
+  yarn bundles: ini 1.3.4 and tar-fs 1.16.0 before 1.10.0 are options of their one port.
 - **How a release is proven.** Every stable 1.x release was swept over every Yarn classic scenario as npm's were;
   1.22.12, which the registry publishes without its bundle, never ran and is not reproduced. The export's failure of a
   phase is the error that ended it, yarn's last `error` line (the steps go to stdout, which interleaves with stderr
