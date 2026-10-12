@@ -340,6 +340,52 @@ class PnpmReleaseTest {
           });
     }
 
+    // the registries of release's getConfig under env, the host's as the user's .npmrc
+    private static Map<String, String> userRegistries(@Nullable Map<String, String> env, String release) {
+        return PnpmOptions.load("", null, "registry=https://user.test/\n", null, env, release(release))
+          .getRegistries();
+    }
+
+    /**
+     * config/reader index.ts readEnvVar (11.0.6): pnpm_config_userconfig or pnpm_config_npmrc_auth_file names the
+     * user .npmrc pnpm reads, which no input holds; before, pnpm reads ~/.npmrc, which the host's registries stand
+     * for. An empty value is unset, and an environment the host does not know sets none.
+     */
+    @Test
+    void readsTheUserNpmrcTheEnvironmentNamesFrom1106() {
+        Map<String, String> env = Collections.singletonMap("pnpm_config_userconfig", "/x/.npmrc");
+        assertThat(userRegistries(env, "11.0.5")).containsEntry("default", "https://user.test/");
+        assertThatThrownBy(() -> userRegistries(env, "11.0.6"))
+          .isInstanceOf(CannotKnow.class)
+          .hasMessage("the engine cannot know the .npmrc /x/.npmrc pnpm reads as the user's, which " +
+                      "pnpm_config_userconfig names in place of ~/.npmrc");
+        assertThatThrownBy(() -> userRegistries(Collections.singletonMap("PNPM_CONFIG_NPMRC_AUTH_FILE", "/y/auth"),
+          "11.0.6"))
+          .isInstanceOf(CannotKnow.class)
+          .hasMessageContaining("which PNPM_CONFIG_NPMRC_AUTH_FILE names");
+        assertThat(userRegistries(Collections.singletonMap("pnpm_config_userconfig", ""), "11.0.6"))
+          .containsEntry("default", "https://user.test/");
+        assertThat(userRegistries(null, "11.0.9")).containsEntry("default", "https://user.test/");
+    }
+
+    /**
+     * config/reader index.ts readNpmEnvVar (11.0.9): NPM_CONFIG_USERCONFIG, which actions/setup-node sets, names the
+     * user .npmrc pnpm reads; before, pnpm reads ~/.npmrc all the same.
+     */
+    @Test
+    void readsTheUserNpmrcNpmConfigUserconfigNamesFrom1109() {
+        Map<String, String> env = Collections.singletonMap("NPM_CONFIG_USERCONFIG", "/runner/temp/.npmrc");
+        assertThat(userRegistries(env, "11.0.8")).containsEntry("default", "https://user.test/");
+        assertThatThrownBy(() -> userRegistries(env, "11.0.9"))
+          .isInstanceOf(CannotKnow.class)
+          .hasMessageContaining("the .npmrc /runner/temp/.npmrc pnpm reads as the user's, which " +
+                                "NPM_CONFIG_USERCONFIG names");
+        assertThatThrownBy(() -> userRegistries(Collections.singletonMap("npm_config_userconfig", "/z/.npmrc"),
+          "11.0.9"))
+          .isInstanceOf(CannotKnow.class)
+          .hasMessageContaining("which npm_config_userconfig names");
+    }
+
     /**
      * installing/deps-installer install/index.ts (11.4.0): updateChecksums resolves in full; before, the lock is up
      * to date.

@@ -216,6 +216,24 @@ public final class PnpmRelease {
     }
 
     /**
+     * The .npmrc the environment's {@code pnpm_config_npmrc_auth_file}, else {@code pnpm_config_userconfig} (or its
+     * {@code PNPM_CONFIG_} form), names is read as the user's in place of ~/.npmrc, an empty value unset, from 11.0.6
+     * (readEnvVar); before, the environment names none.
+     */
+    boolean readsTheUserNpmrcTheEnvironmentNames() {
+        return atLeast(11, 0, 6);
+    }
+
+    /**
+     * The .npmrc {@code npm_config_userconfig} (or {@code NPM_CONFIG_USERCONFIG}, which actions/setup-node sets) names
+     * is read as the user's where neither pnpm variable nor the global config.yaml's npmrcAuthFile names one, from
+     * 11.0.9 (readNpmEnvVar); before, pnpm reads ~/.npmrc all the same.
+     */
+    boolean readsTheUserNpmrcNpmConfigUserconfigNames() {
+        return atLeast(11, 0, 9);
+    }
+
+    /**
      * An {@code overrides} setting that is no object of strings is {@code ERR_PNPM_INVALID_OVERRIDES}, from 11.0.6;
      * before, it is read as it is.
      */

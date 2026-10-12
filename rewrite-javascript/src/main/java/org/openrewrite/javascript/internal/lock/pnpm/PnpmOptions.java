@@ -196,6 +196,7 @@ public final class PnpmOptions {
         Map<String, @Nullable Object> defaultOptions = defaultOptions();
         Map<String, @Nullable Object> workspaceNpmrc = npmrc == null ? new LinkedHashMap<>() :
                 readAndFilterNpmrc(npmrc, env, release, true);
+        requireTheUserNpmrcAtHome(env, release);
         Map<String, @Nullable Object> userConfig = userNpmrc == null ? new LinkedHashMap<>() :
                 readAndFilterNpmrc(userNpmrc, env, release, false);
         Map<String, @Nullable Object> builtin = new LinkedHashMap<>();
@@ -326,8 +327,8 @@ public final class PnpmOptions {
             explicitlySetKeys.add(pair.key);
             if ("registry".equals(pair.key)) {
                 if (!(pair.value instanceof String)) {
-                    throw new JsError(JsError.ERROR, "Unexpected type of registry, expecting a string but received " +
-                                      Js.jsonStringify(pair.value));
+                    throw new JsError(JsError.TYPE_ERROR, "Unexpected type of registry, expecting a string but " +
+                                      "received " + Js.jsonStringify(pair.value));
                 }
                 registries.put("default", normalizeRegistryUrl(pair.value));
                 if (packageManagerRegistries != null) {
@@ -647,6 +648,47 @@ public final class PnpmOptions {
         config.put("ignore-compatibility-db", false);
         config.put("prefer-frozen-lockfile", true);
         return config;
+    }
+
+    /**
+     * getConfig's {@code npmrcAuthFile}, the user .npmrc loadNpmrcConfig reads in place of ~/.npmrc where no command
+     * line names one: from 11.0.6 the file {@code pnpm_config_npmrc_auth_file}, else {@code pnpm_config_userconfig},
+     * names ({@link PnpmRelease#readsTheUserNpmrcTheEnvironmentNames}), and after them and the global config.yaml's
+     * npmrcAuthFile (the port reads no global config.yaml) from 11.0.9 the one {@code npm_config_userconfig} names
+     * ({@link PnpmRelease#readsTheUserNpmrcNpmConfigUserconfigNames}), each read in its upper-case form too. The host
+     * gives ~/.npmrc alone; an environment it does not know names none.
+     *
+     * @throws CannotKnow where the environment names the file pnpm reads
+     */
+    private static void requireTheUserNpmrcAtHome(@Nullable Map<String, String> env, PnpmRelease release) {
+        if (env == null) {
+            return;
+        }
+        String variable = envVarOf(env, "pnpm_config_", "npmrc_auth_file");
+        if (variable == null) {
+            variable = envVarOf(env, "pnpm_config_", "userconfig");
+        }
+        if (variable == null || !release.readsTheUserNpmrcTheEnvironmentNames()) {
+            variable = envVarOf(env, "npm_config_", "userconfig");
+            if (variable != null && !release.readsTheUserNpmrcNpmConfigUserconfigNames()) {
+                variable = null;
+            }
+        }
+        if (variable != null) {
+            throw new CannotKnow("the .npmrc " + env.get(variable) + " pnpm reads as the user's, which " + variable +
+                                 " names in place of ~/.npmrc");
+        }
+    }
+
+    // the variable readEnvVar (pnpm_config_) or readNpmEnvVar (npm_config_) reads key from: <prefix><key>, else its
+    // upper-case form where that one is unset; none where the value read is empty
+    private static @Nullable String envVarOf(Map<String, String> env, String prefix, String key) {
+        String variable = prefix + key;
+        if (env.get(variable) == null) {
+            variable = variable.toUpperCase(Locale.ROOT);
+        }
+        String value = env.get(variable);
+        return value == null || value.isEmpty() ? null : variable;
     }
 
     // loadNpmrcFiles' readAndFilterNpmrc over read-ini-file 5 (ini 6 after strip-bom); from 11.4.0 it pins the
