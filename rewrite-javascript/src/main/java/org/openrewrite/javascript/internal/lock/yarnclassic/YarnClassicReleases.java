@@ -36,10 +36,10 @@ public final class YarnClassicReleases {
 
     /**
      * The releases the engine reproduces, a node-semver range: every recorded scenario replays as each of them and
-     * gives what that release wrote ({@code YarnClassicScenarioTest} with {@code REWRITE_LOCK_EVERY_RELEASE}). 1.22.12
-     * is none: the registry publishes it without its bundle, so it was never run.
+     * gives what that release wrote ({@code YarnClassicScenarioTest} with {@code REWRITE_LOCK_EVERY_RELEASE}). That is
+     * every stable release of Yarn 1 but 1.22.12, which the registry publishes without its bundle, so it was never run.
      */
-    public static final String PROVEN = "1.7.0 - 1.22.11 || 1.22.13 - 1.22.22";
+    public static final String PROVEN = "1.0.0 - 1.22.11 || 1.22.13 - 1.22.22";
 
     private static final List<YarnClassicRelease> ALL = load();
 
