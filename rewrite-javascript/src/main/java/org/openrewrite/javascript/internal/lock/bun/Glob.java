@@ -20,7 +20,9 @@ import java.util.List;
 
 /**
  * Port of bun's src/glob.zig {@code detectGlobSyntax} and src/glob/match.zig {@code match} (bun 1.3.10), over
- * UTF-16 code units: the patterns and paths it matches here are workspace paths.
+ * UTF-16 code units: the patterns and paths it matches here are workspace paths. 1.4.0's src/glob/lib.rs and
+ * matcher.rs are beside it where they differ for these: each token's backslashes and a pattern started past its
+ * {@code !}s; their brace handling (a comma inside brackets, an unterminated group, the branch budget) is not.
  */
 final class Glob {
 

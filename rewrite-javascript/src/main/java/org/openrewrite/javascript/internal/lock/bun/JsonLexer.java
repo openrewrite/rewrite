@@ -16,10 +16,10 @@
 package org.openrewrite.javascript.internal.lock.bun;
 
 /**
- * Port of bun's src/js_lexer.zig {@code NewLexer} in JSON mode with package.json's options (comments and trailing
- * commas allowed) (bun 1.3.10): the JavaScript lexer, one token at a time, as src/interchange/json.zig reads JSON
- * through it. Its {@code expect} only logs; what it returns an error for stops the parse. Over UTF-16 code points,
- * which keep every token's text; Unicode identifiers are told by Java's tables.
+ * Port of bun's src/js_lexer.zig {@code NewLexer} in JSON mode (bun 1.3.10), comments allowed (package.json) or only
+ * logged (strict JSON): the JavaScript lexer, one token at a time, as src/interchange/json.zig reads JSON through it.
+ * Its {@code expect} only logs; what it returns an error for stops the parse. Over UTF-16 code points, which keep every
+ * token's text; Unicode identifiers are told by Java's tables.
  */
 final class JsonLexer {
 

@@ -32,7 +32,8 @@ import static java.nio.charset.StandardCharsets.UTF_8;
 
 /**
  * Port of bun's src/env_loader.zig (bun 1.3.10): the .env files an install loads from the root over the process
- * environment, in its order, and their parser.
+ * environment, in its order, and their parser, with 1.4.0's src/dotenv/env_loader.rs beside it (the first closing
+ * quote, ASCII whitespace, the byte order mark and left-to-right expansion).
  */
 public final class DotEnv {
 
