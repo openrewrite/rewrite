@@ -929,6 +929,14 @@ public final class NpmRelease implements Comparable<NpmRelease> {
     }
 
     /**
+     * {@code location}'s flatten turns {@code global} on when it is {@code global}, from npm 8.11.0; before, it only
+     * follows {@code global}.
+     */
+    boolean setsGlobalFromLocation() {
+        return atLeast(8, 11, 0);
+    }
+
+    /**
      * {@code lockfile-version}'s type takes the strings {@code 1}, {@code 2} and {@code 3} an npmrc file holds, from
      * npm 8.1.2; before, only the numbers.
      */

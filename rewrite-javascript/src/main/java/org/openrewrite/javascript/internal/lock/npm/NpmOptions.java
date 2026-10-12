@@ -441,7 +441,7 @@ public class NpmOptions {
                     break;
                 case "location":
                     // location's flatten turns global on, in the file's own order with global's
-                    if ("global".equals(parseField(value, Type.LITERAL, env))) {
+                    if (release.setsGlobalFromLocation() && "global".equals(parseField(value, Type.LITERAL, env))) {
                         options.global(true);
                     }
                     break;

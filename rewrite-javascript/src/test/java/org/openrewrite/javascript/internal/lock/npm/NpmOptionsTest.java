@@ -125,6 +125,15 @@ class NpmOptionsTest {
         assertThat(fromNpmrc("global=null").isGlobal()).isFalse();
     }
 
+    // before npm 8.11.0 location's flatten only follows global (lib/utils/config/definitions.js)
+    @Test
+    void locationGlobalIsGlobalFrom8_11_0() {
+        assertThat(NpmOptions.fromNpmrc(NpmRelease.of("8.10.0"), null, "location=global").isGlobal()).isFalse();
+        assertThat(NpmOptions.fromNpmrc(NpmRelease.of("7.20.3"), null, "location=global").isGlobal()).isFalse();
+        assertThat(NpmOptions.fromNpmrc(NpmRelease.of("8.10.0"), null, "global=true").isGlobal()).isTrue();
+        assertThat(NpmOptions.fromNpmrc(NpmRelease.of("8.11.0"), null, "location=global").isGlobal()).isTrue();
+    }
+
     // each value installed with npm 11.17.0: an added package's peer chain stays out of the lock where it is true
     @ParameterizedTest
     @CsvSource({
