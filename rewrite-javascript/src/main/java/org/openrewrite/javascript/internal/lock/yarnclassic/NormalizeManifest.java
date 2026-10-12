@@ -130,10 +130,13 @@ final class NormalizeManifest {
             info.data.remove("bundledDependencies");
         }
 
-        for (String dependencyType : MANIFEST_FIELDS) {
+        for (String dependencyType : release.cleansTheResolutions() ? MANIFEST_FIELDS : DEPENDENCY_TYPES) {
             Map<String, @Nullable Object> deps = asObject(info, dependencyType);
             if (deps != null) {
                 deps.remove("//");
+                if (!release.emptiesFalsyDependencies()) {
+                    continue;
+                }
                 for (String name : new ArrayList<>(deps.keySet())) {
                     Object value = deps.get(name);
                     deps.put(name, Js.truthy(value) ? value : "");

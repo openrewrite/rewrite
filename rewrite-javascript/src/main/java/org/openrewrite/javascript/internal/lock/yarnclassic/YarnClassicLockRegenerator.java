@@ -223,7 +223,12 @@ public final class YarnClassicLockRegenerator {
     String install(String lock) {
         Inputs these = lock.equals(inputs.getLock()) ? inputs : inputs.toBuilder().lock(lock).build();
         requireConfigFiles(these);
-        Map<String, @Nullable Object> flags = start(these);
+        Map<String, @Nullable Object> flags;
+        try {
+            flags = start(these);
+        } catch (Cli.HandedOver e) {
+            return lock;
+        }
         Config config = new Config(these, flags);
         String saved = new Install(these, config, flags, registry).run();
         return saved == null ? lock : saved;

@@ -68,7 +68,9 @@ final class PackageRequest {
 
     PackageRequest(DependencyRequestPattern req, PackageResolver resolver) {
         this.parentRequest = req.getParentRequest();
-        this.parentNames = req.getParentNames() == null ? Collections.emptyList() : req.getParentNames();
+        this.parentNames = req.getParentNames() == null ||
+                           !resolver.config.getRelease().passesTheParentNamesDown() ? Collections.emptyList() :
+                req.getParentNames();
         this.lockfile = resolver.lockfile;
         this.registry = req.getRegistry();
         this.resolver = resolver;
@@ -252,7 +254,9 @@ final class PackageRequest {
         }
         ref.addRequest(this);
         ref.addPattern(pattern, resolved);
-        ref.addOptional(optional);
+        if (config.getRelease().tellsOptionalRequestsApart()) {
+            ref.addOptional(optional);
+        }
     }
 
     Promise<Void> find(boolean fresh, boolean frozen) {

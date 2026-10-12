@@ -119,6 +119,48 @@ public final class YarnClassicRelease implements Comparable<YarnClassicRelease> 
         return atLeast(1, 16, 0);
     }
 
+    /**
+     * {@code start} ends with the exit code of the yarn-path it ran through {@code forkp}, from 1.2.0 (1.2.1 also of
+     * one {@code spawnp} ran); before, it awaits the yarn-path and ends with 0 whatever it did, and the project is as
+     * the yarn-path left it: where node cannot load the file, as it was.
+     */
+    boolean exitsWithTheYarnPathsCode() {
+        return atLeast(1, 2, 0);
+    }
+
+    /**
+     * {@code start} reads {@code YARN_IGNORE_PATH} with {@code boolifyWithDefault} ({@code true}, {@code yes} ...
+     * ignore the yarn-path, {@code 0}, {@code false} ... do not), from 1.3.1; before, only {@code 1} ignores it.
+     */
+    boolean boolifiesYarnIgnorePath() {
+        return atLeast(1, 3, 1);
+    }
+
+    /**
+     * {@code main} coerces the value of {@code --prod, --production [prod]} with its boolify, from 1.1.0; before,
+     * commander keeps the value as it is given (a string, or true for the bare option).
+     */
+    boolean boolifiesTheProductionFlag() {
+        return atLeast(1, 1, 0);
+    }
+
+    /**
+     * {@code main} declares {@code --registry <url>}, which config.js passes to the registries over their config,
+     * from 1.2.0; before, a .yarnrc's {@code --registry} is an option commander does not know, which it drops with
+     * the value after it.
+     */
+    boolean declaresRegistry() {
+        return atLeast(1, 2, 0);
+    }
+
+    /**
+     * {@code main} declares {@code --update-checksums}, from 1.4.0; before, a .yarnrc's {@code --update-checksums} is
+     * an option commander does not know, which it drops with the value after it.
+     */
+    boolean declaresUpdateChecksums() {
+        return atLeast(1, 4, 0);
+    }
+
     // yarn src/cli/commands/install.js
 
     /**
@@ -152,6 +194,23 @@ public final class YarnClassicRelease implements Comparable<YarnClassicRelease> 
      */
     boolean checksTheRootsPlatform() {
         return atLeast(1, 15, 0);
+    }
+
+    /**
+     * {@code saveLockfileAndIntegrity} writes no lock under {@code --frozen-lockfile} (#4385), from 1.0.2; before, a
+     * frozen install that passes {@code bailout}'s check writes the lock as any install does.
+     */
+    boolean keepsTheLockUnderFrozenLockfile() {
+        return atLeast(1, 0, 2);
+    }
+
+    /**
+     * {@code fetchRequestFromCwd}'s workspace aggregator depends on the root's own dependencies, devDependencies and
+     * optionalDependencies beside the workspaces, from 1.2.0; before, on the workspaces alone. The aggregator's
+     * request of a root dependency carries parent names, so that a resolution reaches it.
+     */
+    boolean requestsTheRootsDependenciesFromTheAggregator() {
+        return atLeast(1, 2, 0);
     }
 
     // yarn src/config.js
@@ -210,6 +269,16 @@ public final class YarnClassicRelease implements Comparable<YarnClassicRelease> 
     }
 
     /**
+     * {@code init} takes the {@code --production} flag wherever it is given, from 1.2.0; before, the flag's string
+     * {@code false} makes no production install, the config's {@code production} or {@code NODE_ENV=production} (unless
+     * {@code NPM_CONFIG_PRODUCTION} or {@code YARN_PRODUCTION} is {@code false}) makes one, and only then does the
+     * flag's truth decide.
+     */
+    boolean letsTheProductionFlagWin() {
+        return atLeast(1, 2, 0);
+    }
+
+    /**
      * {@code generateModuleCachePath} names a package's cache folder by {@code generateUniquePackageSlug}, whose
      * {@code replace} needs a string name, from 1.11.0; before, by its registry, name, version and uid, whatever their
      * type.
@@ -229,6 +298,17 @@ public final class YarnClassicRelease implements Comparable<YarnClassicRelease> 
     }
 
     // yarn src/rc.js
+
+    /**
+     * {@code buildRcArgs} turns a .yarnrc's {@code --<arg>} into command-line arguments by the commander option it
+     * names: {@code --<arg> <value>} for an option commander does not know or one that takes a value, {@code --<arg>}
+     * for a flag whose value is {@code true}, from 1.1.0. Before, by the value's type: {@code --<arg> <value>} for a
+     * string, {@code --<arg>} for {@code true}, {@code --no-<arg>} for {@code false}, nothing for any other, so that a
+     * flag's string value stays behind as an argument of install, which refuses one.
+     */
+    boolean buildsRcArgsByTheirOption() {
+        return atLeast(1, 1, 0);
+    }
 
     /**
      * {@code loadRcFile} parses an rc file as its path names it, a .yarnrc.yml as YAML, from 1.22.1; before, every rc
@@ -332,6 +412,23 @@ public final class YarnClassicRelease implements Comparable<YarnClassicRelease> 
     // yarn src/lockfile/parse.js
 
     /**
+     * {@code tokenise} ends a line at {@code \r} as at {@code \n}, a {@code \r\n} or {@code \n\n} being one line end
+     * of two characters (a blank line counts no line of its own), and ends a word at {@code \r}, from 1.1.0; before,
+     * {@code \r} is an invalid token, so that a .yarnrc of CRLF lines, which rc.js reads raw, is no rc file at all
+     * (util/rc.js reads what throws as empty), and each {@code \n} is a line end of one character.
+     */
+    boolean readsCarriageReturnsAsLineEnds() {
+        return atLeast(1, 1, 0);
+    }
+
+    /**
+     * {@code parse}'s {@code Unknown token} names the token ({@code util.inspect}), from 1.1.0.
+     */
+    boolean inspectsTheUnknownToken() {
+        return atLeast(1, 1, 0);
+    }
+
+    /**
      * {@code tokenise} ends a comment or a string at the end of the input, from 1.12.1; 1.12.0 reads on past it,
      * adding {@code undefined} to it until V8 refuses the string's length.
      */
@@ -424,6 +521,23 @@ public final class YarnClassicRelease implements Comparable<YarnClassicRelease> 
     // yarn src/util/normalize-manifest/fix.js
 
     /**
+     * {@code fix} turns a dependency's falsy value into {@code ''} (#4461), from 1.1.0; before, the value stays, and
+     * the request's pattern is {@code <name>@null} ({@code @0}, {@code @false}).
+     */
+    boolean emptiesFalsyDependencies() {
+        return atLeast(1, 1, 0);
+    }
+
+    /**
+     * {@code fix} cleans a manifest's {@code resolutions} as its dependencies (constants.js {@code MANIFEST_FIELDS}),
+     * from 1.3.1: their {@code //} key goes and a falsy value becomes {@code ''}; before, a falsy resolution reaches
+     * resolution-map.js as it is, where the git resolver's {@code url.parse} throws.
+     */
+    boolean cleansTheResolutions() {
+        return atLeast(1, 3, 1);
+    }
+
+    /**
      * {@code fix} drops a bin whose name or target is invalid, and {@code path.isAbsolute} throws for a target that is
      * no string, from 1.21.1 ({@code isValidBin}).
      */
@@ -440,6 +554,31 @@ public final class YarnClassicRelease implements Comparable<YarnClassicRelease> 
     }
 
     // yarn src/registries/npm-registry.js
+
+    /**
+     * {@code getRequestUrl} resolves a package's path against the registry with a slash added to it (#4350), from
+     * 1.0.2; before, {@code url.resolve(registry, pathname)}, which replaces the last segment of a registry path
+     * that does not end with one ({@code https://host/npm/remote} asks {@code https://host/npm/<name>}).
+     */
+    boolean addsASlashToTheRegistry() {
+        return atLeast(1, 0, 2);
+    }
+
+    /**
+     * {@code isRequestToRegistry} takes a request to registry.yarnpkg.com for one to a registry of registry.npmjs.org
+     * ({@code requestToYarn}), from 1.4.0; before, their hosts must be the same.
+     */
+    boolean takesYarnsRegistryForNpms() {
+        return atLeast(1, 4, 0);
+    }
+
+    /**
+     * {@code request} sends credentials to a host and path an {@code _authToken} key names ({@code requestNeedsAuth}),
+     * from 1.4.0; before, only where {@code isRequestToRegistry} takes the request for one to the package's registry.
+     */
+    boolean authenticatesToARegistryOfAnAuthToken() {
+        return atLeast(1, 4, 0);
+    }
 
     /**
      * {@code getRequestUrl} asks registry.yarnpkg.com and registry.npmjs.org over https whatever the url says, from
@@ -468,6 +607,15 @@ public final class YarnClassicRelease implements Comparable<YarnClassicRelease> 
     }
 
     // yarn src/package-request.js
+
+    /**
+     * A request keeps the parent names its dependency request carries ({@code req.parentNames || []}), from 1.2.0;
+     * before, every request starts from none, so that its dependencies carry its own name alone and a resolution's
+     * {@code <parent>/<name>} matches under that parent at any depth, a longer path nowhere.
+     */
+    boolean passesTheParentNamesDown() {
+        return atLeast(1, 2, 0);
+    }
 
     /**
      * {@code findVersionOnRegistry} rewraps an error of a request that has a parent and is no MessageError as
@@ -513,6 +661,67 @@ public final class YarnClassicRelease implements Comparable<YarnClassicRelease> 
      */
     boolean namesTheFlatPackage() {
         return atLeast(1, 12, 0);
+    }
+
+    // yarn src/package-resolver.js, src/package-request.js
+
+    /**
+     * {@code find} keys a request by its registry, pattern and optional flag, and {@code resolveToExistingVersion}
+     * adds the flag of a request that joins a version already resolved to its reference (#4448), from 1.1.0; before,
+     * by registry and pattern, so that a pattern requested once as optional and once as required is requested once,
+     * and the reference keeps the flag of the request that made it.
+     */
+    boolean tellsOptionalRequestsApart() {
+        return atLeast(1, 1, 0);
+    }
+
+    // yarn src/package-resolver.js
+
+    /**
+     * {@code find} runs a request whose key was requested before, as one that is not fresh, which then joins the
+     * version already resolved, from 1.4.0; before, it returns at once.
+     */
+    boolean findsARepeatedRequest() {
+        return atLeast(1, 4, 0);
+    }
+
+    /**
+     * {@code resolveToResolution} delays a pattern whose resolution's target is not resolved yet, and resolves it after
+     * every request (#4372), from 1.0.2; before, {@code getStrictResolvedPattern} throws {@code expected manifest}.
+     */
+    boolean waitsForTheTargetOfAResolution() {
+        return atLeast(1, 0, 2);
+    }
+
+    /**
+     * {@code resolveToResolution} applies no resolution under {@code --flat} (#4372), from 1.0.2.
+     */
+    boolean appliesNoResolutionUnderFlat() {
+        return atLeast(1, 0, 2);
+    }
+
+    /**
+     * {@code init} collapses two or more unlocked patterns of a root request's name to one version that satisfies
+     * them all ({@code optimizeResolutions}, #4488), from 1.1.0; before, no such pass.
+     */
+    boolean optimizesResolutions() {
+        return atLeast(1, 1, 0);
+    }
+
+    /**
+     * {@code init} optimizes resolutions under {@code --flat} only (#4613), from 1.2.0; 1.1.0 for every install.
+     */
+    boolean optimizesOnlyFlatResolutions() {
+        return atLeast(1, 2, 0);
+    }
+
+    /**
+     * {@code optimizeResolutions} collapses to the highest version that satisfies each pattern's range (#4562), from
+     * 1.2.0; 1.1.0 to {@code semver.maxSatisfying} of the ranges joined by spaces, one range whose {@code ||} splits
+     * the text, not the ranges.
+     */
+    boolean collapsesToAVersionEveryRangeTakes() {
+        return atLeast(1, 2, 0);
     }
 
     // yarn src/package-resolver.js, src/resolution-map.js
@@ -596,6 +805,15 @@ public final class YarnClassicRelease implements Comparable<YarnClassicRelease> 
      */
     boolean takesOnlyDotsBeforeAFileSlash() {
         return atLeast(1, 0, 2);
+    }
+
+    /**
+     * {@code resolve} names the package and the file of a file: pattern whose directory does not exist
+     * ({@code doesntExist}: {@code Package $1 refers to a non-existing file '$0'.}), from 1.4.0; before, the file
+     * alone ({@code $0 doesn't exist.}).
+     */
+    boolean namesThePackageOfAMissingFile() {
+        return atLeast(1, 4, 0);
     }
 
     // yarn src/resolvers/exotics/link-resolver.js

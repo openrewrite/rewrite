@@ -198,8 +198,13 @@ final class Config {
         boolean productionEnv = env != null && "production".equals(env.get("NODE_ENV")) &&
                                 !"false".equals(env.get("NPM_CONFIG_PRODUCTION")) &&
                                 !"false".equals(env.get("YARN_PRODUCTION"));
-        production = productionFlag != null ? boolify(productionFlag) :
-                Js.truthy(getOption("production")) || productionEnv;
+        if (release.letsTheProductionFlagWin()) {
+            production = productionFlag != null ? boolify(productionFlag) :
+                    Js.truthy(getOption("production")) || productionEnv;
+        } else {
+            production = !"false".equals(productionFlag) &&
+                         (Js.truthy(getOption("production")) || productionEnv || Js.truthy(productionFlag));
+        }
         if (workspaceRoot >= 0 && !workspacesEnabled) {
             throw new MessageError("Your project root defines workspaces but the feature is disabled in your Yarn " +
                                    "config. Please check \"workspaces-experimental\" in your .yarnrc file.");
@@ -794,7 +799,8 @@ final class Config {
         Object alwaysAuth = getRegistryOrGlobalOption(registry, "always-auth");
         // urlParts is pure in yarn, so the url's parts are asked only where they decide
         if (!Js.truthy(alwaysAuth) && getScope(packageIdent).isEmpty() ||
-            !isRequestToRegistry(requestUrl, registry) && !requestNeedsAuth(requestUrl)) {
+            !isRequestToRegistry(requestUrl, registry) &&
+            !(release.authenticatesToARegistryOfAnAuthToken() && requestNeedsAuth(requestUrl))) {
             return null;
         }
         String auth = getAuth(packageIdent);
@@ -806,7 +812,8 @@ final class Config {
         String[] registry = urlParts(registryUrl);
         Object customHostSuffix = getRegistryOrGlobalOption(registryUrl, "custom-host-suffix");
         boolean requestToRegistryHost = request[0].equals(registry[0]);
-        boolean requestToYarn = YARN_REGISTRY.contains(request[0]) && DEFAULT_REGISTRY.contains(registry[0]);
+        boolean requestToYarn = release.takesYarnsRegistryForNpms() && YARN_REGISTRY.contains(request[0]) &&
+                                DEFAULT_REGISTRY.contains(registry[0]);
         boolean requestToRegistryPath = request[1].startsWith(registry[1]);
         boolean customHostSuffixInUse = customHostSuffix instanceof String &&
                                         request[0].endsWith((String) customHostSuffix);

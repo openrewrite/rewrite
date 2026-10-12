@@ -90,6 +90,10 @@ final class ResolutionMap {
 
         boolean validRange = range instanceof String &&
                              NodeSemver.validRange((String) range, Config.SEMVER) != null;
+        // the field's own null, which fix.js empties from 1.3.1, is JSON's for the git resolver's url.parse
+        if (range == null) {
+            throw new JsError(Js.INVALID_ARG_TYPE, "The \"url\" argument must be of type string. Received null");
+        }
         if (!validRange && ExoticResolvers.getExoticResolver(range, config.getRelease()) == null) {
             return null;
         }

@@ -66,8 +66,28 @@ final class Install {
         private final boolean frozenLockfile;
         private final boolean updateChecksums;
         private final boolean skipIntegrityCheck;
+        private final boolean global;
+
+        /**
+         * install's arguments with the flags {@code run} names beside them: what the rc args leave before 1.1.0.
+         */
+        private final List<String> args = new ArrayList<>();
 
         Flags(Config config, Map<String, @Nullable Object> rawFlags) {
+            Object given = rawFlags.get(Rc.ARGS);
+            if (given instanceof List) {
+                for (Object arg : (List<?>) given) {
+                    args.add(Js.string(arg));
+                }
+                String[][] named = {{"saveDev", "--dev"}, {"savePeer", "--peer"}, {"saveOptional", "--optional"},
+                        {"saveExact", "--exact"}, {"saveTilde", "--tilde"}};
+                for (String[] flag : named) {
+                    if (Js.truthy(rawFlags.get(flag[0]))) {
+                        args.add(flag[1]);
+                    }
+                }
+            }
+            global = Js.truthy(rawFlags.get("global"));
             ignorePlatform = Js.truthy(rawFlags.get("ignorePlatform")) ||
                              Js.truthy(config.getOption("ignore-platform"));
             ignoreEngines = Js.truthy(rawFlags.get("ignoreEngines")) || Js.truthy(config.getOption("ignore-engines"));
@@ -101,7 +121,15 @@ final class Install {
      */
     @Nullable
     String run() {
-        return init(lockfile());
+        Lockfile lockfile = lockfile();
+        if (!flags.getArgs().isEmpty()) {
+            String example = String.join(" ", flags.getArgs());
+            throw new MessageError(flags.isGlobal() ?
+                    Lang.format("`--global` has been deprecated. Please run $0 instead.", "yarn global " + example) :
+                    Lang.format("`install` has been replaced with `add` to add new dependencies. Run $0 instead.",
+                            "yarn add " + example));
+        }
+        return init(lockfile);
     }
 
     /**
@@ -372,7 +400,9 @@ final class Install {
             for (String name : Js.keys(depMap)) {
                 String pattern = name;
                 if (lockfile.getLocked(pattern) == null) {
-                    pattern += "@" + Js.string(Js.get(depMap, name));
+                    // the key is there, so its null is JSON's (kept before 1.1.0 empties a falsy range)
+                    Object range = Js.get(depMap, name);
+                    pattern += "@" + (range == null ? "null" : Js.string(range));
                 }
                 patterns.add(pattern);
                 deps.add(DependencyRequestPattern.builder().pattern(pattern).registry(registry).hint(hint)
@@ -389,8 +419,11 @@ final class Install {
         if (workspaceRootFolder) {
             Map<String, WorkspaceLayout.Workspace> workspaces = config.resolveWorkspaces(projectManifestJson);
             workspaceLayout = new WorkspaceLayout(workspaces, config);
+            boolean rootsDependencies = config.getRelease().requestsTheRootsDependenciesFromTheAggregator();
             Map<String, @Nullable Object> workspaceDependencies = new LinkedHashMap<>();
-            Js.assign(workspaceDependencies, projectManifestJson.get("dependencies"));
+            if (rootsDependencies) {
+                Js.assign(workspaceDependencies, projectManifestJson.get("dependencies"));
+            }
             for (String workspaceName : Js.keys(workspaces)) {
                 workspaceDependencies.put(workspaceName, workspaces.get(workspaceName).getManifest().getVersion());
             }
@@ -400,12 +433,14 @@ final class Install {
             virtualDependencyManifest.put("version", "1.0.0");
             virtualDependencyManifest.put("_registry", "npm");
             virtualDependencyManifest.put("dependencies", workspaceDependencies);
-            Map<String, @Nullable Object> devDependencies = new LinkedHashMap<>();
-            Js.assign(devDependencies, projectManifestJson.get("devDependencies"));
-            virtualDependencyManifest.put("devDependencies", devDependencies);
-            Map<String, @Nullable Object> optionalDependencies = new LinkedHashMap<>();
-            Js.assign(optionalDependencies, projectManifestJson.get("optionalDependencies"));
-            virtualDependencyManifest.put("optionalDependencies", optionalDependencies);
+            if (rootsDependencies) {
+                Map<String, @Nullable Object> devDependencies = new LinkedHashMap<>();
+                Js.assign(devDependencies, projectManifestJson.get("devDependencies"));
+                virtualDependencyManifest.put("devDependencies", devDependencies);
+                Map<String, @Nullable Object> optionalDependencies = new LinkedHashMap<>();
+                Js.assign(optionalDependencies, projectManifestJson.get("optionalDependencies"));
+                virtualDependencyManifest.put("optionalDependencies", optionalDependencies);
+            }
             virtualDependencyManifest.put("private", projectManifestJson.get("private"));
             virtualDependencyManifest.put("workspaces", projectManifestJson.get("workspaces"));
             String virtualName = Js.string(virtualDependencyManifest.getName());
@@ -466,7 +501,8 @@ final class Install {
         Map<String, @Nullable Object> lockfileBasedOnResolver = lockfile.getLockfile(resolvedPatterns,
                 config.getRelease());
 
-        if (!flags.isLockfile() || flags.isPureLockfile() || flags.isFrozenLockfile()) {
+        if (!flags.isLockfile() || flags.isPureLockfile() ||
+            flags.isFrozenLockfile() && config.getRelease().keepsTheLockUnderFrozenLockfile()) {
             return null;
         }
         resolver.requireNoRaces();
