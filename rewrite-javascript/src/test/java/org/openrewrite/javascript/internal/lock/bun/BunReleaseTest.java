@@ -225,6 +225,40 @@ class BunReleaseTest {
     }
 
     /**
+     * integrity.zig Integrity.parse (1.2.20, 1.2.21): a sha1 is decoded from past its {@code -} from 1.2.20, and a
+     * hash longer than its digest is unknown from 1.2.21. As a lock's sha1 of 20 bytes and sha1 of 32 bytes are
+     * written back: 1.2.19 both {@code ""}; 1.2.20 both, the second cut to 20 bytes; 1.2.21 the first alone.
+     */
+    @Test
+    void decodesAnIntegrityPastItsAlgorithmFrom1220AndRefusesOneLongerThanItsDigestFrom1221() {
+        String sha1 = "sha1-AQIDBAUGBwgJCgsMDQ4PEBESExQ=";
+        String long32 = "sha1-AQIDBAUGBwgJCgsMDQ4PEBESExQVFhcYGRobHB0eHyA=";
+        assertThat(Integrity.parse(sha1, BunRelease.of("1.2.20"))).hasToString(sha1);
+        assertThat(Integrity.parse(sha1, BunRelease.of("1.2.19"))).hasToString("");
+        assertThat(Integrity.parse(long32, BunRelease.of("1.2.21"))).hasToString("");
+        assertThat(Integrity.parse(long32, BunRelease.of("1.2.20"))).hasToString(sha1);
+        assertThat(Integrity.parse(long32, BunRelease.of("1.2.19"))).hasToString("");
+        assertThat(Integrity.parse("sha256-", BunRelease.of("1.2.19")))
+          .hasToString("sha256-AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA==");
+        assertThat(Integrity.parse("sha256-", BunRelease.of("1.2.20"))).hasToString("");
+
+        String lock = lock("", "\"ms\": [\"ms@2.1.3\", \"\", {}, \"" + sha1 + "\"],");
+        assertThat(writtenBack("1.2.20", lock)).isEqualTo(lock);
+        assertThat(writtenBack("1.2.19", lock)).isEqualTo(lock.replace(sha1, ""));
+
+        StringBuilder past64 = new StringBuilder("sha512-");
+        for (int i = 0; i < 88; i++) {
+            past64.append('A');
+        }
+        assertThatThrownBy(() -> Integrity.parse(past64.toString(), BunRelease.of("1.2.20")))
+          .isInstanceOf(CannotKnow.class)
+          .hasMessageContaining("past its 64-byte buffer");
+        assertThat(Integrity.parse(past64.toString(), BunRelease.of("1.2.21"))).hasToString("");
+        assertThat(Integrity.parse(past64.toString().replaceFirst("AAAA", "!AAA"), BunRelease.of("1.2.20")))
+          .hasToString("");
+    }
+
+    /**
      * ini.zig loadNpmrcConfig (1.2.13): an .npmrc's byte order mark is dropped; before, it starts the first key. (With
      * bunfig naming one local registry and such an .npmrc another, 1.2.13 asks the .npmrc's, 1.2.12 bunfig's.)
      */

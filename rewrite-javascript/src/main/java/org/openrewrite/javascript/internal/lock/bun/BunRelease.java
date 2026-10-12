@@ -197,6 +197,28 @@ public final class BunRelease implements Comparable<BunRelease> {
         return atLeast(1, 2, 11) && !atLeast(1, 3, 0);
     }
 
+    // src/install/integrity.zig Integrity.parse, which reads bun.lock's and a packument's integrities
+
+    /**
+     * An integrity's hash is decoded from past its algorithm's {@code -}, and one with nothing past it is unknown
+     * ({@code Tag.parse}'s offset), from 1.2.20 (bun#21220); before, from its eighth character whatever the
+     * algorithm, two characters into a sha1's hash, which then does not decode, so that a sha1 integrity is unknown
+     * (a packument falls back to its {@code shasum}, a lock's is written {@code ""}), and {@code sha256-} alone is a
+     * sha256 of zeros.
+     */
+    boolean decodesAnIntegrityPastItsAlgorithm() {
+        return atLeast(1, 2, 20);
+    }
+
+    /**
+     * A hash that decodes to more bytes than its algorithm's digest is unknown ({@code calcSizeForSlice}), from 1.2.21;
+     * before, it is decoded into 64 bytes whatever the algorithm and kept, cut to the digest where it is written, and
+     * one of more than 64 bytes is decoded past that buffer, which the release build does not check.
+     */
+    boolean refusesAnIntegrityLongerThanItsDigest() {
+        return atLeast(1, 2, 21);
+    }
+
     // src/install/default-trusted-dependencies.txt, which the root's diff compares a lock's trustedDependencies against
     // where package.json lists none
 
