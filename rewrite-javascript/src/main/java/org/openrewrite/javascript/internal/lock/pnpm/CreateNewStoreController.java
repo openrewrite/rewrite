@@ -16,6 +16,7 @@
 package org.openrewrite.javascript.internal.lock.pnpm;
 
 import org.jspecify.annotations.Nullable;
+import org.openrewrite.javascript.internal.lock.CannotKnow;
 
 import java.time.Instant;
 import java.util.Collections;
@@ -31,9 +32,55 @@ final class CreateNewStoreController {
     private final RegistryMetadata registry;
     private final Instant now;
 
+    /**
+     * The Node.js version the host runs pnpm on, null where it does not say.
+     */
+    private final @Nullable String nodeVersion;
+
     CreateNewStoreController(RegistryMetadata registry, Instant now) {
+        this(registry, now, null);
+    }
+
+    CreateNewStoreController(RegistryMetadata registry, Instant now, @Nullable String nodeVersion) {
         this.registry = registry;
         this.now = now;
+        this.nodeVersion = nodeVersion;
+    }
+
+    /**
+     * store/index's ReadOnlyStoreIndex of 11.7.0, which frozenStore opens the store index with
+     * ({@link PnpmRelease#opensAFrozenStoreReadOnly}): Node.js must open a SQLite "immutable" URI, and the store
+     * must be seeded, which no input says.
+     */
+    private void openFrozenStore() {
+        if (nodeVersion == null) {
+            throw new CannotKnow("the Node.js version of the host, which frozenStore needs to be >=22.15.0, " +
+                                 ">=23.11.0, or >=24.0.0");
+        }
+        String version = nodeVersion.startsWith("v") ? nodeVersion.substring(1) : nodeVersion;
+        String[] parts = version.split("\\.", -1);
+        double major = number(parts[0]);
+        double minor = parts.length > 1 ? number(parts[1]) : Double.NaN;
+        boolean supported = !(major < 22) && (major != 22 || minor >= 15) && (major != 23 || minor >= 11);
+        if (!supported) {
+            throw new PnpmError("FROZEN_STORE_UNSUPPORTED_NODE", "frozenStore opens the store index read-only via a " +
+                    "SQLite \"immutable\" URI, which requires Node.js >=22.15.0, >=23.11.0, or >=24.0.0, but the " +
+                    "current version is " + version + ". Upgrade Node.js, or run without frozenStore.");
+        }
+        throw new CannotKnow("whether the store frozenStore opens read-only is seeded (its index.db and files)");
+    }
+
+    // Number(s) of a version's digits: NaN for anything else
+    private static double number(String s) {
+        if (s.isEmpty()) {
+            return 0;
+        }
+        for (char c : s.toCharArray()) {
+            if (c < '0' || c > '9') {
+                return Double.NaN;
+            }
+        }
+        return Double.parseDouble(s);
     }
 
     /**
@@ -57,6 +104,9 @@ final class CreateNewStoreController {
     }
 
     NpmResolver createNewStoreController(PnpmOptions options, @Nullable Object fetchFullMetadata) {
+        if (options.isTrue("frozenStore") && options.getRelease().opensAFrozenStoreReadOnly()) {
+            openFrozenStore();
+        }
         boolean fullMetadata = fetchFullMetadata != null && fetchFullMetadata != Js.UNDEFINED ?
                 Js.truthy(fetchFullMetadata) : ("time-based".equals(options.get("resolutionMode")) ||
                                                 "no-downgrade".equals(options.get("trustPolicy"))) &&

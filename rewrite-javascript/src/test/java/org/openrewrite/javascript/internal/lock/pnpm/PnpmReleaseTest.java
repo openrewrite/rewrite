@@ -1167,6 +1167,97 @@ class PnpmReleaseTest {
     }
 
     /**
+     * installing/deps-installer verifyLockfileResolutions.ts (11.7.0): a snapshot's dependency alias that is no
+     * package name fails the verification; before, it passes.
+     */
+    @Test
+    void rejectsAnInvalidDependencyAliasInTheLockFrom1170() {
+        String lock = "lockfileVersion: '9.0'\n\nsettings:\n  autoInstallPeers: true\n" +
+                      "  excludeLinksFromLockfile: false\n\nimporters:\n\n  .:\n    dependencies:\n      foo:\n" +
+                      "        specifier: 1.0.0\n        version: 1.0.0\n\npackages:\n\n  foo@1.0.0:\n" +
+                      "    resolution: {integrity: sha512-x}\n\n  bar@1.0.0:\n    resolution: {integrity: sha512-y}\n\n" +
+                      "snapshots:\n\n  foo@1.0.0:\n    dependencies:\n      .bin: bar@1.0.0\n\n  bar@1.0.0: {}\n";
+        assertThatThrownBy(() -> VerifyLockfileResolutions.verifyLockfileResolutions(
+          LockfileReader.read(lock, release("11.7.0")).getLockfile(), Collections.emptyList(), release("11.7.0")))
+          .isInstanceOfSatisfying(PnpmError.class, e -> {
+              assertThat(e.getCode()).isEqualTo("ERR_PNPM_INVALID_DEPENDENCY_NAME");
+              assertThat(e.getMessage()).isEqualTo("The lockfile contains 1 dependency alias that are not valid " +
+                                                   "package names:\n  \".bin\"");
+          });
+        VerifyLockfileResolutions.verifyLockfileResolutions(LockfileReader.read(lock, release("11.6.0"))
+          .getLockfile(), Collections.emptyList(), release("11.6.0"));
+    }
+
+    /**
+     * lockfile/utils toLockfileResolution.ts (11.7.0): a resolution kept with its tarball keeps its path; before, not.
+     */
+    @Test
+    void keepsATarballResolutionsPathFrom1170() {
+        String codeload = "https://codeload.github.com/o/r/tar.gz/abc";
+        Map<String, @Nullable Object> resolution = obj("{'integrity':'sha512-x','tarball':'" + codeload +
+                                                       "','path':'/x'}");
+        assertThat(json(LockfileUtils.toLockfileResolution("r", "1.0.0", resolution, REGISTRY, false,
+          release("11.7.0")))).isEqualTo("{'integrity':'sha512-x','tarball':'" + codeload +
+                                         "','gitHosted':true,'path':'/x'}");
+        assertThat(json(LockfileUtils.toLockfileResolution("r", "1.0.0", resolution, REGISTRY, false,
+          release("11.6.0")))).isEqualTo("{'integrity':'sha512-x','tarball':'" + codeload + "','gitHosted':true}");
+    }
+
+    /**
+     * config/reader getNetworkConfigs.ts (11.7.0): a username after a colon and a password after the URL of the
+     * same scope are checked together; before, apart.
+     */
+    @Test
+    void groupsCredentialsByRegistryAndScopeFrom1170() {
+        String npmrc = "//r.test/:@s:username=u\n//r.test/@s/:_password=%%%\n";
+        assertThatThrownBy(() -> options("", npmrc, null, Collections.emptyMap(), "11.7.0"))
+          .isInstanceOfSatisfying(PnpmError.class,
+            e -> assertThat(e.getCode()).isEqualTo("ERR_PNPM_AUTH_INVALID_BASE64"));
+        options("", npmrc, null, Collections.emptyMap(), "11.6.0");
+    }
+
+    /**
+     * store/connection-manager and store/index ReadOnlyStoreIndex (11.7.0): frozenStore opens the store read-only,
+     * which a Node.js before 22.15.0 cannot; whether the store is seeded no input says. Before, no such setting.
+     */
+    @Test
+    void opensAFrozenStoreReadOnlyFrom1170() {
+        PnpmOptions frozen = options("frozenStore: true\n", null, null, Collections.emptyMap(), "11.7.0");
+        assertThatThrownBy(() -> new CreateNewStoreController(WRAPPY_ONLY, NOW, "v20.19.0")
+          .createStoreController(frozen))
+          .isInstanceOfSatisfying(PnpmError.class, e -> {
+              assertThat(e.getCode()).isEqualTo("ERR_PNPM_FROZEN_STORE_UNSUPPORTED_NODE");
+              assertThat(e.getMessage()).endsWith("but the current version is 20.19.0. Upgrade Node.js, or run " +
+                                                  "without frozenStore.");
+          });
+        assertThatThrownBy(() -> new CreateNewStoreController(WRAPPY_ONLY, NOW, "v24.21.0")
+          .createStoreController(frozen))
+          .isInstanceOf(CannotKnow.class);
+        new CreateNewStoreController(WRAPPY_ONLY, NOW, "v20.19.0").createStoreController(
+          options("frozenStore: true\n", null, null, Collections.emptyMap(), "11.6.0"));
+    }
+
+    /**
+     * hooks/read-package-hook createReadPackageHook.ts (11.7.0): the compatibility database's two entries for
+     * gatsby-core-utils@&lt;2.14.0-next.1 are merged; before, the last one wins.
+     */
+    @Test
+    void mergesThePackageExtensionsOfASelectorFrom1170() {
+        ReadPackageHook merged = ReadPackageHook.createReadPackageHook(false, "", Collections.emptyList(), null,
+          null, release("11.7.0"));
+        ReadPackageHook last = ReadPackageHook.createReadPackageHook(false, "", Collections.emptyList(), null,
+          null, release("11.6.0"));
+        assertThat(merged).isNotNull();
+        assertThat(last).isNotNull();
+        assertThat(merged.apply(obj("{'name':'gatsby-core-utils','version':'2.0.0'}"), null).get("dependencies"))
+          .isEqualTo(obj("{'got':'8.3.2','@babel/runtime':'^7.14.8'}"));
+        assertThat(last.apply(obj("{'name':'gatsby-core-utils','version':'2.0.0'}"), null).get("dependencies"))
+          .isEqualTo(obj("{'got':'8.3.2'}"));
+        assertThat(merged.apply(obj("{'name':'gatsby-core-utils','version':'3.0.0'}"), null).get("dependencies"))
+          .isNull();
+    }
+
+    /**
      * lockfile/utils toLockfileResolution.ts (11.5.3): a tarball URL is git-hosted in any case; before, only in
      * lower case, so that a mixed-case codeload URL is kept without the flag.
      */

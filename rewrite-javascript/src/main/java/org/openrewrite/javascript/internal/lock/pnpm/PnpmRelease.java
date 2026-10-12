@@ -170,6 +170,14 @@ public final class PnpmRelease {
         return atLeast(11, 5, 3);
     }
 
+    /**
+     * A resolution written with its tarball URL keeps its {@code path} (a git repository's subdirectory), from 11.7.0;
+     * before, the path is left out.
+     */
+    boolean keepsATarballResolutionsPath() {
+        return atLeast(11, 7, 0);
+    }
+
     // @pnpm/lockfile.fs src/yamlDocuments.ts
 
     /**
@@ -283,6 +291,35 @@ public final class PnpmRelease {
      */
     boolean readsUrlScopedConfigFromTheEnvironment() {
         return atLeast(11, 6, 0);
+    }
+
+    /**
+     * A registry's credentials are checked together by registry and scope, a scope written after the URL
+     * ({@code //h/@s/:}) or after a colon ({@code //h/:@s:}) alike, from 11.7.0; before, by the key as written.
+     */
+    boolean groupsCredentialsByRegistryAndScope() {
+        return atLeast(11, 7, 0);
+    }
+
+    // @pnpm/store.connection-manager src/createNewStoreController.ts, @pnpm/store.index (ReadOnlyStoreIndex)
+
+    /**
+     * {@code frozenStore} opens the store index read-only, which needs a Node.js that opens a SQLite "immutable" URI
+     * ({@code ERR_PNPM_FROZEN_STORE_UNSUPPORTED_NODE}) and a seeded store, from 11.7.0; before, it is no setting.
+     */
+    boolean opensAFrozenStoreReadOnly() {
+        return atLeast(11, 7, 0);
+    }
+
+    // @pnpm/hooks.read-package-hook src/createReadPackageHook.ts
+
+    /**
+     * The compatibility database's and the project's packageExtensions are one extender whose entries of one selector
+     * are merged, the first one's keys winning, from 11.7.0; before, the database's last entry of a selector wins,
+     * and the project's are a second extender.
+     */
+    boolean mergesThePackageExtensionsOfASelector() {
+        return atLeast(11, 7, 0);
     }
 
     /**
@@ -479,6 +516,24 @@ public final class PnpmRelease {
         return atLeast(11, 5, 3);
     }
 
+    /**
+     * A dependency alias of the lock's importers or snapshots that is no package name fails the lock's verification
+     * first ({@code ERR_PNPM_INVALID_DEPENDENCY_NAME}), from 11.7.0; before, it is read as it is.
+     */
+    boolean rejectsAnInvalidDependencyAliasInTheLock() {
+        return atLeast(11, 7, 0);
+    }
+
+    // @pnpm/installing.deps-installer src/install/index.ts (mutateModules)
+
+    /**
+     * The lock's verification runs beside the install, so that a project without a package.json fails with that
+     * first, from 11.7.0; before, the verification comes first.
+     */
+    boolean verifiesTheLockBesideTheInstall() {
+        return atLeast(11, 7, 0);
+    }
+
     // @pnpm/installing.env-installer src/resolveOptionalSubdeps.ts, resolveAndInstallConfigDeps.ts,
     // installConfigDeps.ts
 
@@ -577,6 +632,14 @@ public final class PnpmRelease {
      */
     boolean breaksPeerDedupeTiesByDepPath() {
         return atLeast(11, 5, 3);
+    }
+
+    /**
+     * A peer provider a childless package keeps from the lock goes into a copy of its parents' scope, from 11.7.0;
+     * before, into the scope it shares with its siblings, who take it as theirs.
+     */
+    boolean keepsALockedPeerInItsOwnScope() {
+        return atLeast(11, 7, 0);
     }
 
     // @pnpm/installing.deps-installer src/install/index.ts (installSome's catalogMode)

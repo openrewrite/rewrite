@@ -19,8 +19,10 @@ import lombok.Value;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.javascript.internal.lock.CannotKnow;
 import org.openrewrite.javascript.internal.lock.LocaleCompare;
+import org.openrewrite.javascript.internal.lock.ValidateNpmPackageName;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -74,6 +76,11 @@ final class VerifyLockfileResolutions {
                                           PnpmRelease release) {
         if (lockfile.getPackages() == null) {
             return;
+        }
+        // from 11.7.0 a dependency alias of the lock that is no package name fails first
+        List<String> invalidAliases = collectInvalidAliases(lockfile);
+        if (!invalidAliases.isEmpty() && release.rejectsAnInvalidDependencyAliasInTheLock()) {
+            throw buildInvalidAliasError(invalidAliases);
         }
         // from 11.5.3 a registry dep path backed by another resolution fails ahead of any verifier
         List<ResolutionPolicyViolation> shapeViolations = collectShapeViolations(lockfile);
@@ -150,6 +157,54 @@ final class VerifyLockfileResolutions {
             candidates.put(key, new Candidate(name, version, nonSemverVersion, snapshot.getResolution()));
         }
         return candidates;
+    }
+
+    // collectCandidates' invalidAliases of 11.7.0: the importers' aliases, then the snapshots', each once
+    private static List<String> collectInvalidAliases(LockfileObject lockfile) {
+        Set<String> invalid = new LinkedHashSet<>();
+        for (ProjectSnapshot importer : lockfile.getImporters().values()) {
+            pushInvalidAliases(importer.getDependencies(), invalid);
+            pushInvalidAliases(importer.getDevDependencies(), invalid);
+            pushInvalidAliases(importer.getOptionalDependencies(), invalid);
+        }
+        Map<String, PackageSnapshot> packages = lockfile.getPackages();
+        if (packages != null) {
+            for (PackageSnapshot snapshot : packages.values()) {
+                pushInvalidAliases(snapshot.getDependencies(), invalid);
+                pushInvalidAliases(snapshot.getOptionalDependencies(), invalid);
+            }
+        }
+        return new ArrayList<>(invalid);
+    }
+
+    private static void pushInvalidAliases(@Nullable Map<String, ?> deps, Set<String> invalid) {
+        if (deps == null) {
+            return;
+        }
+        for (String alias : deps.keySet()) {
+            if (!ValidateNpmPackageName.validForOldPackages(alias, ValidateNpmPackageName.Release.V7_0_2)) {
+                invalid.add(alias);
+            }
+        }
+    }
+
+    private static PnpmError buildInvalidAliasError(List<String> aliases) {
+        List<String> sorted = new ArrayList<>(aliases);
+        Collections.sort(sorted);
+        List<String> lines = new ArrayList<>();
+        for (String alias : sorted.subList(0, Math.min(MAX_VIOLATIONS_TO_PRINT, sorted.size()))) {
+            lines.add("  " + Js.jsonStringify(alias));
+        }
+        int omitted = sorted.size() - lines.size();
+        String details = String.join("\n", lines) + (omitted > 0 ? "\n  …and " + omitted + " more" : "");
+        return new PnpmError("INVALID_DEPENDENCY_NAME", "The lockfile contains " + aliases.size() + " dependency " +
+                (aliases.size() == 1 ? "alias" : "aliases") + " that are not valid package names:\n" + details,
+                "A dependency alias becomes a directory under node_modules, so it must be a valid npm package name " +
+                "— a single `name` or `@scope/name` with no leading `.` or `_`, and not a reserved name such as " +
+                "`node_modules`. An alias containing path-traversal segments or a reserved name such as `.bin` or " +
+                "`.pnpm` could make an install write outside the intended directory or overwrite pnpm-owned " +
+                "layout. This usually means the lockfile was tampered with — inspect recent changes to " +
+                "pnpm-lock.yaml before trusting it.");
     }
 
     // collectCandidates' shapeViolations of 11.5.3, one for each dep path

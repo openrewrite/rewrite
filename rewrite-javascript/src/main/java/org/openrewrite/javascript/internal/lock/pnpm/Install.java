@@ -184,10 +184,20 @@ final class Install {
         boolean existsNonEmptyWantedLockfile = existsWantedLockfile && !LockfileWriter.isEmptyLockfile(wantedLockfile);
         // from 11.1.3 the lock's resolutions are verified, unless trustLockfile (from 11.3.0) trusts it
         PnpmRelease release = options.getRelease();
+        RuntimeException verification = null;
         if (release.checksTheReleaseAgeAsAPolicy() &&
             !(options.isTrue("trustLockfile") && release.readsTrustLockfile())) {
-            VerifyLockfileResolutions.verifyLockfileResolutions(wantedLockfile, stores.resolutionVerifiers(options),
-                    release);
+            try {
+                VerifyLockfileResolutions.verifyLockfileResolutions(wantedLockfile,
+                        stores.resolutionVerifiers(options), release);
+            } catch (RuntimeException e) {
+                verification = e;
+            }
+        }
+        // from 11.7.0 the verification runs beside the install, which fails first without a package.json
+        // (PnpmRelease#verifiesTheLockBesideTheInstall)
+        if (verification != null && (missingManifest == null || !release.verifiesTheLockBesideTheInstall())) {
+            throw verification;
         }
         if (missingManifest != null) {
             throw new JsError(JsError.ERROR,

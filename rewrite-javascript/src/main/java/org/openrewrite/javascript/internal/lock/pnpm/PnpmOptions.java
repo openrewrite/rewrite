@@ -31,12 +31,14 @@ import org.openrewrite.javascript.semver.NodeSemver;
 
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collection;
 import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import java.util.function.Function;
 import java.util.regex.Matcher;
@@ -853,7 +855,10 @@ public final class PnpmOptions {
      */
     static Map<String, String> getNetworkConfigs(Map<String, @Nullable Object> rawConfig, PnpmRelease release) {
         Map<String, String> registries = new LinkedHashMap<>();
+        // the credentials of each registry key as written, and from 11.7.0 of each registry and scope, whether the
+        // scope follows the registry's URL ({@code //h/@s/:}) or a colon ({@code //h/:@s:})
         Map<String, Map<String, String>> rawCredsMap = new LinkedHashMap<>();
+        Map<String, Map<String, Map<String, String>>> rawCredsByScope = new LinkedHashMap<>();
         for (String configKey : Js.keys(rawConfig)) {
             Object value = rawConfig.get(configKey);
             if (!configKey.isEmpty() && configKey.charAt(0) == '@' && configKey.endsWith(":registry")) {
@@ -862,7 +867,12 @@ public final class PnpmOptions {
             }
             Matcher creds = AUTH_SUFFIX.matcher(configKey);
             if (creds.find()) {
-                rawCredsMap.computeIfAbsent(configKey.substring(0, creds.start()), r -> new LinkedHashMap<>())
+                String registry = configKey.substring(0, creds.start());
+                rawCredsMap.computeIfAbsent(registry, r -> new LinkedHashMap<>())
+                        .put(AUTH_SUFFIX_KEY_MAP.get(creds.group(1)), Js.string(value));
+                String[] registryAndScope = registryAndScope(registry);
+                rawCredsByScope.computeIfAbsent(registryAndScope[0], r -> new LinkedHashMap<>())
+                        .computeIfAbsent(registryAndScope[1], s -> new LinkedHashMap<>())
                         .put(AUTH_SUFFIX_KEY_MAP.get(creds.group(1)), Js.string(value));
                 continue;
             }
@@ -871,10 +881,64 @@ public final class PnpmOptions {
                                      configKey + ")");
             }
         }
-        for (Map<String, String> creds : rawCredsMap.values()) {
-            parseCreds(creds, release);
+        RuntimeException byKey = firstCredsFailure(rawCredsMap.values(), release);
+        List<Map<String, String>> scopedCreds = new ArrayList<>();
+        for (Map<String, Map<String, String>> byRegistry : rawCredsByScope.values()) {
+            scopedCreds.addAll(byRegistry.values());
+        }
+        RuntimeException byScope = firstCredsFailure(scopedCreds, release);
+        RuntimeException failure = sameFailure(byKey, byScope) ||
+                                   !release.groupsCredentialsByRegistryAndScope() ? byKey : byScope;
+        if (failure != null) {
+            throw failure;
         }
         return registries;
+    }
+
+    // parseCreds of each group in turn: the first failure, null where none fails
+    private static @Nullable RuntimeException firstCredsFailure(Collection<Map<String, String>> groups,
+                                                                PnpmRelease release) {
+        try {
+            for (Map<String, String> creds : groups) {
+                parseCreds(creds, release);
+            }
+            return null;
+        } catch (PnpmError | JsError e) {
+            return e;
+        }
+    }
+
+    private static boolean sameFailure(@Nullable RuntimeException a, @Nullable RuntimeException b) {
+        if (a == null || b == null) {
+            return a == b;
+        }
+        return a.getClass() == b.getClass() && Objects.equals(a.getMessage(), b.getMessage()) &&
+               (!(a instanceof PnpmError) || ((PnpmError) a).getCode().equals(((PnpmError) b).getCode()));
+    }
+
+    /**
+     * getNetworkConfigs.ts' splitScopeFromRegistry of 11.7.0, which a credential's registry is grouped by: the
+     * registry and its scope, {@code @} for none.
+     */
+    static String[] registryAndScope(String registry) {
+        if (registry.startsWith("//")) {
+            int scopeSeparatorIndex = registry.lastIndexOf(":@");
+            if (scopeSeparatorIndex != -1 && isPackageScope(registry.substring(scopeSeparatorIndex + 1))) {
+                String host = registry.substring(0, scopeSeparatorIndex);
+                return new String[]{host.endsWith("/") ? host : host + "/",
+                        registry.substring(scopeSeparatorIndex + 1)};
+            }
+            String trimmed = registry.endsWith("/") ? registry.substring(0, registry.length() - 1) : registry;
+            int lastSlashIndex = trimmed.lastIndexOf('/');
+            if (lastSlashIndex != -1 && isPackageScope(trimmed.substring(lastSlashIndex + 1))) {
+                return new String[]{trimmed.substring(0, lastSlashIndex + 1), trimmed.substring(lastSlashIndex + 1)};
+            }
+        }
+        return new String[]{registry, "@"};
+    }
+
+    private static boolean isPackageScope(String scope) {
+        return scope.startsWith("@") && scope.length() > 1 && !scope.contains("/") && !scope.contains(":");
     }
 
     private static void getDefaultCreds(Map<String, @Nullable Object> rawConfig, PnpmRelease release) {

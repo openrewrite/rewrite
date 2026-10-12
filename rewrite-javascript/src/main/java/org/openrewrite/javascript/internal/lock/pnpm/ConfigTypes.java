@@ -80,6 +80,8 @@ final class ConfigTypes {
         t.put("filter-prod", union(STRING, ARRAY));
         t.put("force-legacy-deploy", BOOLEAN);
         t.put("frozen-lockfile", BOOLEAN);
+        // read from 11.7.0 (PnpmRelease#opensAFrozenStoreReadOnly)
+        t.put("frozen-store", BOOLEAN);
         t.put("git-checks", BOOLEAN);
         t.put("git-shallow-hosts", ARRAY);
         t.put("global-bin-dir", STRING);

@@ -17,6 +17,7 @@ package org.openrewrite.javascript.internal.lock.pnpm;
 
 import lombok.Value;
 import org.jspecify.annotations.Nullable;
+import org.openrewrite.javascript.internal.lock.JsError;
 import org.openrewrite.javascript.internal.lock.RootRelativePath;
 import org.openrewrite.javascript.internal.lock.V8Sort;
 import org.openrewrite.javascript.semver.NodeSemver;
@@ -26,11 +27,14 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.UncheckedIOException;
 import java.nio.charset.StandardCharsets;
+import java.util.AbstractMap;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.function.Predicate;
 import java.util.zip.GZIPInputStream;
 
@@ -41,6 +45,7 @@ final class ReadPackageHook {
 
     private static final String COMPAT_DB = "compat-db.json.gz";
     private static @Nullable Map<String, @Nullable Object> compatPackageExtensions;
+    private static @Nullable List<Map.Entry<String, @Nullable Object>> compatPackageExtensionEntries;
 
     private final List<Hook> hooks;
 
@@ -73,13 +78,19 @@ final class ReadPackageHook {
                                                            @Nullable Object packageExtensions,
                                                            PnpmRelease release) {
         List<Hook> hooks = new ArrayList<>();
+        @SuppressWarnings("unchecked")
+        Map<String, @Nullable Object> userExtensions = packageExtensions instanceof Map &&
+                                                       !((Map<?, ?>) packageExtensions).isEmpty() ?
+                (Map<String, @Nullable Object>) packageExtensions : null;
+        List<Hook> extenders = new ArrayList<>();
         if (!ignoreCompatibilityDb) {
-            hooks.add(createPackageExtender(compatPackageExtensions(), release));
+            extenders.add(createPackageExtender(compatPackageExtensions(), release));
         }
-        if (packageExtensions instanceof Map && !((Map<?, ?>) packageExtensions).isEmpty()) {
-            @SuppressWarnings("unchecked")
-            Map<String, @Nullable Object> extensions = (Map<String, @Nullable Object>) packageExtensions;
-            hooks.add(createPackageExtender(extensions, release));
+        if (userExtensions != null) {
+            extenders.add(createPackageExtender(userExtensions, release));
+        }
+        if (!extenders.isEmpty()) {
+            hooks.add(mergedPackageExtender(extenders, ignoreCompatibilityDb, userExtensions, release));
         }
         if (!overrides.isEmpty()) {
             hooks.add(createVersionsOverrider(overrides, lockfileDir, release));
@@ -92,6 +103,121 @@ final class ReadPackageHook {
             hooks.add(createOptionalDependenciesRemover(toBeRemoved));
         }
         return hooks.isEmpty() ? null : new ReadPackageHook(hooks);
+    }
+
+    private static final String[] PACKAGE_EXTENSION_FIELDS = {"dependencies", "optionalDependencies",
+            "peerDependencies", "peerDependenciesMeta"};
+
+    /**
+     * The package extensions' hook: 11.2.2's compatibility database extender (its last entry of a selector) and the
+     * project's after it; from 11.7.0 one extender over getEffectivePackageExtensions, which merges the entries of a
+     * selector, the first one's keys winning (PnpmRelease#mergesThePackageExtensionsOfASelector). The two differ
+     * only for a package a selector named more than once matches, the release asked where they extend it otherwise.
+     */
+    @SuppressWarnings("unchecked")
+    private static Hook mergedPackageExtender(List<Hook> extenders, boolean ignoreCompatibilityDb,
+                                              @Nullable Map<String, @Nullable Object> userExtensions,
+                                              PnpmRelease release) {
+        List<Map.Entry<String, @Nullable Object>> entries = new ArrayList<>();
+        if (!ignoreCompatibilityDb) {
+            entries.addAll(compatPackageExtensionEntries());
+        }
+        if (userExtensions != null) {
+            for (String selector : Js.keys(userExtensions)) {
+                entries.add(new AbstractMap.SimpleEntry<>(selector, userExtensions.get(selector)));
+            }
+        }
+        Set<String> seen = new HashSet<>();
+        Set<@Nullable String> mergedNames = new HashSet<>();
+        for (Map.Entry<String, @Nullable Object> entry : entries) {
+            if (!seen.add(entry.getKey())) {
+                mergedNames.add(ParseOverrides.parseWantedDependency(entry.getKey()).getAlias());
+            }
+        }
+        Hook legacy = (manifest, dir) -> {
+            Map<String, @Nullable Object> extended = manifest;
+            for (Hook extender : extenders) {
+                extended = extender.apply(extended, dir);
+            }
+            return extended;
+        };
+        if (mergedNames.isEmpty()) {
+            return legacy;
+        }
+        Map<String, @Nullable Object> effective = new LinkedHashMap<>();
+        RuntimeException failure = null;
+        try {
+            for (Map.Entry<String, @Nullable Object> entry : entries) {
+                effective.put(entry.getKey(), mergePackageExtension(
+                        (Map<String, @Nullable Object>) effective.get(entry.getKey()), entry.getValue()));
+            }
+        } catch (JsError e) {
+            failure = e;
+        }
+        RuntimeException mergeFailure = failure;
+        Hook merged = mergeFailure == null ? createPackageExtender(effective, release) : null;
+        return (manifest, dir) -> {
+            Object name = manifest.get("name");
+            if (!mergedNames.contains(name instanceof String ? (String) name : null)) {
+                return legacy.apply(manifest, dir);
+            }
+            if (mergeFailure != null) {
+                if (release.mergesThePackageExtensionsOfASelector()) {
+                    throw mergeFailure;
+                }
+                return legacy.apply(manifest, dir);
+            }
+            Map<String, @Nullable Object> viaLegacy = legacy.apply(deepCopy(manifest), dir);
+            Map<String, @Nullable Object> viaMerged = merged.apply(deepCopy(manifest), dir);
+            return Js.jsonStringify(viaLegacy).equals(Js.jsonStringify(viaMerged)) ||
+                   release.mergesThePackageExtensionsOfASelector() ? viaMerged : viaLegacy;
+        };
+    }
+
+    // createReadPackageHook.ts' mergePackageExtension of 11.7.0: the earlier entry's keys win
+    @SuppressWarnings("unchecked")
+    private static Map<String, @Nullable Object> mergePackageExtension(@Nullable Map<String, @Nullable Object> previous,
+                                                                      @Nullable Object next) {
+        if (previous == null) {
+            return clonePackageExtension(next);
+        }
+        Map<String, @Nullable Object> merged = clonePackageExtension(previous);
+        for (String field : PACKAGE_EXTENSION_FIELDS) {
+            Object nextField = property(next, field);
+            if (nextField == null || nextField == Js.UNDEFINED) {
+                continue;
+            }
+            Map<String, @Nullable Object> values = new LinkedHashMap<>();
+            spread(values, nextField);
+            spread(values, merged.get(field));
+            merged.put(field, values);
+        }
+        return merged;
+    }
+
+    private static Map<String, @Nullable Object> clonePackageExtension(@Nullable Object packageExtension) {
+        Map<String, @Nullable Object> cloned = new LinkedHashMap<>();
+        for (String field : PACKAGE_EXTENSION_FIELDS) {
+            Object value = property(packageExtension, field);
+            if (value == null || value == Js.UNDEFINED) {
+                continue;
+            }
+            Map<String, @Nullable Object> values = new LinkedHashMap<>();
+            spread(values, value);
+            cloned.put(field, values);
+        }
+        return cloned;
+    }
+
+    // packageExtension[field]: undefined of anything but null and undefined, which throw
+    @SuppressWarnings("unchecked")
+    private static @Nullable Object property(@Nullable Object packageExtension, String field) {
+        if (packageExtension == null || packageExtension == Js.UNDEFINED) {
+            throw new JsError(JsError.TYPE_ERROR, "Cannot read properties of " +
+                                                  (packageExtension == null ? "null" : "undefined") +
+                                                  " (reading '" + field + "')");
+        }
+        return packageExtension instanceof Map ? ((Map<String, @Nullable Object>) packageExtension).get(field) : null;
     }
 
     static ReadPackageHook packageExtender(Map<String, @Nullable Object> packageExtensions) {
@@ -147,14 +273,29 @@ final class ReadPackageHook {
     static synchronized Map<String, @Nullable Object> compatPackageExtensions() {
         if (compatPackageExtensions == null) {
             Map<String, @Nullable Object> extensions = new LinkedHashMap<>();
-            Object entries = Manifests.parseValue(readResource(), COMPAT_DB);
-            for (Object entry : (List<Object>) entries) {
-                List<Object> pair = (List<Object>) entry;
-                extensions.put((String) pair.get(0), pair.get(1));
+            for (Map.Entry<String, @Nullable Object> entry : compatPackageExtensionEntries()) {
+                extensions.put(entry.getKey(), entry.getValue());
             }
             compatPackageExtensions = extensions;
         }
         return compatPackageExtensions;
+    }
+
+    /**
+     * The compatibility database's entries as @yarnpkg/extensions lists them, a selector more than once among them.
+     */
+    @SuppressWarnings("unchecked")
+    static synchronized List<Map.Entry<String, @Nullable Object>> compatPackageExtensionEntries() {
+        if (compatPackageExtensionEntries == null) {
+            List<Map.Entry<String, @Nullable Object>> list = new ArrayList<>();
+            Object entries = Manifests.parseValue(readResource(), COMPAT_DB);
+            for (Object entry : (List<Object>) entries) {
+                List<Object> pair = (List<Object>) entry;
+                list.add(new AbstractMap.SimpleImmutableEntry<>((String) pair.get(0), pair.get(1)));
+            }
+            compatPackageExtensionEntries = Collections.unmodifiableList(list);
+        }
+        return compatPackageExtensionEntries;
     }
 
     private static String readResource() {

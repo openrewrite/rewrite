@@ -159,7 +159,7 @@ public final class PnpmLockRegenerator {
                 inputs.getRelease() == null ? PnpmRelease.PORTED : inputs.getRelease());
         this.now = requireNonNull(inputs.getNow(), "now");
         this.envInstaller = new EnvInstaller(registry, now, inputs.getHost());
-        this.stores = new CreateNewStoreController(registry, now);
+        this.stores = new CreateNewStoreController(registry, now, inputs.getHost().getNodeVersion());
         this.lockInstall = new Install(inputs, inputs.getLockDir(), lockFile, registry, stores, now);
     }
 

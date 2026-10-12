@@ -65,6 +65,25 @@ final class LockfileUtils {
         if (typed || !Js.truthy(integrity)) {
             return resolution;
         }
+        Map<String, @Nullable Object> lockfileResolution = toLockfileResolution(name, version, resolution, integrity,
+                registry, lockfileIncludeTarballUrl, release);
+        // from 11.7.0 a resolution that keeps its tarball keeps its path too (a git repository's subdirectory)
+        // (PnpmRelease#keepsATarballResolutionsPath)
+        Object path = resolution.get("path");
+        if (path != null && path != Js.UNDEFINED && lockfileResolution.containsKey("tarball") &&
+            release.keepsATarballResolutionsPath()) {
+            Map<String, @Nullable Object> withPath = new LinkedHashMap<>(lockfileResolution);
+            withPath.put("path", path);
+            return withPath;
+        }
+        return lockfileResolution;
+    }
+
+    private static Map<String, @Nullable Object> toLockfileResolution(String name, String version,
+                                                                      Map<String, @Nullable Object> resolution,
+                                                                      Object integrity, String registry,
+                                                                      @Nullable Boolean lockfileIncludeTarballUrl,
+                                                                      PnpmRelease release) {
         Object tarball = resolution.get("tarball");
         // the release is asked where its resolution differs from those of the releases around it
         Outcome current = Outcome.of(() -> keepingATarballUrl(name, version, resolution, integrity, tarball,

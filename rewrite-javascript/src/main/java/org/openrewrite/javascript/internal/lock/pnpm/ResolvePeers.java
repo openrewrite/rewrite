@@ -627,9 +627,12 @@ final class ResolvePeers {
     // 11.5.2's second pass: each peer the lock records the node with takes the provider it recorded, where that
     // provider kept its dep path, has no peers of its own, satisfies the range and no current choice must win
     @SuppressWarnings("ConstantConditions")
-    private static void keepLockedPeerContext(DependenciesTreeNode node, ResolvedPackage resolvedPackage,
-                                              Map<String, ParentRef> parentPkgs, List<NodeId> parentNodeIds,
-                                              Ctx ctx) {
+    private static Map<String, ParentRef> keepLockedPeerContext(DependenciesTreeNode node,
+                                                               ResolvedPackage resolvedPackage,
+                                                               Map<String, ParentRef> parentPkgs,
+                                                               Map<String, ParentRef> parentParentPkgs,
+                                                               List<NodeId> parentNodeIds,
+                                                               Ctx ctx) {
         for (Map.Entry<String, String> locked : node.getLockedPeerContext().entrySet()) {
             String peerName = locked.getKey();
             String previousPeerDepPath = locked.getValue();
@@ -665,8 +668,14 @@ final class ResolvePeers {
             }
             ctx.pathsByNodeId.put(peerNodeId, previousPeerDepPath);
             peerPathPromise.resolve(previousPeerDepPath);
+            // a childless node shares its parent's map: from 11.7.0 the locked peer goes into a copy, out of its
+            // siblings' scope (PnpmRelease#keepsALockedPeerInItsOwnScope); before, into the shared map
+            if (parentPkgs == parentParentPkgs && ctx.release.keepsALockedPeerInItsOwnScope()) {
+                parentPkgs = new LinkedHashMap<>(parentParentPkgs);
+            }
             parentPkgs.put(peerName, lockedPeer);
         }
+        return parentPkgs;
     }
 
     /**
@@ -905,7 +914,8 @@ final class ResolvePeers {
             }
         }
         if (node.getLockedPeerContext() != null && ctx.resolvedPeerProviderPaths != null) {
-            keepLockedPeerContext(node, resolvedPackage, parentPkgs, parentNodeIds, ctx);
+            parentPkgs = keepLockedPeerContext(node, resolvedPackage, parentPkgs, parentParentPkgs, parentNodeIds,
+                    ctx);
         }
         PeersCacheItem hit = findHit(ctx, parentPkgs, pkgIdWithPatchHash);
         if (hit != null) {
