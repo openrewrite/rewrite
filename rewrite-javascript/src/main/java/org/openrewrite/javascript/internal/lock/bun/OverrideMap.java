@@ -53,6 +53,17 @@ final class OverrideMap {
     }
 
     /**
+     * The first warning {@code release} gives reading the overrides of a root manifest that declares nothing else, as
+     * {@link #parseAppend} reads them; null where it reads every rule.
+     */
+    static @Nullable String warning(BunRelease release, String rootManifest) {
+        List<String> warnings = new ArrayList<>();
+        new OverrideMap().parseAppend(new Lockfile(release), new Package(), Json.parse(rootManifest),
+                new Workspaces(release), Collections.<String, String>emptyMap(), warnings);
+        return warnings.isEmpty() ? null : warnings.get(0);
+    }
+
+    /**
      * {@code ScopedOverride} (from 1.4.0): a rule that is not a plain name, scoped to a parent, to the range the
      * dependent declares, or both. The parent's version and the target range are {@link DependencyVersion#ZEROED}
      * (no range) or an npm range.

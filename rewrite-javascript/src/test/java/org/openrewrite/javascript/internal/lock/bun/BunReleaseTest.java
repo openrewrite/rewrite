@@ -753,6 +753,49 @@ class BunReleaseTest {
         assertThat(earlier).contains("\"b\": [\"b@1.0.0\"").contains("\"b\": \"2.0.0\"");
     }
 
+    /**
+     * OverrideMap.rs with override_selector.rs (1.4.0, bun#38333), read over what the recipes write for an override
+     * along a path: one parent, a nested object in overrides or a Yarn path in resolutions, is a rule; a deeper path,
+     * or a parent whose range is no npm range, is declined as bun warns of it. Before, any path is declined.
+     */
+    @Test
+    void theRecipesWriteAnOverrideOneParentDeepFrom140() {
+        org.openrewrite.javascript.internal.lock.ManifestRules later = BunManifestRules.of(BunRelease.of("1.4.0"));
+        org.openrewrite.javascript.internal.lock.ManifestRules.OverridePlace overrides =
+          org.openrewrite.javascript.internal.lock.ManifestRules.OverridePlace.OVERRIDES;
+        org.openrewrite.javascript.internal.lock.ManifestRules.OverridePlace resolutions =
+          org.openrewrite.javascript.internal.lock.ManifestRules.OverridePlace.RESOLUTIONS;
+        List<org.openrewrite.javascript.internal.lock.DependencyPathSegment> isOdd = java.util.Arrays.asList(
+          new org.openrewrite.javascript.internal.lock.DependencyPathSegment("is-odd", "3.0.1"));
+        List<org.openrewrite.javascript.internal.lock.DependencyPathSegment> twoParents = java.util.Arrays.asList(
+          new org.openrewrite.javascript.internal.lock.DependencyPathSegment("is-even", null),
+          new org.openrewrite.javascript.internal.lock.DependencyPathSegment("is-odd", null));
+        List<org.openrewrite.javascript.internal.lock.DependencyPathSegment> scoped = java.util.Arrays.asList(
+          new org.openrewrite.javascript.internal.lock.DependencyPathSegment("@s/a", "npm:^1"));
+        List<org.openrewrite.javascript.internal.lock.DependencyPathSegment> tagged = java.util.Arrays.asList(
+          new org.openrewrite.javascript.internal.lock.DependencyPathSegment("is-odd", "latest"));
+
+        assertThat(later.overrideDeclined("is-number", "7.0.0", isOdd, overrides)).isNull();
+        assertThat(later.overrideDeclined("is-number", "7.0.0", isOdd, resolutions)).isNull();
+        assertThat(later.overrideKey("is-number", isOdd, Collections.emptyList())).isEqualTo("is-odd@3.0.1/is-number");
+        assertThat(later.overrideDeclined("@t/b", "7.0.0", scoped, resolutions)).isNull();
+        assertThat(later.overrideKey("@t/b", scoped, Collections.emptyList())).isEqualTo("@s/a@npm:^1/@t/b");
+        assertThat(later.overrideDeclined("is-number", "7.0.0", twoParents, overrides))
+          .isEqualTo("Bun currently only supports one level of nested \"overrides\"");
+        assertThat(later.overrideDeclined("is-number", "7.0.0", twoParents, resolutions))
+          .isEqualTo("Bun currently only supports one level of nested \"resolutions\"");
+        assertThat(later.overrideDeclined("is-number", "7.0.0", tagged, overrides))
+          .isEqualTo("Invalid version range \"latest\" for \"is-odd\"");
+
+        assertThat(BunManifestRules.RULES.overrideDeclined("is-number", "7.0.0", isOdd, overrides))
+          .isEqualTo("bun does not support nested overrides");
+        assertThat(BunManifestRules.RULES.overrideDeclined("is-number", "7.0.0", Collections.emptyList(), overrides))
+          .isNull();
+        // a release the engine does not reproduce reads a path it cannot say how
+        assertThat(BunManifestRules.RULES.installedAs("9.9.9")
+          .overrideDeclined("is-number", "7.0.0", isOdd, overrides)).contains("cannot know what bun 9.9.9 writes");
+    }
+
     private static PackageManifest.PackageVersion version(BunRelease release, String packument) {
         PackageManifest manifest = requireNonNull(PackageManifest.parse(release, new Log(), packument, "debug", false));
         PackageManifest.FindResult pick = requireNonNull(manifest.findBestVersion(
