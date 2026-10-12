@@ -27,6 +27,7 @@ import {activate as activateCompositeWithJavaDelegate} from "../../fixtures/comp
 import {activate as activateJavaDelegatePrecondition} from "../../fixtures/java-delegate-precondition";
 import {
     findNodeResolutionResult,
+    findNodeRuntime,
     javascript,
     JavaScriptVisitor,
     JS,
@@ -192,6 +193,19 @@ describe("Rewrite RPC", () => {
         expect(marker!.version).toEqual("1.0.0");
         expect(marker!.dependencies).toHaveLength(1);
         expect(marker!.dependencies[0].name).toEqual("lodash");
+    });
+
+    test("a package.json parsed over RPC carries the NodeRuntime of the parser", async () => {
+        const sourceFile = (await client.parse([{
+            text: JSON.stringify({name: "test-project", version: "1.0.0"}, null, 2),
+            sourcePath: "package.json"
+        }], Json.Kind.Document))[0];
+
+        expect(findNodeRuntime(sourceFile as Json.Document)).toMatchObject({
+            nodeVersion: process.version,
+            os: process.platform,
+            cpu: process.arch
+        });
     });
 
     test("getMarketplace", async () =>

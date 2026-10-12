@@ -402,7 +402,7 @@ extensions.configure<LicenseExtension> {
 //    )
 }
 
-// The lock regeneration test fixtures (recorded package-manager output, ~1000 files including binary
+// The lock regeneration test fixtures (recorded package-manager output, ~18000 files including binary
 // tarballs) live in openrewrite/rewrite-javascript-lock-fixtures. The latest main is fetched once into
 // build/lock-fixtures and joins the test classpath; `clean` picks up newer fixtures.
 val lockFixturesDir = layout.buildDirectory.dir("lock-fixtures")
