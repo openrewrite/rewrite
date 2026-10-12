@@ -20,7 +20,6 @@
  * <ul>
  *     <li>@npmcli/arborist: Copyright npm, Inc.</li>
  *     <li>npm-pick-manifest: Copyright (c) npm, Inc.</li>
- *     <li>npm-install-checks: Copyright (c) Robert Kowalski and Isaac Z. Schlueter ("Authors")</li>
  *     <li>pacote: Copyright (c) Isaac Z. Schlueter, Kat Marchán, npm, Inc., and Contributors</li>
  *     <li>ssri, which {@code internal.lock.Ssri} ports: Copyright (c) npm, Inc.</li>
  *     <li>npm-package-arg, which {@code internal.lock.Spec} ports: Copyright (c) npm, Inc.</li>
@@ -49,6 +48,39 @@
  * ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF OR
  * IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  * </pre>
+ * {@code NpmInstallChecks} is a port of npm-install-checks, distributed under the BSD 2-Clause License:
+ * <pre>
+ * Copyright (c) Robert Kowalski and Isaac Z. Schlueter ("Authors")
+ * All rights reserved.
+ *
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following conditions
+ * are met:
+ *
+ * 1. Redistributions of source code must retain the above copyright
+ *    notice, this list of conditions and the following disclaimer.
+ *
+ * 2. Redistributions in binary form must reproduce the above copyright
+ *    notice, this list of conditions and the following disclaimer in the
+ *    documentation and/or other materials provided with the distribution.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE AUTHORS AND CONTRIBUTORS ``AS IS'' AND
+ * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+ * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
+ * PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL THE AUTHORS OR CONTRIBUTORS
+ * BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
+ * CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
+ * SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR
+ * BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY,
+ * WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE
+ * OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN
+ * IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ * </pre>
+ * {@code ExplainEresolve} (npm's lib/utils/explain-eresolve.js and explain-dep.js) and the {@code devEngines} check
+ * of {@code NpmLockRegenerator} (npm's lib/base-cmd.js) are ports of the npm application, Copyright (c) npm, Inc. and
+ * Contributors, licensed on the terms of The Artistic License 2.0
+ * (https://www.perlfoundation.org/artistic-license-20.html).
+ * <p>
  * {@code internal.lock.PosixPath} is a port of Node.js {@code lib/path.js}, {@code JsonParseEvenBetterErrors} of
  * json-parse-even-better-errors (Copyright 2017 Kat Marchán, Copyright npm, Inc.) and
  * {@code internal.lock.BraceExpansion} of brace-expansion and balanced-match (Copyright Julian Gruber, TypeScript
