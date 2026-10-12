@@ -48,6 +48,7 @@ class TextLockfileWriterTest {
         Lockfile lockfile = TextLockfileReader.load(lock,
           BunOptions.load(null, null, null, HostEnvironment.UNKNOWN));
         int configVersion = lockfile.savedConfigVersion != null ? lockfile.savedConfigVersion : 0;
-        assertThat(TextLockfileWriter.saveFromBinary(Cleaner.clean(lockfile), configVersion)).isEqualTo(lock);
+        assertThat(TextLockfileWriter.saveFromBinary(Cleaner.clean(lockfile), configVersion, BunRelease.PORTED))
+          .isEqualTo(lock);
     }
 }

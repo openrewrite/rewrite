@@ -36,7 +36,7 @@ final class Cleaner {
 
     private Cleaner(Lockfile old) {
         this.old = old;
-        this.lockfile = new Lockfile();
+        this.lockfile = new Lockfile(old.release);
         this.mapping = new int[old.packages.size()];
         Arrays.fill(mapping, INVALID_PACKAGE_ID);
     }

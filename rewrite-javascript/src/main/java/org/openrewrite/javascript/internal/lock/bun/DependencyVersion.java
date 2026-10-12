@@ -31,6 +31,14 @@ final class DependencyVersion {
         }
 
         static Tag infer(String dependency) {
+            return infer(dependency, BunRelease.PORTED);
+        }
+
+        /**
+         * {@code Tag.infer} as the release infers a spec's kind: before 1.2.14 no {@code catalog:} spec, which then
+         * reads as a git one.
+         */
+        static Tag infer(String dependency, BunRelease release) {
             if (dependency.isEmpty()) {
                 return DIST_TAG;
             }
@@ -62,7 +70,7 @@ final class DependencyVersion {
                     }
                     break;
                 case 'c':
-                    if (dependency.startsWith("catalog:")) {
+                    if (dependency.startsWith("catalog:") && release.parsesCatalogSpecs()) {
                         return CATALOG;
                     }
                     break;
@@ -158,7 +166,7 @@ final class DependencyVersion {
                         String remain = dependency.substring(start);
                         for (int i = 0; i < remain.length(); i++) {
                             if (remain.charAt(i) == '@') {
-                                return infer(remain.substring(i + 1));
+                                return infer(remain.substring(i + 1), release);
                             }
                         }
                         return NPM;
@@ -344,14 +352,19 @@ final class DependencyVersion {
     }
 
     static @Nullable DependencyVersion parse(String alias, @Nullable Long aliasHash, String dependency) {
+        return parse(alias, aliasHash, dependency, BunRelease.PORTED);
+    }
+
+    static @Nullable DependencyVersion parse(String alias, @Nullable Long aliasHash, String dependency,
+                                             BunRelease release) {
         String dep = Strings.trimLeft(dependency, " \t\n\r");
-        return parseWithTag(alias, aliasHash, dep, Tag.infer(dep), dependency);
+        return parseWithTag(alias, aliasHash, dep, Tag.infer(dep, release), dependency);
     }
 
     static @Nullable DependencyVersion parseWithOptionalTag(String alias, @Nullable Long aliasHash, String dependency,
-                                                            @Nullable Tag tag) {
+                                                            @Nullable Tag tag, BunRelease release) {
         String dep = Strings.trimLeft(dependency, " \t\n\r");
-        return parseWithTag(alias, aliasHash, dep, tag != null ? tag : Tag.infer(dep), dependency);
+        return parseWithTag(alias, aliasHash, dep, tag != null ? tag : Tag.infer(dep, release), dependency);
     }
 
     /**

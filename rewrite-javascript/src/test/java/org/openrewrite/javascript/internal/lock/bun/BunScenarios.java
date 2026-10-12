@@ -15,6 +15,7 @@
  */
 package org.openrewrite.javascript.internal.lock.bun;
 
+import lombok.Value;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.javascript.internal.lock.Host;
 import org.openrewrite.javascript.internal.lock.HostInputs;
@@ -23,6 +24,8 @@ import org.openrewrite.javascript.internal.lock.LockScenario.Phase;
 import org.openrewrite.javascript.internal.lock.LockScenario;
 import org.openrewrite.javascript.internal.lock.RootRelativePath;
 
+import java.io.IOException;
+import java.io.UncheckedIOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Instant;
@@ -36,6 +39,7 @@ import java.util.TreeMap;
 import java.util.TreeSet;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import java.util.stream.Stream;
 
 /**
  * The recorded Bun scenarios ({@link LockScenario#discover}) in the recorder's layout: each lock with the manifests,
@@ -51,6 +55,7 @@ final class BunScenarios {
     private static final Pattern PLATFORM = Pattern.compile("(?m)^platform os=(\\S+) cpu=(\\S+) libc=(\\S*)$");
     private static final Pattern REQUEST = Pattern.compile("(?m)^GET ([a-z]+://[^/ ]+)");
     private static final Pattern ORIGIN = Pattern.compile("^[a-z]+://[^/]+");
+    private static final Pattern RECORDED_RELEASE = Pattern.compile("^bun (\\d+\\.\\d+\\.\\d+)");
 
     private BunScenarios() {
     }
@@ -126,6 +131,16 @@ final class BunScenarios {
         }
     }
 
+    /**
+     * A release a scenario is replayed as, and where the outcome it writes is kept: the scenario's own directory, or
+     * its {@code release/<first>/}.
+     */
+    @Value
+    static class Replay {
+        String release;
+        Path outcome;
+    }
+
     static final class Scenario extends LockScenario {
         Scenario(String name, String label, Path dir, @Nullable Path httpCache) {
             super(name, label, dir, httpCache);
@@ -136,6 +151,55 @@ final class BunScenarios {
          */
         boolean isEdit() {
             return has("before") && (has("pkg") || has("pkg-after") || has("pkg-root"));
+        }
+
+        /**
+         * The release that recorded the scenario, {@code recorded-with}'s; null for a downloaded fixture.
+         */
+        @Nullable
+        String recordedRelease() {
+            String recorded = recordedWith();
+            Matcher m = recorded == null ? null : RECORDED_RELEASE.matcher(recorded);
+            return m != null && m.find() ? m.group(1) : null;
+        }
+
+        /**
+         * This scenario replayed as each release its {@code releases} files name: the first and last of every range of
+         * the scenario's own outcome but the release that recorded it, and of each other outcome under
+         * {@code release/}.
+         */
+        List<Replay> releases() {
+            List<String> all = BunReleases.all();
+            List<Replay> replays = new ArrayList<>();
+            String recorded = recordedRelease();
+            for (String release : LockScenario.releaseEndpoints(getDir().resolve("releases"), all,
+                    BunReleases.PROVEN)) {
+                if (!release.equals(recorded)) {
+                    replays.add(new Replay(release, getDir()));
+                }
+            }
+            Path others = getDir().resolve("release");
+            if (Files.isDirectory(others)) {
+                try (Stream<Path> list = Files.list(others)) {
+                    list.filter(Files::isDirectory).sorted().forEach(dir -> {
+                        for (String release : LockScenario.releaseEndpoints(dir.resolve("releases"), all,
+                                BunReleases.PROVEN)) {
+                            replays.add(new Replay(release, dir));
+                        }
+                    });
+                } catch (IOException e) {
+                    throw new UncheckedIOException(e);
+                }
+            }
+            return replays;
+        }
+
+        /**
+         * A file of another release's outcome directory; null where it holds none.
+         */
+        static @Nullable String read(Path outcome, String file) {
+            Path path = outcome.resolve(file);
+            return Files.isRegularFile(path) ? LockScenario.read(path) : null;
         }
 
         /**

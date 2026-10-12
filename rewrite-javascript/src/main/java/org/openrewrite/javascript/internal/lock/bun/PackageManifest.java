@@ -27,7 +27,8 @@ import java.util.Set;
 
 /**
  * Port of bun's src/install/npm.zig {@code PackageManifest} and {@code PackageVersion} (bun 1.3.10), with
- * {@code findBestVersion} and the minimum release age filter.
+ * {@code findBestVersion} and the minimum release age filter, as the release that installs reads a packument
+ * ({@link BunRelease}).
  */
 final class PackageManifest {
 
@@ -361,6 +362,14 @@ final class PackageManifest {
      */
     static @Nullable PackageManifest parse(Log log, String jsonBuffer, String expectedName,
                                            boolean isExtendedManifest) {
+        return parse(BunRelease.PORTED, log, jsonBuffer, expectedName, isExtendedManifest);
+    }
+
+    /**
+     * {@code parse} as {@code release} reads a packument.
+     */
+    static @Nullable PackageManifest parse(BunRelease release, Log log, String jsonBuffer, String expectedName,
+                                           boolean isExtendedManifest) {
         Json.Expr json;
         try {
             json = Json.parse(jsonBuffer);
@@ -451,15 +460,25 @@ final class PackageManifest {
                     }
                 }
 
+                boolean impliesMetaPeers = release.impliesOptionalPeersOfPeerDependenciesMeta();
                 String[] groups = {"dependencies", "optionalDependencies", "peerDependencies"};
                 for (String group : groups) {
                     Json.Expr versionedDeps = value.get(group);
-                    if (versionedDeps == null || !versionedDeps.isObject()) {
+                    boolean isPeer = "peerDependencies".equals(group);
+                    List<Json.Property> items = versionedDeps != null && versionedDeps.isObject() ?
+                            versionedDeps.properties() : Collections.<Json.Property>emptyList();
+                    if (impliesMetaPeers) {
+                        // a group runs with its items, the peers also for the names peerDependenciesMeta lists alone
+                        Json.Expr meta = isPeer ? value.get("peerDependenciesMeta") : null;
+                        boolean hasMetaOnlyPeers = meta != null && meta.isObject() && !meta.properties().isEmpty();
+                        if (items.isEmpty() && !hasMetaOnlyPeers) {
+                            continue;
+                        }
+                    } else if (versionedDeps == null || !versionedDeps.isObject()) {
                         continue;
                     }
-                    // bun keeps the bundled names found in the last group it reads
+                    // bun keeps the bundled names found in the last group it reads (from 1.3.14 the last but the peers)
                     List<Long> bundled = new ArrayList<>();
-                    boolean isPeer = "peerDependencies".equals(group);
                     List<Long> optionalPeerDepNames = new ArrayList<>();
                     if (isPeer) {
                         Json.Expr meta = value.get("peerDependenciesMeta");
@@ -475,7 +494,7 @@ final class PackageManifest {
                     List<String> names = new ArrayList<>();
                     List<String> versions = new ArrayList<>();
                     int nonOptionalPeerDependencyOffset = 0;
-                    for (Json.Property item : versionedDeps.properties()) {
+                    for (Json.Property item : items) {
                         String nameStr = item.key.asString();
                         String versionStr = item.value.asString();
                         if (nameStr == null || versionStr == null) {
@@ -499,6 +518,35 @@ final class PackageManifest {
                             nonOptionalPeerDependencyOffset++;
                         }
                     }
+                    if (isPeer && impliesMetaPeers) {
+                        // a name peerDependenciesMeta marks optional and the peers do not list is an optional peer
+                        // of "*", moved to the optional peers at the front
+                        Json.Expr meta = value.get("peerDependenciesMeta");
+                        if (meta != null && meta.isObject()) {
+                            outer:
+                            for (Json.Property metaProp : meta.properties()) {
+                                Json.Expr optional = metaProp.value.get("optional");
+                                if (optional == null || !Boolean.TRUE.equals(optional.asBool())) {
+                                    continue;
+                                }
+                                String metaKey = metaProp.key.asString();
+                                long metaHash = Wyhash11.stringHash(metaKey);
+                                for (String existing : names) {
+                                    if (Wyhash11.stringHash(existing) == metaHash) {
+                                        continue outer;
+                                    }
+                                }
+                                names.add(metaKey);
+                                versions.add("*");
+                                int i = names.size() - 1;
+                                if (nonOptionalPeerDependencyOffset != i) {
+                                    Collections.swap(names, i, nonOptionalPeerDependencyOffset);
+                                    Collections.swap(versions, i, nonOptionalPeerDependencyOffset);
+                                }
+                                nonOptionalPeerDependencyOffset++;
+                            }
+                        }
+                    }
                     List<String> pairs = new ArrayList<>(names.size() * 2);
                     for (int i = 0; i < names.size(); i++) {
                         pairs.add(names.get(i));
@@ -512,7 +560,9 @@ final class PackageManifest {
                         packageVersion.peerDependencies = pairs;
                         packageVersion.nonOptionalPeerDependenciesStart = nonOptionalPeerDependencyOffset;
                     }
-                    packageVersion.bundledDependencies = bundleAllDeps ? null : new ArrayList<>(bundled);
+                    if (!(isPeer && impliesMetaPeers)) {
+                        packageVersion.bundledDependencies = bundleAllDeps ? null : new ArrayList<>(bundled);
+                    }
                 }
 
                 if (timeObj != null) {

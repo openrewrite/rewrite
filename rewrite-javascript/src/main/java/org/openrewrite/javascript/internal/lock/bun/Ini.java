@@ -35,14 +35,23 @@ final class Ini {
             .build();
 
     private final HostEnvironment env;
+    private final BunRelease release;
     private final Map<String, @Nullable Object> out = new LinkedHashMap<>();
 
-    private Ini(HostEnvironment env) {
+    private Ini(HostEnvironment env, BunRelease release) {
         this.env = env;
+        this.release = release;
     }
 
     static Map<String, @Nullable Object> parse(String src, HostEnvironment env) {
-        Ini parser = new Ini(env);
+        return parse(src, env, BunRelease.PORTED);
+    }
+
+    /**
+     * The .npmrc as {@code release} reads it.
+     */
+    static Map<String, @Nullable Object> parse(String src, HostEnvironment env, BunRelease release) {
+        Ini parser = new Ini(env, release);
         parser.parse(src);
         return parser.out;
     }
@@ -250,12 +259,14 @@ final class Ini {
             val = val.length() > 1 ? val.substring(1, val.length() - 1) : val.substring(1);
         }
         Object parsed;
+        // before 1.3.5 a quoted value is taken as it is
+        boolean expands = value && release.expandsQuotedNpmrcValues();
         try {
             parsed = JSON.readValue(val, Object.class);
         } catch (JsonProcessingException e) {
-            return value ? expandEnvVars(val) : val;
+            return expands ? expandEnvVars(val) : val;
         }
-        if (parsed instanceof String && value) {
+        if (parsed instanceof String && expands) {
             return expandEnvVars((String) parsed);
         }
         return parsed;
@@ -323,7 +334,9 @@ final class Ini {
                 return -1;
             }
             String raw = val.substring(i + 2, j);
-            boolean optional = !raw.isEmpty() && raw.charAt(raw.length() - 1) == '?';
+            // before 1.3.5 a trailing ? is part of the variable's name
+            boolean optional = !raw.isEmpty() && raw.charAt(raw.length() - 1) == '?' &&
+                               release.expandsQuotedNpmrcValues();
             String expanded = env.reference(optional ? raw.substring(0, raw.length() - 1) : raw);
             if (expanded == null && !optional) {
                 return -1;

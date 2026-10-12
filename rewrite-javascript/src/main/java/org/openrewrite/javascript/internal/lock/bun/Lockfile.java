@@ -69,10 +69,23 @@ public final class Lockfile {
     @Nullable Integer savedConfigVersion;
 
     /**
+     * The release that installs, whose order of dependency groups the sorts follow.
+     */
+    final BunRelease release;
+
+    Lockfile() {
+        this(BunRelease.PORTED);
+    }
+
+    Lockfile(BunRelease release) {
+        this.release = release;
+    }
+
+    /**
      * Sorts the dependencies of a node_modules folder: behavior, then name.
      */
     int depSort(int l, int r) {
-        return Dependency.compare(dependencies.get(l), dependencies.get(r));
+        return Dependency.compare(dependencies.get(l), dependencies.get(r), release);
     }
 
     @Nullable

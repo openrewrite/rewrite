@@ -15,6 +15,7 @@
  */
 package org.openrewrite.javascript.internal.lock.bun;
 
+import lombok.AccessLevel;
 import lombok.Getter;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.javascript.internal.lock.HostEnvironment;
@@ -33,6 +34,12 @@ import java.util.Map;
 public final class BunOptions {
 
     static final String DEFAULT_REGISTRY = "https://registry.npmjs.org/";
+
+    /**
+     * The release that installs.
+     */
+    @Getter(AccessLevel.PACKAGE)
+    private BunRelease release = BunRelease.PORTED;
 
     /**
      * The default registry's url ({@code options.scope.url.href}).
@@ -65,6 +72,14 @@ public final class BunOptions {
      */
     public static BunOptions load(@Nullable String bunfigToml, @Nullable String userNpmrc, @Nullable String npmrc,
                                   HostEnvironment env) {
+        return load(BunRelease.PORTED, bunfigToml, userNpmrc, npmrc, env);
+    }
+
+    /**
+     * The options as {@code release} loads them.
+     */
+    static BunOptions load(BunRelease release, @Nullable String bunfigToml, @Nullable String userNpmrc,
+                           @Nullable String npmrc, HostEnvironment env) {
         Install install = new Install();
         if (bunfigToml != null) {
             Json.Expr bunfig = Toml.parse(bunfigToml);
@@ -74,12 +89,13 @@ public final class BunOptions {
             }
         }
         if (userNpmrc != null) {
-            install.readNpmrc(userNpmrc, env);
+            install.readNpmrc(userNpmrc, env, release);
         }
         if (npmrc != null) {
-            install.readNpmrc(npmrc, env);
+            install.readNpmrc(npmrc, env, release);
         }
         BunOptions options = new BunOptions();
+        options.release = release;
         options.apply(install, env);
         return options;
     }
@@ -126,8 +142,11 @@ public final class BunOptions {
         if (Boolean.TRUE.equals(install.frozenLockfile)) {
             frozenLockfile = true;
         }
-        minimumReleaseAgeMs = install.minimumReleaseAgeMs;
-        minimumReleaseAgeExcludes = install.minimumReleaseAgeExcludes;
+        // before 1.3.0 bunfig.toml has no minimum release age
+        if (release.readsMinimumReleaseAge()) {
+            minimumReleaseAgeMs = install.minimumReleaseAgeMs;
+            minimumReleaseAgeExcludes = install.minimumReleaseAgeExcludes;
+        }
         for (String key : new String[]{"BUN_CONFIG_REGISTRY", "NPM_CONFIG_REGISTRY", "npm_config_registry"}) {
             String value = env.setting(key);
             if (value != null && !value.isEmpty() && (value.startsWith("https://") || value.startsWith("http://"))) {
@@ -222,8 +241,8 @@ public final class BunOptions {
         }
 
         // ini.zig loadNpmrc: the top-level keys a lock-only install uses, each of the type it takes
-        void readNpmrc(String npmrc, HostEnvironment env) {
-            Map<String, @Nullable Object> out = Ini.parse(npmrc, env);
+        void readNpmrc(String npmrc, HostEnvironment env, BunRelease release) {
+            Map<String, @Nullable Object> out = Ini.parse(npmrc, env, release);
             Object registry = out.get("registry");
             if (registry instanceof String) {
                 defaultRegistry = (String) registry;

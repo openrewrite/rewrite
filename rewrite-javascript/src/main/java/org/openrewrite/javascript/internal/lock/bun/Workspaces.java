@@ -16,16 +16,18 @@
 package org.openrewrite.javascript.internal.lock.bun;
 
 import org.jspecify.annotations.Nullable;
+import org.openrewrite.javascript.internal.lock.CannotKnow;
 import org.openrewrite.javascript.internal.lock.RootRelativePath;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
 /**
  * Port of bun's src/install/lockfile/Package/WorkspaceMap.zig {@code processNamesArray} (bun 1.3.10), over the
- * project's manifests the host supplies, by location.
+ * project's manifests the host supplies, by location, as the release that installs reads them ({@link BunRelease}).
  */
 final class Workspaces {
 
@@ -41,7 +43,13 @@ final class Workspaces {
 
     private static final String[] IGNORED_PATHS = {"node_modules", ".git", "CMakeFiles"};
 
+    private final BunRelease release;
+
     final LinkedHashMap<String, Entry> map = new LinkedHashMap<>();
+
+    Workspaces(BunRelease release) {
+        this.release = release;
+    }
 
     /**
      * @param manifests the project's manifests by location relative to the root ({@code ""} the root itself).
@@ -83,6 +91,14 @@ final class Workspaces {
 
         for (int i = 0; i < workspaceGlobs.size(); i++) {
             String userPattern = workspaceGlobs.get(i);
+            if (!release.walksDotComponentsAsWritten()) {
+                for (String component : userPattern.replace('\\', '/').split("/")) {
+                    if (component.length() == 2 && component.charAt(0) == '.' && !"..".equals(component)) {
+                        throw new CannotKnow("the directories bun " + release + " walks for the workspaces pattern " +
+                                             userPattern + ", whose " + component + " its glob walker takes for ..");
+                    }
+                }
+            }
             String globPattern = userPattern.isEmpty() ? "package.json" : RootRelativePath.join(
                     userPattern.replace('\\', '/'), "package.json");
             for (String location : manifests.keySet()) {
@@ -94,7 +110,8 @@ final class Workspaces {
                     continue;
                 }
                 boolean negated = false;
-                for (String nextPattern : workspaceGlobs.subList(i + 1, workspaceGlobs.size())) {
+                for (String nextPattern : release.excludesWorkspacesALaterPatternNegates() ?
+                        workspaceGlobs.subList(i + 1, workspaceGlobs.size()) : Collections.<String>emptyList()) {
                     if (Glob.match(nextPattern, location) == Glob.MatchResult.NEGATE_NO_MATCH) {
                         negated = true;
                         break;
