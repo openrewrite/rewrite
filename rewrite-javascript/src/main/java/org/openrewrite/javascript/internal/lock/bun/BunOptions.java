@@ -19,6 +19,7 @@ import lombok.AccessLevel;
 import lombok.Getter;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.javascript.internal.lock.HostEnvironment;
+import org.openrewrite.javascript.internal.lock.WhatwgUrl;
 
 import java.util.ArrayList;
 import java.util.Collections;
@@ -54,6 +55,12 @@ public final class BunOptions {
     private boolean linkWorkspacePackages = true;
     private boolean frozenLockfile;
     private boolean loadLockfile = true;
+
+    /**
+     * From 1.4.1, bunfig.toml's {@code install.offline}, or {@code install.prefer = "offline"}: versions come from bun's
+     * manifest cache.
+     */
+    private boolean readsTheManifestCache;
     private @Nullable Double minimumReleaseAgeMs;
     private List<String> minimumReleaseAgeExcludes = Collections.emptyList();
 
@@ -81,10 +88,11 @@ public final class BunOptions {
     static BunOptions load(BunRelease release, @Nullable String bunfigToml, @Nullable String userNpmrc,
                            @Nullable String npmrc, HostEnvironment env) {
         Install install = new Install();
+        Json.Expr installObj = null;
         if (bunfigToml != null) {
-            Json.Expr bunfig = Toml.parse(bunfigToml);
-            Json.Expr installObj = bunfig.getObject("install");
-            if (installObj != null) {
+            Json.Expr bunfig = Toml.parse(bunfigToml, release);
+            installObj = bunfig.getObject("install");
+            if (installObj != null && !release.letsBunfigOverrideNpmrc()) {
                 install.readBunfig(installObj);
             }
         }
@@ -93,6 +101,10 @@ public final class BunOptions {
         }
         if (npmrc != null) {
             install.readNpmrc(npmrc, env, release);
+        }
+        if (installObj != null && release.letsBunfigOverrideNpmrc()) {
+            // PackageManager.rs init: npmrc < bunfig < CLI (overlay_bunfig_install)
+            install.readBunfig(installObj);
         }
         BunOptions options = new BunOptions();
         options.release = release;
@@ -116,13 +128,15 @@ public final class BunOptions {
     private void apply(Install install, HostEnvironment env) {
         String base = install.defaultRegistry != null && !install.defaultRegistry.isEmpty() ?
                 install.defaultRegistry : DEFAULT_REGISTRY;
-        registry = expandEnv(base, env);
+        registry = scopeUrl(expandEnv(base, env));
         if (install.linkWorkspacePackages != null) {
             linkWorkspacePackages = install.linkWorkspacePackages;
         }
+        readsTheManifestCache = release.readsTheManifestCacheOffline() &&
+                               (Boolean.TRUE.equals(install.offline) || install.preferOffline);
         for (Map.Entry<String, String> scope : install.scoped.entrySet()) {
             String url = scope.getValue().isEmpty() ? base : scope.getValue();
-            scopes.put(scope.getKey(), expandEnv(url, env));
+            scopes.put(scope.getKey(), scopeUrl(expandEnv(url, env)));
         }
         if (install.saveDev != null) {
             localDevDependencies = install.saveDev;
@@ -150,7 +164,7 @@ public final class BunOptions {
         for (String key : new String[]{"BUN_CONFIG_REGISTRY", "NPM_CONFIG_REGISTRY", "npm_config_registry"}) {
             String value = env.setting(key);
             if (value != null && !value.isEmpty() && (value.startsWith("https://") || value.startsWith("http://"))) {
-                registry = value;
+                registry = scopeUrl(value);
                 break;
             }
         }
@@ -158,6 +172,19 @@ public final class BunOptions {
         if (skipLoad != null) {
             loadLockfile = "0".equals(skipLoad);
         }
+    }
+
+    // npm.rs Scope::set_url, from 1.4.0: the WHATWG serialization of the url, its credentials split off; the url as it
+    // is where it does not parse
+    private String scopeUrl(String href) {
+        if (!release.canonicalizesTheRegistryUrl()) {
+            return href;
+        }
+        WhatwgUrl url = WhatwgUrl.tryParse(href);
+        if (url == null || !("http:".equals(url.getProtocol()) || "https:".equals(url.getProtocol()))) {
+            return href;
+        }
+        return url.getProtocol() + "//" + url.getHost() + url.getPathname() + url.getSearch() + url.getHash();
     }
 
     // Npm.Registry.Scope.fromAPI: a url of $NAME is the environment variable's value
@@ -178,6 +205,8 @@ public final class BunOptions {
         @Nullable String defaultRegistry;
         final Map<String, String> scoped = new LinkedHashMap<>();
         @Nullable Boolean linkWorkspacePackages;
+        @Nullable Boolean offline;
+        boolean preferOffline;
         @Nullable Boolean saveDev;
         @Nullable Boolean saveOptional;
         @Nullable Boolean savePeer;
@@ -207,6 +236,11 @@ public final class BunOptions {
             savePeer = bool(installObj, "peer", savePeer);
             saveDev = bool(installObj, "dev", saveDev);
             linkWorkspacePackages = bool(installObj, "linkWorkspacePackages", linkWorkspacePackages);
+            offline = bool(installObj, "offline", offline);
+            Json.Expr prefer = installObj.get("prefer");
+            if (prefer != null && prefer.isString()) {
+                preferOffline = "offline".equals(prefer.asString());
+            }
             Json.Expr minAge = installObj.get("minimumReleaseAge");
             if (minAge != null && minAge.kind == Json.Kind.NUMBER && minAge.asNumber() >= 0) {
                 minimumReleaseAgeMs = minAge.asNumber() * 1000;

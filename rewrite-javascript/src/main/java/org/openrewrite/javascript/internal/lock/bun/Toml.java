@@ -15,315 +15,389 @@
  */
 package org.openrewrite.javascript.internal.lock.bun;
 
+import org.openrewrite.javascript.internal.lock.CannotKnow;
+
 import java.util.ArrayList;
 import java.util.List;
 
 /**
- * bunfig.toml read into bun's expression shape, as bun's TOML parser (src/toml) gives it to {@code bunfig.zig}:
- * tables and dotted keys become nested objects, with strings, numbers, booleans, arrays and inline tables.
+ * bunfig.toml read into bun's expression shape: port of src/interchange/toml.zig {@code TOML} over its lexer
+ * ({@link TomlLexer}) (bun 1.3.10), and from 1.4.0 of src/parsers/toml.rs, a strict TOML 1.1 parser ({@link Toml11}).
  */
 final class Toml {
 
-    private final String source;
-    private int pos;
+    /**
+     * A bunfig.toml bun does not parse: {@code error} names the parser's error, the message is the first it logged.
+     */
+    static final class SyntaxError extends Json.SyntaxError {
+        SyntaxError(String error, String message) {
+            super(error, message);
+        }
+    }
 
-    private Toml(String source) {
-        this.source = source;
+    private final TomlLexer lexer;
+
+    private Toml(TomlLexer lexer) {
+        this.lexer = lexer;
     }
 
     static Json.Expr parse(String source) {
-        Toml p = new Toml(source);
-        List<Json.Property> root = new ArrayList<>();
-        List<Json.Property> current = root;
-        while (true) {
-            p.skipWhitespaceAndNewlines();
-            if (p.pos >= source.length()) {
-                break;
-            }
-            char c = source.charAt(p.pos);
-            if (c == '[') {
-                boolean arrayTable = source.startsWith("[[", p.pos);
-                p.pos += arrayTable ? 2 : 1;
-                List<String> keys = p.keyPath();
-                p.expect(']');
-                if (arrayTable) {
-                    p.expect(']');
-                }
-                List<Json.Property> table = root;
-                for (int i = 0; i < keys.size(); i++) {
-                    boolean last = i == keys.size() - 1;
-                    if (last && arrayTable) {
-                        Json.Expr array = get(table, keys.get(i));
-                        if (array == null) {
-                            array = new Json.Expr(Json.Kind.ARRAY, new ArrayList<Json.Expr>());
-                            table.add(new Json.Property(Json.Expr.string(keys.get(i)), array));
-                        }
-                        List<Json.Property> element = new ArrayList<>();
-                        array.items().add(new Json.Expr(Json.Kind.OBJECT, element));
-                        table = element;
-                    } else {
-                        table = object(table, keys.get(i));
-                    }
-                }
-                current = table;
-            } else {
-                List<String> keys = p.keyPath();
-                p.skipSpaces();
-                p.expect('=');
-                p.skipSpaces();
-                Json.Expr value = p.value();
-                List<Json.Property> table = current;
-                for (int i = 0; i < keys.size() - 1; i++) {
-                    table = object(table, keys.get(i));
-                }
-                table.add(new Json.Property(Json.Expr.string(keys.get(keys.size() - 1)), value));
-            }
-            p.skipSpaces();
-            p.skipComment();
-        }
-        return new Json.Expr(Json.Kind.OBJECT, root);
+        return parse(source, BunRelease.PORTED);
     }
 
-    private static Json.Expr get(List<Json.Property> table, String key) {
-        for (Json.Property p : table) {
-            if (key.equals(p.key.asString())) {
-                return p.value;
+    /**
+     * bunfig.toml as {@code release} parses it (with its logs redacted).
+     */
+    static Json.Expr parse(String source, BunRelease release) {
+        if (source.isEmpty()) {
+            return object();
+        }
+        Json.Log log = new Json.Log();
+        if (release.parsesTomlStrictly()) {
+            try {
+                return Toml11.parse(source, log);
+            } catch (Json.Failure f) {
+                throw new SyntaxError(f.error, log.first(f.error));
             }
         }
-        return null;
-    }
-
-    private static List<Json.Property> object(List<Json.Property> table, String key) {
-        Json.Expr existing = get(table, key);
-        if (existing != null && existing.isObject()) {
-            return existing.properties();
-        }
-        List<Json.Property> props = new ArrayList<>();
-        table.add(new Json.Property(Json.Expr.string(key), new Json.Expr(Json.Kind.OBJECT, props)));
-        return props;
-    }
-
-    private Json.SyntaxError error(String message) {
-        return new Json.SyntaxError(message + " at offset " + pos);
-    }
-
-    private void expect(char c) {
-        skipSpaces();
-        if (pos >= source.length() || source.charAt(pos) != c) {
-            throw error("Expected \"" + c + "\"");
-        }
-        pos++;
-    }
-
-    private void skipSpaces() {
-        while (pos < source.length() && (source.charAt(pos) == ' ' || source.charAt(pos) == '\t')) {
-            pos++;
-        }
-    }
-
-    private void skipComment() {
-        if (pos < source.length() && source.charAt(pos) == '#') {
-            while (pos < source.length() && source.charAt(pos) != '\n') {
-                pos++;
-            }
-        }
-    }
-
-    private void skipWhitespaceAndNewlines() {
-        while (pos < source.length()) {
-            char c = source.charAt(pos);
-            if (c == ' ' || c == '\t' || c == '\n' || c == '\r') {
-                pos++;
-            } else if (c == '#') {
-                skipComment();
-            } else {
-                break;
-            }
-        }
-    }
-
-    private List<String> keyPath() {
-        List<String> keys = new ArrayList<>();
-        while (true) {
-            skipSpaces();
-            keys.add(key());
-            skipSpaces();
-            if (pos < source.length() && source.charAt(pos) == '.') {
-                pos++;
-                continue;
-            }
-            return keys;
-        }
-    }
-
-    private String key() {
-        if (pos >= source.length()) {
-            throw error("Expected key");
-        }
-        char c = source.charAt(pos);
-        if (c == '"') {
-            return basicString();
-        }
-        if (c == '\'') {
-            return literalString();
-        }
-        int start = pos;
-        while (pos < source.length()) {
-            char k = source.charAt(pos);
-            if (k >= 'a' && k <= 'z' || k >= 'A' && k <= 'Z' || k >= '0' && k <= '9' || k == '_' || k == '-' ||
-                k == '@') {
-                pos++;
-            } else {
-                break;
-            }
-        }
-        if (start == pos) {
-            throw error("Expected key");
-        }
-        return source.substring(start, pos);
-    }
-
-    private Json.Expr value() {
-        if (pos >= source.length()) {
-            throw error("Expected value");
-        }
-        char c = source.charAt(pos);
-        if (c == '"') {
-            return Json.Expr.string(source.startsWith("\"\"\"", pos) ? multilineString("\"\"\"") : basicString());
-        }
-        if (c == '\'') {
-            return Json.Expr.string(source.startsWith("'''", pos) ? multilineString("'''") : literalString());
-        }
-        if (c == '[') {
-            pos++;
-            List<Json.Expr> items = new ArrayList<>();
-            while (true) {
-                skipWhitespaceAndNewlines();
-                if (pos < source.length() && source.charAt(pos) == ']') {
-                    pos++;
-                    break;
-                }
-                items.add(value());
-                skipWhitespaceAndNewlines();
-                if (pos < source.length() && source.charAt(pos) == ',') {
-                    pos++;
-                }
-            }
-            return new Json.Expr(Json.Kind.ARRAY, items);
-        }
-        if (c == '{') {
-            pos++;
-            List<Json.Property> props = new ArrayList<>();
-            while (true) {
-                skipSpaces();
-                if (pos < source.length() && source.charAt(pos) == '}') {
-                    pos++;
-                    break;
-                }
-                List<String> keys = keyPath();
-                expect('=');
-                skipSpaces();
-                Json.Expr v = value();
-                List<Json.Property> table = props;
-                for (int i = 0; i < keys.size() - 1; i++) {
-                    table = object(table, keys.get(i));
-                }
-                table.add(new Json.Property(Json.Expr.string(keys.get(keys.size() - 1)), v));
-                skipSpaces();
-                if (pos < source.length() && source.charAt(pos) == ',') {
-                    pos++;
-                }
-            }
-            return new Json.Expr(Json.Kind.OBJECT, props);
-        }
-        if (source.startsWith("true", pos)) {
-            pos += 4;
-            return new Json.Expr(Json.Kind.BOOLEAN, true);
-        }
-        if (source.startsWith("false", pos)) {
-            pos += 5;
-            return new Json.Expr(Json.Kind.BOOLEAN, false);
-        }
-        int start = pos;
-        while (pos < source.length()) {
-            char k = source.charAt(pos);
-            if (k >= '0' && k <= '9' || k == '.' || k == '-' || k == '+' || k == '_' || k == 'e' || k == 'E') {
-                pos++;
-            } else {
-                break;
-            }
-        }
+        Json.Expr root;
         try {
-            return new Json.Expr(Json.Kind.NUMBER, Double.parseDouble(source.substring(start, pos).replace("_", "")));
-        } catch (NumberFormatException e) {
-            throw error("Invalid value");
+            root = new Toml(TomlLexer.init(source, log)).runParser();
+        } catch (Json.Failure f) {
+            throw new SyntaxError(f.error, log.first(f.error));
+        }
+        if (log.hasErrors()) {
+            // the parse returned what it read past an error it only logged, and the install goes on with it
+            throw new CannotKnow("what bun " + release + " makes of bunfig.toml it reads past its own error (" +
+                                 log.first("") + ")");
+        }
+        return root;
+    }
+
+    private static Json.Expr object() {
+        return new Json.Expr(Json.Kind.OBJECT, new ArrayList<Json.Property>());
+    }
+
+    private static Json.Expr array() {
+        return new Json.Expr(Json.Kind.ARRAY, new ArrayList<Json.Expr>());
+    }
+
+    // a dotted key's segments, each the string expression of its key
+    private static final class Rope {
+        final Json.Expr head;
+        final int headStart;
+        Rope next;
+
+        Rope(Json.Expr head, int headStart) {
+            this.head = head;
+            this.headStart = headStart;
         }
     }
 
-    private String basicString() {
-        pos++;
-        StringBuilder out = new StringBuilder();
-        while (pos < source.length()) {
-            char c = source.charAt(pos++);
-            if (c == '"') {
-                return out.toString();
-            }
-            if (c == '\\' && pos < source.length()) {
-                char e = source.charAt(pos++);
-                switch (e) {
-                    case 'n':
-                        out.append('\n');
-                        break;
-                    case 't':
-                        out.append('\t');
-                        break;
-                    case 'r':
-                        out.append('\r');
-                        break;
-                    case 'b':
-                        out.append('\b');
-                        break;
-                    case 'f':
-                        out.append('\f');
-                        break;
-                    case 'u':
-                        out.append((char) Integer.parseInt(source.substring(pos, pos + 4), 16));
-                        pos += 4;
-                        break;
-                    default:
-                        out.append(e);
-                        break;
+    private static final class Clobber extends RuntimeException {
+        Clobber() {
+            super(null, null, false, false);
+        }
+    }
+
+    private Json.Expr runParser() {
+        Json.Expr root = object();
+        Json.Expr head = root;
+        while (true) {
+            switch (lexer.token) {
+                case END_OF_FILE:
+                    return root;
+                case OPEN_BRACKET: {
+                    lexer.next();
+                    Rope key = parseKey();
+                    lexer.expect(TomlLexer.T.CLOSE_BRACKET);
+                    if (!lexer.hasNewlineBefore) {
+                        lexer.expectedString("line break");
+                    }
+                    try {
+                        head = getOrPutObject(root, key);
+                    } catch (Clobber c) {
+                        throw lexer.addDefaultError("Table already defined");
+                    }
+                    break;
                 }
-            } else {
-                out.append(c);
+                case OPEN_BRACKET_DOUBLE: {
+                    lexer.next();
+                    Rope key = parseKey();
+                    lexer.expect(TomlLexer.T.CLOSE_BRACKET_DOUBLE);
+                    if (!lexer.hasNewlineBefore) {
+                        lexer.expectedString("line break");
+                    }
+                    Json.Expr array;
+                    try {
+                        array = getOrPutArray(root, key);
+                    } catch (Clobber c) {
+                        throw lexer.addDefaultError("Cannot overwrite table array");
+                    }
+                    Json.Expr newHead = object();
+                    array.items().add(newHead);
+                    head = newHead;
+                    break;
+                }
+                default:
+                    parseAssignment(head);
+                    break;
             }
         }
-        throw error("Unterminated string");
     }
 
-    private String literalString() {
-        int end = source.indexOf('\'', pos + 1);
-        if (end < 0) {
-            throw error("Unterminated string");
+    private Json.Expr parseKeySegment() {
+        switch (lexer.token) {
+            case STRING_LITERAL: {
+                Json.Expr str = Json.Expr.string(lexer.stringLiteral);
+                lexer.next();
+                return str;
+            }
+            case IDENTIFIER: {
+                Json.Expr str = Json.Expr.string(lexer.identifier);
+                lexer.next();
+                return str;
+            }
+            case FALSE:
+                lexer.next();
+                return Json.Expr.string("false");
+            case TRUE:
+                lexer.next();
+                return Json.Expr.string("true");
+            case NUMERIC_LITERAL: {
+                Json.Expr str = Json.Expr.string(lexer.raw());
+                lexer.next();
+                return str;
+            }
+            default:
+                return null;
         }
-        String s = source.substring(pos + 1, end);
-        pos = end + 1;
-        return s;
     }
 
-    private String multilineString(String delimiter) {
-        int start = pos + 3;
-        int end = source.indexOf(delimiter, start);
-        if (end < 0) {
-            throw error("Unterminated string");
+    private Rope parseKey() {
+        int start = lexer.start;
+        Json.Expr first = parseKeySegment();
+        if (first == null) {
+            lexer.expectedString("key");
+            throw new Json.Failure(Json.SYNTAX_ERROR);
         }
-        String s = source.substring(start, end);
-        if (s.startsWith("\n")) {
-            s = s.substring(1);
-        } else if (s.startsWith("\r\n")) {
-            s = s.substring(2);
+        Rope head = new Rope(first, start);
+        Rope rope = head;
+        while (lexer.token == TomlLexer.T.DOT) {
+            lexer.next();
+            int segmentStart = lexer.start;
+            Json.Expr segment = parseKeySegment();
+            if (segment == null) {
+                break;
+            }
+            rope.next = new Rope(segment, segmentStart);
+            rope = rope.next;
         }
-        pos = end + 3;
-        return s;
+        return head;
+    }
+
+    private void parseAssignment(Json.Expr obj) {
+        lexer.allowDoubleBracket = false;
+        Rope rope = parseKey();
+        int ropeEnd = lexer.start;
+        boolean isArray = lexer.token == TomlLexer.T.EMPTY_ARRAY;
+        if (isArray) {
+            lexer.next();
+        }
+        lexer.expectAssignment();
+        if (!isArray) {
+            Json.Expr value = parseValue();
+            try {
+                setRope(obj, rope, value);
+            } catch (Clobber c) {
+                String keyName = Strings.trimRight(lexer.source().substring(rope.headStart, ropeEnd), " \t\n\r\u000B\f");
+                lexer.addError(rope.headStart, "Cannot redefine key '" + keyName + "'");
+                throw new Json.Failure(Json.SYNTAX_ERROR);
+            }
+        }
+        lexer.allowDoubleBracket = true;
+    }
+
+    private Json.Expr parseValue() {
+        lexer.allowDoubleBracket = true;
+        switch (lexer.token) {
+            case FALSE:
+                lexer.next();
+                return new Json.Expr(Json.Kind.BOOLEAN, false);
+            case TRUE:
+                lexer.next();
+                return new Json.Expr(Json.Kind.BOOLEAN, true);
+            case STRING_LITERAL: {
+                Json.Expr str = Json.Expr.string(lexer.stringLiteral);
+                lexer.next();
+                return str;
+            }
+            case IDENTIFIER: {
+                Json.Expr str = Json.Expr.string(lexer.identifier);
+                lexer.next();
+                return str;
+            }
+            case NUMERIC_LITERAL: {
+                double value = lexer.number;
+                lexer.next();
+                return new Json.Expr(Json.Kind.NUMBER, value);
+            }
+            case MINUS: {
+                lexer.next();
+                double value = lexer.number;
+                lexer.expect(TomlLexer.T.NUMERIC_LITERAL);
+                return new Json.Expr(Json.Kind.NUMBER, -value);
+            }
+            case PLUS: {
+                lexer.next();
+                double value = lexer.number;
+                lexer.expect(TomlLexer.T.NUMERIC_LITERAL);
+                return new Json.Expr(Json.Kind.NUMBER, value);
+            }
+            case OPEN_BRACE: {
+                lexer.next();
+                Json.Expr expr = object();
+                while (lexer.token != TomlLexer.T.CLOSE_BRACE) {
+                    if (!expr.properties().isEmpty() && !parseMaybeTrailingComma(TomlLexer.T.CLOSE_BRACE)) {
+                        break;
+                    }
+                    parseAssignment(expr);
+                    lexer.allowDoubleBracket = false;
+                }
+                lexer.allowDoubleBracket = true;
+                lexer.expect(TomlLexer.T.CLOSE_BRACE);
+                return expr;
+            }
+            case EMPTY_ARRAY:
+                lexer.next();
+                lexer.allowDoubleBracket = true;
+                return array();
+            case OPEN_BRACKET: {
+                lexer.next();
+                Json.Expr array = array();
+                lexer.allowDoubleBracket = false;
+                while (lexer.token != TomlLexer.T.CLOSE_BRACKET) {
+                    if (!array.items().isEmpty() && !parseMaybeTrailingComma(TomlLexer.T.CLOSE_BRACKET)) {
+                        break;
+                    }
+                    array.items().add(parseValue());
+                }
+                lexer.allowDoubleBracket = true;
+                lexer.expect(TomlLexer.T.CLOSE_BRACKET);
+                return array;
+            }
+            default:
+                lexer.unexpected();
+                throw new Json.Failure(Json.SYNTAX_ERROR);
+        }
+    }
+
+    private boolean parseMaybeTrailingComma(TomlLexer.T closer) {
+        lexer.expect(TomlLexer.T.COMMA);
+        return lexer.token != closer;
+    }
+
+    // E.Object.get: the first property of the name
+    private static Json.Expr get(Json.Expr obj, Json.Expr key) {
+        return obj.get(key.asString());
+    }
+
+    // E.Object.setRope: an array takes the value at its end, an object is descended, anything else is a clobber
+    private static void setRope(Json.Expr obj, Rope rope, Json.Expr value) {
+        Json.Expr existing = get(obj, rope.head);
+        if (existing != null) {
+            if (existing.isArray()) {
+                List<Json.Expr> items = existing.items();
+                if (rope.next == null) {
+                    items.add(value);
+                    return;
+                }
+                if (!items.isEmpty()) {
+                    Json.Expr last = items.get(items.size() - 1);
+                    if (!last.isObject()) {
+                        throw new Clobber();
+                    }
+                    setRope(last, rope.next, value);
+                    return;
+                }
+                items.add(value);
+                return;
+            }
+            if (existing.isObject()) {
+                if (rope.next != null) {
+                    setRope(existing, rope.next, value);
+                    return;
+                }
+                throw new Clobber();
+            }
+            throw new Clobber();
+        }
+        Json.Expr value_ = value;
+        if (rope.next != null) {
+            value_ = object();
+            setRope(value_, rope.next, value);
+        }
+        obj.properties().add(new Json.Property(rope.head, value_));
+    }
+
+    // E.Object.getOrPutObject: a table reopened is the one there (merged), a table under an array of tables is under
+    // its last element
+    private static Json.Expr getOrPutObject(Json.Expr obj, Rope rope) {
+        Json.Expr existing = get(obj, rope.head);
+        if (existing != null) {
+            if (existing.isArray()) {
+                List<Json.Expr> items = existing.items();
+                if (rope.next == null || items.isEmpty() || !items.get(items.size() - 1).isObject()) {
+                    throw new Clobber();
+                }
+                return getOrPutObject(items.get(items.size() - 1), rope.next);
+            }
+            if (existing.isObject()) {
+                return rope.next != null ? getOrPutObject(existing, rope.next) : existing;
+            }
+            throw new Clobber();
+        }
+        if (rope.next != null) {
+            Json.Expr child = object();
+            Json.Expr out = getOrPutObject(child, rope.next);
+            obj.properties().add(new Json.Property(rope.head, child));
+            return out;
+        }
+        Json.Expr out = object();
+        obj.properties().add(new Json.Property(rope.head, out));
+        return out;
+    }
+
+    // E.Object.getOrPutArray
+    private static Json.Expr getOrPutArray(Json.Expr obj, Rope rope) {
+        Json.Expr existing = get(obj, rope.head);
+        if (existing != null) {
+            if (existing.isArray()) {
+                if (rope.next == null) {
+                    return existing;
+                }
+                List<Json.Expr> items = existing.items();
+                if (items.isEmpty() || !items.get(items.size() - 1).isObject()) {
+                    throw new Clobber();
+                }
+                return getOrPutArray(items.get(items.size() - 1), rope.next);
+            }
+            if (existing.isObject()) {
+                if (rope.next == null) {
+                    throw new Clobber();
+                }
+                return getOrPutArray(existing, rope.next);
+            }
+            throw new Clobber();
+        }
+        if (rope.next != null) {
+            Json.Expr child = object();
+            Json.Expr out = getOrPutArray(child, rope.next);
+            obj.properties().add(new Json.Property(rope.head, child));
+            return out;
+        }
+        Json.Expr out = array();
+        obj.properties().add(new Json.Property(rope.head, out));
+        return out;
     }
 }

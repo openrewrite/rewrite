@@ -32,6 +32,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
+import static java.util.Objects.requireNonNull;
 import static org.openrewrite.javascript.internal.lock.bun.Package.INVALID_PACKAGE_ID;
 
 /**
@@ -57,7 +58,7 @@ final class PackageManager {
 
     private static final class ResolveError extends Exception {
         enum Kind {
-            DIST_TAG_NOT_FOUND, NO_MATCHING_VERSION, TOO_RECENT_VERSION
+            DIST_TAG_NOT_FOUND, NO_MATCHING_VERSION, TOO_RECENT_VERSION, MISSING_PACKAGE_JSON
         }
 
         final Kind kind;
@@ -179,7 +180,9 @@ final class PackageManager {
         }
 
         DependencyVersion version = null;
-        if (dependency.version.tag == DependencyVersion.Tag.NPM) {
+        // from 1.4.0 an npm: alias names its target itself, and only a plain dependency follows another's alias
+        if (dependency.version.tag == DependencyVersion.Tag.NPM &&
+            (!options.getRelease().redirectsOnlyPlainDependenciesToAnAlias() || !dependency.version.npm().isAlias)) {
             DependencyVersion aliased = knownNpmAliases.get(nameHash);
             if (aliased != null) {
                 SemverQuery.Group group = dependency.version.npm().version;
@@ -199,13 +202,14 @@ final class PackageManager {
         if (version == null &&
             !dependency.behavior.isWorkspace(options.getRelease()) &&
             (dependency.version.tag != DependencyVersion.Tag.NPM || !dependency.version.npm().isAlias)) {
-            DependencyVersion override = lockfile.overrides.get(nameHash);
+            // from 1.4.0 a scoped rule the edge's parent and declared range match comes first
+            DependencyVersion override = lockfile.overrides.get(lockfile, id, nameHash);
             if (override != null) {
                 name = replacementName(name, override);
                 nameHash = replacementNameHash(nameHash, override);
                 version = override;
                 if (override.tag == DependencyVersion.Tag.CATALOG) {
-                    Dependency catalogDep = lockfile.catalogs.get(override.string(), name);
+                    Dependency catalogDep = lockfile.catalogs.get(override.string(), name, lockfile.release);
                     if (catalogDep != null) {
                         name = replacementName(name, catalogDep.version);
                         nameHash = replacementNameHash(nameHash, catalogDep.version);
@@ -213,7 +217,7 @@ final class PackageManager {
                     }
                 }
             } else if (dependency.version.tag == DependencyVersion.Tag.CATALOG) {
-                Dependency catalogDep = lockfile.catalogs.get(dependency.version.string(), name);
+                Dependency catalogDep = lockfile.catalogs.get(dependency.version.string(), name, lockfile.release);
                 if (catalogDep != null) {
                     name = replacementName(name, catalogDep.version);
                     nameHash = replacementNameHash(nameHash, catalogDep.version);
@@ -291,7 +295,10 @@ final class PackageManager {
                     result = getOrPutResolvedPackage(nameHash, name, dependency, version, dependency.behavior, id,
                             resolution, installPeer);
                 } catch (ResolveError e) {
-                    throw new IllegalStateException(e);
+                    if (e.kind != ResolveError.Kind.MISSING_PACKAGE_JSON) {
+                        throw new IllegalStateException(e);
+                    }
+                    result = null;
                 }
                 if (result != null) {
                     if (result.isFirstTime && result.pkg.dependenciesLen > 0) {
@@ -316,6 +323,11 @@ final class PackageManager {
             case NO_MATCHING_VERSION:
                 return "No version matching \"" + version.literal + "\" found for specifier \"" + name +
                        "\" (but package exists)";
+            case MISSING_PACKAGE_JSON:
+                return version.tag == DependencyVersion.Tag.FOLDER ?
+                        "Could not find package.json for \"file:" + version.string() + "\" dependency \"" + name +
+                        "\"" :
+                        "Could not find package.json for dependency \"" + name + "\"";
             default:
                 return version.tag == DependencyVersion.Tag.DIST_TAG ?
                         "Package \"" + name + "\" with tag \"" + version.distTag().tag +
@@ -365,7 +377,11 @@ final class PackageManager {
         if (!peersStarted) {
             firstPass.add(new Resolved(dependencyId, version, manifest, findResult));
         }
-        Integer id = lockfile.getPackageID(nameHash, version,
+        // from 1.4.0 a peer before the peers takes only its own pick, unless its range is *; the rest wait for them
+        boolean suppressPeerSatisfies = options.getRelease().bindsAPeerBeforeThePeersOnlyToItsPick() &&
+                                        behavior.isPeer() && !installPeer &&
+                                        !(version.tag == DependencyVersion.Tag.NPM && version.npm().version.isStar());
+        Integer id = lockfile.getPackageID(nameHash, suppressPeerSatisfies ? null : version,
                 Resolution.npm(findResult.version, findResult.packageVersion.tarballUrl));
         if (id != null) {
             assignResolution(dependencyId, id);
@@ -376,6 +392,9 @@ final class PackageManager {
 
         Package pkg = lockfile.appendPackage(Package.fromNPM(lockfile, manifest, findResult.version,
                 findResult.packageVersion, Features.NPM));
+        if (version.tag == DependencyVersion.Tag.NPM && isExact(version.npm().version)) {
+            lockfile.markExactPin(pkg.meta.id);
+        }
         registerAliases(lockfile, pkg);
         assignResolution(dependencyId, pkg.meta.id);
         return new ResolvedPackageResult(pkg, true);
@@ -468,6 +487,15 @@ final class PackageManager {
                     assignResolution(dependencyId, res[0]);
                     return new ResolvedPackageResult(lockfile.packages.get(res[0]), res[1] == 1);
                 }
+                // transitive folder dependencies do not have their dependencies resolved
+                BunRelease release = options.getRelease();
+                if (release.refusesAFolderPathLeavingItsPackage() &&
+                    !(release.trustsTheFolderPathsOfALocalPackage() ?
+                            lockfile.isTrustedFolderDependency(dependencyId) :
+                            lockfile.overridesContainName(dependency.nameHash, dependency.name)) &&
+                    binTargetEscapesPackageDir(version.string(), dependency)) {
+                    throw new ResolveError(ResolveError.Kind.MISSING_PACKAGE_JSON);
+                }
                 Package pkg = new Package();
                 pkg.name = name;
                 pkg.nameHash = nameHash;
@@ -480,6 +508,16 @@ final class PackageManager {
                 return new ResolvedPackageResult(lockfile.packages.get(pkg.meta.id), true);
             }
             case WORKSPACE: {
+                // from 1.4.0 only the root's and the workspaces' own manifests name a workspace folder
+                if (options.getRelease().resolvesAForeignWorkspaceSpecOnlyToTheRootsWorkspace() &&
+                    !behavior.isWorkspace() && !lockfile.isWorkspaceDependency(dependencyId) &&
+                    !lockfile.overridesContainName(dependency.nameHash, dependency.name)) {
+                    ResolvedPackageResult workspace = rootWorkspace(nameHash, dependencyId);
+                    if (workspace == null) {
+                        throw new ResolveError(ResolveError.Kind.MISSING_PACKAGE_JSON);
+                    }
+                    return workspace;
+                }
                 String workspacePath = lockfile.workspacePaths.get(nameHash);
                 int[] res = folderResolution(Resolution.Tag.WORKSPACE, version,
                         workspacePath != null ? workspacePath : version.string(), dependency);
@@ -546,6 +584,46 @@ final class PackageManager {
         return new int[]{id, 1};
     }
 
+    // SemverQuery.zig Group.isExact: one comparator, = a version
+    private static boolean isExact(SemverQuery.Group group) {
+        return group.head.next == null && group.head.head.next == null && !group.head.head.range.hasRight() &&
+               group.head.head.range.left.op == SemverRange.Op.EQL;
+    }
+
+    /**
+     * bin.rs {@code bin_target_escapes_package_dir}: whether a path leaves the directory it is relative to, being
+     * absolute, holding a colon in its first component, or climbing above its start; {@code /} and {@code \} both
+     * separate.
+     */
+    private static boolean binTargetEscapesPackageDir(String target, Dependency dependency) {
+        if (target.startsWith("/")) {
+            return true;
+        }
+        String[] components = target.split("[/\\\\]", -1);
+        if (components[0].indexOf(':') >= 0) {
+            return true;
+        }
+        int depth = 0;
+        for (String component : components) {
+            if (component.isEmpty() || ".".equals(component)) {
+                continue;
+            }
+            if ("..".equals(component)) {
+                if (--depth < 0) {
+                    return true;
+                }
+            } else {
+                depth++;
+            }
+        }
+        if (target.startsWith("\\")) {
+            throw new CannotKnow("folder dependency " + dependency.name + "@" + dependency.version.literal +
+                                 " (bun on Windows takes a path starting with a backslash for an absolute one, " +
+                                 "which leaves its package, and the host is not known to be another platform)");
+        }
+        return false;
+    }
+
     private boolean resolutionSatisfiesDependency(Resolution resolution, DependencyVersion dependency) {
         if (resolution.tag == Resolution.Tag.NPM && dependency.tag == DependencyVersion.Tag.NPM) {
             return dependency.npm().version.satisfies(resolution.version);
@@ -571,7 +649,9 @@ final class PackageManager {
         List<Dependency> deps = lockfile.dependencies;
         int begin = off;
         int end = off + len;
-        if (end - begin > 1 && deps.get(0).behavior.isPeer()) {
+        // before 1.4.0, a peer that is going to be installed through "dependencies" is skipped
+        if (!options.getRelease().enqueuesEveryDependencyOfTheList() && end - begin > 1 &&
+            deps.get(0).behavior.isPeer()) {
             int peerI = 0;
             Dependency peer = deps.get(peerI);
             while (peer.behavior.isPeer()) {
@@ -795,11 +875,26 @@ final class PackageManager {
     // run first, `edge` takes the first pre-existing package it accepts (getPackageID walks highest first) or appends
     // its pick; run after `other` appended its pick, it takes that pick when it accepts it and it walks earlier
     private boolean dependsOnOrder(int packagesBefore, Resolved edge, Resolved other) {
-        if (existing(packagesBefore, other) != null || !accepts(edge, other.resolution)) {
+        if (existing(packagesBefore, other) != null || !takesAppendedPick(edge, other)) {
             return false;
         }
         Resolution first = existing(packagesBefore, edge);
         return first == null ? !other.resolution.eql(edge.resolution) : other.resolution.order(first) > 0;
+    }
+
+    // whether `edge` accepts the pick `other` appended; from 1.4.0 getPackageID refuses one below edge's own pick and
+    // of another major, unless other's range is one exact version (mark_exact_pin)
+    private boolean takesAppendedPick(Resolved edge, Resolved other) {
+        if (!accepts(edge, other.resolution)) {
+            return false;
+        }
+        if (!options.getRelease().keepsARangeOffALowerMajorAddedThisInstall() ||
+            other.resolution.eql(edge.resolution) ||
+            other.version.tag == DependencyVersion.Tag.NPM && isExact(other.version.npm().version)) {
+            return true;
+        }
+        return !Lockfile.isBelowAndOfAnotherMajor(requireNonNull(other.resolution.version),
+                requireNonNull(edge.resolution.version));
     }
 
     @Nullable
@@ -831,10 +926,10 @@ final class PackageManager {
     }
 
     /**
-     * {@code verifyResolutions}: each required dependency that did not resolve, as bun reports it.
+     * {@code verifyResolutions}: each required dependency that did not resolve, as bun reports it, then its error.
      */
-    static List<String> verifyResolutions(Lockfile lockfile, BunOptions options) {
-        List<String> failed = new ArrayList<>();
+    static List<String[]> verifyResolutions(Lockfile lockfile, BunOptions options) {
+        List<String[]> failed = new ArrayList<>();
         int end = lockfile.packages.size();
         for (Package parent : lockfile.packages) {
             boolean local = parent.resolution.tag == Resolution.Tag.ROOT ||
@@ -852,11 +947,26 @@ final class PackageManager {
                     continue;
                 }
                 String literal = failedDep.version.literal;
-                failed.add(failedDep.name.isEmpty() || failedDep.name.equals(literal) ? literal :
-                        failedDep.name + "@" + literal);
+                String spec = failedDep.name.isEmpty() || failedDep.name.equals(literal) ? literal :
+                        failedDep.name + "@" + literal;
+                failed.add(new String[]{spec, failedDep.version.tag == DependencyVersion.Tag.CATALOG &&
+                                              options.getRelease().namesTheCatalogADependencyIsMissingFrom() ?
+                        catalogFailure(lockfile, failedDep) : spec + " failed to resolve"});
             }
         }
         return failed;
+    }
+
+    // PackageManagerResolution.rs verify_resolutions, from 1.4.0
+    private static String catalogFailure(Lockfile lockfile, Dependency failedDep) {
+        String nameAtLiteral = failedDep.name + "@" + failedDep.version.literal;
+        String catalogName = failedDep.version.string();
+        boolean isDefault = catalogName.isEmpty() || "default".equals(catalogName);
+        if (!isDefault && !lockfile.catalogs.groups.containsKey(catalogName)) {
+            return nameAtLiteral + ": there is no catalog named \"" + catalogName + "\" in the root package.json";
+        }
+        return isDefault ? nameAtLiteral + " is not in the catalog" :
+                nameAtLiteral + " is not in catalog \"" + catalogName + "\"";
     }
 
     private static boolean isEnabled(Behavior behavior, boolean local, BunOptions options) {

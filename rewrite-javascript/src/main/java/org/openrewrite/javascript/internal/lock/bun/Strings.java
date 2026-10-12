@@ -24,6 +24,7 @@ final class Strings {
     static final String WHITESPACE_CHARS = " \t\n\r\u000B\u000C";
 
     private static final char[] HEX_CHARS = "0123456789ABCDEF".toCharArray();
+    private static final char[] LOWER_HEX_CHARS = "0123456789abcdef".toCharArray();
 
     private Strings() {
     }
@@ -80,9 +81,24 @@ final class Strings {
      * {@code bun.fmt.formatJSONStringUTF8}: {@code js_printer.writePreQuotedString} with a double quote, for JSON.
      */
     static void appendJsonString(StringBuilder out, String text, boolean quote) {
+        appendJsonString(out, text, quote, BunRelease.PORTED);
+    }
+
+    /**
+     * {@code formatJSONStringUTF8} as {@code release} writes it: quoted, 1.4.0's {@code encode_json_string_chars}
+     * ({@link BunRelease#escapesQuotedJsonStringsMinimally}); else {@code writePreQuotedString}.
+     */
+    static void appendJsonString(StringBuilder out, String text, boolean quote, BunRelease release) {
+        if (quote && release.escapesQuotedJsonStringsMinimally()) {
+            out.append('"');
+            encodeJsonStringChars(out, text);
+            out.append('"');
+            return;
+        }
         if (quote) {
             out.append('"');
         }
+        boolean json = release.escapesBelAndVtAsUnicodeInJson();
         int i = 0;
         while (i < text.length()) {
             int c = text.codePointAt(i);
@@ -95,7 +111,7 @@ final class Strings {
             i += width;
             switch (c) {
                 case 0x07:
-                    out.append("\\x07");
+                    out.append(json ? "\\u0007" : "\\x07");
                     break;
                 case 0x08:
                     out.append("\\b");
@@ -110,7 +126,7 @@ final class Strings {
                     out.append("\\r");
                     break;
                 case 0x0B:
-                    out.append("\\v");
+                    out.append(json ? "\\u000B" : "\\v");
                     break;
                 case '\\':
                     out.append("\\\\");
@@ -148,6 +164,47 @@ final class Strings {
         }
         if (quote) {
             out.append('"');
+        }
+    }
+
+    /**
+     * src/bun_core/fmt.rs {@code encode_json_string_chars} (1.4.0): only {@code "}, {@code \}, {@code \b \f \n \r \t}
+     * and the other control characters, as <code>&#92;u00xx</code> in lowercase hex, are escaped; everything else, U+2028,
+     * U+2029, U+FEFF and a lone surrogate too, is written as it is.
+     */
+    private static void encodeJsonStringChars(StringBuilder out, String text) {
+        for (int i = 0; i < text.length(); i++) {
+            char b = text.charAt(i);
+            switch (b) {
+                case '"':
+                    out.append("\\\"");
+                    break;
+                case '\\':
+                    out.append("\\\\");
+                    break;
+                case 0x08:
+                    out.append("\\b");
+                    break;
+                case 0x0C:
+                    out.append("\\f");
+                    break;
+                case '\n':
+                    out.append("\\n");
+                    break;
+                case '\r':
+                    out.append("\\r");
+                    break;
+                case '\t':
+                    out.append("\\t");
+                    break;
+                default:
+                    if (b < 0x20) {
+                        out.append("\\u00").append(LOWER_HEX_CHARS[b >> 4]).append(LOWER_HEX_CHARS[b & 0xF]);
+                    } else {
+                        out.append(b);
+                    }
+                    break;
+            }
         }
     }
 

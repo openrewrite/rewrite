@@ -15,10 +15,6 @@
  */
 package org.openrewrite.javascript.internal.lock.bun;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.DeserializationFeature;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.json.JsonMapper;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.javascript.internal.lock.HostEnvironment;
 
@@ -29,10 +25,6 @@ import java.util.Map;
 
 /** Port of bun's src/ini.zig {@code Parser.parse} (bun 1.3.10), which reads an .npmrc. */
 final class Ini {
-
-    private static final ObjectMapper JSON = JsonMapper.builder()
-            .enable(DeserializationFeature.FAIL_ON_TRAILING_TOKENS)
-            .build();
 
     private final HostEnvironment env;
     private final BunRelease release;
@@ -252,24 +244,61 @@ final class Ini {
         return didAnyEscape ? unesc.toString() : val;
     }
 
-    // a quoted value: single quotes stripped, then JSON, whose strings take the environment's substitutions
+    // a quoted value: single quotes stripped, then strict JSON to its end (Json.parseStrict), whose strings take the
+    // environment's substitutions; what does not parse is the text
     private @Nullable Object quoted(String quoted, boolean value) {
         String val = quoted;
         if (val.charAt(0) == '\'') {
             val = val.length() > 1 ? val.substring(1, val.length() - 1) : val.substring(1);
         }
+        if (val.isEmpty() && release.readsAnEmptyQuotedNpmrcValueAsAString()) {
+            return val;
+        }
         Object parsed;
         // before 1.3.5 a quoted value is taken as it is
         boolean expands = value && release.expandsQuotedNpmrcValues();
         try {
-            parsed = JSON.readValue(val, Object.class);
-        } catch (JsonProcessingException e) {
+            parsed = javaValue(Json.parseStrict(val, release));
+        } catch (Json.SyntaxError e) {
             return expands ? expandEnvVars(val) : val;
         }
         if (parsed instanceof String && expands) {
             return expandEnvVars((String) parsed);
         }
         return parsed;
+    }
+
+    // the JSON value as the map holds it: a string, number, boolean, null, list or map, the first of a repeated key
+    private static @Nullable Object javaValue(Json.Expr expr) {
+        switch (expr.kind) {
+            case STRING:
+                return expr.asString();
+            case NUMBER: {
+                double d = expr.asNumber();
+                return d == Math.rint(d) && Math.abs(d) < 1e15 ? (Object) (long) d : (Object) d;
+            }
+            case BOOLEAN:
+                return expr.asBool();
+            case ARRAY: {
+                List<@Nullable Object> list = new ArrayList<>();
+                for (Json.Expr item : expr.items()) {
+                    list.add(javaValue(item));
+                }
+                return list;
+            }
+            case OBJECT: {
+                Map<String, @Nullable Object> map = new LinkedHashMap<>();
+                for (Json.Property p : expr.properties()) {
+                    String key = p.key.asString();
+                    if (key != null && !map.containsKey(key)) {
+                        map.put(key, javaValue(p.value));
+                    }
+                }
+                return map;
+            }
+            default:
+                return null;
+        }
     }
 
     private String expandEnvVars(String val) {

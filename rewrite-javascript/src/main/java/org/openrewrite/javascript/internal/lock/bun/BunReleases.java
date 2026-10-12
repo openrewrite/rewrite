@@ -37,12 +37,13 @@ public final class BunReleases {
     /**
      * The releases the engine reproduces, a node-semver range: every recorded scenario replays as each of them and
      * gives what that release wrote ({@code BunScenarioTest} with {@code REWRITE_LOCK_EVERY_RELEASE}), and every
-     * upstream change between them and 1.3.10 that reaches a lock is a question of {@link BunRelease}. Every scenario
-     * also replays as each release from 1.2.0 to 1.3.1, which miss questions still: the git and GitHub specs before
-     * 1.3.2 (hosted_git_info.zig), and what bun 1.2.0 to 1.2.12 did otherwise in bun.lock's writer and reader, the
-     * overrides and the workspace globs.
+     * upstream change between them and 1.3.10 that reaches a lock is a question of {@link BunRelease}: the Zig sources
+     * to 1.3.14, and the Rust translation of 1.4.0 to 1.4.3 (lockfileVersion 2 and 3, scoped overrides, the new JSON and
+     * TOML parsers, bunfig over .npmrc, and the rest). Every scenario also replays as each release from 1.2.0 to 1.2.23,
+     * which miss questions still: what bun 1.2.0 to 1.2.23 did otherwise in bun.lock's writer and reader, the overrides,
+     * the workspace globs, .npmrc and semver.
      */
-    public static final String PROVEN = "1.3.2 - 1.3.14";
+    public static final String PROVEN = "1.3.0 - 1.4.3";
 
     private static final List<String> ALL = load();
 

@@ -18,8 +18,9 @@ package org.openrewrite.javascript.internal.lock.bun;
 import org.jspecify.annotations.Nullable;
 
 /**
- * Port of bun's src/semver/Version.zig (bun 1.3.10). The core numbers are u64: compared unsigned, saturating at
- * {@code -1L}, printed unsigned. The tag's {@code pre} and {@code build} are empty when absent.
+ * Port of bun's src/semver/Version.zig (bun 1.3.10), with Version.rs (1.4.0) beside it. The core numbers are u64:
+ * compared unsigned, saturating at {@code -1L}, printed unsigned. The tag's {@code pre} and {@code build} are empty
+ * when absent.
  */
 final class SemverVersion {
 
@@ -312,6 +313,15 @@ final class SemverVersion {
     }
 
     static ParseResult parse(String input) {
+        return parse(input, BunRelease.PORTED);
+    }
+
+    /**
+     * {@code parse} as the release reads a version: from 1.4.0 one of whitespace, {@code v} and {@code =} alone is
+     * invalid ({@link BunRelease#rejectsAVersionOfSeparatorsAlone()}), and a number of more than 20 digits is its
+     * value ({@link BunRelease#readsALongVersionNumberByItsValue()}).
+     */
+    static ParseResult parse(String input, BunRelease release) {
         ParseResult result = new ParseResult();
         int partI = 0;
         int partStartI;
@@ -321,7 +331,8 @@ final class SemverVersion {
             return result;
         }
         boolean isDone = false;
-        int i = 0;
+        // before 1.4.0 the index stays 0 when only separators are found, which reads one starting with a space as 0.0.0
+        int i = release.rejectsAVersionOfSeparatorsAlone() ? input.length() : 0;
         for (int c = 0; c < input.length(); c++) {
             char ch = input.charAt(c);
             if (ch == ' ' || ch == '\t' || ch == '\n' || ch == '\r' || ch == '\u000B' || ch == '\u000C' || ch == 'v' ||
@@ -333,6 +344,10 @@ final class SemverVersion {
         }
         if (i == input.length()) {
             result.valid = false;
+            if (release.rejectsAVersionOfSeparatorsAlone()) {
+                result.wildcard = SemverQuery.Wildcard.MAJOR;
+                result.len = i;
+            }
             return result;
         }
         while (i < input.length()) {
@@ -354,7 +369,7 @@ final class SemverVersion {
                     i++;
                 }
                 lastCharI = i;
-                Long number = parseVersionNumber(input.substring(partStartI, lastCharI));
+                Long number = parseVersionNumber(input.substring(partStartI, lastCharI), release);
                 if (partI == 0) {
                     result.version.major = number;
                     partI = 1;
@@ -435,7 +450,18 @@ final class SemverVersion {
         return result;
     }
 
-    private static @Nullable Long parseVersionNumber(String input) {
+    /**
+     * {@code parseVersionNumber} of the digits the parser scanned: missing past 20 digits, 0 past the u64 maximum; from
+     * 1.4.0 the value of any count of digits, 0 past the maximum.
+     */
+    private static @Nullable Long parseVersionNumber(String input, BunRelease release) {
+        if (release.readsALongVersionNumberByItsValue()) {
+            try {
+                return Long.parseUnsignedLong(input);
+            } catch (NumberFormatException e) {
+                return 0L;
+            }
+        }
         StringBuilder bytes = new StringBuilder();
         for (int k = 0; k < input.length(); k++) {
             char c = input.charAt(k);

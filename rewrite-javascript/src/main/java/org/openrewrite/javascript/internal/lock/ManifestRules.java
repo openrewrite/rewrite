@@ -60,11 +60,29 @@ public interface ManifestRules {
     }
 
     /**
+     * These rules as release {@code version} of the package manager reads the files, the release the root's
+     * {@code NodeRuntime} marker records for it (null where it records none); these where its reading does not depend
+     * on the release.
+     */
+    default ManifestRules installedAs(@Nullable String version) {
+        return this;
+    }
+
+    /**
      * Why it would not apply an override of {@code packageName} along {@code path} as the key writes it; null when
      * it would.
      */
     default @Nullable String overrideDeclined(String packageName, List<DependencyPathSegment> path) {
         return null;
+    }
+
+    /**
+     * Why it would not apply an override of {@code packageName} to {@code newVersion} along {@code path} as the
+     * recipe writes it at {@code place}; null when it would. By default as {@link #overrideDeclined(String, List)}.
+     */
+    default @Nullable String overrideDeclined(String packageName, String newVersion,
+                                              List<DependencyPathSegment> path, OverridePlace place) {
+        return overrideDeclined(packageName, path);
     }
 
     /**

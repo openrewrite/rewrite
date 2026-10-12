@@ -49,7 +49,7 @@ final class BunScenarios {
     private static final Pattern LOAD_ERROR_NAME = Pattern.compile("(?m)^(\\w+): failed to parse lockfile");
     private static final Pattern EDIT_STARTED = Pattern.compile("(?m)^edit started (\\S+)$");
     private static final Pattern PLATFORM = Pattern.compile("(?m)^platform os=(\\S+) cpu=(\\S+) libc=(\\S*)$");
-    private static final Pattern REQUEST = Pattern.compile("(?m)^GET ([a-z]+://[^/ ]+)");
+    private static final Pattern REQUEST = Pattern.compile("(?m)^GET ([a-z]+://[^/ ]+)\\S* (?!tarball )");
     private static final Pattern ORIGIN = Pattern.compile("^[a-z]+://[^/]+");
     private static final Pattern RECORDED_RELEASE = Pattern.compile("^bun (\\d+\\.\\d+\\.\\d+)");
 
@@ -187,13 +187,15 @@ final class BunScenarios {
         }
 
         /**
-         * Whether the edit's install, rerun from an empty cache, asked the host of {@code registry}: any host when
-         * {@code requests-after.log} names none.
+         * Whether bun asked the host of {@code registry} for a document: in {@code requests}, a release's requests in
+         * the phases a replay of its outcome reads ({@code release/<first>/requests.log}), or where no outcome keeps
+         * them in the edit's install rerun from an empty cache ({@code requests-after.log}); any host when they name
+         * none. A tarball is no document (releases before 1.2.21 fetch them even with {@code --lockfile-only}).
          */
-        boolean asked(String registry) {
-            String requests = file("requests-after.log");
+        boolean asked(String registry, @Nullable String requests) {
+            String log = requests == null ? file("requests-after.log") : requests;
             Set<String> origins = new TreeSet<>();
-            Matcher request = REQUEST.matcher(requests == null ? "" : requests);
+            Matcher request = REQUEST.matcher(log == null ? "" : log);
             while (request.find()) {
                 origins.add(request.group(1));
             }

@@ -18,7 +18,8 @@ package org.openrewrite.javascript.internal.lock.bun;
 import org.jspecify.annotations.Nullable;
 
 /**
- * Port of bun's src/install/resolution.zig with versioned_url.zig (bun 1.3.10): how a package was resolved.
+ * Port of bun's src/install/resolution.zig with versioned_url.zig (bun 1.3.10), with resolution.rs (1.4.x) beside it:
+ * how a package was resolved.
  */
 final class Resolution {
 
@@ -86,6 +87,14 @@ final class Resolution {
     }
 
     static Resolution fromTextLockfile(String resStr) {
+        return fromTextLockfile(resStr, BunRelease.PORTED);
+    }
+
+    /**
+     * {@code fromTextLockfile} as the release tells a resolution's kind ({@link DependencyVersion.Tag#infer}), splits a
+     * GitHub one ({@link Repository#parseAppendGithub}) and reads a version ({@link SemverVersion#parse}).
+     */
+    static Resolution fromTextLockfile(String resStr, BunRelease release) {
         if (resStr.startsWith("root:")) {
             return ROOT;
         }
@@ -98,18 +107,18 @@ final class Resolution {
         if (resStr.startsWith("file:")) {
             return of(Tag.FOLDER, resStr.substring("file:".length()));
         }
-        switch (DependencyVersion.Tag.infer(resStr)) {
+        switch (DependencyVersion.Tag.infer(resStr, release)) {
             case GIT:
                 return repository(Tag.GIT, Repository.parseAppendGit(resStr));
             case GITHUB:
-                return repository(Tag.GITHUB, Repository.parseAppendGithub(resStr));
+                return repository(Tag.GITHUB, Repository.parseAppendGithub(resStr, release));
             case TARBALL:
                 if (Dependency.isRemoteTarball(resStr)) {
                     return of(Tag.REMOTE_TARBALL, resStr);
                 }
                 return of(Tag.LOCAL_TARBALL, resStr);
             case NPM: {
-                SemverVersion.ParseResult parsed = SemverVersion.parse(resStr);
+                SemverVersion.ParseResult parsed = SemverVersion.parse(resStr, release);
                 if (!parsed.valid || parsed.version.major == null || parsed.version.minor == null ||
                     parsed.version.patch == null) {
                     throw new UnexpectedResolution("Unexpected resolution: " + resStr);
@@ -122,6 +131,13 @@ final class Resolution {
     }
 
     int order(Resolution rhs) {
+        return order(rhs, BunRelease.PORTED);
+    }
+
+    /**
+     * {@code order} as the release orders repositories ({@link Repository#order(Repository, BunRelease)}).
+     */
+    int order(Resolution rhs, BunRelease release) {
         if (tag != rhs.tag) {
             return Integer.compare(tag.value, rhs.tag.value);
         }
@@ -137,7 +153,7 @@ final class Resolution {
                 return Strings.order(value, rhs.value);
             case GIT:
             case GITHUB:
-                return repository.order(rhs.repository);
+                return repository.order(rhs.repository, release);
             default:
                 return 0;
         }

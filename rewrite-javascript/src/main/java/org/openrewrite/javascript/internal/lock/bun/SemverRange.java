@@ -16,7 +16,7 @@
 package org.openrewrite.javascript.internal.lock.bun;
 
 /**
- * Port of bun's src/semver/SemverRange.zig (bun 1.3.10).
+ * Port of bun's src/semver/SemverRange.zig (bun 1.3.10), with SemverRange.rs (1.4.0) beside it.
  */
 final class SemverRange {
 
@@ -33,6 +33,37 @@ final class SemverRange {
         Comparator(Op op, SemverVersion version) {
             this.op = op;
             this.version = version;
+        }
+
+        /**
+         * {@code < major+1.0.0}, the major saturating; from 1.4.0 {@code <=} the ceiling where it would pass it
+         * ({@code lt_next_major}, {@link BunRelease#boundsARangeAtTheCeilingInclusively()}).
+         */
+        static Comparator ltNextMajor(long major, BunRelease release) {
+            if (major == SemverVersion.MAX && release.boundsARangeAtTheCeilingInclusively()) {
+                return new Comparator(Op.LTE, SemverVersion.of(SemverVersion.MAX, SemverVersion.MAX, SemverVersion.MAX));
+            }
+            return new Comparator(Op.LT, SemverVersion.of(SemverVersion.saturatingIncrement(major), 0, 0));
+        }
+
+        /**
+         * {@code < major.minor+1.0}, as {@link #ltNextMajor} ({@code lt_next_minor}).
+         */
+        static Comparator ltNextMinor(long major, long minor, BunRelease release) {
+            if (minor == SemverVersion.MAX && release.boundsARangeAtTheCeilingInclusively()) {
+                return new Comparator(Op.LTE, SemverVersion.of(major, SemverVersion.MAX, SemverVersion.MAX));
+            }
+            return new Comparator(Op.LT, SemverVersion.of(major, SemverVersion.saturatingIncrement(minor), 0));
+        }
+
+        /**
+         * {@code < major.minor.patch+1}, as {@link #ltNextMajor} ({@code lt_next_patch}).
+         */
+        static Comparator ltNextPatch(long major, long minor, long patch, BunRelease release) {
+            if (patch == SemverVersion.MAX && release.boundsARangeAtTheCeilingInclusively()) {
+                return new Comparator(Op.LTE, SemverVersion.of(major, minor, SemverVersion.MAX));
+            }
+            return new Comparator(Op.LT, SemverVersion.of(major, minor, SemverVersion.saturatingIncrement(patch)));
         }
 
         boolean eql(Comparator rhs) {
@@ -82,20 +113,17 @@ final class SemverRange {
 
     static final SemverRange EMPTY = new SemverRange(Comparator.UNSET, Comparator.UNSET);
 
-    static SemverRange initWildcard(SemverVersion version, SemverQuery.Wildcard wildcard) {
+    static SemverRange initWildcard(SemverVersion version, SemverQuery.Wildcard wildcard, BunRelease release) {
         switch (wildcard) {
             case NONE:
                 return new SemverRange(new Comparator(Op.EQL, version));
             case MAJOR:
                 return new SemverRange(new Comparator(Op.GTE, SemverVersion.ZERO));
             case MINOR:
-                return new SemverRange(
-                        new Comparator(Op.LT, SemverVersion.of(SemverVersion.saturatingIncrement(version.major), 0, 0)),
+                return new SemverRange(Comparator.ltNextMajor(version.major, release),
                         new Comparator(Op.GTE, SemverVersion.of(version.major, 0, 0)));
             default:
-                return new SemverRange(
-                        new Comparator(Op.LT,
-                                SemverVersion.of(version.major, SemverVersion.saturatingIncrement(version.minor), 0)),
+                return new SemverRange(Comparator.ltNextMinor(version.major, version.minor, release),
                         new Comparator(Op.GTE, SemverVersion.of(version.major, version.minor, 0)));
         }
     }

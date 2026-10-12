@@ -79,6 +79,13 @@ class BunScenarioTest extends LockScenarioTest {
         @Nullable
         String release;
 
+        /**
+         * What that release asked the registry for in the phases replayed, where its outcome keeps it
+         * ({@code release/<first>/requests.log}); null for the scenario's own outcome.
+         */
+        @Nullable
+        String requests;
+
         @Override
         public String toString() {
             return label;
@@ -121,7 +128,7 @@ class BunScenarioTest extends LockScenarioTest {
     // the scenario's own edit over its before
     private static Edit recorded(BunScenarios.Scenario scenario, @Nullable String release, String label) {
         return new Edit(scenario, label, Objects.requireNonNull(scenario.file("before")), scenario.file("after"),
-                scenario.expect(), scenario.file("again"), release);
+                scenario.expect(), scenario.file("again"), release, null);
     }
 
     // another release's outcome: the edit over the lock that release wrote first, and the edit over the scenario's own
@@ -129,17 +136,18 @@ class BunScenarioTest extends LockScenarioTest {
     private static List<Edit> outcome(BunScenarios.Scenario scenario, String release, Path outcome, String label) {
         List<Edit> edits = new ArrayList<>();
         String before = BunScenarios.Scenario.read(outcome, "before");
+        String requests = BunScenarios.Scenario.read(outcome, "requests.log");
         Edit edit = null;
         if (before != null) {
             edit = new Edit(scenario, label, before, BunScenarios.Scenario.read(outcome, "after"),
                     trimmed(BunScenarios.Scenario.read(outcome, "expect")),
-                    BunScenarios.Scenario.read(outcome, "after-again"), release);
+                    BunScenarios.Scenario.read(outcome, "after-again"), release, requests);
             edits.add(edit);
         }
         Edit cross = new Edit(scenario, label + "/cross", Objects.requireNonNull(scenario.file("before")),
                 BunScenarios.Scenario.read(outcome, "cross"),
                 trimmed(BunScenarios.Scenario.read(outcome, "expect-cross")),
-                BunScenarios.Scenario.read(outcome, "cross-again"), release);
+                BunScenarios.Scenario.read(outcome, "cross-again"), release, requests);
         if (edit == null || !(edit.getStart().equals(cross.getStart()) &&
                               Objects.equals(edit.getAfter(), cross.getAfter()) &&
                               Objects.equals(edit.getExpect(), cross.getExpect()))) {
@@ -156,26 +164,30 @@ class BunScenarioTest extends LockScenarioTest {
      * The registry as the scenario recorded it: {@code http/<name>}, or {@code http/<name>@full}, whatever its url; a
      * downloaded fixture's empty versions are filled from its {@code http/<name>-<version>} documents. It holds what
      * the edit replayed over it wrote and the second install's rewrite of that, which a second install's failure is
-     * held to.
+     * held to, and answers only for the hosts bun asked ({@link BunScenarios.Scenario#asked}): those of the release
+     * replayed where its outcome keeps its requests.
      */
     static final class ScenarioRegistry extends RecordedRegistry<BunScenarios.Scenario> implements ManifestSource {
         private final @Nullable String after;
         private final @Nullable String again;
+        private final @Nullable String requests;
 
         ScenarioRegistry(BunScenarios.Scenario scenario) {
-            this(scenario, scenario.file("after"), scenario.file("again"));
+            this(scenario, scenario.file("after"), scenario.file("again"), null);
         }
 
-        ScenarioRegistry(BunScenarios.Scenario scenario, @Nullable String after, @Nullable String again) {
+        ScenarioRegistry(BunScenarios.Scenario scenario, @Nullable String after, @Nullable String again,
+                         @Nullable String requests) {
             super(scenario);
             this.after = after;
             this.again = again;
+            this.requests = requests;
         }
 
         @Override
         public @Nullable String packument(String registry, String name, boolean extended) {
             String file = extended ? name + "@full" : name;
-            if (!scenario.asked(registry)) {
+            if (!scenario.asked(registry, requests)) {
                 notRecorded(BunScenarios.Scenario.origin(registry) + "/" + file);
                 return null;
             }
@@ -235,7 +247,7 @@ class BunScenarioTest extends LockScenarioTest {
         BunScenarios.Scenario scenario = edit.getScenario();
         Expect expect = Expect.of(edit.getExpect());
         skipUnlessReplayed(edit.getLabel(), scenario, expect);
-        ScenarioRegistry http = new ScenarioRegistry(scenario, edit.getAfter(), edit.getAgain());
+        ScenarioRegistry http = new ScenarioRegistry(scenario, edit.getAfter(), edit.getAgain(), edit.getRequests());
         Result result = new BunLockRegenerator(inputs(scenario, edit.getStart(), edit.getRelease()), http)
           .regenerate();
         check(edit.getLabel(), expect, edit.getAfter(), result, http);

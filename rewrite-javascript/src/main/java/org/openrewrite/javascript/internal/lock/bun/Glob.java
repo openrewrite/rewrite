@@ -20,7 +20,9 @@ import java.util.List;
 
 /**
  * Port of bun's src/glob.zig {@code detectGlobSyntax} and src/glob/match.zig {@code match} (bun 1.3.10), over
- * UTF-16 code units: the patterns and paths it matches here are workspace paths.
+ * UTF-16 code units: the patterns and paths it matches here are workspace paths. 1.4.0's src/glob/lib.rs and
+ * matcher.rs are beside it where they differ for these: each token's backslashes and a pattern started past its
+ * {@code !}s; their brace handling (a comma inside brackets, an unterminated group, the branch budget) is not.
  */
 final class Glob {
 
@@ -38,6 +40,13 @@ final class Glob {
     }
 
     static boolean detectGlobSyntax(String potentialPattern) {
+        return detectGlobSyntax(potentialPattern, BunRelease.PORTED);
+    }
+
+    /**
+     * {@code detectGlobSyntax} as {@code release} tells glob syntax that no backslash escapes.
+     */
+    static boolean detectGlobSyntax(String potentialPattern, BunRelease release) {
         if (!potentialPattern.isEmpty() && potentialPattern.charAt(0) == '!') {
             return true;
         }
@@ -48,12 +57,21 @@ final class Glob {
                 if (idx < 0) {
                     break;
                 }
-                // bun counts the backslashes before the index relative to the remaining slice, in the whole pattern
                 int i = idx - offset;
                 int backslashCount = 0;
-                while (i > 0 && potentialPattern.charAt(i - 1) == '\\') {
-                    backslashCount++;
-                    i--;
+                if (release.countsTheBackslashesBeforeEachGlobToken()) {
+                    // lib.rs detect_glob_syntax: the run before the token itself, back to where the slice starts
+                    while (i > 0 && potentialPattern.charAt(offset + i - 1) == '\\') {
+                        backslashCount++;
+                        i--;
+                    }
+                } else {
+                    // bun counts the backslashes before the index relative to the remaining slice, in the whole
+                    // pattern
+                    while (i > 0 && potentialPattern.charAt(i - 1) == '\\') {
+                        backslashCount++;
+                        i--;
+                    }
                 }
                 if (backslashCount % 2 == 0) {
                     return true;
@@ -119,13 +137,22 @@ final class Glob {
     }
 
     static MatchResult match(String glob, String path) {
+        return match(glob, path, BunRelease.PORTED);
+    }
+
+    /**
+     * {@code match} as {@code release} matches: from 1.4.0 the pattern starts past its leading {@code !}s
+     * ({@link BunRelease#readsAGlobstarAfterANegation}).
+     */
+    static MatchResult match(String glob, String path, BunRelease release) {
         State state = new State();
         boolean negated = false;
         while (state.globIndex < glob.length() && glob.charAt(state.globIndex) == '!') {
             negated = !negated;
             state.globIndex++;
         }
-        boolean matched = globMatchImpl(state, glob, 0, path, new ArrayList<>());
+        int globStart = release.readsAGlobstarAfterANegation() ? state.globIndex : 0;
+        boolean matched = globMatchImpl(state, glob, globStart, path, new ArrayList<>());
         if (negated) {
             return matched ? MatchResult.NEGATE_NO_MATCH : MatchResult.NEGATE_MATCH;
         }

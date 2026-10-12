@@ -54,7 +54,8 @@ final class TextLockfileWriter {
         int[] indent = {0};
         writer.append("{\n");
         incIndent(writer, indent);
-        writer.append("\"lockfileVersion\": ").append(Lockfile.TEXT_LOCKFILE_VERSION_CURRENT).append(",\n");
+        writer.append("\"lockfileVersion\": ").append(release.keepsTheLockfileVersionItRead() ?
+                versionToWrite(lockfile) : Lockfile.TEXT_LOCKFILE_VERSION_CURRENT).append(",\n");
         writeIndent(writer, indent);
         if (release.writesConfigVersion()) {
             writer.append("\"configVersion\": ").append(configVersion).append(",\n");
@@ -62,7 +63,7 @@ final class TextLockfileWriter {
         }
         writer.append("\"workspaces\": {\n");
         incIndent(writer, indent);
-        writeWorkspaceDeps(writer, indent, lockfile, 0, "");
+        writeWorkspaceDeps(writer, indent, lockfile, 0, "", release);
 
         List<Integer> workspaceSortBuf = new ArrayList<>();
         for (int pkgId = 0; pkgId < pkgs.size(); pkgId++) {
@@ -74,7 +75,8 @@ final class TextLockfileWriter {
         for (int workspacePkgId : workspaceSortBuf) {
             writer.append('\n');
             writeIndent(writer, indent);
-            writeWorkspaceDeps(writer, indent, lockfile, workspacePkgId, pkgs.get(workspacePkgId).resolution.value);
+            writeWorkspaceDeps(writer, indent, lockfile, workspacePkgId, pkgs.get(workspacePkgId).resolution.value,
+                    release);
         }
         writer.append('\n');
         decIndent(writer, indent);
@@ -135,26 +137,27 @@ final class TextLockfileWriter {
             indent[0]++;
             for (String[] value : foundPatchedDependencies.values()) {
                 writeIndent(writer, indent);
-                Strings.appendJsonString(writer, value[0], true);
+                Strings.appendJsonString(writer, value[0], true, release);
                 writer.append(": ");
-                Strings.appendJsonString(writer, value[1], true);
+                Strings.appendJsonString(writer, value[1], true, release);
                 writer.append(",\n");
             }
             decIndent(writer, indent);
             writer.append("},\n");
         }
 
-        if (!lockfile.overrides.map.isEmpty()) {
+        if (!lockfile.overrides.isEmpty()) {
             lockfile.overrides.sort();
             writeIndent(writer, indent);
             writer.append("\"overrides\": {\n");
             indent[0]++;
-            for (Dependency overrideDep : lockfile.overrides.map.values()) {
-                writeIndent(writer, indent);
-                Strings.appendJsonString(writer, overrideDep.name, true);
-                writer.append(": ");
-                Strings.appendJsonString(writer, overrideDep.version.literal, true);
-                writer.append(",\n");
+            if (!lockfile.overrides.hasScoped()) {
+                for (Dependency overrideDep : lockfile.overrides.map.values()) {
+                    writeOverrideRule(writer, indent[0], overrideDep.name, "", overrideDep.version.literal, release);
+                }
+            } else {
+                // from 1.4.0
+                writeOverrideRules(writer, indent[0], lockfile.overrides, release);
             }
             decIndent(writer, indent);
             writer.append("},\n");
@@ -169,9 +172,9 @@ final class TextLockfileWriter {
             indent[0]++;
             for (Dependency catalogDep : lockfile.catalogs.defaultMap.values()) {
                 writeIndent(writer, indent);
-                Strings.appendJsonString(writer, catalogDep.name, true);
+                Strings.appendJsonString(writer, catalogDep.name, true, release);
                 writer.append(": ");
-                Strings.appendJsonString(writer, catalogDep.version.literal, true);
+                Strings.appendJsonString(writer, catalogDep.version.literal, true, release);
                 writer.append(",\n");
             }
             decIndent(writer, indent);
@@ -183,14 +186,14 @@ final class TextLockfileWriter {
             indent[0]++;
             for (Map.Entry<String, LinkedHashMap<String, Dependency>> entry : lockfile.catalogs.groups.entrySet()) {
                 writeIndent(writer, indent);
-                Strings.appendJsonString(writer, entry.getKey(), true);
+                Strings.appendJsonString(writer, entry.getKey(), true, release);
                 writer.append(": {\n");
                 indent[0]++;
                 for (Dependency catalogDep : entry.getValue().values()) {
                     writeIndent(writer, indent);
-                    Strings.appendJsonString(writer, catalogDep.name, true);
+                    Strings.appendJsonString(writer, catalogDep.name, true, release);
                     writer.append(": ");
-                    Strings.appendJsonString(writer, catalogDep.version.literal, true);
+                    Strings.appendJsonString(writer, catalogDep.version.literal, true, release);
                     writer.append(",\n");
                 }
                 decIndent(writer, indent);
@@ -236,12 +239,12 @@ final class TextLockfileWriter {
                     writeIndent(writer, indent);
                 }
                 writer.append('"');
-                Strings.appendJsonString(writer, item.relativePath, false);
+                Strings.appendJsonString(writer, item.relativePath, false, release);
                 if (item.depth != 0) {
                     writer.append('/');
                 }
                 Dependency dep = depsBuf.get(depId);
-                Strings.appendJsonString(writer, dep.name, false);
+                Strings.appendJsonString(writer, dep.name, false, release);
                 writer.append("\": ");
 
                 List<Integer> pkgDepsSortBuf = new ArrayList<>(pkg.dependenciesLen);
@@ -253,12 +256,12 @@ final class TextLockfileWriter {
                 switch (res.tag) {
                     case ROOT:
                         writer.append("[\"");
-                        Strings.appendJsonString(writer, pkg.name, false);
+                        Strings.appendJsonString(writer, pkg.name, false, release);
                         writer.append("@root:\", ");
                         writer.append('{');
                         if (pkg.bin.tag != Bin.Tag.NONE) {
                             writer.append(pkg.bin.tag == Bin.Tag.DIR ? " \"binDir\": " : " \"bin\": ");
-                            pkg.bin.toJsonSingleLine(writer);
+                            pkg.bin.toJsonSingleLine(writer, release);
                             writer.append(" }]");
                         } else {
                             writer.append("}]");
@@ -266,21 +269,21 @@ final class TextLockfileWriter {
                         break;
                     case FOLDER:
                         writer.append("[\"");
-                        Strings.appendJsonString(writer, pkg.name, false);
+                        Strings.appendJsonString(writer, pkg.name, false, release);
                         writer.append("@file:");
-                        Strings.appendJsonString(writer, res.value, false);
+                        Strings.appendJsonString(writer, res.value, false, release);
                         writer.append("\", ");
-                        writePackageInfoObject(writer, dep.behavior, depsBuf, pkgDepsSortBuf, pkg);
+                        writePackageInfoObject(writer, dep.behavior, depsBuf, pkgDepsSortBuf, pkg, release);
                         writer.append(']');
                         break;
                     case LOCAL_TARBALL:
                     case REMOTE_TARBALL:
                         writer.append("[\"");
-                        Strings.appendJsonString(writer, pkg.name, false);
+                        Strings.appendJsonString(writer, pkg.name, false, release);
                         writer.append('@');
-                        Strings.appendJsonString(writer, res.value, false);
+                        Strings.appendJsonString(writer, res.value, false, release);
                         writer.append("\", ");
-                        writePackageInfoObject(writer, dep.behavior, depsBuf, pkgDepsSortBuf, pkg);
+                        writePackageInfoObject(writer, dep.behavior, depsBuf, pkgDepsSortBuf, pkg, release);
                         if (release.carriesTarballIntegrity() && pkg.meta.integrity.tag.isSupported()) {
                             writer.append(", \"").append(pkg.meta.integrity).append("\"]");
                         } else {
@@ -289,37 +292,52 @@ final class TextLockfileWriter {
                         break;
                     case SYMLINK:
                         writer.append("[\"");
-                        Strings.appendJsonString(writer, pkg.name, false);
+                        Strings.appendJsonString(writer, pkg.name, false, release);
                         writer.append("@link:");
-                        Strings.appendJsonString(writer, res.value, false);
+                        Strings.appendJsonString(writer, res.value, false, release);
                         writer.append("\", ");
-                        writePackageInfoObject(writer, dep.behavior, depsBuf, pkgDepsSortBuf, pkg);
+                        writePackageInfoObject(writer, dep.behavior, depsBuf, pkgDepsSortBuf, pkg, release);
                         writer.append(']');
                         break;
                     case NPM:
                         writer.append("[\"");
-                        Strings.appendJsonString(writer, pkg.name, false);
+                        Strings.appendJsonString(writer, pkg.name, false, release);
                         writer.append('@').append(res.version).append("\", ");
-                        writer.append('"').append(res.url.startsWith(DEFAULT_REGISTRY) ? "" : res.url).append("\", ");
-                        writePackageInfoObject(writer, dep.behavior, depsBuf, pkgDepsSortBuf, pkg);
+                        boolean underDefault = release.matchesTheDefaultRegistryAtAPathBoundary() ?
+                                TextLockfileReader.urlIsUnderRegistry(res.url, BunOptions.DEFAULT_REGISTRY) :
+                                res.url.startsWith(DEFAULT_REGISTRY);
+                        writer.append('"');
+                        if (release.escapesTheRegistryAndRepositoryInBunLock()) {
+                            Strings.appendJsonString(writer, underDefault ? "" : res.url, false, release);
+                        } else {
+                            writer.append(underDefault ? "" : res.url);
+                        }
+                        writer.append("\", ");
+                        writePackageInfoObject(writer, dep.behavior, depsBuf, pkgDepsSortBuf, pkg, release);
                         writer.append(", \"").append(pkg.meta.integrity).append("\"]");
                         break;
                     case WORKSPACE:
                         writer.append("[\"");
-                        Strings.appendJsonString(writer, pkg.name, false);
+                        Strings.appendJsonString(writer, pkg.name, false, release);
                         writer.append("@workspace:");
-                        Strings.appendJsonString(writer, res.value, false);
+                        Strings.appendJsonString(writer, res.value, false, release);
                         writer.append("\"]");
                         break;
                     default: {
                         Repository repo = res.repository;
                         writer.append("[\"");
-                        Strings.appendJsonString(writer, pkg.name, false);
-                        writer.append('@').append(repo.format(res.tag == Resolution.Tag.GIT ? "git+" : "github:"))
-                                .append("\", ");
-                        writePackageInfoObject(writer, dep.behavior, depsBuf, pkgDepsSortBuf, pkg);
+                        Strings.appendJsonString(writer, pkg.name, false, release);
+                        String formatted = repo.format(res.tag == Resolution.Tag.GIT ? "git+" : "github:");
+                        writer.append('@');
+                        if (release.escapesTheRegistryAndRepositoryInBunLock()) {
+                            Strings.appendJsonString(writer, formatted, false, release);
+                        } else {
+                            writer.append(formatted);
+                        }
+                        writer.append("\", ");
+                        writePackageInfoObject(writer, dep.behavior, depsBuf, pkgDepsSortBuf, pkg, release);
                         writer.append(", ");
-                        Strings.appendJsonString(writer, repo.resolved, true);
+                        Strings.appendJsonString(writer, repo.resolved, true, release);
                         if (release.carriesTarballIntegrity() && pkg.meta.integrity.tag.isSupported()) {
                             writer.append(", \"").append(pkg.meta.integrity).append("\"]");
                         } else {
@@ -341,7 +359,7 @@ final class TextLockfileWriter {
     }
 
     private static void writePackageInfoObject(StringBuilder writer, Behavior depBehavior, List<Dependency> depsBuf,
-                                               List<Integer> pkgDepIds, Package pkg) {
+                                               List<Integer> pkgDepIds, Package pkg, BunRelease release) {
         List<String> optionalPeersBuf = new ArrayList<>();
         writer.append('{');
         boolean any = false;
@@ -369,9 +387,9 @@ final class TextLockfileWriter {
                 } else {
                     writer.append(", ");
                 }
-                Strings.appendJsonString(writer, dep.name, true);
+                Strings.appendJsonString(writer, dep.name, true, release);
                 writer.append(": ");
-                Strings.appendJsonString(writer, dep.version.literal, true);
+                Strings.appendJsonString(writer, dep.version.literal, true, release);
             }
             if (!first) {
                 writer.append(" }");
@@ -384,7 +402,7 @@ final class TextLockfileWriter {
                 if (i != 0) {
                     writer.append(' ');
                 }
-                Strings.appendJsonString(writer, optionalPeersBuf.get(i), true);
+                Strings.appendJsonString(writer, optionalPeersBuf.get(i), true, release);
                 if (i != optionalPeersBuf.size() - 1) {
                     writer.append(',');
                 }
@@ -428,14 +446,14 @@ final class TextLockfileWriter {
                 any = true;
             }
             writer.append(pkg.bin.tag == Bin.Tag.DIR ? " \"binDir\": " : " \"bin\": ");
-            pkg.bin.toJsonSingleLine(writer);
+            pkg.bin.toJsonSingleLine(writer, release);
         }
 
         writer.append(any ? " }" : "}");
     }
 
     private static void writeWorkspaceDeps(StringBuilder writer, int[] indent, Lockfile lockfile, int pkgId,
-                                           String res) {
+                                           String res, BunRelease release) {
         List<String> optionalPeersBuf = new ArrayList<>();
         boolean any = false;
         Package pkg = lockfile.packages.get(pkgId);
@@ -446,16 +464,16 @@ final class TextLockfileWriter {
                 writer.append('\n');
                 incIndent(writer, indent);
                 writer.append("\"name\": ");
-                Strings.appendJsonString(writer, rootName, true);
+                Strings.appendJsonString(writer, rootName, true, release);
                 any = true;
             }
         } else {
-            Strings.appendJsonString(writer, res, true);
+            Strings.appendJsonString(writer, res, true, release);
             writer.append(": {");
             writer.append('\n');
             incIndent(writer, indent);
             writer.append("\"name\": ");
-            Strings.appendJsonString(writer, pkg.name, true);
+            Strings.appendJsonString(writer, pkg.name, true, release);
             SemverVersion version = lockfile.workspaceVersions.get(pkg.nameHash);
             if (version != null) {
                 writer.append(",\n");
@@ -466,15 +484,21 @@ final class TextLockfileWriter {
                 writer.append(",\n");
                 writeIndent(writer, indent);
                 writer.append(pkg.bin.tag == Bin.Tag.DIR ? "\"binDir\": " : "\"bin\": ");
-                pkg.bin.toJsonMultiLine(writer, indent);
+                pkg.bin.toJsonMultiLine(writer, indent, release);
             }
             any = true;
         }
 
+        List<Dependency> deps = new ArrayList<>(lockfile.dependenciesOf(pkg));
+        if (lockfile.release.sortsWorkspaceDependenciesByName()) {
+            // a git or tarball dependency without an alias sorts under its literal when parsed, and its resolution
+            // renames it without sorting it again
+            deps.sort((l, r) -> Strings.order(l.name, r.name));
+        }
         for (int g = 0; g < GROUP_NAMES.length; g++) {
             Behavior groupBehavior = GROUP_BEHAVIORS[g];
             boolean first = true;
-            for (Dependency dep : lockfile.dependenciesOf(pkg)) {
+            for (Dependency dep : deps) {
                 if (!dep.behavior.includes(groupBehavior)) {
                     continue;
                 }
@@ -502,9 +526,9 @@ final class TextLockfileWriter {
                     writer.append(",\n");
                     writeIndent(writer, indent);
                 }
-                Strings.appendJsonString(writer, dep.name, true);
+                Strings.appendJsonString(writer, dep.name, true, release);
                 writer.append(": ");
-                Strings.appendJsonString(writer, dep.version.literal, true);
+                Strings.appendJsonString(writer, dep.version.literal, true, release);
             }
             if (!first) {
                 writer.append(",\n");
@@ -519,7 +543,7 @@ final class TextLockfileWriter {
             indent[0]++;
             for (String optionalPeer : optionalPeersBuf) {
                 writeIndent(writer, indent);
-                Strings.appendJsonString(writer, optionalPeer, true);
+                Strings.appendJsonString(writer, optionalPeer, true, release);
                 writer.append(",\n");
             }
             decIndent(writer, indent);
@@ -530,6 +554,155 @@ final class TextLockfileWriter {
             decIndent(writer, indent);
         }
         writer.append("},");
+    }
+
+    // override_selector_key: name when range is empty, else name@range
+    private static String overrideSelectorKey(String name, String range) {
+        return range.isEmpty() ? name : name + "@" + range;
+    }
+
+    private static void writeOverrideRule(StringBuilder writer, int indent, String name, String range, String value,
+                                          BunRelease release) {
+        writeIndent(writer, new int[]{indent});
+        Strings.appendJsonString(writer, overrideSelectorKey(name, range), true, release);
+        writer.append(": ");
+        Strings.appendJsonString(writer, value, true, release);
+        writer.append(",\n");
+    }
+
+    // a group of write_override_rules: a parent's, or a ranged rule's without a parent, both keyed name[@range]
+    private static final class GroupKey {
+        final long nameHash;
+        final String name;
+        final String literal;
+
+        GroupKey(long nameHash, String name, String literal) {
+            this.nameHash = nameHash;
+            this.name = name;
+            this.literal = literal;
+        }
+
+        int order(GroupKey rhs) {
+            int c = Strings.order(name, rhs.name);
+            return c != 0 ? c : Strings.order(literal, rhs.literal);
+        }
+    }
+
+    /**
+     * {@code write_override_rules} (from 1.4.0): the sorted plain rules, rules without a parent and parents' groups
+     * merged by key; scoped rules live in selector-keyed objects, and a plain rule folds into its name's unranged
+     * group as {@code "."}.
+     */
+    private static void writeOverrideRules(StringBuilder writer, int indent, OverrideMap overrides,
+                                           BunRelease release) {
+        List<Dependency> flat = new ArrayList<>(overrides.map.values());
+        List<OverrideMap.ScopedOverride> scoped = overrides.scoped;
+        int soloEnd = 0;
+        while (soloEnd < scoped.size() && scoped.get(soloEnd).parent == null) {
+            soloEnd++;
+        }
+        int f = 0;
+        int s = 0;
+        int g = soloEnd;
+        while (f < flat.size() || s < soloEnd || g < scoped.size()) {
+            GroupKey solo = s < soloEnd ? new GroupKey(scoped.get(s).dep.nameHash, scoped.get(s).dep.name,
+                    scoped.get(s).targetRange.literal) : null;
+            Dependency parent = g < scoped.size() ? scoped.get(g).parent : null;
+            GroupKey parented = parent == null ? null : new GroupKey(parent.nameHash, parent.name,
+                    parent.version.literal);
+            GroupKey group = solo != null && parented != null ? (parented.order(solo) < 0 ? parented : solo) :
+                    solo != null ? solo : parented;
+
+            if (f < flat.size()) {
+                Dependency flatDep = flat.get(f);
+                boolean flatFirst;
+                if (group == null) {
+                    flatFirst = true;
+                } else {
+                    int c = Strings.order(flatDep.name, group.name);
+                    flatFirst = c < 0 || c == 0 && !group.literal.isEmpty();
+                }
+                if (flatFirst) {
+                    writeOverrideRule(writer, indent, flatDep.name, "", flatDep.version.literal, release);
+                    f++;
+                    continue;
+                }
+            }
+            if (group == null) {
+                break;
+            }
+
+            writeIndent(writer, new int[]{indent});
+            Strings.appendJsonString(writer, overrideSelectorKey(group.name, group.literal), true, release);
+            writer.append(": {\n");
+
+            String dot = null;
+            if (group.literal.isEmpty()) {
+                if (f < flat.size() && flat.get(f).nameHash == group.nameHash) {
+                    dot = flat.get(f).version.literal;
+                    f++;
+                }
+            } else if (s < soloEnd && scoped.get(s).dep.nameHash == group.nameHash &&
+                       scoped.get(s).targetRange.literal.equals(group.literal)) {
+                dot = scoped.get(s).dep.version.literal;
+                s++;
+            }
+            if (dot != null) {
+                writeIndent(writer, new int[]{indent + 1});
+                writer.append("\".\": ");
+                Strings.appendJsonString(writer, dot, true, release);
+                writer.append(",\n");
+            }
+
+            while (g < scoped.size()) {
+                OverrideMap.ScopedOverride rule = scoped.get(g);
+                if (rule.parent == null || rule.parent.nameHash != group.nameHash ||
+                    !rule.parent.version.literal.equals(group.literal)) {
+                    break;
+                }
+                writeOverrideRule(writer, indent + 1, rule.dep.name, rule.targetRange.literal,
+                        rule.dep.version.literal, release);
+                g++;
+            }
+
+            writeIndent(writer, new int[]{indent});
+            writer.append("},\n");
+        }
+    }
+
+    /**
+     * {@code Stringifier::version_to_write} (from 1.4.0): a lock read keeps its version, 0 as 1, unless its overrides
+     * hold scoped rules; otherwise, among the packages written, an npm package without a supported integrity whose
+     * tarball is outside the default registry, or a git package whose tag is unsafe, holds it at 1; else it is 3 with
+     * scoped rules and 2 without.
+     */
+    private static int versionToWrite(Lockfile lockfile) {
+        int loaded = lockfile.textLockfileVersion;
+        boolean hasScoped = lockfile.overrides.hasScoped();
+        if (!hasScoped && loaded < Lockfile.TEXT_LOCKFILE_VERSION_SCOPED_OVERRIDES) {
+            return Math.max(loaded, Lockfile.TEXT_LOCKFILE_VERSION_CURRENT);
+        }
+        Tree.Iterator iter = new Tree.Iterator(lockfile);
+        Tree.Next node;
+        while ((node = iter.next()) != null) {
+            for (int depId : node.dependencies) {
+                int pkgId = lockfile.resolutions.get(depId);
+                if (pkgId == INVALID_PACKAGE_ID) {
+                    continue;
+                }
+                Package pkg = lockfile.packages.get(pkgId);
+                Resolution res = pkg.resolution;
+                if (res.tag == Resolution.Tag.NPM) {
+                    if (!pkg.meta.integrity.tag.isSupported() &&
+                        !TextLockfileReader.urlIsUnderRegistry(res.url, BunOptions.DEFAULT_REGISTRY)) {
+                        return Lockfile.TEXT_LOCKFILE_VERSION_CURRENT;
+                    }
+                } else if (res.tag == Resolution.Tag.GIT && !Repository.isSafeResolvedTag(res.repository.resolved)) {
+                    return Lockfile.TEXT_LOCKFILE_VERSION_CURRENT;
+                }
+            }
+        }
+        return hasScoped ? Lockfile.TEXT_LOCKFILE_VERSION_SCOPED_OVERRIDES : Lockfile.TEXT_LOCKFILE_VERSION_STRICT;
     }
 
     static void writeIndent(StringBuilder writer, int[] indent) {

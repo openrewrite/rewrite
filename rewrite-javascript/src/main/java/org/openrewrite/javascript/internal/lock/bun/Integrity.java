@@ -19,8 +19,8 @@ import java.util.Arrays;
 import java.util.Base64;
 
 /**
- * Port of bun's src/install/integrity.zig (bun 1.3.10): the digest decoded and encoded again with Zig's unpadded
- * base64, then {@code =} appended for sha1 and {@code ==} for every other algorithm.
+ * Port of bun's src/install/integrity.zig (bun 1.3.10), with integrity.rs (1.4.0) beside it: the digest decoded and
+ * encoded again with Zig's unpadded base64, then {@code =} appended for sha1 and {@code ==} for every other algorithm.
  */
 final class Integrity {
 
@@ -51,6 +51,16 @@ final class Integrity {
     }
 
     static Integrity parseSHASum(String buf) {
+        return parseSHASum(buf, BunRelease.PORTED);
+    }
+
+    /**
+     * {@code parseSHASum}: the first 40 characters as pairs of digits, letters read in base 36; from 1.4.0
+     * hexadecimal digits only, an odd count of them an error ({@link BunRelease#readsAShasumAsHexadecimal()}).
+     *
+     * @throws IllegalArgumentException {@code InvalidCharacter}
+     */
+    static Integrity parseSHASum(String buf, BunRelease release) {
         if (buf.isEmpty()) {
             return UNKNOWN;
         }
@@ -58,6 +68,21 @@ final class Integrity {
         int end = Math.min(40, buf.length());
         int outI = 0;
         int i = 0;
+        if (release.readsAShasumAsHexadecimal()) {
+            if (end % 2 != 0) {
+                throw new IllegalArgumentException("InvalidCharacter");
+            }
+            while (i < end) {
+                int hi = hexValue(buf.charAt(i));
+                int lo = hexValue(buf.charAt(i + 1));
+                if (hi < 0 || lo < 0) {
+                    throw new IllegalArgumentException("InvalidCharacter");
+                }
+                value[outI++] = (byte) (hi << 4 | lo);
+                i += 2;
+            }
+            return new Integrity(Tag.SHA1, value);
+        }
         while (i < end) {
             int x0 = hexDigit(buf.charAt(i));
             i++;
@@ -84,7 +109,51 @@ final class Integrity {
         throw new IllegalArgumentException("InvalidCharacter");
     }
 
+    // hex_digit_value: -1 for anything but 0-9, a-f and A-F
+    private static int hexValue(char c) {
+        if (c >= '0' && c <= '9') {
+            return c - '0';
+        } else if (c >= 'a' && c <= 'f') {
+            return c - 'a' + 10;
+        } else if (c >= 'A' && c <= 'F') {
+            return c - 'A' + 10;
+        }
+        return -1;
+    }
+
     static Integrity parse(String buf) {
+        return parse(buf, BunRelease.PORTED);
+    }
+
+    /**
+     * {@code parse}: the whole string is one hash; from 1.4.0 the strongest of the hashes it holds separated by ASCII
+     * whitespace, each read up to a {@code ?} ({@link BunRelease#keepsTheStrongestOfSeveralHashes()}).
+     */
+    static Integrity parse(String buf, BunRelease release) {
+        if (!release.keepsTheStrongestOfSeveralHashes()) {
+            return parseEntry(buf, false);
+        }
+        Integrity strongest = UNKNOWN;
+        int start = 0;
+        for (int i = 0; i <= buf.length(); i++) {
+            if (i == buf.length() || isAsciiWhitespace(buf.charAt(i))) {
+                Integrity parsed = parseEntry(buf.substring(start, i), true);
+                if (parsed.tag.ordinal() > strongest.tag.ordinal()) {
+                    strongest = parsed;
+                }
+                start = i + 1;
+            }
+        }
+        return strongest;
+    }
+
+    // u8::is_ascii_whitespace: no vertical tab
+    private static boolean isAsciiWhitespace(char c) {
+        return c == ' ' || c == '\t' || c == '\n' || c == '\u000C' || c == '\r';
+    }
+
+    // parse_entry, the hash read up to a '?' from 1.4.0
+    private static Integrity parseEntry(String buf, boolean cutAtQuery) {
         if (buf.length() < "sha256-".length()) {
             return UNKNOWN;
         }
@@ -109,7 +178,9 @@ final class Integrity {
             default:
                 return UNKNOWN;
         }
-        String input = Strings.trimRight(buf.substring(dash + 1), "=");
+        String hash = buf.substring(dash + 1);
+        int query = cutAtQuery ? hash.indexOf('?') : -1;
+        String input = Strings.trimRight(query >= 0 ? hash.substring(0, query) : hash, "=");
         int leftover = input.length() % 4;
         if (leftover == 1) {
             return UNKNOWN;

@@ -234,6 +234,22 @@ final class Package {
                         }
                         workspaceNames.processNamesArray(log, packages.items(), relativeTo(sourceDir, manifests));
                     }
+                    // from 1.4.1 the workspaces whose node_modules are self-contained, which the saved tree ignores
+                    Json.Expr selfContained = options.getRelease().readsSelfContainedWorkspaces() ?
+                            dependencies.get("selfContained") : null;
+                    if (selfContained != null) {
+                        if (!selfContained.isArray()) {
+                            log.addError("\"workspaces.selfContained\" expects an array of workspace paths or names");
+                            throw new IllegalArgumentException("InvalidPackageJSON");
+                        }
+                        for (Json.Expr item : selfContained.items()) {
+                            if (item.asString() == null) {
+                                log.addError("\"workspaces.selfContained\" entries must be strings (workspace " +
+                                             "paths or names)");
+                                throw new IllegalArgumentException("InvalidPackageJSON");
+                            }
+                        }
+                    }
                     continue;
                 }
                 for (Json.Property item : dependencies.properties()) {
@@ -282,7 +298,10 @@ final class Package {
             resolution = resolved;
         }
 
-        Json.Expr patchedDeps = json.get("patchedDependencies");
+        // from 1.4.1 the root's alone
+        Json.Expr patchedDeps = features.patchedDependencies ||
+                                !options.getRelease().readsPatchedDependenciesFromTheRootOnly() ?
+                json.get("patchedDependencies") : null;
         if (patchedDeps != null) {
             for (Json.Property prop : patchedDeps.properties()) {
                 if (prop.value.isString()) {
@@ -316,7 +335,7 @@ final class Package {
                     }
                     SemverVersion workspaceVersion = null;
                     if (entry.version != null) {
-                        SemverVersion.ParseResult result = SemverVersion.parse(entry.version);
+                        SemverVersion.ParseResult result = SemverVersion.parse(entry.version, options.getRelease());
                         if (result.valid && result.wildcard == SemverQuery.Wildcard.NONE) {
                             workspaceVersion = result.version.min();
                         }
@@ -376,17 +395,17 @@ final class Package {
         }
 
         if (features.isMain) {
-            lockfile.overrides.parseAppend(lockfile, this, json);
+            lockfile.overrides.parseAppend(lockfile, this, json, workspaceNames, manifests);
             boolean foundAnyCatalogOrCatalogObject = false;
             boolean hasWorkspaces = false;
             Json.Expr workspacesExpr = json.get("workspaces");
             // before 1.2.14 there are no catalogs
             if (workspacesExpr != null && options.getRelease().parsesCatalogSpecs()) {
-                foundAnyCatalogOrCatalogObject = lockfile.catalogs.parseAppend(log, workspacesExpr);
+                foundAnyCatalogOrCatalogObject = lockfile.catalogs.parseAppend(log, workspacesExpr, lockfile.release);
                 hasWorkspaces = true;
             }
             if (!foundAnyCatalogOrCatalogObject && hasWorkspaces && options.getRelease().readsTopLevelCatalogs()) {
-                lockfile.catalogs.parseAppend(log, json);
+                lockfile.catalogs.parseAppend(log, json, lockfile.release);
             }
         }
     }
@@ -440,6 +459,9 @@ final class Package {
                 DependencyVersion parsed = DependencyVersion.parse(key, keyHash, map.get(2 * i + 1), lockfile.release);
                 Dependency dependency = new Dependency(keyHash, key, parsed == null ? DependencyVersion.ZEROED : parsed,
                         behavior);
+                if (lockfile.release.stripsCatalogReferencesOutsideTheWorkspaces()) {
+                    CatalogMap.stripReference(dependency);
+                }
                 if (duplicateAt != null) {
                     dependencies.remove((int) duplicateAt);
                     dependencies.add(dependency);
@@ -550,10 +572,10 @@ final class Package {
                         trimmed.charAt(0) != '*' && trimmed.charAt(0) != '^' && trimmed.charAt(0) != '~') {
                         int at = Math.max(input.lastIndexOf('@'), 0);
                         if (at > 0) {
-                            workspaceRange = SemverQuery.parse(input.substring(at + 1));
+                            workspaceRange = SemverQuery.parse(input.substring(at + 1), options.getRelease());
                             nameHash = Wyhash11.stringHash(input.substring(0, at));
                         } else {
-                            workspaceRange = SemverQuery.parse(input);
+                            workspaceRange = SemverQuery.parse(input, options.getRelease());
                         }
                     }
                 }
@@ -580,23 +602,27 @@ final class Package {
             }
             case NPM: {
                 DependencyVersion.NpmInfo npm = dependencyVersion.npm();
-                if (workspaceVersion != null) {
-                    if (options.isLinkWorkspacePackages() && npm.version.satisfies(workspaceVersion)) {
-                        String path = workspacePath;
-                        DependencyVersion dep = DependencyVersion.parseWithTag(externalAlias, aliasHash, path,
-                                DependencyVersion.Tag.WORKSPACE, path);
-                        if (dep != null) {
-                            dependencyVersion = new DependencyVersion(dep.tag, dependencyVersion.literal, dep.value);
-                        }
-                    } else {
-                        for (int i = 0; i < packageDependencies.size(); i++) {
-                            Dependency dep = packageDependencies.get(i);
-                            if (dep.nameHash == nameHash && (options.getRelease().tellsDependencyGroupsApart() ?
-                                    dep.behavior.isWorkspace() : dep.version.tag == DependencyVersion.Tag.WORKSPACE)) {
-                                packageDependencies.set(i,
-                                        new Dependency(aliasHash, externalAlias, dependencyVersion, behavior));
-                                return null;
-                            }
+                // from 1.4.1 one rule, which links * even to a workspace without a version
+                boolean links = options.getRelease().linksAStarRangeToAWorkspaceWithoutVersion() ?
+                        Lockfile.linkedWorkspacePath(options.isLinkWorkspacePackages(), lockfile.workspacePaths,
+                                lockfile.workspaceVersions, nameHash, npm.version) != null :
+                        workspaceVersion != null && options.isLinkWorkspacePackages() &&
+                        npm.version.satisfies(workspaceVersion);
+                if (links) {
+                    String path = workspacePath;
+                    DependencyVersion dep = DependencyVersion.parseWithTag(externalAlias, aliasHash, path,
+                            DependencyVersion.Tag.WORKSPACE, path, lockfile.release);
+                    if (dep != null) {
+                        dependencyVersion = new DependencyVersion(dep.tag, dependencyVersion.literal, dep.value);
+                    }
+                } else if (workspaceVersion != null) {
+                    for (int i = 0; i < packageDependencies.size(); i++) {
+                        Dependency dep = packageDependencies.get(i);
+                        if (dep.nameHash == nameHash && (options.getRelease().tellsDependencyGroupsApart() ?
+                                dep.behavior.isWorkspace() : dep.version.tag == DependencyVersion.Tag.WORKSPACE)) {
+                            packageDependencies.set(i,
+                                    new Dependency(aliasHash, externalAlias, dependencyVersion, behavior));
+                            return null;
                         }
                     }
                 }
@@ -620,7 +646,8 @@ final class Package {
                         throw new IllegalArgumentException("InstallFailed");
                     }
                     dependencyVersion = dependencyVersion.asWorkspace(workspacePath);
-                } else {
+                } else if (features.isMain || features.isWorkspace ||
+                           !options.getRelease().registersWorkspaceSpecsOfTheWorkspacesOnly()) {
                     String workspace = dependencyVersion.string();
                     String path = "*".equals(workspace) ? "*" :
                             RootRelativePath.join(sourceDir.replace('\\', '/'), workspace.replace('\\', '/'));
@@ -667,6 +694,10 @@ final class Package {
         }
 
         Dependency thisDep = new Dependency(aliasHash, externalAlias, dependencyVersion, behavior);
+        if (!(features.isMain || features.isWorkspace) &&
+            options.getRelease().stripsCatalogReferencesOutsideTheWorkspaces()) {
+            CatalogMap.stripReference(thisDep);
+        }
         if (features.checkForDuplicateDependencies && !groupBehavior.isPeer() && !groupBehavior.isWorkspace()) {
             if (duplicateCheckerMap.containsKey(aliasHash)) {
                 if (groupBehavior.isOptional()) {
