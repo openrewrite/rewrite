@@ -62,7 +62,12 @@ final class Tree {
      */
     private static final class HoistResult {
         enum Kind {
-            DEPENDENCY_LOOP, HOISTED, RESOLVE, RESOLVE_REPLACE, RESOLVE_LATER, PLACEMENT
+            DEPENDENCY_LOOP, HOISTED, RESOLVE, RESOLVE_REPLACE, RESOLVE_LATER,
+            /**
+             * From 1.4.0: hoisted, and the optional peer's slot now points at the package it deduped onto.
+             */
+            REBIND,
+            PLACEMENT
         }
 
         static final HoistResult DEPENDENCY_LOOP = new HoistResult(Kind.DEPENDENCY_LOOP, 0, 0, false);
@@ -87,6 +92,10 @@ final class Tree {
 
         static HoistResult resolveReplace(int treeId, int depId) {
             return new HoistResult(Kind.RESOLVE_REPLACE, treeId, depId, false);
+        }
+
+        static HoistResult rebind(int packageId) {
+            return new HoistResult(Kind.REBIND, packageId, 0, false);
         }
 
         static HoistResult placement(int treeId, boolean bundled) {
@@ -116,17 +125,26 @@ final class Tree {
         private final Deque<FillItem> queue = new ArrayDeque<>();
         private final Map<Long, LinkedHashSet<Integer>> pendingOptionalPeers = new LinkedHashMap<>();
 
+        /**
+         * An optional peer got bound after its dependent was placed ({@link Lockfile#resolve}).
+         */
+        private boolean lateBoundOptionalPeer;
+
         Builder(Lockfile lockfile) {
             this.lockfile = lockfile;
         }
 
-        void hoist() {
+        /**
+         * Sets the lockfile's trees and hoisted dependencies; whether an optional peer got bound late.
+         */
+        boolean hoist() {
             new Tree().processSubtree(ROOT_DEP_ID, INVALID_ID, this);
             while (!queue.isEmpty()) {
                 FillItem item = queue.poll();
                 trees.get(item.treeId).processSubtree(item.dependencyId, item.hoistRootId, this);
             }
             clean();
+            return lateBoundOptionalPeer;
         }
 
         private void clean() {
@@ -182,11 +200,11 @@ final class Tree {
                 if (!dependency.behavior.isOptionalPeer()) {
                     continue;
                 }
-                hoisted = next.hoistDependency(true, hoistRootId, pkgId, dependency, builder);
+                hoisted = next.hoistDependency(true, hoistRootId, pkgId, dependency, parentPkg, builder);
             } else if (builder.lockfile.packages.get(pkgId).resolution.tag == Resolution.Tag.FOLDER) {
                 BunRelease release = builder.lockfile.release;
                 if (release.dedupesAPeerResolvedToAFolderPackage() && dependency.behavior.isPeer() &&
-                    next.hoistDependency(true, hoistRootId, pkgId, dependency, builder).kind ==
+                    next.hoistDependency(true, hoistRootId, pkgId, dependency, parentPkg, builder).kind ==
                     HoistResult.Kind.HOISTED) {
                     hoisted = HoistResult.HOISTED;
                 } else {
@@ -205,13 +223,16 @@ final class Tree {
                     hoisted = HoistResult.placement(next.id, false);
                 }
             } else {
-                hoisted = next.hoistDependency(true, hoistRootId, pkgId, dependency, builder);
+                hoisted = next.hoistDependency(true, hoistRootId, pkgId, dependency, parentPkg, builder);
             }
 
             switch (hoisted.kind) {
                 case DEPENDENCY_LOOP:
                 case HOISTED:
                     continue;
+                case REBIND:
+                    builder.lockfile.resolutions.set(depId, hoisted.id);
+                    break;
                 case RESOLVE: {
                     builder.lockfile.resolutions.set(depId, hoisted.id);
                     LinkedHashSet<Integer> peers = builder.pendingOptionalPeers.remove(dependency.nameHash);
@@ -223,6 +244,7 @@ final class Tree {
                     break;
                 }
                 case RESOLVE_REPLACE: {
+                    builder.lateBoundOptionalPeer = true;
                     builder.lockfile.resolutions.set(hoisted.depId, pkgId);
                     LinkedHashSet<Integer> peers = builder.pendingOptionalPeers.remove(dependency.nameHash);
                     if (peers != null) {
@@ -287,8 +309,10 @@ final class Tree {
     }
 
     // 1: dedupe (hoisted), 2: place here or higher, 3: stay at this relative place (dependency loop)
+    // inputDepRange: the package whose dependencies are being placed
     private HoistResult hoistDependency(boolean asDefined, int hoistRootId, int packageId, Dependency dependency,
-                                        Builder builder) {
+                                        Package inputDepRange, Builder builder) {
+        BunRelease release = builder.lockfile.release;
         List<Integer> thisDependencies = builder.dependencyLists.get(this.id);
         for (int depId : thisDependencies) {
             Dependency dep = builder.lockfile.dependencies.get(depId);
@@ -308,22 +332,33 @@ final class Tree {
             if (resId == packageId) {
                 return HoistResult.HOISTED;
             }
-            if (asDefined && dep.behavior.isDev() != dependency.behavior.isDev()) {
+            if (release.dedupesAPackagesEdgesToOneName()) {
+                // the same package lists this name in another dependency group
+                if (inputDepRange.containsDependency(depId)) {
+                    return HoistResult.HOISTED;
+                }
+            } else if (asDefined && dep.behavior.isDev() != dependency.behavior.isDev()) {
                 return HoistResult.HOISTED;
             }
             if (dependency.behavior.isPeer()) {
-                if (dependency.version.tag == DependencyVersion.Tag.NPM) {
+                // from 1.4.0 an optional peer's binding follows the dedupe, in the tree being saved
+                HoistResult dedupe = dependency.behavior.isOptionalPeer() &&
+                                     release.rebindsTheOptionalPeersItDedupes() ?
+                        HoistResult.rebind(resId) : HoistResult.HOISTED;
+                DependencyVersion peerRange = release.dedupesACatalogPeerByItsRange() ?
+                        builder.lockfile.catalogs.resolveRange(dependency) : dependency.version;
+                if (peerRange.tag == DependencyVersion.Tag.NPM) {
                     Resolution resolution = builder.lockfile.packages.get(resId).resolution;
                     if (resolution.tag == Resolution.Tag.NPM &&
-                        dependency.version.npm().version.satisfies(resolution.version)) {
-                        return HoistResult.HOISTED;
+                        peerRange.npm().version.satisfies(resolution.version)) {
+                        return dedupe;
                     }
                 }
                 if (builder.lockfile.isWorkspaceRootDependency(depId)) {
-                    return HoistResult.HOISTED;
+                    return dedupe;
                 }
             }
-            if (asDefined && !dep.behavior.isPeer()) {
+            if (asDefined && !dep.behavior.isPeer() && !release.dedupesAPackagesEdgesToOneName()) {
                 throw new DependencyLoop("Package \"" + builder.describe(packageId) + "\" has a dependency loop\n" +
                                          "  Resolution: \"" + builder.describe(resId) + "\"\n" +
                                          "  Dependency: \"" + dependency.name + "@" + dependency.version.literal +
@@ -334,7 +369,7 @@ final class Tree {
 
         if (this.parent != INVALID_ID && this.id != hoistRootId) {
             HoistResult id = builder.trees.get(this.parent)
-                    .hoistDependency(false, hoistRootId, packageId, dependency, builder);
+                    .hoistDependency(false, hoistRootId, packageId, dependency, inputDepRange, builder);
             if (!asDefined || id.kind != HoistResult.Kind.DEPENDENCY_LOOP) {
                 return id;
             }

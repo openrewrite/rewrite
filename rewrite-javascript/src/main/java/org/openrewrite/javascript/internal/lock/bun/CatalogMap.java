@@ -83,6 +83,37 @@ final class CatalogMap {
         return group.get(depName);
     }
 
+    /**
+     * {@code resolve_range} (from 1.4.0): the version a {@code catalog:} dependency's entry names, else, without an
+     * entry or for any other dependency, the dependency's own.
+     */
+    DependencyVersion resolveRange(Dependency dep) {
+        if (dep.version.tag != DependencyVersion.Tag.CATALOG) {
+            return dep.version;
+        }
+        Dependency entry = get(dep.version.string(), dep.name);
+        return entry == null ? dep.version : entry.version;
+    }
+
+    /**
+     * {@code strip_reference} (from 1.4.0): only the root and its workspaces reference catalogs, so that elsewhere a
+     * {@code catalog:} dependency is left unresolvable, keeping its literal, and a {@code catalog:} peer becomes an
+     * optional peer of {@code *}, binding to whatever the importer provides.
+     */
+    static void stripReference(Dependency dep) {
+        if (dep.version.tag != DependencyVersion.Tag.CATALOG) {
+            return;
+        }
+        String literal = dep.version.literal;
+        if (!dep.behavior.isPeer()) {
+            dep.version = new DependencyVersion(DependencyVersion.Tag.UNINITIALIZED, literal, null);
+            return;
+        }
+        dep.behavior = dep.behavior.add(Behavior.OPTIONAL);
+        dep.version = new DependencyVersion(DependencyVersion.Tag.NPM, literal,
+                new DependencyVersion.NpmInfo(dep.name, SemverQuery.parse("*"), false));
+    }
+
     LinkedHashMap<String, Dependency> getOrPutGroup(String catalogName) {
         if (catalogName.isEmpty()) {
             return defaultMap;

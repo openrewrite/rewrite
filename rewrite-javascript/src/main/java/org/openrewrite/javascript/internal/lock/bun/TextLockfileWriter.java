@@ -476,10 +476,16 @@ final class TextLockfileWriter {
             any = true;
         }
 
+        List<Dependency> deps = new ArrayList<>(lockfile.dependenciesOf(pkg));
+        if (lockfile.release.sortsWorkspaceDependenciesByName()) {
+            // a git or tarball dependency without an alias sorts under its literal when parsed, and its resolution
+            // renames it without sorting it again
+            deps.sort((l, r) -> Strings.order(l.name, r.name));
+        }
         for (int g = 0; g < GROUP_NAMES.length; g++) {
             Behavior groupBehavior = GROUP_BEHAVIORS[g];
             boolean first = true;
-            for (Dependency dep : lockfile.dependenciesOf(pkg)) {
+            for (Dependency dep : deps) {
                 if (!dep.behavior.includes(groupBehavior)) {
                     continue;
                 }

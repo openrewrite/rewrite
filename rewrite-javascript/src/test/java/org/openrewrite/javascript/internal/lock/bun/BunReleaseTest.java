@@ -23,6 +23,7 @@ import org.openrewrite.javascript.internal.lock.HostEnvironment;
 
 import java.util.Collections;
 import java.util.List;
+import java.util.Map;
 
 import static java.util.Objects.requireNonNull;
 import static org.assertj.core.api.Assertions.assertThat;
@@ -667,6 +668,39 @@ class BunReleaseTest {
         throw new IllegalArgumentException(owner + " has no dependency on " + name);
     }
 
+    // 1.4.x: the reader's binding, the hoist, the diff and the clean
+
+    private static String npm(String key, String nameAtVersion, String info) {
+        return "    \"" + key + "\": [\"" + nameAtVersion + "\", \"\", " + info + ", \"" + INTEGRITY + "\"],\n";
+    }
+
+    private static String lockWith(String workspaces, String packages) {
+        return "{\n  \"lockfileVersion\": 1,\n  \"workspaces\": {\n" + workspaces + "  },\n  \"packages\": {\n" +
+               packages + "  }\n}\n";
+    }
+
+    private static String rootWith(String dependencies) {
+        return "    \"\": {\n      \"name\": \"r\",\n      \"dependencies\": " + dependencies + ",\n    },\n";
+    }
+
+    private static Dependency dependencyOf(Lockfile lockfile, String pkgName, String depName) {
+        return lockfile.dependencies.get(dependencyIdOf(lockfile, pkgName, depName));
+    }
+
+    // the first package of the name and its first dependency of the name
+    private static int dependencyIdOf(Lockfile lockfile, String pkgName, String depName) {
+        for (Package pkg : lockfile.packages) {
+            if (pkg.name.equals(pkgName)) {
+                for (int id = pkg.dependenciesOff; id < pkg.dependenciesEnd(); id++) {
+                    if (lockfile.dependencies.get(id).name.equals(depName)) {
+                        return id;
+                    }
+                }
+            }
+        }
+        throw new AssertionError(pkgName + " has no dependency " + depName);
+    }
+
     /**
      * OverrideMap.rs get and scoped_rule_for (1.4.0, bun#38333): the scoped rule of the edge's name that matches best
      * wins over the plain one, a ranged parent the edge's owner satisfies over an unranged one over none, a target
@@ -1120,6 +1154,530 @@ class BunReleaseTest {
     void dedupesAPeerResolvedToAFolderPackageFrom141() {
         assertThat(writtenBack("1.4.1", PEER_ON_A_FOLDER)).doesNotContain("\"p/x\"");
         assertThat(writtenBack("1.4.0", PEER_ON_A_FOLDER)).contains("\"p/x\": [\"x@file:x\", {}]");
+    }
+
+    // the package a package's dependency of the name resolves to, as name@resolution; null for none
+    private static @org.jspecify.annotations.Nullable String resolutionOf(Lockfile lockfile, String pkgName,
+                                                                           String depName) {
+        int pkgId = lockfile.resolutions.get(dependencyIdOf(lockfile, pkgName, depName));
+        return pkgId < lockfile.packages.size() ? lockfile.packages.get(pkgId).toString() : null;
+    }
+
+    /**
+     * bun.lock.rs {@code may_stay_unresolved} (1.4.0): a peer the lock provides no package for loads unresolved;
+     * before, the lock is invalid.
+     */
+    @Test
+    void readsAPeerTheLockLeavesUnresolvedFrom140() {
+        String lock = lockWith(rootWith("{ \"a\": \"1.0.0\" }"),
+          npm("a", "a@1.0.0", "{ \"peerDependencies\": { \"b\": \"^1.0.0\" } }"));
+        assertThat(resolutionOf(TextLockfileReader.load(lock, options("1.4.0", null)), "a", "b")).isNull();
+        assertThatThrownBy(() -> TextLockfileReader.load(lock, options("1.3.14", null)))
+          .isInstanceOf(TextLockfileReader.ParseError.class)
+          .hasMessage("Failed to resolve peer dependency 'b' for package 'a'");
+    }
+
+    /**
+     * bun.lock.rs {@code resolve_peer_dep_version_based} (1.4.0): y's peer react ^17 binds to the highest react that
+     * satisfies it, x's nested 17.0.2; before, by y's path to the root's 18.2.0.
+     */
+    @Test
+    void bindsALoadedPeerByVersionFrom140() {
+        String lock = lockWith(rootWith("{ \"react\": \"18.2.0\", \"x\": \"1.0.0\", \"y\": \"1.0.0\" }"),
+          npm("react", "react@18.2.0", "{}") +
+          npm("x", "x@1.0.0", "{ \"dependencies\": { \"react\": \"17.0.2\" } }") +
+          npm("x/react", "react@17.0.2", "{}") +
+          npm("y", "y@1.0.0", "{ \"peerDependencies\": { \"react\": \"^17.0.0\" } }"));
+        assertThat(resolutionOf(TextLockfileReader.load(lock, options("1.4.0", null)), "y", "react"))
+          .isEqualTo("react@17.0.2");
+        assertThat(resolutionOf(TextLockfileReader.load(lock, options("1.3.14", null)), "y", "react"))
+          .isEqualTo("react@18.2.0");
+    }
+
+    /**
+     * CatalogMap.rs {@code strip_reference} (1.4.0): outside the root and the workspaces a {@code catalog:} edge is
+     * left unresolved with its literal, and a {@code catalog:} peer is an optional peer of {@code *}.
+     */
+    @Test
+    void stripsACatalogReference() {
+        Dependency dep = new Dependency("ms", requireNonNull(DependencyVersion.parse("ms", null, "catalog:")),
+          Behavior.of(Behavior.PROD));
+        CatalogMap.stripReference(dep);
+        assertThat(dep.version.tag).isEqualTo(DependencyVersion.Tag.UNINITIALIZED);
+        assertThat(dep.version.literal).isEqualTo("catalog:");
+        Dependency peer = new Dependency("p", requireNonNull(DependencyVersion.parse("p", null, "catalog:x")),
+          Behavior.of(Behavior.PEER));
+        CatalogMap.stripReference(peer);
+        assertThat(peer.behavior.isOptionalPeer()).isTrue();
+        assertThat(peer.version.tag).isEqualTo(DependencyVersion.Tag.NPM);
+        assertThat(peer.version.npm().version.isStar()).isTrue();
+        assertThat(peer.version.literal).isEqualTo("catalog:x");
+        // dependency.rs parse_with_tag (1.4.0): an uninitialized spec keeps its literal; before, it is none
+        assertThat(requireNonNull(DependencyVersion.parseWithTag("ms", null, "catalog:",
+          DependencyVersion.Tag.UNINITIALIZED, "catalog:", BunRelease.of("1.4.0"))).literal).isEqualTo("catalog:");
+        assertThat(DependencyVersion.parseWithTag("ms", null, "catalog:", DependencyVersion.Tag.UNINITIALIZED,
+          "catalog:", BunRelease.of("1.3.14"))).isNull();
+    }
+
+    /**
+     * bun.lock.rs {@code parse_append_dependencies(.., catalogs_apply)} (1.4.0): a package of the lock references no
+     * catalog, so that its {@code catalog:} edge stays unresolved and is written back as it was, and its
+     * {@code catalog:} peer is an optional peer; before, both resolve against the root's catalog.
+     */
+    @Test
+    void stripsTheCatalogReferencesOfALockedPackageFrom140() {
+        String lock = "{\n  \"lockfileVersion\": 1,\n  \"workspaces\": {\n" +
+                      rootWith("{ \"a\": \"1.0.0\", \"ms\": \"catalog:\" }") +
+                      "  },\n  \"catalog\": {\n    \"ms\": \"2.1.3\",\n    \"p\": \"^1.0.0\",\n  },\n" +
+                      "  \"packages\": {\n" +
+                      npm("a", "a@1.0.0", "{ \"dependencies\": { \"ms\": \"catalog:\" }, \"peerDependencies\": " +
+                                          "{ \"p\": \"catalog:\" } }") +
+                      npm("ms", "ms@2.1.3", "{}") +
+                      npm("p", "p@1.0.0", "{}") +
+                      "  }\n}\n";
+        Lockfile later = TextLockfileReader.load(lock, options("1.4.0", null));
+        assertThat(dependencyOf(later, "a", "ms").version.tag).isEqualTo(DependencyVersion.Tag.UNINITIALIZED);
+        assertThat(resolutionOf(later, "a", "ms")).isNull();
+        assertThat(dependencyOf(later, "a", "p").behavior.isOptionalPeer()).isTrue();
+        assertThat(writtenBack("1.4.0", lock))
+          .contains("\"a\": [\"a@1.0.0\", \"\", { \"dependencies\": { \"ms\": \"catalog:\" }, \"peerDependencies\": " +
+                    "{ \"p\": \"catalog:\" }, \"optionalPeers\": [\"p\"] }");
+        Lockfile earlier = TextLockfileReader.load(lock, options("1.3.14", null));
+        assertThat(dependencyOf(earlier, "a", "ms").version.tag).isEqualTo(DependencyVersion.Tag.CATALOG);
+        assertThat(resolutionOf(earlier, "a", "ms")).isEqualTo("ms@2.1.3");
+        assertThat(dependencyOf(earlier, "a", "p").behavior.isOptionalPeer()).isFalse();
+    }
+
+    /**
+     * Package.rs {@code from_npm} and {@code parse_dependency} (1.4.0): a registry manifest's and a folder's
+     * {@code catalog:} dependency is stripped; a workspace's is not.
+     */
+    @Test
+    void stripsTheCatalogReferencesOfAManifestOutsideTheWorkspacesFrom140() {
+        String packument = "{\"name\":\"a\",\"modified\":\"2026-01-01T00:00:00.000Z\",\"versions\":{\"1.0.0\":" +
+                           "{\"name\":\"a\",\"version\":\"1.0.0\",\"dependencies\":{\"ms\":\"catalog:\"}," +
+                           "\"dist\":{\"tarball\":\"https://registry.npmjs.org/a/-/a-1.0.0.tgz\"}}}," +
+                           "\"dist-tags\":{\"latest\":\"1.0.0\"}}";
+        for (String release : new String[]{"1.4.0", "1.3.14"}) {
+            BunRelease bunRelease = BunRelease.of(release);
+            PackageManifest manifest = requireNonNull(PackageManifest.parse(bunRelease, new Log(), packument, "a",
+              false));
+            PackageManifest.FindResult pick = requireNonNull(manifest.findBestVersion(
+              requireNonNull(DependencyVersion.parse("a", Wyhash11.stringHash("a"), "1.0.0")).npm().version));
+            Lockfile lockfile = new Lockfile(bunRelease);
+            Package pkg = Package.fromNPM(lockfile, manifest, pick.version, pick.packageVersion, Features.NPM);
+            assertThat(lockfile.dependencies.get(pkg.dependenciesOff).version.tag).as(release)
+              .isEqualTo("1.4.0".equals(release) ? DependencyVersion.Tag.UNINITIALIZED : DependencyVersion.Tag.CATALOG);
+        }
+        String folder = "{\"name\":\"f\",\"dependencies\":{\"ms\":\"catalog:\"}}";
+        assertThat(firstDependency("1.4.0", folder, Features.FOLDER).version.tag)
+          .isEqualTo(DependencyVersion.Tag.UNINITIALIZED);
+        assertThat(firstDependency("1.3.14", folder, Features.FOLDER).version.tag)
+          .isEqualTo(DependencyVersion.Tag.CATALOG);
+        assertThat(firstDependency("1.4.0", folder, Features.WORKSPACE).version.tag)
+          .isEqualTo(DependencyVersion.Tag.CATALOG);
+    }
+
+    private static Dependency firstDependency(String release, String manifest, Features features) {
+        Lockfile lockfile = new Lockfile(BunRelease.of(release));
+        Package pkg = new Package();
+        pkg.parseWithJSON(lockfile, options(release, null), new Log(), "f", Json.parse(manifest), features,
+          Collections.emptyMap());
+        return lockfile.dependencies.get(pkg.dependenciesOff);
+    }
+
+    /**
+     * Package.rs {@code parse_dependency} (1.4.0, bun#37669): a folder's {@code workspace:} spec names no workspace
+     * path; the root's and a workspace's still do.
+     */
+    @Test
+    void registersTheWorkspaceSpecsOfTheWorkspacesOnlyFrom140() {
+        String folder = "{\"name\":\"f\",\"dependencies\":{\"w\":\"workspace:*\"}}";
+        for (String release : new String[]{"1.4.0", "1.3.14"}) {
+            for (Features features : new Features[]{Features.FOLDER, Features.WORKSPACE}) {
+                Lockfile lockfile = new Lockfile(BunRelease.of(release));
+                new Package().parseWithJSON(lockfile, options(release, null), new Log(), "f", Json.parse(folder),
+                  features, Collections.emptyMap());
+                assertThat(lockfile.workspacePaths.containsKey(Wyhash11.stringHash("w"))).as(release)
+                  .isEqualTo(!"1.4.0".equals(release) || features == Features.WORKSPACE);
+            }
+        }
+    }
+
+    /**
+     * bun.lock.rs {@code find_resolution_bounded_at_bundle} (1.4.0): the optional peer c of the bundled b/a is looked up
+     * no higher than b, so that it stays unresolved; before, the walk reaches the root's c.
+     */
+    @Test
+    void boundsTheOptionalPeersOfABundleFrom140() {
+        String lock = lockWith(rootWith("{ \"b\": \"1.0.0\", \"c\": \"1.0.0\" }"),
+          npm("b", "b@1.0.0", "{ \"dependencies\": { \"a\": \"1.0.0\" } }") +
+          npm("b/a", "a@1.0.0", "{ \"peerDependencies\": { \"c\": \"^1.0.0\" }, \"optionalPeers\": [\"c\"], " +
+                                "\"bundled\": true }") +
+          npm("c", "c@1.0.0", "{}"));
+        assertThat(resolutionOf(TextLockfileReader.load(lock, options("1.4.0", null)), "a", "c")).isNull();
+        assertThat(resolutionOf(TextLockfileReader.load(lock, options("1.3.14", null)), "a", "c"))
+          .isEqualTo("c@1.0.0");
+    }
+
+    /**
+     * bun.lock.rs (1.4.0, bun#38765): a lock with workspaces and no {@code "packages"} binds the root's edges to the
+     * workspaces; before, it leaves them without resolutions.
+     */
+    @Test
+    void resolvesALockWithoutPackagesFrom140() {
+        String lock = "{\n  \"lockfileVersion\": 1,\n  \"workspaces\": {\n    \"\": {\n      \"name\": \"r\",\n" +
+                      "    },\n    \"packages/a\": {\n      \"name\": \"a\",\n    },\n  }\n}\n";
+        Lockfile later = TextLockfileReader.load(lock, options("1.4.0", null));
+        assertThat(later.resolutions).hasSameSizeAs(later.dependencies);
+        assertThat(resolutionOf(later, "r", "a")).isEqualTo("a@workspace:packages/a");
+        assertThat(TextLockfileReader.load(lock, options("1.3.14", null)).resolutions).isEmpty();
+    }
+
+    /**
+     * bun.lock.rs (1.4.3, bun#42884): the bundled mark of a tarball package, in its entry's second element, is read;
+     * before, only a third element's.
+     */
+    @Test
+    void findsTheBundledMarkInAnyEntryFrom143() {
+        String lock = lockWith(rootWith("{ \"b\": \"1.0.0\" }"),
+          npm("b", "b@1.0.0", "{ \"dependencies\": { \"a\": \"https://example.com/a.tgz\" } }") +
+          "    \"b/a\": [\"a@https://example.com/a.tgz\", { \"bundled\": true }],\n");
+        assertThat(dependencyOf(TextLockfileReader.load(lock, options("1.4.3", null)), "b", "a").behavior.isBundled())
+          .isTrue();
+        assertThat(dependencyOf(TextLockfileReader.load(lock, options("1.4.2", null)), "b", "a").behavior.isBundled())
+          .isFalse();
+    }
+
+    /**
+     * bun.lock.rs {@code tag_workspace_links} (1.4.1, bun#41302): a root's dist-tag edge the lock resolves to a
+     * workspace stays a dist tag, as a reparse of package.json gives it; a range the workspace's version satisfies
+     * becomes a workspace link; before, both do.
+     */
+    @Test
+    void tagsWorkspaceLinksAsAReparseDoesFrom141() {
+        String lock = "{\n  \"lockfileVersion\": 1,\n  \"workspaces\": {\n" +
+                      rootWith("{ \"a\": \"latest\", \"b\": \"^1.0.0\" }") +
+                      "    \"packages/a\": {\n      \"name\": \"a\",\n      \"version\": \"1.0.0\",\n    },\n" +
+                      "    \"packages/b\": {\n      \"name\": \"b\",\n      \"version\": \"1.0.0\",\n    },\n" +
+                      "  },\n  \"packages\": {\n    \"a\": [\"a@workspace:packages/a\"],\n" +
+                      "    \"b\": [\"b@workspace:packages/b\"],\n  }\n}\n";
+        Lockfile later = TextLockfileReader.load(lock, options("1.4.1", null));
+        Lockfile earlier = TextLockfileReader.load(lock, options("1.4.0", null));
+        for (Lockfile lockfile : new Lockfile[]{later, earlier}) {
+            Package root = lockfile.packages.get(0);
+            for (int id = root.dependenciesOff; id < root.dependenciesEnd(); id++) {
+                Dependency dep = lockfile.dependencies.get(id);
+                if (dep.behavior.isWorkspace()) {
+                    continue;
+                }
+                DependencyVersion.Tag expected = lockfile == later && "a".equals(dep.name) ?
+                  DependencyVersion.Tag.DIST_TAG : DependencyVersion.Tag.WORKSPACE;
+                assertThat(dep.version.tag).as(dep.name + " at " + lockfile.release).isEqualTo(expected);
+                assertThat(lockfile.packages.get(lockfile.resolutions.get(id)).name).isEqualTo(dep.name);
+            }
+        }
+    }
+
+    /**
+     * Package.rs {@code parse_dependency} with lockfile.rs {@code linked_workspace_path} (1.4.1, bun#41302): the root's
+     * {@code *} links the workspace without a version; before, only a version links.
+     */
+    @Test
+    void linksAStarRangeToAWorkspaceWithoutVersionFrom141() {
+        Map<String, String> manifests = new java.util.LinkedHashMap<>();
+        manifests.put("", "{\"name\":\"r\",\"workspaces\":[\"packages/a\"],\"dependencies\":{\"a\":\"*\"}}");
+        manifests.put("packages/a", "{\"name\":\"a\"}");
+        assertThat(rootDependencyTag("1.4.1", manifests, "a", false)).isEqualTo(DependencyVersion.Tag.WORKSPACE);
+        assertThat(rootDependencyTag("1.4.0", manifests, "a", false)).isEqualTo(DependencyVersion.Tag.NPM);
+    }
+
+    // the version tag of the root's dependency of the name, workspace or not
+    private static DependencyVersion.Tag rootDependencyTag(String release, Map<String, String> manifests,
+                                                           String name, boolean workspace) {
+        Lockfile lockfile = new Lockfile(BunRelease.of(release));
+        Package root = new Package();
+        root.parseWithJSON(lockfile, options(release, null), new Log(), "", Json.parse(manifests.get("")),
+          Features.MAIN, manifests);
+        for (Dependency dep : lockfile.dependenciesOf(root)) {
+            if (dep.name.equals(name) && dep.behavior.isWorkspace() == workspace) {
+                return dep.version.tag;
+            }
+        }
+        throw new AssertionError("no " + name);
+    }
+
+    /**
+     * Package.rs parse_with_json (1.4.1, bun#39816): a workspace's patchedDependencies are not read; the root's are.
+     */
+    @Test
+    void readsPatchedDependenciesFromTheRootOnlyFrom141() {
+        String manifest = "{\"name\":\"a\",\"patchedDependencies\":{\"x@1.0.0\":\"patches/x.patch\"}}";
+        assertThat(patched("1.4.1", manifest, Features.WORKSPACE)).isEmpty();
+        assertThat(patched("1.4.0", manifest, Features.WORKSPACE)).hasSize(1);
+        assertThat(patched("1.4.1", manifest, Features.MAIN)).hasSize(1);
+    }
+
+    private static Map<Long, String> patched(String release, String manifest, Features features) {
+        Lockfile lockfile = new Lockfile(BunRelease.of(release));
+        new Package().parseWithJSON(lockfile, options(release, null), new Log(), "", Json.parse(manifest), features,
+          Collections.emptyMap());
+        return lockfile.patchedDependencies;
+    }
+
+    /**
+     * Package.rs parse_with_json (1.4.1, bun#40014): the root's {@code workspaces.selfContained} is an array of
+     * strings, or the package.json is invalid; before, it is not read.
+     */
+    @ParameterizedTest
+    @ValueSource(strings = {"\"apps\"", "[1]"})
+    void readsSelfContainedWorkspacesFrom141(String selfContained) {
+        String manifest = "{\"name\":\"r\",\"workspaces\":{\"packages\":[],\"selfContained\":" + selfContained + "}}";
+        Log log = new Log();
+        assertThatThrownBy(() -> new Package().parseWithJSON(new Lockfile(BunRelease.of("1.4.1")),
+          options("1.4.1", null), log, "", Json.parse(manifest), Features.MAIN, Collections.emptyMap()))
+          .hasMessage("InvalidPackageJSON");
+        assertThat(log.errors.get(0)).startsWith("\"workspaces.selfContained\" ");
+        new Package().parseWithJSON(new Lockfile(BunRelease.of("1.4.0")), options("1.4.0", null), new Log(), "",
+          Json.parse(manifest), Features.MAIN, Collections.emptyMap());
+    }
+
+    /**
+     * Tree.rs {@code hoist_dependency} (1.4.0, bun#36303): w's foo ^1, besides its dev foo ^2 hoisted to the root, is
+     * deduped onto that edge of w's own; before, it nests as "w/foo".
+     */
+    @Test
+    void dedupesAPackagesEdgesToOneNameFrom140() {
+        String root = "{\"name\":\"r\",\"workspaces\":[\"packages/w\"]}";
+        String member = "{\"name\":\"w\",\"dependencies\":{\"foo\":\"^1.0.0\"},\"devDependencies\":{\"foo\":\"^2.0.0\"}}";
+        ManifestSource registry = (url, name, extended) -> "foo".equals(name) ?
+          "{\"name\":\"foo\",\"modified\":\"2026-01-01T00:00:00.000Z\",\"dist-tags\":{\"latest\":\"2.0.0\"}," +
+          "\"versions\":{" + fooVersion("1.0.0") + "," + fooVersion("2.0.0") + "}}" : null;
+        BunLockRegenerator.Inputs.InputsBuilder inputs = BunLockRegenerator.Inputs.builder()
+          .lock(EMPTY_ROOT)
+          .manifest("", root)
+          .manifest("packages/w", member)
+          .now(java.time.Instant.parse("2026-10-11T00:00:00Z"));
+        org.openrewrite.javascript.internal.LockFileRegeneration.Result later =
+          new BunLockRegenerator(inputs.release(BunRelease.of("1.4.0")).build(), registry).regenerate();
+        assertThat(later.getLockFileContent()).as(String.valueOf(later.getErrorMessage()))
+          .contains("\"foo\": [\"foo@2.0.0\"").doesNotContain("\"w/foo\"");
+        org.openrewrite.javascript.internal.LockFileRegeneration.Result earlier =
+          new BunLockRegenerator(inputs.release(BunRelease.of("1.3.14")).build(), registry).regenerate();
+        String written = earlier.isSuccess() ? earlier.getLockFileContent() :
+          requireNonNull(earlier.getFailure()).getWritten();
+        assertThat(written).as(String.valueOf(earlier.getErrorMessage())).contains("\"w/foo\": [\"foo@1.0.0\"");
+    }
+
+    private static String fooVersion(String version) {
+        return "\"" + version + "\":{\"name\":\"foo\",\"version\":\"" + version + "\",\"dist\":{\"tarball\":" +
+               "\"https://registry.npmjs.org/foo/-/foo-" + version + ".tgz\",\"integrity\":\"" + INTEGRITY + "\"}}";
+    }
+
+    /**
+     * Tree.rs {@code hoist_dependency} (1.4.0, bun#38333): ui's {@code catalog:} peer react, its catalog range
+     * satisfied by the react a hoisted to the root, dedupes; before, no version satisfies it, and it nests as
+     * "ui/react".
+     */
+    @Test
+    void dedupesACatalogPeerByItsRangeFrom140() {
+        String lock = "{\n  \"lockfileVersion\": 1,\n  \"workspaces\": {\n    \"\": {\n      \"name\": \"r\",\n" +
+                      "    },\n    \"packages/a\": {\n      \"name\": \"a\",\n      \"dependencies\": {\n" +
+                      "        \"react\": \"18.2.0\",\n      },\n    },\n    \"packages/ui\": {\n" +
+                      "      \"name\": \"ui\",\n      \"peerDependencies\": {\n        \"react\": \"catalog:\",\n" +
+                      "      },\n    },\n  },\n  \"catalog\": {\n    \"react\": \"^18.0.0\",\n  },\n" +
+                      "  \"packages\": {\n    \"a\": [\"a@workspace:packages/a\"],\n" +
+                      npm("react", "react@18.2.0", "{}") +
+                      "    \"ui\": [\"ui@workspace:packages/ui\"],\n" +
+                      npm("ui/react", "react@18.3.1", "{}") +
+                      "  }\n}\n";
+        assertThat(writtenBack("1.4.0", lock)).doesNotContain("\"ui/react\"");
+        assertThat(writtenBack("1.3.14", lock)).contains("\"ui/react\": [\"react@18.3.1\"");
+    }
+
+    /**
+     * Tree.rs {@code Rebind} (1.4.0, bun#37426): a's optional peer p, locked to the nested 1.0.0, dedupes onto the
+     * root's p 1.2.0 and is bound to it; before, it keeps 1.0.0.
+     */
+    @Test
+    void rebindsAnOptionalPeerItDedupesFrom140() {
+        String lock = lockWith(rootWith("{ \"a\": \"1.0.0\", \"p\": \"1.2.0\" }"),
+          npm("a", "a@1.0.0", "{ \"peerDependencies\": { \"p\": \"^1.0.0\" }, \"optionalPeers\": [\"p\"] }") +
+          npm("a/p", "p@1.0.0", "{}") +
+          npm("p", "p@1.2.0", "{}"));
+        assertThat(resolutionOf(TextLockfileReader.load(lock, options("1.4.0", null)), "a", "p")).isEqualTo("p@1.2.0");
+        assertThat(resolutionOf(TextLockfileReader.load(lock, options("1.3.14", null)), "a", "p")).isEqualTo("p@1.0.0");
+    }
+
+    /**
+     * lockfile.rs {@code resolve} (1.4.0, bun#37426): a's unresolved optional peer p, placed at the root before b's p
+     * replaces it there, is bound late, so that the hoist runs again and the root's folder holds a's edge; before, one
+     * hoist leaves b's there.
+     */
+    @Test
+    void hoistsAgainAfterAnOptionalPeerIsBoundLateFrom140() {
+        String lock = lockWith(rootWith("{ \"a\": \"1.0.0\", \"b\": \"1.0.0\" }"),
+          npm("a", "a@1.0.0", "{ \"peerDependencies\": { \"p\": \"^1.0.0\" }, \"optionalPeers\": [\"p\"] }") +
+          npm("b", "b@1.0.0", "{ \"dependencies\": { \"p\": \"1.0.0\" } }") +
+          npm("p", "p@1.0.0", "{}"));
+        for (String release : new String[]{"1.4.0", "1.3.14"}) {
+            Lockfile lockfile = TextLockfileReader.load(lock, options(release, null));
+            int aPeer = dependencyIdOf(lockfile, "a", "p");
+            lockfile.resolutions.set(aPeer, Package.INVALID_PACKAGE_ID);
+            lockfile.resolve();
+            assertThat(lockfile.trees.get(0).dependencies).as(release)
+              .contains("1.4.0".equals(release) ? aPeer : dependencyIdOf(lockfile, "b", "p"));
+            assertThat(resolutionOf(lockfile, "a", "p")).isEqualTo("p@1.0.0");
+        }
+    }
+
+    /**
+     * lockfile.rs {@code clean_with_logger} and Package.rs {@code clone} (1.4.0): an install that changes resolutions
+     * drops p, which only a's optional peer resolves to; before, and without changes, p stays.
+     */
+    @Test
+    void dropsWhatOnlyOptionalPeersHoldFrom140() {
+        String lock = lockWith(rootWith("{ \"a\": \"1.0.0\" }"),
+          npm("a", "a@1.0.0", "{ \"peerDependencies\": { \"p\": \"^1.0.0\" }, \"optionalPeers\": [\"p\"] }") +
+          npm("p", "p@1.0.0", "{}"));
+        assertThat(cleaned("1.4.0", lock, false)).doesNotContain("\"p\": [\"p@1.0.0\"");
+        assertThat(cleaned("1.4.0", lock, true)).contains("\"p\": [\"p@1.0.0\"");
+        assertThat(cleaned("1.3.14", lock, false)).contains("\"p\": [\"p@1.0.0\"");
+    }
+
+    private static String cleaned(String release, String lock, boolean keepOptionalPeerTargets) {
+        BunOptions options = options(release, null);
+        return TextLockfileWriter.saveFromBinary(Cleaner.clean(TextLockfileReader.load(lock, options),
+          keepOptionalPeerTargets), 0, options.getRelease());
+    }
+
+    // the root's diff of a lock loaded as the release against the project's manifests, with the id mapping it fills
+    private static PackageDiff.Summary rootDiff(String release, String lock, Map<String, String> manifests,
+                                                int[][] mapping) {
+        return rootDiff(options(release, null), lock, manifests, mapping);
+    }
+
+    private static PackageDiff.Summary rootDiff(BunOptions options, String lock, Map<String, String> manifests,
+                                                int[][] mapping) {
+        Log log = new Log();
+        Lockfile from = TextLockfileReader.load(lock, options);
+        Lockfile to = new Lockfile(options.getRelease());
+        Package root = new Package();
+        root.parseWithJSON(to, options, log, "", Json.parse(manifests.get("")), Features.MAIN, manifests);
+        mapping[0] = new int[root.dependenciesLen];
+        java.util.Arrays.fill(mapping[0], Package.INVALID_PACKAGE_ID);
+        return PackageDiff.generate(options, log, from, to, from.packages.get(0), root, mapping[0], manifests);
+    }
+
+    /**
+     * Package.rs {@code Diff::generate} (1.4.0): lodash 4.17.20, locked for "4.17.20", stays where the range becomes
+     * ^4.17.15, which accepts it; before, it is resolved again. Either way it is an update.
+     */
+    @Test
+    void keepsALockedVersionTheNewRangeAcceptsFrom140() {
+        String lock = lockWith(rootWith("{ \"lodash\": \"4.17.20\" }"), npm("lodash", "lodash@4.17.20", "{}"));
+        Map<String, String> manifests = Collections.singletonMap("",
+          "{\"name\":\"r\",\"dependencies\":{\"lodash\":\"^4.17.15\"}}");
+        int[][] mapping = new int[1][];
+        assertThat(rootDiff("1.4.0", lock, manifests, mapping).update).isEqualTo(1);
+        assertThat(mapping[0]).containsExactly(0);
+        assertThat(rootDiff("1.3.14", lock, manifests, mapping).update).isEqualTo(1);
+        assertThat(mapping[0]).containsExactly(Package.INVALID_PACKAGE_ID);
+    }
+
+    private static Map<String, String> workspace(String member) {
+        Map<String, String> manifests = new java.util.LinkedHashMap<>();
+        manifests.put("", "{\"name\":\"r\",\"workspaces\":[\"packages/*\"]}");
+        manifests.put("packages/a", member);
+        return manifests;
+    }
+
+    private static final String WORKSPACE_A = "{\n  \"lockfileVersion\": 1,\n  \"workspaces\": {\n    \"\": {\n" +
+                                              "      \"name\": \"r\",\n    },\n    \"packages/a\": {\n" +
+                                              "      \"name\": \"a\",\n      \"version\": \"1.0.0\",\n    },\n" +
+                                              "  },\n  \"packages\": {\n    \"a\": [\"a@workspace:packages/a\"],\n" +
+                                              "  }\n}\n";
+
+    /**
+     * Package.rs {@code Diff::generate} (1.4.0): a workspace whose package.json changed its trusted dependencies alone
+     * keeps its resolution; before, any diff is an update.
+     */
+    @Test
+    void keepsAWorkspaceWhoseDiffChangesNoResolutionFrom140() {
+        Map<String, String> manifests = workspace("{\"name\":\"a\",\"version\":\"1.0.0\",\"trustedDependencies\":" +
+                                                  "[\"x\"]}");
+        int[][] mapping = new int[1][];
+        assertThat(rootDiff("1.4.0", WORKSPACE_A, manifests, mapping).hasDiffs()).isFalse();
+        assertThat(mapping[0]).containsExactly(0);
+        assertThat(rootDiff("1.3.14", WORKSPACE_A, manifests, mapping).update).isEqualTo(1);
+        assertThat(mapping[0]).containsExactly(Package.INVALID_PACKAGE_ID);
+    }
+
+    /**
+     * Package.rs {@code Diff::generate} (1.4.1, bun#41302): a workspace's version change alone is a diff, which writes
+     * bun.lock again; before, it is none.
+     */
+    @Test
+    void diffsWorkspaceVersionsFrom141() {
+        Map<String, String> manifests = workspace("{\"name\":\"a\",\"version\":\"1.1.0\"}");
+        int[][] mapping = new int[1][];
+        PackageDiff.Summary later = rootDiff("1.4.1", WORKSPACE_A, manifests, mapping);
+        assertThat(later.workspaceVersionsChanged).isTrue();
+        assertThat(later.hasDiffs()).isTrue();
+        assertThat(later.changesResolutions()).isFalse();
+        assertThat(rootDiff("1.4.0", WORKSPACE_A, manifests, mapping).hasDiffs()).isFalse();
+        assertThat(rootDiff("1.4.1", WORKSPACE_A, workspace("{\"name\":\"a\",\"version\":\"1.0.0\"}"), mapping)
+          .hasDiffs()).isFalse();
+    }
+
+    /**
+     * Package.rs {@code Diff::generate} with pruned_workspaces.rs (1.4.0): a depends on b, which bun.lock lists but
+     * whose package.json is gone, and the install fails; before, b is a removal like any other. A frozen install does
+     * not count b removed where nothing depends on it.
+     */
+    @Test
+    void failsOnAWorkspaceMissingFromDiskFrom140() {
+        String lock = "{\n  \"lockfileVersion\": 1,\n  \"workspaces\": {\n    \"\": {\n      \"name\": \"r\",\n" +
+                      "    },\n    \"packages/a\": {\n      \"name\": \"a\",\n      \"dependencies\": {\n" +
+                      "        \"b\": \"workspace:*\",\n      },\n    },\n    \"packages/b\": {\n" +
+                      "      \"name\": \"b\",\n    },\n  },\n  \"packages\": {\n" +
+                      "    \"a\": [\"a@workspace:packages/a\"],\n    \"b\": [\"b@workspace:packages/b\"],\n  }\n}\n";
+        Map<String, String> manifests = workspace("{\"name\":\"a\",\"dependencies\":{\"b\":\"workspace:*\"}}");
+        int[][] mapping = new int[1][];
+        assertThatThrownBy(() -> rootDiff("1.4.0", lock, manifests, mapping))
+          .isInstanceOf(org.openrewrite.javascript.internal.lock.Rejected.class)
+          .hasMessage("workspace \"a\" depends on workspace \"b\" (packages/b), which is listed in bun.lock but not " +
+                      "on disk");
+        assertThat(rootDiff("1.3.14", lock, manifests, mapping).remove).isEqualTo(1);
+
+        String alone = lock.replace("\"b\": \"workspace:*\"", "\"c\": \"1.0.0\"").replace("\"packages\": {\n",
+          "\"packages\": {\n" + npm("c", "c@1.0.0", "{}"));
+        Map<String, String> unrelated = workspace("{\"name\":\"a\",\"dependencies\":{\"c\":\"1.0.0\"}}");
+        BunOptions frozen = BunOptions.load(BunRelease.of("1.4.0"), "[install]\nfrozenLockfile = true\n", null, null,
+          HostEnvironment.UNKNOWN);
+        PackageDiff.Summary pruned = rootDiff(frozen, alone, unrelated, mapping);
+        assertThat(pruned.remove).isZero();
+        assertThat(pruned.prunedWorkspaces).containsExactly(Wyhash11.stringHash("b"));
+        assertThat(rootDiff("1.4.0", alone, unrelated, mapping).remove).isEqualTo(1);
+    }
+
+    /**
+     * bun.lock.rs {@code write_workspace_deps} (1.4.1, bun#40809): a root's dependencies are written by their names
+     * as they are, so that one renamed since its parse moves; before, in the order of the parse.
+     */
+    @Test
+    void sortsWorkspaceDependenciesByNameFrom141() {
+        String lock = lockWith(rootWith("{ \"b\": \"1.0.0\", \"c\": \"1.0.0\" }"),
+          npm("b", "b@1.0.0", "{}") + npm("c", "c@1.0.0", "{}"));
+        for (String release : new String[]{"1.4.1", "1.4.0"}) {
+            BunOptions options = options(release, null);
+            Lockfile lockfile = Cleaner.clean(TextLockfileReader.load(lock, options));
+            // as assign_resolution renames an edge named by its literal
+            lockfile.dependencies.get(dependencyIdOf(lockfile, "r", "c")).name = "a";
+            String workspaces = TextLockfileWriter.saveFromBinary(lockfile, 0, options.getRelease()).split("\"packages\"")[0];
+            assertThat(workspaces.indexOf("\"a\": \"1.0.0\"") < workspaces.indexOf("\"b\": \"1.0.0\"")).as(release)
+              .isEqualTo("1.4.1".equals(release));
+        }
     }
 
     private static PackageManifest.PackageVersion version(BunRelease release, String packument) {

@@ -320,11 +320,74 @@ public final class Lockfile {
 
     /**
      * {@code resolve}: the hoisting that keeps every dependency so the tree is resolvable whatever the
-     * configuration, for saving.
+     * configuration, for saving; from 1.4.0 again while a pass bound an optional peer late, which a reload has bound
+     * up front.
      */
     void resolve() {
-        Tree.Builder builder = new Tree.Builder(this);
-        builder.hoist();
+        boolean lateBoundOptionalPeer;
+        do {
+            lateBoundOptionalPeer = new Tree.Builder(this).hoist();
+        } while (lateBoundOptionalPeer && release.rebindsTheOptionalPeersItDedupes());
+    }
+
+    /**
+     * {@code linked_workspace_path} (from 1.4.1): the path of the workspace an npm range on the name links to instead
+     * of the registry, the workspace of that name, when the range satisfies its version or is {@code *}, which links
+     * even a workspace without a version; null for none.
+     */
+    static @Nullable String linkedWorkspacePath(boolean linkWorkspacePackages, Map<Long, String> workspacePaths,
+                                                Map<Long, SemverVersion> workspaceVersions, long nameHash,
+                                                SemverQuery.Group range) {
+        if (!linkWorkspacePackages) {
+            return null;
+        }
+        String path = workspacePaths.get(nameHash);
+        if (path == null) {
+            return null;
+        }
+        if (range.isStar()) {
+            return path;
+        }
+        SemverVersion version = workspaceVersions.get(nameHash);
+        return version != null && range.satisfies(version) ? path : null;
+    }
+
+    /**
+     * {@code tag_workspace_links} (from 1.4.1): a loader rebuilds each dependency from its literal, so it ends by giving
+     * an edge resolved to a workspace the shape a parse of its package.json gives it: a {@code workspace:} edge takes
+     * the workspace's path, and an npm range becomes a workspace edge where {@link #linkedWorkspacePath}, asked with
+     * the workspaces this lockfile records, links it. A range bound to a workspace any other way stays a range.
+     */
+    void tagWorkspaceLinks(boolean linkWorkspacePackages) {
+        for (int i = 0; i < dependencies.size(); i++) {
+            int pkgId = resolutions.get(i);
+            if (pkgId >= packages.size()) {
+                continue;
+            }
+            Resolution res = packages.get(pkgId).resolution;
+            if (res.tag != Resolution.Tag.WORKSPACE) {
+                continue;
+            }
+            Dependency dep = dependencies.get(i);
+            boolean linked;
+            switch (dep.version.tag) {
+                case WORKSPACE:
+                    linked = true;
+                    break;
+                case NPM: {
+                    DependencyVersion.NpmInfo npm = dep.version.npm();
+                    linked = linkedWorkspacePath(linkWorkspacePackages, workspacePaths, workspaceVersions,
+                            Wyhash11.stringHash(npm.name), npm.version) != null;
+                    break;
+                }
+                default:
+                    linked = false;
+                    break;
+            }
+            if (linked) {
+                dep.version = dep.version.asWorkspace(res.value);
+            }
+        }
     }
 
     /**

@@ -442,6 +442,185 @@ public final class BunRelease implements Comparable<BunRelease> {
         return atLeast(1, 4, 1);
     }
 
+    /**
+     * The text lockfile's parser leaves a peer that no package of the lock provides unresolved, as it does an optional
+     * dependency ({@code may_stay_unresolved}), from 1.4.0 (bun#38851); before, that is {@code Failed to resolve peer
+     * dependency}, and bun ignores the lock.
+     */
+    boolean readsAPeerTheLockLeavesUnresolved() {
+        return atLeast(1, 4, 0);
+    }
+
+    /**
+     * The text lockfile's parser binds a required peer whose range (its catalog entry's, for a {@code catalog:} peer)
+     * is not {@code *} and that no override names as the resolver's peer pass does: to the first package of the name,
+     * highest first, whose resolution satisfies the range, else to the highest when it is of the range's kind
+     * ({@code resolve_peer_dep_version_based}), from 1.4.0 (bun#32182, bun#38333); before, by the package's path, as
+     * every other edge.
+     */
+    boolean bindsALoadedPeerByVersion() {
+        return atLeast(1, 4, 0);
+    }
+
+    /**
+     * Only the root and its workspaces reference catalogs ({@code CatalogMap::strip_reference}), from 1.4.0
+     * (bun#38333): a {@code catalog:} dependency of a package of bun.lock, of a registry manifest or of a folder's
+     * package.json is left unresolved with its literal, and a {@code catalog:} peer there is an optional peer of
+     * {@code *}; before, each resolves against the root's catalogs.
+     */
+    boolean stripsCatalogReferencesOutsideTheWorkspaces() {
+        return atLeast(1, 4, 0);
+    }
+
+    /**
+     * A {@code workspace:} spec names a workspace path only in the root's and a workspace's package.json
+     * ({@code parse_dependency}), from 1.4.0 (bun#37669); before, a folder's package.json registers one too.
+     */
+    boolean registersWorkspaceSpecsOfTheWorkspacesOnly() {
+        return atLeast(1, 4, 0);
+    }
+
+    /**
+     * The text lockfile's parser looks an optional peer of a package below a bundled one up no higher than the bundled
+     * package's parent ({@code find_resolution_bounded_at_bundle}), as the hoist does, from 1.4.0 (bun#37350); before,
+     * up to the root.
+     */
+    boolean boundsTheOptionalPeersOfABundle() {
+        return atLeast(1, 4, 0);
+    }
+
+    /**
+     * The text lockfile's parser resolves the root's and the workspaces' dependencies of a lock with workspaces but no
+     * {@code "packages"} as against an empty one, from 1.4.0 (bun#38765); before, it leaves them without resolutions.
+     */
+    boolean resolvesALockWithoutPackages() {
+        return atLeast(1, 4, 0);
+    }
+
+    /**
+     * The hoist dedupes an edge onto another edge of the same package to its name, in whichever tree it finds it
+     * ({@code input_dep_range.contains}), and a dependency loop is no error, from 1.4.0 (bun#36303); before, it dedupes
+     * only a dev edge onto one that is not, or the reverse, in the package's own tree, nests the edge below the other
+     * it finds higher up, and fails on a dependency loop.
+     */
+    boolean dedupesAPackagesEdgesToOneName() {
+        return atLeast(1, 4, 0);
+    }
+
+    /**
+     * The hoist dedupes a peer by its catalog entry's range ({@code CatalogMap::resolve_range}), from 1.4.0
+     * (bun#38333); before, no version satisfies a {@code catalog:} peer, which nests.
+     */
+    boolean dedupesACatalogPeerByItsRange() {
+        return atLeast(1, 4, 0);
+    }
+
+    /**
+     * The hoist rebinds an optional peer to the package it dedupes onto ({@code Rebind}), and hoists again while a pass
+     * bound one late ({@code late_bound_optional_peer}), from 1.4.0 (bun#37426); before, an optional peer keeps its
+     * binding, and one hoist is all.
+     */
+    boolean rebindsTheOptionalPeersItDedupes() {
+        return atLeast(1, 4, 0);
+    }
+
+    /**
+     * The clean keeps a package that only optional peers resolve to only where the install changes no resolution
+     * ({@code keep_optional_peer_targets}: frozen, or no add, remove, update, override or catalog change), binding those
+     * peers after the clone to what survived it, from 1.4.0 (bun#35681, bun#37426, bun#38333, bun#38853); before, it
+     * keeps it whatever changed.
+     */
+    boolean dropsWhatOnlyOptionalPeersHold() {
+        return atLeast(1, 4, 0);
+    }
+
+    /**
+     * The root's diff keeps an npm dependency whose literal changed resolved to its locked version while that still
+     * satisfies the new range (npm's sticky rule), counting it updated, from 1.4.0 (bun#30412); before, it is resolved
+     * again.
+     */
+    boolean keepsALockedVersionTheNewRangeAccepts() {
+        return atLeast(1, 4, 0);
+    }
+
+    /**
+     * The root's diff keeps a workspace's resolution unless the workspace's own diff changes resolutions (an add,
+     * remove, update, override or catalog change), from 1.4.0 (bun#38333); before, unless it has any diff (trusted or
+     * patched dependencies too).
+     */
+    boolean keepsAWorkspaceWhoseDiffChangesNoResolution() {
+        return atLeast(1, 4, 0);
+    }
+
+    /**
+     * The root's diff fails where the root or a workspace on disk depends by {@code workspace:} on a workspace that
+     * bun.lock lists but whose package.json is gone, and a frozen install does not count such a workspace removed
+     * ({@code pruned_workspaces}), from 1.4.0 (bun#38333); before, the workspace is a removal like any other.
+     */
+    boolean failsOnAWorkspaceMissingFromDisk() {
+        return atLeast(1, 4, 0);
+    }
+
+    /**
+     * After it binds the edges, the text lockfile's parser makes an edge resolved to a workspace a workspace link only
+     * where a reparse of its package.json would: a {@code workspace:} edge, or an npm range that links to the workspace
+     * ({@code tag_workspace_links}), from 1.4.1 (bun#41302); before, every edge it binds to a workspace, but the second
+     * of a root's or a workspace's edges to one name, becomes one.
+     */
+    boolean tagsWorkspaceLinksAsAReparseDoes() {
+        return atLeast(1, 4, 1);
+    }
+
+    /**
+     * An npm range of {@code *} links to the workspace of its name even when that workspace has no version, and a range
+     * that links to none replaces the workspace of its name only when it has one ({@code linked_workspace_path}), from
+     * 1.4.1 (bun#41302); before, only a range the workspace's version satisfies links.
+     */
+    boolean linksAStarRangeToAWorkspaceWithoutVersion() {
+        return atLeast(1, 4, 1);
+    }
+
+    /**
+     * The root's diff counts a workspace whose version changed, so that bun.lock is written again for it
+     * ({@code workspace_versions_changed}), from 1.4.1 (bun#41302); before, a version change alone is no diff.
+     */
+    boolean diffsWorkspaceVersions() {
+        return atLeast(1, 4, 1);
+    }
+
+    /**
+     * Only the root's package.json is read for {@code patchedDependencies}, from 1.4.1 (bun#39816); before, a
+     * workspace's and a folder's too.
+     */
+    boolean readsPatchedDependenciesFromTheRootOnly() {
+        return atLeast(1, 4, 1);
+    }
+
+    /**
+     * The root's {@code workspaces.selfContained} is an array of strings, or the package.json is invalid, from 1.4.1
+     * (bun#40014); before, it is not read.
+     */
+    boolean readsSelfContainedWorkspaces() {
+        return atLeast(1, 4, 1);
+    }
+
+    /**
+     * bun.lock lists the dependencies of a group of the root and of each workspace by their names as they are when
+     * written, so that a git or tarball dependency its resolution renamed moves to its name's place, from 1.4.1
+     * (bun#40809); before, in the order they were parsed in.
+     */
+    boolean sortsWorkspaceDependenciesByName() {
+        return atLeast(1, 4, 1);
+    }
+
+    /**
+     * The text lockfile's parser reads a package's {@code "bundled": true} from the first object of its entry, from
+     * 1.4.3 (bun#42884); before, only from its third element, so that a git, tarball or folder package is never bundled.
+     */
+    boolean findsTheBundledMarkInAnyEntry() {
+        return atLeast(1, 4, 3);
+    }
+
     // ----
 
     // 1.4.x: src/install/PackageManager (install_with_manager.rs, PackageManager.rs init), CatalogMap.rs, bunfig.rs

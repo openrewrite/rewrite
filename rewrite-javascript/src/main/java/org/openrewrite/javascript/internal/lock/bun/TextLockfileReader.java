@@ -285,7 +285,7 @@ final class TextLockfileReader {
                 }
             }
             int[] offLen = parseAppendDependencies(rootPkgExpr, false, null, Collections.<String>emptySet(),
-                    workspacesObj);
+                    workspacesObj, true);
             Package rootPkg = new Package();
             if (maybeName != null) {
                 rootPkg.name = maybeName;
@@ -316,7 +316,8 @@ final class TextLockfileReader {
                     String name = value.get("name").asString();
                     pkg.name = name;
                     pkg.nameHash = Wyhash11.stringHash(name);
-                    int[] offLen = parseAppendDependencies(value, false, null, Collections.<String>emptySet(), null);
+                    int[] offLen = parseAppendDependencies(value, false, null, Collections.<String>emptySet(), null,
+                            true);
                     pkg.dependenciesOff = offLen[0];
                     pkg.dependenciesLen = offLen[1];
                     Json.Expr binExpr = value.get("bin");
@@ -340,24 +341,40 @@ final class TextLockfileReader {
         Json.Expr pkgsExpr = root.get("packages");
         if (pkgsExpr == null) {
             if (workspacePkgsLen == 0) {
-                return new Lockfile(options.getRelease());
+                return new Lockfile(release);
             }
-            return lockfile;
-        }
-        if (!pkgsExpr.isObject()) {
+            // from 1.4.0 the workspaces' and the root's edges are resolved as against an empty object
+            if (!release.resolvesALockWithoutPackages()) {
+                return lockfile;
+            }
+        } else if (!pkgsExpr.isObject()) {
             throw error("InvalidPackagesObject", "Expected an object");
         }
+        List<Json.Property> pkgRows = pkgsExpr == null ? Collections.<Json.Property>emptyList() :
+                pkgsExpr.properties();
 
         Set<String> bundledPkgs = new HashSet<>();
-        for (Json.Property prop : pkgsExpr.properties()) {
+        for (Json.Property prop : pkgRows) {
             if (!prop.value.isArray()) {
                 throw error("InvalidPackageInfo", "Expected an array");
             }
             List<Json.Expr> pkgInfo = prop.value.items();
-            if (pkgInfo.size() < 3) {
+            Json.Expr infoObj = null;
+            if (release.findsTheBundledMarkInAnyEntry()) {
+                // index 2 for an npm resolution (after the registry string), index 1 otherwise
+                for (Json.Expr item : pkgInfo) {
+                    if (item.isObject()) {
+                        infoObj = item;
+                        break;
+                    }
+                }
+            } else if (pkgInfo.size() >= 3) {
+                infoObj = pkgInfo.get(2);
+            }
+            if (infoObj == null) {
                 continue;
             }
-            Json.Expr bundledExpr = pkgInfo.get(2).get("bundled");
+            Json.Expr bundledExpr = infoObj.get("bundled");
             if (bundledExpr == null) {
                 continue;
             }
@@ -368,7 +385,7 @@ final class TextLockfileReader {
         }
 
         nextPkgKey:
-        for (Json.Property prop : pkgsExpr.properties()) {
+        for (Json.Property prop : pkgRows) {
             String pkgPath = prop.key.asString();
             if (!prop.value.isArray()) {
                 throw error("InvalidPackageInfo", "Expected an array");
@@ -459,7 +476,8 @@ final class TextLockfileReader {
                     if (!infoObj.isObject()) {
                         throw error("InvalidPackageInfo", "Expected an object");
                     }
-                    int[] offLen = parseAppendDependencies(infoObj, true, pkgPath, bundledPkgs, null);
+                    int[] offLen = parseAppendDependencies(infoObj, true, pkgPath, bundledPkgs, null,
+                            res.tag == Resolution.Tag.WORKSPACE);
                     pkg.dependenciesOff = offLen[0];
                     pkg.dependenciesLen = offLen[1];
                     Json.Expr binExpr = infoObj.get("bin");
@@ -573,21 +591,26 @@ final class TextLockfileReader {
         }
 
         // from 1.2.19 a package's same-named dependencies take the first group's resolution
-        boolean groupsApart = options.getRelease().tellsDependencyGroupsApart();
+        boolean groupsApart = release.tellsDependencyGroupsApart();
+        // from 1.4.1 an edge is bound as it is, and tagged a workspace link afterwards as a reparse would
+        boolean tagsLinks = release.tagsWorkspaceLinksAsAReparseDoes();
         Set<String> seenDeps = new HashSet<>();
         Package rootPkg = lockfile.packages.get(0);
         rootPkg.resolution = Resolution.ROOT;
         rootPkg.meta.origin = Package.Origin.LOCAL;
         for (int depId = rootPkg.dependenciesOff; depId < rootPkg.dependenciesEnd(); depId++) {
             Dependency dep = lockfile.dependencies.get(depId);
-            Integer resId = pkgMap.get(dep.name);
+            Integer resId = resolvePeerDepVersionBased(dep);
             if (resId == null) {
-                if (dep.behavior.optional()) {
+                resId = pkgMap.get(dep.name);
+            }
+            if (resId == null) {
+                if (mayStayUnresolved(dep)) {
                     continue;
                 }
                 throw dependencyResolutionFailure(dep, null);
             }
-            if (groupsApart && !dep.behavior.isWorkspace() && !seenDeps.add(dep.name)) {
+            if (tagsLinks || groupsApart && !dep.behavior.isWorkspace() && !seenDeps.add(dep.name)) {
                 lockfile.resolutions.set(depId, resId);
                 continue;
             }
@@ -600,17 +623,20 @@ final class TextLockfileReader {
                 seenDeps.clear();
                 for (int depId = workspace.dependenciesOff; depId < workspace.dependenciesEnd(); depId++) {
                     Dependency dep = lockfile.dependencies.get(depId);
-                    Integer resId = pkgMap.get(workspace.name + "/" + dep.name);
+                    Integer resId = resolvePeerDepVersionBased(dep);
+                    if (resId == null) {
+                        resId = pkgMap.get(workspace.name + "/" + dep.name);
+                    }
                     if (resId == null) {
                         resId = pkgMap.get(dep.name);
                     }
                     if (resId == null) {
-                        if (dep.behavior.optional()) {
+                        if (mayStayUnresolved(dep)) {
                             continue;
                         }
                         throw dependencyResolutionFailure(dep, workspace.name);
                     }
-                    if (groupsApart && !seenDeps.add(dep.name)) {
+                    if (tagsLinks || groupsApart && !seenDeps.add(dep.name)) {
                         lockfile.resolutions.set(depId, resId);
                         continue;
                     }
@@ -619,7 +645,7 @@ final class TextLockfileReader {
             }
         }
 
-        for (Json.Property prop : pkgsExpr.properties()) {
+        for (Json.Property prop : pkgRows) {
             String pkgPath = prop.key.asString();
             Integer pkgId = pkgMap.get(pkgPath);
             if (pkgId == null) {
@@ -631,28 +657,139 @@ final class TextLockfileReader {
             }
             for (int depId = pkg.dependenciesOff; depId < pkg.dependenciesEnd(); depId++) {
                 Dependency dep = lockfile.dependencies.get(depId);
-                Integer resId;
-                try {
-                    resId = findResolution(pkgMap, pkgPath, dep.name);
-                } catch (InvalidPackageKey e) {
-                    throw error("InvalidPackageKey", "Invalid package path");
+                // a stripped catalog: edge stays unresolved, as in a fresh install
+                if (dep.version.tag == DependencyVersion.Tag.UNINITIALIZED &&
+                    release.stripsCatalogReferencesOutsideTheWorkspaces()) {
+                    continue;
+                }
+                Integer resId = resolvePeerDepVersionBased(dep);
+                if (resId == null) {
+                    try {
+                        // from 1.4.0 an optional peer is looked up no higher than its bundle's, as the hoist does
+                        resId = findResolution(pkgMap, pkgPath, dep.name,
+                                dep.behavior.isOptionalPeer() && release.boundsTheOptionalPeersOfABundle() ?
+                                        bundledPkgs : null);
+                    } catch (InvalidPackageKey e) {
+                        throw error("InvalidPackageKey", "Invalid package path");
+                    }
                 }
                 if (resId == null) {
-                    if (dep.behavior.optional()) {
+                    if (mayStayUnresolved(dep)) {
                         continue;
                     }
                     throw dependencyResolutionFailure(dep, pkgPath);
+                }
+                if (tagsLinks) {
+                    lockfile.resolutions.set(depId, resId);
+                    continue;
                 }
                 mapDepToPkg(dep, depId, resId);
             }
         }
 
+        if (tagsLinks) {
+            lockfile.tagWorkspaceLinks(options.isLinkWorkspacePackages());
+        }
+
         try {
             lockfile.resolve();
         } catch (Tree.DependencyLoop e) {
+            // from 1.4.0 the hoist has no dependency loop to fail on
             throw error("InvalidPackagesObject", e.getMessage());
         }
         return lockfile;
+    }
+
+    /**
+     * {@code may_stay_unresolved}: an edge a fresh install may itself leave unresolved, which bun.lock lists without a
+     * package; from 1.4.0 a peer too, before an optional dependency alone.
+     */
+    private boolean mayStayUnresolved(Dependency dep) {
+        return dep.behavior.optional() ||
+               dep.behavior.isPeer() && options.getRelease().readsAPeerTheLockLeavesUnresolved();
+    }
+
+    /**
+     * {@code resolve_peer_dep_version_based} (from 1.4.0): a required peer whose range, its catalog entry's for a
+     * {@code catalog:} peer, is not {@code *} and that no override names binds as the resolver's peer pass binds it, to
+     * the first package of the range's name, highest first, that satisfies the range, else to the highest when it is
+     * of the range's kind; null leaves it to the path walk. A peer cannot be bound from the printed tree as another edge
+     * is: it never gets its own path where the version hoisted above satisfies it.
+     */
+    private @Nullable Integer resolvePeerDepVersionBased(Dependency dep) {
+        if (!options.getRelease().bindsALoadedPeerByVersion() || !dep.behavior.isPeer() ||
+            dep.behavior.isOptionalPeer()) {
+            return null;
+        }
+        // deferred_peer_range: optional and * peers keep the path walk, which reproduces what the resolver did
+        DependencyVersion range = lockfile.catalogs.resolveRange(dep);
+        if (range.tag == DependencyVersion.Tag.NPM && range.npm().version.isStar()) {
+            return null;
+        }
+        // the package index is keyed by real names, which the range, not the dependency, carries for an alias
+        long nameHash;
+        switch (range.tag) {
+            case NPM:
+                nameHash = Wyhash11.stringHash(range.npm().name);
+                break;
+            case DIST_TAG:
+                nameHash = Wyhash11.stringHash(range.distTag().name);
+                break;
+            case GIT:
+            case GITHUB:
+                nameHash = Wyhash11.stringHash(range.repository().packageName);
+                break;
+            case TARBALL:
+                nameHash = Wyhash11.stringHash(range.tarball().packageName);
+                break;
+            default:
+                nameHash = dep.nameHash;
+                break;
+        }
+        // the resolver applies an override before its scan; the tree reflects it, so an overridden peer keeps the
+        // walk. npm: aliases and workspace edges are never overridden, and a catalog peer is by its own name.
+        boolean overridable = !dep.behavior.isWorkspace() &&
+                              (dep.version.tag != DependencyVersion.Tag.NPM || !dep.version.npm().isAlias);
+        long overrideNameHash = dep.version.tag == DependencyVersion.Tag.CATALOG ? dep.nameHash : nameHash;
+        // OverrideMap::has_rule_for_name
+        if (overridable && lockfile.overrides.map.containsKey(overrideNameHash)) {
+            return null;
+        }
+        List<Integer> candidates = lockfile.packageIndex.get(nameHash);
+        if (candidates == null || candidates.isEmpty()) {
+            return null;
+        }
+        for (int id : candidates) {
+            if (id < lockfile.packages.size() &&
+                satisfiesDependencyVersion(lockfile.packages.get(id).resolution, range)) {
+                return id;
+            }
+        }
+        int first = candidates.get(0);
+        if (first < lockfile.packages.size()) {
+            Resolution.Tag resTag = lockfile.packages.get(first).resolution.tag;
+            if (resTag == Resolution.Tag.NPM && range.tag == DependencyVersion.Tag.NPM ||
+                resTag == Resolution.Tag.GIT && range.tag == DependencyVersion.Tag.GIT ||
+                resTag == Resolution.Tag.GITHUB && range.tag == DependencyVersion.Tag.GITHUB) {
+                return first;
+            }
+        }
+        return null;
+    }
+
+    /**
+     * {@code Resolution::satisfies_dependency_version}: an npm version the range accepts, or the same git or GitHub
+     * repository.
+     */
+    private static boolean satisfiesDependencyVersion(Resolution resolution, DependencyVersion version) {
+        if (resolution.tag == Resolution.Tag.NPM && version.tag == DependencyVersion.Tag.NPM) {
+            return version.npm().version.satisfies(resolution.version);
+        }
+        if (resolution.tag == Resolution.Tag.GIT && version.tag == DependencyVersion.Tag.GIT ||
+            resolution.tag == Resolution.Tag.GITHUB && version.tag == DependencyVersion.Tag.GITHUB) {
+            return resolution.repository.eql(version.repository());
+        }
+        return false;
     }
 
     private static @Nullable Integer configVersionFromExpr(Json.Expr expr) {
@@ -726,10 +863,15 @@ final class TextLockfileReader {
     /**
      * {@code PkgMap.findResolution}: the dependency's name under the key, then under each ancestor key, a scoped
      * name counting as one folder.
+     *
+     * @param bundledPkgs the keys marked {@code "bundled": true}, above whose parent the walk stops
+     *                    ({@code find_resolution_bounded_at_bundle}, from 1.4.0); null for no bound
      */
-    static @Nullable Integer findResolution(Map<String, Integer> map, String pkgPath, String depName) {
+    static @Nullable Integer findResolution(Map<String, Integer> map, String pkgPath, String depName,
+                                            @Nullable Set<String> bundledPkgs) {
         StringBuilder pathBuf = new StringBuilder(pkgPath).append('/');
         int offset = pkgPath.length() + 1;
+        boolean atBundleRoot = false;
         boolean valid = true;
         while (valid) {
             pathBuf.setLength(offset);
@@ -738,10 +880,13 @@ final class TextLockfileReader {
             if (entry != null) {
                 return entry;
             }
-            if (offset == 0) {
+            if (offset == 0 || atBundleRoot) {
                 return null;
             }
             String before = pathBuf.substring(0, offset - 1);
+            if (bundledPkgs != null) {
+                atBundleRoot = bundledPkgs.contains(before);
+            }
             int slash = before.lastIndexOf('/');
             if (slash < 0) {
                 offset = 0;
@@ -780,9 +925,13 @@ final class TextLockfileReader {
     /**
      * {@code parseAppendDependencies}: the four groups in order, an optional peer by {@code optionalPeers}, a bundled
      * edge by its bundled key; the root also gets one workspace edge per member. Sorted by behavior, then name.
+     *
+     * @param catalogsApply whether the package is the root or a workspace, whose {@code catalog:} edges from 1.4.0
+     *                      alone reference the catalogs ({@link CatalogMap#stripReference})
      */
     private int[] parseAppendDependencies(Json.Expr obj, boolean checkForBundled, @Nullable String pkgPath,
-                                          Set<String> bundledPkgs, Json.@Nullable Expr workspacesObj) {
+                                          Set<String> bundledPkgs, Json.@Nullable Expr workspacesObj,
+                                          boolean catalogsApply) {
         Set<Long> optionalPeers = new HashSet<>();
         Json.Expr optionalPeersExpr = obj.get("optionalPeers");
         if (optionalPeersExpr != null) {
@@ -822,6 +971,9 @@ final class TextLockfileReader {
                     throw error("InvalidDependencyVersion", "Invalid dependency version");
                 }
                 Dependency dep = new Dependency(nameHash, nameStr, version, behavior);
+                if (!catalogsApply && options.getRelease().stripsCatalogReferencesOutsideTheWorkspaces()) {
+                    CatalogMap.stripReference(dep);
+                }
                 if (checkForBundled && bundledPkgs.contains(pkgPath + "/" + nameStr)) {
                     dep.behavior = dep.behavior.add(Behavior.BUNDLED);
                 }

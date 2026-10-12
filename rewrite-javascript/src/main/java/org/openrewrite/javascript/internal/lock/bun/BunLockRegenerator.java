@@ -199,6 +199,13 @@ public final class BunLockRegenerator {
         }
 
         /**
+         * The root's diff changes resolutions ({@code manager.summary.changes_resolutions()}); a new lock's does not.
+         */
+        boolean isChangesResolutions() {
+            return summary != null && summary.changesResolutions();
+        }
+
+        /**
          * {@code saveLockfile} over the cleaned lockfile: the bun.lock text, or null when bun deletes the empty
          * lockfile.
          */
@@ -308,7 +315,8 @@ public final class BunLockRegenerator {
         PackageManager manager = install.getManager();
 
         Lockfile beforeClean = manager.lockfile;
-        Lockfile cleaned = Cleaner.clean(beforeClean);
+        Lockfile cleaned = Cleaner.clean(beforeClean,
+                manager.options.isFrozenLockfile() || !install.isChangesResolutions());
         List<String[]> failed = PackageManager.verifyResolutions(cleaned, manager.options);
         if (!failed.isEmpty()) {
             String first = manager.log.errors.isEmpty() ? "" : manager.log.errors.get(0) + "; ";
@@ -508,7 +516,7 @@ public final class BunLockRegenerator {
                 Arrays.fill(mapping, INVALID_PACKAGE_ID);
                 summary = PackageDiff.generate(options, log, manager.lockfile, lockfile, root,
                         maybeRoot, mapping, manifests);
-                if (release.redirectsDependentsOfAMovedDirectDependency() && changesResolutions(summary)) {
+                if (release.redirectsDependentsOfAMovedDirectDependency() && summary.changesResolutions()) {
                     directBefore = DirectDependencies.snapshot(manager.lockfile);
                 }
                 if (summary.hasDiffs()) {
@@ -536,13 +544,6 @@ public final class BunLockRegenerator {
             manager.drainDependencyList();
         }
         return new PendingInstall(loadResult, manager, configVersion, packagesBefore, summary, directBefore);
-    }
-
-    // Package.rs DiffSummary::changes_resolutions: an added, removed or updated dependency, or changed overrides or
-    // catalogs
-    private static boolean changesResolutions(PackageDiff.Summary summary) {
-        return summary.add > 0 || summary.remove > 0 || summary.update > 0 || summary.overridesChanged ||
-               summary.catalogsChanged;
     }
 
     private static void replaceRoot(PackageManager manager, Lockfile lockfile, Package maybeRoot, int[] mapping,

@@ -517,7 +517,9 @@ final class DependencyVersion {
                 return new DependencyVersion(Tag.FOLDER, literal, literal);
             }
             case UNINITIALIZED:
-                return null;
+                // from 1.4.0 a catalog: edge stripped outside the workspaces keeps its literal
+                return release.stripsCatalogReferencesOutsideTheWorkspaces() ?
+                        new DependencyVersion(Tag.UNINITIALIZED, literal, null) : null;
             case SYMLINK: {
                 int colon = dependency.indexOf(':');
                 String target = colon >= 0 ? dependency.substring(colon + 1) : literal;
