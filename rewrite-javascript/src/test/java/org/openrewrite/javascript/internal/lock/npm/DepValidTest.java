@@ -49,6 +49,19 @@ class DepValidTest {
         return DepValid.depValid(child, requested, accept, emptyRequestor);
     }
 
+    // dep-valid.js from npm 7.0.13 compares a tarball's resolved and spec with backslashes read as slashes; before, as
+    // written
+    @Test
+    void tarballPathsComparedAsWrittenBefore7_0_13() {
+        for (String version : new String[]{"7.0.12", "7.0.13"}) {
+            NpmRelease release = NpmRelease.of(version);
+            Node child = node(opts().name("tarball").resolved("file:/path\\to/tarball.tgz").release(release));
+            Node requestor = node(opts().path("/requestor").release(release));
+            assertThat(DepValid.depValid(child, "/path/to/tarball.tgz", null, requestor)).as("npm %s", version)
+              .isEqualTo("7.0.13".equals(version));
+        }
+    }
+
     @Test
     void basic() {
         assertThat(depValid(child(null, null, null), "", null)).as("* is always ok").isTrue();

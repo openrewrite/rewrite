@@ -31,6 +31,7 @@ import java.io.InputStreamReader;
 import java.io.UncheckedIOException;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Objects;
 import java.util.regex.Pattern;
@@ -160,6 +161,23 @@ class NodeSemverReleasesTest {
 
     static Stream<Arguments> differences() {
         return differenceRows(false).stream().map(row -> Arguments.of(release(row.get(0).asText()), row));
+    }
+
+    // classes/range.js: 7.3.2 keeps a group of any version beside the others, which admits no prerelease, so that a
+    // prerelease another group admits satisfies the range; 7.3.3 takes such a range for any (npm 7.0.15 locks a
+    // 2.0.0-beta.1 for `x || 2.0.0-beta.1` where npm 7.1.0 locks 1.0.0)
+    @Test
+    void groupOfAnyKeptBesideOthersIn7_3_2() {
+        Options v732 = Options.DEFAULT.release(Release.V7_3_2);
+        assertThat(NodeSemver.satisfies("1.0.0-beta.1", "* || 1.0.0-beta.1", v732)).isTrue();
+        assertThat(NodeSemver.satisfies("1.0.0-beta.1", "* || 1.0.0-beta.1", Options.DEFAULT)).isFalse();
+        assertThat(NodeSemver.satisfies("1.0.0-beta.1", "x || >=1.0.0-beta.0 <1.0.0", v732)).isTrue();
+        assertThat(NodeSemver.satisfies("1.0.0-beta.1", "x || >=1.0.0-beta.0 <1.0.0", Options.DEFAULT)).isFalse();
+        assertThat(NodeSemver.maxSatisfying(Arrays.asList("1.0.0", "2.0.0-beta.1"), "x || 2.0.0-beta.1",
+          Options.LOOSE.release(Release.V7_3_2))).isEqualTo("2.0.0-beta.1");
+        assertThat(NodeSemver.maxSatisfying(Arrays.asList("1.0.0", "2.0.0-beta.1"), "x || 2.0.0-beta.1",
+          Options.LOOSE)).isEqualTo("1.0.0");
+        assertThat(NodeSemver.validRange("* || 1.0.0-beta.1", v732)).isEqualTo("||1.0.0-beta.1");
     }
 
     // ranges/min-version.js: 7.3.2 takes the least lower bound of any set, so that one set's bounds can leave it below

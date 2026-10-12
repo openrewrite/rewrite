@@ -664,6 +664,14 @@ public final class NpmRelease implements Comparable<NpmRelease> {
     }
 
     /**
+     * {@code tarballValid} compares a {@code file:} tarball's resolved and spec with their backslashes read as
+     * slashes, from npm 7.0.13; before, as written, so that a resolved that is no string matches nothing.
+     */
+    boolean comparesTarballPathsWithSlashes() {
+        return atLeast(7, 0, 13);
+    }
+
+    /**
      * {@code linkValid}: a workspace's link stays valid under {@code install-links}, from npm 9.0.0; before, every link
      * is invalid there.
      */
@@ -1797,9 +1805,10 @@ public final class NpmRelease implements Comparable<NpmRelease> {
      * a wildcard for no range); 7.8.1 from npm 11.16.0, which strips build metadata from a whole range; 7.7.3 from npm
      * 11.6.2 and 7.7.4 from npm 10.9.5, which strip it from a comparator as 7.8.0 does; 7.7.2, as every release from
      * 7.5.4 (npm 9.8.1) answers; 7.5.2 in npm 9.7.2 to 9.8.0, which reads a loose range's {@code ||} groups untrimmed;
-     * before, 7.7.2 again, as 7.3.6 to 7.5.1 (npm 8.7.0 to 9.7.1) answer, and 7.3.5 (npm 8.0.0 to 8.6.0) and 7.3.4
-     * (npm 7.1.0 to 7.24.2) but for {@code >=} and a 0, any character, 0, any character, 0, which their {@code GTE0}
-     * (dots unescaped) reads as any; 7.3.2 before npm 7.1.0, which also keeps every set and comparator as parsed.
+     * before, 7.7.2 again, as 7.3.6 to 7.5.1 (npm 8.7.0 to 9.7.1) answer, and 7.3.5 (npm 7.7.0 to 8.6.0) and 7.3.4
+     * (npm 7.1.0 to 7.6.3) but for {@code >=} and a 0, any character, 0, any character, 0, which their {@code GTE0}
+     * (dots unescaped) reads as any; 7.3.2 before npm 7.1.0, which also keeps every set and comparator as parsed, so
+     * that a prerelease another group admits satisfies a range with a group of any version.
      */
     NodeSemver.Release semver() {
         return atLeast(11, 18, 0) ? NodeSemver.Release.V7_8_5 :
