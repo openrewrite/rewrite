@@ -950,6 +950,30 @@ class YarnClassicReleaseTest {
     }
 
     /**
+     * en.js {@code workspacesRequirePrivateProjects} ends with a period from 1.4.0, as yarn 1.3.2, 1.4.0 and 1.6.0
+     * refused the sweep's open-ws-not-private (1.4.0 to 1.5.1 report it as unexpected).
+     */
+    @ParameterizedTest(name = "{0}")
+    @CsvSource(delimiter = '|', value = {
+            "1.3.2|Workspaces can only be enabled in private projects",
+            "1.4.0|An unexpected error occurred: \"Workspaces can only be enabled in private projects.\".",
+            "1.6.0|Workspaces can only be enabled in private projects.",
+    })
+    void endsTheWorkspacesPrivacyMessageAsItsReleaseDoes(String version, String reported) {
+        YarnClassicLockRegenerator.Inputs inputs = YarnClassicLockRegenerator.Inputs.builder()
+                .release(release(version))
+                .manifest("", "{\"name\":\"r\",\"version\":\"1.0.0\",\"workspaces\":[\"packages/*\"]}")
+                .manifest("packages/a", "{\"name\":\"a\",\"version\":\"1.0.0\"}")
+                .lock("# yarn lockfile v1\n\n\n")
+                .paths(new LinkedHashSet<>(Arrays.asList("package.json", "yarn.lock", "packages/a/package.json")))
+                .env(Collections.emptyMap())
+                .build();
+        LockFileRegeneration.Result result = new YarnClassicLockRegenerator(inputs, YarnClassicScenarios.NO_REGISTRY)
+                .regenerate();
+        assertThat(result.getErrorMessage()).isEqualTo("MALFORMED_MANIFEST: yarn rejects this edit: " + reported);
+    }
+
+    /**
      * config.js {@code resolveWorkspaces}: a manifest two levels under a member's node_modules is a member before
      * 1.6.0, which ignores one level down only (as yarn 1.5.1 and 1.6.0 installed a {@code packages/**} root).
      */
