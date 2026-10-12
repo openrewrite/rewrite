@@ -122,7 +122,7 @@ final class CatalogMap {
     }
 
     boolean parseAppend(Log log, Json.Expr expr, BunRelease release) {
-        boolean foundAny = parseAppend(log, expr);
+        boolean foundAny = parseGroups(log, expr, release);
         Json.Expr catalogs = expr.get("catalogs");
         Json.Expr defaultGroup = catalogs != null && catalogs.isObject() ? catalogs.get("default") : null;
         if (release.rejectsAnEntryOfBothDefaultCatalogs() && !defaultMap.isEmpty() && defaultGroup != null &&
@@ -144,13 +144,17 @@ final class CatalogMap {
     }
 
     boolean parseAppend(Log log, Json.Expr expr) {
+        return parseGroups(log, expr, BunRelease.PORTED);
+    }
+
+    private boolean parseGroups(Log log, Json.Expr expr, BunRelease release) {
         boolean foundAny = false;
         Json.Expr defaultCatalog = expr.get("catalog");
         if (defaultCatalog != null) {
             LinkedHashMap<String, Dependency> group = getOrPutGroup("");
             foundAny = true;
             if (defaultCatalog.isObject()) {
-                putEntries(log, group, defaultCatalog);
+                putEntries(log, group, defaultCatalog, release);
             }
         }
         Json.Expr catalogs = expr.get("catalogs");
@@ -160,7 +164,7 @@ final class CatalogMap {
                 for (Json.Property catalog : catalogs.properties()) {
                     LinkedHashMap<String, Dependency> group = getOrPutGroup(catalog.key.asString());
                     if (catalog.value.isObject()) {
-                        putEntries(log, group, catalog.value);
+                        putEntries(log, group, catalog.value, release);
                     }
                 }
             }
@@ -168,7 +172,8 @@ final class CatalogMap {
         return foundAny;
     }
 
-    private static void putEntries(Log log, LinkedHashMap<String, Dependency> group, Json.Expr obj) {
+    private static void putEntries(Log log, LinkedHashMap<String, Dependency> group, Json.Expr obj,
+                                   BunRelease release) {
         for (Json.Property item : obj.properties()) {
             String depName = item.key.asString();
             long depNameHash = Wyhash11.stringHash(depName);
@@ -176,7 +181,7 @@ final class CatalogMap {
             if (versionStr == null) {
                 continue;
             }
-            DependencyVersion version = DependencyVersion.parse(depName, depNameHash, versionStr);
+            DependencyVersion version = DependencyVersion.parse(depName, depNameHash, versionStr, release);
             if (version == null) {
                 log.addError("Invalid dependency version");
                 continue;
