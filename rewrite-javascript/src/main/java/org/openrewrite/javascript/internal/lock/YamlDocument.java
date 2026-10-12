@@ -26,13 +26,15 @@ import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.function.Supplier;
 import java.util.regex.Pattern;
 
 import static java.util.Collections.singletonList;
 
 /**
  * Port of yaml 2.9.0's parseDocument (its lexer's tokens read from an OpenRewrite YAML tree) and Document.toString,
- * with @pnpm/yaml.document-sync's patchDocument, as pnpm writes pnpm-workspace.yaml.
+ * with @pnpm/yaml.document-sync's patchDocument, as pnpm writes pnpm-workspace.yaml; the numbers of 2.8.3 beside
+ * 2.9.0's ({@link Release}).
  */
 public final class YamlDocument {
 
@@ -56,10 +58,24 @@ public final class YamlDocument {
     private static final Pattern CONTROL = Pattern.compile("[\\x00-\\x08\\x0b-\\x1f\\x7f-\\x9f\\ud800-\\udfff]");
     private static final Pattern FLOW_INDICATOR = Pattern.compile("[\\[\\]{},]");
     private static final Pattern DOCUMENT_MARKER = Pattern.compile("^(%|---|\\.\\.\\.)");
+    private static final Pattern SIGNED_DIGIT = Pattern.compile("^-?[0-9]");
+
+    /**
+     * The yaml releases that write a number otherwise (stringifyNumber): 2.8.3 pads a float to the fraction digits it
+     * was read with only where its form starts with a digit, after an exponent too; 2.8.4 and 2.9.0 where it starts
+     * with {@code -} and a digit too, and never where it has an exponent.
+     */
+    public enum Release {
+        V2_8_3,
+        V2_9_0
+    }
 
     private @Nullable String commentBefore;
     private @Nullable Node contents;
     private @Nullable String comment;
+
+    // the release that writes the document, asked only of a number the releases write otherwise
+    private Supplier<Release> release = () -> Release.V2_9_0;
 
     /**
      * The document yaml composes from {@code docs}; an {@link IllegalArgumentException} names what is not read here.
@@ -111,6 +127,14 @@ public final class YamlDocument {
         }
     }
 
+    /**
+     * Has {@code release} write the document, asked which yaml release it is only where a number of the document is
+     * written otherwise by the two; 2.9.0 until then.
+     */
+    public void writtenBy(Supplier<Release> release) {
+        this.release = release;
+    }
+
     // stringifyDocument, with lineWidth 0 and singleQuote true
     @Override
     public String toString() {
@@ -118,7 +142,7 @@ public final class YamlDocument {
             throw unsupported("no content");
         }
         List<String> lines = new ArrayList<>();
-        Context ctx = new Context("", false, false);
+        Context ctx = new Context("", false, false, release);
         if (commentBefore != null) {
             lines.add("");
             lines.add(0, indentComment(commentString(commentBefore), ""));
@@ -222,17 +246,20 @@ public final class YamlDocument {
     }
 
     /**
-     * The stringify context: the indent of what is written, whether inside a flow collection, whether a key.
+     * The stringify context: the indent of what is written, whether inside a flow collection, whether a key, and the
+     * release that writes it.
      */
     private static final class Context {
         final String indent;
         final boolean inFlow;
         final boolean implicitKey;
+        final Supplier<Release> release;
 
-        Context(String indent, boolean inFlow, boolean implicitKey) {
+        Context(String indent, boolean inFlow, boolean implicitKey, Supplier<Release> release) {
             this.indent = indent;
             this.inFlow = inFlow;
             this.implicitKey = implicitKey;
+            this.release = release;
         }
     }
 
@@ -401,13 +428,13 @@ public final class YamlDocument {
                 return sourced ? source : (Boolean) value ? "true" : "false";
             }
             if (value instanceof Double) {
-                return number((Double) value);
+                return number((Double) value, ctx);
             }
             return string((String) value, ctx);
         }
 
         // intStringify for hex and octal, stringifyNumber otherwise
-        private String number(double d) {
+        private String number(double d, Context ctx) {
             if ((hex || oct) && d >= 0 && d == Math.floor(d) && !Double.isInfinite(d)) {
                 return (hex ? "0x" : "0o") + Long.toString((long) d, hex ? 16 : 8);
             }
@@ -418,7 +445,14 @@ public final class YamlDocument {
                 return d < 0 ? "-.inf" : ".inf";
             }
             String n = d == 0 && 1 / d < 0 ? "-0" : EcmaScript.numberToString(d);
-            if (!hex && !oct && minFractionDigits > 0 && Character.isDigit(n.charAt(0))) {
+            boolean pads = !hex && !oct && minFractionDigits > 0 && SIGNED_DIGIT.matcher(n).find() && !n.contains("e");
+            // 2.8.3 tests /^\d/ alone, so that it pads no negative number and pads one with an exponent after it,
+            // asked only where the two differ
+            boolean pads283 = !hex && !oct && minFractionDigits > 0 && Character.isDigit(n.charAt(0));
+            if (pads != pads283 && ctx.release.get() == Release.V2_8_3) {
+                pads = pads283;
+            }
+            if (pads) {
                 StringBuilder digits = new StringBuilder(n);
                 int i = n.indexOf('.');
                 if (i < 0) {
@@ -490,12 +524,12 @@ public final class YamlDocument {
             if (value == null) {
                 throw unsupported("a key without a value");
             }
-            String str = key.stringify(new Context(ctx.indent + INDENT_STEP, ctx.inFlow, true));
+            String str = key.stringify(new Context(ctx.indent + INDENT_STEP, ctx.inFlow, true, ctx.release));
             if (!ctx.inFlow && str.length() > 1024) {
                 throw unsupported("a key of more than 1024 characters");
             }
             str += ":";
-            Context valueCtx = new Context(ctx.indent + INDENT_STEP, ctx.inFlow, false);
+            Context valueCtx = new Context(ctx.indent + INDENT_STEP, ctx.inFlow, false, ctx.release);
             String valueStr = value.stringify(valueCtx);
             String ws = " ";
             if (value.spaceBefore || value.commentBefore != null) {
@@ -557,7 +591,7 @@ public final class YamlDocument {
         // stringifyBlockCollection
         private String blockString(Context ctx) {
             String itemIndent = itemIndent(ctx);
-            Context itemCtx = new Context(itemIndent, ctx.inFlow, false);
+            Context itemCtx = new Context(itemIndent, ctx.inFlow, false, ctx.release);
             List<String> lines = new ArrayList<>();
             for (Object item : entries()) {
                 Node before = item instanceof Node ? (Node) item : ((Pair) item).key;
@@ -597,7 +631,7 @@ public final class YamlDocument {
 
         // stringifyFlowCollection of one line, which lineWidth 0 never folds
         private String flowString(Context ctx) {
-            Context itemCtx = new Context(itemIndent(ctx) + INDENT_STEP, true, ctx.implicitKey);
+            Context itemCtx = new Context(itemIndent(ctx) + INDENT_STEP, true, ctx.implicitKey, ctx.release);
             List<String> lines = new ArrayList<>();
             List<?> entries = entries();
             for (int i = 0; i < entries.size(); i++) {

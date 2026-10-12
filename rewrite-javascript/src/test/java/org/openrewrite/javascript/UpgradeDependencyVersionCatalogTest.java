@@ -210,8 +210,8 @@ class UpgradeDependencyVersionCatalogTest implements RewriteTest {
           spec -> spec.recipe(new UpgradeDependencyVersion("acme-logger", null, "~1.5.0"))
             .dataTable(NodeDependencyEditsDeclined.Row.class, rows -> assertThat(rows).singleElement()
               .extracting(NodeDependencyEditsDeclined.Row::getReason).isEqualTo("acme-logger's catalog entry was not " +
-                "upgraded: pnpm 10.0.0 is not a release whose writes are recorded (9.5.0 - 9.15.9, 10.32.1 - " +
-                "10.34.6, 11.0.6 - 11)")),
+                "upgraded: pnpm 10.0.0 is not a release whose writes are recorded (" +
+                org.openrewrite.javascript.internal.PnpmRelease.recorded() + ")")),
           packageJson(manifest, null, nodeResolutionResult(PackageManager.Pnpm, dependency("acme-logger", "1.4.1")),
             s -> s.noTrim()),
           yaml("""

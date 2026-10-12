@@ -10,7 +10,8 @@ what `internal.lock` holds, and how the recipes write overrides and follow catal
 again: one port per library, the host's registries as the user's config, corepack, the regenerators by module.
 Amended 2026-10-11: later releases of the ported pnpm and Yarn majors; the npm release that built the LST,
 with every npm release from 7.1.1 reproduced beside the one ported; every Yarn 4.x release reproduced beside
-4.10.3; Bun releases reproduced beside 1.3.10; and Yarn 1 releases reproduced beside 1.22.22.
+4.10.3; Bun releases reproduced beside 1.3.10; and Yarn 1 releases reproduced beside 1.22.22. Amended 2026-10-12:
+pnpm releases reproduced beside 11.2.2.
 
 ## Context
 
@@ -128,8 +129,8 @@ Overrides are written where the project's package manager reads them, at the wor
   range open between majors, or a release whose writes are not recorded, is declined): 11 reads
   pnpm-workspace.yaml only; 10 reads package.json's `pnpm.overrides` and `resolutions` instead of the workspace's when
   they hold any; 9 reads package.json only. The recipe writes where that release's own writer would, editing
-  pnpm-workspace.yaml in place or creating the key or file as pnpm places it; a release outside 11.0.6 - 11 makes
-  the regeneration cannot-know.
+  pnpm-workspace.yaml in place or creating the key or file as pnpm places it; a release outside
+  `PnpmReleases.PROVEN` makes the regeneration cannot-know.
 - An override the package manager cannot read (its own parser's answer: pnpm's `parsePkgAndParentSelector`, Berry's
   `parseResolution`), or one that would win over a declaration through a value that is no version range (a catalog or
   workspace reference), is declined with a `NodeDependencyEditsDeclined` row and writes nothing; an override scoped to
@@ -214,7 +215,8 @@ and read only afterwards, beside `Rc`, `Cli` and `Install`; Berry's Configuratio
 
 pnpm-workspace.yaml is printed as pnpm 10 and 11 print it, through `YamlDocument` and `WorkspaceManifestWriter`
 (pnpm 10's sortKeysByPriority, pnpm 11's reorderRecursive and propagateBlankLinesToNewPairs), for the releases whose
-writes are recorded (9.5.0 - 9.15.9, 10.32.1 - 10.34.6, 11.0.6 - 11); pnpm 9's catalogs and Yarn's .yarnrc.yml
+writes are recorded (9.5.0 - 9.15.9, 10.32.1 - 10.34.6, and the 11.x releases of `PnpmReleases.PROVEN`); pnpm 9's
+catalogs and Yarn's .yarnrc.yml
 are edited in place, and a layout the port does not read (document markers, CR line ends, a tab before a comment, a
 flow mapping with entries) is declined. A workspace pnpm rejects (`catalog` beside `catalogs.default`, recorded) is
 declined. AddDependency sorts the dependency fields as each package manager's add saves them, and still keeps inline
@@ -222,9 +224,28 @@ arrays and objects that npm, pnpm and yarn 1 print again with `JSON.stringify`.
 
 ## Amendment 2026-10-11: later releases of the ported majors
 
-- pnpm: a release from 11.0.6 to below 12 (`Main.RUNS_AS_PORTED`) runs as 11.2.2, for the port (`SwitchCliVersion`,
-  `Main.release`) and the recipes (`PnpmRelease`) alike. Recordings with 11.13.0 and 11.28.5 write the locks 11.2.2
-  writes; 11.0.5 sorts what 11.0.6 appends. Another major stays cannot-know.
+- pnpm (superseded by the amendment on pnpm releases below, which replaces `Main.RUNS_AS_PORTED` with
+  `PnpmReleases.PROVEN`): a release from 11.0.6 to below 12 (`Main.RUNS_AS_PORTED`) runs as the port of 11.2.2,
+  for the port
+  (`SwitchCliVersion`, `Main.release`) and the recipes (`PnpmRelease`) alike; 11.0.5 sorts what 11.0.6 appends, and
+  another major stays cannot-know. What a later 11.x release changed in a ported module is an option of that module's
+  class, a range of releases asked of the release that installs (`Main.releaseIn`): the package manager check names
+  that release (`Main.checkWantedPackageManager`: the one pnpm hands the install to, else 11.2.2), and the install's
+  config carries it as pnpm's own `packageManager.version`, the resolver's `pnpmVersion`. Where the inputs do not say
+  which side of an option it is on (a range of which the root's lock pins one, corepack starting another release than
+  pnpm run directly), both sides are computed and a difference is cannot-know. One option so far: from 11.5.1 a
+  missing optional peer is hoisted at a version only the lock holds
+  (`ResolveDependencies.LOCKED_OPTIONAL_PEER_CANDIDATES`, pnpm/pnpm#12075), recorded with 11.2.2 and 11.5.0 dropping
+  the peer and 11.5.1, 11.15.1 and 11.28.5 keeping it. The other changes of 11.3.0 to 11.28.5 to the ported modules
+  are work items, so a later release is byte-exact per recording, not per release: recordings with 11.13.0 and
+  11.28.5 write the locks 11.2.2 writes for the scenarios taken with them, while seek-oss/playroom's lock after one
+  version bump, recorded with every release from 11.2.2 to 11.28.5, is the port's up to 11.5.1 and another one from
+  each of 11.5.2, 11.7.0, 11.15.0, 11.28.0 and 11.28.1. Their changesets name what those releases changed (read, not
+  recorded apart): the peer contexts the lock records are preferred (pnpm/pnpm#12083) and kept from a node's
+  siblings (pnpm/pnpm#12320), an optional peer only `peerDependenciesMeta` declares is hoisted (pnpm/pnpm#13120), a
+  name a package lists as a dependency and as an optional peer stays a dependency (pnpm/pnpm#15503), and a candidate
+  for an optional peer is skipped when the importer provides one of its own peers at a version it rejects
+  (pnpm/pnpm#15573).
 - Yarn Berry: every 4.x release the release data holds (4.0.0 to 4.18.1) is reproduced beside 4.10.3, as the
   amendment on Yarn Berry releases below has it. Yarn 2 and 3, and a release after the data's, stay cannot-know.
 
@@ -366,3 +387,44 @@ The Yarn classic port follows yarn 1.22.22 and reproduces the 1.x releases besid
   another release. `YarnClassicScenarioTest` replays the first and last release of every range, and every release
   with `REWRITE_LOCK_EVERY_RELEASE`. `PROVEN` is 1.7.0 to 1.22.22 but 1.22.12; 1.6.0 knows no `--focus`, and the
   releases before it word many failures otherwise.
+
+## Amendment 2026-10-12: pnpm releases
+
+The pnpm port follows pnpm 11.2.2 and reproduces the releases of `PnpmReleases.PROVEN` beside it, as the npm port does
+npm's; `Main.RUNS_AS_PORTED`, which let every 11.x release run as 11.2.2, is gone.
+
+- **The release that installs** is the one the `NodeRuntime` marker names, what `pnpm --version` answered in the
+  project's root: the release on the path or the one corepack starts, which main.ts answers before any switch. It runs
+  its own package manager check; a hand-over to another release is cannot-know, since the release that runs may write
+  the env document before it hands over. Without a marker 11.2.2 runs as before and hands the install to the release
+  the project names, which the engine follows where it reproduces it. Where the inputs leave the release at a range
+  (corepack or pnpm run directly, a range the root's lock pins one of), it is every reproduced release of the range,
+  and a question their answers differ on for the inputs is cannot-know; each question is asked only where its answers
+  differ. A release outside `PROVEN` is cannot-know, worded as the other package managers word it.
+- **One question per upstream change.** `PnpmRelease` holds each difference as a question named for what pnpm does,
+  answered through `atLeast` alone by the tag `v<release>` of pnpm/pnpm that made it, the ported class branching where
+  upstream changed with 11.2.2's code beside the other release's. pnpm names its own release only where it does (its
+  `packageManager.version`, `engines.pnpm`). The resolver's `LOCKED_OPTIONAL_PEER_CANDIDATES` (pnpm/pnpm#12075) stays
+  as #9151 wrote it, and `countsLockedVersionsAsOptionalPeerCandidates` answers the same for every reproduced release.
+  A change no scenario reaches is a question all the same, its unit test what the release did when run: pnpm before
+  11.5.0 writes a locked remote tarball without its integrity beside an edit (pnpm/pnpm#12001), where the port of
+  11.2.2 had filled in the locked one.
+- **How a release is proven.** Every stable release from 9.0.0 to 12.12.1 was swept over every pnpm scenario, and the
+  export wrote what each wrote into the scenarios' `releases` files and `release/` outcomes, with the registry
+  documents its replays need; pnpm's own packuments, which six scenarios that pin a release would copy (81 MB), are
+  left out, every release's replay of every scenario being the same without them. `PnpmScenarioTest` replays the
+  first and last release of every range, and every release with `REWRITE_LOCK_EVERY_RELEASE`. A recording a release
+  outside `PROVEN` made is held to cannot-know until the engine reproduces that release. `PROVEN` widens a boundary at
+  a time, once every replay of its releases passes and every pair of releases in it is reviewed, every module of the
+  bundle and every library it bundles: 11.0.3 to 11.16.0 so far. 11.5.2 resolves peers a second time from the peer
+  contexts the lock records, reads a locked package it does not update from its snapshot, and binds each locked
+  tarball URL to the registry's; 11.7.0 resolves the children of a package several occurrences reach in the context of
+  the lowest of them (pnpm/pnpm#12358); a pnpm 11 release before 11.0.6 writes pnpm-workspace.yaml as pnpm 10 does,
+  which the recipes follow.
+- **A bundled library is a question too.** Each release bundles its own node-semver (7.7.4 to 11.1.3, 7.8.0, 7.8.1
+  from 11.3.0, 7.8.4 from 11.7.0, 7.8.5 from 11.9.0), whose range functions the port asks through
+  `PnpmRelease.underSemver`, only where the node-semvers of the releases the install may be answer otherwise; yaml
+  2.8.4 (11.0.7) prints a negative number's fraction digits, which the recipes' pnpm-workspace.yaml writer asks the
+  release that installs. Where pnpm writes a file the regeneration does not (loose minimumReleaseAge adding immature
+  picks to pnpm-workspace.yaml from 11.1.3) or reads one the host does not give (a user .npmrc the environment names,
+  from 11.0.6), the regeneration is cannot-know.

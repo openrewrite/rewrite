@@ -16,6 +16,8 @@
 package org.openrewrite.javascript.internal.lock.pnpm;
 
 import org.jspecify.annotations.Nullable;
+import org.openrewrite.javascript.internal.lock.CannotKnow;
+import org.openrewrite.javascript.internal.lock.EcmaScript;
 import org.openrewrite.javascript.internal.lock.JsError;
 import org.openrewrite.javascript.semver.NodeSemver;
 
@@ -53,7 +55,7 @@ final class NodeRuntimeResolver {
                                                                  ResolveDependencies.@Nullable InfoFromLockfile current,
                                                                  @Nullable String update,
                                                                  @Nullable Map<String, @Nullable Object> mirrors,
-                                                                 @Nullable String hostOs) {
+                                                                 @Nullable String hostOs, PnpmRelease release) {
         String bareSpecifier = wantedDependency.getBareSpecifier();
         if (!"node".equals(wantedDependency.getAlias()) || bareSpecifier == null ||
             !bareSpecifier.startsWith("runtime:")) {
@@ -66,16 +68,21 @@ final class NodeRuntimeResolver {
             result.resolution = current.getResolution();
             return result;
         }
-        String versionSpec = bareSpecifier.substring("runtime:".length());
+        String versionSpec = runtimeSpec(bareSpecifier.substring("runtime:".length()), release);
         String[] parsed = parseNodeSpecifier(versionSpec);
         String nodeMirrorBaseUrl = getNodeMirror(mirrors, parsed[0]);
-        String version = resolveNodeVersion(fetch, parsed[1], nodeMirrorBaseUrl);
+        String version = resolveNodeVersion(fetch, parsed[1], nodeMirrorBaseUrl, release);
         if (version == null) {
             throw new PnpmError("NODEJS_VERSION_NOT_FOUND", "Could not find a Node.js version that satisfies " +
                                                             versionSpec);
         }
-        List<Object> variants = readNodeAssets(fetch, nodeMirrorBaseUrl, version);
-        String range = version.equals(versionSpec) ? version : "^" + version;
+        List<Object> variants = readNodeAssets(fetch, nodeMirrorBaseUrl, version,
+                "release".equals(parsed[0]) && release.verifiesTheNodeShasumsSignature());
+        // from 11.8.0 the saved range keeps the ^ or ~ of the specifier it replaces, else pins the version
+        // (PnpmRelease#keepsARuntimeSpecifiersRangeOperator); before, ^ unless the specifier was the version
+        String caret = version.equals(versionSpec) ? version : "^" + version;
+        String kept = createNodeRuntimeVersionSpec(versionSpec, version, wantedDependency.getPrevSpecifier());
+        String range = caret.equals(kept) || !release.keepsARuntimeSpecifiersRangeOperator() ? caret : kept;
         result.id = "node@runtime:" + version;
         result.normalizedBareSpecifier = "runtime:" + range;
         Map<String, @Nullable Object> manifest = new LinkedHashMap<>();
@@ -88,7 +95,51 @@ final class NodeRuntimeResolver {
         return result;
     }
 
-    private static List<Object> readNodeAssets(RegistryMetadata fetch, String nodeMirrorBaseUrl, String version) {
+    /**
+     * A runtime's version specifier as {@code release} takes it: from 11.9.0 trimmed, a blank one {@code latest}
+     * (normalizeRuntimeSpec, of which the node, bun and deno resolvers each hold a copy,
+     * {@link PnpmRelease#trimsRuntimeVersions}); before, as written, asked where the two differ.
+     */
+    static String runtimeSpec(String versionSpec, PnpmRelease release) {
+        String trimmed = EcmaScript.trim(versionSpec);
+        String normalized = trimmed.isEmpty() ? "latest" : trimmed;
+        return normalized.equals(versionSpec) || !release.trimsRuntimeVersions() ? versionSpec : normalized;
+    }
+
+    // createNodeRuntimeVersionSpec (11.8.0)
+    private static String createNodeRuntimeVersionSpec(String versionSpec, String resolvedVersion,
+                                                       @Nullable String prevSpecifier) {
+        List<Object> prerelease = NodeSemver.valid(resolvedVersion, NodeSemver.Options.DEFAULT) == null ? null :
+                NodeSemver.prerelease(resolvedVersion, NodeSemver.Options.DEFAULT);
+        if (resolvedVersion.equals(versionSpec) || prerelease != null && !prerelease.isEmpty()) {
+            return resolvedVersion;
+        }
+        String source = prevSpecifier != null && prevSpecifier.startsWith("runtime:") ?
+                prevSpecifier.substring("runtime:".length()) : versionSpec;
+        String spec = source.contains("/") ? source.split("/", -1)[1] : source;
+        if (spec.startsWith("^")) {
+            return "^" + resolvedVersion;
+        }
+        if (spec.startsWith("~")) {
+            return "~" + resolvedVersion;
+        }
+        return resolvedVersion;
+    }
+
+    private static List<Object> readNodeAssets(RegistryMetadata fetch, String nodeMirrorBaseUrl, String version,
+                                               boolean verifySignature) {
+        if (verifySignature && !DEFAULT_NODE_MIRROR_BASE_URL.equals(nodeMirrorBaseUrl)) {
+            // fetchVerifiedNodeShasums: SHASUMS256.txt and its .sig at once, a failed fetch named by its HTTP status,
+            // and the signature checked against the Node.js release keys pnpm holds. The release's own SHASUMS256.txt
+            // on nodejs.org is signed by one of them; what another mirror serves, the inputs do not say
+            throw new CannotKnow("whether " + nodeMirrorBaseUrl + "v" + version + "/SHASUMS256.txt.sig is the " +
+                                 "signature of a Node.js release key");
+        }
+        String shasumsUrl = nodeMirrorBaseUrl + "v" + version + "/SHASUMS256.txt";
+        if (verifySignature && fetch.document(shasumsUrl) == null) {
+            throw new CannotKnow("the HTTP status " + shasumsUrl + " answers with, which pnpm names where it cannot " +
+                                 "verify the Node.js download");
+        }
         List<Object> assets = readNodeAssetsFromMirror(fetch, nodeMirrorBaseUrl, version, false);
         if (DEFAULT_NODE_MIRROR_BASE_URL.equals(nodeMirrorBaseUrl)) {
             try {
@@ -151,7 +202,7 @@ final class NodeRuntimeResolver {
     }
 
     private static @Nullable String resolveNodeVersion(RegistryMetadata fetch, String versionSpec,
-                                                       String nodeMirrorBaseUrl) {
+                                                       String nodeMirrorBaseUrl, PnpmRelease release) {
         String url = nodeMirrorBaseUrl + "index.json";
         String index = fetch.document(url);
         Object parsed = index == null ? null : Manifests.parseValue(index, url);
@@ -161,16 +212,18 @@ final class NodeRuntimeResolver {
         List<String> all = new ArrayList<>();
         List<Object> lts = new ArrayList<>();
         for (Object entry : (List<?>) parsed) {
-            Map<String, @Nullable Object> release = ResolveDependencies.asMap(entry);
-            all.add(Js.string(release.get("version")).substring(1));
-            lts.add(release.get("lts"));
+            Map<String, @Nullable Object> indexEntry = ResolveDependencies.asMap(entry);
+            all.add(Js.string(indexEntry.get("version")).substring(1));
+            lts.add(indexEntry.get("lts"));
         }
+        // from 11.9.0 the specifier after a release channel is trimmed too
+        versionSpec = runtimeSpec(versionSpec, release);
         if ("latest".equals(versionSpec)) {
             return all.isEmpty() ? null : all.get(0);
         }
         List<String> versions = new ArrayList<>();
         String versionRange = versionSpec;
-        String selector = Verification.versionSelectorType(versionSpec);
+        String selector = Verification.versionSelectorType(versionSpec, release);
         if ("lts".equals(versionSpec) || "tag".equals(selector)) {
             for (int i = 0; i < all.size(); i++) {
                 Object l = lts.get(i);
@@ -184,7 +237,9 @@ final class NodeRuntimeResolver {
         } else {
             versions.addAll(all);
         }
-        return NodeSemver.maxSatisfying(versions, versionRange, NodeSemver.Options.LOOSE_INCLUDE_PRERELEASE);
+        String range = versionRange;
+        return release.underSemver(semver -> NodeSemver.maxSatisfying(versions, range,
+                NodeSemver.Options.LOOSE_INCLUDE_PRERELEASE.release(semver)));
     }
 
     // {releaseChannel, versionSpecifier}

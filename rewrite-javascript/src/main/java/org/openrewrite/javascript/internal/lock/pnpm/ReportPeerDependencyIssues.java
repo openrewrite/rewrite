@@ -84,8 +84,14 @@ final class ReportPeerDependencyIssues {
 
     static void reportPeerDependencyIssues(Map<String, PeerDependencyIssues> peerDependencyIssuesByProjects,
                                            @Nullable PeerDependencyRules rules, boolean strictPeerDependencies) {
+        reportPeerDependencyIssues(peerDependencyIssuesByProjects, rules, strictPeerDependencies, PnpmRelease.PORTED);
+    }
+
+    static void reportPeerDependencyIssues(Map<String, PeerDependencyIssues> peerDependencyIssuesByProjects,
+                                           @Nullable PeerDependencyRules rules, boolean strictPeerDependencies,
+                                           PnpmRelease release) {
         Map<String, PeerDependencyIssues> newPeerDependencyIssuesByProjects =
-                filterPeerDependencyIssues(peerDependencyIssuesByProjects, rules);
+                filterPeerDependencyIssues(peerDependencyIssuesByProjects, rules, release);
         boolean nothingToReport = true;
         for (PeerDependencyIssues peerIssuesOfProject : newPeerDependencyIssuesByProjects.values()) {
             nothingToReport &= peerIssuesOfProject.getBad().isEmpty() &&
@@ -103,6 +109,12 @@ final class ReportPeerDependencyIssues {
 
     static Map<String, PeerDependencyIssues> filterPeerDependencyIssues(
             Map<String, PeerDependencyIssues> peerDependencyIssuesByProjects, @Nullable PeerDependencyRules rules) {
+        return filterPeerDependencyIssues(peerDependencyIssuesByProjects, rules, PnpmRelease.PORTED);
+    }
+
+    static Map<String, PeerDependencyIssues> filterPeerDependencyIssues(
+            Map<String, PeerDependencyIssues> peerDependencyIssuesByProjects, @Nullable PeerDependencyRules rules,
+            PnpmRelease release) {
         if (rules == null) {
             return peerDependencyIssuesByProjects;
         }
@@ -113,7 +125,7 @@ final class ReportPeerDependencyIssues {
         Map<String, List<String>> allowedVersionsMatchAll = new LinkedHashMap<>();
         Map<String, Map<String, List<AllowedVersionsByParent>>> allowedVersionsByParentPkgName = new LinkedHashMap<>();
         parseAllowedVersions(rules.getAllowedVersions() == null ? Collections.emptyMap() :
-                rules.getAllowedVersions(), allowedVersionsMatchAll, allowedVersionsByParentPkgName);
+                rules.getAllowedVersions(), allowedVersionsMatchAll, allowedVersionsByParentPkgName, release);
         Map<String, PeerDependencyIssues> newPeerDependencyIssuesByProjects = new LinkedHashMap<>();
         for (Map.Entry<String, PeerDependencyIssues> project : peerDependencyIssuesByProjects.entrySet()) {
             PeerDependencyIssues issuesOfProject = project.getValue();
@@ -137,7 +149,7 @@ final class ReportPeerDependencyIssues {
                 }
                 List<BadPeerIssue> filteredIssues = new ArrayList<>();
                 for (BadPeerIssue issue : bad.getValue()) {
-                    if (anySatisfies(issue.getFoundVersion(), allowedVersionsMatchAll.get(peerName))) {
+                    if (anySatisfies(issue.getFoundVersion(), allowedVersionsMatchAll.get(peerName), release)) {
                         continue;
                     }
                     ParentPackage currentParentPkg = issue.getParents().isEmpty() ? null :
@@ -149,12 +161,12 @@ final class ReportPeerDependencyIssues {
                         for (AllowedVersionsByParent allowed : byParent.get(currentParentPkg.getName())) {
                             String parentRange = allowed.getParentPkg().getBareSpecifier();
                             if (!Js.truthy(parentRange) || Js.truthy(currentParentPkg.getVersion()) &&
-                                                           (isSubRange(parentRange, currentParentPkg.getVersion()) ||
-                                                            satisfies(currentParentPkg.getVersion(), parentRange))) {
+                                                           (isSubRange(parentRange, currentParentPkg.getVersion(), release) ||
+                                                            satisfies(currentParentPkg.getVersion(), parentRange, release))) {
                                 allowedVersionsByParent.put(allowed.getTargetPkg().getName(), allowed.getRanges());
                             }
                         }
-                        if (anySatisfies(issue.getFoundVersion(), allowedVersionsByParent.get(peerName))) {
+                        if (anySatisfies(issue.getFoundVersion(), allowedVersionsByParent.get(peerName), release)) {
                             continue;
                         }
                     }
@@ -175,30 +187,35 @@ final class ReportPeerDependencyIssues {
         List<String> ranges;
     }
 
-    private static boolean anySatisfies(String version, @Nullable List<String> ranges) {
+    private static boolean anySatisfies(String version, @Nullable List<String> ranges, PnpmRelease release) {
         if (ranges == null) {
             return false;
         }
         for (String range : ranges) {
-            if (satisfies(version, range)) {
+            if (satisfies(version, range, release)) {
                 return true;
             }
         }
         return false;
     }
 
-    private static boolean isSubRange(@Nullable String superRange, String subRange) {
+    private static boolean isSubRange(@Nullable String superRange, String subRange, PnpmRelease release) {
         return !Js.truthy(superRange) || subRange.equals(superRange) ||
-               ResolveDependencies.validRange(subRange) != null && ResolveDependencies.validRange(superRange) != null &&
-               NodeSemver.subset(subRange, superRange, NodeSemver.Options.DEFAULT);
+               ResolveDependencies.validRange(subRange, release) != null &&
+               ResolveDependencies.validRange(superRange, release) != null &&
+               release.underSemver(semver -> NodeSemver.subset(subRange, superRange,
+                       NodeSemver.Options.DEFAULT.release(semver)));
     }
 
+    // from 11.13.0 a selector of an empty range is a convergence override's, whose rules parseOverrides checks
+    // (PnpmRelease#convergesAnEmptyRangeOverride)
     private static void parseAllowedVersions(Map<String, String> allowedVersions,
                                              Map<String, List<String>> allowedVersionsMatchAll,
-                                             Map<String, Map<String, List<AllowedVersionsByParent>>> byParentPkgName) {
+                                             Map<String, Map<String, List<AllowedVersionsByParent>>> byParentPkgName,
+                                             PnpmRelease release) {
         List<ParseOverrides.VersionOverride> overrides;
         try {
-            overrides = ParseOverrides.parseOverrides(allowedVersions, Collections.emptyMap());
+            overrides = ParseOverrides.parseOverrides(allowedVersions, Collections.emptyMap(), release);
         } catch (PnpmError e) {
             throw new PnpmError("INVALID_ALLOWED_VERSION_SELECTOR", e.getMessage() +
                                                                     " in pnpm.peerDependencyRules.allowedVersions");
@@ -218,9 +235,10 @@ final class ReportPeerDependencyIssues {
         }
     }
 
-    private static boolean satisfies(String version, String range) {
+    private static boolean satisfies(String version, String range, PnpmRelease release) {
         try {
-            return NodeSemver.satisfies(version, range, NodeSemver.Options.DEFAULT);
+            return release.underSemver(semver -> NodeSemver.satisfies(version, range,
+                    NodeSemver.Options.DEFAULT.release(semver)));
         } catch (IllegalArgumentException e) {
             return false;
         }

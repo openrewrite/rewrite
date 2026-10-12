@@ -90,8 +90,26 @@ final class DepsResolver {
                 topParents.add(new ResolvePeers.TopParent(linked.getAlias(), Js.string(linked.getVersion()), null,
                         ResolveDependencies.createNodeIdForLinkedLocalPkg(ctx.getLockfileDir(), target)));
             }
+            // 11.5.2: what the manifest declares or the install adds, and what the install asks for anew
+            Set<String> declaredDirectDependencies = new LinkedHashSet<>(Js.keys(
+                    PreferredVersions.getAllDependenciesFromManifest(project.getManifest())));
+            Set<String> explicitlyRequestedDirectDependencies = new LinkedHashSet<>();
+            for (ResolveDependencies.WantedDependency wanted : project.getWantedDependencies()) {
+                String alias = wanted.getAlias();
+                if (alias == null) {
+                    continue;
+                }
+                if (wanted.isNew()) {
+                    declaredDirectDependencies.add(alias);
+                }
+                if (wanted.isNew() || wanted.isUpdateSpec() || wanted.getPrevSpecifier() != null &&
+                                                               !wanted.getPrevSpecifier().equals(wanted.getBareSpecifier())) {
+                    explicitlyRequestedDirectDependencies.add(alias);
+                }
+            }
             projectsToLink.add(new ResolvePeers.ProjectToResolve(project.getId(), project.getRootDir(),
-                    resolvedImporter.getDirectNodeIdsByAlias(), topParents));
+                    resolvedImporter.getDirectNodeIdsByAlias(), topParents, declaredDirectDependencies,
+                    explicitlyRequestedDirectDependencies, resolvedImporter.getHoistedPeerProviderNodeIds()));
         }
 
         Set<String> workspaceProjectIds = new LinkedHashSet<>();
@@ -102,7 +120,16 @@ final class DepsResolver {
         ResolvePeers.Result peers = ResolvePeers.resolvePeers(tree.getAllPeerDepNames(), projectsToLink,
                 tree.getDependenciesTree(), opts.isResolvePeersFromWorkspaceRoot(), opts.isDedupePeerDependents(),
                 opts.isDedupePeers(), opts.isDedupeInjectedDeps(), opts.getPeersSuffixMaxLength(),
-                ctx.getLockfileDir(), tree.getResolvedImporters(), workspaceProjectIds);
+                ctx.getLockfileDir(), tree.getResolvedImporters(), workspaceProjectIds, ctx.getRelease());
+        if (treeHasLockedPeerContexts(tree.getDependenciesTree()) &&
+            ctx.getRelease().prefersThePeerContextsTheLockRecords()) {
+            // 11.5.2: again, from the paths the first pass gave the nodes
+            peers = ResolvePeers.resolvePeers(tree.getAllPeerDepNames(), projectsToLink,
+                    tree.getDependenciesTree(), opts.isResolvePeersFromWorkspaceRoot(),
+                    opts.isDedupePeerDependents(), opts.isDedupePeers(), opts.isDedupeInjectedDeps(),
+                    opts.getPeersSuffixMaxLength(), ctx.getLockfileDir(), tree.getResolvedImporters(),
+                    workspaceProjectIds, ctx.getRelease(), peers.getPathsByNodeId());
+        }
         Map<String, DependenciesGraphNode> dependenciesGraph = peers.getDependenciesGraph();
 
         for (ResolveDependencyTree.Importer project : importers) {
@@ -155,7 +182,7 @@ final class DepsResolver {
         }
 
         LockfileObject newLockfile = UpdateLockfile.updateLockfile(dependenciesGraph, wantedLockfile,
-                opts.getRegistries(), opts.isLockfileIncludeTarballUrl());
+                opts.getRegistries(), opts.isLockfileIncludeTarballUrl(), ctx.getRelease());
         if (tree.getTime() != null) {
             Map<String, @Nullable Object> time = new LinkedHashMap<>();
             Object previous = wantedLockfile.getTime();
@@ -174,6 +201,17 @@ final class DepsResolver {
         newLockfile.set("catalogs", UpdateLockfile.getCatalogSnapshots(allDirect));
         return new Result(newLockfile, peers.getPeerDependencyIssuesByProjects(),
                 tree.getResolutionPolicyViolations());
+    }
+
+    // treeHasLockedPeerContexts (11.5.2)
+    private static boolean treeHasLockedPeerContexts(
+            Map<ResolveDependencies.NodeId, ResolveDependencies.DependenciesTreeNode> dependenciesTree) {
+        for (ResolveDependencies.DependenciesTreeNode node : dependenciesTree.values()) {
+            if (node.getLockedPeerContext() != null) {
+                return true;
+            }
+        }
+        return false;
     }
 
     private static boolean truthy(@Nullable Map<String, @Nullable String> refs, String alias) {
