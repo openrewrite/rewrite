@@ -501,6 +501,35 @@ class UpgradeTransitiveDependencyVersionTest implements RewriteTest {
     }
 
     /**
+     * In the same workspace an edit of a member's own dependency goes to the workspace's lock, whose regeneration
+     * reports the workspace manifest it cannot read; the member is not a project of npm's with no lock to write.
+     */
+    @Test
+    void anEditOfAMemberOfAWorkspaceWhoseManifestIsUnreadFailsWithTheWorkspacesLock() {
+        Scenario s = new Scenario("pnpm/override-recipe-member");
+        String member = requireNonNull(s.file("tree-before/" + MEMBER));
+        rewriteRun(
+          spec -> spec.recipe(new UpgradeDependencyVersion("is-odd", null, "^4.0.0")).executionContext(s.ctx())
+            .dataTable(NodeLockRegenerationFailures.Row.class, rows -> assertThat(rows).singleElement()
+              .satisfies(row -> {
+                  assertThat(row.getSourcePath()).isEqualTo(MEMBER);
+                  assertThat(row.getKind()).isEqualTo(LockFileRegeneration.Kind.CANNOT_KNOW.toString());
+                  assertThat(row.getDetail())
+                    .isEqualTo("the engine cannot know pnpm-workspace.yaml (its contents were not read)");
+              })),
+          s.root(PackageManager.Pnpm, s.file("pkg-before")),
+          packageJson(member, null, nodeResolutionResult(PackageManager.Npm, dependencies(member)),
+            spec -> spec.path(MEMBER).noTrim().after(actual -> actual)),
+          SourceSpecs.other(s.file("workspace-before"), spec -> spec.path("pnpm-workspace.yaml")),
+          pnpmLock(requireNonNull(s.file("before")), null, spec -> spec.path("pnpm-lock.yaml").noTrim()
+            .after(actual -> {
+                assertThat(actual).endsWith(requireNonNull(s.file("before")));
+                return actual;
+            }))
+        );
+    }
+
+    /**
      * A member the host parsed without its marker is its workspace's member too: its package manager reads its
      * manifest for the lock, and the override is the root's.
      */
