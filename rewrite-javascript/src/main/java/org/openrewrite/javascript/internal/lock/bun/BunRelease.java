@@ -299,6 +299,24 @@ public final class BunRelease implements Comparable<BunRelease> {
         return atLeast(1, 3, 14);
     }
 
+    // 1.4.x: src/install/lockfile/OverrideMap.rs and override_selector.rs
+
+    // ----
+
+    // 1.4.x: src/parsers (json.rs, toml.rs), src/dotenv, src/glob, src/js_printer
+
+    // ----
+
+    // 1.4.x: src/install (dependency.rs, integrity.rs, repository.rs, npm.rs, resolution.rs) and src/semver
+
+    // ----
+
+    // 1.4.x: src/install (PackageManagerEnqueue.rs, lockfile.rs, Tree.rs, Package.rs, bun.lock.rs's reader)
+
+    // ----
+
+    // 1.4.x: src/install/PackageManager (install_with_manager.rs, PackageManager.rs init), CatalogMap.rs, bunfig.rs
+
     @Override
     public int compareTo(BunRelease o) {
         int c = Integer.compare(major, o.major);
