@@ -1204,6 +1204,17 @@ public final class NpmRelease implements Comparable<NpmRelease> {
         return atLeast(7, 5, 3);
     }
 
+    // @npmcli/arborist version-from-tgz.js
+
+    /**
+     * A tarball URL is read with Node's legacy {@code url.parse}, whose protocol may be of either case and whose path
+     * keeps its query, escapes a quote and keeps a {@code .} segment, until npm 10.5.0; from then, with WHATWG URL
+     * after {@code http:/} or {@code https:/}.
+     */
+    boolean readsTarballUrlWithUrlParse() {
+        return !atLeast(10, 5, 0);
+    }
+
     // @npmcli/arborist yarn-lock.js
 
     /**
@@ -1404,6 +1415,15 @@ public final class NpmRelease implements Comparable<NpmRelease> {
                                 atLeast(8, 5, 3) ? MapWorkspaces.Release.V2_0_1 :
                                         atLeast(7, 20, 6) ? MapWorkspaces.Release.V2_0_0 :
                                                 MapWorkspaces.Release.V1_0_3;
+    }
+
+    /**
+     * A POSIX character class ({@code [[:alpha:]]}) in a workspaces pattern is read as one by glob 9 and its minimatch
+     * 7 (map-workspaces 3.0.3), from npm 9.6.3; before, glob 7 and 8's minimatch 3 and 5 read {@code [[:alpha:]} as a
+     * bracket expression of those characters followed by {@code ]}.
+     */
+    boolean readsPosixClassesOfWorkspacePatterns() {
+        return atLeast(9, 6, 3);
     }
 
     // @npmcli/package-json normalize.js

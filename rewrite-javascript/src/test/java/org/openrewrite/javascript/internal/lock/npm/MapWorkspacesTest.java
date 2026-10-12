@@ -22,6 +22,7 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.params.provider.MethodSource;
+import org.openrewrite.javascript.internal.lock.CannotKnow;
 import org.openrewrite.javascript.internal.lock.PosixPath;
 
 import java.util.ArrayList;
@@ -34,6 +35,7 @@ import static java.util.Arrays.asList;
 import static java.util.Collections.singletonList;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.assertj.core.api.Assertions.catchThrowable;
 import static org.openrewrite.javascript.internal.lock.npm.NpmTreeSupport.fixture;
 import static org.openrewrite.javascript.internal.lock.npm.NpmTreeSupport.json;
 import static org.openrewrite.javascript.internal.lock.npm.NpmTreeSupport.obj;
@@ -299,6 +301,62 @@ class MapWorkspacesTest {
         VirtualTreeLoader.ProjectFiles files = VirtualTreeLoader.ProjectFiles.builder().manifests(manifests).build();
         Map<String, Object> pkg = obj("workspaces", json(workspaces));
         assertThat(members(MapWorkspaces.mapWorkspaces(CWD, pkg, files, NpmRelease.of(release)))).isEqualTo(members);
+    }
+
+    /**
+     * What map-workspaces with glob 7 and 8 found for these patterns over this layout, alike at npm 7.1.1, 8.5.3,
+     * 8.8.0, 9.4.2, 9.5.0 and 9.6.2: where the POSIX class glob 9 (npm 9.6.3) reads finds other directories, the
+     * engine cannot know which those releases find; where it finds the same (an unknown class, a bracket expression
+     * holding [: but no class), it answers as they do.
+     */
+    @ParameterizedTest
+    @CsvSource(delimiter = '|', quoteCharacter = '`', value = {
+      "[\"packages/[:alpha:]\"]|a=packages/a|false",
+      "[\"packages/[[:foo:]]\"]|colon-bracket=packages/:] brackets=packages/[]|false",
+      "[\"packages/[[:alpha:]]\"]|colon-bracket=packages/:] brackets=packages/[] a-bracket=packages/a] " +
+      "p-bracket=packages/p]|true",
+      "[\"packages/[[:alpha:]]*\"]|colon-bracket=packages/:] brackets=packages/[] a-bracket=packages/a] " +
+      "p-bracket=packages/p]|true",
+      "[\"packages/[[:digit:]]\"]|colon-bracket=packages/:] brackets=packages/[]|true",
+      "[\"packages/[![:digit:]]\"]|a-bracket=packages/a] p-bracket=packages/p]|true",
+      "[\"packages/[^[:alpha:]]\"]|``|true",
+      "[\"packages/[[:alpha:][:digit:]]\"]|``|true",
+      "[\"packages/[a[:digit:]]\"]|colon-bracket=packages/:] brackets=packages/[] a-bracket=packages/a]|true",
+      "[\"packages/[[:upper:]]\"]|colon-bracket=packages/:] brackets=packages/[] p-bracket=packages/p]|true",
+      "[\"packages/[[:alpha:]]]\"]|``|true",
+      "[\"packages/*[[:alpha:]]\"]|colon-bracket=packages/:] brackets=packages/[] a-bracket=packages/a] " +
+      "p-bracket=packages/p]|true",
+      "[\"packages/x-[[:digit:]]\"]|``|true",
+      "[\"packages/*\",\"!packages/[[:alpha:]]\"]|seven=packages/7 a=packages/a ab=packages/ab q=packages/Q " +
+      "x-1=packages/x-1|true",
+    })
+    void posixClassesAsGlobSevenAndEightRead(String workspaces, String npmMembers, boolean cannotKnow) {
+        Map<String, String> manifests = new LinkedHashMap<>();
+        manifests.put("", "{\"name\":\"root\"}");
+        manifests.put("packages/a", "{\"name\":\"a\"}");
+        manifests.put("packages/Q", "{\"name\":\"q\"}");
+        manifests.put("packages/7", "{\"name\":\"seven\"}");
+        manifests.put("packages/a]", "{\"name\":\"a-bracket\"}");
+        manifests.put("packages/p]", "{\"name\":\"p-bracket\"}");
+        manifests.put("packages/:]", "{\"name\":\"colon-bracket\"}");
+        manifests.put("packages/ab", "{\"name\":\"ab\"}");
+        manifests.put("packages/x-1", "{\"name\":\"x-1\"}");
+        manifests.put("packages/[]", "{\"name\":\"brackets\"}");
+        VirtualTreeLoader.ProjectFiles files = VirtualTreeLoader.ProjectFiles.builder().manifests(manifests).build();
+        Map<String, Object> pkg = obj("workspaces", json(workspaces));
+        for (String release : new String[]{"7.1.1", "8.8.0", "9.6.2"}) {
+            if (cannotKnow) {
+                assertThatThrownBy(() -> MapWorkspaces.mapWorkspaces(CWD, pkg, files, NpmRelease.of(release)))
+                  .isInstanceOf(CannotKnow.class).hasMessageContaining("as npm before 9.6.3 reads its POSIX class");
+            } else {
+                assertThat(members(MapWorkspaces.mapWorkspaces(CWD, pkg, files, NpmRelease.of(release))))
+                  .as("npm %s", release).isEqualTo(npmMembers);
+            }
+        }
+        // glob 9 reads the class as minimatch 10 does: no release from 9.6.3 is refused for it (minimatch 10 refuses
+        // x-[[:digit:]] itself, which minimatch 7 in npm 9.6.3 to 9.6.5 reads as no directory)
+        Throwable thrown = catchThrowable(() -> MapWorkspaces.mapWorkspaces(CWD, pkg, files, NpmRelease.of("9.6.3")));
+        assertThat(thrown instanceof CannotKnow).as("refused at npm 9.6.3: %s", thrown).isFalse();
     }
 
     // glob 8 (npm 9.6.2) sorts packages/a-b/ before packages/a/; map-workspaces 3.0.3 (npm 9.6.3) sorts what glob 9

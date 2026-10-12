@@ -17,6 +17,8 @@ package org.openrewrite.javascript.internal.lock.npm;
 
 import lombok.Getter;
 import org.jspecify.annotations.Nullable;
+import org.openrewrite.javascript.internal.lock.CannotKnow;
+import org.openrewrite.javascript.internal.lock.JsError;
 import org.openrewrite.javascript.internal.lock.LocaleCompare;
 import org.openrewrite.javascript.internal.lock.Minimatch;
 import org.openrewrite.javascript.internal.lock.PosixPath;
@@ -153,7 +155,7 @@ final class MapWorkspaces {
             return new LinkedHashMap<>();
         }
         if (release.mapWorkspaces() != Release.V5_0_3) {
-            return mapWorkspaces3_0_4(cwd, workspaces, files, release.mapWorkspaces());
+            return mapWorkspaces3_0_4(cwd, workspaces, files, release.mapWorkspaces(), release);
         }
         Patterns p = getPatterns(workspaces, release);
         Map<Object, String> results = new LinkedHashMap<>();
@@ -291,7 +293,7 @@ final class MapWorkspaces {
     // glob(getGlobPattern(pattern)): a leading ./ and a trailing / name nothing, . finds the directory itself, and
     // ** alone does too under glob 9 and 10, or after ./ under glob 7 and 8; any other directory matches with its
     // own slash, the . and empty portions of the pattern dropped; before 2.0.1 a backslash stays glob's escape
-    private static boolean globs3_0_4(String dir, String pattern, Release release) {
+    private static boolean globs3_0_4(String dir, String pattern, Release release, Minimatch.Release minimatch) {
         String glob = release == Release.V1_0_3 || release == Release.V2_0_0 ? pattern : pattern.replace('\\', '/');
         boolean dotSlash = glob.startsWith("./");
         while (glob.startsWith("./")) {
@@ -304,8 +306,7 @@ final class MapWorkspaces {
             return glob.isEmpty() || ".".equals(glob) ||
                    globstarsOnly(glob) && (dotSlash || release == Release.V3_0_4);
         }
-        return !glob.isEmpty() &&
-               Minimatch.minimatch(dir + "/", levelTwoFileOptimize(glob + "/"), Minimatch.Release.V10_2_5);
+        return !glob.isEmpty() && Minimatch.minimatch(dir + "/", levelTwoFileOptimize(glob + "/"), minimatch);
     }
 
     private static boolean globstarsOnly(String glob) {
@@ -317,8 +318,41 @@ final class MapWorkspaces {
         return true;
     }
 
+    // the directories glob(getGlobPattern(pattern)) finds, read with the given minimatch
+    private static List<String> globMatches3_0_4(String pattern, VirtualTreeLoader.ProjectFiles files,
+            List<String> ignore, Release release, Minimatch.Release minimatch) {
+        List<String> matches = new ArrayList<>();
+        for (String location : files.manifestLocations()) {
+            String dir = location.isEmpty() ? "." : location;
+            if (!ignored(dir, ignore, IGNORE_3_0_4) && globs3_0_4(dir, pattern, release, minimatch)) {
+                matches.add(dir);
+            }
+        }
+        return matches;
+    }
+
+    // glob 7 and 8 (before npm 9.6.3) read a pattern with minimatch 3 and 5, whose bracket expression [[:alpha:]] holds
+    // [, :, a, l, p and h and is followed by ]: where that finds other directories than the POSIX class minimatch 10
+    // reads, or minimatch 10 refuses the class, the engine cannot know which, minimatch 5 not being ported
+    private static List<String> globMatches3_0_4(String pattern, VirtualTreeLoader.ProjectFiles files,
+            List<String> ignore, Release release, NpmRelease npmRelease) {
+        if (npmRelease.readsPosixClassesOfWorkspacePatterns() || !pattern.contains("[:")) {
+            return globMatches3_0_4(pattern, files, ignore, release, Minimatch.Release.V10_2_5);
+        }
+        List<String> bracketMatches = globMatches3_0_4(pattern, files, ignore, release, Minimatch.Release.V3_0_4);
+        try {
+            List<String> matches = globMatches3_0_4(pattern, files, ignore, release, Minimatch.Release.V10_2_5);
+            if (new LinkedHashSet<>(bracketMatches).equals(new LinkedHashSet<>(matches))) {
+                return matches;
+            }
+        } catch (JsError e) {
+            // minimatch 10 refuses what minimatch 3 and 5 read
+        }
+        throw new CannotKnow("the workspaces pattern " + pattern + " as npm before 9.6.3 reads its POSIX class");
+    }
+
     private static Map<Object, String> mapWorkspaces3_0_4(String cwd, @Nullable Object workspaces,
-            VirtualTreeLoader.ProjectFiles files, Release release) {
+            VirtualTreeLoader.ProjectFiles files, Release release, NpmRelease npmRelease) {
         List<Map.Entry<String, Boolean>> patterns = patterns3_0_4(workspaces);
         Map<Object, String> results = new LinkedHashMap<>();
         if (patterns.isEmpty()) {
@@ -333,13 +367,7 @@ final class MapWorkspaces {
         Map<String, Object> byPathname = new LinkedHashMap<>();
         boolean refusesAtOnce = release == Release.V1_0_3 || release == Release.V2_0_0 || release == Release.V2_0_1;
         for (Map.Entry<String, Boolean> item : patterns) {
-            List<String> matches = new ArrayList<>();
-            for (String location : files.manifestLocations()) {
-                String dir = location.isEmpty() ? "." : location;
-                if (!ignored(dir, ignore, IGNORE_3_0_4) && globs3_0_4(dir, item.getKey(), release)) {
-                    matches.add(dir);
-                }
-            }
+            List<String> matches = globMatches3_0_4(item.getKey(), files, ignore, release, npmRelease);
             if (release == Release.V3_0_4) {
                 // 3.0.3 sorts what glob 9 and 10 find, which ends in no slash, as glob 8 sorted
                 matches.sort(LocaleCompare::en);

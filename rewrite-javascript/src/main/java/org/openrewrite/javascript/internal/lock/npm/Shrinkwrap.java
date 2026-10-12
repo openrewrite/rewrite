@@ -311,7 +311,8 @@ public final class Shrinkwrap {
                                npmRegRe().matcher(resolvedString).find();
             boolean isReg = isnpmReg || isYarnReg;
             VersionFromTgz.NameVersion tgz =
-                    isReg ? VersionFromTgz.versionFromTgz(parsed.getName(), resolvedString) : null;
+                    isReg ? VersionFromTgz.versionFromTgz(parsed.getName(), resolvedString,
+                            resolveOptions.getRelease()) : null;
             Object yspec = resolved;
             if (tgz != null && Objects.equals(tgz.getName(), parsed.getName()) &&
                 Js.strictEquals(tgz.getVersion(), version)) {
@@ -718,9 +719,11 @@ public final class Shrinkwrap {
 
         if (!truthy(meta.get("version")) && spec != null) {
             if (type == Spec.Type.FILE || type == Spec.Type.REMOTE) {
-                VersionFromTgz.NameVersion fromTgz = VersionFromTgz.versionFromTgz(spec.getName(), spec.getFetchSpec());
+                VersionFromTgz.NameVersion fromTgz = VersionFromTgz.versionFromTgz(spec.getName(), spec.getFetchSpec(),
+                        resolveOptions.getRelease());
                 if (fromTgz == null) {
-                    fromTgz = VersionFromTgz.versionFromTgz(spec.getName(), (String) meta.get("resolved"));
+                    fromTgz = VersionFromTgz.versionFromTgz(spec.getName(), (String) meta.get("resolved"),
+                            resolveOptions.getRelease());
                 }
                 if (fromTgz != null) {
                     meta.put("version", fromTgz.getVersion());
