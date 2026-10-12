@@ -1059,6 +1059,38 @@ class PnpmReleaseTest {
         assertThat(release("11.5.0").countsLockedVersionsAsOptionalPeerCandidates()).isFalse();
     }
 
+    private static boolean nodeSatisfies(String node, String wanted, String release) {
+        return PackageIsInstallable.checkEngine("p@1.0.0", obj("{'node':'" + wanted + "'}"), node, null,
+          release(release)) == null;
+    }
+
+    /**
+     * The node-semver each release bundles (its bundle's semver 7.7.4, 7.8.0, 7.8.1, 7.8.4, 7.8.5): 7.8.1 (11.3.0)
+     * strips build metadata from a whole range, so a hyphen range's lower bound takes the -0 of includePrerelease;
+     * 7.8.4 (11.7.0) takes 1.x.3 for no range and gives ^0.2.3 no -0; 7.8.5 (11.9.0) gives ~1.2 its -0. A range of
+     * releases asks only where their node-semvers answer otherwise.
+     */
+    @Test
+    void bundlesTheNodeSemverOfItsRelease() {
+        assertThat(nodeSatisfies("1.2.3-rc.1", "1.2.3+build - 2.0.0", "11.3.0")).isTrue();
+        assertThat(nodeSatisfies("1.2.3-rc.1", "1.2.3+build - 2.0.0", "11.2.2")).isFalse();
+        assertThat(nodeSatisfies("0.2.3-rc.1", "^0.2.3", "11.6.0")).isTrue();
+        assertThat(nodeSatisfies("0.2.3-rc.1", "^0.2.3", "11.7.0")).isFalse();
+        assertThat(nodeSatisfies("1.2.0-rc.1", "~1.2", "11.9.0")).isTrue();
+        assertThat(nodeSatisfies("1.2.0-rc.1", "~1.2", "11.8.0")).isFalse();
+        assertThat(PickPackageFromMeta.parseBareSpecifier("1.x.3", "foo", "latest", REGISTRY, release("11.6.0"))
+          .getType()).isEqualTo("range");
+        assertThat(PickPackageFromMeta.parseBareSpecifier("1.x.3", "foo", "latest", REGISTRY, release("11.7.0"))
+          .getType()).isEqualTo("tag");
+        PnpmRelease straddling = PnpmRelease.oneOf("11.2.2 - 11.3.0", Arrays.asList("11.2.2", "11.3.0"));
+        assertThat(nodeSatisfies("1.2.4", "1.2.3+build - 2.0.0", "11.2.2")).isTrue();
+        assertThat(PackageIsInstallable.checkEngine("p@1.0.0", obj("{'node':'1.2.3+build - 2.0.0'}"), "1.2.4",
+          null, straddling)).isNull();
+        assertThatThrownBy(() -> PackageIsInstallable.checkEngine("p@1.0.0",
+          obj("{'node':'1.2.3+build - 2.0.0'}"), "1.2.3-rc.1", null, straddling))
+          .isInstanceOf(CannotKnow.class);
+    }
+
     /**
      * lockfile/utils toLockfileResolution.ts (11.5.3): a tarball URL is git-hosted in any case; before, only in
      * lower case, so that a mixed-case codeload URL is kept without the flag.

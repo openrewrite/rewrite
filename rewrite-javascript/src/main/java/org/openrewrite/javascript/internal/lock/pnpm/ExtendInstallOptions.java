@@ -86,7 +86,7 @@ final class ExtendInstallOptions {
                 config.getCatalogs());
         ReadPackageHook readPackageHook = ReadPackageHook.createReadPackageHook(
                 config.isTrue("ignoreCompatibilityDb"), lockfileDir, parsedOverrides,
-                config.get("ignoredOptionalDependencies"), config.get("packageExtensions"));
+                config.get("ignoredOptionalDependencies"), config.get("packageExtensions"), config.getRelease());
         if (Js.truthy(config.get("virtualStoreOnly")) && !Js.truthy(config.get("enableModulesDir")) &&
             !Js.truthy(config.get("enableGlobalVirtualStore"))) {
             throw new PnpmError("CONFIG_CONFLICT_VIRTUAL_STORE_ONLY_WITH_NO_MODULES_DIR", "Cannot use " +

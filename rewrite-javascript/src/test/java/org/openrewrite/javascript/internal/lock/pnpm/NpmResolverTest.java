@@ -439,7 +439,8 @@ class NpmResolverTest {
     }
 
     private static @Nullable NamedRegistryPackageSpec named(String spec, Set<String> aliases, @Nullable String alias) {
-        return PickPackageFromMeta.parseNamedRegistrySpecifierToRegistryPackageSpec(spec, aliases, alias, "latest");
+        return PickPackageFromMeta.parseNamedRegistrySpecifierToRegistryPackageSpec(spec, aliases, alias, "latest",
+          PnpmRelease.PORTED);
     }
 
     private static NamedRegistryPackageSpec spec(String type, String name, String fetchSpec, String registryName) {

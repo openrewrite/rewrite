@@ -437,13 +437,15 @@ public final class PnpmOptions {
             if (!(version instanceof String)) {
                 throw new JsError(JsError.ERROR, "range.trim is not a function");
             }
-            if (NodeSemver.validRange((String) version, NodeSemver.Options.DEFAULT) == null &&
-                release.skipsAnInvalidNodeRuntimeRange()) {
+            String range = (String) version;
+            if (release.underSemver(semver -> NodeSemver.validRange(range,
+                    NodeSemver.Options.DEFAULT.release(semver))) == null && release.skipsAnInvalidNodeRuntimeRange()) {
                 continue;
             }
             String minVersion;
             try {
-                minVersion = NodeSemver.minVersion((String) version, NodeSemver.Options.DEFAULT);
+                minVersion = release.underSemver(semver -> NodeSemver.minVersion(range,
+                        NodeSemver.Options.DEFAULT.release(semver)));
             } catch (IllegalArgumentException e) {
                 throw new JsError(JsError.ERROR, e.getMessage());
             }
@@ -473,7 +475,8 @@ public final class PnpmOptions {
         if (pmFromDevEngines != null) {
             Object version = pmFromDevEngines.getVersion();
             if (version != null && !(version instanceof String &&
-                                     NodeSemver.validRange((String) version, NodeSemver.Options.DEFAULT) != null)) {
+                                     release.underSemver(semver -> NodeSemver.validRange((String) version,
+                                             NodeSemver.Options.DEFAULT.release(semver))) != null)) {
                 pmFromDevEngines = pmFromDevEngines.withVersion(null);
             }
             return pmFromDevEngines.withFromDevEngines(true);

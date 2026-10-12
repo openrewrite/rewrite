@@ -653,8 +653,9 @@ final class ResolvePeers {
             }
             ParentRef lockedPeer = toPkgByName(Collections.singletonList(new ParentPkgNode(peerName,
                     ctx.dependenciesTree.get(peerNodeId), peerNodeId, parentNodeIds))).get(peerName);
-            if (!YarnpkgSemverUtils.satisfiesWithPrereleases(lockedPeer.version,
-                    peerDependency.getVersion().replaceFirst("^workspace:", ""), true)) {
+            String lockedPeerRange = peerDependency.getVersion().replaceFirst("^workspace:", "");
+            if (!ctx.release.underSemver(semver -> YarnpkgSemverUtils.satisfiesWithPrereleases(lockedPeer.version,
+                    lockedPeerRange, true, semver))) {
                 continue;
             }
             Deferred peerPathPromise = ctx.pathsByNodeIdPromises.get(peerNodeId);
@@ -1404,7 +1405,8 @@ final class ResolvePeers {
                                 optionalPeer, peerVersionRange));
                 continue;
             }
-            if (!YarnpkgSemverUtils.satisfiesWithPrereleases(resolved.version, peerVersionRange, true)) {
+            if (!ctx.release.underSemver(semver -> YarnpkgSemverUtils.satisfiesWithPrereleases(resolved.version,
+                    peerVersionRange, true, semver))) {
                 List<ParentPackage> peerLocation = resolved.nodeId == null ? new ArrayList<>() :
                         getLocationFromParentNodeIds(ctx.dependenciesTree, resolved.parentNodeIds);
                 ctx.peerDependencyIssues.getBad().computeIfAbsent(peerName, k -> new ArrayList<>())

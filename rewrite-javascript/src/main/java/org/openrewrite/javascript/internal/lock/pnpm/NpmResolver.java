@@ -156,7 +156,7 @@ final class NpmResolver {
         Map<String, Map<String, Verification.Project>> workspacePackages = opts.alwaysTryWorkspacePackages ?
                 opts.workspacePackages : null;
         PickPackageFromMeta.RegistryPackageSpec spec = bareSpecifier != null && !bareSpecifier.isEmpty() ?
-                PickPackageFromMeta.parseBareSpecifier(bareSpecifier, alias, defaultTag, registryUrl) :
+                PickPackageFromMeta.parseBareSpecifier(bareSpecifier, alias, defaultTag, registryUrl, release) :
                 new PickPackageFromMeta.RegistryPackageSpec("tag", String.valueOf(alias), defaultTag, null);
         if (spec == null) {
             return null;
@@ -265,7 +265,7 @@ final class NpmResolver {
                                                         PreferredVersions.@Nullable ByName preferred) {
         String immatureVersion = PickPackageFromMeta.pickVersionByVersionRange(
                 new PickPackageFromMeta.VersionRangeOptions(meta, spec.getFetchSpec(),
-                        preferred == null ? null : preferred.get(spec.getName())));
+                        preferred == null ? null : preferred.get(spec.getName()), release));
         if (immatureVersion == null) {
             return null;
         }
@@ -326,7 +326,7 @@ final class NpmResolver {
         }
         PickPackageFromMeta.JsrRegistryPackageSpec spec = PickPackageFromMeta.parseJsrSpecifierToRegistryPackageSpec(
                 wantedDependency.getBareSpecifier(), wantedDependency.getAlias(),
-                opts.defaultTag == null ? "latest" : opts.defaultTag);
+                opts.defaultTag == null ? "latest" : opts.defaultTag, release);
         if (spec == null) {
             return null;
         }
@@ -351,7 +351,7 @@ final class NpmResolver {
         PickPackageFromMeta.NamedRegistryPackageSpec spec =
                 PickPackageFromMeta.parseNamedRegistrySpecifierToRegistryPackageSpec(
                         wantedDependency.getBareSpecifier(), namedRegistries.keySet(), wantedDependency.getAlias(),
-                        opts.defaultTag == null ? "latest" : opts.defaultTag);
+                        opts.defaultTag == null ? "latest" : opts.defaultTag, release);
         if (spec == null) {
             return null;
         }
@@ -442,7 +442,7 @@ final class NpmResolver {
                                                             PackageRequester.RequestPackageOptions opts) {
         String bareSpecifier = workspacePrefToNpm(wantedDependency.getBareSpecifier());
         PickPackageFromMeta.RegistryPackageSpec spec = PickPackageFromMeta.parseBareSpecifier(bareSpecifier,
-                wantedDependency.getAlias(), defaultTag, registryUrl);
+                wantedDependency.getAlias(), defaultTag, registryUrl, release);
         if (spec == null) {
             throw new JsError(JsError.ERROR, "Invalid workspace: spec (" + wantedDependency.getBareSpecifier() + ")");
         }
@@ -488,8 +488,8 @@ final class NpmResolver {
         return projectDir.isEmpty() ? "" : projectDir;
     }
 
-    private static @Nullable String pickMatchingLocalVersionOrNull(Map<String, Verification.Project> versions,
-                                                                   PickPackageFromMeta.RegistryPackageSpec spec) {
+    private @Nullable String pickMatchingLocalVersionOrNull(Map<String, Verification.Project> versions,
+                                                            PickPackageFromMeta.RegistryPackageSpec spec) {
         List<String> localVersions = new ArrayList<>(versions.keySet());
         switch (spec.getType()) {
             case "tag":
@@ -497,17 +497,19 @@ final class NpmResolver {
             case "version":
                 return versions.containsKey(spec.getFetchSpec()) ? spec.getFetchSpec() : null;
             case "range":
-                return resolveWorkspaceRange(spec.getFetchSpec(), localVersions);
+                return resolveWorkspaceRange(spec.getFetchSpec(), localVersions, release);
             default:
                 return null;
         }
     }
 
-    static @Nullable String resolveWorkspaceRange(String range, List<String> versions) {
+    // @pnpm/workspace.range-resolver, over the node-semver the release bundles (any of them reads * alike)
+    static @Nullable String resolveWorkspaceRange(String range, List<String> versions, PnpmRelease release) {
         if ("*".equals(range) || "^".equals(range) || "~".equals(range) || range.isEmpty()) {
             return NodeSemver.maxSatisfying(versions, "*", NodeSemver.Options.INCLUDE_PRERELEASE);
         }
-        return NodeSemver.maxSatisfying(versions, range, NodeSemver.Options.LOOSE);
+        return release.underSemver(semver -> NodeSemver.maxSatisfying(versions, range,
+                NodeSemver.Options.LOOSE.release(semver)));
     }
 
     private ResolveResult resolveFromLocalPackage(Verification.Project localPackage,
@@ -589,12 +591,12 @@ final class NpmResolver {
         return prefix + createVersionSpec(version, pinnedVersion != null ? pinnedVersion : defaultPinnedVersion);
     }
 
-    static String calcSpecifier(ResolveDependencies.WantedDependency wantedDependency,
-                                PickPackageFromMeta.RegistryPackageSpec spec, String version,
-                                @Nullable String defaultPinnedVersion) {
+    String calcSpecifier(ResolveDependencies.WantedDependency wantedDependency,
+                         PickPackageFromMeta.RegistryPackageSpec spec, String version,
+                         @Nullable String defaultPinnedVersion) {
         String prev = wantedDependency.getPrevSpecifier();
         if (prev != null && !prev.isEmpty() && prev.equals(wantedDependency.getBareSpecifier()) &&
-            "tag".equals(Verification.versionSelectorType(prev))) {
+            "tag".equals(Verification.versionSelectorType(prev, release))) {
             return prev;
         }
         String range = calcRange(version, wantedDependency, defaultPinnedVersion);

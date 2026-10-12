@@ -60,17 +60,29 @@ final class ReadPackageHook {
                                                            List<ParseOverrides.VersionOverride> overrides,
                                                            @Nullable Object ignoredOptionalDependencies,
                                                            @Nullable Object packageExtensions) {
+        return createReadPackageHook(ignoreCompatibilityDb, lockfileDir, overrides, ignoredOptionalDependencies,
+                packageExtensions, PnpmRelease.PORTED);
+    }
+
+    /**
+     * {@link #createReadPackageHook(boolean, String, List, Object, Object)} as {@code release} makes it.
+     */
+    static @Nullable ReadPackageHook createReadPackageHook(boolean ignoreCompatibilityDb, String lockfileDir,
+                                                           List<ParseOverrides.VersionOverride> overrides,
+                                                           @Nullable Object ignoredOptionalDependencies,
+                                                           @Nullable Object packageExtensions,
+                                                           PnpmRelease release) {
         List<Hook> hooks = new ArrayList<>();
         if (!ignoreCompatibilityDb) {
-            hooks.add(createPackageExtender(compatPackageExtensions()));
+            hooks.add(createPackageExtender(compatPackageExtensions(), release));
         }
         if (packageExtensions instanceof Map && !((Map<?, ?>) packageExtensions).isEmpty()) {
             @SuppressWarnings("unchecked")
             Map<String, @Nullable Object> extensions = (Map<String, @Nullable Object>) packageExtensions;
-            hooks.add(createPackageExtender(extensions));
+            hooks.add(createPackageExtender(extensions, release));
         }
         if (!overrides.isEmpty()) {
-            hooks.add(createVersionsOverrider(overrides, lockfileDir));
+            hooks.add(createVersionsOverrider(overrides, lockfileDir, release));
         }
         if (ignoredOptionalDependencies instanceof List && !((List<?>) ignoredOptionalDependencies).isEmpty()) {
             List<String> toBeRemoved = new ArrayList<>();
@@ -83,11 +95,13 @@ final class ReadPackageHook {
     }
 
     static ReadPackageHook packageExtender(Map<String, @Nullable Object> packageExtensions) {
-        return new ReadPackageHook(Collections.singletonList(createPackageExtender(packageExtensions)));
+        return new ReadPackageHook(Collections.singletonList(createPackageExtender(packageExtensions,
+                PnpmRelease.PORTED)));
     }
 
     static ReadPackageHook versionsOverrider(List<ParseOverrides.VersionOverride> overrides, String rootDir) {
-        return new ReadPackageHook(Collections.singletonList(createVersionsOverrider(overrides, rootDir)));
+        return new ReadPackageHook(Collections.singletonList(createVersionsOverrider(overrides, rootDir,
+                PnpmRelease.PORTED)));
     }
 
     static ReadPackageHook optionalDependenciesRemover(List<String> toBeRemoved) {
@@ -173,7 +187,7 @@ final class ReadPackageHook {
 
     // createPackageExtender: extensions by package name, each with its range
     @SuppressWarnings("unchecked")
-    private static Hook createPackageExtender(Map<String, @Nullable Object> packageExtensions) {
+    private static Hook createPackageExtender(Map<String, @Nullable Object> packageExtensions, PnpmRelease release) {
         Map<@Nullable String, List<PackageExtension>> extensionsByPkgName = new LinkedHashMap<>();
         for (String selector : Js.keys(packageExtensions)) {
             Object packageExtension = packageExtensions.get(selector);
@@ -190,8 +204,8 @@ final class ReadPackageHook {
             }
             for (PackageExtension extension : extensions) {
                 String range = extension.getRange();
-                if (range != null &&
-                    !NodeSemver.satisfies(manifest.get("version"), range, NodeSemver.Options.DEFAULT)) {
+                if (range != null && !release.underSemver(semver -> NodeSemver.satisfies(manifest.get("version"),
+                        range, NodeSemver.Options.DEFAULT.release(semver)))) {
                     continue;
                 }
                 if (!(extension.getExtension() instanceof Map)) {
@@ -260,7 +274,8 @@ final class ReadPackageHook {
     }
 
     @SuppressWarnings("unchecked")
-    private static Hook createVersionsOverrider(List<ParseOverrides.VersionOverride> overrides, String rootDir) {
+    private static Hook createVersionsOverrider(List<ParseOverrides.VersionOverride> overrides, String rootDir,
+                                                PnpmRelease release) {
         List<VersionOverride> versionOverrides = new ArrayList<>();
         List<VersionOverride> genericVersionOverrides = new ArrayList<>();
         for (ParseOverrides.VersionOverride override : overrides) {
@@ -277,8 +292,8 @@ final class ReadPackageHook {
                 ParseOverrides.PackageSelector parentPkg = override.override.getParentPkg();
                 if (parentPkg.getName().equals(manifest.get("name")) &&
                     (!Js.truthy(parentPkg.getBareSpecifier()) ||
-                     NodeSemver.satisfies(manifest.get("version"), parentPkg.getBareSpecifier(),
-                             NodeSemver.Options.DEFAULT))) {
+                     release.underSemver(semver -> NodeSemver.satisfies(manifest.get("version"),
+                             parentPkg.getBareSpecifier(), NodeSemver.Options.DEFAULT.release(semver))))) {
                     versionOverridesWithParent.add(override);
                 }
             }
@@ -289,7 +304,7 @@ final class ReadPackageHook {
             for (Object deps : new Object[]{dependencies, optionalDependencies, devDependencies}) {
                 if (Js.truthy(deps)) {
                     overrideDeps(versionOverridesWithParent, genericVersionOverrides, dir,
-                            (Map<String, @Nullable Object>) deps, null);
+                            (Map<String, @Nullable Object>) deps, null, release);
                 }
             }
             if (Js.truthy(peerDependencies)) {
@@ -298,7 +313,7 @@ final class ReadPackageHook {
                 }
                 overrideDeps(versionOverridesWithParent, genericVersionOverrides, dir,
                         (Map<String, @Nullable Object>) manifest.get("dependencies"),
-                        (Map<String, @Nullable Object>) peerDependencies);
+                        (Map<String, @Nullable Object>) peerDependencies, release);
             }
             return manifest;
         };
@@ -307,15 +322,15 @@ final class ReadPackageHook {
     private static void overrideDeps(List<VersionOverride> versionOverrides,
                                      List<VersionOverride> genericVersionOverrides,
                                      @Nullable String dir, Map<String, @Nullable Object> deps,
-                                     @Nullable Map<String, @Nullable Object> peerDeps) {
+                                     @Nullable Map<String, @Nullable Object> peerDeps, PnpmRelease release) {
         Map<String, @Nullable Object> source = peerDeps != null ? peerDeps : deps;
         for (String name : new ArrayList<>(Js.keys(source))) {
             String bareSpecifier = Js.string(source.get(name));
             VersionOverride versionOverride = pickMostSpecificVersionOverride(
-                    matching(versionOverrides, name, bareSpecifier));
+                    matching(versionOverrides, name, bareSpecifier, release), release);
             if (versionOverride == null) {
                 versionOverride = pickMostSpecificVersionOverride(
-                        matching(genericVersionOverrides, name, bareSpecifier));
+                        matching(genericVersionOverrides, name, bareSpecifier, release), release);
             }
             if (versionOverride == null) {
                 continue;
@@ -332,7 +347,7 @@ final class ReadPackageHook {
             String newBareSpecifier = versionOverride.protocol != null ?
                     versionOverride.protocol + resolveLocalOverride(versionOverride, dir) :
                     versionOverride.override.getNewBareSpecifier();
-            if (peerDeps == null || !isValidPeerRange(newBareSpecifier)) {
+            if (peerDeps == null || !isValidPeerRange(newBareSpecifier, release)) {
                 deps.put(targetName, newBareSpecifier);
             } else {
                 peerDeps.put(targetName, newBareSpecifier);
@@ -340,11 +355,13 @@ final class ReadPackageHook {
         }
     }
 
-    private static List<VersionOverride> matching(List<VersionOverride> overrides, String name, String bareSpecifier) {
+    private static List<VersionOverride> matching(List<VersionOverride> overrides, String name, String bareSpecifier,
+                                                  PnpmRelease release) {
         List<VersionOverride> out = new ArrayList<>();
         for (VersionOverride override : overrides) {
             ParseOverrides.PackageSelector target = override.override.getTargetPkg();
-            if (target.getName().equals(name) && isIntersectingRange(target.getBareSpecifier(), bareSpecifier)) {
+            if (target.getName().equals(name) &&
+                isIntersectingRange(target.getBareSpecifier(), bareSpecifier, release)) {
                 out.add(override);
             }
         }
@@ -356,10 +373,11 @@ final class ReadPackageHook {
                 RootRelativePath.relative(pkgDir, target.targetPath) : String.valueOf(target.targetPath);
     }
 
-    private static @Nullable VersionOverride pickMostSpecificVersionOverride(List<VersionOverride> versionOverrides) {
+    private static @Nullable VersionOverride pickMostSpecificVersionOverride(List<VersionOverride> versionOverrides,
+                                                                            PnpmRelease release) {
         V8Sort.sort(versionOverrides, (a, b) -> isIntersectingRange(
                 orEmpty(b.override.getTargetPkg().getBareSpecifier()),
-                orEmpty(a.override.getTargetPkg().getBareSpecifier())) ? -1 : 1);
+                orEmpty(a.override.getTargetPkg().getBareSpecifier()), release) ? -1 : 1);
         return versionOverrides.isEmpty() ? null : versionOverrides.get(0);
     }
 
@@ -367,18 +385,23 @@ final class ReadPackageHook {
         return s == null ? "" : s;
     }
 
-    static boolean isIntersectingRange(@Nullable String range1, String range2) {
+    // semver's range functions under the node-semver the release bundles
+    static boolean isIntersectingRange(@Nullable String range1, String range2, PnpmRelease release) {
         return range1 == null || range1.isEmpty() || range2.equals(range1) ||
-               NodeSemver.validRange(range2, NodeSemver.Options.DEFAULT) != null &&
-               NodeSemver.validRange(range1, NodeSemver.Options.DEFAULT) != null &&
-               NodeSemver.intersects(range2, range1, NodeSemver.Options.DEFAULT);
+               release.underSemver(semver -> NodeSemver.validRange(range2,
+                       NodeSemver.Options.DEFAULT.release(semver)) != null &&
+                                             NodeSemver.validRange(range1,
+                                                     NodeSemver.Options.DEFAULT.release(semver)) != null &&
+                                             NodeSemver.intersects(range2, range1,
+                                                     NodeSemver.Options.DEFAULT.release(semver)));
     }
 
     /**
      * @pnpm/deps.peer-range {@code isValidPeerRange}.
      */
-    static boolean isValidPeerRange(String version) {
-        return NodeSemver.validRange(version, NodeSemver.Options.DEFAULT) != null || version.contains("workspace:") ||
+    static boolean isValidPeerRange(String version, PnpmRelease release) {
+        return release.underSemver(semver -> NodeSemver.validRange(version,
+                NodeSemver.Options.DEFAULT.release(semver))) != null || version.contains("workspace:") ||
                version.contains("catalog:");
     }
 

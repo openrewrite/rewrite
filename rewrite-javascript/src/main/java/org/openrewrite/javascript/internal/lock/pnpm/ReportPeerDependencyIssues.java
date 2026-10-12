@@ -84,8 +84,14 @@ final class ReportPeerDependencyIssues {
 
     static void reportPeerDependencyIssues(Map<String, PeerDependencyIssues> peerDependencyIssuesByProjects,
                                            @Nullable PeerDependencyRules rules, boolean strictPeerDependencies) {
+        reportPeerDependencyIssues(peerDependencyIssuesByProjects, rules, strictPeerDependencies, PnpmRelease.PORTED);
+    }
+
+    static void reportPeerDependencyIssues(Map<String, PeerDependencyIssues> peerDependencyIssuesByProjects,
+                                           @Nullable PeerDependencyRules rules, boolean strictPeerDependencies,
+                                           PnpmRelease release) {
         Map<String, PeerDependencyIssues> newPeerDependencyIssuesByProjects =
-                filterPeerDependencyIssues(peerDependencyIssuesByProjects, rules);
+                filterPeerDependencyIssues(peerDependencyIssuesByProjects, rules, release);
         boolean nothingToReport = true;
         for (PeerDependencyIssues peerIssuesOfProject : newPeerDependencyIssuesByProjects.values()) {
             nothingToReport &= peerIssuesOfProject.getBad().isEmpty() &&
@@ -103,6 +109,12 @@ final class ReportPeerDependencyIssues {
 
     static Map<String, PeerDependencyIssues> filterPeerDependencyIssues(
             Map<String, PeerDependencyIssues> peerDependencyIssuesByProjects, @Nullable PeerDependencyRules rules) {
+        return filterPeerDependencyIssues(peerDependencyIssuesByProjects, rules, PnpmRelease.PORTED);
+    }
+
+    static Map<String, PeerDependencyIssues> filterPeerDependencyIssues(
+            Map<String, PeerDependencyIssues> peerDependencyIssuesByProjects, @Nullable PeerDependencyRules rules,
+            PnpmRelease release) {
         if (rules == null) {
             return peerDependencyIssuesByProjects;
         }
@@ -137,7 +149,7 @@ final class ReportPeerDependencyIssues {
                 }
                 List<BadPeerIssue> filteredIssues = new ArrayList<>();
                 for (BadPeerIssue issue : bad.getValue()) {
-                    if (anySatisfies(issue.getFoundVersion(), allowedVersionsMatchAll.get(peerName))) {
+                    if (anySatisfies(issue.getFoundVersion(), allowedVersionsMatchAll.get(peerName), release)) {
                         continue;
                     }
                     ParentPackage currentParentPkg = issue.getParents().isEmpty() ? null :
@@ -149,12 +161,12 @@ final class ReportPeerDependencyIssues {
                         for (AllowedVersionsByParent allowed : byParent.get(currentParentPkg.getName())) {
                             String parentRange = allowed.getParentPkg().getBareSpecifier();
                             if (!Js.truthy(parentRange) || Js.truthy(currentParentPkg.getVersion()) &&
-                                                           (isSubRange(parentRange, currentParentPkg.getVersion()) ||
-                                                            satisfies(currentParentPkg.getVersion(), parentRange))) {
+                                                           (isSubRange(parentRange, currentParentPkg.getVersion(), release) ||
+                                                            satisfies(currentParentPkg.getVersion(), parentRange, release))) {
                                 allowedVersionsByParent.put(allowed.getTargetPkg().getName(), allowed.getRanges());
                             }
                         }
-                        if (anySatisfies(issue.getFoundVersion(), allowedVersionsByParent.get(peerName))) {
+                        if (anySatisfies(issue.getFoundVersion(), allowedVersionsByParent.get(peerName), release)) {
                             continue;
                         }
                     }
@@ -175,22 +187,24 @@ final class ReportPeerDependencyIssues {
         List<String> ranges;
     }
 
-    private static boolean anySatisfies(String version, @Nullable List<String> ranges) {
+    private static boolean anySatisfies(String version, @Nullable List<String> ranges, PnpmRelease release) {
         if (ranges == null) {
             return false;
         }
         for (String range : ranges) {
-            if (satisfies(version, range)) {
+            if (satisfies(version, range, release)) {
                 return true;
             }
         }
         return false;
     }
 
-    private static boolean isSubRange(@Nullable String superRange, String subRange) {
+    private static boolean isSubRange(@Nullable String superRange, String subRange, PnpmRelease release) {
         return !Js.truthy(superRange) || subRange.equals(superRange) ||
-               ResolveDependencies.validRange(subRange) != null && ResolveDependencies.validRange(superRange) != null &&
-               NodeSemver.subset(subRange, superRange, NodeSemver.Options.DEFAULT);
+               ResolveDependencies.validRange(subRange, release) != null &&
+               ResolveDependencies.validRange(superRange, release) != null &&
+               release.underSemver(semver -> NodeSemver.subset(subRange, superRange,
+                       NodeSemver.Options.DEFAULT.release(semver)));
     }
 
     private static void parseAllowedVersions(Map<String, String> allowedVersions,
@@ -218,9 +232,10 @@ final class ReportPeerDependencyIssues {
         }
     }
 
-    private static boolean satisfies(String version, String range) {
+    private static boolean satisfies(String version, String range, PnpmRelease release) {
         try {
-            return NodeSemver.satisfies(version, range, NodeSemver.Options.DEFAULT);
+            return release.underSemver(semver -> NodeSemver.satisfies(version, range,
+                    NodeSemver.Options.DEFAULT.release(semver)));
         } catch (IllegalArgumentException e) {
             return false;
         }

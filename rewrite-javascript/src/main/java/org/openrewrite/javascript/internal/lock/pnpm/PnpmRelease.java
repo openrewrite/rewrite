@@ -15,11 +15,18 @@
  */
 package org.openrewrite.javascript.internal.lock.pnpm;
 
+import org.jspecify.annotations.Nullable;
 import org.openrewrite.javascript.internal.lock.CannotKnow;
+import org.openrewrite.javascript.semver.NodeSemver;
 
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.EnumSet;
 import java.util.List;
+import java.util.Objects;
+import java.util.Set;
+import java.util.function.Function;
+import java.util.function.Supplier;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -582,6 +589,81 @@ public final class PnpmRelease {
      */
     boolean countsLockedVersionsAsOptionalPeerCandidates() {
         return atLeast(11, 5, 1);
+    }
+
+    // semver
+
+    /**
+     * The node-semver pnpm 11 bundles: 7.8.5 from 11.9.0, whose {@code ~1.2} reaches down to {@code 1.2.0-0} under
+     * {@code includePrerelease}; 7.8.4 from 11.7.0, which takes an x-range with a number after a wildcard
+     * ({@code 1.x.3}) for no range and leaves a caret range below 1.0.0 without the {@code -0} includePrerelease adds;
+     * 7.8.1 from 11.3.0, which strips build metadata from a whole range; 7.8.0 from 11.2.0, and before, 7.7.4, which
+     * answers as 7.8.0 does (7.8.0 adds only {@code truncate}).
+     */
+    NodeSemver.Release semver() {
+        return atLeast(11, 9, 0) ? NodeSemver.Release.V7_8_5 :
+                atLeast(11, 7, 0) ? NodeSemver.Release.V7_8_4 :
+                        atLeast(11, 3, 0) ? NodeSemver.Release.V7_8_1 : NodeSemver.Release.V7_8_0;
+    }
+
+    /**
+     * What {@code answer} gives under the node-semver this release bundles ({@link #semver()}): where this is one of
+     * several releases, their node-semvers' answers where they agree, the question where they do not.
+     */
+    <T> T underSemver(Function<NodeSemver.Release, T> answer) {
+        if (releases.size() == 1) {
+            return answer.apply(semver());
+        }
+        Set<NodeSemver.Release> asked = EnumSet.noneOf(NodeSemver.Release.class);
+        Answer<T> first = null;
+        for (int[] release : releases) {
+            NodeSemver.Release semver = new PnpmRelease(name, Collections.singletonList(release)).semver();
+            if (!asked.add(semver)) {
+                continue;
+            }
+            Answer<T> next = Answer.of(() -> answer.apply(semver));
+            if (first == null) {
+                first = next;
+            } else if (!first.same(next)) {
+                return answer.apply(semver());
+            }
+        }
+        return Objects.requireNonNull(first).get();
+    }
+
+    // a value or the error that came instead
+    private static final class Answer<T> {
+        private final @Nullable T value;
+        private final @Nullable RuntimeException error;
+
+        private Answer(@Nullable T value, @Nullable RuntimeException error) {
+            this.value = value;
+            this.error = error;
+        }
+
+        static <T> Answer<T> of(Supplier<T> compute) {
+            try {
+                return new Answer<>(compute.get(), null);
+            } catch (RuntimeException e) {
+                return new Answer<>(null, e);
+            }
+        }
+
+        boolean same(Answer<T> other) {
+            if (error != null || other.error != null) {
+                return error != null && other.error != null && error.getClass() == other.error.getClass() &&
+                       Objects.equals(error.getMessage(), other.error.getMessage());
+            }
+            return Objects.equals(value, other.value);
+        }
+
+        T get() {
+            if (error != null) {
+                throw error;
+            }
+            //noinspection DataFlowIssue
+            return value;
+        }
     }
 
     /**

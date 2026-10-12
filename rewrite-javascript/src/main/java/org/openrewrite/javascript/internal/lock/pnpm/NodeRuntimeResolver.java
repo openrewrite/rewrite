@@ -70,7 +70,7 @@ final class NodeRuntimeResolver {
         String versionSpec = bareSpecifier.substring("runtime:".length());
         String[] parsed = parseNodeSpecifier(versionSpec);
         String nodeMirrorBaseUrl = getNodeMirror(mirrors, parsed[0]);
-        String version = resolveNodeVersion(fetch, parsed[1], nodeMirrorBaseUrl);
+        String version = resolveNodeVersion(fetch, parsed[1], nodeMirrorBaseUrl, release);
         if (version == null) {
             throw new PnpmError("NODEJS_VERSION_NOT_FOUND", "Could not find a Node.js version that satisfies " +
                                                             versionSpec);
@@ -160,7 +160,7 @@ final class NodeRuntimeResolver {
     }
 
     private static @Nullable String resolveNodeVersion(RegistryMetadata fetch, String versionSpec,
-                                                       String nodeMirrorBaseUrl) {
+                                                       String nodeMirrorBaseUrl, PnpmRelease release) {
         String url = nodeMirrorBaseUrl + "index.json";
         String index = fetch.document(url);
         Object parsed = index == null ? null : Manifests.parseValue(index, url);
@@ -170,16 +170,16 @@ final class NodeRuntimeResolver {
         List<String> all = new ArrayList<>();
         List<Object> lts = new ArrayList<>();
         for (Object entry : (List<?>) parsed) {
-            Map<String, @Nullable Object> release = ResolveDependencies.asMap(entry);
-            all.add(Js.string(release.get("version")).substring(1));
-            lts.add(release.get("lts"));
+            Map<String, @Nullable Object> indexEntry = ResolveDependencies.asMap(entry);
+            all.add(Js.string(indexEntry.get("version")).substring(1));
+            lts.add(indexEntry.get("lts"));
         }
         if ("latest".equals(versionSpec)) {
             return all.isEmpty() ? null : all.get(0);
         }
         List<String> versions = new ArrayList<>();
         String versionRange = versionSpec;
-        String selector = Verification.versionSelectorType(versionSpec);
+        String selector = Verification.versionSelectorType(versionSpec, release);
         if ("lts".equals(versionSpec) || "tag".equals(selector)) {
             for (int i = 0; i < all.size(); i++) {
                 Object l = lts.get(i);
@@ -193,7 +193,9 @@ final class NodeRuntimeResolver {
         } else {
             versions.addAll(all);
         }
-        return NodeSemver.maxSatisfying(versions, versionRange, NodeSemver.Options.LOOSE_INCLUDE_PRERELEASE);
+        String range = versionRange;
+        return release.underSemver(semver -> NodeSemver.maxSatisfying(versions, range,
+                NodeSemver.Options.LOOSE_INCLUDE_PRERELEASE.release(semver)));
     }
 
     // {releaseChannel, versionSpecifier}

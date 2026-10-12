@@ -65,6 +65,35 @@ final class PickPackageFromMeta {
 
         @Nullable
         Map<String, PreferredVersions.Selector> preferredVersionSelectors;
+
+        /**
+         * The release whose node-semver reads the range.
+         */
+        PnpmRelease release;
+
+        // semver's range functions under the release's node-semver, the loose options npm-resolver passes
+        boolean satisfies(String version) {
+            return release.underSemver(semver -> NodeSemver.satisfies(version, versionRange,
+                    NodeSemver.Options.LOOSE.release(semver)));
+        }
+
+        @Nullable
+        String maxSatisfying(List<String> versions) {
+            return release.underSemver(semver -> NodeSemver.maxSatisfying(versions, versionRange,
+                    NodeSemver.Options.LOOSE.release(semver)));
+        }
+
+        @Nullable
+        String minSatisfying(List<String> versions) {
+            return release.underSemver(semver -> NodeSemver.minSatisfying(versions, versionRange,
+                    NodeSemver.Options.LOOSE.release(semver)));
+        }
+    }
+
+    // semver.validRange(range) under the release's node-semver
+    private static boolean validRange(String range, PnpmRelease release) {
+        return release.underSemver(semver -> NodeSemver.validRange(range,
+                NodeSemver.Options.DEFAULT.release(semver))) != null;
     }
 
     /**
@@ -73,11 +102,20 @@ final class PickPackageFromMeta {
      */
     static @Nullable RegistryPackageSpec parseBareSpecifier(String bareSpecifier, @Nullable String alias,
                                                             String defaultTag, String registry) {
+        return parseBareSpecifier(bareSpecifier, alias, defaultTag, registry, PnpmRelease.PORTED);
+    }
+
+    /**
+     * {@link #parseBareSpecifier(String, String, String, String)} over the node-semver {@code release} bundles.
+     */
+    static @Nullable RegistryPackageSpec parseBareSpecifier(String bareSpecifier, @Nullable String alias,
+                                                            String defaultTag, String registry,
+                                                            PnpmRelease release) {
         String name = alias;
         if (bareSpecifier.startsWith("npm:")) {
             bareSpecifier = bareSpecifier.substring(4);
             if (alias != null && !alias.isEmpty() &&
-                NodeSemver.validRange(bareSpecifier, NodeSemver.Options.DEFAULT) != null) {
+                validRange(bareSpecifier, release)) {
                 name = alias;
             } else {
                 int index = bareSpecifier.lastIndexOf('@');
@@ -91,7 +129,7 @@ final class PickPackageFromMeta {
             }
         }
         if (name != null && !name.isEmpty()) {
-            RegistryPackageSpec spec = selectorSpec(name, bareSpecifier);
+            RegistryPackageSpec spec = selectorSpec(name, bareSpecifier, release);
             if (spec != null) {
                 return spec;
             }
@@ -106,13 +144,14 @@ final class PickPackageFromMeta {
     }
 
     // version-selector-type's {type, normalized} for a package name
-    private static @Nullable RegistryPackageSpec selectorSpec(String name, String selector) {
-        String type = Verification.versionSelectorType(selector);
+    private static @Nullable RegistryPackageSpec selectorSpec(String name, String selector, PnpmRelease release) {
+        String type = Verification.versionSelectorType(selector, release);
         if (type == null) {
             return null;
         }
         String normalized = "version".equals(type) ? NodeSemver.valid(selector, NodeSemver.Options.LOOSE) :
-                "range".equals(type) ? NodeSemver.validRange(selector, NodeSemver.Options.LOOSE) : selector;
+                "range".equals(type) ? release.underSemver(semver -> NodeSemver.validRange(selector,
+                        NodeSemver.Options.LOOSE.release(semver))) : selector;
         return new RegistryPackageSpec(type, name, normalized, null);
     }
 
@@ -133,18 +172,20 @@ final class PickPackageFromMeta {
 
     static @Nullable JsrRegistryPackageSpec parseJsrSpecifierToRegistryPackageSpec(String rawSpecifier,
                                                                                    @Nullable String alias,
-                                                                                   String defaultTag) {
+                                                                                   String defaultTag,
+                                                                                   PnpmRelease release) {
         JsrSpecifierParser.JsrSpec spec = JsrSpecifierParser.parseJsrSpecifier(rawSpecifier, alias);
         if (spec == null || !Js.truthy(spec.getNpmPkgName())) {
             return null;
         }
         RegistryPackageSpec selector = selectorSpec(spec.getNpmPkgName(),
-                spec.getVersionSelector() != null ? spec.getVersionSelector() : defaultTag);
+                spec.getVersionSelector() != null ? spec.getVersionSelector() : defaultTag, release);
         return selector == null ? null : new JsrRegistryPackageSpec(selector, spec.getJsrPkgName());
     }
 
     static @Nullable NamedRegistryPackageSpec parseNamedRegistrySpecifierToRegistryPackageSpec(
-            String rawSpecifier, Set<String> knownRegistryNames, @Nullable String packageAlias, String defaultTag) {
+            String rawSpecifier, Set<String> knownRegistryNames, @Nullable String packageAlias, String defaultTag,
+            PnpmRelease release) {
         int colon = rawSpecifier.indexOf(':');
         if (colon <= 0) {
             return null;
@@ -156,7 +197,7 @@ final class PickPackageFromMeta {
         String body = rawSpecifier.substring(colon + 1);
         String pkgName;
         String versionSelector = null;
-        if (ResolveDependencies.validRange(body) != null) {
+        if (ResolveDependencies.validRange(body, release) != null) {
             if (!Js.truthy(packageAlias)) {
                 return null;
             }
@@ -189,7 +230,8 @@ final class PickPackageFromMeta {
                 return null;
             }
         }
-        RegistryPackageSpec selector = selectorSpec(pkgName, versionSelector != null ? versionSelector : defaultTag);
+        RegistryPackageSpec selector = selectorSpec(pkgName, versionSelector != null ? versionSelector : defaultTag,
+                release);
         return selector == null ? null : new NamedRegistryPackageSpec(selector, registryName);
     }
 
@@ -293,7 +335,7 @@ final class PickPackageFromMeta {
                 }
                 default:
                     version = pickVersionByVersionRange.apply(new VersionRangeOptions(meta, spec.getFetchSpec(),
-                            preferredVersionSelectors));
+                            preferredVersionSelectors, release));
             }
             if (version == null || version.isEmpty()) {
                 return null;
@@ -326,12 +368,13 @@ final class PickPackageFromMeta {
         return Double.isNaN(time) ? null : Instant.ofEpochMilli((long) time);
     }
 
-    private static boolean semverSatisfiesLoose(@Nullable String version, String range) {
+    private static boolean semverSatisfiesLoose(@Nullable String version, String range, PnpmRelease release) {
         if (version == null) {
             return false;
         }
         try {
-            return NodeSemver.satisfies(version, range, NodeSemver.Options.LOOSE);
+            return release.underSemver(semver -> NodeSemver.satisfies(version, range,
+                    NodeSemver.Options.LOOSE.release(semver)));
         } catch (IllegalArgumentException e) {
             return false;
         }
@@ -347,9 +390,8 @@ final class PickPackageFromMeta {
         Map<String, PreferredVersions.Selector> selectors = options.getPreferredVersionSelectors();
         if (selectors != null && !selectors.isEmpty()) {
             for (List<String> preferredVersions : prioritizePreferredVersions(options.getMeta(),
-                    options.getVersionRange(), selectors)) {
-                String preferredVersion = NodeSemver.minSatisfying(preferredVersions, options.getVersionRange(),
-                        NodeSemver.Options.LOOSE);
+                    options.getVersionRange(), selectors, options.getRelease())) {
+                String preferredVersion = options.minSatisfying(preferredVersions);
                 if (preferredVersion != null) {
                     return preferredVersion;
                 }
@@ -361,7 +403,7 @@ final class PickPackageFromMeta {
             versions.sort((a, b) -> NodeSemver.compare(a, b, NodeSemver.Options.DEFAULT));
             return versions.isEmpty() ? null : versions.get(0);
         }
-        return NodeSemver.minSatisfying(versions, options.getVersionRange(), NodeSemver.Options.LOOSE);
+        return options.minSatisfying(versions);
     }
 
     @SuppressWarnings("unchecked")
@@ -372,23 +414,24 @@ final class PickPackageFromMeta {
         String latest = latestValue == null ? null : Js.string(latestValue);
         Map<String, PreferredVersions.Selector> selectors = options.getPreferredVersionSelectors();
         if (selectors != null && !selectors.isEmpty()) {
-            for (List<String> preferredVersions : prioritizePreferredVersions(meta, versionRange, selectors)) {
+            for (List<String> preferredVersions : prioritizePreferredVersions(meta, versionRange, selectors,
+                    options.getRelease())) {
                 if (latest != null && preferredVersions.contains(latest) &&
-                    semverSatisfiesLoose(latest, versionRange)) {
+                    semverSatisfiesLoose(latest, versionRange, options.getRelease())) {
                     return latest;
                 }
-                String preferredVersion = NodeSemver.maxSatisfying(preferredVersions, versionRange,
-                        NodeSemver.Options.LOOSE);
+                String preferredVersion = options.maxSatisfying(preferredVersions);
                 if (preferredVersion != null) {
                     return preferredVersion;
                 }
             }
         }
         List<String> versions = versionKeys(meta);
-        if (Js.truthy(latest) && ("*".equals(versionRange) || semverSatisfiesLoose(latest, versionRange))) {
+        if (Js.truthy(latest) && ("*".equals(versionRange) ||
+                                  semverSatisfiesLoose(latest, versionRange, options.getRelease()))) {
             return latest;
         }
-        String maxVersion = NodeSemver.maxSatisfying(versions, versionRange, NodeSemver.Options.LOOSE);
+        String maxVersion = options.maxSatisfying(versions);
         Map<String, Object> versionManifests = (Map<String, Object>) meta.get("versions");
         if (maxVersion != null && Js.truthy(deprecated(versionManifests.get(maxVersion))) && versions.size() > 1) {
             List<String> nonDeprecatedVersions = new ArrayList<>();
@@ -399,8 +442,7 @@ final class PickPackageFromMeta {
                     nonDeprecatedVersions.add(Js.string(v == null ? Js.UNDEFINED : v));
                 }
             }
-            String maxNonDeprecatedVersion = NodeSemver.maxSatisfying(nonDeprecatedVersions, versionRange,
-                    NodeSemver.Options.LOOSE);
+            String maxNonDeprecatedVersion = options.maxSatisfying(nonDeprecatedVersions);
             if (maxNonDeprecatedVersion != null) {
                 return maxNonDeprecatedVersion;
             }
@@ -416,10 +458,10 @@ final class PickPackageFromMeta {
     @SuppressWarnings("unchecked")
     static List<List<String>> prioritizePreferredVersions(
             Map<String, @Nullable Object> meta, String versionRange,
-            Map<String, PreferredVersions.Selector> preferredVerSelectors) {
+            Map<String, PreferredVersions.Selector> preferredVerSelectors, PnpmRelease release) {
         Map<String, Long> versionsPrioritizer = new LinkedHashMap<>();
         for (String version : versionKeys(meta)) {
-            if (semverSatisfiesLoose(version, versionRange)) {
+            if (semverSatisfiesLoose(version, versionRange, release)) {
                 add(versionsPrioritizer, version, 0);
             }
         }
@@ -437,7 +479,7 @@ final class PickPackageFromMeta {
                 }
                 case "range":
                     for (String version : versionKeys(meta)) {
-                        if (semverSatisfiesLoose(version, preferredSelector)) {
+                        if (semverSatisfiesLoose(version, preferredSelector, release)) {
                             add(versionsPrioritizer, version, weight);
                         }
                     }

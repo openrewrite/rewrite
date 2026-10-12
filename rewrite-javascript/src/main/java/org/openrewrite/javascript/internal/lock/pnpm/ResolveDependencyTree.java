@@ -179,12 +179,17 @@ final class ResolveDependencyTree {
      * validatePeerDependencies.ts: each of a project's peer ranges is a semver range, a workspace: or a catalog: spec.
      */
     static void validatePeerDependencies(String rootDir, Map<String, @Nullable Object> manifest) {
+        validatePeerDependencies(rootDir, manifest, PnpmRelease.PORTED);
+    }
+
+    static void validatePeerDependencies(String rootDir, Map<String, @Nullable Object> manifest,
+                                         PnpmRelease release) {
         Map<String, @Nullable Object> peerDependencies = ResolveDependencies.asMap(manifest.get("peerDependencies"));
         Object name = manifest.get("name");
         String projectId = name != null ? Js.string(name) : rootDir;
         for (String depName : Js.keys(peerDependencies)) {
             String version = Js.string(peerDependencies.get(depName));
-            if (!ReadPackageHook.isValidPeerRange(version)) {
+            if (!ReadPackageHook.isValidPeerRange(version, release)) {
                 throw new PnpmError("INVALID_PEER_DEPENDENCY_SPECIFICATION", "The peerDependencies field named '" +
                         depName + "' of package '" + projectId + "' has an invalid value: '" + version + "'",
                         "The values in peerDependencies should be either a valid semver range, a `workspace:` spec, " +
@@ -197,7 +202,7 @@ final class ResolveDependencyTree {
                                         PreferredVersions.ByName preferredVersions) {
         List<ResolveDependencies.ImporterToResolve> resolveArgs = new ArrayList<>();
         for (Importer importer : importers) {
-            validatePeerDependencies(importer.getRootDir(), importer.getManifest());
+            validatePeerDependencies(importer.getRootDir(), importer.getManifest(), ctx.getRelease());
             List<WantedDependency> wantedDependencies = new ArrayList<>();
             for (WantedDependency dep : importer.getWantedDependencies()) {
                 String spec = dep.getBareSpecifier();

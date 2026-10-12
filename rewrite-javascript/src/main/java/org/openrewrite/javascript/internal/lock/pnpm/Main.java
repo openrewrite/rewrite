@@ -320,7 +320,7 @@ public final class Main {
                     options.getRelease());
         }
         return new FilterResults(projects, ProjectsGraph.createProjectsGraph(projects, false,
-                Js.truthy(options.get("linkWorkspacePackages"))));
+                Js.truthy(options.get("linkWorkspacePackages")), options.getRelease()));
     }
 
     // project-manifest-reader over the one manifest findPackages lists in dir
@@ -400,7 +400,7 @@ public final class Main {
             unlessLocked = switched.getUnlessLocked();
             return switched.getRelease();
         }
-        checkPackageManager(pm, underCorepack, current);
+        checkPackageManager(pm, underCorepack, current, running());
         if (rootLockFile == null) {
             if (SyncEnvLockfile.syncEnvLockfile(pm, () -> null, running()) != null) {
                 unlessLocked = stores.storeControllerFailure(options.packageManagerBootstrap(running()));
@@ -530,7 +530,7 @@ public final class Main {
     }
 
     private static void checkPackageManager(PnpmOptions.WantedPackageManager pm, boolean underCorepack,
-                                            String current) {
+                                            String current, PnpmRelease running) {
         if (!Js.truthy(pm.getName())) {
             return;
         }
@@ -543,7 +543,8 @@ public final class Main {
             return;
         }
         if (Js.truthy(pm.getVersion()) &&
-            !NodeSemver.satisfies(current, Js.string(pm.getVersion()), NodeSemver.Options.INCLUDE_PRERELEASE)) {
+            !running.underSemver(semver -> NodeSemver.satisfies(current, Js.string(pm.getVersion()),
+                    NodeSemver.Options.INCLUDE_PRERELEASE.release(semver)))) {
             String msg = "This project is configured to use " + Js.string(pm.getVersion()) +
                          " of pnpm. Your current pnpm is v" + current;
             if (underCorepack) {
@@ -631,7 +632,8 @@ public final class Main {
         Object wantedRange = runtime.get("version");
         String failure;
         if (!Js.truthy(wantedRange) || !(wantedRange instanceof String) ||
-            NodeSemver.validRange((String) wantedRange, NodeSemver.Options.DEFAULT) == null) {
+            release.underSemver(semver -> NodeSemver.validRange((String) wantedRange,
+                    NodeSemver.Options.DEFAULT.release(semver))) == null) {
             failure = Js.truthy(wantedRange) ?
                     "This project requires an invalid " + displayName + " version range: " + Js.string(wantedRange) :
                     "This project requires a " + displayName + " runtime but does not specify a version range";
@@ -643,8 +645,8 @@ public final class Main {
                                  "project requires with onFail \"error\"");
         } else {
             String currentVersion = inputs.getHost().getNodeVersion();
-            if (currentVersion == null || NodeSemver.satisfies(currentVersion, (String) wantedRange,
-                    NodeSemver.Options.INCLUDE_PRERELEASE)) {
+            if (currentVersion == null || release.underSemver(semver -> NodeSemver.satisfies(currentVersion,
+                    (String) wantedRange, NodeSemver.Options.INCLUDE_PRERELEASE.release(semver)))) {
                 return;
             }
             failure = "This project requires " + displayName + " " + wantedRange + ". Your current " + displayName +

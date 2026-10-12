@@ -100,13 +100,14 @@ final class PreferredVersions {
      * {@code getPreferredVersionsFromLockfileAndManifests}.
      */
     static Map<String, Map<String, Selector>> getPreferredVersionsFromLockfileAndManifests(
-            @Nullable Map<String, PackageSnapshot> snapshots, Collection<Map<String, @Nullable Object>> manifests) {
+            @Nullable Map<String, PackageSnapshot> snapshots, Collection<Map<String, @Nullable Object>> manifests,
+            PnpmRelease release) {
         Map<String, Map<String, Selector>> preferredVersions = new LinkedHashMap<>();
         for (Map<String, @Nullable Object> manifest : manifests) {
             Map<String, @Nullable Object> specs = getAllDependenciesFromManifest(manifest);
             for (String name : Js.keys(specs)) {
                 String spec = Js.string(specs.get(name));
-                String selector = Verification.versionSelectorType(spec);
+                String selector = Verification.versionSelectorType(spec, release);
                 if (selector == null) {
                     continue;
                 }

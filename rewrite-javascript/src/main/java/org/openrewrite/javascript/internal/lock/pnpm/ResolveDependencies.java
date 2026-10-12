@@ -613,7 +613,7 @@ final class ResolveDependencies {
     static Promise<RootResult> resolveRootDependencies(ResolutionContext ctx, List<ImporterToResolve> importers) {
         if (ctx.isAutoInstallPeers()) {
             ctx.setAllPreferredVersions(PreferredVersions.getPreferredVersionsFromLockfileAndManifests(
-                    ctx.getWantedLockfile().getPackages(), Collections.emptyList()));
+                    ctx.getWantedLockfile().getPackages(), Collections.emptyList(), ctx.getRelease()));
         } else if (ctx.isHoistPeers()) {
             ctx.setAllPreferredVersions(new LinkedHashMap<>());
         }
@@ -1176,7 +1176,7 @@ final class ResolveDependencies {
                          info == null || info.getDependencyLockfile() == null ||
                          ctx.getWorkspacePackages() != null && ctx.getLinkWorkspacePackagesDepth() != -1 &&
                          wantedDepIsLocallyAvailable(ctx.getWorkspacePackages(), wanted, ctx.getDefaultTag(),
-                                 ctx.getRegistries().get("default")) ||
+                                 ctx.getRegistries().get("default"), ctx.getRelease()) ||
                          ctx.getUpdatedSet().contains(info.getName());
 
         ResolveDependencyOptions resolveDependencyOpts = new ResolveDependencyOptions();
@@ -1375,11 +1375,12 @@ final class ResolveDependencies {
             if (alias != null && !alias.isEmpty()) {
                 String resolved = resolvedDependencies.get(alias);
                 String preferred = preferredDependencies.get(alias);
-                if (Js.truthy(resolved) && (referenceSatisfiesWantedSpec(wantedLockfile, wantedDependency, resolved) ||
+                if (Js.truthy(resolved) && (referenceSatisfiesWantedSpec(wantedLockfile, wantedDependency, resolved,
+                        release) ||
                                             resolved.startsWith("file:"))) {
                     reference = resolved;
-                } else if (validRange(wantedDependency.getBareSpecifier()) != null && Js.truthy(preferred) &&
-                           referenceSatisfiesWantedSpec(wantedLockfile, wantedDependency, preferred)) {
+                } else if (validRange(wantedDependency.getBareSpecifier(), release) != null && Js.truthy(preferred) &&
+                           referenceSatisfiesWantedSpec(wantedLockfile, wantedDependency, preferred, release)) {
                     proceedThis = true;
                     reference = preferred;
                 }
@@ -1406,7 +1407,7 @@ final class ResolveDependencies {
     }
 
     private static boolean referenceSatisfiesWantedSpec(LockfileObject lockfile, WantedDependency wantedDep,
-                                                        String preferredRef) {
+                                                        String preferredRef, PnpmRelease release) {
         String depPath = DepPath.refToRelative(preferredRef, wantedDep.getAlias());
         if (depPath == null) {
             return false;
@@ -1416,14 +1417,14 @@ final class ResolveDependencies {
             return false;
         }
         String version = nameVerFromPkgSnapshot(depPath, pkgSnapshot)[1];
-        if (validRange(wantedDep.getBareSpecifier()) == null) {
+        if (validRange(wantedDep.getBareSpecifier(), release) == null) {
             for (ProjectSnapshot importer : lockfile.getImporters().values()) {
                 if (wantedDep.getBareSpecifier().equals(importer.getSpecifiers().get(wantedDep.getAlias()))) {
                     return true;
                 }
             }
         }
-        return satisfiesLoose(version, wantedDep.getBareSpecifier());
+        return satisfiesLoose(version, wantedDep.getBareSpecifier(), release);
     }
 
     /**
@@ -1596,7 +1597,8 @@ final class ResolveDependencies {
         if (options.update == null && currentPkg != null && currentPkg.getVersion() != null &&
             currentPkg.getPkgId().endsWith("@" + currentPkg.getVersion()) && !calcSpecifier) {
             wantedDependency.setBareSpecifier(replaceVersionInBareSpecifier(wantedDependency.getBareSpecifier(),
-                    currentPkg.getVersion(), namedRegistryPrefixes(ctx, wantedDependency.getBareSpecifier())));
+                    currentPkg.getVersion(), namedRegistryPrefixes(ctx, wantedDependency.getBareSpecifier()),
+                    ctx.getRelease()));
         }
         PackageRequester.RequestPackageOptions request = new PackageRequester.RequestPackageOptions();
         request.alwaysTryWorkspacePackages = ctx.getLinkWorkspacePackagesDepth() >= options.currentDepth;
@@ -1715,7 +1717,7 @@ final class ResolveDependencies {
         String pkgIdWithPatchHash = pkgResponse.getId().startsWith(pkgName + "@") ? pkgResponse.getId() :
                 pkgName + "@" + pkgResponse.getId();
         PatchingConfig.PatchInfo patch = PatchingConfig.getPatchInfo(ctx.getPatchedDependencies(), pkgName,
-                Js.string(pkg.get("version")));
+                Js.string(pkg.get("version")), ctx.getRelease());
         if (patch != null) {
             ctx.getAppliedPatches().add(patch.getKey());
             pkgIdWithPatchHash = pkgIdWithPatchHash + "(patch_hash=" + patch.getHash() + ")";
@@ -2140,13 +2142,14 @@ final class ResolveDependencies {
                 // 11.2.2 takes the preferred versions an exact peer version names; 11.12.0 those any peer range
                 // satisfies, and where a range none, the range or nothing (PnpmRelease#hoistsAPeerInRange)
                 boolean isExactVersion = NodeSemver.valid(range, NodeSemver.Options.DEFAULT) != null;
-                String exactSatisfying = isExactVersion ?
-                        NodeSemver.maxSatisfying(versions, range, NodeSemver.Options.INCLUDE_PRERELEASE) : null;
+                String exactSatisfying = isExactVersion ? release.underSemver(semver -> NodeSemver.maxSatisfying(
+                        versions, range, NodeSemver.Options.INCLUDE_PRERELEASE.release(semver))) : null;
                 String hoisted = exactSatisfying != null ? join(exactSatisfying, nonVersions) :
                         isExactVersion && autoInstallPeers ? range : highest(versions, nonVersions);
-                boolean isSemverRange = NodeSemver.validRange(range, NodeSemver.Options.INCLUDE_PRERELEASE) != null;
-                String rangeSatisfying = isSemverRange ?
-                        NodeSemver.maxSatisfying(versions, range, NodeSemver.Options.INCLUDE_PRERELEASE) : null;
+                boolean isSemverRange = release.underSemver(semver -> NodeSemver.validRange(range,
+                        NodeSemver.Options.INCLUDE_PRERELEASE.release(semver))) != null;
+                String rangeSatisfying = isSemverRange ? release.underSemver(semver -> NodeSemver.maxSatisfying(
+                        versions, range, NodeSemver.Options.INCLUDE_PRERELEASE.release(semver))) : null;
                 String inRange = rangeSatisfying != null ? join(rangeSatisfying, nonVersions) :
                         isSemverRange && !versions.isEmpty() ? autoInstallPeers ? range : null :
                                 highest(versions, nonVersions);
@@ -2286,7 +2289,12 @@ final class ResolveDependencies {
 
     static String replaceVersionInBareSpecifier(String bareSpecifier, String version,
                                                 List<String> namedRegistryPrefixes) {
-        if (validRange(bareSpecifier) != null) {
+        return replaceVersionInBareSpecifier(bareSpecifier, version, namedRegistryPrefixes, PnpmRelease.PORTED);
+    }
+
+    static String replaceVersionInBareSpecifier(String bareSpecifier, String version,
+                                                List<String> namedRegistryPrefixes, PnpmRelease release) {
+        if (validRange(bareSpecifier, release) != null) {
             return version;
         }
         String prefix = null;
@@ -2303,7 +2311,7 @@ final class ResolveDependencies {
         if (prefix == null) {
             return bareSpecifier;
         }
-        if (validRange(bareSpecifier.substring(prefix.length())) != null) {
+        if (validRange(bareSpecifier.substring(prefix.length()), release) != null) {
             return prefix + version;
         }
         int versionDelimiter = bareSpecifier.lastIndexOf('@');
@@ -2324,10 +2332,10 @@ final class ResolveDependencies {
 
     private static boolean wantedDepIsLocallyAvailable(Map<String, Map<String, Verification.Project>> workspacePackages,
                                                        WantedDependency wantedDependency, String defaultTag,
-                                                       String registry) {
+                                                       String registry, PnpmRelease release) {
         PickPackageFromMeta.RegistryPackageSpec spec = PickPackageFromMeta.parseBareSpecifier(
                 wantedDependency.getBareSpecifier(), wantedDependency.getAlias(),
-                defaultTag.isEmpty() ? "latest" : defaultTag, registry);
+                defaultTag.isEmpty() ? "latest" : defaultTag, registry, release);
         if (spec == null || !workspacePackages.containsKey(spec.getName())) {
             return false;
         }
@@ -2338,26 +2346,30 @@ final class ResolveDependencies {
             case "version":
                 return localVersions.contains(spec.getFetchSpec());
             case "range":
-                return NodeSemver.maxSatisfying(localVersions, spec.getFetchSpec(), NodeSemver.Options.LOOSE) != null;
+                return release.underSemver(semver -> NodeSemver.maxSatisfying(localVersions, spec.getFetchSpec(),
+                        NodeSemver.Options.LOOSE.release(semver))) != null;
             default:
                 return false;
         }
     }
 
-    static @Nullable String validRange(String range) {
+    // semver.validRange under the node-semver the release bundles
+    static @Nullable String validRange(String range, PnpmRelease release) {
         try {
-            return NodeSemver.validRange(range, NodeSemver.Options.DEFAULT);
+            return release.underSemver(semver -> NodeSemver.validRange(range,
+                    NodeSemver.Options.DEFAULT.release(semver)));
         } catch (IllegalArgumentException e) {
             return null;
         }
     }
 
-    private static boolean satisfiesLoose(@Nullable String version, String range) {
+    private static boolean satisfiesLoose(@Nullable String version, String range, PnpmRelease release) {
         if (version == null) {
             return false;
         }
         try {
-            return NodeSemver.satisfies(version, range, NodeSemver.Options.LOOSE);
+            return release.underSemver(semver -> NodeSemver.satisfies(version, range,
+                    NodeSemver.Options.LOOSE.release(semver)));
         } catch (IllegalArgumentException e) {
             return false;
         }

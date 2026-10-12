@@ -464,6 +464,6 @@ final class PackageRequester {
     private @Nullable Boolean packageIsInstallable(String pkgId, Map<String, @Nullable Object> manifest,
                                                    boolean optional) {
         return force ? Boolean.TRUE : PackageIsInstallable.packageIsInstallable(pkgId, manifest, engineStrict,
-                nodeVersion, optional, supportedArchitectures, host);
+                nodeVersion, optional, supportedArchitectures, host, npmResolver.getRelease());
     }
 }

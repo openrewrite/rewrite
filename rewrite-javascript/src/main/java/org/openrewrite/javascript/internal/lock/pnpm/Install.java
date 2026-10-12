@@ -254,7 +254,7 @@ final class Install {
         } else if (!Verification.allProjectsAreUpToDate(projects, options.getCatalogs(),
                 options.isTrue("autoInstallPeers"), options.isTrue("excludeLinksFromLockfile"),
                 options.getLinkWorkspacePackagesDepth() >= 0, wantedLockfile, workspacePackages, inputs.getFiles(),
-                lockDir)) {
+                lockDir, options.getRelease())) {
             reason = "projects not up to date with the lock";
         }
         Map<String, String> patches = patchHashes(patchedDependencies);
@@ -307,7 +307,7 @@ final class Install {
         }
         PreferredVersions.ByName preferredVersions = PreferredVersions.ByName.of(
                 PreferredVersions.getPreferredVersionsFromLockfileAndManifests(wantedLockfile.getPackages(),
-                        manifests));
+                        manifests, options.getRelease()));
 
         Map<String, String> registries = options.getRegistries();
         Map<String, String> files = new LinkedHashMap<>(inputs.getFiles());
@@ -340,7 +340,8 @@ final class Install {
         ctx.setHoistPeers(autoInstallPeers || options.isTrue("dedupePeerDependents"));
         ctx.setResolvePeersFromWorkspaceRoot(options.isTrue("resolvePeersFromWorkspaceRoot"));
         ctx.setBlockExoticSubdeps(options.isTrue("blockExoticSubdeps"));
-        ctx.setPatchedDependencies(PatchingConfig.groupPatchedDependencies(install.getPatchedDependencies()));
+        ctx.setPatchedDependencies(PatchingConfig.groupPatchedDependencies(install.getPatchedDependencies(),
+                options.getRelease()));
         Double minimumReleaseAge = options.getNumber("minimumReleaseAge");
         List<String> minimumReleaseAgeExclude = options.getStrings("minimumReleaseAgeExclude");
         if (minimumReleaseAge != null && minimumReleaseAge != 0) {
@@ -379,7 +380,7 @@ final class Install {
         newLockfile.set("lockfileVersion", LockfileObject.LOCKFILE_VERSION);
         String written = lockFile.writeWantedLockfile(newLockfile);
         ReportPeerDependencyIssues.reportPeerDependencyIssues(result.getPeerDependencyIssuesByProjects(),
-                options.getPeerDependencyRules(), options.isTrue("strictPeerDependencies"));
+                options.getPeerDependencyRules(), options.isTrue("strictPeerDependencies"), options.getRelease());
         return written;
     }
 
@@ -576,8 +577,10 @@ final class Install {
 
     // semver.validRange of both, then semver.eq, which takes versions only; from 11.5.2 semver.valid of both
     private static boolean eq(String alias, String wanted, String catalogDepSpecifier, PnpmRelease release) {
-        if (NodeSemver.validRange(wanted, NodeSemver.Options.DEFAULT) == null ||
-            NodeSemver.validRange(catalogDepSpecifier, NodeSemver.Options.DEFAULT) == null) {
+        if (release.underSemver(semver -> NodeSemver.validRange(wanted, NodeSemver.Options.DEFAULT.release(semver)) ==
+                                          null ||
+                                          NodeSemver.validRange(catalogDepSpecifier,
+                                                  NodeSemver.Options.DEFAULT.release(semver)) == null)) {
             return false;
         }
         if ((NodeSemver.valid(wanted, NodeSemver.Options.DEFAULT) == null ||

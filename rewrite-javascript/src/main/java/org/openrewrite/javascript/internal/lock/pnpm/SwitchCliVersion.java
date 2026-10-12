@@ -100,7 +100,7 @@ final class SwitchCliVersion {
         // the store controller and the resolution of pnpm itself take the release's bootstrap config
         Supplier<PnpmOptions> bootstrap = () -> options.packageManagerBootstrap(running());
         if (lockFile == null && persistLockfile &&
-            NodeSemver.satisfies(current, version, NodeSemver.Options.INCLUDE_PRERELEASE)) {
+            satisfies(current, version)) {
             PnpmError failure = stores.storeControllerFailure(bootstrap.get());
             if (failure == null && !(version.equals(current) || follows(version))) {
                 throw new CannotKnow("which pnpm release the workspace's " + LockfileReader.WANTED_LOCKFILE +
@@ -115,9 +115,9 @@ final class SwitchCliVersion {
         NpmResolver storeToUse = null;
         // the release pnpm hands over to is the locked one, else one the registry has in range: when that cannot be
         // the release that runs, resolving it only names another
-        if (!Js.truthy(pmVersion) || !NodeSemver.satisfies(pmVersion, version, NodeSemver.Options.INCLUDE_PRERELEASE)) {
+        if (!Js.truthy(pmVersion) || !satisfies(pmVersion, version)) {
             storeToUse = stores.createStoreController(bootstrap.get());
-            if (!NodeSemver.satisfies(current, version, NodeSemver.Options.INCLUDE_PRERELEASE) && !follows(version)) {
+            if (!satisfies(current, version) && !follows(version)) {
                 throw switchesTo(version);
             }
             envLockfile = envInstaller.resolvePackageManagerIntegrities(version, envLockfile,
@@ -156,6 +156,12 @@ final class SwitchCliVersion {
     // the release that runs: the one that built the LST, else pnpm's own
     private PnpmRelease running() {
         return runs == null ? PnpmRelease.PORTED : runs;
+    }
+
+    // semver.satisfies(version, range, { includePrerelease: true }) of the node-semver the release that runs bundles
+    private boolean satisfies(Object version, String range) {
+        return running().underSemver(semver -> NodeSemver.satisfies(version, range,
+                NodeSemver.Options.INCLUDE_PRERELEASE.release(semver)));
     }
 
     /**

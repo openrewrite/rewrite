@@ -40,7 +40,8 @@ final class SyncEnvLockfile {
         }
         String version = Js.string(pm.getVersion());
         String current = running.version();
-        if (!NodeSemver.satisfies(current, version, NodeSemver.Options.INCLUDE_PRERELEASE)) {
+        if (!running.underSemver(semver -> NodeSemver.satisfies(current, version,
+                NodeSemver.Options.INCLUDE_PRERELEASE.release(semver)))) {
             return null;
         }
         EnvLockfile locked = envLockfile.get();
@@ -50,7 +51,8 @@ final class SyncEnvLockfile {
         if ((locked == null || !hasLockedVersion) && !running.recordsTheReleaseAnEnvDocumentLacks()) {
             return null;
         }
-        if (hasLockedVersion && NodeSemver.satisfies(lockedVersion, version, NodeSemver.Options.INCLUDE_PRERELEASE)) {
+        if (hasLockedVersion && running.underSemver(semver -> NodeSemver.satisfies(lockedVersion, version,
+                NodeSemver.Options.INCLUDE_PRERELEASE.release(semver)))) {
             return null;
         }
         return current;

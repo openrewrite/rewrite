@@ -38,8 +38,10 @@ final class ProjectsGraph {
     private final Map<String, Verification.Project> projectMap = new LinkedHashMap<>();
     private final List<Unmatched> unmatched = new ArrayList<>();
     private final List<String> unknown = new ArrayList<>();
+    private final PnpmRelease release;
 
-    private ProjectsGraph() {
+    private ProjectsGraph(PnpmRelease release) {
+        this.release = release;
     }
 
     @Value
@@ -66,7 +68,15 @@ final class ProjectsGraph {
 
     static Result createProjectsGraph(List<Verification.Project> projects, boolean ignoreDevDeps,
                                       @Nullable Boolean linkWorkspacePackages) {
-        ProjectsGraph projectsGraph = new ProjectsGraph();
+        return createProjectsGraph(projects, ignoreDevDeps, linkWorkspacePackages, PnpmRelease.PORTED);
+    }
+
+    /**
+     * The graph as {@code release} makes it, its version ranges read by the node-semver that release bundles.
+     */
+    static Result createProjectsGraph(List<Verification.Project> projects, boolean ignoreDevDeps,
+                                      @Nullable Boolean linkWorkspacePackages, PnpmRelease release) {
+        ProjectsGraph projectsGraph = new ProjectsGraph(release);
         for (Verification.Project project : projects) {
             projectsGraph.projectMap.put(project.getRootDir(), project);
         }
@@ -115,7 +125,7 @@ final class ProjectsGraph {
         try {
             if (isWorkspaceSpec) {
                 PickPackageFromMeta.RegistryPackageSpec parsed = PickPackageFromMeta.parseBareSpecifier(
-                        NpmResolver.workspacePrefToNpm(rawSpec), depName, "latest", "");
+                        NpmResolver.workspacePrefToNpm(rawSpec), depName, "latest", "", release);
                 if (parsed == null) {
                     return null;
                 }
@@ -167,7 +177,7 @@ final class ProjectsGraph {
                 }
                 strings.add((String) version);
             }
-            matched = NpmResolver.resolveWorkspaceRange(rawSpec, strings);
+            matched = NpmResolver.resolveWorkspaceRange(rawSpec, strings, release);
             if (matched == null) {
                 unmatched.add(new Unmatched(depName, rawSpec));
                 return null;

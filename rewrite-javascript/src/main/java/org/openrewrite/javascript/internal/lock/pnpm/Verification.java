@@ -87,6 +87,20 @@ final class Verification {
                                           boolean linkWorkspacePackages, LockfileObject wantedLockfile,
                                           @Nullable Map<String, Map<String, Project>> workspacePackages,
                                           Map<String, String> files, String lockfileDir) {
+        return allProjectsAreUpToDate(projects, catalogs, autoInstallPeers, excludeLinksFromLockfile,
+                linkWorkspacePackages, wantedLockfile, workspacePackages, files, lockfileDir, PnpmRelease.PORTED);
+    }
+
+    /**
+     * {@link #allProjectsAreUpToDate(List, Map, boolean, boolean, boolean, LockfileObject, Map, Map, String)} with
+     * the version ranges read by the node-semver {@code release} bundles.
+     */
+    static boolean allProjectsAreUpToDate(List<Project> projects,
+                                          Map<String, @Nullable Map<String, @Nullable Object>> catalogs,
+                                          boolean autoInstallPeers, boolean excludeLinksFromLockfile,
+                                          boolean linkWorkspacePackages, LockfileObject wantedLockfile,
+                                          @Nullable Map<String, Map<String, Project>> workspacePackages,
+                                          Map<String, String> files, String lockfileDir, PnpmRelease release) {
         if (!allCatalogsAreUpToDate(catalogs, wantedLockfile.getCatalogs())) {
             return false;
         }
@@ -109,11 +123,11 @@ final class Verification {
                 }
                 continue;
             }
-            if (!satisfiesPackageManifest(autoInstallPeers, excludeLinksFromLockfile, importer, project.getManifest())
-                    .isSatisfies() ||
+            if (!satisfiesPackageManifest(autoInstallPeers, excludeLinksFromLockfile, importer, project.getManifest(),
+                    release).isSatisfies() ||
                 !localTarballDepsAreUpToDate(wantedLockfile.getPackages(), importer) ||
                 !linkedPackagesAreUpToDate(linkWorkspacePackages, manifestsByDir, workspacePackages,
-                        wantedLockfile.getPackages(), project, importer, files, lockfileDir)) {
+                        wantedLockfile.getPackages(), project, importer, files, lockfileDir, release)) {
                 return false;
             }
         }
@@ -123,6 +137,13 @@ final class Verification {
     @SuppressWarnings("unchecked")
     static Satisfies satisfiesPackageManifest(boolean autoInstallPeers, boolean excludeLinksFromLockfile,
                                               @Nullable ProjectSnapshot importer, Map<String, @Nullable Object> pkg) {
+        return satisfiesPackageManifest(autoInstallPeers, excludeLinksFromLockfile, importer, pkg,
+                PnpmRelease.PORTED);
+    }
+
+    static Satisfies satisfiesPackageManifest(boolean autoInstallPeers, boolean excludeLinksFromLockfile,
+                                              @Nullable ProjectSnapshot importer, Map<String, @Nullable Object> pkg,
+                                              PnpmRelease release) {
         if (importer == null) {
             return new Satisfies(false, "no importer");
         }
@@ -202,12 +223,14 @@ final class Verification {
                                                 orUndefined(specifier) + " don't match package manifest specifier (" +
                                                 Js.string(pkgDeps.get(depName)) + ")");
                 }
-                if (specifier == null || NodeSemver.validRange(specifier, NodeSemver.Options.DEFAULT) == null) {
+                if (specifier == null || release.underSemver(semver -> NodeSemver.validRange(specifier,
+                        NodeSemver.Options.DEFAULT.release(semver))) == null) {
                     continue;
                 }
                 String version = DepPath.removeSuffix(importerDeps.get(depName));
                 if (NodeSemver.valid(version, NodeSemver.Options.DEFAULT) != null &&
-                    !NodeSemver.satisfies(version, specifier, NodeSemver.Options.DEFAULT)) {
+                    !release.underSemver(semver -> NodeSemver.satisfies(version, specifier,
+                            NodeSemver.Options.DEFAULT.release(semver)))) {
                     return new Satisfies(false, "The importer resolution is broken at dependency \"" + depName +
                                                 "\": version \"" + version + "\" doesn't satisfy range \"" +
                                                 specifier + "\"");
@@ -351,7 +374,8 @@ final class Verification {
                                                      @Nullable Map<String, Map<String, Project>> workspacePackages,
                                                      @Nullable Map<String, PackageSnapshot> lockfilePackages,
                                                      Project project, ProjectSnapshot snapshot,
-                                                     Map<String, String> files, String lockfileDir) {
+                                                     Map<String, String> files, String lockfileDir,
+                                                     PnpmRelease release) {
         for (String depField : ProjectSnapshot.DEPENDENCIES_FIELDS) {
             Map<String, @Nullable String> lockfileDeps = snapshot.field(depField);
             Object manifestDeps = project.getManifest().get(depField);
@@ -376,7 +400,7 @@ final class Verification {
                     }
                     String depPath = DepPath.refToRelative(lockfileRef, depName);
                     if (depPath == null || !isLocalFileDepUpdated(lockfilePackages == null ? null :
-                            lockfilePackages.get(depPath), files, lockfileDir)) {
+                            lockfilePackages.get(depPath), files, lockfileDir, release)) {
                         return false;
                     }
                     continue;
@@ -386,7 +410,7 @@ final class Verification {
                                  currentSpec.startsWith("workspace:."))) {
                     continue;
                 }
-                if (isLinked && "tag".equals(versionSelectorType(currentSpec))) {
+                if (isLinked && "tag".equals(versionSelectorType(currentSpec, release))) {
                     continue;
                 }
                 String linkedDir;
@@ -408,11 +432,12 @@ final class Verification {
                     linkedPkg = readPackageJson(files, linkedDir);
                 }
                 String availableRange = getVersionRange(currentSpec);
+                String linkedVersion = linkedPkg == null ? null : Js.string(linkedPkg.get("version"));
                 boolean localPackageSatisfiesRange = "*".equals(availableRange) || "^".equals(availableRange) ||
                                                      "~".equals(availableRange) ||
-                                                     linkedPkg != null && NodeSemver.satisfies(
-                                                             Js.string(linkedPkg.get("version")), availableRange,
-                                                             NodeSemver.Options.LOOSE);
+                                                     linkedVersion != null && release.underSemver(semver ->
+                                                             NodeSemver.satisfies(linkedVersion, availableRange,
+                                                                     NodeSemver.Options.LOOSE.release(semver)));
                 if (isLinked != localPackageSatisfiesRange) {
                     return false;
                 }
@@ -423,7 +448,7 @@ final class Verification {
 
     @SuppressWarnings("unchecked")
     private static boolean isLocalFileDepUpdated(@Nullable PackageSnapshot pkgSnapshot, Map<String, String> files,
-                                                 String lockfileDir) {
+                                                 String lockfileDir, PnpmRelease release) {
         if (pkgSnapshot == null) {
             return false;
         }
@@ -453,8 +478,9 @@ final class Verification {
                     currentSpec.startsWith("workspace:")) {
                     continue;
                 }
-                if (!NodeSemver.satisfies(Js.string(lockfileDeps.get(depName)), getVersionRange(currentSpec),
-                        NodeSemver.Options.LOOSE)) {
+                String locked = Js.string(lockfileDeps.get(depName));
+                if (!release.underSemver(semver -> NodeSemver.satisfies(locked, getVersionRange(currentSpec),
+                        NodeSemver.Options.LOOSE.release(semver)))) {
                     return false;
                 }
             }
@@ -490,10 +516,18 @@ final class Verification {
      * version-selector-type 3.0.0 (loose): {@code version}, {@code range}, {@code tag}, or null.
      */
     static @Nullable String versionSelectorType(String selector) {
+        return versionSelectorType(selector, PnpmRelease.PORTED);
+    }
+
+    /**
+     * {@link #versionSelectorType(String)} over the node-semver {@code release} bundles.
+     */
+    static @Nullable String versionSelectorType(String selector, PnpmRelease release) {
         if (NodeSemver.valid(selector, NodeSemver.Options.LOOSE) != null) {
             return "version";
         }
-        if (NodeSemver.validRange(selector, NodeSemver.Options.LOOSE) != null) {
+        if (release.underSemver(semver -> NodeSemver.validRange(selector,
+                NodeSemver.Options.LOOSE.release(semver))) != null) {
             return "range";
         }
         if (UriComponent.encodeURIComponent(selector).equals(selector)) {
