@@ -54,10 +54,18 @@ public final class PnpmRelease {
     private final int major;
     private final @Nullable String declined;
 
+    // the major whose pnpm-workspace.yaml writer the release runs
+    private final int writes;
+
     private PnpmRelease(String version, int major, @Nullable String declined) {
+        this(version, major, declined, major);
+    }
+
+    private PnpmRelease(String version, int major, @Nullable String declined, int writes) {
         this.version = version;
         this.major = major;
         this.declined = declined;
+        this.writes = writes;
     }
 
     /**
@@ -94,7 +102,17 @@ public final class PnpmRelease {
             if (exact != null ? NodeSemver.satisfies(exact, recorded, NodeSemver.Options.DEFAULT) :
                     NodeSemver.validRange(version, NodeSemver.Options.DEFAULT) != null &&
                     NodeSemver.subset(version, recorded, NodeSemver.Options.DEFAULT)) {
-                return new PnpmRelease(version, Integer.parseInt(recorded.substring(0, recorded.indexOf('.'))), null);
+                int major = Integer.parseInt(recorded.substring(0, recorded.indexOf('.')));
+                if (major == 11) {
+                    // a pnpm 11 release before 11.0.6 writes pnpm-workspace.yaml as pnpm 10 does
+                    try {
+                        return new PnpmRelease(version, major, null, PnpmReleases.installs(version)
+                                .keepsTheWorkspaceManifestKeyOrder() ? 11 : 10);
+                    } catch (CannotKnow e) {
+                        return new PnpmRelease(version, major, e.getSubject());
+                    }
+                }
+                return new PnpmRelease(version, major, null);
             }
         }
         String ranges = recorded();
@@ -137,7 +155,7 @@ public final class PnpmRelease {
      * The release's writer of pnpm-workspace.yaml; null when it is declined, or pnpm 9, which never writes the file.
      */
     public @Nullable WorkspaceManifestWriter writer() {
-        return declined != null || major == 9 ? null : new WorkspaceManifestWriter(major);
+        return declined != null || major == 9 ? null : new WorkspaceManifestWriter(writes);
     }
 
     /**

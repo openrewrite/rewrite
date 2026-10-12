@@ -274,7 +274,7 @@ public final class PnpmOptions {
         }
 
         Map<String, String> fromEnv = new LinkedHashMap<>();
-        for (ConfigPair pair : parseEnvVars(ENV_TYPES, env)) {
+        for (ConfigPair pair : parseEnvVars(ENV_TYPES, env, release)) {
             if (pair.value == Js.UNDEFINED) {
                 continue;
             }
@@ -298,7 +298,8 @@ public final class PnpmOptions {
         }
         config.put("registries", registries);
 
-        if (explicitlySetKeys.contains("minimumReleaseAge") && config.get("minimumReleaseAgeStrict") == null) {
+        if (explicitlySetKeys.contains("minimumReleaseAge") && config.get("minimumReleaseAgeStrict") == null &&
+            release.defaultsMinimumReleaseAgeStrict()) {
             config.put("minimumReleaseAgeStrict", true);
         }
         Object lockfile = config.get("lockfile");
@@ -852,12 +853,25 @@ public final class PnpmOptions {
      */
     static List<ConfigPair> parseEnvVars(Function<String, @Nullable Object> getSchema,
                                          @Nullable Map<String, String> env) {
+        return parseEnvVars(getSchema, env, PnpmRelease.PORTED);
+    }
+
+    /**
+     * {@link #parseEnvVars(Function, Map)} as {@code release} reads the environment: the {@code PNPM_CONFIG_} variables
+     * from 11.0.6 on ({@link PnpmRelease#readsUpperCaseConfigVariables}).
+     */
+    static List<ConfigPair> parseEnvVars(Function<String, @Nullable Object> getSchema,
+                                         @Nullable Map<String, String> env, PnpmRelease release) {
         List<ConfigPair> pairs = new ArrayList<>();
         if (env == null) {
             return pairs;
         }
         for (Map.Entry<String, String> entry : env.entrySet()) {
             String suffix = getEnvKeySuffix(entry.getKey());
+            if (suffix != null && entry.getKey().startsWith("PNPM_CONFIG_") &&
+                !release.readsUpperCaseConfigVariables()) {
+                continue;
+            }
             if (suffix == null || entry.getValue() == null) {
                 continue;
             }
@@ -1033,7 +1047,17 @@ public final class PnpmOptions {
         }
         if (settings.containsKey("overrides") && Js.truthy(settings.get("overrides"))) {
             Object overrides = settings.get("overrides");
-            assertValidOverrides(overrides);
+            try {
+                assertValidOverrides(overrides);
+            } catch (PnpmError e) {
+                // the check is 11.0.6's (PnpmRelease#rejectsOverridesThatAreNoStrings); what a release before makes
+                // of such overrides the port does not follow
+                if (!release.rejectsOverridesThatAreNoStrings()) {
+                    throw new CannotKnow("what pnpm " + release + " makes of overrides that are no object of " +
+                                         "strings (" + e.getMessage() + ")");
+                }
+                throw e;
+            }
             Map<String, @Nullable Object> map = (Map<String, @Nullable Object>) overrides;
             if (map.isEmpty()) {
                 settings.remove("overrides");

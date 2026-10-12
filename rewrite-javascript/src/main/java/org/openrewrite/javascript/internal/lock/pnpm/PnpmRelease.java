@@ -165,7 +165,40 @@ public final class PnpmRelease {
         return atLeast(11, 1, 3);
     }
 
-    // @pnpm/config.reader src/index.ts, getOptionsFromRootManifest.ts
+    // @pnpm/config.reader src/index.ts, env.ts, getOptionsFromRootManifest.ts
+
+    /**
+     * minimumReleaseAge set explicitly makes minimumReleaseAgeStrict default to true, from 11.0.4; before, it stays
+     * unset, and the picker takes the lowest immature version.
+     */
+    boolean defaultsMinimumReleaseAgeStrict() {
+        return atLeast(11, 0, 4);
+    }
+
+    /**
+     * A {@code PNPM_CONFIG_} environment variable sets a setting as its {@code pnpm_config_} form does, from 11.0.6;
+     * before, only the lower-case form is read.
+     */
+    boolean readsUpperCaseConfigVariables() {
+        return atLeast(11, 0, 6);
+    }
+
+    /**
+     * An {@code overrides} setting that is no object of strings is {@code ERR_PNPM_INVALID_OVERRIDES}, from 11.0.6;
+     * before, it is read as it is.
+     */
+    boolean rejectsOverridesThatAreNoStrings() {
+        return atLeast(11, 0, 6);
+    }
+
+    /**
+     * {@code updateWorkspaceManifest} keeps the order of a pnpm-workspace.yaml level that is not sorted, a new key
+     * last, and the blank lines between keys, from 11.0.6 (reorderRecursive, propagateBlankLinesToNewPairs); before,
+     * it sorts every level, packages first, as pnpm 10 does.
+     */
+    public boolean keepsTheWorkspaceManifestKeyOrder() {
+        return atLeast(11, 0, 6);
+    }
 
     /**
      * {@code namedRegistries} (and the built-in {@code gh}) name registries an {@code <alias>:} spec resolves from,

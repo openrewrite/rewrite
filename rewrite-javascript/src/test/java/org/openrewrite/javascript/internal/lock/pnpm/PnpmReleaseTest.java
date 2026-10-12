@@ -69,11 +69,12 @@ class PnpmReleaseTest {
     }
 
     @ParameterizedTest
-    @ValueSource(strings = {"11.0.5", "10.34.6", "12.0.0", "11.6.0-rc.0", "13.0.0"})
+    @ValueSource(strings = {"11.0.2", "10.34.6", "12.0.0", "11.6.0-rc.0", "13.0.0"})
     void aReleaseOutsideTheProvenOnesIsCannotKnow(String version) {
         assertThatThrownBy(() -> PnpmReleases.runs(version))
           .isInstanceOf(CannotKnow.class)
-          .hasMessageContaining("what pnpm " + version + " writes, since the engine reproduces pnpm 11.0.6 - ");
+          .hasMessageContaining("what pnpm " + version + " writes, since the engine reproduces pnpm " +
+                                PnpmReleases.ranges(PnpmReleases.proven()));
     }
 
     @Test
@@ -84,6 +85,57 @@ class PnpmReleaseTest {
           .isInstanceOf(CannotKnow.class)
           .hasMessageContaining("one of 11.2.2 || 11.5.1, where the releases from 11.5.0 install it otherwise");
         assertThatThrownBy(either::version).isInstanceOf(CannotKnow.class);
+    }
+
+    /**
+     * config/reader index.ts (11.0.4): minimumReleaseAge set explicitly makes minimumReleaseAgeStrict default to true;
+     * before, it stays unset.
+     */
+    @Test
+    void defaultsMinimumReleaseAgeStrictFrom1104() {
+        assertThat(options("minimumReleaseAge: 60\n", null, null, Collections.emptyMap(), "11.0.4")
+          .get("minimumReleaseAgeStrict")).isEqualTo(true);
+        assertThat(options("minimumReleaseAge: 60\n", null, null, Collections.emptyMap(), "11.0.3")
+          .get("minimumReleaseAgeStrict")).isNull();
+    }
+
+    /**
+     * config/reader env.ts (11.0.6): a {@code PNPM_CONFIG_} variable sets a setting; before, only the lower-case form.
+     */
+    @Test
+    void readsUpperCaseConfigVariablesFrom1106() {
+        Map<String, String> env = Collections.singletonMap("PNPM_CONFIG_MINIMUM_RELEASE_AGE", "5");
+        assertThat(options("", null, null, env, "11.0.6").get("minimumReleaseAge")).isEqualTo(5.0);
+        assertThat(options("", null, null, env, "11.0.5").get("minimumReleaseAge")).isEqualTo(1440.0);
+    }
+
+    /**
+     * config/reader getOptionsFromRootManifest.ts (11.0.6): overrides that are no object of strings are
+     * {@code ERR_PNPM_INVALID_OVERRIDES}; what a release before makes of them the engine does not follow.
+     */
+    @Test
+    void rejectsOverridesThatAreNoStringsFrom1106() {
+        assertThatThrownBy(() -> options("overrides:\n  foo: 1\n", null, null, Collections.emptyMap(), "11.0.6"))
+          .isInstanceOfSatisfying(PnpmError.class, e -> {
+              assertThat(e.getCode()).isEqualTo("ERR_PNPM_INVALID_OVERRIDES");
+              assertThat(e.getMessage()).isEqualTo("The value of overrides.foo should be a string, but got number");
+          });
+        assertThatThrownBy(() -> options("overrides:\n  foo: 1\n", null, null, Collections.emptyMap(), "11.0.5"))
+          .isInstanceOf(CannotKnow.class)
+          .hasMessageContaining("what pnpm 11.0.5 makes of overrides that are no object of strings");
+    }
+
+    /**
+     * workspace/workspace-manifest-writer (11.0.6): a level that is not sorted keeps its order, a new key last;
+     * before, every level is sorted, packages first, as pnpm 10 does, whose writer the recipes take for it.
+     */
+    @Test
+    void keepsTheWorkspaceManifestKeyOrderFrom1106() {
+        assertThat(release("11.0.6").keepsTheWorkspaceManifestKeyOrder()).isTrue();
+        assertThat(release("11.0.5").keepsTheWorkspaceManifestKeyOrder()).isFalse();
+        List<String> unsorted = Arrays.asList("packages", "zeta", "alpha");
+        assertThat(new WorkspaceManifestWriter(11).insertionIndex(unsorted, "beta")).isEqualTo(3);
+        assertThat(new WorkspaceManifestWriter(10).insertionIndex(unsorted, "beta")).isEqualTo(2);
     }
 
     /**

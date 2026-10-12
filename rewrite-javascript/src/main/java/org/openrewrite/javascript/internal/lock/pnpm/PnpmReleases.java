@@ -39,7 +39,7 @@ public final class PnpmReleases {
      * gives what that release wrote ({@code PnpmScenarioTest} with {@code REWRITE_LOCK_EVERY_RELEASE}), and every
      * upstream change between them and 11.2.2 in the modules the port names is a question of {@link PnpmRelease}.
      */
-    public static final String PROVEN = "11.0.6 - 11.5.2";
+    public static final String PROVEN = "11.0.3 - 11.5.2";
 
     private static final List<String> ALL = load();
 
@@ -92,7 +92,7 @@ public final class PnpmReleases {
      *
      * @throws CannotKnow where it names a release the engine does not reproduce
      */
-    static PnpmRelease installs(String version) {
+    public static PnpmRelease installs(String version) {
         if (!isProven(version)) {
             throw new CannotKnow("what pnpm " + version + " writes, since the engine reproduces pnpm " +
                                  ranges(proven()));
