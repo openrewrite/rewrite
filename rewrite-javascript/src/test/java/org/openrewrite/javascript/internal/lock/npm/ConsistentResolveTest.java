@@ -17,11 +17,27 @@ package org.openrewrite.javascript.internal.lock.npm;
 
 import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.MethodSource;
+import org.openrewrite.javascript.internal.lock.Spec;
+import org.openrewrite.javascript.internal.lock.UpstreamCalls;
+import org.openrewrite.javascript.internal.lock.V8RegExp;
+
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
+import java.util.Map;
+import java.util.TreeMap;
+import java.util.regex.Pattern;
+import java.util.stream.Stream;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 /**
- * Port of @npmcli/arborist test/consistent-resolve.js and test/relpath.js.
+ * Port of @npmcli/arborist test/consistent-resolve.js and test/relpath.js, and npm 7.4.3's and 7.6.3's answers for git
+ * specs of every form ({@code upstream/hosted-git-info-3}).
  */
 class ConsistentResolveTest {
 
@@ -218,5 +234,93 @@ class ConsistentResolveTest {
                   .isEqualTo("file:../abs/c%23x");
             }
         }
+    }
+
+    private static final String IS_GIT = "^[^@]+@[^:.]+\\.[^:]+:.+$";
+    private static final Pattern IS_URL = Pattern.compile("^(?:git[+])?[a-z]+:", Pattern.CASE_INSENSITIVE);
+
+    static Stream<Arguments> hostedGitInfoThreeRows() {
+        List<Arguments> out = new ArrayList<>();
+        for (UpstreamCalls.Call call : UpstreamCalls.read("hosted-git-info-3.jsonl.gz")) {
+            for (String release : new String[]{"7.4.3", "7.6.3"}) {
+                out.add(Arguments.of(release, call.arg(1), ((Map<?, ?>) call.getOut()).get(release)));
+            }
+        }
+        return out.stream();
+    }
+
+    /**
+     * What npm-package-arg's resolve and consistent-resolve answer for git specs of every form as npm 7.4.3 and 7.6.3
+     * bundle them, with hosted-git-info 3.0.7 and 3.0.8 (rows written by generate/hosted-git-info-3.js).
+     */
+    @ParameterizedTest(name = "{0} {1}")
+    @MethodSource("hostedGitInfoThreeRows")
+    void readsGitSpecsAsTheReleaseDoes(String version, String spec, Map<?, ?> expected) {
+        NpmRelease release = NpmRelease.of(version);
+        Object npa = expected.get("npa");
+        if (npa instanceof Map) {
+            assertThatThrownBy(() -> Spec.resolve("dep", spec, "/p", release.npmPackageArg()))
+              .hasMessage((String) ((Map<?, ?>) npa).get("message"));
+        } else {
+            Spec resolved = Spec.resolve("dep", spec, "/p", release.npmPackageArg());
+            List<@Nullable Object> want = new ArrayList<>((List<?>) npa);
+            List<@Nullable Object> got = new ArrayList<>(Arrays.asList(String.valueOf(resolved.getType()),
+              resolved.getSaveSpec(), resolved.getFetchSpec(), resolved.getGitCommittish(), resolved.getGitRange()));
+            if (urlParse(expected)) {
+                want.set(2, null);
+                got.set(2, null);
+            }
+            assertThat(got).as("npa").isEqualTo(want);
+        }
+        if (!nameAndScpSpec(version, spec) && !lineTerminator(spec)) {
+            assertThat(ConsistentResolve.consistentResolve(spec, "/p", "/p", true, release)).as("consistent-resolve")
+              .isEqualTo(expected.get("cr"));
+        }
+    }
+
+    // npm-package-arg before 11.0.0 makes the fetchSpec of a git URL no host reads with url.parse and url.format, where
+    // the port reads it with WHATWG URL (SpecTest's urlParse): npm-package-arg's difference, not hosted-git-info's
+    private static boolean urlParse(Map<?, ?> expected) {
+        Object npa = expected.get("npa");
+        return npa instanceof List && "git".equals(((List<?>) npa).get(0)) && expected.get("hosted") == null;
+    }
+
+    // npm-package-arg 8.1.0 (npm before 7.5.5) reads a whole scp-style string as a name and a spec, where the port
+    // reads it as 8.1.1 does (NpmRelease#npmPackageArg): consistent-resolve asks it of a resolved, which npm writes as
+    // a URL
+    private static boolean nameAndScpSpec(String version, String spec) {
+        return "7.4.3".equals(version) && !IS_URL.matcher(spec).find() && V8RegExp.of(IS_GIT).matcher(spec).find();
+    }
+
+    // a line terminator, which Spec's own IS_GIT reads with Java's $ (before a last one too) where V8 does not
+    private static boolean lineTerminator(String spec) {
+        return Pattern.compile(IS_GIT).matcher(spec).find() != V8RegExp.of(IS_GIT).matcher(spec).find();
+    }
+
+    @Test
+    void namesEveryHostedGitInfoThreeRowItDoesNotReplay() {
+        Map<String, Integer> notReplayed = new TreeMap<>();
+        for (UpstreamCalls.Call call : UpstreamCalls.read("hosted-git-info-3.jsonl.gz")) {
+            String spec = (String) call.arg(1);
+            for (String version : new String[]{"7.4.3", "7.6.3"}) {
+                if (urlParse((Map<?, ?>) ((Map<?, ?>) call.getOut()).get(version))) {
+                    notReplayed.merge(version + " fetchSpec of a git URL url.parse reads", 1, Integer::sum);
+                }
+                if (nameAndScpSpec(version, spec)) {
+                    notReplayed.merge(version + " consistent-resolve of a name and an scp-style spec", 1, Integer::sum);
+                }
+                if (lineTerminator(spec)) {
+                    notReplayed.merge(version + " consistent-resolve of a line terminator", 1, Integer::sum);
+                }
+            }
+        }
+        Map<String, Integer> expected = new TreeMap<>();
+        // of the 5886 git URLs no host reads, url.parse and WHATWG URL make 897 fetchSpecs apart
+        expected.put("7.4.3 fetchSpec of a git URL url.parse reads", 5886);
+        expected.put("7.6.3 fetchSpec of a git URL url.parse reads", 5886);
+        expected.put("7.4.3 consistent-resolve of a name and an scp-style spec", 1350);
+        expected.put("7.4.3 consistent-resolve of a line terminator", 1);
+        expected.put("7.6.3 consistent-resolve of a line terminator", 1);
+        assertThat(notReplayed).isEqualTo(expected);
     }
 }

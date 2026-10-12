@@ -1470,12 +1470,18 @@ public final class NpmRelease implements Comparable<NpmRelease> {
     /**
      * The hosted-git-info npm bundles: 9.0.3 from npm 11.15.0, whose https URL of a sourcehut repository ends in no
      * {@code .git}; 9.0.2 and the releases back to 5.2.1 (npm 8.19.3) that read a URL as it does (parse-url.js); 4.1.0
-     * from npm 8.3.1, and 5.0.0 and 5.1.0 that answer as it does; before, 4.0.2, which knows no sourcehut.
+     * from npm 8.3.1, and 5.0.0 and 5.1.0 that answer as it does; 4.0.2 from npm 7.7.0 (4.0.1 at 7.7.0 and 7.7.1
+     * answers alike), which knows no sourcehut; 3.0.8 from npm 7.5.0, which reads a URL with Node's {@code url.parse}
+     * and an scp-style one with a pattern of its own, so that a GitLab project in a subgroup is no hosted git there,
+     * and an scp-style URL whose committish holds a colon is; before, 3.0.7, whose shortcut pattern needs a user and a
+     * project ({@code github:foo} is no host there).
      */
     GitHost.Release hostedGitInfo() {
         return atLeast(11, 15, 0) ? GitHost.Release.V9_0_3 :
                 atLeast(8, 19, 3) ? GitHost.Release.V9_0_2 :
-                        atLeast(8, 3, 1) ? GitHost.Release.V4_1_0 : GitHost.Release.V4_0_2;
+                        atLeast(8, 3, 1) ? GitHost.Release.V4_1_0 :
+                                atLeast(7, 7, 0) ? GitHost.Release.V4_0_2 :
+                                        atLeast(7, 5, 0) ? GitHost.Release.V3_0_8 : GitHost.Release.V3_0_7;
     }
 
     // json-stringify-nice
