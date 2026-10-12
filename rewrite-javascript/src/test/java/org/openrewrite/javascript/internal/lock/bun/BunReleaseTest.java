@@ -259,6 +259,22 @@ class BunReleaseTest {
     }
 
     /**
+     * migration.zig (1.2.23): a pnpm-lock.yaml is migrated where no package-lock.json or yarn.lock comes first, and
+     * package.json rewritten; before, it is ignored, so that only a bun.lockb stops the walk for the install root.
+     * (Beside a pnpm-lock.yaml, 1.2.23 prints {@code migrated lockfile from pnpm-lock.yaml}; 1.2.22 installs afresh.)
+     */
+    @Test
+    void migratesAPnpmLockFrom1223() {
+        java.util.Set<String> pnpm = java.util.Collections.singleton("pnpm-lock.yaml");
+        assertThat(Lockfile.rewritesAnotherFile(pnpm::contains, BunRelease.of("1.2.23"))).isTrue();
+        assertThat(Lockfile.rewritesAnotherFile(pnpm::contains, BunRelease.of("1.2.22"))).isFalse();
+        java.util.Set<String> yarnFirst = new java.util.HashSet<>(java.util.Arrays.asList("pnpm-lock.yaml", "yarn.lock"));
+        assertThat(Lockfile.rewritesAnotherFile(yarnFirst::contains, BunRelease.of("1.2.23"))).isFalse();
+        java.util.Set<String> lockb = java.util.Collections.singleton("bun.lockb");
+        assertThat(Lockfile.rewritesAnotherFile(lockb::contains, BunRelease.of("1.2.0"))).isTrue();
+    }
+
+    /**
      * install_with_manager.zig runAndWait (1.2.22): bunfig's security scanner runs for {@code bun install} too, whose
      * verdict the engine cannot know; 1.2.21 runs it for {@code bun add} alone. (A lock-only install naming a scanner
      * not installed: 1.2.21 saves the lock; 1.2.22 {@code error: Security scanner 'zz-no-such-scanner' is configured in

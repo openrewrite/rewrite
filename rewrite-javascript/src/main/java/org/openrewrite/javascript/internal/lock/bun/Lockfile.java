@@ -35,11 +35,12 @@ public final class Lockfile {
 
     /**
      * What bun loads where it holds no bun.lock and rewrites besides it: a bun.lockb, or a pnpm-lock.yaml it migrates
-     * (package-lock.json and yarn.lock first), rewriting package.json.
+     * (package-lock.json and yarn.lock first), rewriting package.json, from 1.2.23
+     * ({@link BunRelease#migratesAPnpmLock()}).
      */
-    public static boolean rewritesAnotherFile(Predicate<String> holds) {
-        return holds.test("bun.lockb") || !holds.test("package-lock.json") && !holds.test("yarn.lock") &&
-                                          holds.test("pnpm-lock.yaml");
+    public static boolean rewritesAnotherFile(Predicate<String> holds, BunRelease release) {
+        return holds.test("bun.lockb") || release.migratesAPnpmLock() && !holds.test("package-lock.json") &&
+                                          !holds.test("yarn.lock") && holds.test("pnpm-lock.yaml");
     }
 
     static final int TEXT_LOCKFILE_VERSION_CURRENT = 1;

@@ -129,7 +129,7 @@ final class BunInputs implements Port {
         if (walked.isStopped() || root.isEmpty() && dir.getLock() != null || holds.test("bun.lock")) {
             return walked;
         }
-        return Lockfile.rewritesAnotherFile(holds) ?
+        return Lockfile.rewritesAnotherFile(holds, release) ?
                 InstallRoot.stops(walked.getDepth(), InstallRoot.Stop.WRITES_ANOTHER_FILE) : walked;
     }
 }

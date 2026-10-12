@@ -197,6 +197,16 @@ public final class BunRelease implements Comparable<BunRelease> {
         return atLeast(1, 2, 11) && !atLeast(1, 3, 0);
     }
 
+    // src/install/migration.zig detectAndLoadOtherLockfile
+
+    /**
+     * An install without bun.lock migrates a pnpm-lock.yaml where neither a package-lock.json nor a yarn.lock comes
+     * first, rewriting package.json (src/install/pnpm.zig), from 1.2.23; before, it ignores a pnpm-lock.yaml.
+     */
+    boolean migratesAPnpmLock() {
+        return atLeast(1, 2, 23);
+    }
+
     // src/install/integrity.zig Integrity.parse, which reads bun.lock's and a packument's integrities
 
     /**
