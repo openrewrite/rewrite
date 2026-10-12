@@ -425,8 +425,8 @@ public final class BunLockRegenerator {
         }
 
         Lockfile loaded = loadResult.getLockfile();
-        PackageManager manager = new PackageManager(loaded != null ? loaded : new Lockfile(), options, log, manifests,
-                registry, inputs.getNow().toEpochMilli());
+        PackageManager manager = new PackageManager(loaded != null ? loaded : new Lockfile(release), options, log,
+                manifests, registry, inputs.getNow().toEpochMilli());
         boolean needsNewLockfile = !loadResult.isOk();
         int packagesBefore = manager.lockfile.packages.size();
         if (!loadResult.isOk() && inputs.getLock() != null) {
@@ -439,7 +439,7 @@ public final class BunLockRegenerator {
                 needsNewLockfile = true;
             } else {
                 Json.Expr rootJson = Json.parse(rootManifest);
-                Lockfile lockfile = new Lockfile();
+                Lockfile lockfile = new Lockfile(release);
                 Package maybeRoot = new Package();
                 maybeRoot.parseWithJSON(lockfile, options, log, "", rootJson, Features.MAIN, manifests);
                 manager.registerAliases(lockfile, maybeRoot);
@@ -458,7 +458,7 @@ public final class BunLockRegenerator {
                 throw Rejected.rejects(Reason.RESOLUTION_REQUIRED, "lockfile had changes, but lockfile is frozen");
             }
             Json.Expr rootJson = Json.parse(rootManifest);
-            manager.lockfile = new Lockfile();
+            manager.lockfile = new Lockfile(release);
             Package root = new Package();
             root.parseWithJSON(manager.lockfile, options, log, "", rootJson, Features.MAIN, manifests);
             manager.registerAliases(manager.lockfile, root);

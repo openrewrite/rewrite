@@ -194,7 +194,7 @@ final class PackageManager {
             }
         }
         if (version == null &&
-            !dependency.behavior.isWorkspace() &&
+            !dependency.behavior.isWorkspace(options.getRelease()) &&
             (dependency.version.tag != DependencyVersion.Tag.NPM || !dependency.version.npm().isAlias)) {
             DependencyVersion override = lockfile.overrides.get(nameHash);
             if (override != null) {
@@ -845,7 +845,7 @@ final class PackageManager {
                    options.isLocalOptionalDependencies() && behavior.isOptional() ||
                    options.isLocalDevDependencies() && behavior.isDev() ||
                    options.isLocalPeerDependencies() && behavior.isPeer() ||
-                   behavior.isWorkspace();
+                   behavior.isWorkspace(options.getRelease());
         }
         return behavior.isProd() ||
                options.isRemoteOptionalDependencies() && behavior.isOptional() ||

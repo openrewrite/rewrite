@@ -90,6 +90,22 @@ public final class BunRelease implements Comparable<BunRelease> {
         return atLeast(1, 3, 2);
     }
 
+    // src/install/dependency.zig, lockfile/Package.zig, lockfile/bun.lock.zig, lockfile/Tree.zig, PackageManagerEnqueue.zig
+
+    /**
+     * A package's dependencies are told apart by their group, from 1.2.19 ("fix resolving duplicate dependencies"):
+     * sorted workspace, dev, optional, prod, then peer first; the root's diff matches a dependency of the same
+     * behavior, and diffs a member again where the root's workspaces list it; only the workspaces group carries the
+     * workspace bit, which the tests read alone; and of a package's same-named dependencies in the lock the first
+     * group's resolution stands. Before, each of prod, dev, optional, peer and workspace sorts last; the diff matches
+     * by name unless only one of the two is a workspace alone, and diffs a member again where the dependency is a
+     * workspace spec; a member's dependencies, and one the lock resolves to a member, carry the workspace bit too, so
+     * that the tests ask for a workspace alone; and the root's members follow its other dependencies in the lock.
+     */
+    boolean tellsDependencyGroupsApart() {
+        return atLeast(1, 2, 19);
+    }
+
     // src/install/PackageManager/install_with_manager.zig installWithManager
 
     /**

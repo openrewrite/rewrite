@@ -27,7 +27,7 @@ import java.util.Set;
 
 /**
  * Port of bun's src/install/lockfile/Package.zig {@code Diff.generate} (bun 1.3.10), for an install without update
- * requests.
+ * requests, as the release that installs diffs ({@link BunRelease}).
  */
 final class PackageDiff {
 
@@ -89,19 +89,20 @@ final class PackageDiff {
 
         summary.patchedDependenciesChanged = patchedDependenciesChanged(fromLockfile, toLockfile);
 
+        BunRelease release = options.getRelease();
         for (int i = 0; i < fromDeps.size(); i++) {
             Dependency fromDep = fromDeps.get(i);
             int prevI = toI;
             boolean found = false;
             for (; toI < toDeps.size(); toI++) {
-                if (fromDep.nameHash == toDeps.get(toI).nameHash && fromDep.behavior.eq(toDeps.get(toI).behavior)) {
+                if (matches(fromDep, toDeps.get(toI), release)) {
                     found = true;
                     break;
                 }
             }
             if (!found) {
                 for (toI = 0; toI < prevI; toI++) {
-                    if (fromDep.nameHash == toDeps.get(toI).nameHash && fromDep.behavior.eq(toDeps.get(toI).behavior)) {
+                    if (matches(fromDep, toDeps.get(toI), release)) {
                         found = true;
                         break;
                     }
@@ -116,7 +117,9 @@ final class PackageDiff {
             if (toDeps.get(matched).eql(fromDep)) {
                 if (idMapping != null) {
                     boolean updateMapping = true;
-                    if (isRoot && fromDep.behavior.isWorkspace()) {
+                    // before 1.2.19 a member is diffed again where the dependency is a workspace spec
+                    if (release.tellsDependencyGroupsApart() ? isRoot && fromDep.behavior.isWorkspace() :
+                            toDeps.get(matched).version.tag == DependencyVersion.Tag.WORKSPACE) {
                         updateMapping = workspaceUnchanged(options, log, fromLockfile, toLockfile,
                                 fromResolutions.get(i), fromDep, manifests);
                         toDeps = toLockfile.dependenciesOf(to);
@@ -142,6 +145,20 @@ final class PackageDiff {
             }
         }
         return summary;
+    }
+
+    /**
+     * The dependency of {@code to} a dependency of {@code from} is diffed against: of the same name and behavior, or
+     * before 1.2.19 of the same name unless only one of the two is a workspace alone.
+     */
+    private static boolean matches(Dependency from, Dependency to, BunRelease release) {
+        if (from.nameHash != to.nameHash) {
+            return false;
+        }
+        if (release.tellsDependencyGroupsApart()) {
+            return from.behavior.eq(to.behavior);
+        }
+        return from.behavior.isWorkspaceOnly() == to.behavior.isWorkspaceOnly();
     }
 
     private static boolean workspaceUnchanged(BunOptions options, Log log, Lockfile fromLockfile, Lockfile toLockfile,

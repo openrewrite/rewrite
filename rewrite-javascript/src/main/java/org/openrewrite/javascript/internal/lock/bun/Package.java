@@ -297,6 +297,9 @@ final class Package {
 
         Map<Long, Boolean> duplicateCheckerMap = new HashMap<>();
         List<Dependency> packageDependencies = new ArrayList<>();
+        // before 1.2.19 a member's dependencies carry the workspace bit besides their group's
+        boolean inWorkspace = !options.getRelease().tellsDependencyGroupsApart() &&
+                              lockfile.workspacePaths.containsKey(nameHash);
         for (int g = 0; g < GROUP_PROPS.length; g++) {
             if (!groupEnabled(features, g)) {
                 continue;
@@ -320,7 +323,7 @@ final class Package {
                     }
                     Dependency dep = parseDependency(lockfile, options, log, sourceDir, groupBehavior, features,
                             packageDependencies, duplicateCheckerMap, DependencyVersion.Tag.WORKSPACE, workspaceVersion,
-                            entry.name, path);
+                            entry.name, path, inWorkspace);
                     if (dep != null) {
                         if (groupBehavior.isPeer() && optionalPeerDependencies.take(dep.nameHash)) {
                             dep.behavior = dep.behavior.add(Behavior.OPTIONAL);
@@ -341,7 +344,7 @@ final class Package {
                     String externalName = item.key.asString();
                     String version = item.value.asString() == null ? "" : item.value.asString();
                     Dependency dep = parseDependency(lockfile, options, log, sourceDir, groupBehavior, features,
-                            packageDependencies, duplicateCheckerMap, null, null, externalName, version);
+                            packageDependencies, duplicateCheckerMap, null, null, externalName, version, inWorkspace);
                     if (dep != null) {
                         if (groupBehavior.isPeer() && optionalPeerDependencies.take(dep.nameHash)) {
                             dep.behavior = dep.behavior.add(Behavior.OPTIONAL);
@@ -356,7 +359,7 @@ final class Package {
             // what is left was listed in peerDependenciesMeta alone: an optional peer of "*", as pnpm and Yarn take it
             for (String externalName : optionalPeerDependencies.names) {
                 Dependency dep = parseDependency(lockfile, options, log, sourceDir, Behavior.of(Behavior.PEER), features,
-                        packageDependencies, duplicateCheckerMap, null, null, externalName, "*");
+                        packageDependencies, duplicateCheckerMap, null, null, externalName, "*", false);
                 if (dep != null) {
                     dep.behavior = dep.behavior.add(Behavior.OPTIONAL);
                     packageDependencies.add(dep);
@@ -364,7 +367,7 @@ final class Package {
             }
         }
 
-        packageDependencies.sort(Dependency::compare);
+        packageDependencies.sort((l, r) -> Dependency.compare(l, r, options.getRelease()));
         dependenciesOff = lockfile.dependencies.size();
         dependenciesLen = packageDependencies.size();
         for (Dependency dep : packageDependencies) {
@@ -513,14 +516,19 @@ final class Package {
         return Bin.NONE;
     }
 
+    /**
+     * @param inWorkspace before 1.2.19, whether the package is a workspace member, whose dependencies all carry the
+     *                    workspace bit besides their group's
+     */
     private static @Nullable Dependency parseDependency(Lockfile lockfile, BunOptions options, Log log,
                                                         String sourceDir, Behavior groupBehavior, Features features,
                                                         List<Dependency> packageDependencies,
                                                         Map<Long, Boolean> duplicateCheckerMap,
                                                         DependencyVersion.@Nullable Tag tag,
                                                         @Nullable SemverVersion workspaceVer, String externalAlias,
-                                                        String version) {
+                                                        String version, boolean inWorkspace) {
         long aliasHash = Wyhash11.stringHash(externalAlias);
+        Behavior behavior = inWorkspace ? groupBehavior.add(Behavior.WORKSPACE) : groupBehavior;
         DependencyVersion dependencyVersion = DependencyVersion.parseWithOptionalTag(externalAlias, aliasHash, version,
                 tag);
         if (dependencyVersion == null) {
@@ -582,9 +590,10 @@ final class Package {
                     } else {
                         for (int i = 0; i < packageDependencies.size(); i++) {
                             Dependency dep = packageDependencies.get(i);
-                            if (dep.nameHash == nameHash && dep.behavior.isWorkspace()) {
+                            if (dep.nameHash == nameHash && (options.getRelease().tellsDependencyGroupsApart() ?
+                                    dep.behavior.isWorkspace() : dep.version.tag == DependencyVersion.Tag.WORKSPACE)) {
                                 packageDependencies.set(i,
-                                        new Dependency(aliasHash, externalAlias, dependencyVersion, groupBehavior));
+                                        new Dependency(aliasHash, externalAlias, dependencyVersion, behavior));
                                 return null;
                             }
                         }
@@ -656,7 +665,7 @@ final class Package {
                 break;
         }
 
-        Dependency thisDep = new Dependency(aliasHash, externalAlias, dependencyVersion, groupBehavior);
+        Dependency thisDep = new Dependency(aliasHash, externalAlias, dependencyVersion, behavior);
         if (features.checkForDuplicateDependencies && !groupBehavior.isPeer() && !groupBehavior.isWorkspace()) {
             if (duplicateCheckerMap.containsKey(aliasHash)) {
                 if (groupBehavior.isOptional()) {

@@ -48,11 +48,12 @@ final class TextLockfileReader {
             "peerDependencies"};
     private static final int[] GROUP_BEHAVIORS = {Behavior.PROD, Behavior.DEV, Behavior.OPTIONAL, Behavior.PEER};
 
-    private final Lockfile lockfile = new Lockfile();
+    private final Lockfile lockfile;
     private final BunOptions options;
 
     private TextLockfileReader(BunOptions options) {
         this.options = options;
+        this.lockfile = new Lockfile(options.getRelease());
     }
 
     /**
@@ -167,7 +168,10 @@ final class TextLockfileReader {
                 if (!catalogProp.value.isObject()) {
                     throw error("InvalidCatalogsObject", "Expected an object");
                 }
-                readCatalog(catalogProp.value, lockfile.catalogs.getOrPutGroup(catalogName), "InvalidCatalogsObject");
+                // before 1.2.19 an entry of a named catalog is an InvalidCatalogObject
+                readCatalog(catalogProp.value, lockfile.catalogs.getOrPutGroup(catalogName),
+                        options.getRelease().tellsDependencyGroupsApart() ? "InvalidCatalogsObject" :
+                                "InvalidCatalogObject");
             }
         }
 
@@ -278,7 +282,7 @@ final class TextLockfileReader {
         Json.Expr pkgsExpr = root.get("packages");
         if (pkgsExpr == null) {
             if (workspacePkgsLen == 0) {
-                return new Lockfile();
+                return new Lockfile(options.getRelease());
             }
             return lockfile;
         }
@@ -496,6 +500,8 @@ final class TextLockfileReader {
             lockfile.resolutions.add(INVALID_PACKAGE_ID);
         }
 
+        // from 1.2.19 a package's same-named dependencies take the first group's resolution
+        boolean groupsApart = options.getRelease().tellsDependencyGroupsApart();
         Set<String> seenDeps = new HashSet<>();
         Package rootPkg = lockfile.packages.get(0);
         rootPkg.resolution = Resolution.ROOT;
@@ -509,7 +515,7 @@ final class TextLockfileReader {
                 }
                 throw dependencyResolutionFailure(dep, null);
             }
-            if (!dep.behavior.isWorkspace() && !seenDeps.add(dep.name)) {
+            if (groupsApart && !dep.behavior.isWorkspace() && !seenDeps.add(dep.name)) {
                 lockfile.resolutions.set(depId, resId);
                 continue;
             }
@@ -532,7 +538,7 @@ final class TextLockfileReader {
                         }
                         throw dependencyResolutionFailure(dep, workspace.name);
                     }
-                    if (!seenDeps.add(dep.name)) {
+                    if (groupsApart && !seenDeps.add(dep.name)) {
                         lockfile.resolutions.set(depId, resId);
                         continue;
                     }
@@ -548,7 +554,7 @@ final class TextLockfileReader {
                 throw error("InvalidPackagesObject", "Invalid packages object");
             }
             Package pkg = lockfile.packages.get(pkgId);
-            if (pkg.resolution.tag == Resolution.Tag.WORKSPACE) {
+            if (groupsApart && pkg.resolution.tag == Resolution.Tag.WORKSPACE) {
                 continue;
             }
             for (int depId = pkg.dependenciesOff; depId < pkg.dependenciesEnd(); depId++) {
@@ -621,15 +627,19 @@ final class TextLockfileReader {
             Resolution res = lockfile.packages.get(pkgId).resolution;
             if (res.tag == Resolution.Tag.WORKSPACE) {
                 dep.version = dep.version.asWorkspace(res.value);
+                // before 1.2.19 a dependency on a member carries the workspace bit too
+                if (!options.getRelease().tellsDependencyGroupsApart()) {
+                    dep.behavior = dep.behavior.add(Behavior.WORKSPACE);
+                }
             }
         }
     }
 
-    private static ParseError dependencyResolutionFailure(Dependency dep, @Nullable String pkgPath) {
+    private ParseError dependencyResolutionFailure(Dependency dep, @Nullable String pkgPath) {
         String behavior = dep.behavior.isDev() ? "dev" :
                 dep.behavior.optional() ? "optional" :
                         dep.behavior.isPeer() ? "peer" :
-                                dep.behavior.isWorkspace() ? "workspace" : "prod";
+                                dep.behavior.isWorkspace(options.getRelease()) ? "workspace" : "prod";
         if (pkgPath != null) {
             return error("InvalidPackageInfo", "Failed to resolve " + behavior + " dependency '" + dep.name +
                                                "' for package '" + pkgPath + "'");
@@ -745,6 +755,7 @@ final class TextLockfileReader {
             }
         }
 
+        List<Dependency> members = new ArrayList<>();
         if (workspacesObj != null) {
             workspaces:
             for (String workspacePath : lockfile.workspacePaths.values()) {
@@ -755,18 +766,27 @@ final class TextLockfileReader {
                     }
                     String name = prop.value.get("name").asString();
                     DependencyVersion version = new DependencyVersion(DependencyVersion.Tag.WORKSPACE, "", path);
-                    lockfile.dependencies.add(new Dependency(Wyhash11.stringHash(name), name, version,
+                    members.add(new Dependency(Wyhash11.stringHash(name), name, version,
                             Behavior.of(Behavior.WORKSPACE)));
                     continue workspaces;
                 }
             }
         }
+        // before 1.2.19 the root's members follow its other dependencies, unsorted
+        boolean membersSorted = options.getRelease().tellsDependencyGroupsApart();
+        if (membersSorted) {
+            lockfile.dependencies.addAll(members);
+        }
 
         int end = lockfile.dependencies.size();
         List<Dependency> slice = new ArrayList<>(lockfile.dependencies.subList(off, end));
-        slice.sort(Dependency::compare);
+        slice.sort((l, r) -> Dependency.compare(l, r, options.getRelease()));
         for (int k = 0; k < slice.size(); k++) {
             lockfile.dependencies.set(off + k, slice.get(k));
+        }
+        if (!membersSorted) {
+            lockfile.dependencies.addAll(members);
+            end = lockfile.dependencies.size();
         }
         return new int[]{off, end - off};
     }
