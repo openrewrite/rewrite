@@ -894,6 +894,14 @@ public final class NpmRelease implements Comparable<NpmRelease> {
     // @npmcli/arborist node.js
 
     /**
+     * A node at the filesystem root may go without a name, from npm 7.1.0; before, a node with neither a name nor a
+     * folder or package to name it after is a TypeError wherever it is.
+     */
+    boolean acceptsUnnamedFilesystemRoot() {
+        return atLeast(7, 1, 0);
+    }
+
+    /**
      * {@code canReplaceWith}: a node of another package name, such as an alias, cannot replace this one, from npm
      * 7.20.3; before, the name the node is installed under is all that is compared.
      */

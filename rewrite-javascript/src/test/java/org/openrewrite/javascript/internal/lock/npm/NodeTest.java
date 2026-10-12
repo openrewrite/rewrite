@@ -319,6 +319,14 @@ class NodeTest {
         assertThat(node(opts().path("/")).getName()).as("ok to have a nameless node in system root").isNull();
     }
 
+    // node.js from npm 7.1.0 lets a node at the filesystem root go without a name; before, any nameless node throws
+    @Test
+    void namelessNodeInSystemRootThrowsBefore7_1_0() {
+        assertThatThrownBy(() -> node(opts().path("/").release(NpmRelease.of("7.0.15"))))
+          .hasMessage("could not detect node name from path or package");
+        assertThat(node(opts().path("/").release(NpmRelease.of("7.1.0"))).getName()).isNull();
+    }
+
     // load with a virtual filesystem parent; upstream also asserts the throws of arborist's debug mode
     @Test
     void loadWithAVirtualFilesystemParent() {

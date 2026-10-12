@@ -329,7 +329,9 @@ public class Node {
 
         this.path = truthy(path) ? PosixPath.resolve(path) : null;
 
-        if (!truthy(this.name) && (this.path == null || !this.path.equals(PosixPath.dirname(this.path)))) {
+        // before npm 7.1.0 a node at the filesystem root needs a name too
+        if (!truthy(this.name) && (!release.acceptsUnnamedFilesystemRoot() || this.path == null ||
+                                    !this.path.equals(PosixPath.dirname(this.path)))) {
             throw new IllegalArgumentException("could not detect node name from path or package");
         }
 
