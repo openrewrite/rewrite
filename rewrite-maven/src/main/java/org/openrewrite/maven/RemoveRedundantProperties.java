@@ -27,7 +27,7 @@ import org.openrewrite.maven.internal.MavenPomDownloader;
 import org.openrewrite.maven.tree.MavenResolutionResult;
 import org.openrewrite.maven.tree.Pom;
 import org.openrewrite.maven.tree.ResolvedPom;
-import org.openrewrite.maven.tree.Version;
+import org.openrewrite.semver.LatestRelease;
 import org.openrewrite.xml.RemoveContentVisitor;
 import org.openrewrite.xml.tree.Xml;
 
@@ -42,7 +42,6 @@ import static org.openrewrite.internal.StringUtils.matchesGlob;
 @Value
 @EqualsAndHashCode(callSuper = false)
 public class RemoveRedundantProperties extends Recipe {
-    private static final Version FIRST_MAVEN_WITH_SUPER_POM_DEFAULTS = new Version("3.10.0");
     private static final Map<String, String> SUPER_POM_DEFAULTS = new HashMap<>();
 
     static {
@@ -144,7 +143,7 @@ public class RemoveRedundantProperties extends Recipe {
                 return getCursor().firstEnclosingOrThrow(Xml.Document.class).getMarkers()
                         .findFirst(BuildTool.class)
                         .filter(buildTool -> buildTool.getType() == BuildTool.Type.Maven)
-                        .map(buildTool -> new Version(buildTool.getVersion()).compareTo(FIRST_MAVEN_WITH_SUPER_POM_DEFAULTS) >= 0)
+                        .map(buildTool -> new LatestRelease(null).compare(null, buildTool.getVersion(), "3.10.0") >= 0)
                         .orElse(false);
             }
         };
