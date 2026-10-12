@@ -610,6 +610,22 @@ class PnpmReleaseTest {
     }
 
     /**
+     * resolving/npm-resolver pickPackage.ts (11.22.0): under a release-age cutoff a resolution that picks the lowest
+     * version picks the lowest mature one; before, the highest mature one (small-settings-resolution-mode-lowest-direct
+     * records it).
+     */
+    @Test
+    void picksTheLowestMatureVersionFrom11220() {
+        PickPackageFromMeta.RegistryPackageSpec spec = PickPackageFromMeta.parseBareSpecifier("^1.0.0", "foo",
+          "latest", REGISTRY);
+        Map<String, @Nullable Object> meta = fooMeta(null, true);
+        PickPackage.PickerOptions lowest = picker("2026-10-12T00:00:00Z", false, "11.22.0").withPickLowestVersion(true);
+        assertThat(PickPackage.pickRespectingMinReleaseAge(lowest, spec, meta)).containsEntry("version", "1.0.0");
+        assertThat(PickPackage.pickRespectingMinReleaseAge(lowest.withRelease(release("11.21.0")), spec, meta))
+          .containsEntry("version", "1.1.0");
+    }
+
+    /**
      * resolving/npm-resolver pickPackageFromMeta.ts (11.2.0): an abbreviated packument modified exactly at the
      * release-age cutoff counts as mature; before, it needs the time field it lacks.
      */
