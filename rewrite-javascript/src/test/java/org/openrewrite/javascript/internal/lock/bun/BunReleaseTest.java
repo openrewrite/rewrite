@@ -437,8 +437,8 @@ class BunReleaseTest {
     }
 
     /**
-     * GlobWalker.zig makeComponent (1.3.4): {@code .x} in a workspaces glob is itself; before, the walker takes it for
-     * {@code ..} and walks what the engine cannot see.
+     * GlobWalker.zig makeComponent (1.3.4): {@code .x} in a workspaces glob is itself, a hidden directory the walker
+     * passes over until 1.4.0; before, the walker takes it for {@code ..} and walks what the engine cannot see.
      */
     @Test
     void walksATwoCharacterDotComponentAsWrittenFrom134() {
@@ -446,7 +446,7 @@ class BunReleaseTest {
         List<Json.Expr> globs = Json.parse("[\".x/*\"]").items();
         Workspaces later = new Workspaces(BunRelease.of("1.3.4"));
         later.processNamesArray(new Log(), globs, manifests);
-        assertThat(later.map).containsOnlyKeys(".x/a");
+        assertThat(later.map).isEmpty();
         assertThatThrownBy(() -> new Workspaces(BunRelease.of("1.3.3")).processNamesArray(new Log(), globs, manifests))
           .isInstanceOf(CannotKnow.class)
           .hasMessageContaining("whose .x its glob walker takes for ..");
@@ -2026,6 +2026,53 @@ class BunReleaseTest {
             names.add(lockfile.dependencies.get(id).name);
         }
         return names;
+    }
+
+    private static java.util.Set<String> workspaces(String release, String globs, String... locations) {
+        java.util.Map<String, String> manifests = new java.util.LinkedHashMap<>();
+        for (String location : locations) {
+            manifests.put(location, "{\"name\":\"" + location.replace('/', '-') + "\"}");
+        }
+        Workspaces names = new Workspaces(BunRelease.of(release));
+        names.processNamesArray(new Log(), Json.parse(globs).items(), manifests);
+        return names.map.keySet();
+    }
+
+    /**
+     * matcher.rs match (1.4.0, bun#33759): a {@code **} right after the {@code !} is a globstar, so that a later
+     * {@code !**}{@code /test} takes the directories named test below the top out of the workspaces.
+     */
+    @Test
+    void readsAGlobstarAfterANegationFrom140() {
+        String globs = "[\"packages/**\", \"!**/test\"]";
+        assertThat(workspaces("1.4.0", globs, "packages/a", "packages/a/test")).containsOnly("packages/a");
+        assertThat(workspaces("1.3.14", globs, "packages/a", "packages/a/test"))
+          .containsOnly("packages/a", "packages/a/test");
+    }
+
+    /**
+     * lib.rs detect_glob_syntax (1.4.0, bun#37052): the backslashes are counted right before each token, so that
+     * {@code pkgs/\*x\*} is a path; before, a glob.
+     */
+    @Test
+    void countsTheBackslashesBeforeEachGlobTokenFrom140() {
+        assertThat(Glob.detectGlobSyntax("pkgs/\\*x\\*", BunRelease.of("1.4.0"))).isFalse();
+        assertThat(Glob.detectGlobSyntax("pkgs/\\*x\\*", BunRelease.of("1.3.14"))).isTrue();
+        assertThat(Glob.detectGlobSyntax("pkgs/\\*x*", BunRelease.of("1.4.0"))).isTrue();
+        assertThat(Glob.detectGlobSyntax("packages\\*", BunRelease.of("1.3.14"))).isFalse();
+    }
+
+    /**
+     * GlobWalker.rs match_pattern_dir and match_pattern_impl (1.4.0, bun#32853): a hidden directory the pattern names
+     * is walked into; wildcards still pass hidden ones over. Before, every hidden one is passed over.
+     */
+    @Test
+    void walksIntoAHiddenDirectoryThePatternNamesFrom140() {
+        String[] locations = {".github/actions/a", "packages/.cache/b", "packages/c", ".h/d"};
+        assertThat(workspaces("1.4.0", "[\".github/actions/*\", \"packages/**\", \"*/d\", \".*/d\"]", locations))
+          .containsOnly(".github/actions/a", "packages/c", ".h/d");
+        assertThat(workspaces("1.3.14", "[\".github/actions/*\", \"packages/**\", \"*/d\", \".*/d\"]", locations))
+          .containsOnly("packages/c");
     }
 
     // the error the release's JSON parser fails a package.json or bun.lock with, as "name: first message"; "reads past"

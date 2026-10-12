@@ -384,6 +384,34 @@ public final class BunRelease implements Comparable<BunRelease> {
     }
 
     /**
+     * A glob is matched from past its leading {@code !}s (src/glob/matcher.rs {@code glob_start}), so that a
+     * {@code **} right after them is a globstar, from 1.4.0 (bun#33759); before, from its start, so that it is two
+     * {@code *}s that stop at a slash and {@code !**}{@code /test} negates no path below the top.
+     */
+    boolean readsAGlobstarAfterANegation() {
+        return atLeast(1, 4, 0);
+    }
+
+    /**
+     * Whether a workspaces entry is a glob counts the backslashes right before each {@code *}, opening brace,
+     * {@code [} or {@code ?} (src/glob/lib.rs {@code detect_glob_syntax}), from 1.4.0 (bun#37052); before, those at the
+     * token's offset in what is left of the pattern counted from its start, so that a token after an escaped one
+     * of its kind reads as unescaped ({@code pkgs/\*x\*} is a glob).
+     */
+    boolean countsTheBackslashesBeforeEachGlobToken() {
+        return atLeast(1, 4, 0);
+    }
+
+    /**
+     * The workspaces' glob walker goes into a hidden directory where the pattern's component for it itself starts
+     * with {@code .} ({@code .github/actions/*}), from 1.4.0 (bun#32853); {@code *}, {@code **} and the other
+     * wildcards still pass hidden entries over. Before, it passes over every hidden entry.
+     */
+    boolean matchesHiddenEntriesThePatternNames() {
+        return atLeast(1, 4, 0);
+    }
+
+    /**
      * An .npmrc value that is empty once its single quotes are stripped ({@code ''}) is the empty string, from 1.4.0
      * (bun#32712); before, it is parsed as JSON's empty document, an empty object, which no string setting takes.
      */
