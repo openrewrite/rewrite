@@ -87,7 +87,7 @@ final class NormalizeManifest {
         fix(info, looseSemver, release);
         resolveRelative(info, moduleLoc, lockfileFolder, release);
         try {
-            validate(info);
+            validate(info, release);
         } catch (MessageError err) {
             throw new MessageError(prefix + err.getMessage(), err.getCode());
         }
@@ -289,7 +289,7 @@ final class NormalizeManifest {
         return project.append("/\0").toString();
     }
 
-    static void validate(Manifest info) {
+    static void validate(Manifest info, YarnClassicRelease release) {
         Object name = info.getName();
         if (name instanceof String) {
             String n = (String) name;
@@ -307,7 +307,7 @@ final class NormalizeManifest {
         for (String key : STRINGS) {
             Object val = info.get(key);
             if (Js.truthy(val) && !(val instanceof String)) {
-                throw new MessageError(Lang.format("$0 is not a string", key));
+                throw new MessageError(Lang.format(release, "$0 is not a string", key));
             }
         }
         cleanDependencies(info);

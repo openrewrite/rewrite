@@ -102,7 +102,7 @@ class ExoticResolversTest {
             "package@git@bitbucket.org:team/repo.git|team|repo|''",
     })
     void explodeHostedGitFragment(String fragment, String user, String repo, String hash) {
-        assertThat(GitResolver.explodeHostedGitFragment(fragment))
+        assertThat(GitResolver.explodeHostedGitFragment(fragment, YarnClassicRelease.PORTED))
                 .isEqualTo(new GitResolver.ExplodedFragment(user, repo, hash));
     }
 }

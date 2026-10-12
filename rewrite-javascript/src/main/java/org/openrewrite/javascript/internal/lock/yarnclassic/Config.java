@@ -461,13 +461,13 @@ final class Config {
             if (!workspacesNohoistEnabled) {
                 // a warning from 1.6.0; before, every warning is thrown
                 if (!release.throwsOnlyWorkspaceErrors()) {
-                    errors.add(Lang.format("$0 defines nohoist but the feature is disabled in your Yarn config. " +
+                    errors.add(Lang.format(release, "$0 defines nohoist but the feature is disabled in your Yarn config. " +
                                            "Please check \"workspaces-nohoist-experimental\" in your .yarnrc file.",
                             manifest.getName()));
                 }
                 wsCopy.put("nohoist", null);
             } else if (!isPrivate) {
-                errors.add(Lang.format("nohoist config is ignored in $0 because it is not a private package. If " +
+                errors.add(Lang.format(release, "nohoist config is ignored in $0 because it is not a private package. If " +
                                        "you think nohoist should be allowed in public packages, please submit an " +
                                        "issue for your use case.", manifest.getName()));
                 wsCopy.put("nohoist", null);
@@ -501,7 +501,7 @@ final class Config {
             }
             String name = Js.string(manifest.getName());
             if (workspaces.containsKey(name)) {
-                throw new MessageError(Lang.format("There are more than one workspace with name $0", name));
+                throw new MessageError(Lang.format(release, "There are more than one workspace with name $0", name));
             }
             workspaces.put(name, new WorkspaceLayout.Workspace(loc, manifest));
         }

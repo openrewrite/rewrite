@@ -162,7 +162,7 @@ final class PackageRequest {
                 boolean ownRejection = err instanceof MessageError && !release.tellsItsErrorsByClass();
                 if (release.namesTheParentOfAPackageNotFound() && (err instanceof JsError || ownRejection) &&
                     parentRequest != null && Js.truthy(parentRequest.pattern)) {
-                    MessageError notFound = new MessageError(Lang.format("Couldn't find package $0 required by $1 " +
+                    MessageError notFound = new MessageError(Lang.format(config.getRelease(), "Couldn't find package $0 required by $1 " +
                                                                          "on the $2 registry.", pattern,
                             parentRequest.pattern, registry));
                     throw ownRejection ? notFound.rewrapped() : notFound;
@@ -176,7 +176,7 @@ final class PackageRequest {
         if ("npm".equals(registry) || "yarn".equals(registry)) {
             return new NpmResolver(this, name, range);
         }
-        throw new MessageError(Lang.format("Unknown registry resolver $0", registry));
+        throw new MessageError(Lang.format(config.getRelease(), "Unknown registry resolver $0", registry));
     }
 
     Promise<String> normalizeRange(String pattern) {
@@ -264,7 +264,7 @@ final class PackageRequest {
             Object version = info.getVersion();
             if (config.getRelease().rejectsAnInvalidVersion() &&
                 (!(version instanceof String) || NodeSemver.valid((String) version, Config.SEMVER) == null)) {
-                throw new MessageError(Lang.format("Can't add $0: invalid package version $1.", info.getName(),
+                throw new MessageError(Lang.format(config.getRelease(), "Can't add $0: invalid package version $1.", info.getName(),
                         info.getVersion()));
             }
             info.fresh = fresh;
@@ -286,12 +286,12 @@ final class PackageRequest {
 
             if (Js.truthy(info.get("flat")) && !resolver.flat) {
                 throw new MessageError(config.getRelease().namesTheFlatPackage() ?
-                        Lang.format(FLAT_GLOBAL_ERROR,
+                        Lang.format(config.getRelease(), FLAT_GLOBAL_ERROR,
                                 Js.templateString(info.getName()) + "@" + Js.templateString(info.getVersion())) :
                         FLAT_GLOBAL_ERROR.replace("$0", "undefined@undefined"));
             }
 
-            validateVersionInfo(info);
+            validateVersionInfo(info, config.getRelease());
 
             PackageRemote remote = info.remote;
             if (remote == null) {
@@ -360,12 +360,12 @@ final class PackageRequest {
         });
     }
 
-    static void validateVersionInfo(Manifest info) {
+    static void validateVersionInfo(Manifest info, YarnClassicRelease release) {
         String human = Js.templateString(info.getName()) + "@" + Js.templateString(info.getVersion());
         info.put("version", getPackageVersion(info));
         for (String key : REQUIRED_PACKAGE_KEYS) {
             if (!Js.truthy(info.get(key))) {
-                throw new MessageError(Lang.format("Package $0 doesn't have a $1.", human, key));
+                throw new MessageError(Lang.format(release, "Package $0 doesn't have a $1.", human, key));
             }
         }
     }

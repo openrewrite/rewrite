@@ -1117,6 +1117,72 @@ class YarnClassicReleaseTest {
     }
 
     /**
+     * base-reporter.js {@code stringifyLangArgs}, as yarn 1.4.0, 1.5.0, 1.6.0 and 1.7.0 reported a range that holds a
+     * backslash followed by an {@code n}, and one that holds a line break: the escapes of the JSON before 1.5.0, a line
+     * break for each from 1.5.0, the backslash's {@code n} kept from 1.7.0; a message reported as unexpected (1.4.0 to
+     * 1.5.1) goes through it twice. ({@code ^} stands for a backslash.)
+     */
+    @Test
+    void breaksTheLinesOfAnArgumentAsItsReleaseDoes() {
+        String escaped = "a\\nb";
+        String broken = "a\nb";
+        assertThat(versionNotFound("1.4.0", escaped)).isEqualTo(backslashes(
+                "An unexpected error occurred: \"Couldn't find any versions for ^\"x^\" that matches ^\"a^^^^nb^\"\"."));
+        assertThat(versionNotFound("1.5.0", escaped)).isEqualTo(backslashes(
+                "An unexpected error occurred: \"Couldn't find any versions for ^\"x^\" that matches ^\"a^^\nb^\"\"."));
+        assertThat(versionNotFound("1.6.0", escaped)).isEqualTo(backslashes(
+                "Couldn't find any versions for \"x\" that matches \"a^\nb\""));
+        assertThat(versionNotFound("1.7.0", escaped)).isEqualTo(backslashes(
+                "Couldn't find any versions for \"x\" that matches \"a^^nb\""));
+        assertThat(versionNotFound("1.4.0", broken)).isEqualTo(backslashes(
+                "An unexpected error occurred: \"Couldn't find any versions for ^\"x^\" that matches ^\"a^^nb^\"\"."));
+        assertThat(versionNotFound("1.5.0", broken)).isEqualTo(backslashes(
+                "An unexpected error occurred: \"Couldn't find any versions for ^\"x^\" that matches ^\"a\nb^\"\"."));
+        assertThat(versionNotFound("1.6.0", broken)).isEqualTo("Couldn't find any versions for \"x\" that matches \"a\nb\"");
+        assertThat(versionNotFound("1.7.0", broken)).isEqualTo("Couldn't find any versions for \"x\" that matches \"a\nb\"");
+    }
+
+    // what yarn reports for a root dependency on x, whose only version is 1.0.0, of a range no version satisfies
+    private static String versionNotFound(String version, String range) {
+        Map<String, @Nullable Object> manifest = new LinkedHashMap<>();
+        manifest.put("name", "p");
+        manifest.put("version", "1.0.0");
+        manifest.put("dependencies", Collections.singletonMap("x", range));
+        YarnClassicLockRegenerator.Inputs inputs = YarnClassicLockRegenerator.Inputs.builder()
+                .release(release(version))
+                .manifest("", Js.jsonStringify(manifest))
+                .lock("# yarn lockfile v1\n\n\n")
+                .env(Collections.emptyMap())
+                .build();
+        LockFileRegeneration.Result result = new YarnClassicLockRegenerator(inputs, packuments(Collections.singletonMap(
+                "x", "{\"name\":\"x\",\"dist-tags\":{\"latest\":\"1.0.0\"},\"versions\":{\"1.0.0\":{\"name\":\"x\"," +
+                     "\"version\":\"1.0.0\",\"dist\":{\"tarball\":\"https://registry.yarnpkg.com/x/-/x-1.0.0.tgz\"}}}}")))
+                .regenerate();
+        String error = String.valueOf(result.getErrorMessage());
+        return error.substring(error.indexOf(" this edit: ") + " this edit: ".length());
+    }
+
+    private static String backslashes(String text) {
+        return text.replace('^', '\\');
+    }
+
+    // a registry that has these packuments, by name, and no tarball
+    private static RegistrySource packuments(Map<String, String> byName) {
+        return new RegistrySource() {
+            @Override
+            public @Nullable String packument(String registry, String name, boolean full,
+                                              @Nullable String authorization) {
+                return byName.get(name);
+            }
+
+            @Override
+            public byte @Nullable [] tarball(String url, String name, String version, @Nullable String authorization) {
+                return null;
+            }
+        };
+    }
+
+    /**
      * tar-stream and readable-stream as each release bundles them, as yarn 1.6.0, 1.7.0 and 1.8.0 installed these
      * tarballs from a registry: an archive cut inside a file after package.json extracts before 1.8.0 (readable-stream
      * 2.2.9 calls no {@code _final}) and is corrupt from 1.8.0; cut inside package.json, what yarn reads of it follows

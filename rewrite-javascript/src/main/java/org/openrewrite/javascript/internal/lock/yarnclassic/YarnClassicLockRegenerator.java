@@ -322,7 +322,7 @@ public final class YarnClassicLockRegenerator {
      * 1.22.20. Yarn 1.22.20 reports none; its words are the error's.
      */
     static String unexpectedError(JsError error, YarnClassicRelease release) {
-        return release.reportsUnexpectedErrors() ? Lang.format("An unexpected error occurred: $0.",
+        return release.reportsUnexpectedErrors() ? Lang.format(release, "An unexpected error occurred: $0.",
                 String.valueOf(error.getMessage())) : error.toString();
     }
 
@@ -332,7 +332,7 @@ public final class YarnClassicLockRegenerator {
      */
     static String report(MessageError error, YarnClassicRelease release) {
         String message = String.valueOf(error.getMessage());
-        return release.tellsItsErrorsByClass() ? message : Lang.format("An unexpected error occurred: $0.", message);
+        return release.tellsItsErrorsByClass() ? message : Lang.format(release, "An unexpected error occurred: $0.", message);
     }
 
     private static Reason reasonFor(String message) {

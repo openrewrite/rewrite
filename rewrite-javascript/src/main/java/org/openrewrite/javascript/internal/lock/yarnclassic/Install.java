@@ -125,8 +125,8 @@ final class Install {
         if (!flags.getArgs().isEmpty()) {
             String example = String.join(" ", flags.getArgs());
             throw new MessageError(flags.isGlobal() ?
-                    Lang.format("`--global` has been deprecated. Please run $0 instead.", "yarn global " + example) :
-                    Lang.format("`install` has been replaced with `add` to add new dependencies. Run $0 instead.",
+                    Lang.format(config.getRelease(), "`--global` has been deprecated. Please run $0 instead.", "yarn global " + example) :
+                    Lang.format(config.getRelease(), "`install` has been replaced with `add` to add new dependencies. Run $0 instead.",
                             "yarn add " + example));
         }
         return init(lockfile);

@@ -65,11 +65,11 @@ final class NpmResolver {
         Object distTags = Js.get(body, "dist-tags");
         YarnClassicRelease release = config.getRelease();
         if (release.rejectsAResponseWithoutVersions() && Js.truthy(versions) && Js.keys(versions).isEmpty()) {
-            throw new MessageError(Lang.format("No valid versions found for $0. The package may be unpublished.",
+            throw new MessageError(Lang.format(config.getRelease(), "No valid versions found for $0. The package may be unpublished.",
                     Js.get(body, "name")));
         }
         if (!Js.truthy(distTags) || release.rejectsAResponseWithoutVersions() && !Js.truthy(versions)) {
-            throw new MessageError(Lang.format("Received malformed response from registry for $0. " +
+            throw new MessageError(Lang.format(config.getRelease(), "Received malformed response from registry for $0. " +
                                                "The registry may be down.",
                     release.namesTheRequestedPackageOfAMalformedResponse() ? name : Js.get(body, "name")));
         }
@@ -91,7 +91,7 @@ final class NpmResolver {
         if (satisfied != null) {
             return Js.get(versions, satisfied);
         }
-        throw new MessageError(Lang.format("Couldn't find any versions for $0 that matches $1",
+        throw new MessageError(Lang.format(config.getRelease(), "Couldn't find any versions for $0 that matches $1",
                 Js.get(body, "name"), wanted));
     }
 
@@ -214,7 +214,7 @@ final class NpmResolver {
         Object desiredVersion = shrunk != null && Js.truthy(shrunk.getVersion()) ? shrunk.getVersion() : null;
         return resolveRequest(desiredVersion).then(found -> {
             if (found == null) {
-                throw new MessageError(Lang.format("Couldn't find package $0 on the $1 registry.", name,
+                throw new MessageError(Lang.format(config.getRelease(), "Couldn't find package $0 on the $1 registry.", name,
                         NPM_REGISTRY_ID));
             }
             Map<String, @Nullable Object> data = found instanceof Map ? (Map<String, @Nullable Object>) found :

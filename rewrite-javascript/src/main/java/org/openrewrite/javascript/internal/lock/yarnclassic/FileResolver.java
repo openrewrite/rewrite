@@ -60,9 +60,9 @@ final class FileResolver {
             if (text == null && resolver.files.isMissing(location)) {
                 // yarn prints the absolute path, relative to the root here
                 throw new MessageError(request.config.getRelease().namesThePackageOfAMissingFile() ?
-                        Lang.format("Package $1 refers to a non-existing file '$0'.", location,
+                        Lang.format(request.config.getRelease(), "Package $1 refers to a non-existing file '$0'.", location,
                                 request.pattern.split("@", -1)[0]) :
-                        Lang.format("$0 doesn't exist.", location));
+                        Lang.format(request.config.getRelease(), "$0 doesn't exist.", location));
             }
             if (text == null) {
                 throw new CannotKnow("the package.json of " + FILE_PROTOCOL_PREFIX + loc + ", which the project's " +

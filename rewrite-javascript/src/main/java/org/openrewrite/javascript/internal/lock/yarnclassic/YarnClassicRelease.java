@@ -867,6 +867,24 @@ public final class YarnClassicRelease implements Comparable<YarnClassicRelease> 
         return atLeast(1, 4, 0);
     }
 
+    // yarn src/reporters/base-reporter.js
+
+    /**
+     * {@code stringifyLangArgs} turns each line break an argument's JSON escapes ({@code \r\n}, {@code \n}) into
+     * {@code os.EOL}, from 1.5.0; before, a message prints the escape.
+     */
+    boolean breaksTheLinesOfAnArgument() {
+        return atLeast(1, 5, 0);
+    }
+
+    /**
+     * {@code stringifyLangArgs} keeps a {@code \n} that a backslash leads in an argument's JSON (an argument's
+     * backslash followed by an {@code n}), from 1.7.0; 1.5.0 and 1.6.0 turn its escape into {@code os.EOL} as well.
+     */
+    boolean keepsAnEscapedBackslashBeforeAnN() {
+        return atLeast(1, 7, 0);
+    }
+
     // yarn src/util/conversion.js
 
     /**

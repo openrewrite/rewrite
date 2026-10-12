@@ -115,7 +115,7 @@ final class TarballFetcher {
         TarFs extracted = untar(reference(), tarball, config.getRelease());
         Ssri.Integrity integrity = integrity(remote);
         if (integrity != null && integrity.getHashes().isEmpty()) {
-            throw new MessageError(reference() + ": " + Lang.format("Integrity checked failed for $0 (none of " +
+            throw new MessageError(reference() + ": " + Lang.format(config.getRelease(), "Integrity checked failed for $0 (none of " +
                                                                     "the specified algorithms are supported)",
                     remote.packageName));
         }
@@ -204,7 +204,7 @@ final class TarballFetcher {
             if (!release.reportsCorruptArchives()) {
                 throw new JsError(e.getName(), url + ": " + e.getMessage());
             }
-            throw new MessageError(url + ": " + Lang.format("Extracting tar content of $1 failed, the file appears " +
+            throw new MessageError(url + ": " + Lang.format(release, "Extracting tar content of $1 failed, the file appears " +
                                                             "to be corrupt: $0", e.getMessage(), null));
         }
     }

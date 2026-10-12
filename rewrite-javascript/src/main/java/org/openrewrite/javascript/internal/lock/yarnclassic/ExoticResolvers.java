@@ -224,7 +224,7 @@ final class ExoticResolvers {
         Matcher match = (release.readsScopedAliases() ? REGISTRY_FRAGMENT : UNSCOPED_REGISTRY_FRAGMENT)
                 .matcher(fragment);
         if (!match.find()) {
-            throw new MessageError(Lang.format("Invalid fragment $0.", fragment));
+            throw new MessageError(Lang.format(release, "Invalid fragment $0.", fragment));
         }
         String range = match.group(4) == null || match.group(4).isEmpty() ? "latest" : match.group(4);
         return new RegistryFragment(fragment.startsWith("npm:") ? "npm" : "yarn", match.group(2), range);
