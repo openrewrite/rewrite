@@ -1322,32 +1322,43 @@ class PnpmReleaseTest {
 
         @Override
         public @Nullable String document(String url) {
-            if (url.equals(NodeRuntimeResolver.DEFAULT_NODE_MIRROR_BASE_URL + "index.json")) {
-                return "[{\"version\":\"v22.0.0\",\"lts\":false}]";
+            if (url.endsWith("/release/index.json")) {
+                return "[{\"version\":\"v22.0.0\",\"lts\":false},{\"version\":\"v21.0.0\",\"lts\":false}]";
             }
-            if (url.equals(NodeRuntimeResolver.DEFAULT_NODE_MIRROR_BASE_URL + "v22.0.0/SHASUMS256.txt")) {
+            if (url.endsWith("/release/v22.0.0/SHASUMS256.txt")) {
                 return "aa  node-v22.0.0-linux-x64.tar.gz\n";
             }
             return null;
         }
     };
 
+    private static NpmResolver.@Nullable ResolveResult nodeRuntime(String version, @Nullable String mirror,
+                                                                  String release) {
+        ResolveDependencies.WantedDependency node = new ResolveDependencies.WantedDependency("node",
+          "runtime:" + version, false, false);
+        Map<String, @Nullable Object> mirrors = mirror == null ? null :
+          Collections.singletonMap("release", mirror);
+        return NodeRuntimeResolver.resolveNodeRuntime(NODE_22, node, null, null, mirrors, "linux", release(release));
+    }
+
     /**
      * engine/runtime/node-resolver and crypto/shasums-file verifyNodeShasums.ts (11.5.3): a release-channel Node.js
-     * runtime is resolved from a SHASUMS256.txt whose signature a Node.js release key made, which no input holds;
-     * before, from the file alone.
+     * runtime is resolved from a SHASUMS256.txt whose signature a Node.js release key made. nodejs.org's own is; what
+     * another mirror serves no input says, nor the HTTP status of one pnpm cannot fetch; before, from the file alone.
      */
     @Test
     void verifiesTheNodeShasumsSignatureFrom1153() {
-        ResolveDependencies.WantedDependency node = new ResolveDependencies.WantedDependency("node", "runtime:22.0.0",
-          false, false);
-        assertThatThrownBy(() -> NodeRuntimeResolver.resolveNodeRuntime(NODE_22, node, null, null, null, "linux",
-          release("11.5.3")))
+        assertThat(nodeRuntime("22.0.0", null, "11.5.3").id).isEqualTo("node@runtime:22.0.0");
+        assertThat(nodeRuntime("22.0.0", "https://mirror.test/download/release/", "11.5.2").id)
+          .isEqualTo("node@runtime:22.0.0");
+        assertThatThrownBy(() -> nodeRuntime("22.0.0", "https://mirror.test/download/release/", "11.5.3"))
           .isInstanceOf(CannotKnow.class)
           .hasMessageContaining("v22.0.0/SHASUMS256.txt.sig");
-        NpmResolver.ResolveResult resolved = NodeRuntimeResolver.resolveNodeRuntime(NODE_22, node, null, null, null,
-          "linux", release("11.5.2"));
-        assertThat(resolved).isNotNull();
-        assertThat(resolved.id).isEqualTo("node@runtime:22.0.0");
+        assertThatThrownBy(() -> nodeRuntime("21.0.0", null, "11.5.3"))
+          .isInstanceOf(CannotKnow.class)
+          .hasMessageContaining("the HTTP status");
+        assertThatThrownBy(() -> nodeRuntime("21.0.0", null, "11.5.2"))
+          .isInstanceOfSatisfying(PnpmError.class,
+            e -> assertThat(e.getCode()).isEqualTo("ERR_PNPM_FAILED_DOWNLOAD_SHASUM_FILE"));
     }
 }

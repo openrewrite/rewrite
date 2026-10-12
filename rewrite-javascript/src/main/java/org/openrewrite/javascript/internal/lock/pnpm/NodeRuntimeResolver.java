@@ -92,11 +92,17 @@ final class NodeRuntimeResolver {
 
     private static List<Object> readNodeAssets(RegistryMetadata fetch, String nodeMirrorBaseUrl, String version,
                                                boolean verifySignature) {
-        if (verifySignature) {
+        if (verifySignature && !DEFAULT_NODE_MIRROR_BASE_URL.equals(nodeMirrorBaseUrl)) {
             // fetchVerifiedNodeShasums: SHASUMS256.txt and its .sig at once, a failed fetch named by its HTTP status,
-            // and the signature checked against the Node.js release keys pnpm holds, none of which the inputs give
+            // and the signature checked against the Node.js release keys pnpm holds. The release's own SHASUMS256.txt
+            // on nodejs.org is signed by one of them; what another mirror serves, the inputs do not say
             throw new CannotKnow("whether " + nodeMirrorBaseUrl + "v" + version + "/SHASUMS256.txt.sig is the " +
                                  "signature of a Node.js release key");
+        }
+        String shasumsUrl = nodeMirrorBaseUrl + "v" + version + "/SHASUMS256.txt";
+        if (verifySignature && fetch.document(shasumsUrl) == null) {
+            throw new CannotKnow("the HTTP status " + shasumsUrl + " answers with, which pnpm names where it cannot " +
+                                 "verify the Node.js download");
         }
         List<Object> assets = readNodeAssetsFromMirror(fetch, nodeMirrorBaseUrl, version, false);
         if (DEFAULT_NODE_MIRROR_BASE_URL.equals(nodeMirrorBaseUrl)) {
