@@ -330,7 +330,7 @@ final class TextLockfileReader {
             }
             String nameStr;
             String resStr;
-            if (resInfoStr.startsWith("@root:")) {
+            if (resInfoStr.startsWith("@root:") && options.getRelease().readsAnUnnamedRootEntry()) {
                 nameStr = "";
                 resStr = resInfoStr.substring(1);
             } else {

@@ -75,6 +75,15 @@ public final class BunRelease implements Comparable<BunRelease> {
     }
 
     /**
+     * The text lockfile's parser reads a package entry of the root without a name ({@code "@root:"}), which 1.3.0
+     * writes for a {@code file:} dependency on the root; before, that is an invalid package resolution, and bun
+     * ignores the lock.
+     */
+    boolean readsAnUnnamedRootEntry() {
+        return atLeast(1, 3, 0);
+    }
+
+    /**
      * The text lockfile's parser expands an npm package's {@code ""} registry to the registry of the package's scope
      * ({@code scopeForPackageName}), from 1.3.7; before, to the default {@code https://registry.npmjs.org/}.
      */
@@ -122,6 +131,26 @@ public final class BunRelease implements Comparable<BunRelease> {
      */
     boolean readsTopLevelCatalogs() {
         return atLeast(1, 2, 19);
+    }
+
+    // src/ini.zig
+
+    /**
+     * .npmrc expands {@code ${VAR}} inside a quoted value too, and {@code ${VAR?}} to nothing where the variable is
+     * unset, from 1.3.5; before, a quoted value is taken as it is, and {@code VAR?} is a name.
+     */
+    boolean expandsQuotedNpmrcValues() {
+        return atLeast(1, 3, 5);
+    }
+
+    // src/bunfig.zig and src/install/PackageManager/PackageManagerOptions.zig
+
+    /**
+     * bunfig.toml's {@code minimumReleaseAge} and {@code minimumReleaseAgeExcludes} hold back versions published
+     * within that age (the full packument's {@code time}), from 1.3.0; before, neither is a setting.
+     */
+    boolean readsMinimumReleaseAge() {
+        return atLeast(1, 3, 0);
     }
 
     // src/install/PackageManager/install_with_manager.zig installWithManager

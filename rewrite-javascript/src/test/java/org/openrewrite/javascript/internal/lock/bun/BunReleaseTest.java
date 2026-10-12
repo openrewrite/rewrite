@@ -302,6 +302,47 @@ class BunReleaseTest {
         }
     }
 
+    /**
+     * ini.zig (1.3.5): a quoted value takes the environment's substitutions, and {@code ${VAR?}} an unset one as
+     * nothing.
+     */
+    @Test
+    void expandsTheEnvironmentInAQuotedNpmrcValueFrom135() {
+        HostEnvironment env = HostEnvironment.of(Collections.singletonMap("REG", "https://r.example/"));
+        String npmrc = "registry=\"${REG}\"\n";
+        assertThat(BunOptions.load(BunRelease.of("1.3.5"), null, npmrc, null, env).getRegistry())
+          .isEqualTo("https://r.example/");
+        assertThat(BunOptions.load(BunRelease.of("1.3.4"), null, npmrc, null, env).getRegistry()).isEqualTo("${REG}");
+        assertThat(Ini.parse("a=x${UNSET?}y\n", env, BunRelease.of("1.3.5")).get("a")).isEqualTo("xy");
+        assertThat(Ini.parse("a=x${UNSET?}y\n", env, BunRelease.of("1.3.4")).get("a")).isEqualTo("x${UNSET?}y");
+    }
+
+    /**
+     * bunfig.zig (1.3.0): minimumReleaseAge is a setting; before, it is not read.
+     */
+    @Test
+    void readsTheMinimumReleaseAgeFrom130() {
+        String bunfig = "[install]\nminimumReleaseAge = 60\n";
+        assertThat(BunOptions.load(BunRelease.of("1.3.0"), bunfig, null, null, HostEnvironment.UNKNOWN)
+          .getMinimumReleaseAgeMs()).isEqualTo(60000.0);
+        assertThat(BunOptions.load(BunRelease.of("1.2.23"), bunfig, null, null, HostEnvironment.UNKNOWN)
+          .getMinimumReleaseAgeMs()).isNull();
+    }
+
+    /**
+     * bun.lock.zig (1.3.0): an unnamed root's entry ({@code "@root:"}) reads; before, it is an invalid resolution.
+     */
+    @Test
+    void readsAnUnnamedRootEntryFrom130() {
+        String lock = "{\n  \"lockfileVersion\": 1,\n  \"workspaces\": {\n    \"\": {\n      \"dependencies\": {\n" +
+                      "        \"self\": \"file:.\",\n      },\n    },\n  },\n  \"packages\": {\n" +
+                      "    \"self\": [\"@root:\", {}],\n  }\n}\n";
+        TextLockfileReader.load(lock, options("1.3.0", null));
+        assertThatThrownBy(() -> TextLockfileReader.load(lock, options("1.2.23", null)))
+          .isInstanceOf(TextLockfileReader.ParseError.class)
+          .hasMessage("Invalid package resolution");
+    }
+
     private static PackageManifest.PackageVersion version(BunRelease release, String packument) {
         PackageManifest manifest = requireNonNull(PackageManifest.parse(release, new Log(), packument, "debug", false));
         PackageManifest.FindResult pick = requireNonNull(manifest.findBestVersion(
