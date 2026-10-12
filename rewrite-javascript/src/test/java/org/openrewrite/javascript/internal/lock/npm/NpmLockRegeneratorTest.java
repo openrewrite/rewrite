@@ -22,7 +22,9 @@ import org.openrewrite.javascript.internal.LockFileRegeneration.Kind;
 import org.openrewrite.javascript.internal.LockFileRegeneration.Result;
 
 import java.time.Instant;
+import java.util.Arrays;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.Map;
 
 import static java.util.Collections.singletonMap;
@@ -105,5 +107,23 @@ class NpmLockRegeneratorTest {
         assertThat(result.getFailure().getKind()).isEqualTo(Kind.PM_FAILS);
         assertThat(result.getErrorMessage()).isEqualTo("MALFORMED_MANIFEST: npm fails on this edit: it cannot apply " +
           "the manifest: directories.bin: ref.replace is not a function");
+    }
+
+    /**
+     * A root package.json the host holds without its contents is not one npm fails on: the lock's root entry does not
+     * stand in for it, and the engine cannot know what npm reads there.
+     */
+    @Test
+    void aRootPackageJsonTheHostHoldsUnreadIsCannotKnow() {
+        Result result = new NpmLockRegenerator(NpmLockRegenerator.Inputs.builder()
+          .lock(LOCK)
+          .paths(new LinkedHashSet<>(Arrays.asList("package.json", "package-lock.json")))
+          .now(Instant.EPOCH)
+          .build(), NO_REGISTRY).regenerate();
+
+        assertThat(result.getFailure()).isNotNull();
+        assertThat(result.getFailure().getKind()).isEqualTo(Kind.CANNOT_KNOW);
+        assertThat(result.getFailure().getDetail())
+          .isEqualTo("the engine cannot know package.json (its contents were not read)");
     }
 }
