@@ -312,7 +312,8 @@ public final class NodeDependencyEdits implements PackageJsonHelper.FileEditor {
                 regeneration(ctx, importer).result.getRegenResult();
         SourceFile out = sf;
         if (result != null && result.isSuccess()) {
-            out = PackageJsonHelper.reparseLock(sf, requireNonNull(result.getLockFileContent()));
+            String content = requireNonNull(result.getLockFileContent());
+            out = content.equals(print(sf)) ? sf : PackageJsonHelper.reparseLock(sf, content);
         } else if (result != null) {
             failure(ctx, requireNonNull(importer), requireNonNull(result.getFailure()));
             out = warn(sf, "lock regeneration failed: " + result.getErrorMessage());
