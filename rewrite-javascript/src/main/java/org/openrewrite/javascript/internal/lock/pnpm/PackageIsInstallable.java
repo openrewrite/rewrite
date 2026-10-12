@@ -81,13 +81,27 @@ final class PackageIsInstallable {
     }
 
     /**
-     * cli.utils' {@code packageIsInstallable} over a project's manifest: an engines.pnpm this release does not
-     * satisfy throws, and under engineStrict any engine; a platform never does.
+     * {@link #projectIsInstallable(String, Map, boolean, Object, Object, Host, PnpmRelease)} with 11.2.2 installing.
      */
     static void projectIsInstallable(String pkgPath, Map<String, @Nullable Object> pkg, boolean engineStrict,
                                      @Nullable Object nodeVersion, @Nullable Object supportedArchitectures,
                                      Host host) {
-        PnpmError err = checkPackage(pkgPath, pkg, nodeVersion, PNPM_VERSION, supportedArchitectures, host);
+        projectIsInstallable(pkgPath, pkg, engineStrict, nodeVersion, supportedArchitectures, host,
+                PnpmRelease.PORTED);
+    }
+
+    /**
+     * cli.utils' {@code packageIsInstallable} over a project's manifest: an engines.pnpm the release that installs
+     * does not satisfy throws, and under engineStrict any engine; a platform never does.
+     */
+    static void projectIsInstallable(String pkgPath, Map<String, @Nullable Object> pkg, boolean engineStrict,
+                                     @Nullable Object nodeVersion, @Nullable Object supportedArchitectures,
+                                     Host host, PnpmRelease release) {
+        // the release names its own version only where the manifest's engines ask for pnpm
+        Object engines = pkg.get("engines");
+        String pnpmVersion = engines instanceof Map && ((Map<?, ?>) engines).containsKey("pnpm") ?
+                release.version() : PNPM_VERSION;
+        PnpmError err = checkPackage(pkgPath, pkg, nodeVersion, pnpmVersion, supportedArchitectures, host);
         if (err instanceof UnsupportedEngineError &&
             (((UnsupportedEngineError) err).getWanted().containsKey("pnpm") || engineStrict)) {
             throw err;

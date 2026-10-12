@@ -20,6 +20,7 @@ import org.jspecify.annotations.Nullable;
 import java.time.Instant;
 import java.util.Collections;
 import java.util.List;
+import java.util.Map;
 
 /**
  * Port of @pnpm/store.connection-manager src/index.ts and createNewStoreController.ts (pnpm 11.2.2): the npm resolver
@@ -60,9 +61,19 @@ final class CreateNewStoreController {
                 Js.truthy(fetchFullMetadata) : ("time-based".equals(options.get("resolutionMode")) ||
                                                 "no-downgrade".equals(options.get("trustPolicy"))) &&
                                                !options.isTrue("registrySupportsTimeField");
-        return new NpmResolver(registry, options.getRegistries(),
-                NpmResolver.mergeNamedRegistries(options.getNamedRegistries()), options.get("saveWorkspaceProtocol"),
-                !Boolean.FALSE.equals(options.get("minimumReleaseAgeIgnoreMissingTime")), fullMetadata, now);
+        PnpmRelease release = options.getRelease();
+        Double minimumReleaseAge = options.getNumber("minimumReleaseAge");
+        return new NpmResolver(registry, options.getRegistries(), namedRegistries(options),
+                options.get("saveWorkspaceProtocol"),
+                !Boolean.FALSE.equals(options.get("minimumReleaseAgeIgnoreMissingTime")), fullMetadata, now, release,
+                minimumReleaseAge != null && minimumReleaseAge != 0 && !minimumReleaseAge.isNaN() &&
+                Boolean.TRUE.equals(options.get("minimumReleaseAgeStrict")));
+    }
+
+    // the named registries the npm resolver reads, each checked, from 11.1.0
+    static Map<String, String> namedRegistries(PnpmOptions options) {
+        return options.getRelease().readsNamedRegistries() ?
+                NpmResolver.mergeNamedRegistries(options.getNamedRegistries()) : Collections.emptyMap();
     }
 
     /**
@@ -83,6 +94,7 @@ final class CreateNewStoreController {
                         .namedRegistries(options.getNamedRegistries())
                         .fetch(registry)
                         .now(now)
+                        .release(options.getRelease())
                         .build());
         return npmVerifier == null ? Collections.emptyList() : Collections.singletonList(npmVerifier);
     }

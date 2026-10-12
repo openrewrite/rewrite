@@ -32,6 +32,7 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.Deque;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -265,6 +266,7 @@ final class ResolvePeers {
         final List<NodeId> parentNodeIds;
         final List<String> parentDepPathsChain;
         final int[] pending;
+        final PnpmRelease release;
 
         Ctx(Set<String> allPeerDepNames, Map<NodeId, Map<String, ParentPkgInfo>> parentPkgsOfNode,
             Map<NodeId, DependenciesTreeNode> dependenciesTree, Map<String, DependenciesGraphNode> depGraph,
@@ -272,7 +274,7 @@ final class ResolvePeers {
             Map<String, Set<String>> depPathsByPkgId, Map<String, List<PeersCacheItem>> peersCache,
             PeerDependencyIssues peerDependencyIssues, Set<String> purePkgs, boolean dedupePeers,
             int peersSuffixMaxLength, Deque<Runnable> microtasks, List<NodeId> parentNodeIds,
-            List<String> parentDepPathsChain, int[] pending) {
+            List<String> parentDepPathsChain, int[] pending, PnpmRelease release) {
             this.allPeerDepNames = allPeerDepNames;
             this.parentPkgsOfNode = parentPkgsOfNode;
             this.dependenciesTree = dependenciesTree;
@@ -289,18 +291,19 @@ final class ResolvePeers {
             this.parentNodeIds = parentNodeIds;
             this.parentDepPathsChain = parentDepPathsChain;
             this.pending = pending;
+            this.release = release;
         }
 
         Ctx with(List<NodeId> parentNodeIds, List<String> parentDepPathsChain) {
             return new Ctx(allPeerDepNames, parentPkgsOfNode, dependenciesTree, depGraph, pathsByNodeId,
                     pathsByNodeIdPromises, depPathsByPkgId, peersCache, peerDependencyIssues, purePkgs, dedupePeers,
-                    peersSuffixMaxLength, microtasks, parentNodeIds, parentDepPathsChain, pending);
+                    peersSuffixMaxLength, microtasks, parentNodeIds, parentDepPathsChain, pending, release);
         }
 
         Ctx withIssues(PeerDependencyIssues issues) {
             return new Ctx(allPeerDepNames, parentPkgsOfNode, dependenciesTree, depGraph, pathsByNodeId,
                     pathsByNodeIdPromises, depPathsByPkgId, peersCache, issues, purePkgs, dedupePeers,
-                    peersSuffixMaxLength, microtasks, parentNodeIds, parentDepPathsChain, pending);
+                    peersSuffixMaxLength, microtasks, parentNodeIds, parentDepPathsChain, pending, release);
         }
 
         void drain() {
@@ -331,6 +334,18 @@ final class ResolvePeers {
                                int peersSuffixMaxLength, String lockfileDir,
                                Map<String, ResolveDependencyTree.ResolvedImporter> resolvedImporters,
                                Set<String> workspaceProjectIds) {
+        return resolvePeers(allPeerDepNames, projects, dependenciesTree, resolvePeersFromWorkspaceRoot,
+                dedupePeerDependents, dedupePeers, dedupeInjectedDeps, peersSuffixMaxLength, lockfileDir,
+                resolvedImporters, workspaceProjectIds, PnpmRelease.PORTED);
+    }
+
+    static Result resolvePeers(Set<String> allPeerDepNames, List<ProjectToResolve> projects,
+                               Map<NodeId, DependenciesTreeNode> dependenciesTree,
+                               boolean resolvePeersFromWorkspaceRoot,
+                               boolean dedupePeerDependents, boolean dedupePeers, boolean dedupeInjectedDeps,
+                               int peersSuffixMaxLength, String lockfileDir,
+                               Map<String, ResolveDependencyTree.ResolvedImporter> resolvedImporters,
+                               Set<String> workspaceProjectIds, PnpmRelease release) {
         Map<String, DependenciesGraphNode> depGraph = new LinkedHashMap<>();
         Map<NodeId, String> pathsByNodeId = new LinkedHashMap<>();
         Map<NodeId, Deferred> pathsByNodeIdPromises = new LinkedHashMap<>();
@@ -343,7 +358,7 @@ final class ResolvePeers {
         Ctx base = new Ctx(allPeerDepNames, new LinkedHashMap<>(), dependenciesTree, depGraph, pathsByNodeId,
                 pathsByNodeIdPromises, depPathsByPkgId, new LinkedHashMap<>(), new PeerDependencyIssues(),
                 new LinkedHashSet<>(), dedupePeers, peersSuffixMaxLength, microtasks, new ArrayList<>(),
-                new ArrayList<>(), pending);
+                new ArrayList<>(), pending, release);
         for (ProjectToResolve project : projects) {
             PeerDependencyIssues peerDependencyIssues = new PeerDependencyIssues();
             Map<String, ParentRef> merged = new LinkedHashMap<>(rootPkgsByName);
@@ -595,7 +610,9 @@ final class ResolvePeers {
             for (Map.Entry<String, ParentRef> entry : newParentPkgs.entrySet()) {
                 ParentRef current = parentPkgs.get(entry.getKey());
                 if (current != null) {
-                    if (!parentPkgsMatch(ctx.dependenciesTree, current, entry.getValue())) {
+                    if (!parentPkgsMatch(ctx.dependenciesTree, current, entry.getValue()) ||
+                        inheritedParentPkgBreaksPeerDiamond(ctx, parentPkgs, current, entry.getValue(), children) &&
+                        ctx.release.replacesAnInheritedParentThatBreaksAPeerDiamond()) {
                         entry.getValue().occurrence = current.occurrence + 1;
                         parentPkgs.put(entry.getKey(), entry.getValue());
                     }
@@ -684,8 +701,13 @@ final class ResolvePeers {
                                          List<DepPath.PeerId> peerIds, List<PendingPeer> pendingPeerNodes,
                                          List<List<String>> cycles, Consumer<String> addDepPathToGraph) {
         Set<String> cyclicPeerAliases = new LinkedHashSet<>();
+        Set<String> pendingPeerAliases = new HashSet<>();
+        for (PendingPeer pendingPeer : pendingPeerNodes) {
+            pendingPeerAliases.add(pendingPeer.getAlias());
+        }
         for (List<String> cycle : cycles) {
-            if (cycle.contains(currentAlias)) {
+            if (cycle.contains(currentAlias) ||
+                !Collections.disjoint(cycle, pendingPeerAliases) && ctx.release.cutsCyclesOfPendingPeers()) {
                 cyclicPeerAliases.addAll(cycle);
             }
         }
@@ -798,6 +820,78 @@ final class ResolvePeers {
             return true;
         }
         return currentNode.getResolvedPackage().getName().equals(newNode.getResolvedPackage().getName());
+    }
+
+    /**
+     * Whether the parent package a node inherits must give way to its own child of that name, because the
+     * inherited one was resolved against other versions of the peers that the own child and one of the node's
+     * children share, as resolvePeers.ts's {@code inheritedParentPkgBreaksPeerDiamond} decides from pnpm
+     * 11.5.1 on.
+     */
+    private static boolean inheritedParentPkgBreaksPeerDiamond(Ctx ctx, Map<String, ParentRef> parentPkgs,
+                                                               ParentRef inheritedParentPkg,
+                                                               ParentRef ownChildParentPkg,
+                                                               Map<String, NodeId> children) {
+        if (inheritedParentPkg.nodeId == null || ownChildParentPkg.nodeId == null) {
+            return false;
+        }
+        if (inheritedParentPkg.nodeId.equals(ownChildParentPkg.nodeId)) {
+            return false;
+        }
+        Map<String, ParentPkgInfo> inheritedContext = ctx.parentPkgsOfNode.get(inheritedParentPkg.nodeId);
+        if (inheritedContext == null) {
+            return false;
+        }
+        DependenciesTreeNode parentNode = ctx.dependenciesTree.get(ownChildParentPkg.nodeId);
+        ResolvedPackage parentPkg = parentNode == null ? null : parentNode.getResolvedPackage();
+        if (parentPkg == null) {
+            return false;
+        }
+        Set<String> conflictingPeers = new LinkedHashSet<>();
+        for (String peerName : parentPkg.getPeerDependencies().keySet()) {
+            if (!ctx.allPeerDepNames.contains(peerName)) {
+                continue;
+            }
+            ParentPkgInfo inheritedPeer = inheritedContext.get(peerName);
+            ParentRef currentPeer = parentPkgs.get(peerName);
+            if (inheritedPeer == null || currentPeer == null) {
+                continue;
+            }
+            if (parentPeerDiffers(ctx.dependenciesTree, currentPeer, inheritedPeer)) {
+                conflictingPeers.add(peerName);
+            }
+        }
+        if (conflictingPeers.isEmpty()) {
+            return false;
+        }
+        for (NodeId childNodeId : children.values()) {
+            DependenciesTreeNode child = ctx.dependenciesTree.get(childNodeId);
+            Map<String, PeerDependency> childPeerDependencies = child == null || child.getResolvedPackage() == null ?
+                    null : child.getResolvedPackage().getPeerDependencies();
+            if (childPeerDependencies == null || childPeerDependencies.get(parentPkg.getName()) == null) {
+                continue;
+            }
+            for (String peerName : conflictingPeers) {
+                if (childPeerDependencies.get(peerName) != null) {
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+
+    private static boolean parentPeerDiffers(Map<NodeId, DependenciesTreeNode> dependenciesTree,
+                                             ParentRef currentPeer, ParentPkgInfo inheritedPeer) {
+        if (inheritedPeer.pkgIdWithPatchHash != null) {
+            if (currentPeer.nodeId == null || currentPeer.nodeId.isLink()) {
+                return true;
+            }
+            DependenciesTreeNode current = dependenciesTree.get(currentPeer.nodeId);
+            String currentPkgId = current == null || current.getResolvedPackage() == null ? null :
+                    current.getResolvedPackage().getPkgIdWithPatchHash();
+            return !inheritedPeer.pkgIdWithPatchHash.equals(currentPkgId);
+        }
+        return !currentPeer.version.equals(inheritedPeer.version);
     }
 
     private static @Nullable PeersCacheItem findHit(Ctx ctx, Map<String, ParentRef> parentPkgs,

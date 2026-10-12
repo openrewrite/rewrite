@@ -119,6 +119,19 @@ final class ResolveDependencyTree {
      * group.
      */
     static List<WantedDependency> getWantedDependencies(Map<String, @Nullable Object> pkg, boolean autoInstallPeers) {
+        return getWantedDependencies(pkg, autoInstallPeers, PnpmRelease.PORTED);
+    }
+
+    /**
+     * {@link #getWantedDependencies(Map, boolean)} as {@code release} reads the project: from 11.4.0 a dependency
+     * name no npm package can have is an error ({@link PnpmRelease#rejectsAnInvalidDependencyName}).
+     */
+    static List<WantedDependency> getWantedDependencies(Map<String, @Nullable Object> pkg, boolean autoInstallPeers,
+                                                        PnpmRelease release) {
+        for (String field : new String[]{"dependencies", "devDependencies", "optionalDependencies",
+                "peerDependencies"}) {
+            ResolveDependencies.assertValidDependencyAliases(pkg.get(field), "The current package", release);
+        }
         Map<String, @Nullable Object> dependencies = ResolveDependencies.asMap(pkg.get("dependencies"));
         Map<String, @Nullable Object> devDependencies = ResolveDependencies.asMap(pkg.get("devDependencies"));
         Map<String, @Nullable Object> optionalDependencies =

@@ -18,10 +18,11 @@ package org.openrewrite.javascript.internal;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.javascript.internal.lock.CannotKnow;
 import org.openrewrite.javascript.internal.lock.ManifestRules;
-import org.openrewrite.javascript.internal.lock.pnpm.Main;
+import org.openrewrite.javascript.internal.lock.pnpm.PnpmReleases;
 import org.openrewrite.javascript.internal.lock.pnpm.WorkspaceManifestWriter;
 import org.openrewrite.javascript.semver.NodeSemver;
 
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
@@ -34,9 +35,20 @@ import static java.util.Objects.requireNonNull;
  */
 public final class PnpmRelease {
 
-    // each range's first and last release recorded with the same writes, and the pnpm 11 releases the port runs
+    // each range's first and last release recorded with the same writes, and the pnpm 11 releases the engine
+    // reproduces, whose writes are the port's
     private static final List<String> RECORDED = Arrays.asList("9.5.0 - 9.15.9", "10.32.1 - 10.34.6",
-            Main.RUNS_AS_PORTED);
+            pnpm11Proven());
+
+    private static String pnpm11Proven() {
+        List<String> releases = new ArrayList<>();
+        for (String release : PnpmReleases.all()) {
+            if (release.startsWith("11.") && PnpmReleases.isProven(release)) {
+                releases.add(release);
+            }
+        }
+        return PnpmReleases.ranges(releases).replace(", ", " || ");
+    }
 
     private final String version;
     private final int major;

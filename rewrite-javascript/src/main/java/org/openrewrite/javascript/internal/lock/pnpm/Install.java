@@ -162,7 +162,7 @@ final class Install {
         String lockText = lockFile.text();
         LockfileReader.ReadResult read = lockText == null ?
                 new LockfileReader.ReadResult(createLockfileObject(projects, options), false) :
-                LockfileReader.read(lockText);
+                LockfileReader.read(lockText, options.getRelease());
         if (read.getLockfile() == null) {
             throw new LockfileReader.IgnoredLockfile("no " + LockfileReader.WANTED_LOCKFILE);
         }
@@ -174,7 +174,12 @@ final class Install {
             }
         }
         boolean existsNonEmptyWantedLockfile = existsWantedLockfile && !LockfileWriter.isEmptyLockfile(wantedLockfile);
-        VerifyLockfileResolutions.verifyLockfileResolutions(wantedLockfile, stores.resolutionVerifiers(options));
+        // from 11.1.3 the lock's resolutions are verified, unless trustLockfile (from 11.3.0) trusts it
+        PnpmRelease release = options.getRelease();
+        if (release.checksTheReleaseAgeAsAPolicy() &&
+            !(options.isTrue("trustLockfile") && release.readsTrustLockfile())) {
+            VerifyLockfileResolutions.verifyLockfileResolutions(wantedLockfile, stores.resolutionVerifiers(options));
+        }
         if (missingManifest != null) {
             throw new JsError(JsError.ERROR,
                     "No package.json found in \"" + (missingManifest.isEmpty() ? "." : missingManifest) + "\"");
@@ -264,7 +269,8 @@ final class Install {
         List<ResolveDependencyTree.Importer> importers = new ArrayList<>();
         for (Verification.Project project : projects) {
             List<ResolveDependencies.WantedDependency> wantedDependencies =
-                    ResolveDependencyTree.getWantedDependencies(project.getManifest(), autoInstallPeers);
+                    ResolveDependencyTree.getWantedDependencies(project.getManifest(), autoInstallPeers,
+                            options.getRelease());
             for (ResolveDependencies.WantedDependency dep : wantedDependencies) {
                 dep.setUpdateSpec(true);
             }
@@ -316,6 +322,7 @@ final class Install {
         ctx.setPreferWorkspacePackages(options.isTrue("preferWorkspacePackages"));
         ctx.setReadPackageHook(opts.getReadPackageHook());
         ctx.setPnpmVersion(options.getPackageManagerVersion());
+        ctx.setRelease(options.getRelease());
         ctx.setRegistries(registries);
         ctx.setNamedRegistryPrefixes(options.getNamedRegistryPrefixes());
         Object resolutionMode = options.get("resolutionMode");

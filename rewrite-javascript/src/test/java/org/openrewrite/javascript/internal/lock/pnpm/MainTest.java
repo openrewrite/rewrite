@@ -300,8 +300,8 @@ class MainTest {
           .isEqualTo("11.2.2");
         assertThat(installedBy(manifest("\"packageManager\":\"pnpm@11.5.0\""), null, environment))
           .isEqualTo("11.5.0");
-        assertThat(installedBy(manifest("\"packageManager\":\"pnpm@11.15.1\""), null, environment))
-          .isEqualTo("11.15.1");
+        assertThat(installedBy(manifest("\"packageManager\":\"pnpm@11.5.1\""), null, environment))
+          .isEqualTo("11.5.1");
     }
 
     /**
@@ -310,11 +310,11 @@ class MainTest {
      */
     @Test
     void withoutASwitchTheInstallIsThePortedReleasesOrTheOneCorepackStarts() {
-        String named = manifest("\"packageManager\":\"pnpm@11.15.1\"");
+        String named = manifest("\"packageManager\":\"pnpm@11.5.1\"");
         assertThat(installedBy(named, "pmOnFail: ignore\n", true)).isEqualTo(Main.PNPM_VERSION);
         assertThat(installedBy(named, "pmOnFail: warn\n", true)).isEqualTo(Main.PNPM_VERSION);
-        assertThat(installedBy(named, "pmOnFail: ignore\n", false)).isEqualTo("11.2.2 || 11.15.1");
-        assertThat(installedBy(named, "pmOnFail: warn\n", false)).isEqualTo("11.2.2 || 11.15.1");
+        assertThat(installedBy(named, "pmOnFail: ignore\n", false)).isEqualTo("11.2.2 || 11.5.1");
+        assertThat(installedBy(named, "pmOnFail: warn\n", false)).isEqualTo("11.2.2 || 11.5.1");
     }
 
     /**

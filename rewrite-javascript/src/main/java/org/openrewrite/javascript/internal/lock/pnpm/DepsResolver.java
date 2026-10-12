@@ -102,7 +102,7 @@ final class DepsResolver {
         ResolvePeers.Result peers = ResolvePeers.resolvePeers(tree.getAllPeerDepNames(), projectsToLink,
                 tree.getDependenciesTree(), opts.isResolvePeersFromWorkspaceRoot(), opts.isDedupePeerDependents(),
                 opts.isDedupePeers(), opts.isDedupeInjectedDeps(), opts.getPeersSuffixMaxLength(),
-                ctx.getLockfileDir(), tree.getResolvedImporters(), workspaceProjectIds);
+                ctx.getLockfileDir(), tree.getResolvedImporters(), workspaceProjectIds, ctx.getRelease());
         Map<String, DependenciesGraphNode> dependenciesGraph = peers.getDependenciesGraph();
 
         for (ResolveDependencyTree.Importer project : importers) {
@@ -155,7 +155,7 @@ final class DepsResolver {
         }
 
         LockfileObject newLockfile = UpdateLockfile.updateLockfile(dependenciesGraph, wantedLockfile,
-                opts.getRegistries(), opts.isLockfileIncludeTarballUrl());
+                opts.getRegistries(), opts.isLockfileIncludeTarballUrl(), ctx.getRelease());
         if (tree.getTime() != null) {
             Map<String, @Nullable Object> time = new LinkedHashMap<>();
             Object previous = wantedLockfile.getTime();

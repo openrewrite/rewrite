@@ -84,6 +84,9 @@ final class NpmResolutionVerifier implements ResolutionVerifier {
 
         @NonNull
         Instant now;
+
+        @Builder.Default
+        PnpmRelease release = PnpmRelease.PORTED;
     }
 
     private final Options opts;
@@ -224,7 +227,7 @@ final class NpmResolutionVerifier implements ResolutionVerifier {
         }
         try {
             TrustChecks.failIfTrustDowngraded(meta, version, trustExcludePolicy, opts.getTrustPolicyIgnoreAfter(),
-                    opts.getNow());
+                    opts.getNow(), opts.getRelease());
         } catch (PnpmError e) {
             return new Result(false, TRUST_DOWNGRADE_VIOLATION_CODE, e.getMessage());
         }

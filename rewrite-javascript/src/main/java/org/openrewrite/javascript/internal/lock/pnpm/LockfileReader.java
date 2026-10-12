@@ -66,7 +66,14 @@ final class LockfileReader {
      * {@link IgnoredLockfile}.
      */
     static ReadResult read(String text) {
-        String lockfileRawContent = extractMainDocument(StripBom.stripBom(text));
+        return read(text, PnpmRelease.PORTED);
+    }
+
+    /**
+     * {@link #read(String)} as {@code release} reads the lock.
+     */
+    static ReadResult read(String text, PnpmRelease release) {
+        String lockfileRawContent = extractMainDocument(StripBom.stripBom(text), release);
         if (Js.trim(lockfileRawContent).isEmpty()) {
             return new ReadResult(null, false);
         }
@@ -74,7 +81,8 @@ final class LockfileReader {
         boolean hadConflicts;
         try {
             try {
-                lockfile = LockfileFormatConverters.convertToLockfileObject(JsYaml.load(lockfileRawContent));
+                lockfile = LockfileFormatConverters.convertToLockfileObject(JsYaml.load(lockfileRawContent),
+                        release);
                 hadConflicts = false;
             } catch (JsYaml.YamlException | LockfileFormatConverters.TypeError e) {
                 if (!isDiff(lockfileRawContent)) {
@@ -82,7 +90,7 @@ final class LockfileReader {
                                               e.getMessage());
                 }
                 hadConflicts = true;
-                lockfile = autofixMergeConflicts(lockfileRawContent);
+                lockfile = autofixMergeConflicts(lockfileRawContent, release);
             }
             Object version = lockfile.getLockfileVersion();
             String lockfileSemver = comverToSemver(Js.string(version == null || version == Js.UNDEFINED ?
@@ -119,7 +127,17 @@ final class LockfileReader {
      * The main document of a lock that may start with the env document.
      */
     static String extractMainDocument(String content) {
-        content = content.replace("\r\n", "\n");
+        return extractMainDocument(content, PnpmRelease.PORTED);
+    }
+
+    /**
+     * {@link #extractMainDocument(String)} as {@code release} reads it: CRLF line ends are read as LF from 11.1.3
+     * ({@link PnpmRelease#readsACrLfLockWithAnEnvDocument}).
+     */
+    static String extractMainDocument(String content, PnpmRelease release) {
+        if (content.contains("\r\n") && release.readsACrLfLockWithAnEnvDocument()) {
+            content = content.replace("\r\n", "\n");
+        }
         if (!content.startsWith(YAML_DOCUMENT_START)) {
             return content;
         }
@@ -134,10 +152,20 @@ final class LockfileReader {
      * {@code streamReadFirstYamlDocument} over the lock's text: the env document, null when there is none.
      */
     static @Nullable String readFirstYamlDocument(@Nullable String text) {
+        return readFirstYamlDocument(text, PnpmRelease.PORTED);
+    }
+
+    /**
+     * {@link #readFirstYamlDocument(String)} as {@code release} reads it: CRLF line ends are read as LF from 11.1.3.
+     */
+    static @Nullable String readFirstYamlDocument(@Nullable String text, PnpmRelease release) {
         if (text == null) {
             return null;
         }
-        String buffer = StripBom.stripBom(text).replace("\r\n", "\n");
+        String buffer = StripBom.stripBom(text);
+        if (buffer.contains("\r\n") && release.readsACrLfLockWithAnEnvDocument()) {
+            buffer = buffer.replace("\r\n", "\n");
+        }
         if (!buffer.startsWith(YAML_DOCUMENT_START)) {
             return null;
         }
@@ -151,6 +179,10 @@ final class LockfileReader {
     }
 
     static LockfileObject autofixMergeConflicts(String fileContent) {
+        return autofixMergeConflicts(fileContent, PnpmRelease.PORTED);
+    }
+
+    static LockfileObject autofixMergeConflicts(String fileContent, PnpmRelease release) {
         List<String> ours = new ArrayList<>();
         List<String> theirs = new ArrayList<>();
         String state = "top";
@@ -179,8 +211,8 @@ final class LockfileReader {
             }
         }
         return LockfileMerger.mergeLockfileChanges(
-                LockfileFormatConverters.convertToLockfileObject(JsYaml.load(String.join("\n", ours))),
-                LockfileFormatConverters.convertToLockfileObject(JsYaml.load(String.join("\n", theirs))));
+                LockfileFormatConverters.convertToLockfileObject(JsYaml.load(String.join("\n", ours)), release),
+                LockfileFormatConverters.convertToLockfileObject(JsYaml.load(String.join("\n", theirs)), release));
     }
 
     // fileContent.split(/[\n\r]+/)

@@ -54,12 +54,30 @@ final class NpmResolver {
     private final Map<String, Map<String, @Nullable Object>> metaCache = new LinkedHashMap<>();
 
     /**
+     * The release whose resolver this is.
+     */
+    private final PnpmRelease release;
+
+    /**
+     * {@code strictPublishedByCheck}, minimumReleaseAge under minimumReleaseAgeStrict, which the picker reads before
+     * 11.1.3 ({@link PnpmRelease#checksTheReleaseAgeAsAPolicy}).
+     */
+    private final boolean strictPublishedByCheck;
+
+    /**
      * @param namedRegistries the aliases {@link #mergeNamedRegistries} answers
      * @param now             the clock {@code trustPolicyIgnoreAfter} counts from
      */
     NpmResolver(RegistryMetadata registry, Map<String, String> registries, Map<String, String> namedRegistries,
                 @Nullable Object saveWorkspaceProtocol, boolean ignoreMissingTimeField, boolean fullMetadata,
                 Instant now) {
+        this(registry, registries, namedRegistries, saveWorkspaceProtocol, ignoreMissingTimeField, fullMetadata, now,
+                PnpmRelease.PORTED, false);
+    }
+
+    NpmResolver(RegistryMetadata registry, Map<String, String> registries, Map<String, String> namedRegistries,
+                @Nullable Object saveWorkspaceProtocol, boolean ignoreMissingTimeField, boolean fullMetadata,
+                Instant now, PnpmRelease release, boolean strictPublishedByCheck) {
         this.registry = registry;
         this.registries = registries;
         this.namedRegistries = namedRegistries;
@@ -67,6 +85,12 @@ final class NpmResolver {
         this.ignoreMissingTimeField = ignoreMissingTimeField;
         this.fullMetadata = fullMetadata;
         this.now = now;
+        this.release = release;
+        this.strictPublishedByCheck = strictPublishedByCheck;
+    }
+
+    PnpmRelease getRelease() {
+        return release;
     }
 
     /**
@@ -117,7 +141,7 @@ final class NpmResolver {
         String alias = wantedDependency.getAlias();
         String bareSpecifier = wantedDependency.getBareSpecifier();
         String registryUrl = alias != null && !alias.isEmpty() ?
-                PickRegistryForPackage.pickRegistryForPackage(registries, alias, bareSpecifier) :
+                PickRegistryForPackage.pickRegistryForPackage(registries, alias, bareSpecifier, release) :
                 registries.get("default");
         if (bareSpecifier != null && bareSpecifier.startsWith("workspace:")) {
             if (bareSpecifier.startsWith("workspace:.")) {
@@ -144,6 +168,8 @@ final class NpmResolver {
                 .pickLowestVersion(opts.pickLowestVersion)
                 .includeLatestTag("latest".equals(opts.update))
                 .ignoreMissingTimeField(ignoreMissingTimeField)
+                .strictPublishedByCheck(strictPublishedByCheck)
+                .release(release)
                 .build();
         PickPackage.PickResult pickResult;
         try {
@@ -171,12 +197,19 @@ final class NpmResolver {
             }
             String dep = alias != null && !alias.isEmpty() ?
                     alias + "@" + (bareSpecifier == null ? "" : bareSpecifier) : String.valueOf(bareSpecifier);
+            if (opts.publishedBy != null && !release.checksTheReleaseAgeAsAPolicy()) {
+                PnpmError immature = noMatureMatchingVersion(wantedDependency, dep, spec, meta, registryUrl,
+                        preferredVersions);
+                if (immature != null) {
+                    throw immature;
+                }
+            }
             throw new PnpmError("NO_MATCHING_VERSION", "No matching version found for " + dep +
                                                        " while fetching it from " + registryUrl);
         }
         if ("no-downgrade".equals(opts.trustPolicy)) {
             TrustChecks.failIfTrustDowngraded(meta, Js.string(pickedPackage.get("version")), opts.trustPolicyExclude,
-                    opts.trustPolicyIgnoreAfter, now);
+                    opts.trustPolicyIgnoreAfter, now, release);
         }
         String pickedName = Js.string(pickedPackage.get("name"));
         String pickedVersion = Js.string(pickedPackage.get("version"));
@@ -218,9 +251,70 @@ final class NpmResolver {
         Object time = meta.get("time");
         Object publishedAt = time instanceof Map ? ((Map<?, ?>) time).get(pickedVersion) : null;
         result.publishedAt = publishedAt == null ? null : Js.string(publishedAt);
-        result.policyViolation = detectMinReleaseAgeViolation(pickedName, pickedVersion, result.publishedAt,
-                opts.publishedBy, opts.publishedByExclude);
+        result.policyViolation = policyViolation(detectMinReleaseAgeViolation(pickedName, pickedVersion,
+                result.publishedAt, opts.publishedBy, opts.publishedByExclude));
         return result;
+    }
+
+    // NoMatchingVersionError before 11.1.3 under a release-age cutoff, where the range picks a version without it: its
+    // code is NO_MATURE_MATCHING_VERSION, and it names that version where the packument has times; null where the
+    // range picks none, and the error is NO_MATCHING_VERSION as from 11.1.3
+    private @Nullable PnpmError noMatureMatchingVersion(ResolveDependencies.WantedDependency wantedDependency,
+                                                        String dep, PickPackageFromMeta.RegistryPackageSpec spec,
+                                                        Map<String, @Nullable Object> meta, String registryUrl,
+                                                        PreferredVersions.@Nullable ByName preferred) {
+        String immatureVersion = PickPackageFromMeta.pickVersionByVersionRange(
+                new PickPackageFromMeta.VersionRangeOptions(meta, spec.getFetchSpec(),
+                        preferred == null ? null : preferred.get(spec.getName())));
+        if (immatureVersion == null) {
+            return null;
+        }
+        Object time = meta.get("time");
+        if (Js.truthy(time)) {
+            Object releasedAt = time instanceof Map ? ((Map<?, ?>) time).get(immatureVersion) : null;
+            String releaseAgeText = formatTimeAgo(V8Date.dateParse(Js.string(releasedAt == null ? Js.UNDEFINED :
+                    releasedAt)));
+            String pkgName = Js.truthy(wantedDependency.getAlias()) ? wantedDependency.getAlias() :
+                    Js.string(meta.get("name"));
+            return new PnpmError("NO_MATURE_MATCHING_VERSION", "Version " + immatureVersion + " (released " +
+                    (releaseAgeText == null ? "just now" : releaseAgeText) + ") of " + pkgName +
+                    " does not meet the minimumReleaseAge constraint");
+        }
+        return new PnpmError("NO_MATURE_MATCHING_VERSION", "No matching version found for " + dep +
+                                                           " while fetching it from " + registryUrl);
+    }
+
+    // formatTimeAgo of 11.1.2's npm-resolver, the run's clock as Date.now()
+    private @Nullable String formatTimeAgo(double ts) {
+        if (Double.isNaN(ts)) {
+            return null;
+        }
+        double diffMs = now.toEpochMilli() - ts;
+        if (diffMs < 0) {
+            return null;
+        }
+        long diffSec = (long) Math.floor(diffMs / 1e3);
+        long diffMin = diffSec / 60;
+        long diffHour = diffMin / 60;
+        long diffDay = diffHour / 24;
+        long diffMonth = diffDay / 30;
+        long diffYear = diffDay / 365;
+        if (diffYear > 0) {
+            return diffYear + " year" + (diffYear == 1 ? "" : "s") + " ago";
+        }
+        if (diffMonth > 0) {
+            return diffMonth + " month" + (diffMonth == 1 ? "" : "s") + " ago";
+        }
+        if (diffDay > 0) {
+            return diffDay + " day" + (diffDay == 1 ? "" : "s") + " ago";
+        }
+        if (diffHour > 0) {
+            return diffHour + " hour" + (diffHour == 1 ? "" : "s") + " ago";
+        }
+        if (diffMin > 0) {
+            return diffMin + " minute" + (diffMin == 1 ? "" : "s") + " ago";
+        }
+        return "a few seconds ago";
     }
 
     @Nullable
@@ -292,6 +386,8 @@ final class NpmResolver {
                 .pickLowestVersion(opts.pickLowestVersion)
                 .includeLatestTag("latest".equals(opts.update))
                 .ignoreMissingTimeField(ignoreMissingTimeField)
+                .strictPublishedByCheck(strictPublishedByCheck)
+                .release(release)
                 .build();
         PickPackage.PickResult pickResult = PickPackage.pickPackage(metaCache, registry, spec, pickerOpts,
                 registryUrl, wantedDependency.isOptional(), fullMetadata);
@@ -320,8 +416,8 @@ final class NpmResolver {
         Object time = meta.get("time");
         Object publishedAt = time instanceof Map ? ((Map<?, ?>) time).get(pickedVersion) : null;
         result.publishedAt = publishedAt == null ? null : Js.string(publishedAt);
-        result.policyViolation = detectMinReleaseAgeViolation(pickedName, pickedVersion, result.publishedAt,
-                opts.publishedBy, opts.publishedByExclude);
+        result.policyViolation = policyViolation(detectMinReleaseAgeViolation(pickedName, pickedVersion,
+                result.publishedAt, opts.publishedBy, opts.publishedByExclude));
         return result;
     }
 
@@ -628,6 +724,12 @@ final class NpmResolver {
     static String normalizeRegistryUrl(String url) {
         WhatwgUrl parsed = WhatwgUrl.tryParse(url);
         return parsed == null ? url : parsed.toString();
+    }
+
+    // the violation a release reports from 11.1.3 on (PnpmRelease#checksTheReleaseAgeAsAPolicy); before, none
+    private ResolveDependencies.@Nullable PolicyViolation policyViolation(
+            ResolveDependencies.@Nullable PolicyViolation violation) {
+        return violation != null && release.checksTheReleaseAgeAsAPolicy() ? violation : null;
     }
 
     static ResolveDependencies.@Nullable PolicyViolation detectMinReleaseAgeViolation(

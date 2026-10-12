@@ -21,9 +21,11 @@ import org.openrewrite.javascript.internal.lock.CannotKnow;
 import org.openrewrite.javascript.semver.NodeSemver;
 
 /**
- * Port of pnpm/src switchCliVersion.ts and shouldPersistLockfile.ts (pnpm 11.2.2): the release that installs, which
- * the engine follows only when it {@link Main#runsAsPorted runs as the ported one}, and then with what the ported
- * modules do from that release on (the release options their classes name).
+ * Port of pnpm/src switchCliVersion.ts and shouldPersistLockfile.ts (pnpm 11.2.2): the release that installs. Where
+ * the host does not say which release runs, 11.2.2 does, and the engine follows it to the release it hands the
+ * install to when that is one the engine reproduces ({@link Main#runsAsPorted}), with what the ported modules do from
+ * that release on. Where the release that built the LST runs, a hand-over to another is cannot-know: that release
+ * runs over what the first left behind (its env document among it), which no recording holds.
  */
 final class SwitchCliVersion {
 
@@ -49,9 +51,30 @@ final class SwitchCliVersion {
     private final EnvInstaller envInstaller;
     private final CreateNewStoreController stores;
 
+    /**
+     * The release that runs, the one that built the LST; null where the host recorded none.
+     */
+    private final @Nullable PnpmRelease runs;
+
     SwitchCliVersion(EnvInstaller envInstaller, CreateNewStoreController stores) {
+        this(envInstaller, stores, null);
+    }
+
+    SwitchCliVersion(EnvInstaller envInstaller, CreateNewStoreController stores, @Nullable PnpmRelease runs) {
         this.envInstaller = envInstaller;
         this.stores = stores;
+        this.runs = runs;
+    }
+
+    // @pnpm/cli.meta's packageManager.version of the release that runs
+    private String current() {
+        return runs == null ? Main.PNPM_VERSION : runs.version();
+    }
+
+    // whether the engine follows pnpm to version, a release or a range it would hand the install to: only where the
+    // host does not say which release runs, and every release it names is one the engine reproduces
+    private boolean follows(String version) {
+        return runs == null && Main.runsAsPorted(version);
     }
 
     /**
@@ -59,18 +82,19 @@ final class SwitchCliVersion {
      */
     Switched switchCliVersion(PnpmOptions.WantedPackageManager pm, PnpmOptions options,
                               EnvLockfile.@Nullable OnDisk lockFile) {
+        String current = current();
         if (!"pnpm".equals(pm.getName()) || pm.getVersion() == null) {
-            return new Switched(Main.PNPM_VERSION, null);
+            return new Switched(current, null);
         }
         String version = Js.string(pm.getVersion());
         boolean persistLockfile = shouldPersistLockfile(pm);
-        if (!persistLockfile && Main.runsAsPorted(version)) {
+        if (!persistLockfile && (version.equals(current) || follows(version))) {
             return new Switched(version, null);
         }
         if (lockFile == null && persistLockfile &&
-            NodeSemver.satisfies(Main.PNPM_VERSION, version, NodeSemver.Options.INCLUDE_PRERELEASE)) {
+            NodeSemver.satisfies(current, version, NodeSemver.Options.INCLUDE_PRERELEASE)) {
             PnpmError failure = stores.storeControllerFailure(options);
-            if (failure == null && !Main.runsAsPorted(version)) {
+            if (failure == null && !(version.equals(current) || follows(version))) {
                 throw new CannotKnow("which pnpm release the workspace's " + LockfileReader.WANTED_LOCKFILE +
                                      " pins for " + version + " (pnpm runs that release)");
             }
@@ -82,11 +106,10 @@ final class SwitchCliVersion {
                 envLockfile == null ? null : envLockfile.packageManagerDependencies(), "pnpm");
         NpmResolver storeToUse = null;
         // the release pnpm hands over to is the locked one, else one the registry has in range: when that cannot be
-        // the ported release, resolving it only names another
+        // the release that runs, resolving it only names another
         if (!Js.truthy(pmVersion) || !NodeSemver.satisfies(pmVersion, version, NodeSemver.Options.INCLUDE_PRERELEASE)) {
             storeToUse = stores.createStoreController(options);
-            if (!NodeSemver.satisfies(Main.PNPM_VERSION, version, NodeSemver.Options.INCLUDE_PRERELEASE) &&
-                !Main.runsAsPorted(version)) {
+            if (!NodeSemver.satisfies(current, version, NodeSemver.Options.INCLUDE_PRERELEASE) && !follows(version)) {
                 throw switchesTo(version);
             }
             EnvLockfile resolved = envInstaller.resolvePackageManagerIntegrities(version, envLockfile,
@@ -94,17 +117,20 @@ final class SwitchCliVersion {
             pmVersion = EnvInstaller.lockedVersion(resolved.packageManagerDependencies(), "pnpm");
             if (!Js.truthy(pmVersion)) {
                 // pnpm warns that it cannot resolve the release and goes on
-                return new Switched(Main.PNPM_VERSION, null);
+                return new Switched(current, null);
             }
         } else if (!EnvInstaller.isPackageManagerResolved(envLockfile, Js.string(pmVersion))) {
             storeToUse = stores.createStoreController(options);
-            if (!Main.runsAsPorted(Js.string(pmVersion))) {
+            if (!(current.equals(pmVersion) || follows(Js.string(pmVersion)))) {
                 throw switchesTo(Js.string(pmVersion));
             }
             envInstaller.resolvePackageManagerIntegrities(Js.string(pmVersion), envLockfile, persistLockfile,
                     rootLockFile, storeToUse, options);
         }
-        if (Main.runsAsPorted(Js.string(pmVersion))) {
+        if (current.equals(pmVersion)) {
+            return new Switched(current, null);
+        }
+        if (follows(Js.string(pmVersion))) {
             // a root lock the inputs do not hold may pin another release of the range than the one resolved here
             return new Switched(persistLockfile && lockFile == null ? version : Js.string(pmVersion), null);
         }
@@ -114,9 +140,17 @@ final class SwitchCliVersion {
         throw switchesTo(Js.string(pmVersion));
     }
 
-    static CannotKnow switchesTo(String release) {
+    /**
+     * The hand-over to {@code release} the engine does not follow.
+     */
+    CannotKnow switchesTo(String release) {
+        if (runs != null) {
+            return new CannotKnow("the pnpm release that installs the project: pnpm " + release + ", which pnpm " +
+                                  runs + " downloads and hands the install over to");
+        }
         return new CannotKnow("the lock pnpm " + release + " writes (pnpm " + Main.PNPM_VERSION + " hands the " +
-                              "install to the release the project names)");
+                              "install to the release the project names, and the engine reproduces pnpm " +
+                              PnpmReleases.ranges(PnpmReleases.proven()) + ")");
     }
 
     static boolean shouldPersistLockfile(PnpmOptions.WantedPackageManager pm) {

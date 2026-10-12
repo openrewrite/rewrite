@@ -230,12 +230,26 @@ final class PickPackageFromMeta {
      * {@code pickPackageFromMeta}: the version manifest the spec selects, null when none does;
      * {@code publishedByExclude} answers true, the versions it trusts, or null.
      */
-    @SuppressWarnings("unchecked")
     static @Nullable Map<String, @Nullable Object> pickPackageFromMeta(
             Function<VersionRangeOptions, @Nullable String> pickVersionByVersionRange,
             @Nullable Map<String, PreferredVersions.Selector> preferredVersionSelectors,
             @Nullable Instant publishedBy, @Nullable Function<String, @Nullable Object> publishedByExclude,
             Map<String, @Nullable Object> meta, RegistryPackageSpec spec) {
+        return pickPackageFromMeta(pickVersionByVersionRange, preferredVersionSelectors, publishedBy,
+                publishedByExclude, meta, spec, PnpmRelease.PORTED);
+    }
+
+    /**
+     * {@link #pickPackageFromMeta(Function, Map, Instant, Function, Map, RegistryPackageSpec)} as {@code release}
+     * runs it: before 11.2.0 a packument without times modified at the cutoff has none
+     * ({@link PnpmRelease#takesAPackumentModifiedAtTheCutoffAsMature}).
+     */
+    @SuppressWarnings("unchecked")
+    static @Nullable Map<String, @Nullable Object> pickPackageFromMeta(
+            Function<VersionRangeOptions, @Nullable String> pickVersionByVersionRange,
+            @Nullable Map<String, PreferredVersions.Selector> preferredVersionSelectors,
+            @Nullable Instant publishedBy, @Nullable Function<String, @Nullable Object> publishedByExclude,
+            Map<String, @Nullable Object> meta, RegistryPackageSpec spec, PnpmRelease release) {
         if (publishedBy != null) {
             Object excludeResult = publishedByExclude == null ? null :
                     publishedByExclude.apply(Js.string(meta.get("name")));
@@ -246,7 +260,8 @@ final class PickPackageFromMeta {
                             excludeResult instanceof List ? (List<String>) excludeResult : null);
                 } else {
                     Instant modifiedDate = parseModifiedDate(meta.get("modified"));
-                    if (modifiedDate == null || modifiedDate.isAfter(publishedBy)) {
+                    if (modifiedDate == null || modifiedDate.isAfter(publishedBy) ||
+                        modifiedDate.equals(publishedBy) && !release.takesAPackumentModifiedAtTheCutoffAsMature()) {
                         assertMetaHasTime(meta);
                     }
                 }

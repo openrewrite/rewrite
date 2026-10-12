@@ -46,14 +46,23 @@ final class EnvLockfile {
      */
     static final class OnDisk {
         private final @Nullable String text;
+        private final PnpmRelease release;
         private @Nullable String envDocument;
         private boolean envWritten;
         private boolean read;
         private @Nullable EnvLockfile envLockfile;
 
         OnDisk(@Nullable String text) {
+            this(text, PnpmRelease.PORTED);
+        }
+
+        /**
+         * The lock file as {@code release}, the one that runs, reads and writes it.
+         */
+        OnDisk(@Nullable String text, PnpmRelease release) {
             this.text = text;
-            this.envDocument = LockfileReader.readFirstYamlDocument(text);
+            this.release = release;
+            this.envDocument = LockfileReader.readFirstYamlDocument(text, release);
         }
 
         @Nullable
@@ -81,7 +90,7 @@ final class EnvLockfile {
                 return text;
             }
             return LockfileReader.YAML_DOCUMENT_START + envDocument + LockfileReader.YAML_DOCUMENT_SEPARATOR +
-                   (text == null ? "" : LockfileReader.extractMainDocument(text));
+                   (text == null ? "" : LockfileReader.extractMainDocument(text, release));
         }
 
         /**

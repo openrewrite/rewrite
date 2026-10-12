@@ -170,6 +170,12 @@ final class PackageRequester {
         boolean integrityChanged = previousIntegrity != null && newIntegrity != null &&
                                    !previousIntegrity.equals(newIntegrity);
         boolean updated = !resolveResult.id.equals(pkgId) || resolution == null || integrityChanged;
+        // 11.5.0 (pnpm/pnpm#12001): a resolution without an integrity takes the locked one
+        if (!updated && previousIntegrity instanceof String && !Js.truthy(resolveResult.resolution.get("type")) &&
+            !Js.truthy(resolveResult.resolution.get("integrity")) &&
+            npmResolver.getRelease().keepsALockedIntegrityTheResolverDoesNotGive()) {
+            resolveResult.resolution.put("integrity", previousIntegrity);
+        }
         String id = resolveResult.id;
 
         if ("directory".equals(resolveResult.resolution.get("type")) && !id.startsWith("file:")) {
@@ -196,7 +202,8 @@ final class PackageRequester {
     }
 
     // what fetching the package would read: the directory's package.json, else the lock's own record of a package
-    // whose tarball it carries, else nothing the engine is given
+    // whose tarball it carries, which pnpm does not fetch (nor take the integrity of, but from 11.5.0 on, above),
+    // else nothing the engine is given
     private Map<String, @Nullable Object> manifestFromFetch(ResolveDependencies.WantedDependency wantedDependency,
                                                             NpmResolver.ResolveResult resolveResult,
                                                             ResolveDependencies.@Nullable InfoFromLockfile currentPkg) {
@@ -216,11 +223,6 @@ final class PackageRequester {
                 snapshot.getOptionalDependencies() != null && !snapshot.getOptionalDependencies().isEmpty()) {
                 throw new CannotKnow("the manifest of " + resolveResult.id + " (pnpm reads its dependencies from " +
                                      "the package's tarball)");
-            }
-            Map<String, @Nullable Object> locked = currentPkg.getResolution();
-            if (resolution.get("integrity") == null && resolution.get("type") == null && locked != null &&
-                locked.get("integrity") != null) {
-                resolution.put("integrity", locked.get("integrity"));
             }
             Map<String, @Nullable Object> manifest = new LinkedHashMap<>();
             manifest.put("name", currentPkg.getName());
@@ -260,6 +262,7 @@ final class PackageRequester {
             return result;
         }
         String bareSpecifier = wantedDependency.getBareSpecifier();
+        PnpmRelease release = npmResolver.getRelease();
         if (bareSpecifier != null && !bareSpecifier.isEmpty()) {
             result = resolveFromGit(bareSpecifier, options, currentPkg);
             if (result == null) {
@@ -267,6 +270,10 @@ final class PackageRequester {
             }
             if (result == null) {
                 result = resolveFromLocalScheme(wantedDependency, options, currentPkg);
+            }
+            // before 11.1.1 the local resolver claims its path shapes here, ahead of the runtimes and named registries
+            if (result == null && !release.resolvesNamedRegistrySpecsBeforeLocalPaths()) {
+                result = resolveFromLocalPath(wantedDependency, options, currentPkg);
             }
             if (result != null) {
                 return result;
@@ -287,11 +294,14 @@ final class PackageRequester {
         if (result != null) {
             return result;
         }
-        result = npmResolver.resolveFromNamedRegistry(wantedDependency, options, preferredVersions);
-        if (result != null) {
-            return result;
+        // named registries from 11.1.0
+        if (release.readsNamedRegistries()) {
+            result = npmResolver.resolveFromNamedRegistry(wantedDependency, options, preferredVersions);
+            if (result != null) {
+                return result;
+            }
         }
-        if (bareSpecifier != null && !bareSpecifier.isEmpty()) {
+        if (bareSpecifier != null && !bareSpecifier.isEmpty() && release.resolvesNamedRegistrySpecsBeforeLocalPaths()) {
             result = resolveFromLocalPath(wantedDependency, options, currentPkg);
             if (result != null) {
                 return result;

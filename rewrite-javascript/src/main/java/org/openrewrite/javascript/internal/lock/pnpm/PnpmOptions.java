@@ -88,10 +88,16 @@ public final class PnpmOptions {
      */
     private final String packageManagerVersion;
 
+    /**
+     * The release whose config this is, which the ported modules ask what it does ({@link PnpmRelease}).
+     */
+    private final PnpmRelease release;
+
     private PnpmOptions(Map<String, @Nullable Object> config, Set<String> explicitlySetKeys,
                         Map<String, @Nullable Map<String, @Nullable Object>> catalogs, Map<String, String> registries,
                         @Nullable List<String> workspacePackagePatterns,
-                        @Nullable WantedPackageManager wantedPackageManager, String packageManagerVersion) {
+                        @Nullable WantedPackageManager wantedPackageManager, String packageManagerVersion,
+                        PnpmRelease release) {
         this.config = config;
         this.explicitlySetKeys = explicitlySetKeys;
         this.catalogs = catalogs;
@@ -99,6 +105,7 @@ public final class PnpmOptions {
         this.workspacePackagePatterns = workspacePackagePatterns;
         this.wantedPackageManager = wantedPackageManager;
         this.packageManagerVersion = packageManagerVersion;
+        this.release = release;
     }
 
     /**
@@ -107,7 +114,15 @@ public final class PnpmOptions {
      */
     PnpmOptions withPackageManagerVersion(String version) {
         return new PnpmOptions(config, explicitlySetKeys, catalogs, registries, workspacePackagePatterns,
-                wantedPackageManager, version);
+                wantedPackageManager, version, release);
+    }
+
+    /**
+     * The config of {@code release}, the one that installs ({@link Main#installs}).
+     */
+    PnpmOptions withRelease(PnpmRelease release) {
+        return new PnpmOptions(config, explicitlySetKeys, catalogs, registries, workspacePackagePatterns,
+                wantedPackageManager, packageManagerVersion, release);
     }
 
     @Value
@@ -135,17 +150,26 @@ public final class PnpmOptions {
     }
 
     /**
-     * {@code getConfig} over the project's pnpm-workspace.yaml and .npmrc, the user's .npmrc (the host's registries),
-     * each null without one, the root manifest and the environment (null when unknown).
+     * {@code getConfig} as 11.2.2 reads it.
+     */
+    static PnpmOptions load(@Nullable String workspaceManifest, @Nullable String npmrc, @Nullable String userNpmrc,
+                            @Nullable Map<String, @Nullable Object> rootManifest, @Nullable Map<String, String> env) {
+        return load(workspaceManifest, npmrc, userNpmrc, rootManifest, env, PnpmRelease.PORTED);
+    }
+
+    /**
+     * {@code getConfig} of {@code release} over the project's pnpm-workspace.yaml and .npmrc, the user's .npmrc (the
+     * host's registries), each null without one, the root manifest and the environment (null when unknown).
      */
     @SuppressWarnings("unchecked")
     static PnpmOptions load(@Nullable String workspaceManifest, @Nullable String npmrc, @Nullable String userNpmrc,
-                            @Nullable Map<String, @Nullable Object> rootManifest, @Nullable Map<String, String> env) {
+                            @Nullable Map<String, @Nullable Object> rootManifest, @Nullable Map<String, String> env,
+                            PnpmRelease release) {
         Map<String, @Nullable Object> defaultOptions = defaultOptions();
         Map<String, @Nullable Object> workspaceNpmrc = npmrc == null ? new LinkedHashMap<>() :
-                readAndFilterNpmrc(npmrc, env);
+                readAndFilterNpmrc(npmrc, env, release);
         Map<String, @Nullable Object> userConfig = userNpmrc == null ? new LinkedHashMap<>() :
-                readAndFilterNpmrc(userNpmrc, env);
+                readAndFilterNpmrc(userNpmrc, env, release);
         Map<String, @Nullable Object> builtin = new LinkedHashMap<>();
         builtin.put("registry", DEFAULT_REGISTRY);
         builtin.put("@jsr:registry", "https://npm.jsr.io/");
@@ -180,7 +204,9 @@ public final class PnpmOptions {
         Map<String, String> registriesFromNpmrc = new LinkedHashMap<>();
         registriesFromNpmrc.put("default", normalizeRegistryUrl(authConfig.get("registry")));
         registriesFromNpmrc.putAll(networkRegistries);
-        getDefaultCreds(authConfig);
+        if (holdsUnscopedCreds(authConfig) && !release.rescopesUnscopedCredentials()) {
+            getDefaultCreds(authConfig);
+        }
         for (String key : Js.keys(authConfig)) {
             if (key.endsWith("tokenHelper") && !(userConfig.containsKey(key) &&
                                                  Js.strictEquals(userConfig.get(key), authConfig.get(key)))) {
@@ -196,7 +222,7 @@ public final class PnpmOptions {
             Manifests.convertManifestAfterRead(rootManifest);
         }
         if (rootManifest != null && config.get("nodeVersion") == null) {
-            config.put("nodeVersion", getNodeVersionFromEnginesRuntime(rootManifest));
+            config.put("nodeVersion", getNodeVersionFromEnginesRuntime(rootManifest, release));
         }
 
         Map<String, @Nullable Map<String, @Nullable Object>> catalogs = new LinkedHashMap<>();
@@ -205,7 +231,8 @@ public final class PnpmOptions {
             Map<String, @Nullable Object> manifest = WorkspaceManifest.readWorkspaceManifest(workspaceManifest);
             patterns = workspacePackagePatterns(manifest);
             if (manifest != null) {
-                Map<String, @Nullable Object> newSettings = getOptionsFromPnpmSettings(manifest, rootManifest, env);
+                Map<String, @Nullable Object> newSettings = getOptionsFromPnpmSettings(manifest, rootManifest, env,
+                        release);
                 for (String option : CLI_OPTIONS) {
                     newSettings.put(camelcase(option), true);
                 }
@@ -281,9 +308,9 @@ public final class PnpmOptions {
         Object gitBranchLockfile = config.get("gitBranchLockfile");
         config.put("useGitBranchLockfile", gitBranchLockfile instanceof Boolean ? gitBranchLockfile : false);
         WantedPackageManager wantedPackageManager = rootManifest == null ? null :
-                withPmOnFail(getWantedPackageManager(rootManifest), config.get("pmOnFail"));
+                withPmOnFail(getWantedPackageManager(rootManifest, release), config.get("pmOnFail"));
         return new PnpmOptions(config, explicitlySetKeys, catalogs, registries, patterns, wantedPackageManager,
-                Main.PNPM_VERSION);
+                release.toString(), release);
     }
 
     /**
@@ -307,8 +334,17 @@ public final class PnpmOptions {
         return pm.getOnFail() == null ? pm.withOnFail("download") : pm;
     }
 
-    @SuppressWarnings("unchecked")
     static @Nullable String getNodeVersionFromEnginesRuntime(Map<String, @Nullable Object> manifest) {
+        return getNodeVersionFromEnginesRuntime(manifest, PnpmRelease.PORTED);
+    }
+
+    /**
+     * {@code getNodeVersionFromEnginesRuntime} as {@code release} reads it: from 11.4.0 a version that is no valid
+     * range is skipped ({@link PnpmRelease#skipsAnInvalidNodeRuntimeRange}).
+     */
+    @SuppressWarnings("unchecked")
+    static @Nullable String getNodeVersionFromEnginesRuntime(Map<String, @Nullable Object> manifest,
+                                                             PnpmRelease release) {
         for (String enginesFieldName : new String[]{"devEngines", "engines"}) {
             Object engines = manifest.get(enginesFieldName);
             Object enginesRuntime = engines instanceof Map ? ((Map<String, @Nullable Object>) engines).get("runtime") :
@@ -336,6 +372,10 @@ public final class PnpmOptions {
             if (!(version instanceof String)) {
                 throw new JsError(JsError.ERROR, "range.trim is not a function");
             }
+            if (NodeSemver.validRange((String) version, NodeSemver.Options.DEFAULT) == null &&
+                release.skipsAnInvalidNodeRuntimeRange()) {
+                continue;
+            }
             String minVersion;
             try {
                 minVersion = NodeSemver.minVersion((String) version, NodeSemver.Options.DEFAULT);
@@ -359,7 +399,12 @@ public final class PnpmOptions {
     }
 
     static @Nullable WantedPackageManager getWantedPackageManager(Map<String, @Nullable Object> manifest) {
-        WantedPackageManager pmFromDevEngines = parseDevEnginesPackageManager(manifest.get("devEngines"));
+        return getWantedPackageManager(manifest, PnpmRelease.PORTED);
+    }
+
+    static @Nullable WantedPackageManager getWantedPackageManager(Map<String, @Nullable Object> manifest,
+                                                                  PnpmRelease release) {
+        WantedPackageManager pmFromDevEngines = parseDevEnginesPackageManager(manifest.get("devEngines"), release);
         if (pmFromDevEngines != null) {
             Object version = pmFromDevEngines.getVersion();
             if (version != null && !(version instanceof String &&
@@ -402,8 +447,11 @@ public final class PnpmOptions {
         return new String[]{parts[0], pmReference.split("\\+", -1)[0]};
     }
 
+    // devEngines.packageManager as one object takes onFail from pmOnFail from 11.1.3, "error" before
+    // (PnpmRelease#takesPmOnFailForDevEnginesWithoutOnFail)
     @SuppressWarnings("unchecked")
-    private static @Nullable WantedPackageManager parseDevEnginesPackageManager(@Nullable Object devEngines) {
+    private static @Nullable WantedPackageManager parseDevEnginesPackageManager(@Nullable Object devEngines,
+                                                                                PnpmRelease release) {
         Object packageManager = devEngines instanceof Map ?
                 ((Map<String, @Nullable Object>) devEngines).get("packageManager") : null;
         if (!Js.truthy(packageManager)) {
@@ -434,6 +482,9 @@ public final class PnpmOptions {
         } else {
             pmEngine = packageManager;
             onFail = property(pmEngine, "onFail");
+            if (onFail == null && !release.takesPmOnFailForDevEnginesWithoutOnFail()) {
+                onFail = "error";
+            }
         }
         Object name = pmEngine instanceof Map ? ((Map<String, @Nullable Object>) pmEngine).get("name") : null;
         if (!Js.truthy(name)) {
@@ -492,8 +543,10 @@ public final class PnpmOptions {
         return config;
     }
 
-    // loadNpmrcFiles' readAndFilterNpmrc over read-ini-file 5 (ini 6 after strip-bom)
-    private static Map<String, @Nullable Object> readAndFilterNpmrc(String text, @Nullable Map<String, String> env) {
+    // loadNpmrcFiles' readAndFilterNpmrc over read-ini-file 5 (ini 6 after strip-bom); from 11.4.0 it pins the
+    // file's unscoped credentials to the file's registry (PnpmRelease#rescopesUnscopedCredentials)
+    private static Map<String, @Nullable Object> readAndFilterNpmrc(String text, @Nullable Map<String, String> env,
+                                                                   PnpmRelease release) {
         Map<String, @Nullable Object> result = new LinkedHashMap<>();
         Map<String, @Nullable Object> raw;
         try {
@@ -515,7 +568,56 @@ public final class PnpmOptions {
                 result.put(key, value);
             }
         }
-        return result;
+        return holdsUnscopedCreds(result) && release.rescopesUnscopedCredentials() ? rescopeUnscopedCreds(result) :
+                result;
+    }
+
+    private static boolean holdsUnscopedCreds(Map<String, @Nullable Object> source) {
+        for (String key : UNSCOPED_RESCOPABLE_KEYS) {
+            if (source.containsKey(key)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private static final List<String> UNSCOPED_RESCOPABLE_KEYS = Arrays.asList("_authToken", "_auth", "username",
+            "_password", "tokenHelper", "cert", "key");
+
+    /**
+     * loadNpmrcFiles.ts' {@code rescopeUnscopedCreds} (11.4.0): each unscoped credential of a source moves to the
+     * nerf-dart of the source's registry, else npm's, unless the source scopes one there already; with a registry that
+     * is no URL, pnpm drops them.
+     */
+    static Map<String, @Nullable Object> rescopeUnscopedCreds(Map<String, @Nullable Object> source) {
+        if (!holdsUnscopedCreds(source)) {
+            return source;
+        }
+        Object rawRegistry = source.get("registry");
+        String fallbackRegistry = rawRegistry instanceof String && !((String) rawRegistry).isEmpty() ?
+                (String) rawRegistry : DEFAULT_REGISTRY;
+        String nerfedRegistry = nerfDart(normalizeRegistryUrl(fallbackRegistry));
+        for (String key : UNSCOPED_RESCOPABLE_KEYS) {
+            if (!source.containsKey(key)) {
+                continue;
+            }
+            if (nerfedRegistry != null) {
+                String scopedKey = nerfedRegistry + ":" + key;
+                if (!source.containsKey(scopedKey)) {
+                    source.put(scopedKey, source.get(key));
+                }
+            }
+            source.remove(key);
+        }
+        return source;
+    }
+
+    // @pnpm/config.nerf-dart 1.0.1; null where new URL() throws
+    private static @Nullable String nerfDart(String url) {
+        WhatwgUrl parsed = WhatwgUrl.tryParse(url);
+        WhatwgUrl rel = parsed == null ? null :
+                WhatwgUrl.tryParse(".", parsed.getProtocol() + "//" + parsed.getHost() + parsed.getPathname());
+        return rel == null ? null : "//" + rel.getHost() + rel.getPathname();
     }
 
     private static final Pattern UNREAD_VALUE = Pattern.compile(
@@ -892,17 +994,29 @@ public final class PnpmOptions {
         return out.toString();
     }
 
-    @SuppressWarnings("unchecked")
     static Map<String, @Nullable Object> getOptionsFromPnpmSettings(
             Map<String, @Nullable Object> pnpmSettings, @Nullable Map<String, @Nullable Object> manifest,
             @Nullable Map<String, String> env) {
+        return getOptionsFromPnpmSettings(pnpmSettings, manifest, env, PnpmRelease.PORTED);
+    }
+
+    /**
+     * getOptionsFromRootManifest.ts' {@code getOptionsFromPnpmSettings} as {@code release} reads the settings: the
+     * URLs of {@code registries} and {@code namedRegistries} take the environment from 11.1.0
+     * ({@link PnpmRelease#readsNamedRegistries}).
+     */
+    @SuppressWarnings("unchecked")
+    static Map<String, @Nullable Object> getOptionsFromPnpmSettings(
+            Map<String, @Nullable Object> pnpmSettings, @Nullable Map<String, @Nullable Object> manifest,
+            @Nullable Map<String, String> env, PnpmRelease release) {
         Map<String, @Nullable Object> settings = new LinkedHashMap<>();
         for (String key : Js.keys(pnpmSettings)) {
             Object value = pnpmSettings.get(key);
             String newKey = envReplace(key, env);
             if (value instanceof String) {
                 settings.put(newKey, envReplace((String) value, env));
-            } else if ("registries".equals(newKey) || "namedRegistries".equals(newKey)) {
+            } else if (("registries".equals(newKey) || "namedRegistries".equals(newKey)) &&
+                       holdsAnEnvReference(value) && release.readsNamedRegistries()) {
                 if (value instanceof Map) {
                     Map<String, @Nullable Object> out = new LinkedHashMap<>();
                     for (String k : Js.keys((Map<String, @Nullable Object>) value)) {
@@ -932,6 +1046,20 @@ public final class PnpmOptions {
             }
         }
         return settings;
+    }
+
+    // whether a map setting holds a string env-replace would read a ${VAR} of; one that holds none reads the same
+    // with the environment or without it
+    @SuppressWarnings("unchecked")
+    private static boolean holdsAnEnvReference(@Nullable Object value) {
+        if (value instanceof Map) {
+            for (Object v : ((Map<String, @Nullable Object>) value).values()) {
+                if (v instanceof String && ((String) v).contains("${")) {
+                    return true;
+                }
+            }
+        }
+        return false;
     }
 
     private static void assertValidOverrides(@Nullable Object overrides) {
@@ -1149,6 +1277,10 @@ public final class PnpmOptions {
         return (Map<String, @Nullable Object>) value;
     }
 
+    /**
+     * resolveDependencyTree's {@code namedRegistryPrefixes} from 11.1.0 on; a release before has none
+     * ({@link PnpmRelease#readsNamedRegistries}), which the resolution asks where a spec starts with one.
+     */
     List<String> getNamedRegistryPrefixes() {
         List<String> namedRegistryPrefixes = new ArrayList<>();
         namedRegistryPrefixes.add("gh:");

@@ -211,7 +211,7 @@ class UpgradeDependencyVersionCatalogTest implements RewriteTest {
             .dataTable(NodeDependencyEditsDeclined.Row.class, rows -> assertThat(rows).singleElement()
               .extracting(NodeDependencyEditsDeclined.Row::getReason).isEqualTo("acme-logger's catalog entry was not " +
                 "upgraded: pnpm 10.0.0 is not a release whose writes are recorded (9.5.0 - 9.15.9, 10.32.1 - " +
-                "10.34.6, 11.0.6 - 11)")),
+                "10.34.6, 11.0.6 - 11.5.1)")),
           packageJson(manifest, null, nodeResolutionResult(PackageManager.Pnpm, dependency("acme-logger", "1.4.1")),
             s -> s.noTrim()),
           yaml("""

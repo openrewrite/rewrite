@@ -25,6 +25,7 @@ import org.openrewrite.javascript.internal.lock.EventLoop.Promise;
 import org.openrewrite.javascript.internal.lock.JsError;
 import org.openrewrite.javascript.internal.lock.RootRelativePath;
 import org.openrewrite.javascript.internal.lock.V8Date;
+import org.openrewrite.javascript.internal.lock.ValidateNpmPackageName;
 import org.openrewrite.javascript.semver.NodeSemver;
 
 import java.time.Instant;
@@ -548,6 +549,11 @@ final class ResolveDependencies {
          */
         private String pnpmVersion = Main.PNPM_VERSION;
 
+        /**
+         * The release that installs, which the resolver's modules ask what it does.
+         */
+        private PnpmRelease release = PnpmRelease.PORTED;
+
         private Map<String, String> registries = new LinkedHashMap<>();
         private List<String> namedRegistryPrefixes = new ArrayList<>();
         private @Nullable String resolutionMode;
@@ -635,7 +641,7 @@ final class ResolveDependencies {
                     hasNewMissingPeers[0] = true;
                     List<WantedDependency> wantedDependencies = getNonDevWantedDependencies(
                             Collections.<String, @Nullable Object>singletonMap("optionalDependencies",
-                                    optionalDependencies));
+                                    optionalDependencies), ctx.getRelease());
                     ResolvedDependenciesOptions options = importer.getOptions().copy();
                     options.setParentPkgAliases(importer.getParentPkgAliases());
                     options.setPublishedBy(publishedBy);
@@ -704,7 +710,8 @@ final class ResolveDependencies {
                 return Promise.resolved(ctx.getLoop(), allMissingOptionalPeers);
             }
             List<WantedDependency> wantedDependencies = getNonDevWantedDependencies(
-                    Collections.<String, @Nullable Object>singletonMap("dependencies", dependencies));
+                    Collections.<String, @Nullable Object>singletonMap("dependencies", dependencies),
+                    ctx.getRelease());
             ResolvedDependenciesOptions options = importer.getOptions().copy();
             options.setParentPkgAliases(parentPkgAliases);
             options.setPublishedBy(publishedBy);
@@ -742,7 +749,7 @@ final class ResolveDependencies {
                         importer.getWantedDependencies(), ctx.getWantedLockfile(), ctx.getRegistries(),
                         importer.getOptions().getPreferredDependencies(),
                         importer.getOptions().isProceed() || ctx.isForceFullResolution(),
-                        importer.getOptions().getResolvedDependencies());
+                        importer.getOptions().getResolvedDependencies(), ctx.getRelease());
                 List<Promise<DependencyResolution>> dependencies = new ArrayList<>();
                 for (ExtendedWantedDependency extendedWantedDep : extendedWantedDeps) {
                     dependencies.add(Promise.async(ctx.getLoop(), () -> resolveDependenciesOfImporterDependency(ctx,
@@ -961,12 +968,36 @@ final class ResolveDependencies {
         return Promise.async(ctx.getLoop(), () -> {
             List<ExtendedWantedDependency> extendedWantedDeps = getDepsToResolve(wantedDependencies,
                     ctx.getWantedLockfile(), ctx.getRegistries(), options.getPreferredDependencies(),
-                    options.isProceed() || ctx.isForceFullResolution(), options.getResolvedDependencies());
+                    options.isProceed() || ctx.isForceFullResolution(), options.getResolvedDependencies(),
+                    ctx.getRelease());
             List<Function<PostponedResolutionOpts, Promise<PeersResolutionResult>>> postponedResolutionsQueue =
                     new ArrayList<>();
             List<Function<ParentPkgAliases, Promise<PeersResolutionResult>>> postponedPeersResolutionQueue =
                     new ArrayList<>();
             List<PkgAddress> pkgAddresses = new ArrayList<>();
+            if (extendedWantedDeps.isEmpty() || ctx.getRelease().takesChildrenInTheOrderWanted()) {
+                // 11.3.0 (pnpm/pnpm#8155): Promise.all's results, then the queues in the order wanted
+                List<Promise<DependencyResolution>> resolving = new ArrayList<>();
+                for (ExtendedWantedDependency extendedWantedDep : extendedWantedDeps) {
+                    resolving.add(Promise.async(ctx.getLoop(), () -> resolveDependenciesOfDependency(ctx,
+                            preferredVersions, options, extendedWantedDep)));
+                }
+                return Promise.all(ctx.getLoop(), resolving).then(resolved -> {
+                    for (DependencyResolution result : resolved) {
+                        if (result.getResolveDependencyResult() != null) {
+                            pkgAddresses.add(result.getResolveDependencyResult());
+                        }
+                        if (result.getPostponedResolution() != null) {
+                            postponedResolutionsQueue.add(result.getPostponedResolution());
+                        }
+                        if (result.getPostponedPeersResolution() != null) {
+                            postponedPeersResolutionQueue.add(result.getPostponedPeersResolution());
+                        }
+                    }
+                    return resolvePostponed(ctx, preferredVersions, options, pkgAddresses, postponedResolutionsQueue,
+                            postponedPeersResolutionQueue);
+                });
+            }
             List<Promise<Void>> resolving = new ArrayList<>();
             for (ExtendedWantedDependency extendedWantedDep : extendedWantedDeps) {
                 resolving.add(Promise.async(ctx.getLoop(), () -> resolveDependenciesOfDependency(ctx,
@@ -1236,7 +1267,7 @@ final class ResolveDependencies {
         Object peers = dependencyLockfile != null && dependencyLockfile.getPeerDependencies() != null ?
                 dependencyLockfile.getPeerDependencies() : parentPkg.getPkg().get("peerDependencies");
         boolean parentDependsOnPeer = peers instanceof Map && !((Map<?, ?>) peers).isEmpty();
-        List<WantedDependency> wantedDependencies = getNonDevWantedDependencies(parentPkg.getPkg());
+        List<WantedDependency> wantedDependencies = getNonDevWantedDependencies(parentPkg.getPkg(), ctx.getRelease());
         ResolvedDependenciesOptions options = new ResolvedDependenciesOptions(new ParentPkg(parentPkg.getNodeId(),
                 parentPkg.isInstallable(), Js.string(parentPkg.getRootDir()), parentPkg.isOptional(),
                 parentPkg.getPkgId(), parentPkg.getResolvedVia()));
@@ -1272,7 +1303,8 @@ final class ResolveDependencies {
                                                            Map<String, String> registries,
                                                            @Nullable Map<String, @Nullable String> preferredDeps,
                                                            boolean proceed,
-                                                           @Nullable Map<String, @Nullable String> resolvedDeps) {
+                                                           @Nullable Map<String, @Nullable String> resolvedDeps,
+                                                           PnpmRelease release) {
         Map<String, @Nullable String> resolvedDependencies = resolvedDeps == null ? Collections.emptyMap() :
                 resolvedDeps;
         Map<String, @Nullable String> preferredDependencies = preferredDeps == null ? Collections.emptyMap() :
@@ -1295,7 +1327,8 @@ final class ResolveDependencies {
                     reference = preferred;
                 }
             }
-            InfoFromLockfile infoFromLockfile = getInfoFromLockfile(wantedLockfile, registries, reference, alias);
+            InfoFromLockfile infoFromLockfile = getInfoFromLockfile(wantedLockfile, registries, reference, alias,
+                    release);
             if (!proceedAll && (infoFromLockfile == null ||
                                 infoFromLockfile.getDependencyLockfile() != null &&
                                 (infoFromLockfile.getDependencyLockfile().getPeerDependencies() != null ||
@@ -1348,7 +1381,7 @@ final class ResolveDependencies {
     private static @Nullable InfoFromLockfile getInfoFromLockfile(LockfileObject lockfile,
                                                                  Map<String, String> registries,
                                                                  @Nullable String reference,
-                                                                 @Nullable String alias) {
+                                                                 @Nullable String alias, PnpmRelease release) {
         if (!Js.truthy(reference) || !Js.truthy(alias)) {
             return null;
         }
@@ -1380,7 +1413,7 @@ final class ResolveDependencies {
             info.setVersion(nameVer[1]);
             info.setDependencyLockfile(dependencyLockfile);
             info.setResolution(dependencyLockfile.getResolution() == null ? null :
-                    LockfileUtils.pkgSnapshotToResolution(depPath, dependencyLockfile, registries));
+                    LockfileUtils.pkgSnapshotToResolution(depPath, dependencyLockfile, registries, release));
             return info;
         }
         DepPath.DependencyPath parsed = DepPath.parse(depPath);
@@ -1427,9 +1460,12 @@ final class ResolveDependencies {
                 options.preferredVersions;
         return Promise.async(ctx.getLoop(), () -> requestPackage(wanted, ctx, options, currentPkg, preferredVersions))
                 .recover(e -> {
-                    boolean trustDowngrade = e instanceof PnpmError &&
-                                             "ERR_PNPM_TRUST_DOWNGRADE".equals(((PnpmError) e).getCode());
-                    if ((e instanceof PnpmError || e instanceof JsError) && wanted.isOptional() && !trustDowngrade) {
+                    String code = e instanceof PnpmError ? ((PnpmError) e).getCode() : null;
+                    // before 11.1.3 an immature pick also fails an optional dependency
+                    boolean kept = "ERR_PNPM_TRUST_DOWNGRADE".equals(code) ||
+                                   "ERR_PNPM_NO_MATURE_MATCHING_VERSION".equals(code) &&
+                                   !ctx.getRelease().checksTheReleaseAgeAsAPolicy();
+                    if ((e instanceof PnpmError || e instanceof JsError) && wanted.isOptional() && !kept) {
                         return Promise.resolved(ctx.getLoop(), null);
                     }
                     throw e;
@@ -1445,7 +1481,7 @@ final class ResolveDependencies {
         if (options.update == null && currentPkg != null && currentPkg.getVersion() != null &&
             currentPkg.getPkgId().endsWith("@" + currentPkg.getVersion()) && !calcSpecifier) {
             wantedDependency.setBareSpecifier(replaceVersionInBareSpecifier(wantedDependency.getBareSpecifier(),
-                    currentPkg.getVersion(), ctx.getNamedRegistryPrefixes()));
+                    currentPkg.getVersion(), namedRegistryPrefixes(ctx, wantedDependency.getBareSpecifier())));
         }
         PackageRequester.RequestPackageOptions request = new PackageRequester.RequestPackageOptions();
         request.alwaysTryWorkspacePackages = ctx.getLinkWorkspacePackagesDepth() >= options.currentDepth;
@@ -1800,6 +1836,21 @@ final class ResolveDependencies {
      * left out.
      */
     static List<WantedDependency> getNonDevWantedDependencies(Map<String, @Nullable Object> pkg) {
+        return getNonDevWantedDependencies(pkg, PnpmRelease.PORTED);
+    }
+
+    /**
+     * {@link #getNonDevWantedDependencies(Map)} as {@code release} reads a package: from 11.4.0 a dependency name no
+     * npm package can have is an error ({@link PnpmRelease#rejectsAnInvalidDependencyName}).
+     */
+    static List<WantedDependency> getNonDevWantedDependencies(Map<String, @Nullable Object> pkg,
+                                                              PnpmRelease release) {
+        String pkgDescription = pkg.get("name") != null && pkg.get("name") != Js.UNDEFINED ?
+                "Package \"" + Js.string(pkg.get("name")) + (pkg.get("version") != null &&
+                                                             pkg.get("version") != Js.UNDEFINED ?
+                        "@" + Js.string(pkg.get("version")) : "") + "\"" : "Package";
+        assertValidDependencyAliases(pkg.get("dependencies"), pkgDescription, release);
+        assertValidDependencyAliases(pkg.get("optionalDependencies"), pkgDescription, release);
         Object bd = pkg.get("bundledDependencies") != null ? pkg.get("bundledDependencies") :
                 pkg.get("bundleDependencies");
         if (Boolean.TRUE.equals(bd)) {
@@ -1831,6 +1882,26 @@ final class ResolveDependencies {
             wanted.add(dependency);
         }
         return wanted;
+    }
+
+    /**
+     * validateDependencyAlias.ts' {@code assertValidDependencyAliases}, with validate-npm-package-name 7.0.2, where
+     * {@code release} makes it ({@link PnpmRelease#rejectsAnInvalidDependencyName}).
+     */
+    static void assertValidDependencyAliases(@Nullable Object deps, String parentPkgDescription, PnpmRelease release) {
+        if (deps == null || deps == Js.UNDEFINED) {
+            return;
+        }
+        for (String alias : Js.ownKeys(deps)) {
+            if (!ValidateNpmPackageName.validForOldPackages(alias, ValidateNpmPackageName.Release.V7_0_2) &&
+                release.rejectsAnInvalidDependencyName()) {
+                throw new PnpmError("INVALID_DEPENDENCY_NAME", parentPkgDescription + " contains a dependency with " +
+                        "an invalid name: " + Js.jsonStringify(alias), "A dependency name must be a valid npm " +
+                        "package name — a single `name` or `@scope/name` consisting of URL-friendly " +
+                        "characters, with no leading `.` or `_`, and not equal to reserved names such as " +
+                        "`node_modules`.");
+            }
+        }
     }
 
     /**
@@ -1994,6 +2065,18 @@ final class ResolveDependencies {
             return new String[]{value, "*"};
         }
         return new String[]{value.substring(0, index), value.substring(index + 1)};
+    }
+
+    // the named-registry prefixes the release reads (PnpmRelease#readsNamedRegistries): none before 11.1.0, which
+    // matters only to a spec that starts with one
+    private static List<String> namedRegistryPrefixes(ResolutionContext ctx, @Nullable String bareSpecifier) {
+        for (String prefix : ctx.getNamedRegistryPrefixes()) {
+            if (bareSpecifier != null && bareSpecifier.startsWith(prefix)) {
+                return ctx.getRelease().readsNamedRegistries() ? ctx.getNamedRegistryPrefixes() :
+                        Collections.emptyList();
+            }
+        }
+        return ctx.getNamedRegistryPrefixes();
     }
 
     static String replaceVersionInBareSpecifier(String bareSpecifier, String version,

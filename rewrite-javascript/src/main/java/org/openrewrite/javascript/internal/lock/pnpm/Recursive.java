@@ -130,7 +130,8 @@ final class Recursive {
             }
             Map<String, String> overrides = projectOverrides(projectConfigRecord, dir, allProjects, opts);
             // without a lock of its own the project installs from scratch
-            Install other = new Install(inputs, dir, new EnvLockfile.OnDisk(lock), registry, stores, now);
+            Install other = new Install(inputs, dir, new EnvLockfile.OnDisk(lock, opts.getRelease()), registry,
+                    stores, now);
             Install.Result otherInstall;
             try {
                 otherInstall = other.install(new Verification.Project(dir, ".", project.getManifest()),

@@ -106,15 +106,37 @@ class SwitchCliVersionTest {
     }
 
     /**
-     * Another release from 11.0.6 runs as the port: a pin needs no switch, and a member's range of them none either.
-     * The release that installs is the one pinned, or the range where the root's lock, which the inputs do not hold,
-     * pins one of it.
+     * Without the release that built the LST, 11.2.2 hands the install to another release the engine reproduces: a
+     * pin, and a member's range of them. The release that installs is the one pinned, or the range where the root's
+     * lock, which the inputs do not hold, pins one of it.
      */
     @ParameterizedTest
-    @CsvSource(delimiter = '|', value = {"11.3.0|false|", "11.28.5|false|", "^11.0.6|true|packages/a"})
-    void aPnpm11ReleaseRunsAsThePortedOne(String version, boolean fromDevEngines, @Nullable String lockDir) {
+    @CsvSource(delimiter = '|', value = {"11.3.0|false|", "11.5.1|false|", ">=11.0.6 <=11.5.1|true|packages/a"})
+    void anotherReproducedReleaseInstalls(String version, boolean fromDevEngines, @Nullable String lockDir) {
         assertThat(switchCliVersion(pm(version, fromDevEngines), MAIN_DOCUMENT, null, lockDir == null ? "" : lockDir))
           .isEqualTo(new SwitchCliVersion.Switched(version, null));
+    }
+
+    /**
+     * A member's range whose root lock the inputs do not hold may be pinned there to a release the engine does not
+     * reproduce: one yet to come, or a published one outside {@link PnpmReleases#PROVEN}.
+     */
+    @ParameterizedTest
+    @ValueSource(strings = {"^11.0.6", "^11.2.0"})
+    void aMembersOpenRangeIsCannotKnow(String range) {
+        assertThatThrownBy(() -> switchCliVersion(pm(range, true), MAIN_DOCUMENT, null, "packages/a"))
+          .isInstanceOf(CannotKnow.class)
+          .hasMessageContaining("which pnpm release the workspace's pnpm-lock.yaml pins for " + range);
+    }
+
+    /**
+     * A pinned release the engine does not reproduce is one it cannot know the lock of.
+     */
+    @Test
+    void anUnprovenPinIsCannotKnow() {
+        assertThatThrownBy(() -> switchCliVersion(pm("11.28.5", false), MAIN_DOCUMENT))
+          .isInstanceOf(CannotKnow.class)
+          .hasMessageContaining("the lock pnpm 11.28.5 writes");
     }
 
     /**
@@ -140,12 +162,12 @@ class SwitchCliVersionTest {
      * a member whose root lock the inputs do not hold installs with one of the range.
      */
     @ParameterizedTest
-    @CsvSource(delimiter = '|', value = {"^11.0.6|11.3.0", "^11.0.6|11.28.5", ">=11.5.1 <12|11.15.1"})
+    @CsvSource(delimiter = '|', value = {"^11.0.6|11.3.0", "^11.0.6|11.5.1", ">=11.5.1 <12|11.5.1"})
     void aRangeInstallsWithTheReleaseTheRootsLockPins(String range, String locked) {
         assertThat(switchCliVersion(pm(range, true), resolvedEnvDocument(locked)))
           .isEqualTo(new SwitchCliVersion.Switched(locked, null));
-        assertThat(switchCliVersion(pm("^11.0.6", true), resolvedEnvDocument(locked), null, "packages/a"))
-          .isEqualTo(new SwitchCliVersion.Switched("^11.0.6", null));
+        assertThat(switchCliVersion(pm(">=11.0.6 <=11.5.1", true), resolvedEnvDocument(locked), null, "packages/a"))
+          .isEqualTo(new SwitchCliVersion.Switched(">=11.0.6 <=11.5.1", null));
     }
 
     /**

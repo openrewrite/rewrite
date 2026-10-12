@@ -55,6 +55,15 @@ final class PickPackage {
         boolean includeLatestTag;
 
         boolean ignoreMissingTimeField;
+
+        /**
+         * minimumReleaseAge under minimumReleaseAgeStrict, which before 11.1.3 leaves an immature range unpicked
+         * ({@link PnpmRelease#checksTheReleaseAgeAsAPolicy}).
+         */
+        boolean strictPublishedByCheck;
+
+        @Builder.Default
+        PnpmRelease release = PnpmRelease.PORTED;
     }
 
     private static @Nullable Map<String, @Nullable Object> runPicker(
@@ -83,17 +92,17 @@ final class PickPackage {
     private static @Nullable Map<String, @Nullable Object> pickHighest(
             @Nullable Map<String, PreferredVersions.Selector> preferredVersionSelectors, @Nullable Instant publishedBy,
             @Nullable Function<String, @Nullable Object> publishedByExclude, Map<String, @Nullable Object> meta,
-            PickPackageFromMeta.RegistryPackageSpec spec) {
+            PickPackageFromMeta.RegistryPackageSpec spec, PnpmRelease release) {
         return PickPackageFromMeta.pickPackageFromMeta(PickPackageFromMeta::pickVersionByVersionRange,
-                preferredVersionSelectors, publishedBy, publishedByExclude, meta, spec);
+                preferredVersionSelectors, publishedBy, publishedByExclude, meta, spec, release);
     }
 
     private static @Nullable Map<String, @Nullable Object> pickLowest(
             @Nullable Map<String, PreferredVersions.Selector> preferredVersionSelectors, @Nullable Instant publishedBy,
             @Nullable Function<String, @Nullable Object> publishedByExclude, Map<String, @Nullable Object> meta,
-            PickPackageFromMeta.RegistryPackageSpec spec) {
+            PickPackageFromMeta.RegistryPackageSpec spec, PnpmRelease release) {
         return PickPackageFromMeta.pickPackageFromMeta(PickPackageFromMeta::pickLowestVersionByVersionRange,
-                preferredVersionSelectors, publishedBy, publishedByExclude, meta, spec);
+                preferredVersionSelectors, publishedBy, publishedByExclude, meta, spec, release);
     }
 
     static @Nullable Map<String, @Nullable Object> pickRespectingMinReleaseAge(
@@ -101,11 +110,15 @@ final class PickPackage {
             Map<String, @Nullable Object> meta) {
         return runPicker(pickerOpts, spec, targetSpec -> {
             Map<String, @Nullable Object> highest = pickHighest(pickerOpts.getPreferredVersionSelectors(),
-                    pickerOpts.getPublishedBy(), pickerOpts.getPublishedByExclude(), meta, targetSpec);
-            if (highest != null) {
+                    pickerOpts.getPublishedBy(), pickerOpts.getPublishedByExclude(), meta, targetSpec,
+                    pickerOpts.getRelease());
+            // before 11.1.3 a strict check leaves an immature range unpicked
+            if (highest != null || pickerOpts.isStrictPublishedByCheck() &&
+                                   !pickerOpts.getRelease().checksTheReleaseAgeAsAPolicy()) {
                 return highest;
             }
-            return pickLowest(pickerOpts.getPreferredVersionSelectors(), null, null, meta, targetSpec);
+            return pickLowest(pickerOpts.getPreferredVersionSelectors(), null, null, meta, targetSpec,
+                    pickerOpts.getRelease());
         });
     }
 
@@ -114,9 +127,9 @@ final class PickPackage {
             Map<String, @Nullable Object> meta) {
         return runPicker(pickerOpts, spec, targetSpec -> pickerOpts.isPickLowestVersion() ?
                 pickLowest(pickerOpts.getPreferredVersionSelectors(), pickerOpts.getPublishedBy(),
-                        pickerOpts.getPublishedByExclude(), meta, targetSpec) :
+                        pickerOpts.getPublishedByExclude(), meta, targetSpec, pickerOpts.getRelease()) :
                 pickHighest(pickerOpts.getPreferredVersionSelectors(), pickerOpts.getPublishedBy(),
-                        pickerOpts.getPublishedByExclude(), meta, targetSpec));
+                        pickerOpts.getPublishedByExclude(), meta, targetSpec, pickerOpts.getRelease()));
     }
 
     static @Nullable Map<String, @Nullable Object> pickMatchingVersionFast(
@@ -152,19 +165,25 @@ final class PickPackage {
         boolean fullMetadata = optional || filterMetadata;
         String cacheKey = fullMetadata ? name + ":full" : name;
         Map<String, @Nullable Object> cached = metaCache.get(cacheKey);
+        PnpmRelease release = pickerOpts.getRelease();
         if (cached != null) {
-            Map<String, @Nullable Object> upgraded = maybeUpgradeForReleaseAge(registry, spec, pickerOpts, registryUrl,
-                    cached);
-            if (upgraded != cached) {
-                metaCache.put(cacheKey, upgraded);
+            // from 11.1.2 a held packument changed after the cutoff is fetched again in full
+            if (!needsUpgradeForReleaseAge(spec, pickerOpts, cached) ||
+                !release.upgradesAHeldPackumentForTheReleaseAge()) {
+                return new PickResult(cached, pickMatchingVersionFinal(pickerOpts, spec, cached));
             }
+            Map<String, @Nullable Object> upgraded = fetch(registry, registryUrl, spec.getName(), true);
+            metaCache.put(cacheKey, upgraded);
             return new PickResult(upgraded, pickMatchingVersionFinal(pickerOpts, spec, upgraded));
         }
         Map<String, @Nullable Object> meta = fetch(registry, registryUrl, name, fullMetadata);
         if (pickerOpts.getPublishedBy() != null && !fullMetadata && meta.get("time") == null &&
             !excluded(pickerOpts, name)) {
             Instant modified = modifiedDate(meta);
-            if (modified == null || modified.isAfter(pickerOpts.getPublishedBy())) {
+            // before 11.2.0 a packument modified at the cutoff is fetched in full too
+            if (modified == null || modified.isAfter(pickerOpts.getPublishedBy()) ||
+                modified.equals(pickerOpts.getPublishedBy()) &&
+                !release.takesAPackumentModifiedAtTheCutoffAsMature()) {
                 meta = fetch(registry, registryUrl, name, true);
             }
         }
@@ -175,17 +194,17 @@ final class PickPackage {
         return new PickResult(meta, pickMatchingVersionFinal(pickerOpts, spec, meta));
     }
 
-    private static Map<String, @Nullable Object> maybeUpgradeForReleaseAge(
-            RegistryMetadata registry, PickPackageFromMeta.RegistryPackageSpec spec, PickerOptions pickerOpts,
-            String registryUrl, Map<String, @Nullable Object> meta) {
+    // maybeUpgradeAbbreviatedMetaForReleaseAge's test: whether it fetches the held packument again in full
+    private static boolean needsUpgradeForReleaseAge(PickPackageFromMeta.RegistryPackageSpec spec,
+                                                     PickerOptions pickerOpts, Map<String, @Nullable Object> meta) {
         if (pickerOpts.getPublishedBy() == null || meta.get("time") != null || excluded(pickerOpts, spec.getName())) {
-            return meta;
+            return false;
         }
         Instant modified = modifiedDate(meta);
-        if (modified != null && !modified.isAfter(pickerOpts.getPublishedBy())) {
-            return meta;
-        }
-        return fetch(registry, registryUrl, spec.getName(), true);
+        // before 11.2.0 a packument modified at the cutoff is upgraded too
+        return modified == null || !(modified.isBefore(pickerOpts.getPublishedBy()) ||
+                                     modified.equals(pickerOpts.getPublishedBy()) &&
+                                     pickerOpts.getRelease().takesAPackumentModifiedAtTheCutoffAsMature());
     }
 
     private static final String[] VERSION_FIELDS = {"name", "version", "bin", "directories", "devDependencies",

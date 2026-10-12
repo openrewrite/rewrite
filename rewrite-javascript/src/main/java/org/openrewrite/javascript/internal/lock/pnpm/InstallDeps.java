@@ -82,7 +82,7 @@ final class InstallDeps {
         Map<String, @Nullable Object> manifest = Manifests.readProjectManifest(text,
                 RootRelativePath.join(dir, "package.json"));
         PackageIsInstallable.projectIsInstallable(".", manifest, opts.isTrue("engineStrict"),
-                opts.getNodeVersion(), opts.get("supportedArchitectures"), inputs.getHost());
+                opts.getNodeVersion(), opts.get("supportedArchitectures"), inputs.getHost(), opts.getRelease());
         return new Verification.Project(dir, ".", manifest);
     }
 
