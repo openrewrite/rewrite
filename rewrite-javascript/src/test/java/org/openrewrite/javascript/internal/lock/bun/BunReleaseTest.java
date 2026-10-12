@@ -2623,6 +2623,9 @@ class BunReleaseTest {
         assertThat(Glob.match(pattern, path, BunRelease.of("1.2.4")).matches()).as("1.2.4").isEqualTo(in124);
     }
 
+    /**
+     * As 1.2.2 and 1.2.3 read {@code "workspaces": ["packages/{a,ab}b"]} beside packages/ab and packages/abb.
+     */
     @Test
     void matchesAWorkspacesGlobsBranchesAsTheReleaseDoes() {
         String[] locations = {"packages/ab", "packages/abb"};
