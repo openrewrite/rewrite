@@ -339,8 +339,6 @@ public final class BunRelease implements Comparable<BunRelease> {
         return atLeast(1, 4, 0);
     }
 
-    // ----
-
     // 1.4.x: src/parsers (json.rs, toml.rs), src/dotenv, src/glob, src/js_printer
 
     /**
@@ -469,8 +467,6 @@ public final class BunRelease implements Comparable<BunRelease> {
     boolean expandsEnvValuesLeftToRight() {
         return atLeast(1, 4, 0);
     }
-
-    // ----
 
     // 1.4.x: src/install (dependency.rs, integrity.rs, repository.rs, npm.rs, resolution.rs) and src/semver
 
@@ -613,8 +609,6 @@ public final class BunRelease implements Comparable<BunRelease> {
     boolean boundsARangeAtTheCeilingInclusively() {
         return atLeast(1, 4, 0);
     }
-
-    // ----
 
     // 1.4.x: src/install (PackageManagerEnqueue.rs, lockfile.rs, Tree.rs, Package.rs, bun.lock.rs's reader)
 
@@ -889,8 +883,6 @@ public final class BunRelease implements Comparable<BunRelease> {
     boolean findsTheBundledMarkInAnyEntry() {
         return atLeast(1, 4, 3);
     }
-
-    // ----
 
     // 1.4.x: src/install/PackageManager (install_with_manager.rs, PackageManager.rs init), CatalogMap.rs, bunfig.rs
 
