@@ -350,6 +350,98 @@ public final class BunRelease implements Comparable<BunRelease> {
 
     // 1.4.x: src/install (PackageManagerEnqueue.rs, lockfile.rs, Tree.rs, Package.rs, bun.lock.rs's reader)
 
+    /**
+     * {@code enqueue_dependency_list} enqueues every dependency of the list, from 1.4.0 (bun#35392); before, where the
+     * lockfile's first dependency is a peer, each leading peer of the list that a later non-dev dependency of the list
+     * also names is left out, its slot overwritten with the list's first dependency not yet left out.
+     */
+    boolean enqueuesEveryDependencyOfTheList() {
+        return atLeast(1, 4, 0);
+    }
+
+    /**
+     * Only a dependency that is no npm alias itself is redirected to the npm alias another package declared under its
+     * name, from 1.4.0 (bun#33835); before, an alias whose target bears that name is redirected too.
+     */
+    boolean redirectsOnlyPlainDependenciesToAnAlias() {
+        return atLeast(1, 4, 0);
+    }
+
+    /**
+     * Before the peers are installed, a peer whose range is not {@code *} takes an existing package only where it is
+     * the very version its range picks, and otherwise waits for the peers ({@code suppress_peer_satisfies}), from
+     * 1.4.0 (bun#30412); before, it takes any package its range accepts.
+     */
+    boolean bindsAPeerBeforeThePeersOnlyToItsPick() {
+        return atLeast(1, 4, 0);
+    }
+
+    /**
+     * A range is not deduplicated to a package this install added below the range's own pick and of another major,
+     * unless that package was added for a range of one exact version ({@code Lockfile::get_package_id}'s
+     * order-independence guard, {@code mark_exact_pin}, {@code mark_loaded_packages}), from 1.4.0 (bun#30412); before,
+     * to any package the range accepts.
+     */
+    boolean keepsARangeOffALowerMajorAddedThisInstall() {
+        return atLeast(1, 4, 0);
+    }
+
+    /**
+     * Where the root's diff changes what resolves (an added, removed or updated dependency, or changed overrides or
+     * catalogs), every edge still resolving to the package a root or workspace dependency resolved to before follows
+     * that dependency to its new npm package of the same name where the edge's range, after overrides and catalogs,
+     * accepts it ({@code DirectDependencies::redirect_dependents}), from 1.4.0 (bun#38333); before, it keeps the old
+     * package.
+     */
+    boolean redirectsDependentsOfAMovedDirectDependency() {
+        return atLeast(1, 4, 0);
+    }
+
+    /**
+     * A {@code file:} dependency of a package that is neither the root nor a workspace, whose path leaves the
+     * package's directory ({@code bin_target_escapes_package_dir}: absolute, a colon in its first component, or
+     * {@code ..} above its start), resolves to nothing unless an override or resolution names it ({@code Could not find
+     * package.json for "file:<path>" dependency "<name>"}), from 1.4.0 (bun#31417, bun#32452); before, to a folder
+     * package without dependencies.
+     */
+    boolean refusesAFolderPathLeavingItsPackage() {
+        return atLeast(1, 4, 0);
+    }
+
+    /**
+     * Such a path is also taken where a {@code file:} package the root or a workspace depends on directly declares it
+     * ({@code is_trusted_folder_dependency}), from 1.4.3 (bun#33106); before, only where an override names it.
+     */
+    boolean trustsTheFolderPathsOfALocalPackage() {
+        return atLeast(1, 4, 3);
+    }
+
+    /**
+     * A {@code workspace:} dependency of a package that is neither the root nor a workspace, unless an override or
+     * resolution names it, resolves only to the root's workspace of that name, else to nothing ({@code Workspace
+     * dependency "<name>" not found}), from 1.4.0 (bun#37669); before, to the workspace folder its path names.
+     */
+    boolean resolvesAForeignWorkspaceSpecOnlyToTheRootsWorkspace() {
+        return atLeast(1, 4, 0);
+    }
+
+    /**
+     * The hoisting leaves out a folder package that a directory above already holds under the same name, so that a
+     * cycle of folder packages ends, from 1.4.0 (bun#38333); before, a folder package is always placed below its
+     * dependent, and such a cycle nests forever.
+     */
+    boolean skipsAFolderPackageADirectoryAboveHolds() {
+        return atLeast(1, 4, 0);
+    }
+
+    /**
+     * A peer resolved to a folder package is deduplicated where a directory above provides that package, instead of
+     * nesting a second copy, from 1.4.1 (bun#40564); before, it is placed below its dependent as any folder package is.
+     */
+    boolean dedupesAPeerResolvedToAFolderPackage() {
+        return atLeast(1, 4, 1);
+    }
+
     // ----
 
     // 1.4.x: src/install/PackageManager (install_with_manager.rs, PackageManager.rs init), CatalogMap.rs, bunfig.rs

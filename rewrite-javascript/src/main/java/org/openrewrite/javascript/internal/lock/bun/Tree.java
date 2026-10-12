@@ -16,6 +16,8 @@
 package org.openrewrite.javascript.internal.lock.bun;
 
 import org.jspecify.annotations.Nullable;
+import org.openrewrite.javascript.internal.LockFileRegeneration.Reason;
+import org.openrewrite.javascript.internal.lock.Rejected;
 
 import java.util.ArrayDeque;
 import java.util.ArrayList;
@@ -182,7 +184,26 @@ final class Tree {
                 }
                 hoisted = next.hoistDependency(true, hoistRootId, pkgId, dependency, builder);
             } else if (builder.lockfile.packages.get(pkgId).resolution.tag == Resolution.Tag.FOLDER) {
-                hoisted = HoistResult.placement(next.id, false);
+                BunRelease release = builder.lockfile.release;
+                if (release.dedupesAPeerResolvedToAFolderPackage() && dependency.behavior.isPeer() &&
+                    next.hoistDependency(true, hoistRootId, pkgId, dependency, builder).kind ==
+                    HoistResult.Kind.HOISTED) {
+                    hoisted = HoistResult.HOISTED;
+                } else {
+                    // folder packages never hoist, so a cycle between them would nest forever
+                    int holder = holderAbove(next.id, pkgId, dependency, builder);
+                    if (holder != INVALID_ID) {
+                        if (release.skipsAFolderPackageADirectoryAboveHolds()) {
+                            continue;
+                        }
+                        if (onlyFolderPackagesBelow(holder, next.id, builder)) {
+                            throw Rejected.crashes(Reason.RESOLUTION_REQUIRED, null, "it never finishes: its " +
+                                    "hoisting places the folder package " + builder.describe(pkgId) + " inside " +
+                                    "itself again and again, as folder packages never hoist");
+                        }
+                    }
+                    hoisted = HoistResult.placement(next.id, false);
+                }
             } else {
                 hoisted = next.hoistDependency(true, hoistRootId, pkgId, dependency, builder);
             }
@@ -238,6 +259,31 @@ final class Tree {
             builder.trees.remove(builder.trees.size() - 1);
             builder.dependencyLists.remove(builder.dependencyLists.size() - 1);
         }
+    }
+
+    // the tree, this one or one above it, whose dependency is the same package under the same name; else INVALID_ID
+    private static int holderAbove(int treeId, int packageId, Dependency dependency, Builder builder) {
+        for (int id = treeId; id != INVALID_ID; id = builder.trees.get(id).parent) {
+            int ancestorDepId = builder.trees.get(id).dependencyId;
+            if (ancestorDepId < builder.lockfile.dependencies.size() &&
+                builder.lockfile.resolutions.get(ancestorDepId) == packageId &&
+                builder.lockfile.dependencies.get(ancestorDepId).nameHash == dependency.nameHash) {
+                return id;
+            }
+        }
+        return INVALID_ID;
+    }
+
+    // whether every tree from this one up to, not including, the holder is a folder package's, each placed whatever is
+    // above it, so that a copy of the holder placed here repeats the same chain below it without end
+    private static boolean onlyFolderPackagesBelow(int holder, int treeId, Builder builder) {
+        for (int id = treeId; id != holder; id = builder.trees.get(id).parent) {
+            int packageId = builder.lockfile.resolutions.get(builder.trees.get(id).dependencyId);
+            if (builder.lockfile.packages.get(packageId).resolution.tag != Resolution.Tag.FOLDER) {
+                return false;
+            }
+        }
+        return true;
     }
 
     // 1: dedupe (hoisted), 2: place here or higher, 3: stay at this relative place (dependency loop)

@@ -796,6 +796,332 @@ class BunReleaseTest {
           .overrideDeclined("is-number", "7.0.0", isOdd, overrides)).contains("cannot know what bun 9.9.9 writes");
     }
 
+    // a version of a packument, with what `extra` adds to it (",\"dependencies\":{...}")
+    private static String registryVersion(String name, String version, String extra) {
+        return "\"" + version + "\":{\"name\":\"" + name + "\",\"version\":\"" + version + "\"" + extra +
+               ",\"dist\":{\"tarball\":\"https://registry.npmjs.org/" + name + "/-/" + name.replaceAll(".*/", "") +
+               "-" + version + ".tgz\",\"integrity\":\"" + INTEGRITY + "\"}}";
+    }
+
+    private static String registryPackument(String name, String latest, String... versions) {
+        return "{\"name\":\"" + name + "\",\"modified\":\"2026-01-01T00:00:00.000Z\",\"dist-tags\":{\"latest\":\"" +
+               latest + "\"},\"versions\":{" + String.join(",", versions) + "}}";
+    }
+
+    private static org.openrewrite.javascript.internal.LockFileRegeneration.Result install(
+      String release, String lock, java.util.Map<String, String> manifests, java.util.Map<String, String> packuments) {
+        BunLockRegenerator.Inputs.InputsBuilder inputs = BunLockRegenerator.Inputs.builder()
+          .lock(lock)
+          .now(java.time.Instant.parse("2026-10-11T00:00:00Z"))
+          .release(BunRelease.of(release));
+        for (java.util.Map.Entry<String, String> manifest : manifests.entrySet()) {
+            inputs.manifest(manifest.getKey(), manifest.getValue());
+        }
+        return new BunLockRegenerator(inputs.build(), (url, name, extended) -> packuments.get(name)).regenerate();
+    }
+
+    private static String written(org.openrewrite.javascript.internal.LockFileRegeneration.Result result) {
+        assertThat(result.isSuccess()).as(String.valueOf(result.getErrorMessage())).isTrue();
+        return requireNonNull(result.getLockFileContent());
+    }
+
+    private static String failure(org.openrewrite.javascript.internal.LockFileRegeneration.Result result) {
+        assertThat(result.isSuccess()).as(String.valueOf(result.getLockFileContent())).isFalse();
+        return requireNonNull(result.getFailure()).getKind() + " " + result.getFailure().getDetail();
+    }
+
+    private static java.util.Map<String, String> rootManifest(String manifest) {
+        java.util.Map<String, String> manifests = new java.util.LinkedHashMap<>();
+        manifests.put("", manifest);
+        return manifests;
+    }
+
+    /**
+     * PackageManagerEnqueue.rs enqueue_dependency_list (1.4.0): every dependency of the list is enqueued; before, a
+     * list whose first dependency is a peer that a later dependency also names leaves that peer out. (With the groups
+     * sorted peers last, from 1.2.19, a parsed root never starts so; this list is built by hand.)
+     */
+    @Test
+    void enqueuesEveryDependencyOfTheListFrom140() {
+        for (String release : new String[]{"1.3.14", "1.4.0"}) {
+            BunOptions options = options(release, null);
+            Lockfile lockfile = new Lockfile(options.getRelease());
+            Package root = new Package();
+            root.name = "root";
+            root.nameHash = Wyhash11.stringHash("root");
+            root.resolution = Resolution.ROOT;
+            long x = Wyhash11.stringHash("x");
+            lockfile.dependencies.add(new Dependency(x, "x", requireNonNull(DependencyVersion.parse("x", x, "1.0.0")),
+              Behavior.of(Behavior.PEER)));
+            lockfile.dependencies.add(new Dependency(x, "x", requireNonNull(DependencyVersion.parse("x", x, "1.0.0")),
+              Behavior.of(Behavior.PROD)));
+            lockfile.resolutions.add(Package.INVALID_PACKAGE_ID);
+            lockfile.resolutions.add(Package.INVALID_PACKAGE_ID);
+            root.dependenciesLen = 2;
+            lockfile.appendPackage(root);
+            PackageManager manager = new PackageManager(lockfile, options, new Log(), Collections.emptyMap(),
+              (url, name, extended) -> {
+                  throw new AssertionError("nothing is fetched: " + name);
+              }, 0);
+            manager.enqueueDependencyList(0, 2);
+            if ("1.4.0".equals(release)) {
+                assertThat(manager.peerDependencies).containsExactly(0);
+            } else {
+                assertThat(manager.peerDependencies).isEmpty();
+            }
+        }
+    }
+
+    /**
+     * PackageManagerEnqueue.rs (1.4.0, bun#33835): the npm: alias {@code @ts/old} of the package the root's alias
+     * {@code typescript} installs is not redirected to that alias; before, its target typescript was, so that it
+     * resolves to the aliasing package itself.
+     */
+    @Test
+    void redirectsOnlyPlainDependenciesToAnAliasFrom140() {
+        java.util.Map<String, String> packuments = new java.util.LinkedHashMap<>();
+        packuments.put("@ts/ts6", registryPackument("@ts/ts6", "6.0.2",
+          registryVersion("@ts/ts6", "6.0.2", ",\"dependencies\":{\"@ts/old\":\"npm:typescript@^6\"}")));
+        packuments.put("typescript", registryPackument("typescript", "6.0.3",
+          registryVersion("typescript", "6.0.3", "")));
+        java.util.Map<String, String> manifests =
+          rootManifest("{\"name\":\"root\",\"dependencies\":{\"typescript\":\"npm:@ts/ts6@6.0.2\"}}");
+        assertThat(written(install("1.4.0", EMPTY_ROOT, manifests, packuments)))
+          .contains("\"@ts/old\": [\"typescript@6.0.3\"");
+        assertThat(written(install("1.3.14", EMPTY_ROOT, manifests, packuments)))
+          .contains("\"@ts/old\": [\"@ts/ts6@6.0.2\"");
+    }
+
+    // x@1.0.0 and z@1.0.0 at the root; z has the peer x ^1.0.0 and w, whose x ~1.5.0 adds x@1.5.0 after z's peer
+    private static Lockfile resolvedPeerPick(String release) {
+        BunOptions options = options(release, null);
+        String manifest = "{\"name\":\"root\",\"dependencies\":{\"x\":\"1.0.0\",\"z\":\"1.0.0\"}}";
+        java.util.Map<String, String> packuments = new java.util.LinkedHashMap<>();
+        packuments.put("x", registryPackument("x", "1.5.0", registryVersion("x", "1.0.0", ""),
+          registryVersion("x", "1.5.0", "")));
+        packuments.put("z", registryPackument("z", "1.0.0", registryVersion("z", "1.0.0",
+          ",\"dependencies\":{\"w\":\"1.0.0\"},\"peerDependencies\":{\"x\":\"^1.0.0\"}")));
+        packuments.put("w", registryPackument("w", "1.0.0", registryVersion("w", "1.0.0",
+          ",\"dependencies\":{\"x\":\"~1.5.0\"}")));
+        Lockfile lockfile = new Lockfile(options.getRelease());
+        java.util.Map<String, String> manifests = rootManifest(manifest);
+        PackageManager manager = new PackageManager(lockfile, options, new Log(), manifests,
+          (url, name, extended) -> packuments.get(name), 0);
+        Package root = new Package();
+        root.parseWithJSON(lockfile, options, new Log(), "", Json.parse(manifest), Features.MAIN, manifests);
+        root = lockfile.appendPackage(root);
+        manager.enqueueDependencyList(root.dependenciesOff, root.dependenciesLen);
+        manager.resolve(lockfile.packages.size());
+        return lockfile;
+    }
+
+    private static String peerResolution(Lockfile lockfile) {
+        for (int i = 0; i < lockfile.dependencies.size(); i++) {
+            if (lockfile.dependencies.get(i).behavior.isPeer()) {
+                return String.valueOf(lockfile.packages.get(lockfile.resolutions.get(i)).resolution.version);
+            }
+        }
+        throw new AssertionError("no peer");
+    }
+
+    /**
+     * PackageManagerEnqueue.rs get_or_put_resolved_package_with_find_result (1.4.0, bun#30412): z's peer x ^1.0.0,
+     * reached once x's packument holds the root's x@1.0.0 but not its pick 1.5.0, waits for the peers, and takes the
+     * highest x it accepts then, 1.5.0, which w added meanwhile; before, it takes 1.0.0 at once.
+     */
+    @Test
+    void bindsAPeerBeforeThePeersOnlyToItsPickFrom140() {
+        assertThat(peerResolution(resolvedPeerPick("1.4.0"))).isEqualTo("1.5.0");
+        assertThat(peerResolution(resolvedPeerPick("1.3.14"))).isEqualTo("1.0.0");
+    }
+
+    /**
+     * lockfile.rs get_package_id (1.4.0, bun#30412): a range does not take a package this install added below its
+     * pick and of another major, unless an exact range added it or the lock holds it.
+     */
+    @Test
+    void keepsARangeOffALowerMajorAddedThisInstallFrom140() {
+        for (String release : new String[]{"1.3.14", "1.4.0"}) {
+            Lockfile lockfile = new Lockfile(BunRelease.of(release));
+            Package x = new Package();
+            x.name = "x";
+            x.nameHash = Wyhash11.stringHash("x");
+            x.resolution = Resolution.npm(SemverVersion.parse("1.9.0").version.min(), "");
+            int id = lockfile.appendPackage(x).meta.id;
+            DependencyVersion atLeast1 = requireNonNull(DependencyVersion.parse("x", x.nameHash, ">=1"));
+            Resolution pick = Resolution.npm(SemverVersion.parse("2.0.0").version.min(), "");
+            assertThat(lockfile.getPackageID(x.nameHash, atLeast1, pick)).isEqualTo("1.4.0".equals(release) ? null : id);
+            assertThat(lockfile.getPackageID(x.nameHash, atLeast1,
+              Resolution.npm(SemverVersion.parse("1.9.5").version.min(), ""))).isEqualTo(id);
+            lockfile.markExactPin(id);
+            assertThat(lockfile.getPackageID(x.nameHash, atLeast1, pick)).isEqualTo(id);
+            lockfile.exactPinned.clear();
+            lockfile.markLoadedPackages();
+            assertThat(lockfile.getPackageID(x.nameHash, atLeast1, pick)).isEqualTo(id);
+        }
+    }
+
+    /**
+     * The install of x ^1 (1.9.0) and x >=1 (2.0.0) in one wave: from 1.4.0 the order their packuments arrive in no
+     * longer decides whether >=1 takes 1.9.0, so both are installed; before, the engine cannot know.
+     */
+    @Test
+    void installsARangeBesideALowerMajorWhateverTheArrivalOrderFrom140() {
+        java.util.Map<String, String> packuments = new java.util.LinkedHashMap<>();
+        packuments.put("x", registryPackument("x", "2.0.0", registryVersion("x", "1.9.0", ""),
+          registryVersion("x", "2.0.0", "")));
+        packuments.put("a", registryPackument("a", "1.0.0", registryVersion("a", "1.0.0",
+          ",\"dependencies\":{\"x\":\"^1\"}")));
+        packuments.put("b", registryPackument("b", "1.0.0", registryVersion("b", "1.0.0",
+          ",\"dependencies\":{\"x\":\">=1\"}")));
+        java.util.Map<String, String> manifests =
+          rootManifest("{\"name\":\"root\",\"dependencies\":{\"a\":\"1.0.0\",\"b\":\"1.0.0\"}}");
+        assertThat(written(install("1.4.0", EMPTY_ROOT, manifests, packuments)))
+          .contains("\"x\": [\"x@1.9.0\"").contains("\"b/x\": [\"x@2.0.0\"");
+        assertThat(failure(install("1.3.14", EMPTY_ROOT, manifests, packuments))).isEqualTo(
+          "CANNOT_KNOW the engine cannot know manifest arrival order: x for a@1.0.0 (^1) and b@1.0.0 (>=1) resolved " +
+          "in one install");
+        // an exact range's pick is taken whatever its major, so that the order decides again
+        packuments.put("a", registryPackument("a", "1.0.0", registryVersion("a", "1.0.0",
+          ",\"dependencies\":{\"x\":\"1.9.0\"}")));
+        assertThat(failure(install("1.4.0", EMPTY_ROOT, manifests, packuments))).isEqualTo(
+          "CANNOT_KNOW the engine cannot know manifest arrival order: x for a@1.0.0 (1.9.0) and b@1.0.0 (>=1) " +
+          "resolved in one install");
+    }
+
+    private static final String MS_IN_A_WORKSPACE = "{\n  \"lockfileVersion\": 1,\n  \"configVersion\": 1,\n" +
+                                                    "  \"workspaces\": {\n    \"\": {\n      \"name\": \"root\",\n" +
+                                                    "      \"dependencies\": {\n        \"ms\": \"2.0.0\",\n      },\n" +
+                                                    "    },\n    \"packages/a\": {\n      \"name\": \"a\",\n" +
+                                                    "      \"dependencies\": {\n        \"ms\": \"^2.0.0\",\n" +
+                                                    "      },\n    },\n  },\n  \"packages\": {\n" +
+                                                    "    \"a\": [\"a@workspace:packages/a\"],\n\n" +
+                                                    "    \"ms\": [\"ms@2.0.0\", \"\", {}, \"" + INTEGRITY + "\"],\n" +
+                                                    "  }\n}\n";
+
+    /**
+     * update_transitive.rs DirectDependencies::redirect_dependents (1.4.0, bun#38333): the root's ms 2.0.0 becomes
+     * ^2.1.0 (2.1.3) while the workspace a keeps ms ^2.0.0 on the locked 2.0.0: a's edge follows the root's to 2.1.3,
+     * and 2.0.0 leaves the lock; before, a keeps 2.0.0.
+     */
+    @Test
+    void redirectsDependentsOfAMovedDirectDependencyFrom140() {
+        java.util.Map<String, String> packuments = java.util.Collections.singletonMap("ms", registryPackument("ms",
+          "2.1.3", registryVersion("ms", "2.0.0", ""), registryVersion("ms", "2.1.3", "")));
+        java.util.Map<String, String> manifests = rootManifest("{\"name\":\"root\",\"workspaces\":[\"packages/a\"]," +
+                                                               "\"dependencies\":{\"ms\":\"^2.1.0\"}}");
+        manifests.put("packages/a", "{\"name\":\"a\",\"dependencies\":{\"ms\":\"^2.0.0\"}}");
+        String later = written(install("1.4.0", MS_IN_A_WORKSPACE, manifests, packuments));
+        assertThat(later).contains("\"ms\": [\"ms@2.1.3\"").doesNotContain("ms@2.0.0");
+        String earlier = written(install("1.3.14", MS_IN_A_WORKSPACE, manifests, packuments));
+        assertThat(earlier).contains("\"ms\": [\"ms@2.1.3\"").contains("\"a/ms\": [\"ms@2.0.0\"");
+    }
+
+    /**
+     * PackageManagerEnqueue.rs get_or_put_resolved_package (1.4.0, bun#31417, bun#32452): x's file:../b leaves x's
+     * directory, so that b resolves to nothing, unless an override names b; before, to a folder package.
+     */
+    @Test
+    void refusesAFolderPathLeavingItsPackageFrom140() {
+        java.util.Map<String, String> packuments = java.util.Collections.singletonMap("x", registryPackument("x",
+          "1.0.0", registryVersion("x", "1.0.0", ",\"dependencies\":{\"b\":\"file:../b\"}")));
+        java.util.Map<String, String> manifests = rootManifest("{\"name\":\"root\",\"dependencies\":{\"x\":\"1.0.0\"}}");
+        assertThat(failure(install("1.4.0", EMPTY_ROOT, manifests, packuments))).isEqualTo(
+          "PM_REJECTS bun rejects this edit: Could not find package.json for \"file:../b\" dependency \"b\"; " +
+          "b@file:../b failed to resolve");
+        assertThat(written(install("1.3.14", EMPTY_ROOT, manifests, packuments)))
+          .contains("\"x/b\": [\"b@file:../b\", {}]");
+        java.util.Map<String, String> overridden = rootManifest("{\"name\":\"root\",\"dependencies\":{\"x\":\"1.0.0\"}," +
+                                                                "\"overrides\":{\"b\":\"file:../b\"}}");
+        assertThat(written(install("1.4.0", EMPTY_ROOT, overridden, packuments)))
+          .contains("\"x/b\": [\"b@file:../b\", {}]");
+        // bun on Windows takes \b for absolute, which leaves the package, and on POSIX for a name below it
+        java.util.Map<String, String> backslash = java.util.Collections.singletonMap("x", registryPackument("x",
+          "1.0.0", registryVersion("x", "1.0.0", ",\"dependencies\":{\"b\":\"file:\\\\b\"}")));
+        assertThat(failure(install("1.4.0", EMPTY_ROOT, manifests, backslash)))
+          .startsWith("CANNOT_KNOW the engine cannot know folder dependency b@file:\\b (bun on Windows");
+    }
+
+    /**
+     * PackageManagerEnqueue.rs and lockfile.rs is_trusted_folder_dependency (1.4.3, bun#33106): the root's file:
+     * package a may name a folder above its own; from 1.4.0 to 1.4.2 that resolves to nothing.
+     */
+    @Test
+    void trustsTheFolderPathsOfALocalPackageFrom143() {
+        java.util.Map<String, String> manifests = rootManifest("{\"name\":\"root\",\"dependencies\":{\"a\":\"file:./a\"}}");
+        manifests.put("a", "{\"name\":\"a\",\"version\":\"1.0.0\",\"dependencies\":{\"b\":\"file:../../b\"}}");
+        assertThat(written(install("1.4.3", EMPTY_ROOT, manifests, Collections.emptyMap())))
+          .contains("\"a/b\": [\"b@file:../b\", {}]");
+        assertThat(failure(install("1.4.2", EMPTY_ROOT, manifests, Collections.emptyMap()))).isEqualTo(
+          "PM_REJECTS bun rejects this edit: Could not find package.json for \"file:../b\" dependency \"b\"; " +
+          "b@file:../../b failed to resolve");
+    }
+
+    /**
+     * PackageManagerEnqueue.rs get_or_put_resolved_package (1.4.0, bun#37669): x's workspace:* resolves only to the
+     * root's workspace w; before, to the folder its path names, whose manifest the engine is not given here.
+     */
+    @Test
+    void resolvesAForeignWorkspaceSpecOnlyToTheRootsWorkspaceFrom140() {
+        java.util.Map<String, String> packuments = java.util.Collections.singletonMap("x", registryPackument("x",
+          "1.0.0", registryVersion("x", "1.0.0", ",\"dependencies\":{\"w\":\"workspace:*\"}")));
+        java.util.Map<String, String> manifests = rootManifest("{\"name\":\"root\",\"dependencies\":{\"x\":\"1.0.0\"}}");
+        assertThat(failure(install("1.4.0", EMPTY_ROOT, manifests, packuments))).isEqualTo(
+          "PM_REJECTS bun rejects this edit: Workspace dependency \"w\" not found; w@workspace:* failed to resolve");
+        assertThat(failure(install("1.3.14", EMPTY_ROOT, manifests, packuments)))
+          .startsWith("CANNOT_KNOW the engine cannot know workspace member manifest of w@workspace:*");
+        java.util.Map<String, String> withW = rootManifest("{\"name\":\"root\",\"workspaces\":[\"packages/w\"]," +
+                                                           "\"dependencies\":{\"x\":\"1.0.0\"}}");
+        withW.put("packages/w", "{\"name\":\"w\",\"version\":\"1.0.0\"}");
+        assertThat(written(install("1.4.0", EMPTY_ROOT, withW, packuments)))
+          .isEqualTo(written(install("1.3.14", EMPTY_ROOT, withW, packuments)))
+          .contains("\"w\": [\"w@workspace:packages/w\"]");
+    }
+
+    private static final String FOLDER_CYCLE = "{\n  \"lockfileVersion\": 1,\n  \"configVersion\": 1,\n" +
+                                               "  \"workspaces\": {\n    \"\": {\n      \"name\": \"root\",\n" +
+                                               "      \"dependencies\": {\n        \"a\": \"file:./a\",\n" +
+                                               "        \"b\": \"file:./b\",\n      },\n    },\n  },\n" +
+                                               "  \"packages\": {\n" +
+                                               "    \"a\": [\"a@file:a\", { \"dependencies\": { \"b\": \"file:../b\" } }],\n\n" +
+                                               "    \"b\": [\"b@file:b\", { \"dependencies\": { \"a\": \"file:../a\" } }],\n" +
+                                               "  }\n}\n";
+
+    /**
+     * Tree.rs process_subtree (1.4.0, bun#38333): the folder packages a and b depend on each other, and each is placed
+     * once below the other; before, the hoisting nests them inside each other forever, which the port reports where
+     * a folder package comes below itself through folder packages alone.
+     */
+    @Test
+    void skipsAFolderPackageADirectoryAboveHoldsFrom140() {
+        assertThat(writtenBack("1.4.0", FOLDER_CYCLE))
+          .contains("\"a/b\": [\"b@file:b\"")
+          .contains("\"b/a\": [\"a@file:a\"")
+          .doesNotContain("\"a/b/a\"");
+        assertThatThrownBy(() -> writtenBack("1.3.14", FOLDER_CYCLE))
+          .isInstanceOf(org.openrewrite.javascript.internal.lock.Rejected.class)
+          .hasMessageContaining("it never finishes: its hoisting places the folder package a@");
+    }
+
+    private static final String PEER_ON_A_FOLDER = "{\n  \"lockfileVersion\": 1,\n  \"configVersion\": 1,\n" +
+                                                   "  \"workspaces\": {\n    \"\": {\n      \"name\": \"root\",\n" +
+                                                   "      \"dependencies\": {\n        \"p\": \"1.0.0\",\n" +
+                                                   "        \"x\": \"file:./x\",\n      },\n    },\n  },\n" +
+                                                   "  \"packages\": {\n" +
+                                                   "    \"p\": [\"p@1.0.0\", \"\", { \"peerDependencies\": { \"x\": " +
+                                                   "\"^1.0.0\" } }, \"" + INTEGRITY + "\"],\n\n" +
+                                                   "    \"x\": [\"x@file:x\", {}],\n  }\n}\n";
+
+    /**
+     * Tree.rs process_subtree (1.4.1, bun#40564): p's peer x, which the lock binds to the root's folder x, dedupes
+     * with it; before, it nests a second copy, p/x.
+     */
+    @Test
+    void dedupesAPeerResolvedToAFolderPackageFrom141() {
+        assertThat(writtenBack("1.4.1", PEER_ON_A_FOLDER)).doesNotContain("\"p/x\"");
+        assertThat(writtenBack("1.4.0", PEER_ON_A_FOLDER)).contains("\"p/x\": [\"x@file:x\", {}]");
+    }
+
     private static PackageManifest.PackageVersion version(BunRelease release, String packument) {
         PackageManifest manifest = requireNonNull(PackageManifest.parse(release, new Log(), packument, "debug", false));
         PackageManifest.FindResult pick = requireNonNull(manifest.findBestVersion(

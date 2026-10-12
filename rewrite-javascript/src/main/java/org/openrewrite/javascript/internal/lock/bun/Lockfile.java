@@ -18,6 +18,7 @@ package org.openrewrite.javascript.internal.lock.bun;
 import org.jspecify.annotations.Nullable;
 
 import java.util.ArrayList;
+import java.util.BitSet;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
@@ -26,6 +27,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.function.Predicate;
 
+import static java.util.Objects.requireNonNull;
 import static org.openrewrite.javascript.internal.lock.bun.Package.INVALID_PACKAGE_ID;
 
 /** Port of bun's src/install/lockfile.zig (bun 1.3.10); package 0 is the root. */
@@ -84,6 +86,17 @@ public final class Lockfile {
     @Nullable Integer savedConfigVersion;
 
     /**
+     * From 1.4.0, the package count when the lock finished loading ({@code loaded_package_count}, set by
+     * {@link #markLoadedPackages()}); 0 for a new lock, so that every package is one this install added.
+     */
+    int loadedPackageCount;
+
+    /**
+     * From 1.4.0, the packages added for a range of one exact version ({@code exact_pinned}).
+     */
+    final BitSet exactPinned = new BitSet();
+
+    /**
      * The release that installs, whose order of dependency groups the sorts follow.
      */
     final BunRelease release;
@@ -140,6 +153,73 @@ public final class Lockfile {
     }
 
     /**
+     * {@code is_trusted_folder_dependency} (1.4.3): whether the folder path of a dependency may leave its package's
+     * directory, the root, a workspace or a {@code file:} package one of them depends on directly declaring it, or an
+     * override or resolution naming it.
+     */
+    boolean isTrustedFolderDependency(int id) {
+        if (isDependencyOfLocalPackage(id)) {
+            return true;
+        }
+        Dependency dep = dependencies.get(id);
+        return overridesContainName(dep.nameHash, dep.name);
+    }
+
+    // is_dependency_of_local_package: the first package whose dependencies hold it is the root, a workspace, or a
+    // file: package the root or a workspace depends on directly
+    private boolean isDependencyOfLocalPackage(int id) {
+        for (int parentId = 0; parentId < packages.size(); parentId++) {
+            Package parent = packages.get(parentId);
+            if (parent.containsDependency(id)) {
+                switch (parent.resolution.tag) {
+                    case ROOT:
+                    case WORKSPACE:
+                        return true;
+                    case FOLDER:
+                        return isWorkspaceDeclaredPackage(parentId);
+                    default:
+                        return false;
+                }
+            }
+        }
+        return false;
+    }
+
+    // is_workspace_declared_package: the root or a workspace resolves a dependency to the package
+    private boolean isWorkspaceDeclaredPackage(int id) {
+        for (Package pkg : packages) {
+            if ((pkg.resolution.tag == Resolution.Tag.WORKSPACE || pkg.resolution.tag == Resolution.Tag.ROOT) &&
+                resolutionsOf(pkg).contains(id)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /**
+     * {@code OverrideMap::contains_name} (from 1.4.0): whether a plain override or resolution rule names the
+     * dependency, its name compared as well as its hash.
+     */
+    boolean overridesContainName(long nameHash, String name) {
+        Dependency rule = overrides.map.get(nameHash);
+        return rule != null && rule.name.equals(name);
+    }
+
+    /**
+     * {@code mark_loaded_packages}: the packages there are now are the lock's.
+     */
+    void markLoadedPackages() {
+        loadedPackageCount = packages.size();
+    }
+
+    /**
+     * {@code mark_exact_pin}: the package was added for a range of one exact version.
+     */
+    void markExactPin(int id) {
+        exactPinned.set(id);
+    }
+
+    /**
      * An existing package that is the resolution, or one whose npm version the range satisfies, highest first.
      */
     @Nullable
@@ -155,11 +235,29 @@ public final class Lockfile {
             if (existing.eql(resolution)) {
                 return id;
             }
-            if (existing.tag == Resolution.Tag.NPM && npmVersion != null && npmVersion.satisfies(existing.version)) {
+            if (existing.tag == Resolution.Tag.NPM && npmVersion != null && npmVersion.satisfies(existing.version) &&
+                !(release.keepsARangeOffALowerMajorAddedThisInstall() && belowThePickOfAnotherMajor(id, resolution))) {
                 return id;
             }
         }
         return null;
+    }
+
+    // get_package_id's order-independence guard: a package this install added, for no exact range, below the pick the
+    // caller passes and of another major is the network order's, not a choice
+    private boolean belowThePickOfAnotherMajor(int id, Resolution resolution) {
+        if (id < loadedPackageCount || exactPinned.get(id) || resolution.tag != Resolution.Tag.NPM) {
+            return false;
+        }
+        return isBelowAndOfAnotherMajor(requireNonNull(packages.get(id).resolution.version),
+                requireNonNull(resolution.version));
+    }
+
+    /**
+     * Whether a version orders below the pick and has another major.
+     */
+    static boolean isBelowAndOfAnotherMajor(SemverVersion version, SemverVersion pick) {
+        return version.order(pick) < 0 && version.major != pick.major;
     }
 
     int appendPackageDedupe(Package pkg) {

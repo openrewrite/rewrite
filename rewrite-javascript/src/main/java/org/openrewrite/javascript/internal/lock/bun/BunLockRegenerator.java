@@ -179,13 +179,19 @@ public final class BunLockRegenerator {
          */
         private final PackageDiff.@Nullable Summary summary;
 
+        /**
+         * From 1.4.0, the root's and the workspaces' rows before the diff, whose moves the dependents follow.
+         */
+        private final DirectDependencies directBefore;
+
         PendingInstall(LoadResult loadResult, PackageManager manager, int configVersion, int packagesBefore,
-                       PackageDiff.@Nullable Summary summary) {
+                       PackageDiff.@Nullable Summary summary, DirectDependencies directBefore) {
             this.loadResult = loadResult;
             this.manager = manager;
             this.configVersion = configVersion;
             this.packagesBefore = packagesBefore;
             this.summary = summary;
+            this.directBefore = directBefore;
         }
 
         Lockfile getLockfile() {
@@ -292,6 +298,7 @@ public final class BunLockRegenerator {
             }
             requirePatchFiles(these, install.getLockfile(), install.getManager().options.getRelease());
             install.getManager().resolve(install.getPackagesBefore());
+            install.getDirectBefore().redirectDependents(install.getLockfile());
         } catch (IllegalArgumentException e) {
             if (e instanceof Json.SyntaxError || e instanceof TextLockfileReader.ParseError || !log.hasErrors()) {
                 throw e;
@@ -467,10 +474,12 @@ public final class BunLockRegenerator {
         Lockfile loaded = loadResult.getLockfile();
         PackageManager manager = new PackageManager(loaded != null ? loaded : new Lockfile(release), options, log,
                 manifests, registry, inputs.getNow().toEpochMilli());
+        manager.lockfile.markLoadedPackages();
         boolean needsNewLockfile = !loadResult.isOk();
         int packagesBefore = manager.lockfile.packages.size();
         if (!loadResult.isOk() && inputs.getLock() != null) {
-            return new PendingInstall(loadResult, manager, configVersion, packagesBefore, null);
+            return new PendingInstall(loadResult, manager, configVersion, packagesBefore, null,
+                    DirectDependencies.NONE);
         }
 
         if (options.isFrozenLockfile() && release.toleratesAPrunedCheckoutWhenFrozen() && loaded != null) {
@@ -484,6 +493,7 @@ public final class BunLockRegenerator {
         }
 
         PackageDiff.Summary summary = null;
+        DirectDependencies directBefore = DirectDependencies.NONE;
         if (loadResult.isOk()) {
             Package root = manager.lockfile.rootPackage();
             if (root == null || root.dependenciesLen == 0) {
@@ -498,6 +508,9 @@ public final class BunLockRegenerator {
                 Arrays.fill(mapping, INVALID_PACKAGE_ID);
                 summary = PackageDiff.generate(options, log, manager.lockfile, lockfile, root,
                         maybeRoot, mapping, manifests);
+                if (release.redirectsDependentsOfAMovedDirectDependency() && changesResolutions(summary)) {
+                    directBefore = DirectDependencies.snapshot(manager.lockfile);
+                }
                 if (summary.hasDiffs()) {
                     replaceRoot(manager, lockfile, maybeRoot, mapping, summary);
                 }
@@ -522,7 +535,14 @@ public final class BunLockRegenerator {
         } else {
             manager.drainDependencyList();
         }
-        return new PendingInstall(loadResult, manager, configVersion, packagesBefore, summary);
+        return new PendingInstall(loadResult, manager, configVersion, packagesBefore, summary, directBefore);
+    }
+
+    // Package.rs DiffSummary::changes_resolutions: an added, removed or updated dependency, or changed overrides or
+    // catalogs
+    private static boolean changesResolutions(PackageDiff.Summary summary) {
+        return summary.add > 0 || summary.remove > 0 || summary.update > 0 || summary.overridesChanged ||
+               summary.catalogsChanged;
     }
 
     private static void replaceRoot(PackageManager manager, Lockfile lockfile, Package maybeRoot, int[] mapping,
