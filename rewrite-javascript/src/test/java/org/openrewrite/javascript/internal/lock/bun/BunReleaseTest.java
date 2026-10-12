@@ -585,7 +585,10 @@ class BunReleaseTest {
 
     /**
      * bun.lock.zig parseIntoBinaryLockfile (1.2.5): a workspace entry under a key no member took is bound to its
-     * member; before, it is {@code Unknown workspace}.
+     * member; before, it is {@code Unknown workspace}. (A root's {@code "x": "workspace:packages/a"}: 1.2.4 writes the
+     * entry {@code "x": ["a@workspace:packages/a"]} and, installing again, fails it with {@code error: Unknown
+     * workspace: 'packages/a'}, {@code InvalidPackageInfo: failed to parse lockfile} and ignores the lock; 1.2.5 reads
+     * it.)
      */
     @Test
     void readsAWorkspaceEntryUnderAnotherKeyFrom125() {
@@ -659,6 +662,26 @@ class BunReleaseTest {
           .contains("\"a\": [\"a@workspace:packages/a\"]");
         assertThat(written(install("1.2.2", lock, manifests, packuments)))
           .contains("\"a\": [\"a@1.0.0\", \"\", {}, \"" + INTEGRITY + "\"]");
+    }
+
+    /**
+     * As 1.2.2 and 1.2.3 installed a member a overridden by a folder b of the same name: 1.2.2 resolves the root's edge
+     * to the folder and lists no workspace, 1.2.3 links the member.
+     */
+    @Test
+    void overridesTheRootsEdgeToAMemberAsEachReleaseDid() {
+        java.util.Map<String, String> manifests = new java.util.LinkedHashMap<>();
+        manifests.put("", "{\"name\":\"p\",\"workspaces\":[\"packages/a\"],\"overrides\":{\"a\":\"file:./b\"}}");
+        manifests.put("packages/a", "{\"name\":\"a\",\"version\":\"1.0.0\"}");
+        manifests.put("b", "{\"name\":\"a\",\"version\":\"9.0.0\"}");
+        String lock = "{\n  \"lockfileVersion\": 1,\n  \"workspaces\": {\n    \"\": {\n      \"name\": \"p\",\n    },\n" +
+                      "  },\n  \"packages\": {}\n}\n";
+        java.util.Map<String, String> none = java.util.Collections.emptyMap();
+        assertThat(written(install("1.2.2", lock, manifests, none))).isEqualTo("{\n  \"lockfileVersion\": 1,\n" +
+          "  \"workspaces\": {\n    \"\": {\n      \"name\": \"p\",\n    },\n  },\n  \"overrides\": {\n" +
+          "    \"a\": \"file:./b\",\n  },\n  \"packages\": {\n    \"a\": [\"a@file:b\", {}],\n  }\n}\n");
+        assertThat(written(install("1.2.3", lock, manifests, none))).contains("    \"packages/a\": {\n")
+          .contains("    \"a\": [\"a@workspace:packages/a\"],\n");
     }
 
     /**
