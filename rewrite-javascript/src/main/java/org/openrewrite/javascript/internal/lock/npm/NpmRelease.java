@@ -620,6 +620,38 @@ public final class NpmRelease implements Comparable<NpmRelease> {
     }
 
     /**
+     * {@code [_loadDeps]} loads devDependencies before peerDependencies, so that a dev edge is kept over a peer edge
+     * of its name, from npm 7.0.4; before, after them.
+     */
+    boolean loadsDevDepsBeforePeerDeps() {
+        return atLeast(7, 0, 4);
+    }
+
+    /**
+     * {@code [_loadDeps]}: a virtual root loads its source's devDependencies where that source is a top with a path,
+     * from npm 7.5.1; between 7.1.1 and then, never ({@link #skipsDevDepsOfVirtualRoots()}).
+     */
+    boolean loadsDevDepsOfTopSources() {
+        return atLeast(7, 5, 1);
+    }
+
+    /**
+     * {@code [_loadDeps]} loads peer, prod, optional and then dev dependencies, an edge replacing an earlier one of its
+     * name that is no workspace's, from npm 7.12.0; before, optional dependencies first, an earlier edge kept.
+     */
+    boolean loadsPeerDepsFirst() {
+        return atLeast(7, 12, 0);
+    }
+
+    /**
+     * Before npm 7.12.0, {@code [_loadDeps]} loads dependencies last, a prod edge replacing a dev one of its name,
+     * from npm 7.5.5; before, right after optionalDependencies.
+     */
+    boolean loadsProdDepsLast() {
+        return atLeast(7, 5, 5);
+    }
+
+    /**
      * A node's children and edges are case-insensitive-map.js's, one entry for names alike in NFKD lower case, and an
      * edge is satisfied by a node of its own name only (edge.js), from npm 7.21.0; before, plain {@code Map}s.
      */
@@ -649,6 +681,14 @@ public final class NpmRelease implements Comparable<NpmRelease> {
      */
     boolean readsOverrides() {
         return atLeast(8, 3, 0);
+    }
+
+    /**
+     * {@code [_loadDeps]}: a virtual root, a node standing in for another, loads no devDependencies, from npm 7.1.1;
+     * before, any top with a path loads them.
+     */
+    boolean skipsDevDepsOfVirtualRoots() {
+        return atLeast(7, 1, 1);
     }
 
     /**
