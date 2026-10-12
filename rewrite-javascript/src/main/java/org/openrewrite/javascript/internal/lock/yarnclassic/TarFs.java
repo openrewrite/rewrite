@@ -16,6 +16,7 @@
 package org.openrewrite.javascript.internal.lock.yarnclassic;
 
 import org.jspecify.annotations.Nullable;
+import org.openrewrite.javascript.internal.lock.CannotKnow;
 import org.openrewrite.javascript.internal.lock.JsError;
 import org.openrewrite.javascript.internal.lock.PosixPath;
 
@@ -57,7 +58,13 @@ final class TarFs {
 
     private final Map<String, Node> tree = new HashMap<>();
 
-    private TarFs() {
+    /**
+     * Whether yarn's map keeps every link inside the directory (from yarn 1.22.0).
+     */
+    private final boolean jail;
+
+    private TarFs(boolean jail) {
+        this.jail = jail;
         tree.put("", new Node(true, null));
     }
 
@@ -65,7 +72,15 @@ final class TarFs {
      * @throws JsError the error the extraction stops with: an entry type it does not write, a path through a file.
      */
     static TarFs extract(byte[] tar) {
-        TarFs fs = new TarFs();
+        return extract(tar, true);
+    }
+
+    /**
+     * {@code extract} with yarn's map of link targets into the directory ({@code jail}), as yarn 1.22.0 and later
+     * extract; before, a link out of the directory reaches the disk around yarn's cache.
+     */
+    static TarFs extract(byte[] tar, boolean jail) {
+        TarFs fs = new TarFs(jail);
         TarStream.extract(tar, fs::entry);
         return fs;
     }
@@ -76,7 +91,7 @@ final class TarFs {
         if (Js.truthy(linkname) && ("link".equals(header.type) || PosixPath.isAbsolute(linkname))) {
             header.linkname = strip(linkname);
         }
-        if (Js.truthy(header.linkname)) {
+        if (jail && Js.truthy(header.linkname)) {
             String basePath = PosixPath.dirname(PosixPath.join("/", header.name));
             header.linkname = PosixPath.relative("/", PosixPath.join(basePath, header.linkname));
         }
@@ -128,6 +143,10 @@ final class TarFs {
             String segment = todo.removeFirst();
             if ("..".equals(segment)) {
                 if (done.isEmpty()) {
+                    if (!jail && links > 0) {
+                        throw new CannotKnow("what the files outside yarn's cache directory hold that a link of " +
+                                             "the archive leads to (" + location + ")");
+                    }
                     return null;
                 }
                 done.remove(done.size() - 1);

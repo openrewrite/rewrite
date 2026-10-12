@@ -17,6 +17,7 @@ package org.openrewrite.javascript.internal.lock.yarnclassic;
 
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.javascript.internal.lock.CannotKnow;
+import org.openrewrite.javascript.internal.lock.JsError;
 import org.openrewrite.javascript.internal.lock.PosixPath;
 
 import java.util.Arrays;
@@ -50,37 +51,71 @@ final class Rc {
      */
     static Map<String, @Nullable Object> getRcConfigForCwd(Map<String, String> configFiles,
                                                            Map<String, String> home) {
+        return getRcConfigForCwd(configFiles, home, YarnClassicRelease.PORTED);
+    }
+
+    /**
+     * {@code getRcConfigForCwd} as {@code release} reads the chain.
+     */
+    static Map<String, @Nullable Object> getRcConfigForCwd(Map<String, String> configFiles,
+                                                           Map<String, String> home, YarnClassicRelease release) {
         Map<String, @Nullable Object> rc = new LinkedHashMap<>();
         for (int depth = Config.depth(configFiles.keySet()); depth >= 0; depth--) {
             for (String name : RC_FILES) {
                 String text = configFiles.get(Config.up(depth) + name);
                 if (text != null) {
-                    Js.assign(rc, loadRcFile(text, Config.up(depth) + name));
+                    Js.assign(rc, parseRcPath(text, Config.up(depth) + name, release));
                 }
             }
         }
         for (String name : RC_FILES) {
             String text = home.get(name);
             if (text != null) {
-                Js.assign(rc, loadRcFile(text, HOME + name));
+                Js.assign(rc, parseRcPath(text, HOME + name, release));
             }
         }
         return rc;
+    }
+
+    // util/rc.js parseRcPaths: what reading a file throws, from 1.22.1; before, a file that throws counts as empty
+    private static @Nullable Object parseRcPath(String text, String filePath, YarnClassicRelease release) {
+        try {
+            return loadRcFile(text, filePath, release);
+        } catch (JsError | MessageError e) {
+            if (release.throwsRcFileErrors()) {
+                throw e;
+            }
+            return new LinkedHashMap<String, Object>();
+        }
     }
 
     /**
      * {@code loadRcFile}, its directory keys resolved against the file's directory as paths relative to the
      * project's root, or to the home directory ({@code ~/}), whose files the engine does not see.
      */
-    @SuppressWarnings("unchecked")
     static @Nullable Object loadRcFile(String text, String filePath) {
-        Object values = LockfileParser.parseLockfile(text.replace("\r\n", "\n"), PosixPath.basename(filePath))
-                .getObject();
-        Object yarnPath = Js.get(values, "yarnPath");
-        if (filePath.endsWith(".yml") && Js.truthy(values) && yarnPath instanceof String) {
-            Map<String, @Nullable Object> path = new LinkedHashMap<>();
-            path.put("yarn-path", yarnPath);
-            values = path;
+        return loadRcFile(text, filePath, YarnClassicRelease.PORTED);
+    }
+
+    /**
+     * {@code loadRcFile} of {@code release}: a .yarnrc.yml is parsed as YAML and keeps its settings from 1.22.1;
+     * before, it is parsed as a .yarnrc and keeps its {@code yarnPath} alone.
+     */
+    @SuppressWarnings("unchecked")
+    static @Nullable Object loadRcFile(String text, String filePath, YarnClassicRelease release) {
+        String fileLoc = release.parsesRcFilesByTheirPath() ? PosixPath.basename(filePath) : "yarnrc";
+        Object values = LockfileParser.parseLockfile(text.replace("\r\n", "\n"), fileLoc, release).getObject();
+        if (filePath.endsWith(".yml")) {
+            if (!release.keepsYarnrcYmlSettings()) {
+                Map<String, @Nullable Object> path = new LinkedHashMap<>();
+                path.put("yarn-path", yarnPathOf(values));
+                values = path;
+            } else if ((Js.truthy(values) || !release.readsYarnPathOfAValue()) &&
+                       yarnPathOf(values) instanceof String) {
+                Map<String, @Nullable Object> path = new LinkedHashMap<>();
+                path.put("yarn-path", yarnPathOf(values));
+                values = path;
+            }
         }
         if (values instanceof Map) {
             Map<String, @Nullable Object> map = (Map<String, @Nullable Object>) values;
@@ -89,14 +124,22 @@ final class Rc {
                 if (!PATH_KEYS.contains(name)) {
                     continue;
                 }
-                if (filePath.startsWith(HOME) && "yarn-path".equals(name)) {
+                if (filePath.startsWith(HOME) && "yarn-path".equals(name) && map.get(key) instanceof String) {
                     throw new CannotKnow("what the release " + Js.string(map.get(key)) + " that " + filePath +
-                                         " names writes: yarn 1.22.22 hands the install to it");
+                                         " names writes: yarn " + release + " hands the install to it");
                 }
                 map.put(key, resolve(PosixPath.dirname(filePath), map.get(key)));
             }
         }
         return values;
+    }
+
+    // values.yarnPath, which throws where the file's document is no value (undefined)
+    private static @Nullable Object yarnPathOf(@Nullable Object values) {
+        if (values == null) {
+            throw new JsError(JsError.TYPE_ERROR, "Cannot read properties of undefined (reading 'yarnPath')");
+        }
+        return Js.get(values, "yarnPath");
     }
 
     // path.resolve(dirname(filePath), value) relative to the project's root

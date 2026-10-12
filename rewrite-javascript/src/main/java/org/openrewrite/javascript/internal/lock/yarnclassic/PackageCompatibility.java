@@ -31,8 +31,6 @@ import java.util.Map;
  */
 final class PackageCompatibility {
 
-    static final String YARN_VERSION = "1.22.22";
-
     // process.versions of the Node 24 build the recordings ran on, other than node itself
     private static final List<String> NODE_COMPONENTS = Arrays.asList("acorn", "ada", "amaro", "ares", "brotli",
             "cldr", "icu", "llhttp", "merve", "modules", "napi", "nbytes", "ncrypto", "nghttp2", "nghttp3", "ngtcp2",
@@ -96,7 +94,7 @@ final class PackageCompatibility {
      */
     private @Nullable String version(String name) {
         if ("yarn".equals(name)) {
-            return YARN_VERSION;
+            return config.getRelease().toString();
         }
         if ("node".equals(name)) {
             String node = host.getNodeVersion();

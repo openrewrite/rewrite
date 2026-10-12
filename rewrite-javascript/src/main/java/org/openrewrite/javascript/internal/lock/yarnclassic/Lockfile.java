@@ -79,12 +79,19 @@ final class Lockfile {
      * the file with its CRLF line endings turned into LF.
      */
     static Lockfile fromDirectory(@Nullable String rawLockfile) {
+        return fromDirectory(rawLockfile, YarnClassicRelease.PORTED);
+    }
+
+    /**
+     * {@code fromDirectory} as {@code release} parses the lock.
+     */
+    static Lockfile fromDirectory(@Nullable String rawLockfile, YarnClassicRelease release) {
         Object lockfile = null;
         String raw = "";
         LockfileParser.ParseResult parseResult = null;
         if (rawLockfile != null) {
             raw = rawLockfile.replace("\r\n", "\n");
-            parseResult = LockfileParser.parseLockfile(raw, "yarn.lock");
+            parseResult = LockfileParser.parseLockfile(raw, "yarn.lock", release);
             lockfile = parseResult.getObject();
         }
         Object lockfilev2 = null;
@@ -268,6 +275,14 @@ final class Lockfile {
      * earlier pattern of the same name and remote, else a new one.
      */
     Map<String, @Nullable Object> getLockfile(Map<String, Manifest> patterns) {
+        return getLockfile(patterns, YarnClassicRelease.PORTED);
+    }
+
+    /**
+     * {@code getLockfile} of {@code release}: before 1.22.22 a pattern takes the entry of an earlier pattern of the
+     * same remote, whatever its name, and names the package where the names differ.
+     */
+    Map<String, @Nullable Object> getLockfile(Map<String, Manifest> patterns, YarnClassicRelease release) {
         Map<String, @Nullable Object> lockfile = new LinkedHashMap<>();
         Map<String, Map<String, @Nullable Object>> seen = new HashMap<>();
         List<String> sortedPatternsKeys = new ArrayList<>(Js.keys(patterns));
@@ -287,16 +302,22 @@ final class Lockfile {
             String remoteKey = keyForRemote(remote);
             String pkgName = getName(pattern);
 
-            String seenKey = remoteKey != null ? remoteKey + "#" + pkgName : null;
+            String seenKey = !release.sharesEntriesByName() ? remoteKey :
+                    remoteKey != null ? remoteKey + "#" + pkgName : null;
             Map<String, @Nullable Object> seenPattern = seenKey != null ? seen.get(seenKey) : null;
 
             if (seenPattern != null) {
                 lockfile.put(pattern, seenPattern);
+                // a name inferred from the pattern that is not the package's is written
+                if (!release.sharesEntriesByName() && !Js.truthy(seenPattern.get("name")) &&
+                    !Js.strictEquals(pkgName, pkg.getName())) {
+                    seenPattern.put("name", pkg.getName());
+                }
                 continue;
             }
 
             Map<String, @Nullable Object> fields = new LinkedHashMap<>();
-            fields.put("name", pkgName);
+            fields.put("name", release.sharesEntriesByName() ? pkgName : pkg.getName());
             fields.put("version", pkg.getVersion());
             fields.put("uid", pkg.getUid());
             fields.put("resolved", remote.resolved);

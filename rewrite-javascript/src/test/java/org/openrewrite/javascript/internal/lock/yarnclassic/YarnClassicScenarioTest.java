@@ -15,6 +15,7 @@
  */
 package org.openrewrite.javascript.internal.lock.yarnclassic;
 
+import lombok.Value;
 import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
@@ -26,23 +27,30 @@ import org.openrewrite.javascript.internal.LockFileRegeneration.Reason;
 import org.openrewrite.javascript.internal.LockFileRegeneration.Result;
 import org.openrewrite.javascript.internal.lock.Expect;
 import org.openrewrite.javascript.internal.lock.Host;
+import org.openrewrite.javascript.internal.lock.LockScenario;
 import org.openrewrite.javascript.internal.lock.LockScenario.Phase;
+import org.openrewrite.javascript.internal.lock.LockScenario.Replay;
 import org.openrewrite.javascript.internal.lock.LockScenarioTest;
 import org.openrewrite.javascript.internal.lock.RecordedRegistry;
 import org.openrewrite.javascript.internal.lock.RegistrySource;
 
+import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Stream;
 
+import static java.util.Collections.singletonList;
 import static java.util.Objects.requireNonNull;
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**
  * Replays every recorded edit {@link YarnClassicScenarios} finds through {@link YarnClassicLockRegenerator} and asserts
  * its {@code expect} line; {@code REWRITE_LOCK_YARN_CLASSIC_SCENARIO_RESULTS} names a file for one line per edit.
+ * Every scenario is replayed as each other Yarn 1 release too: its {@code releases} file names the releases that write
+ * its recorded outcome, and each {@code release/<first>/} another outcome with its own {@code releases}; the first and
+ * last release of each range are replayed ({@code REWRITE_LOCK_EVERY_RELEASE}, {@code REWRITE_LOCK_RELEASES}).
  */
 class YarnClassicScenarioTest extends LockScenarioTest {
 
@@ -50,6 +58,31 @@ class YarnClassicScenarioTest extends LockScenarioTest {
 
     YarnClassicScenarioTest() {
         super("REWRITE_LOCK_YARN_CLASSIC_SCENARIO_RESULTS", "yarn");
+    }
+
+    /**
+     * One install of the edit: the lock it started from, what it wrote, its expect line, and the release it ran as,
+     * which the host's {@code NodeRuntime} marker names; null for the recording, which the engine replays without one.
+     */
+    @Value
+    static class Edit {
+        YarnClassicScenarios.Scenario scenario;
+        String label;
+        String start;
+
+        @Nullable
+        String after;
+
+        @Nullable
+        String expect;
+
+        @Nullable
+        YarnClassicRelease release;
+
+        @Override
+        public String toString() {
+            return label;
+        }
     }
 
     static Stream<Arguments> edits() {
@@ -60,6 +93,58 @@ class YarnClassicScenarioTest extends LockScenarioTest {
             }
         }
         return out.stream();
+    }
+
+    static Stream<Arguments> releaseEdits() {
+        List<Arguments> out = new ArrayList<>();
+        for (YarnClassicScenarios.Scenario scenario : YarnClassicScenarios.discover()) {
+            if (!scenario.isEdit()) {
+                continue;
+            }
+            for (Replay replay : scenario.releases()) {
+                String label = scenario.getLabel() + "@" + replay.getRelease();
+                YarnClassicRelease release = YarnClassicRelease.of(replay.getRelease());
+                for (Edit edit : replay.getOutcome().equals(scenario.getDir()) ?
+                        singletonList(new Edit(scenario, label, requireNonNull(scenario.file("before")),
+                                scenario.file("after"), asRelease(scenario.expect()), release)) :
+                        outcome(scenario, release, replay.getOutcome(), label)) {
+                    out.add(Arguments.of(edit.getLabel(), edit));
+                }
+            }
+        }
+        return out.stream();
+    }
+
+    // what the engine cannot know of the recording, replayed without the release that built the LST, it may know as
+    // that release (a yarn-path hands the install to it): the lock byte for byte where it writes one
+    private static @Nullable String asRelease(@Nullable String expect) {
+        return expect != null && "cannot-know".equals(Expect.of(expect).getKind()) ? Expect.EXACT_OR + " " + expect :
+                expect;
+    }
+
+    // another release's outcome: the edit over the lock that release wrote first (over the given one where the
+    // recording was given its start), and the edit over the scenario's own before (cross)
+    private static List<Edit> outcome(YarnClassicScenarios.Scenario scenario, YarnClassicRelease release,
+                                      Path outcome, String label) {
+        List<Edit> edits = new ArrayList<>();
+        String start = scenario.isGiven() ? scenario.file("before") : LockScenario.read(outcome, "before");
+        String after = LockScenario.read(outcome, "after");
+        String expect = expect(outcome, "expect");
+        if (start != null && (after != null || expect != null)) {
+            edits.add(new Edit(scenario, label, start, after, expect, release));
+        }
+        String cross = LockScenario.read(outcome, "cross");
+        String expectCross = expect(outcome, "expect-cross");
+        if (!scenario.isGiven() && (cross != null || expectCross != null)) {
+            edits.add(new Edit(scenario, label + "/cross", requireNonNull(scenario.file("before")), cross,
+                    expectCross, release));
+        }
+        return edits;
+    }
+
+    private static @Nullable String expect(Path outcome, String file) {
+        String expect = LockScenario.read(outcome, file);
+        return expect == null ? null : expect.trim();
     }
 
     /**
@@ -101,12 +186,28 @@ class YarnClassicScenarioTest extends LockScenarioTest {
     @ParameterizedTest(name = "{0}")
     @MethodSource("edits")
     void regeneratesWhatYarnWrote(String name, YarnClassicScenarios.Scenario scenario) {
-        Expect expect = Expect.of(scenario.expect());
-        skipUnlessReplayed(scenario.getLabel(), scenario, expect);
+        replay(new Edit(scenario, scenario.getLabel(), requireNonNull(scenario.file("before")), scenario.file("after"),
+                scenario.expect(), null));
+    }
+
+    /**
+     * Every scenario as each other Yarn 1 release installs it: the releases its {@code releases} files name write the
+     * recorded outcome, or the one under {@code release/}.
+     */
+    @ParameterizedTest(name = "{0}")
+    @MethodSource("releaseEdits")
+    void regeneratesWhatEachReleaseWrote(String name, Edit edit) {
+        replay(edit);
+    }
+
+    private void replay(Edit edit) {
+        YarnClassicScenarios.Scenario scenario = edit.getScenario();
+        Expect expect = Expect.of(edit.getExpect());
+        skipUnlessReplayed(edit.getLabel(), scenario, expect);
         ScenarioRegistry http = new ScenarioRegistry(scenario);
-        Result result = new YarnClassicLockRegenerator(scenario.inputs(Phase.AFTER,
-                scenario.file("before")), http).regenerate();
-        check(scenario.getLabel(), expect, scenario.file("after"), result, http);
+        Result result = new YarnClassicLockRegenerator(scenario.inputs(Phase.AFTER, edit.getStart()).toBuilder()
+                .release(edit.getRelease()).build(), http).regenerate();
+        check(edit.getLabel(), expect, edit.getAfter(), result, http);
     }
 
     /**
@@ -143,10 +244,11 @@ class YarnClassicScenarioTest extends LockScenarioTest {
             case "malformed":
                 return failure.getReason() == Reason.MALFORMED_LOCK || failure.getReason() == Reason.MALFORMED_MANIFEST;
             case "pm-rejects":
-                // a package the registry does not have is the one route that is not recorded
+                // a package the registry does not have is the one route that is not recorded, whatever words a
+                // release reports it in
                 return failure.getKind() == Kind.PM_REJECTS && saysWhatYarnSaid(detail, rest) &&
                        (http.missing.isEmpty() || failure.getReason() == Reason.PACKAGE_NOT_FOUND &&
-                        (rest.startsWith("Couldn't find package") || rest.endsWith(": Not found")));
+                        http.missing.stream().allMatch(detail::contains));
             case "pm-fails":
                 return failure.getKind() == Kind.PM_FAILS && saysWhatYarnSaid(detail, rest) && http.missing.isEmpty();
             case "second-install-rejects":

@@ -26,6 +26,7 @@ import org.openrewrite.javascript.internal.LockFileRegeneration.Reason;
 import org.openrewrite.javascript.internal.LockFileRegeneration.Result;
 import org.openrewrite.javascript.internal.lock.Expect;
 import org.openrewrite.javascript.internal.lock.LockScenario.Phase;
+import org.openrewrite.javascript.internal.lock.LockScenario.Replay;
 import org.openrewrite.javascript.internal.lock.LockScenarioTest;
 import org.openrewrite.javascript.internal.lock.RecordedRegistry;
 
@@ -108,7 +109,7 @@ class YarnBerryScenarioTest extends LockScenarioTest {
     static Stream<Arguments> releaseEdits() {
         List<Arguments> out = new ArrayList<>();
         for (BerryScenarios.Scenario scenario : BerryScenarios.discover()) {
-            for (BerryScenarios.Replay replay : scenario.releases()) {
+            for (Replay replay : scenario.releases()) {
                 String label = scenario.getLabel() + "@" + replay.getRelease();
                 List<Edit> edits = replay.getOutcome().equals(scenario.getDir()) ?
                         recorded(scenario, replay.getRelease(), label) :

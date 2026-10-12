@@ -93,7 +93,7 @@ final class TarballFetcher {
     // _fetch: a local path is the filesystem's; any other reference is the registry's, verified, gunzipped, untarred
     private TarFs fetchTarball() {
         byte[] tarball = download();
-        TarFs extracted = untar(reference(), tarball);
+        TarFs extracted = untar(reference(), tarball, config.getRelease());
         Ssri.Integrity integrity = integrity(remote);
         if (integrity != null && integrity.getHashes().isEmpty()) {
             throw new MessageError(reference() + ": " + Lang.format("Integrity checked failed for $0 (none of " +
@@ -162,6 +162,13 @@ final class TarballFetcher {
      * {@code createExtractor}'s gunzip and tar-fs extract, their errors as request-manager rejects them, the url first.
      */
     static TarFs untar(String url, byte[] tarball) {
+        return untar(url, tarball, YarnClassicRelease.PORTED);
+    }
+
+    /**
+     * {@code untar} as {@code release} extracts.
+     */
+    static TarFs untar(String url, byte[] tarball, YarnClassicRelease release) {
         byte[] tar;
         try {
             tar = GunzipMaybe.gunzip(tarball);
@@ -169,7 +176,7 @@ final class TarballFetcher {
             throw new JsError(e.getName(), url + ": " + e.getMessage());
         }
         try {
-            return TarFs.extract(tar);
+            return TarFs.extract(tar, release.jailsTarballLinks());
         } catch (JsError e) {
             throw new MessageError(url + ": " + Lang.format("Extracting tar content of $1 failed, the file appears " +
                                                             "to be corrupt: $0", e.getMessage(), null));

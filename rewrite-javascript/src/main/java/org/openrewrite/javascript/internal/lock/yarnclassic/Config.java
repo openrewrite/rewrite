@@ -98,6 +98,11 @@ final class Config {
     @Getter(AccessLevel.NONE)
     private final Inputs inputs;
 
+    /**
+     * The release that installs.
+     */
+    private final YarnClassicRelease release;
+
     private final boolean looseSemver;
     private final boolean focus;
 
@@ -143,6 +148,7 @@ final class Config {
      */
     Config(Inputs inputs, Map<String, @Nullable Object> flags) {
         this.inputs = inputs;
+        release = inputs.installsAs();
         looseSemver = !Js.truthy(flags.get("strictSemver"));
         focus = Js.truthy(flags.get("focus"));
         ignorePlatform = Js.truthy(flags.get("ignorePlatform"));

@@ -112,7 +112,7 @@ final class Install {
             installAtWorkspaceRoot(config.getWorkspaceRoot(),
                     Objects.requireNonNull(config.getLockfileFolderManifest()));
         }
-        return flags.isLockfile() ? Lockfile.fromDirectory(inputs.getLock()) : new Lockfile();
+        return flags.isLockfile() ? Lockfile.fromDirectory(inputs.getLock(), config.getRelease()) : new Lockfile();
     }
 
     /**
@@ -403,7 +403,8 @@ final class Install {
             }
         }
 
-        Map<String, @Nullable Object> lockfileBasedOnResolver = lockfile.getLockfile(resolvedPatterns);
+        Map<String, @Nullable Object> lockfileBasedOnResolver = lockfile.getLockfile(resolvedPatterns,
+                config.getRelease());
 
         if (!flags.isLockfile() || flags.isPureLockfile() || flags.isFrozenLockfile()) {
             return null;
@@ -465,7 +466,7 @@ final class Install {
         }
 
         String lockSource = LockfileStringifier.stringify(lockfileBasedOnResolver, false,
-                config.isEnableLockfileVersions(), processVersion(host.getNodeVersion(), config));
+                config.isEnableLockfileVersions(), processVersion(host.getNodeVersion(), config), config.getRelease());
         return Fs.writeFilePreservingEol(rawLock, lockSource, host.getOs());
     }
 
