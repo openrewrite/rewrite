@@ -1392,15 +1392,18 @@ public final class NpmRelease implements Comparable<NpmRelease> {
 
     /**
      * The @npmcli/map-workspaces npm bundles: 3.0.6 from npm 10.5.2, which finds the members 5.0.3 finds; 3.0.4 and
-     * the releases back to 2.0.2 (npm 8.5.4) that find them alike; 2.0.1 in npm 8.5.3, which refuses a duplicate name
-     * as soon as it is found; 2.0.0 from npm 8.1.0 and 1.0.4 from 7.20.6, which also read a backslash as glob's
-     * escape; before, 1.0.3, whose duplicate name's message names no paths.
+     * 3.0.3 from npm 9.6.3, which run glob 10 and 9; 3.0.2 and the releases back to 2.0.2 (npm 8.5.4), which find the
+     * members alike under glob 7 and 8; 2.0.1 in npm 8.5.3, which refuses a duplicate name as soon as it is found;
+     * 2.0.0 from npm 8.1.0 and 1.0.4 from 7.20.6, which also read a backslash as glob's escape; before, 1.0.3, whose
+     * duplicate name's message names no paths.
      */
     MapWorkspaces.Release mapWorkspaces() {
         return atLeast(10, 5, 2) ? MapWorkspaces.Release.V5_0_3 :
-                atLeast(8, 5, 4) ? MapWorkspaces.Release.V3_0_4 :
-                        atLeast(8, 5, 3) ? MapWorkspaces.Release.V2_0_1 :
-                                atLeast(7, 20, 6) ? MapWorkspaces.Release.V2_0_0 : MapWorkspaces.Release.V1_0_3;
+                atLeast(9, 6, 3) ? MapWorkspaces.Release.V3_0_4 :
+                        atLeast(8, 5, 4) ? MapWorkspaces.Release.V2_0_2 :
+                                atLeast(8, 5, 3) ? MapWorkspaces.Release.V2_0_1 :
+                                        atLeast(7, 20, 6) ? MapWorkspaces.Release.V2_0_0 :
+                                                MapWorkspaces.Release.V1_0_3;
     }
 
     // @npmcli/package-json normalize.js
