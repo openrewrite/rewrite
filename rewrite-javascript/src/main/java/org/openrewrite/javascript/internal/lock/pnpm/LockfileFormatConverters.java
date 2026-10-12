@@ -282,13 +282,15 @@ final class LockfileFormatConverters {
         Object tarball = resolution.get("tarball");
         if (tarball != null) {
             if (!(tarball instanceof String)) {
-                if (release.marksGitHostedTarballs()) {
+                // from 11.9.0 a tarball that is no string is no git-hosted one
+                // (PnpmRelease#recognizesOnlyCommitArchivesAsGitHosted)
+                if (release.marksGitHostedTarballs() && !release.recognizesOnlyCommitArchivesAsGitHosted()) {
                     throw new TypeError(release.matchesGitHostedTarballUrlsInAnyCase() ?
                             "url.toLowerCase is not a function" : "url.startsWith is not a function");
                 }
                 return;
             }
-            if (LockfileUtils.isGitHostedTarballUrl((String) tarball, release) && release.marksGitHostedTarballs()) {
+            if (LockfileUtils.isGitHostedTarball((String) tarball, release) && release.marksGitHostedTarballs()) {
                 resolution.put("gitHosted", true);
             }
         }

@@ -1549,9 +1549,13 @@ final class ResolveDependencies {
             return new ChildrenResolutionClaim(resolution.getId(), true, missingPeersOfChildren);
         }
         MissingPeersOfChildren missingPeersOfChildren = null;
-        if (ctx.isHoistPeers() && !parentIds.contains(pkgId) && existing.getMissingPeersOfChildren() != null &&
-            (existing.getOwner().getDepth() >= currentDepth || existing.getMissingPeersOfChildren().isResolved())) {
-            missingPeersOfChildren = existing.getMissingPeersOfChildren();
+        // from 11.9.0 an occurrence deeper than the owner no longer shares the missing peers of children the owner
+        // resolved already (PnpmRelease#sharesMissingPeersOfChildrenOnlyWithAnOwnerAsDeep)
+        MissingPeersOfChildren owners = existing.getMissingPeersOfChildren();
+        if (ctx.isHoistPeers() && !parentIds.contains(pkgId) && owners != null &&
+            (existing.getOwner().getDepth() >= currentDepth ||
+             owners.isResolved() && !ctx.getRelease().sharesMissingPeersOfChildrenOnlyWithAnOwnerAsDeep())) {
+            missingPeersOfChildren = owners;
         }
         return new ChildrenResolutionClaim(existing.getId(), false, missingPeersOfChildren);
     }

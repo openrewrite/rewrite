@@ -83,7 +83,7 @@ final class VerifyLockfileResolutions {
             throw buildInvalidAliasError(invalidAliases);
         }
         // from 11.5.3 a registry dep path backed by another resolution fails ahead of any verifier
-        List<ResolutionPolicyViolation> shapeViolations = collectShapeViolations(lockfile);
+        List<ResolutionPolicyViolation> shapeViolations = collectShapeViolations(lockfile, release);
         if (!shapeViolations.isEmpty() && release.rejectsARegistryDepPathWithANonRegistryResolution()) {
             throw buildVerificationError(shapeViolations);
         }
@@ -208,7 +208,8 @@ final class VerifyLockfileResolutions {
     }
 
     // collectCandidates' shapeViolations of 11.5.3, one for each dep path
-    private static List<ResolutionPolicyViolation> collectShapeViolations(LockfileObject lockfile) {
+    private static List<ResolutionPolicyViolation> collectShapeViolations(LockfileObject lockfile,
+                                                                          PnpmRelease release) {
         List<ResolutionPolicyViolation> violations = new ArrayList<>();
         Map<String, PackageSnapshot> packages = lockfile.getPackages();
         if (packages == null) {
@@ -222,7 +223,8 @@ final class VerifyLockfileResolutions {
             if (name == null || name.isEmpty() || version == null || version.isEmpty()) {
                 continue;
             }
-            if (pkgInfo.getNonSemverVersion() == null && !isRegistryShapedResolution(snapshot.getResolution())) {
+            if (pkgInfo.getNonSemverVersion() == null &&
+                !isRegistryShapedResolution(snapshot.getResolution(), release)) {
                 violations.add(new ResolutionPolicyViolation(name, version, snapshot.getResolution(),
                         "RESOLUTION_SHAPE_MISMATCH",
                         "a registry-style dependency path is backed by a non-registry resolution"));
@@ -232,7 +234,7 @@ final class VerifyLockfileResolutions {
     }
 
     @SuppressWarnings("unchecked")
-    private static boolean isRegistryShapedResolution(@Nullable Object resolution) {
+    private static boolean isRegistryShapedResolution(@Nullable Object resolution, PnpmRelease release) {
         if (resolution == null || resolution == Js.UNDEFINED) {
             return true;
         }
@@ -248,7 +250,7 @@ final class VerifyLockfileResolutions {
             }
             for (Object variant : (List<Object>) variants) {
                 if (variant instanceof Map &&
-                    !isRegistryShapedResolution(((Map<String, Object>) variant).get("resolution"))) {
+                    !isRegistryShapedResolution(((Map<String, Object>) variant).get("resolution"), release)) {
                     return false;
                 }
             }
@@ -266,8 +268,15 @@ final class VerifyLockfileResolutions {
         }
         Object tarball = r.get("tarball");
         if (tarball instanceof String && !((String) tarball).isEmpty()) {
-            return HTTP_URL.matcher((String) tarball).find() &&
-                   !LockfileUtils.isGitHostedTarballUrlInAnyCase((String) tarball);
+            String url = (String) tarball;
+            if (!HTTP_URL.matcher(url).find()) {
+                return false;
+            }
+            // from 11.9.0 only a commit's archive is git-hosted (PnpmRelease#recognizesOnlyCommitArchivesAsGitHosted)
+            boolean gitHostedUrl = LockfileUtils.isGitHostedTarballUrlInAnyCase(url);
+            boolean commitArchive = LockfileUtils.isGitHostedCommitArchive(url);
+            return !(gitHostedUrl == commitArchive || !release.recognizesOnlyCommitArchivesAsGitHosted() ?
+                    gitHostedUrl : commitArchive);
         }
         return true;
     }

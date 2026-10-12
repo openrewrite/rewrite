@@ -20,8 +20,10 @@ import org.openrewrite.javascript.internal.lock.CannotKnow;
 import org.openrewrite.javascript.internal.lock.JsError;
 import org.openrewrite.javascript.internal.lock.WhatwgUrl;
 
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
@@ -118,7 +120,7 @@ final class LockfileUtils {
             return out;
         }
         String url = tarballUrl(tarball);
-        boolean gitHosted = Boolean.TRUE.equals(resolution.get("gitHosted")) || isGitHostedTarballUrl(url, release);
+        boolean gitHosted = Boolean.TRUE.equals(resolution.get("gitHosted")) || isGitHostedTarball(url, release);
         if (Boolean.TRUE.equals(lockfileIncludeTarballUrl) || url.startsWith("file:") || gitHosted) {
             return preservingGitHosted(integrity, url, gitHosted);
         }
@@ -240,11 +242,17 @@ final class LockfileUtils {
             resolution = new LinkedHashMap<>();
         }
         Object tarball = resolution.get("tarball");
+        // from 11.9.0 a tarball that is no string fails here, and a missing integrity is the lock's verification's to
+        // find (PnpmRelease#verifiesALockedTarballsIntegrity)
+        if (!isNullish(tarball) && !(tarball instanceof String) && release.verifiesALockedTarballsIntegrity()) {
+            throw new PnpmError("INVALID_TARBALL_RESOLUTION", "Cannot install package \"" + depPath + "\": its " +
+                                "lockfile entry has a non-string \"tarball\" field.");
+        }
         boolean fileTarball = tarball instanceof String && ((String) tarball).startsWith("file:");
         if (isNullish(resolution.get("type")) && isNullish(resolution.get("integrity")) && !fileTarball &&
             !(Boolean.TRUE.equals(resolution.get("gitHosted")) ||
               tarball instanceof String && isGitHostedTarballUrl((String) tarball, release)) &&
-            release.requiresALockedTarballsIntegrity()) {
+            release.requiresALockedTarballsIntegrity() && !release.verifiesALockedTarballsIntegrity()) {
             throw new PnpmError("MISSING_TARBALL_INTEGRITY", "Cannot install package \"" + depPath + "\": its " +
                                 "lockfile entry has no \"integrity\" field, so pnpm cannot verify the downloaded " +
                                 "tarball.", "The lockfile may be corrupted or have been tampered with. Restore it " +
@@ -343,6 +351,102 @@ final class LockfileUtils {
 
     static boolean isGitHostedTarballUrlInAnyCase(String url) {
         return isGitHostedTarballUrl(url.toLowerCase(Locale.ROOT));
+    }
+
+    /**
+     * {@code isGitHostedTarballUrl} as {@code release} asks it of a tarball from 11.0.7 on: from 11.9.0 only a
+     * commit's archive ({@link #isGitHostedCommitArchive}); before, as
+     * {@link #isGitHostedTarballUrl(String, PnpmRelease)} (PnpmRelease#recognizesOnlyCommitArchivesAsGitHosted),
+     * asked where the two differ.
+     */
+    static boolean isGitHostedTarball(String url, PnpmRelease release) {
+        boolean commitArchive = isGitHostedCommitArchive(url);
+        // the releases from 11.5.3 to 11.9.0 answer as in any case
+        if (isGitHostedTarballUrlInAnyCase(url) != commitArchive &&
+            release.recognizesOnlyCommitArchivesAsGitHosted()) {
+            return commitArchive;
+        }
+        return isGitHostedTarballUrl(url, release);
+    }
+
+    private static final Pattern GIT_COMMIT_SHA = Pattern.compile("[0-9a-f]{40}", Pattern.CASE_INSENSITIVE);
+
+    /**
+     * resolver-base's {@code isGitHostedTarballUrl} of 11.9.0: an https URL of a commit's archive on GitHub
+     * ({@code codeload.github.com/<o>/<r>/tar.gz/<sha>}), Bitbucket ({@code <o>/<r>/get/<sha>.tar.gz}) or GitLab
+     * ({@code api/v4/projects/<id>/repository/archive.tar.gz?ref=<sha>}, {@code <o>/<r>/-/archive/<sha>/<n>.tar.gz}),
+     * a value that is no string none.
+     */
+    static boolean isGitHostedCommitArchive(@Nullable Object url) {
+        if (!(url instanceof String)) {
+            return false;
+        }
+        WhatwgUrl parsedUrl = WhatwgUrl.tryParse((String) url);
+        if (parsedUrl == null || !"https:".equals(parsedUrl.getProtocol())) {
+            return false;
+        }
+        List<String> segments = new ArrayList<>();
+        for (String segment : parsedUrl.getPathname().split("/", -1)) {
+            if (!segment.isEmpty()) {
+                segments.add(segment);
+            }
+        }
+        switch (parsedUrl.getHostname().toLowerCase(Locale.ROOT)) {
+            case "codeload.github.com":
+                return segments.size() == 4 && "tar.gz".equals(segments.get(2)) &&
+                       GIT_COMMIT_SHA.matcher(segments.get(3)).matches();
+            case "bitbucket.org":
+                if (segments.size() != 4 || !"get".equals(segments.get(2)) || !segments.get(3).endsWith(".tar.gz")) {
+                    return false;
+                }
+                return GIT_COMMIT_SHA.matcher(segments.get(3).substring(0, segments.get(3).length() -
+                                                                            ".tar.gz".length())).matches();
+            case "gitlab.com":
+                return isGitLabArchive(parsedUrl, segments);
+            default:
+                return false;
+        }
+    }
+
+    private static boolean isGitLabArchive(WhatwgUrl url, List<String> segments) {
+        if (segments.size() == 6 && "api".equals(segments.get(0)) && "v4".equals(segments.get(1)) &&
+            "projects".equals(segments.get(2)) && "repository".equals(segments.get(4)) &&
+            "archive.tar.gz".equals(segments.get(5))) {
+            String ref = searchParam(url.getSearch(), "ref");
+            return GIT_COMMIT_SHA.matcher(ref == null ? "" : ref).matches();
+        }
+        int archiveMarkerIndex = -1;
+        for (int i = 0; i < segments.size(); i++) {
+            if ("-".equals(segments.get(i)) && i + 1 < segments.size() && "archive".equals(segments.get(i + 1))) {
+                archiveMarkerIndex = i;
+                break;
+            }
+        }
+        if (archiveMarkerIndex < 2) {
+            return false;
+        }
+        return segments.size() == archiveMarkerIndex + 4 && segments.get(archiveMarkerIndex + 3).endsWith(".tar.gz") &&
+               GIT_COMMIT_SHA.matcher(segments.get(archiveMarkerIndex + 2)).matches();
+    }
+
+    // url.searchParams.get(name): the first of the query's application/x-www-form-urlencoded pairs of that name
+    private static @Nullable String searchParam(String search, String name) {
+        String query = search.startsWith("?") ? search.substring(1) : search;
+        for (String pair : query.split("&", -1)) {
+            if (pair.isEmpty()) {
+                continue;
+            }
+            int eq = pair.indexOf('=');
+            String key = formDecode(eq == -1 ? pair : pair.substring(0, eq));
+            if (key.equals(name)) {
+                return formDecode(eq == -1 ? "" : pair.substring(eq + 1));
+            }
+        }
+        return null;
+    }
+
+    private static String formDecode(String value) {
+        return new String(WhatwgUrl.percentDecode(value.replace('+', ' ')), StandardCharsets.UTF_8);
     }
 
     private static boolean isGitHostedTarballUrl(String url) {

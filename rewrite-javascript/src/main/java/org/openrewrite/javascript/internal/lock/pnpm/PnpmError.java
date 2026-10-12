@@ -38,4 +38,56 @@ class PnpmError extends RuntimeException {
         this.code = "ERR_PNPM_" + code;
         this.hint = hint;
     }
+
+    /**
+     * The URL a {@code FetchError}'s message names, {@code GET <url>: …}: from 11.9.0 without its credentials
+     * ({@link #redactUrlCredentials}, {@link PnpmRelease#redactsUrlCredentialsInFetchErrors}), asked where it has any.
+     */
+    static String requestUrl(String url, PnpmRelease release) {
+        String redacted = redactUrlCredentials(url);
+        return redacted.equals(url) || !release.redactsUrlCredentialsInFetchErrors() ? url : redacted;
+    }
+
+    /**
+     * {@code redactUrlCredentials} (11.9.0): the user info of every URL in {@code text} left out, an authority ending
+     * at its first {@code /}, {@code ?}, {@code #} or whitespace and its user info at the last {@code @} before.
+     */
+    static String redactUrlCredentials(String text) {
+        StringBuilder result = new StringBuilder();
+        int cursor = 0;
+        while (cursor < text.length()) {
+            int schemeSep = text.indexOf("://", cursor);
+            if (schemeSep == -1) {
+                return result.append(text, cursor, text.length()).toString();
+            }
+            int authorityStart = schemeSep + 3;
+            result.append(text, cursor, authorityStart);
+            cursor = authorityStart;
+            if (schemeSep == 0 || !isSchemeTailChar(text.charAt(schemeSep - 1))) {
+                continue;
+            }
+            int lastAt = -1;
+            for (int i = authorityStart; i < text.length(); i++) {
+                char code = text.charAt(i);
+                if (code == '/' || code == '?' || code == '#' || isAsciiWhitespace(code)) {
+                    break;
+                }
+                if (code == '@') {
+                    lastAt = i;
+                }
+            }
+            if (lastAt != -1) {
+                cursor = lastAt + 1;
+            }
+        }
+        return result.toString();
+    }
+
+    private static boolean isSchemeTailChar(char code) {
+        return code >= '0' && code <= '9' || code >= 'A' && code <= 'Z' || code >= 'a' && code <= 'z';
+    }
+
+    private static boolean isAsciiWhitespace(char code) {
+        return code == ' ' || code == '\t' || code == '\n' || code == 0x0B || code == '\f' || code == '\r';
+    }
 }

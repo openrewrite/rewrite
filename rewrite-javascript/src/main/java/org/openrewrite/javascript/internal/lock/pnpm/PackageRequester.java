@@ -179,13 +179,13 @@ final class PackageRequester {
         }
         String id = resolveResult.id;
         // from 11.9.0 a remote tarball without an integrity is downloaded to fill it, under --lockfile-only too
-        // (resolutionNeedsFetch, PnpmRelease#fetchesATarballToFillAMissingIntegrity); no input holds the tarball
+        // (resolutionNeedsFetch, PnpmRelease#fetchesATarballToFillAMissingIntegrity); no input holds the tarball.
+        // classifyResolution tells a git-hosted tarball by its URL alone, a commit's archive
+        // (PnpmRelease#recognizesOnlyCommitArchivesAsGitHosted)
         Object tarball = resolveResult.resolution.get("tarball");
         Object integrity = resolveResult.resolution.get("integrity");
         if (!Js.truthy(resolveResult.resolution.get("type")) && tarball instanceof String &&
-            HTTP_URL.matcher((String) tarball).find() &&
-            !Boolean.TRUE.equals(resolveResult.resolution.get("gitHosted")) &&
-            !LockfileUtils.isGitHostedTarballUrlInAnyCase((String) tarball) &&
+            HTTP_URL.matcher((String) tarball).find() && !LockfileUtils.isGitHostedCommitArchive(tarball) &&
             !(integrity instanceof String && !((String) integrity).isEmpty()) &&
             npmResolver.getRelease().fetchesATarballToFillAMissingIntegrity()) {
             throw new CannotKnow("the integrity of " + tarball + ", which pnpm downloads to write it");
@@ -201,6 +201,17 @@ final class PackageRequester {
         }
         CannotKnow unknown = null;
         if (manifest == null) {
+            // from 11.0.7 the git-hosted tarball pnpm fetches for the manifest gives a resolution without an integrity
+            // the one it was fetched with, under --lockfile-only too, a store that holds the tarball none
+            // (gitHostedTarballFetcher, PnpmRelease#pinsTheIntegrityOfAFetchedGitHostedTarball); no input holds either
+            if (!Js.truthy(resolveResult.resolution.get("type")) && tarball instanceof String &&
+                !((String) tarball).isEmpty() && !((String) tarball).startsWith("file:") &&
+                (Boolean.TRUE.equals(resolveResult.resolution.get("gitHosted")) ||
+                 isGitHostedPkgUrl((String) tarball)) &&
+                !Js.truthy(integrity) && npmResolver.getRelease().pinsTheIntegrityOfAFetchedGitHostedTarball()) {
+                throw new CannotKnow("the integrity of the git-hosted tarball " + tarball + ", which pnpm fetches " +
+                                     "for its manifest and writes");
+            }
             try {
                 manifest = manifestFromFetch(wantedDependency, resolveResult, currentPkg);
             } catch (CannotKnow e) {
@@ -260,6 +271,13 @@ final class PackageRequester {
         if (value != null && value != Js.UNDEFINED) {
             manifest.put(key, value);
         }
+    }
+
+    // pick-fetcher's isGitHostedPkgUrl, which picks the git-hosted tarball fetcher for a resolution without the
+    // gitHosted flag
+    private static boolean isGitHostedPkgUrl(String url) {
+        return (url.startsWith("https://codeload.github.com/") || url.startsWith("https://bitbucket.org/") ||
+                url.startsWith("https://gitlab.com/")) && url.contains("tar.gz");
     }
 
     private NpmResolver.ResolveResult resolve(ResolveDependencies.WantedDependency wantedDependency,

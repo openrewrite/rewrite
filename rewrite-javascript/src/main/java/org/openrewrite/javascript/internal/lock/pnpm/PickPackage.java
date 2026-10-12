@@ -185,11 +185,11 @@ final class PickPackage {
                 !release.upgradesAHeldPackumentForTheReleaseAge()) {
                 return new PickResult(cached, pickMatchingVersionFinal(pickerOpts, spec, cached));
             }
-            Map<String, @Nullable Object> upgraded = fetch(registry, registryUrl, spec.getName(), true);
+            Map<String, @Nullable Object> upgraded = fetch(registry, registryUrl, spec.getName(), true, release);
             cacheKey.put(metaCache, upgraded);
             return new PickResult(upgraded, pickMatchingVersionFinal(pickerOpts, spec, upgraded));
         }
-        Map<String, @Nullable Object> meta = fetch(registry, registryUrl, name, fullMetadata);
+        Map<String, @Nullable Object> meta = fetch(registry, registryUrl, name, fullMetadata, release);
         if (pickerOpts.getPublishedBy() != null && !fullMetadata && meta.get("time") == null &&
             !excluded(pickerOpts, name)) {
             Instant modified = modifiedDate(meta);
@@ -197,7 +197,7 @@ final class PickPackage {
             if (modified == null || modified.isAfter(pickerOpts.getPublishedBy()) ||
                 modified.equals(pickerOpts.getPublishedBy()) &&
                 !release.takesAPackumentModifiedAtTheCutoffAsMature()) {
-                meta = fetch(registry, registryUrl, name, true);
+                meta = fetch(registry, registryUrl, name, true, release);
             }
         }
         if (filterMetadata) {
@@ -295,10 +295,11 @@ final class PickPackage {
 
     @SuppressWarnings("unchecked")
     private static Map<String, @Nullable Object> fetch(RegistryMetadata registry, String registryUrl, String name,
-                                                       boolean fullMetadata) {
+                                                       boolean fullMetadata, PnpmRelease release) {
         String text = registry.packument(registryUrl, name, fullMetadata);
         if (text == null) {
-            throw new PnpmError("FETCH_404", "GET " + registryUrl + encodeName(name) + ": Not Found - 404",
+            throw new PnpmError("FETCH_404", "GET " + PnpmError.requestUrl(registryUrl + encodeName(name), release) +
+                                             ": Not Found - 404",
                     name + " is not in the npm registry, or you have no permission to fetch it.");
         }
         Object meta = Manifests.parseValue(text, registryUrl + name);

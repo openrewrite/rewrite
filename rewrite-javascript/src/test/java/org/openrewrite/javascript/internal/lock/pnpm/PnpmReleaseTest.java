@@ -422,6 +422,43 @@ class PnpmReleaseTest {
           .hasMessageContaining("one of 11.0.6 || 11.0.7, where the releases from 11.0.7 install it otherwise");
     }
 
+    private static final String CODELOAD =
+      "https://codeload.github.com/u/foo/tar.gz/98e8ff1da1a89f93d1397a24d7413ed15421c139";
+
+    // the lock-only install adding wrappy 1.0.2 beside github:u/foo, locked without an integrity as pnpm 10 and pnpm
+    // 11 before 11.0.7 lock it
+    private static String addWrappyBesideAGitHostedTarball(String release) {
+        String lock = "lockfileVersion: '9.0'\n\nsettings:\n  autoInstallPeers: true\n" +
+                      "  excludeLinksFromLockfile: false\n\nimporters:\n\n  .:\n    dependencies:\n      foo:\n" +
+                      "        specifier: github:u/foo#98e8ff1da1a89f93d1397a24d7413ed15421c139\n" +
+                      "        version: " + CODELOAD + "\n\npackages:\n\n  foo@" + CODELOAD + ":\n" +
+                      "    resolution: {tarball: " + CODELOAD + "}\n    version: 1.0.0\n\nsnapshots:\n\n" +
+                      "  foo@" + CODELOAD + ": {}\n";
+        PnpmLockRegenerator.Inputs inputs = PnpmLockRegenerator.Inputs.builder()
+          .lock(lock)
+          .manifest("", "{\"name\":\"p\",\"version\":\"1.0.0\",\"dependencies\":{\"foo\":\"github:u/foo#" +
+                        "98e8ff1da1a89f93d1397a24d7413ed15421c139\",\"wrappy\":\"1.0.2\"}}")
+          .env(Collections.singletonMap("pnpm_config_minimum_release_age", "0"))
+          .now(NOW)
+          .release(release(release))
+          .build();
+        return new PnpmLockRegenerator(inputs, WRAPPY_ONLY).writeLock();
+    }
+
+    /**
+     * fetching/tarball-fetcher gitHostedTarballFetcher.ts and installing/package-requester (11.0.7): the git-hosted
+     * tarball pnpm fetches for its manifest gives a resolution without an integrity the one fetched, which no input
+     * holds (nor whether the store does, which gives none); before, it is written without one.
+     */
+    @Test
+    void pinsTheIntegrityOfAFetchedGitHostedTarballFrom1107() {
+        assertThat(addWrappyBesideAGitHostedTarball("11.0.6"))
+          .contains("  foo@" + CODELOAD + ":\n    resolution: {tarball: " + CODELOAD + "}\n");
+        assertThatThrownBy(() -> addWrappyBesideAGitHostedTarball("11.0.7"))
+          .isInstanceOf(CannotKnow.class)
+          .hasMessageContaining("the integrity of the git-hosted tarball " + CODELOAD + ", which pnpm fetches");
+    }
+
     /**
      * installing/deps-installer install/index.ts (11.4.0): updateChecksums resolves in full; before, the lock is up
      * to date.
@@ -1876,3 +1913,243 @@ class PnpmReleaseTest {
           });
     }
 }
+
+    private static final String SHA = "0123456789abcdef0123456789abcdef01234567";
+
+    /**
+     * resolving/resolver-base isGitHostedTarballUrl (11.9.0): only a commit's archive is git-hosted, so the archive of
+     * a branch is written without gitHosted, lockfile.fs reads a tarball that is no string, and the npm verifier
+     * checks a flagged resolution of such a URL; before, any codeload URL with tar.gz is git-hosted.
+     */
+    @Test
+    void recognizesOnlyCommitArchivesAsGitHostedFrom1190() {
+        String branch = "https://codeload.github.com/o/r/tar.gz/main";
+        Map<String, @Nullable Object> resolution = obj("{'integrity':'sha512-x','tarball':'" + branch + "'}");
+        assertThat(json(LockfileUtils.toLockfileResolution("r", "1.0.0", resolution, REGISTRY, false,
+          release("11.8.0")))).isEqualTo("{'integrity':'sha512-x','tarball':'" + branch + "','gitHosted':true}");
+        assertThat(json(LockfileUtils.toLockfileResolution("r", "1.0.0", resolution, REGISTRY, false,
+          release("11.9.0")))).isEqualTo("{'integrity':'sha512-x','tarball':'" + branch + "'}");
+        assertThat(LockfileUtils.isGitHostedCommitArchive("https://codeload.github.com/o/r/tar.gz/" + SHA)).isTrue();
+        assertThat(LockfileUtils.isGitHostedCommitArchive("https://bitbucket.org/o/r/get/" + SHA + ".tar.gz"))
+          .isTrue();
+        assertThat(LockfileUtils.isGitHostedCommitArchive("https://gitlab.com/api/v4/projects/7/repository/" +
+                                                          "archive.tar.gz?ref=" + SHA)).isTrue();
+        assertThat(LockfileUtils.isGitHostedCommitArchive("https://gitlab.com/o/r/-/archive/" + SHA + "/r.tar.gz"))
+          .isTrue();
+        assertThat(LockfileUtils.isGitHostedCommitArchive("http://codeload.github.com/o/r/tar.gz/" + SHA)).isFalse();
+
+        Map<String, @Nullable Object> numbered = obj("{'lockfileVersion':'9.0','importers':{},'packages':{" +
+                                                     "'foo@1.0.0':{'resolution':{'integrity':'sha512-x'," +
+                                                     "'tarball':5}}},'snapshots':{'foo@1.0.0':{}}}");
+        assertThatThrownBy(() -> LockfileFormatConverters.convertToLockfileObject(obj(json(numbered)),
+          release("11.8.0")))
+          .isInstanceOf(LockfileFormatConverters.TypeError.class)
+          .hasMessage("url.toLowerCase is not a function");
+        assertThat(LockfileFormatConverters.convertToLockfileObject(numbered, release("11.9.0")).getPackages())
+          .containsKey("foo@1.0.0");
+
+        Map<String, @Nullable Object> flagged = obj("{'integrity':'sha512-x','tarball':'" + branch +
+                                                    "','gitHosted':true}");
+        assertThat(NpmResolutionVerifier.isNpmRegistryResolution(flagged, release("11.8.0"))).isFalse();
+        assertThat(NpmResolutionVerifier.isNpmRegistryResolution(flagged, release("11.9.0"))).isTrue();
+    }
+
+    // the npm verifier of release over registry, under minimumReleaseAge where it is given
+    private static NpmResolutionVerifier npmVerifier(String release, RegistryMetadata registry,
+                                                     @Nullable Double minimumReleaseAge) {
+        NpmResolutionVerifier verifier = NpmResolutionVerifier.createNpmResolutionVerifier(
+          NpmResolutionVerifier.Options.builder()
+            .minimumReleaseAge(minimumReleaseAge)
+            .registries(Collections.singletonMap("default", REGISTRY))
+            .fetch(registry)
+            .now(NOW)
+            .release(release(release))
+            .build());
+        assertThat(verifier).isNotNull();
+        return verifier;
+    }
+
+    private static void verifyLock(String lock, String release, RegistryMetadata registry,
+                                   @Nullable Double minimumReleaseAge) {
+        VerifyLockfileResolutions.verifyLockfileResolutions(LockfileReader.read(lock, release(release)).getLockfile(),
+          Collections.singletonList(npmVerifier(release, registry, minimumReleaseAge)), release(release));
+    }
+
+    // a lock of the orphan package foo 1.0.0 resolved as given
+    private static String fooLock(String resolution) {
+        return "lockfileVersion: '9.0'\n\nsettings:\n  autoInstallPeers: true\n  excludeLinksFromLockfile: false\n\n" +
+               "importers:\n\n  .: {}\n\npackages:\n\n  foo@1.0.0:\n    resolution: " + resolution + "\n\n" +
+               "snapshots:\n\n  foo@1.0.0: {}\n";
+    }
+
+    /**
+     * resolving/npm-resolver createNpmResolutionVerifier.ts isRegistryTarballResolution and lockfile/utils
+     * pkgSnapshotToResolution.ts (11.9.0): a registry tarball locked without an integrity fails the lock's
+     * verification, and a non-semver version is a violation; before, the verification passes both and
+     * pkgSnapshotToResolution fails on the missing integrity. A tarball that is no string fails pkgSnapshotToResolution
+     * from 11.9.0.
+     */
+    @Test
+    void verifiesALockedTarballsIntegrityFrom1190() {
+        RegistryMetadata registry = registry(new String[]{"foo", "", ""});
+        String tarball = REGISTRY + "foo/-/x-1.0.0.tgz";
+        String lock = fooLock("{tarball: " + tarball + "}");
+        assertThatThrownBy(() -> verifyLock(lock, "11.9.0", registry, null))
+          .isInstanceOfSatisfying(PnpmError.class, e -> {
+              assertThat(e.getCode()).isEqualTo("ERR_PNPM_MISSING_TARBALL_INTEGRITY");
+              assertThat(e.getMessage()).isEqualTo("1 lockfile entries failed verification:\n  foo@1.0.0 has no " +
+                                                   "\"integrity\" field, so its downloaded tarball cannot be verified");
+          });
+        verifyLock(lock, "11.8.0", registry, null);
+        Map<String, String> registries = Collections.singletonMap("default", REGISTRY);
+        PackageSnapshot snapshot = LockfileReader.read(lock, release("11.8.0")).getLockfile().getPackages()
+          .get("foo@1.0.0");
+        assertThatThrownBy(() -> LockfileUtils.pkgSnapshotToResolution("foo@1.0.0", snapshot, registries,
+          release("11.8.0")))
+          .isInstanceOfSatisfying(PnpmError.class,
+            e -> assertThat(e.getCode()).isEqualTo("ERR_PNPM_MISSING_TARBALL_INTEGRITY"));
+        assertThat(json(LockfileUtils.pkgSnapshotToResolution("foo@1.0.0", snapshot, registries,
+          release("11.9.0")))).isEqualTo("{'tarball':'" + tarball + "'}");
+
+        ResolutionVerifier.Result nonSemver = npmVerifier("11.9.0", registry, null)
+          .verify(obj("{'integrity':'sha512-x'}"), "foo", "latest", null);
+        assertThat(nonSemver.getCode()).isEqualTo("TARBALL_URL_MISMATCH");
+        assertThat(nonSemver.getReason()).isEqualTo("has a non-semver version (\"latest\") and so cannot be verified " +
+                                                    "against the registry's published metadata");
+        assertThat(npmVerifier("11.8.0", registry, null).verify(obj("{'integrity':'sha512-x'}"), "foo", "latest",
+          null).isOk()).isTrue();
+
+        PackageSnapshot numbered = new PackageSnapshot();
+        numbered.setResolution(obj("{'integrity':'sha512-x','tarball':5}"));
+        assertThatThrownBy(() -> LockfileUtils.pkgSnapshotToResolution("foo@1.0.0", numbered, registries,
+          release("11.9.0")))
+          .isInstanceOfSatisfying(PnpmError.class, e -> {
+              assertThat(e.getCode()).isEqualTo("ERR_PNPM_INVALID_TARBALL_RESOLUTION");
+              assertThat(e.getMessage()).isEqualTo("Cannot install package \"foo@1.0.0\": its lockfile entry has a " +
+                                                   "non-string \"tarball\" field.");
+          });
+    }
+
+    // a registry that answers 404 to every request
+    private static final RegistryMetadata NOT_FOUND = new RegistryMetadata() {
+        @Override
+        public @Nullable String packument(String registry, String name, boolean fullMetadata) {
+            return null;
+        }
+
+        @Override
+        public @Nullable String attestations(String registry, String name, String version) {
+            return null;
+        }
+
+        @Override
+        public @Nullable String document(String url) {
+            return null;
+        }
+    };
+
+    /**
+     * resolving/npm-resolver createNpmResolutionVerifier.ts runAgeCheck and runTarballUrlCheck (11.9.0): the 404 of
+     * a locked package's packument fails the install; before, minimumReleaseAge could not check it, and its tarball
+     * URL could not be verified, each a violation.
+     */
+    @Test
+    void failsVerificationOnARegistryFetchErrorFrom1190() {
+        String lock = fooLock("{integrity: sha512-x}");
+        assertThatThrownBy(() -> verifyLock(lock, "11.8.0", NOT_FOUND, 60.0))
+          .isInstanceOfSatisfying(PnpmError.class, e -> {
+              assertThat(e.getCode()).isEqualTo("ERR_PNPM_MINIMUM_RELEASE_AGE_VIOLATION");
+              assertThat(e.getMessage()).isEqualTo("1 lockfile entries failed verification:\n  foo@1.0.0 could not " +
+                                                   "be checked against minimumReleaseAge (GET " + REGISTRY +
+                                                   "foo: Not Found - 404)");
+          });
+        assertThatThrownBy(() -> verifyLock(lock, "11.9.0", NOT_FOUND, 60.0))
+          .isInstanceOfSatisfying(PnpmError.class, e -> {
+              assertThat(e.getCode()).isEqualTo("ERR_PNPM_FETCH_404");
+              assertThat(e.getMessage()).isEqualTo("GET " + REGISTRY + "foo: Not Found - 404");
+          });
+        String mirrored = fooLock("{integrity: sha512-x, tarball: 'https://mirror.test/foo-1.0.0.tgz'}");
+        assertThatThrownBy(() -> verifyLock(mirrored, "11.8.0", NOT_FOUND, null))
+          .isInstanceOfSatisfying(PnpmError.class, e -> {
+              assertThat(e.getCode()).isEqualTo("ERR_PNPM_TARBALL_URL_MISMATCH");
+              assertThat(e.getMessage()).endsWith("foo@1.0.0 could not be verified against the registry's " +
+                                                  "published metadata");
+          });
+        assertThatThrownBy(() -> verifyLock(mirrored, "11.9.0", NOT_FOUND, null))
+          .isInstanceOfSatisfying(PnpmError.class, e -> assertThat(e.getCode()).isEqualTo("ERR_PNPM_FETCH_404"));
+    }
+
+    /**
+     * core/error FetchError and redactUrlCredentials (11.9.0): a failed request's message names its URL without the
+     * credentials in it; before, as requested.
+     */
+    @Test
+    void redactsUrlCredentialsInFetchErrorsFrom1190() {
+        PickPackageFromMeta.RegistryPackageSpec spec = PickPackageFromMeta.parseBareSpecifier("^1.0.0", "foo",
+          "latest", "https://u:p@r.test/");
+        assertThatThrownBy(() -> PickPackage.pickPackage(new LinkedHashMap<>(), NOT_FOUND, spec,
+          picker("2026-01-01T00:00:00Z", false, "11.9.0"), "https://u:p@r.test/", false, false))
+          .isInstanceOfSatisfying(PnpmError.class, e -> {
+              assertThat(e.getCode()).isEqualTo("ERR_PNPM_FETCH_404");
+              assertThat(e.getMessage()).isEqualTo("GET https://r.test/foo: Not Found - 404");
+          });
+        assertThatThrownBy(() -> PickPackage.pickPackage(new LinkedHashMap<>(), NOT_FOUND, spec,
+          picker("2026-01-01T00:00:00Z", false, "11.8.0"), "https://u:p@r.test/", false, false))
+          .hasMessage("GET https://u:p@r.test/foo: Not Found - 404");
+        assertThat(PnpmError.redactUrlCredentials("from git+ssh://git@github.com:o/r and ://x@y and https://a@b@c/d"))
+          .isEqualTo("from git+ssh://github.com:o/r and ://x@y and https://c/d");
+    }
+
+    // a's shared at depth 1 resolves c, whose peer p a provides; b's chain reaches shared again at depth 5, after that
+    private static final RegistryMetadata DEEP_SHARED = registry(
+      new String[]{"a", "\"shared\":\"1.0.0\",\"p\":\"1.0.0\"", ""},
+      new String[]{"b", "\"x1\":\"1.0.0\"", ""},
+      new String[]{"x1", "\"x2\":\"1.0.0\"", ""},
+      new String[]{"x2", "\"x3\":\"1.0.0\"", ""},
+      new String[]{"x3", "\"y\":\"1.0.0\"", ""},
+      new String[]{"y", "\"shared\":\"1.0.0\"", ""},
+      new String[]{"shared", "\"c\":\"1.0.0\"", ""},
+      new String[]{"c", "", "\"p\":\"1.0.0\""},
+      new String[]{"p", "", ""});
+
+    // the snapshots of the lock-only install of a root with a and b, peers hoisted by dedupePeerDependents alone
+    private static String installDeepShared(String release) {
+        String lock = new PnpmLockRegenerator(PnpmLockRegenerator.Inputs.builder()
+          .manifest("", "{\"name\":\"root\",\"version\":\"1.0.0\",\"dependencies\":{\"a\":\"1.0.0\",\"b\":\"1.0.0\"}}")
+          .file("pnpm-workspace.yaml", "minimumReleaseAge: 0\nautoInstallPeers: false\n")
+          .env(Collections.emptyMap())
+          .now(NOW)
+          .release(release(release))
+          .build(), DEEP_SHARED).writeLock();
+        return lock.substring(lock.indexOf("\nsnapshots:\n"));
+    }
+
+    // a snapshot of one dependency and the transitive peer p
+    private static String transitivelyPeeringP(String name, String suffix, String child, String childSuffix) {
+        return "  " + name + "@1.0.0" + suffix + ":\n    dependencies:\n      " + child + ": 1.0.0" + childSuffix +
+               "\n    transitivePeerDependencies:\n      - p\n";
+    }
+
+    // the snapshots of the install, b's chain down to y taking p from the root or not
+    private static String deepSharedSnapshots(String chainSuffix) {
+        return "\nsnapshots:\n\n  a@1.0.0:\n    dependencies:\n      p: 1.0.0\n      shared: 1.0.0(p@1.0.0)\n\n" +
+               transitivelyPeeringP("b", chainSuffix, "x1", chainSuffix) + "\n" +
+               "  c@1.0.0(p@1.0.0):\n    dependencies:\n      p: 1.0.0\n\n  p@1.0.0: {}\n\n" +
+               transitivelyPeeringP("shared", "(p@1.0.0)", "c", "(p@1.0.0)") + "\n" +
+               transitivelyPeeringP("x1", chainSuffix, "x2", chainSuffix) + "\n" +
+               transitivelyPeeringP("x2", chainSuffix, "x3", chainSuffix) + "\n" +
+               transitivelyPeeringP("x3", chainSuffix, "y", chainSuffix) + "\n" +
+               transitivelyPeeringP("y", chainSuffix, "shared", "(p@1.0.0)");
+    }
+
+    /**
+     * installing/deps-resolver resolveDependencies.ts claimChildrenResolution (11.9.0): shared, reached through b at
+     * depth 5 after its children under a resolved, no longer shares their missing peer p, so that b's chain reports
+     * none and the root hoists no p for it (dedupePeerDependents, autoInstallPeers false); before, b's chain takes p
+     * from the root. pnpm 11.8.0 and 11.9.0 wrote these snapshots when run on it.
+     */
+    @Test
+    void sharesMissingPeersOfChildrenOnlyWithAnOwnerAsDeepFrom1190() {
+        assertThat(installDeepShared("11.8.0")).isEqualTo(deepSharedSnapshots("(p@1.0.0)"));
+        assertThat(installDeepShared("11.9.0")).isEqualTo(deepSharedSnapshots(""));
+    }

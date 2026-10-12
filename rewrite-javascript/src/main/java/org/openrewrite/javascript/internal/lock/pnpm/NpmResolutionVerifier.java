@@ -100,6 +100,7 @@ final class NpmResolutionVerifier implements ResolutionVerifier {
     private final List<String> namedRegistryPrefixes;
 
     private final Map<String, @Nullable Map<String, @Nullable Object>> abbreviatedMetaCache = new HashMap<>();
+    private final Map<String, RuntimeException> abbreviatedMetaErrors = new HashMap<>();
     private final Map<String, Lookup<@Nullable Object>> publishedAtCache = new HashMap<>();
     private final Map<String, Lookup<@Nullable Object>> fullMetaCache = new HashMap<>();
     private final Map<String, Lookup<Map<String, @Nullable Object>>> fullMetaForTrustCache = new HashMap<>();
@@ -168,14 +169,31 @@ final class NpmResolutionVerifier implements ResolutionVerifier {
             return Result.OK;
         }
         PnpmRelease release = opts.getRelease();
+        @SuppressWarnings("unchecked")
+        Map<String, @Nullable Object> registryResolution = (Map<String, @Nullable Object>) resolution;
+        // from 11.9.0 a registry tarball without an integrity is a violation, ahead of a non-semver dep path's pass,
+        // and so are a non-semver version and a tarball that is no string
+        // (PnpmRelease#verifiesALockedTarballsIntegrity)
+        Object integrity = registryResolution.get("integrity");
+        if (!(integrity instanceof String && !((String) integrity).isEmpty()) &&
+            release.verifiesALockedTarballsIntegrity()) {
+            return new Result(false, MISSING_TARBALL_INTEGRITY_VIOLATION_CODE,
+                    "has no \"integrity\" field, so its downloaded tarball cannot be verified");
+        }
         if (nonSemverVersion != null && release.bindsALockedTarballUrlToTheRegistry()) {
             return Result.OK;
         }
         if (NodeSemver.valid(version, NodeSemver.Options.DEFAULT) == null) {
-            return Result.OK;
+            return release.verifiesALockedTarballsIntegrity() ? new Result(false, TARBALL_URL_MISMATCH_VIOLATION_CODE,
+                    "has a non-semver version (\"" + version + "\") and so cannot be verified against the registry's " +
+                    "published metadata") : Result.OK;
         }
-        @SuppressWarnings("unchecked")
-        Object tarballUrl = ((Map<String, @Nullable Object>) resolution).get("tarball");
+        Object tarballUrl = registryResolution.get("tarball");
+        if (tarballUrl != null && tarballUrl != Js.UNDEFINED && !(tarballUrl instanceof String) &&
+            release.verifiesALockedTarballsIntegrity()) {
+            return new Result(false, TARBALL_URL_MISMATCH_VIOLATION_CODE,
+                    "has a non-string \"tarball\" field, so its URL cannot be verified");
+        }
         if (tarballUrl instanceof String && release.bindsALockedTarballUrlToTheRegistry()) {
             Result urlViolation = runTarballUrlCheck(pickRegistryForVersion(name, tarballUrl), name, version,
                     (String) tarballUrl);
@@ -206,12 +224,19 @@ final class NpmResolutionVerifier implements ResolutionVerifier {
     }
 
     static final String TARBALL_URL_MISMATCH_VIOLATION_CODE = "TARBALL_URL_MISMATCH";
+    static final String MISSING_TARBALL_INTEGRITY_VIOLATION_CODE = "MISSING_TARBALL_INTEGRITY";
 
     // runTarballUrlCheck (11.5.2): the lock's tarball URL is the one the registry's metadata lists for the version
     @SuppressWarnings("unchecked")
     private @Nullable Result runTarballUrlCheck(String registry, String name, String version,
                                                 String lockfileTarball) {
         Map<String, @Nullable Object> meta = fetchAbbreviatedMeta(registry, name);
+        // from 11.9.0 the metadata's fetch error fails the verification; before, the URL could not be verified
+        // (PnpmRelease#failsVerificationOnARegistryFetchError)
+        RuntimeException error = abbreviatedMetaErrors.get(registry + "\0" + name);
+        if (error != null && opts.getRelease().failsVerificationOnARegistryFetchError()) {
+            throw error;
+        }
         Object versions = meta == null ? null : meta.get("versions");
         Object manifest = versions instanceof Map ? ((Map<String, @Nullable Object>) versions).get(version) : null;
         Object registryTarball = property(property(manifest, "dist"), "tarball");
@@ -239,6 +264,10 @@ final class NpmResolutionVerifier implements ResolutionVerifier {
         try {
             published = fetchPublishedAt(registry, name, version);
         } catch (PnpmError | JsError e) {
+            // from 11.9.0 a fetch error fails the verification (PnpmRelease#failsVerificationOnARegistryFetchError)
+            if (opts.getRelease().failsVerificationOnARegistryFetchError()) {
+                throw e;
+            }
             return new Result(false, MINIMUM_RELEASE_AGE_VIOLATION_CODE,
                     uncheckable("minimumReleaseAge", Js.message(e)));
         }
@@ -273,6 +302,10 @@ final class NpmResolutionVerifier implements ResolutionVerifier {
         try {
             meta = fetchFullMetaForTrust(registry, name);
         } catch (PnpmError e) {
+            // from 11.9.0 a fetch error fails the verification (PnpmRelease#failsVerificationOnARegistryFetchError)
+            if (opts.getRelease().failsVerificationOnARegistryFetchError()) {
+                throw e;
+            }
             return new Result(false, TRUST_DOWNGRADE_VIOLATION_CODE, uncheckable("trustPolicy", e.getMessage()));
         }
         try {
@@ -350,6 +383,7 @@ final class NpmResolutionVerifier implements ResolutionVerifier {
                         fetchMetadata(registry, name, false, MODIFIED, VERSIONS);
             } catch (PnpmError e) {
                 meta = null;
+                abbreviatedMetaErrors.put(cacheKey, e);
             }
             abbreviatedMetaCache.put(cacheKey, meta);
         }
@@ -381,7 +415,8 @@ final class NpmResolutionVerifier implements ResolutionVerifier {
         String uri = toUri(pkgName, registry);
         String text = opts.getFetch().packument(registry, pkgName, fullMetadata);
         if (text == null) {
-            throw new PnpmError("FETCH_404", "GET " + uri + ": Not Found - 404");
+            throw new PnpmError("FETCH_404", "GET " + PnpmError.requestUrl(uri, opts.getRelease()) +
+                                             ": Not Found - 404");
         }
         try {
             return Manifests.parseMembers(text, uri, whole, keysOnly);
@@ -395,7 +430,8 @@ final class NpmResolutionVerifier implements ResolutionVerifier {
         String uri = toUri(pkgName, registry);
         String text = opts.getFetch().packument(registry, pkgName, true);
         if (text == null) {
-            throw new PnpmError("FETCH_404", "GET " + uri + ": Not Found - 404");
+            throw new PnpmError("FETCH_404", "GET " + PnpmError.requestUrl(uri, opts.getRelease()) +
+                                             ": Not Found - 404");
         }
         Object meta;
         try {
@@ -518,9 +554,41 @@ final class NpmResolutionVerifier implements ResolutionVerifier {
 
     /**
      * {@code isNpmRegistryResolution} as {@code release} reads it: from 11.5.2 a tarball that is neither http nor https
-     * is none ({@link PnpmRelease#verifiesOnlyHttpTarballs}).
+     * is none ({@link PnpmRelease#verifiesOnlyHttpTarballs}); from 11.9.0 {@code isRegistryTarballResolution}, any
+     * untyped resolution, with or without a tarball or an integrity, but a git-hosted one told by its URL
+     * ({@link PnpmRelease#verifiesALockedTarballsIntegrity} and
+     * {@link PnpmRelease#recognizesOnlyCommitArchivesAsGitHosted}, of the same release), asked where the two answer
+     * otherwise.
      */
     static boolean isNpmRegistryResolution(@Nullable Object resolution, PnpmRelease release) {
+        boolean before = isNpmRegistryResolutionBefore1190(resolution, release);
+        boolean registryTarball = isRegistryTarballResolution(resolution);
+        return before == registryTarball || !release.verifiesALockedTarballsIntegrity() ? before : registryTarball;
+    }
+
+    // isRegistryTarballResolution (11.9.0)
+    private static boolean isRegistryTarballResolution(@Nullable Object resolution) {
+        if (!(resolution instanceof Map)) {
+            return false;
+        }
+        Map<?, ?> map = (Map<?, ?>) resolution;
+        if (map.containsKey("type") && map.get("type") != null && map.get("type") != Js.UNDEFINED) {
+            return false;
+        }
+        Object tarball = map.get("tarball");
+        if (tarball instanceof String) {
+            if (LockfileUtils.isGitHostedCommitArchive(tarball)) {
+                return false;
+            }
+            WhatwgUrl url = WhatwgUrl.tryParse((String) tarball);
+            String protocol = url == null ? null : url.getProtocol();
+            return protocol == null || "http:".equals(protocol) || "https:".equals(protocol);
+        }
+        return true;
+    }
+
+    // isNpmRegistryResolution of the releases before 11.9.0
+    private static boolean isNpmRegistryResolutionBefore1190(@Nullable Object resolution, PnpmRelease release) {
         if (!(resolution instanceof Map)) {
             return false;
         }

@@ -187,6 +187,18 @@ public final class PnpmRelease {
         return atLeast(11, 9, 0);
     }
 
+    /**
+     * A tarball URL is git-hosted only as an https URL of a commit's archive ({@code codeload.github.com/<o>/<r>/
+     * tar.gz/<sha>}, bitbucket.org's {@code <o>/<r>/get/<sha>.tar.gz}, gitlab.com's {@code api/v4/projects/<id>/
+     * repository/archive.tar.gz?ref=<sha>} or {@code <o>/<r>/-/archive/<sha>/<name>.tar.gz}), a tarball that is no
+     * string none, from 11.9.0 (resolver-base's isGitHostedTarballUrl, which toLockfileResolution, lockfile.fs, both
+     * verifiers and the fetcher's classifyResolution share, the npm verifier in place of the {@code gitHosted} flag);
+     * before, any URL of those hosts with {@code tar.gz} in it, and lockfile.fs fails on a tarball that is no string.
+     */
+    boolean recognizesOnlyCommitArchivesAsGitHosted() {
+        return atLeast(11, 9, 0);
+    }
+
     // @pnpm/lockfile.fs src/yamlDocuments.ts
 
     /**
@@ -629,6 +641,39 @@ public final class PnpmRelease {
     /**
      * {@code updateChecksums} makes the install resolve in full, from 11.4.0; before, a lock-only install does not
      * read it.
+    /**
+     * Every untyped resolution but a {@code file:}, non-http or git-hosted tarball's is a registry tarball to verify,
+     * and one without an integrity fails the lock's verification ({@code ERR_PNPM_MISSING_TARBALL_INTEGRITY}) ahead of
+     * a non-semver dep path's pass, a non-semver version or a tarball that is no string a
+     * {@code TARBALL_URL_MISMATCH}; pkgSnapshotToResolution fails on such a tarball
+     * ({@code ERR_PNPM_INVALID_TARBALL_RESOLUTION}) and no longer on the missing integrity, from 11.9.0; before, a
+     * resolution with neither a tarball nor an integrity is none, a non-semver version passes, and from 11.4.0
+     * pkgSnapshotToResolution fails on the missing integrity ({@link #requiresALockedTarballsIntegrity}).
+     */
+    boolean verifiesALockedTarballsIntegrity() {
+        return atLeast(11, 9, 0);
+    }
+
+    /**
+     * A registry fetch error the verification meets (a 404 of the metadata its age, trust or tarball URL check
+     * reads) fails the install, from 11.9.0; before, it is a violation the check could not decide (or for the URL
+     * check, a URL that could not be verified), but in the abbreviated metadata's "modified" shortcut, which ignores
+     * it either way.
+     */
+    boolean failsVerificationOnARegistryFetchError() {
+        return atLeast(11, 9, 0);
+    }
+
+    // @pnpm/error src/index.ts (FetchError)
+
+    /**
+     * A failed request's message names its URL without the credentials in it ({@code GET https://r.test/foo: …} for
+     * {@code https://u:p@r.test/foo}), from 11.9.0 (redactUrlCredentials); before, as requested.
+     */
+    boolean redactsUrlCredentialsInFetchErrors() {
+        return atLeast(11, 9, 0);
+    }
+
      */
     boolean resolvesInFullToUpdateChecksums() {
         return atLeast(11, 4, 0);
@@ -746,6 +791,16 @@ public final class PnpmRelease {
     // @pnpm/installing.package-requester src/packageRequester.ts
 
     /**
+     * A git-hosted tarball the install fetches for its manifest gives a resolution without an integrity the one it
+     * was fetched with, under --lockfile-only too (a store that holds the tarball gives none), from 11.0.7
+     * (gitHostedTarballFetcher, the change that marks git-hosted tarballs, {@link #marksGitHostedTarballs}); before,
+     * it is written without one.
+     */
+    boolean pinsTheIntegrityOfAFetchedGitHostedTarball() {
+        return atLeast(11, 0, 7);
+    }
+
+    /**
      * A resolution the resolver gives without an integrity, for a package it did not update, takes the locked one,
      * from 11.5.0 (pnpm/pnpm#12001); before, it has none.
      */
@@ -757,6 +812,15 @@ public final class PnpmRelease {
      * A remote tarball whose resolution has no integrity is downloaded to fill it, under --lockfile-only too, from
      * 11.9.0 (the tarball fetcher's resolutionNeedsFetch); before, it is written without one.
      */
+    /**
+     * An occurrence of a package that does not resolve its children shares their missing peers only with an owner as
+     * deep as it, from 11.9.0 (claimChildrenResolution); before, also with a shallower owner whose children are
+     * resolved already, so that a deeper occurrence reports their missing peers to its own parents.
+     */
+    boolean sharesMissingPeersOfChildrenOnlyWithAnOwnerAsDeep() {
+        return atLeast(11, 9, 0);
+    }
+
     boolean fetchesATarballToFillAMissingIntegrity() {
         return atLeast(11, 9, 0);
     }
