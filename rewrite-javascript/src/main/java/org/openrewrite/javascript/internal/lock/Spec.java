@@ -24,6 +24,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Objects;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -153,17 +154,18 @@ public final class Spec {
     }
 
     private static final Pattern IS_URL = Pattern.compile("^(?:git[+])?[a-z]+:", Pattern.CASE_INSENSITIVE);
-    private static final Pattern IS_GIT = Pattern.compile("^[^@]+@[^:.]+\\.[^:]+:.+$", Pattern.CASE_INSENSITIVE);
-    private static final Pattern IS_FILE_TYPE = Pattern.compile("[.](?:tgz|tar\\.gz|tar)$", Pattern.CASE_INSENSITIVE);
+    // npa.js's literals with their i flag, as V8 reads them: a $ that a trailing newline does not satisfy, a . that
+    // matches no line terminator
+    private static final Pattern IS_GIT = ignoringCase("^[^@]+@[^:.]+\\.[^:]+:.+$");
+    private static final Pattern IS_FILE_TYPE = ignoringCase("[.](?:tgz|tar\\.gz|tar)$");
     // before 13.0.1 any character stands between tar and gz
-    private static final Pattern IS_FILENAME = Pattern.compile("[.](?:tgz|tar.gz|tar)$", Pattern.CASE_INSENSITIVE);
-    private static final Pattern IS_PORT_NUMBER = Pattern.compile(":[0-9]+(/|$)", Pattern.CASE_INSENSITIVE);
+    private static final Pattern IS_FILENAME = ignoringCase("[.](?:tgz|tar.gz|tar)$");
+    private static final Pattern IS_PORT_NUMBER = ignoringCase(":[0-9]+(\\/|$)");
     private static final Pattern IS_PORT_NUMBER_PNPM = V8RegExp.of(":[0-9]+\\/?.*$");
     private static final Pattern FILE_PROTOCOL = Pattern.compile("^file:", Pattern.CASE_INSENSITIVE);
     private static final Pattern ABSOLUTE_PATH = Pattern.compile("^[/]|^[A-Za-z]:");
     private static final Pattern IS_POSIX_FILE = Pattern.compile("^(?:[.]|~[/]|[/]|[a-zA-Z]:)");
-    private static final Pattern GIT_SSH = Pattern.compile("^git\\+ssh://([^:#]+:[^#]+(?:\\.git)?)(?:#(.*))?$",
-            Pattern.CASE_INSENSITIVE | Pattern.DOTALL);
+    private static final Pattern GIT_SSH = ignoringCase("^git\\+ssh:\\/\\/([^:#]+:[^#]+(?:\\.git)?)(?:#(.*))?$");
 
     // npm-package-arg resolves '~' against os.homedir(); the virtual filesystem's home is its root.
     static final String HOME = PosixPath.CWD;
@@ -617,9 +619,14 @@ public final class Spec {
         return result.toString().startsWith("file:") ? result.toString() : "file:" + result;
     }
 
-    private static final Pattern LEADING_DOTS = Pattern.compile("^/{1,3}\\.\\.?(/|$)");
-    private static final Pattern LEADING_DOT = Pattern.compile("^/\\.\\.?(/|$)");
-    private static final Pattern HOME_PATH = Pattern.compile("^/~(/|$)");
+    private static final Pattern LEADING_DOTS = V8RegExp.of("^\\/{1,3}\\.\\.?(\\/|$)");
+    private static final Pattern LEADING_DOT = V8RegExp.of("^\\/\\.\\.?(\\/|$)");
+    private static final Pattern HOME_PATH = V8RegExp.of("^\\/~(\\/|$)");
+
+    // a regular expression literal of npa.js with its i flag
+    private static Pattern ignoringCase(String source) {
+        return Pattern.compile(Objects.requireNonNull(V8RegExp.toJava(source)), Pattern.CASE_INSENSITIVE);
+    }
 
     private static Spec fromFile(Spec res, String where, Release release) {
         if (before8_1_5(release)) {

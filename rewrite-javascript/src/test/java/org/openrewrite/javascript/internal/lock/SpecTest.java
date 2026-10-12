@@ -201,6 +201,17 @@ class SpecTest {
         assertThat(noSlash.getType()).isEqualTo(Spec.Type.DIRECTORY);
     }
 
+    // as npm 11.17.0's npa answers: its $ is not satisfied before a trailing newline, and its . matches no newline
+    @Test
+    void aLineTerminatorEndsNoPattern() {
+        Spec tarball = Spec.npa("x@./a.tgz\n", "/");
+        assertThat(tarball.getType()).isEqualTo(Spec.Type.DIRECTORY);
+        assertThat(tarball.getFetchSpec()).isEqualTo("/a.tgz\n");
+        assertThatThrownBy(() -> Spec.npa("x@git+ssh://git@h.com:u/r.git#a\nb", "/"))
+          .hasMessageContaining("Invalid URL");
+        assertThat(Spec.npa("x@git+ssh://git@h.com:u/r.git#ab", "/").getGitCommittish()).isEqualTo("ab");
+    }
+
     @Test
     void directoryWithNonUriCompatibleComponents() {
         Spec spec = Spec.npa("/test%dir");
