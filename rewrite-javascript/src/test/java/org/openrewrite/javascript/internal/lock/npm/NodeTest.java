@@ -1250,6 +1250,17 @@ class NodeTest {
     }
 
     @Test
+    void canReplaceWithComparesNoPackageNamesBeforeNpm7_20_3() {
+        NpmRelease release = NpmRelease.of("7.20.2");
+        Node root = node(opts().release(release).path("/some/path")
+          .pkg(obj("dependencies", obj("foo", "1.2.3")))
+          .child(opts().pkg(obj("name", "foo", "version", "1.2.3")).build()));
+        Node rep = node(opts().release(release).path("/some/path/node_modules/foo").name("foo")
+          .pkg(obj("name", "bar", "version", "1.2.3")));
+        assertThat(rep.canReplace(child(root, "foo"))).as("an alias can replace the actual node").isTrue();
+    }
+
+    @Test
     void canReplaceWhileIgnoringCertainPeerDeps() {
         Node tree = node(opts().path("/some/path").pkg(obj("dependencies", obj("a", "1||2", "b", "")))
           .child(opts().pkg(obj("name", "a", "version", "1.0.0", "peerDependencies", obj("b", "1"))).build())

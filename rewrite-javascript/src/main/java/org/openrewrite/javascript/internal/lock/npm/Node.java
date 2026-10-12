@@ -1063,7 +1063,7 @@ public class Node {
         if (!Objects.equals(node.name, name)) {
             return false;
         }
-        if (!Js.strictEquals(node.getPackageName(), getPackageName())) {
+        if (release.comparesPackageNamesToReplace() && !Js.strictEquals(node.getPackageName(), getPackageName())) {
             return false;
         }
 

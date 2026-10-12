@@ -32,6 +32,7 @@ import java.time.Instant;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.Deque;
 import java.util.HashMap;
 import java.util.IdentityHashMap;
@@ -207,6 +208,9 @@ public final class IdealTreeBuilder {
     // something, with that replacement
     private @Nullable String replaced;
     private final Map<List<Object>, String> statesAfterReplace = new HashMap<>();
+
+    // before npm 7.20.3: build-ideal-tree.js's own placement, made when it is first asked
+    private @Nullable LegacyPlacement legacyPlacement;
 
     @Getter
     private @Nullable Node idealTree;
@@ -616,7 +620,32 @@ public final class IdealTreeBuilder {
             tasks.sort((a, b) -> LocaleCompare.en(a.getEdge().getName(), b.getEdge().getName()));
 
             List<Runnable> promises = new ArrayList<>();
-            if (options.getRelease().placesWholeStepBeforeVisiting()) {
+            if (!options.getRelease().placesWithPlaceDep()) {
+                // tasks.sort(...).map(({ edge, dep }) => this[_placeDep](dep, node, edge)), each placing its peers as
+                // it goes; then every node placed is queued and its problem edges' manifests fetched
+                List<List<Node>> placed = new ArrayList<>();
+                for (Task task : tasks) {
+                    placed.add(legacyPlacement().placeDep(task.getDep(), node, task.getEdge(), null,
+                            Collections.emptyList()));
+                }
+                for (List<Node> set : placed) {
+                    for (Node p : set) {
+                        mutateTree = true;
+                        depsQueue.push(p);
+                        String from = FromPath.fromPath(p, null);
+                        for (Edge e : problemEdges(p)) {
+                            Spec spec = Spec.resolve(e.getName(), e.getSpec(), from,
+                                    options.getRelease().npmPackageArg());
+                            promises.add(() -> {
+                                try {
+                                    fetchManifest(spec, null, null);
+                                } catch (RuntimeException ignored) {
+                                }
+                            });
+                        }
+                    }
+                }
+            } else if (options.getRelease().placesWholeStepBeforeVisiting()) {
                 // tasks.sort(...).map(({ edge, dep }) => new PlaceDep(...)), then the visits
                 List<PlaceDep> placeDeps = new ArrayList<>();
                 for (Task task : tasks) {
@@ -646,6 +675,14 @@ public final class IdealTreeBuilder {
                 prefetch.run();
             }
         }
+    }
+
+    private LegacyPlacement legacyPlacement() {
+        if (legacyPlacement == null) {
+            legacyPlacement = new LegacyPlacement(Objects.requireNonNull(idealTree), options, depsQueue::push,
+                    depsSeen, loadFailures, peerSetSource, virtualRoots, warnings);
+        }
+        return legacyPlacement;
     }
 
     // treeverse's depth with a visit only: a stack, so the children of a placement are visited last first
@@ -1102,7 +1139,9 @@ public final class IdealTreeBuilder {
                     }
 
                     if (conflictOK || !required.contains(dep)) {
-                        edge.setPeerConflicted(true);
+                        if (options.getRelease().marksPeerConflictsOfLoadedPeerSet()) {
+                            edge.setPeerConflicted(true);
+                        }
                         continue;
                     }
 
@@ -1131,6 +1170,10 @@ public final class IdealTreeBuilder {
     }
 
     private PlaceDep.CouldNotResolve failPeerConflict(Edge edge, @Nullable Edge currentEdge) {
+        if (!options.getRelease().placesWithPlaceDep()) {
+            // explained with the last peer conflict the placement found where the edge resolves to nothing
+            return legacyPlacement().failPeerConflict(edge, currentEdge);
+        }
         Node node = Objects.requireNonNull(edge.getFrom());
         Node curNode = node.resolve(edge.getName());
         if (curNode == null) {

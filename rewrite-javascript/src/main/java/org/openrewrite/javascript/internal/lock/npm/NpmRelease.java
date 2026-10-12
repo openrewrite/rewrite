@@ -201,6 +201,14 @@ public final class NpmRelease implements Comparable<NpmRelease> {
     }
 
     /**
+     * {@code #loadPeerSet} marks the peer edge whose conflict it lets stand ({@code edge.overridden}, later
+     * {@code peerConflicted}), from npm 7.20.3; before, only a placement that warns about one marks it.
+     */
+    boolean marksPeerConflictsOfLoadedPeerSet() {
+        return atLeast(7, 20, 3);
+    }
+
+    /**
      * {@code #checkEngineAndPlatform}: an optional package the engine or platform excludes is marked inert with its
      * optional set, from npm 11.6.2.
      */
@@ -222,6 +230,16 @@ public final class NpmRelease implements Comparable<NpmRelease> {
      */
     boolean placesWholeStepBeforeVisiting() {
         return !atLeast(9, 6, 6);
+    }
+
+    /**
+     * {@code #buildDepStep} places each dependency with place-dep.js and can-place-dep.js, from npm 7.20.3 (arborist
+     * 2.8.0); before, with build-ideal-tree.js's own {@code [_placeDep]}, {@code [_canPlaceDep]} and
+     * {@code [_canPlacePeers]} ({@link LegacyPlacement}), whose explanation of a peer conflict also stands in the last
+     * one a check found for the node an edge does not resolve to.
+     */
+    boolean placesWithPlaceDep() {
+        return atLeast(7, 20, 3);
     }
 
     /**
@@ -559,6 +577,14 @@ public final class NpmRelease implements Comparable<NpmRelease> {
     }
 
     // @npmcli/arborist node.js
+
+    /**
+     * {@code canReplaceWith}: a node of another package name, such as an alias, cannot replace this one, from npm
+     * 7.20.3; before, the name the node is installed under is all that is compared.
+     */
+    boolean comparesPackageNamesToReplace() {
+        return atLeast(7, 20, 3);
+    }
 
     /**
      * {@code replace}: a link the node replaces takes its target out of the tree, from npm 8.8.0; before, the target
@@ -1074,6 +1100,17 @@ public final class NpmRelease implements Comparable<NpmRelease> {
      */
     boolean strictNpmrcRefusesUnknownKeys() {
         return atLeast(12, 0, 0);
+    }
+
+    // npm explain-eresolve.js
+
+    /**
+     * {@code explain} reads the explanation's {@code peerConflict} as the node in the way and the conflicting peer, and
+     * finds what is being installed on the dependency or the current node too, from npm 7.20.3; before, as
+     * build-ideal-tree.js explains a conflict, {@code peerConflict} is the conflicting peer alone.
+     */
+    boolean explainsPeerConflictAsCurrentAndPeer() {
+        return atLeast(7, 20, 3);
     }
 
     // npm-install-checks

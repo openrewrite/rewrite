@@ -438,7 +438,7 @@ public final class NpmLockRegenerator {
         if (e instanceof PlaceDep.CouldNotResolve) {
             PlaceDep.PeerConflict conflict = ((PlaceDep.CouldNotResolve) e).getConflict();
             return Rejected.coded(Reason.PEER_CONFLICT, conflict.getEdge().getName(), "ERESOLVE",
-                    ExplainEresolve.explain(conflict.getExplanation(), 4));
+                    ExplainEresolve.explain(conflict.getExplanation(), 4, conflict.getEdge().getRelease()));
         }
         if (e instanceof CannotKnow || e instanceof Rejected) {
             return e;

@@ -15,6 +15,7 @@
  */
 package org.openrewrite.javascript.internal.lock.npm;
 
+import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.Setter;
 import org.jspecify.annotations.Nullable;
@@ -64,6 +65,7 @@ public final class Edge {
     private final Type type;
 
     // the release of the tree the edge was made in, which a detached edge can no longer ask its dependent for
+    @Getter(AccessLevel.PACKAGE)
     private final NpmRelease release;
 
     // reload() after detach() sees JavaScript's undefined resolution, unlike the null of a missing dependency
