@@ -127,6 +127,27 @@ public final class BunRelease implements Comparable<BunRelease> {
     // src/install/PackageManager/install_with_manager.zig installWithManager
 
     /**
+     * The install processes the peer queue once before it waits for the peers, and waits only while a request is
+     * pending, from 1.3.1; before, it waits for the peers whenever there are any, processing them in the wait.
+     */
+    boolean processesPeersBeforeTheWait() {
+        return atLeast(1, 3, 1);
+    }
+
+    /**
+     * The wait for the peers never ends once a pass of it leaves peers queued and no request pending: nothing wakes
+     * the event loop again (usockets' kqueue or epoll wait without a timeout). From 1.2.21, whose
+     * {@code --lockfile-only} no longer prefetches the tarball of each package it adds (PackageManagerOptions.zig
+     * {@code prefetch_resolved_tarballs}), whose request kept the wait going; until 1.3.10, whose event loop counts
+     * the wakeup a request's end made (bun-usockets {@code pending_wakeups}) and gives such a pass one more. 1.3.10
+     * itself is taken to end the wait there, as the port of it does: on kqueue it waits after a second such pass, and
+     * on epoll as 1.3.9 does, which the port does not reproduce.
+     */
+    boolean waitsForeverOnPeersQueuedWithNothingPending() {
+        return atLeast(1, 2, 21) && !atLeast(1, 3, 10);
+    }
+
+    /**
      * Before it waits for the peers, the install processes the peer queue until it is empty, so that the peers of a
      * package a peer added with nothing to fetch are resolved too, from 1.3.11; before, it processes the queue once,
      * and those peers stay unresolved when no request is pending.

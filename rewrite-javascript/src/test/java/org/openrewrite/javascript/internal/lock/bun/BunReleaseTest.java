@@ -234,6 +234,74 @@ class BunReleaseTest {
         assertThat(earlier.getFailure().getWritten()).contains("\"p\": [\"p@1.0.0\"").doesNotContain("\"q\": [");
     }
 
+    private static final String EMPTY_ROOT = "{\n  \"lockfileVersion\": 1,\n  \"configVersion\": 1,\n  \"workspaces\": " +
+                                            "{\n    \"\": {\n      \"name\": \"root\",\n    },\n  },\n  \"packages\": {}\n}\n";
+
+    private static org.openrewrite.javascript.internal.LockFileRegeneration.Result install(String release,
+                                                                                            String manifest) {
+        ManifestSource registry = (url, name, extended) -> "a".equals(name) ? packument("a", "{\"b\":\"^1.0.0\"}") :
+                "b".equals(name) ? packument("b", "{\"c\":\"^1.0.0\"}") : "c".equals(name) ? packument("c", "{}") :
+                        "p".equals(name) ? packument("p", "{\"q\":\"^1.0.0\"}") :
+                                "q".equals(name) ? packument("q", "{}") : null;
+        return new BunLockRegenerator(BunLockRegenerator.Inputs.builder()
+          .lock(EMPTY_ROOT)
+          .manifest("", manifest)
+          .now(java.time.Instant.parse("2026-10-11T00:00:00Z"))
+          .release(BunRelease.of(release))
+          .build(), registry).regenerate();
+    }
+
+    /**
+     * install_with_manager.zig's wait for the peers: a pass that leaves the peer c of the peer b queued with no request
+     * pending never ends from 1.2.21, whose --lockfile-only fetches no tarball for b, until 1.3.10; installing from a
+     * lock whose root lists nothing, as from scratch.
+     */
+    @ParameterizedTest
+    @ValueSource(strings = {"1.2.21", "1.3.0", "1.3.9"})
+    void neverFinishesWhereAPeerWaitLeavesPeersQueuedWithNothingPending(String release) {
+        org.openrewrite.javascript.internal.LockFileRegeneration.Result result =
+          install(release, "{\"name\":\"root\",\"dependencies\":{\"a\":\"1.0.0\"}}");
+        assertThat(requireNonNull(result.getFailure()).getKind())
+          .isEqualTo(org.openrewrite.javascript.internal.LockFileRegeneration.Kind.PM_FAILS);
+        assertThat(result.getFailure().getDetail()).contains("it never finishes").contains("leaves c queued");
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"1.2.20", "1.3.10", "1.3.14"})
+    void finishesThatWaitBeforeAndAfter(String release) {
+        org.openrewrite.javascript.internal.LockFileRegeneration.Result result =
+          install(release, "{\"name\":\"root\",\"dependencies\":{\"a\":\"1.0.0\"}}");
+        assertThat(result.getLockFileContent()).as(String.valueOf(result.getErrorMessage()))
+          .contains("\"a\": [\"a@1.0.0\"").contains("\"b\": [\"b@1.0.0\"").contains("\"c\": [\"c@1.0.0\"");
+    }
+
+    /**
+     * install_with_manager.zig (1.3.1): the first pass over the peers happens before the wait, which is entered only
+     * with a request pending, so that q, queued by that pass with nothing to fetch, is not resolved until 1.3.11
+     * drains the queue; before, the wait resolves it (up to 1.2.20; 1.2.21 to 1.3.0 never finish there).
+     */
+    @Test
+    void entersThePeerWaitWhateverIsPendingBefore131() {
+        String manifest = "{\"name\":\"root\",\"devDependencies\":{\"a2\":\"1.0.0\"},\"optionalDependencies\":" +
+                          "{\"p\":\"^2.0.0\"}}";
+        ManifestSource registry = (url, name, extended) -> "a2".equals(name) ? packument("a2", "{\"p\":\"^1.0.0\"}") :
+                "p".equals(name) ? packument("p", "{\"q\":\"^1.0.0\"}") : "q".equals(name) ? packument("q", "{}") :
+                        null;
+        for (String release : new String[]{"1.2.20", "1.3.1"}) {
+            org.openrewrite.javascript.internal.LockFileRegeneration.Result result = new BunLockRegenerator(
+              BunLockRegenerator.Inputs.builder().lock(EMPTY_ROOT).manifest("", manifest)
+                .now(java.time.Instant.parse("2026-10-11T00:00:00Z")).release(BunRelease.of(release)).build(),
+              registry).regenerate();
+            String written = result.isSuccess() ? result.getLockFileContent() :
+              requireNonNull(result.getFailure()).getWritten();
+            if ("1.2.20".equals(release)) {
+                assertThat(written).as(String.valueOf(result.getErrorMessage())).contains("\"q\": [\"q@1.0.0\"");
+            } else {
+                assertThat(written).as(String.valueOf(result.getErrorMessage())).doesNotContain("\"q\": [");
+            }
+        }
+    }
+
     private static PackageManifest.PackageVersion version(BunRelease release, String packument) {
         PackageManifest manifest = requireNonNull(PackageManifest.parse(release, new Log(), packument, "debug", false));
         PackageManifest.FindResult pick = requireNonNull(manifest.findBestVersion(

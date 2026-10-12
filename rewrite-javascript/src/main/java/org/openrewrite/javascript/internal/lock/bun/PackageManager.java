@@ -17,7 +17,9 @@ package org.openrewrite.javascript.internal.lock.bun;
 
 import lombok.Getter;
 import org.jspecify.annotations.Nullable;
+import org.openrewrite.javascript.internal.LockFileRegeneration.Reason;
 import org.openrewrite.javascript.internal.lock.CannotKnow;
+import org.openrewrite.javascript.internal.lock.Rejected;
 import org.openrewrite.javascript.internal.lock.RootRelativePath;
 
 import java.util.ArrayDeque;
@@ -25,6 +27,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -670,27 +673,44 @@ final class PackageManager {
         }
         peersStarted = true;
         namesBeforePeers = new HashSet<>(lockfile.packageIndex.keySet());
-        if (options.getRelease().drainsPeersOfResolvedPeers()) {
+        BunRelease release = options.getRelease();
+        if (release.drainsPeersOfResolvedPeers()) {
             // a peer resolved here can add a package whose own peers are queued again, with nothing to fetch
             while (!peerDependencies.isEmpty()) {
                 processPeerDependencyList();
                 drainDependencyList();
             }
-        } else if (!peerDependencies.isEmpty()) {
+        } else if (release.processesPeersBeforeTheWait() && !peerDependencies.isEmpty()) {
             processPeerDependencyList();
             drainDependencyList();
         }
-        if (pendingTaskCount() > 0) {
+        // before 1.3.1 the install waits for the peers whatever is pending
+        if (pendingTaskCount() > 0 || !release.processesPeersBeforeTheWait()) {
             do {
                 processPeerDependencyList();
                 drainDependencyList();
                 runTasks(true);
+                if (release.waitsForeverOnPeersQueuedWithNothingPending() && !peerDependencies.isEmpty() &&
+                    pendingTaskCount() == 0) {
+                    throw Rejected.crashes(Reason.RESOLUTION_REQUIRED, null, "it never finishes: a pass of its " +
+                            "wait for the peers leaves " + queuedPeers() + " queued and no request pending, so " +
+                            "nothing wakes its event loop again");
+                }
             } while (!peerDependencies.isEmpty() || pendingTaskCount() > 0);
         }
         List<String> peerOrder = peerArrivalOrder(peerPicks());
         if (!peerOrder.isEmpty()) {
             throw new CannotKnow(String.join("; ", peerOrder));
         }
+    }
+
+    // the names of the peers queued, as their dependencies name them
+    private String queuedPeers() {
+        Set<String> names = new LinkedHashSet<>();
+        for (int id : peerDependencies) {
+            names.add(lockfile.dependencies.get(id).name);
+        }
+        return String.join(", ", names);
     }
 
     private List<Resolved> peerPicks() {
