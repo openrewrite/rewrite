@@ -374,6 +374,28 @@ class BunReleaseTest {
     }
 
     /**
+     * The recipes' reading of catalogs: none before 1.2.14 ({@code catalog:} a git spec), the workspaces object's
+     * alone before 1.2.19, the root's own where the workspaces hold none from 1.2.19.
+     */
+    @Test
+    void theRecipesReadCatalogsAsTheReleaseDoes() {
+        String topLevel = "{\"name\":\"r\",\"workspaces\":[\"packages/*\"],\"catalog\":{\"ms\":\"2.1.3\"}}";
+        String nested = "{\"name\":\"r\",\"workspaces\":{\"packages\":[\"packages/*\"],\"catalog\":{\"ms\":\"2.1.3\"}}}";
+        BunManifestRules before = BunManifestRules.of(BunRelease.of("1.2.13"));
+        assertThat(before.catalogFile()).isNull();
+        assertThat(before.catalogsAt(nested)).isNull();
+        assertThat(before.catalogOf("catalog:")).isNull();
+        BunManifestRules workspacesOnly = BunManifestRules.of(BunRelease.of("1.2.18"));
+        assertThat(workspacesOnly.catalogsAt(nested)).containsExactly("workspaces");
+        assertThat(workspacesOnly.catalogsAt(topLevel)).isNull();
+        assertThat(workspacesOnly.catalogs(nested)).containsOnlyKeys("");
+        assertThat(workspacesOnly.catalogOf("catalog:")).isEqualTo("");
+        BunManifestRules later = BunManifestRules.of(BunRelease.of("1.2.19"));
+        assertThat(later.catalogsAt(topLevel)).isEmpty();
+        assertThat(later.catalogs(topLevel).get("")).containsEntry("ms", "2.1.3");
+    }
+
+    /**
      * default-trusted-dependencies.txt: {@code opencode-ai} from 1.2.16, {@code yarn} until 1.2.19,
      * {@code @anthropic-ai/claude-code} from 1.3.12.
      */

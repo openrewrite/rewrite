@@ -255,8 +255,11 @@ class PackageJsonOverridesTest {
         assertThat(declined(Bun, ranBy(root, Bun, "1.4.0"), twoParents))
           .isEqualTo("Bun currently only supports one level of nested \"overrides\"");
         assertThat(declined(Bun, ranBy(root, Bun, "1.4.0"), null)).isNull();
+        // 1.2.x reads overrides flat, as 1.3.10 does
+        assertThat(declined(Bun, ranBy(root, Bun, "1.2.0"), oneParent))
+          .isEqualTo("bun does not support nested overrides");
         // a release the engine does not reproduce
-        assertThat(declined(Bun, ranBy(root, Bun, "1.2.0"), oneParent)).contains("cannot know what bun 1.2.0 writes");
+        assertThat(declined(Bun, ranBy(root, Bun, "1.1.45"), oneParent)).contains("cannot know what bun 1.1.45 writes");
         // a marker of another package manager names no Bun release: 1.3.10 installs
         assertThat(declined(Bun, ranBy(root, Npm, "1.4.0"), oneParent))
           .isEqualTo("bun does not support nested overrides");
