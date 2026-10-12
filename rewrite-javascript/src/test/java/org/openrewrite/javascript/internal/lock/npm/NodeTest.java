@@ -1194,6 +1194,18 @@ class NodeTest {
     }
 
     @Test
+    void canDedupeReadsParentsBeforeNpm7_14_0() {
+        NpmRelease release = NpmRelease.of("7.13.0");
+        Node root = node(opts().release(release).path("/path/to/root")
+          .pkg(obj("name", "root", "version", "1.2.3", "dependencies", obj("a", "1")))
+          .child(opts().pkg(obj("name", "a", "version", "1.2.3")).build()));
+        Node top = node(opts().release(release).fsParent(root).path(root.getPath() + "/packages/top")
+          .pkg(obj("name", "top", "version", "1.2.3", "dependencies", obj("a", "1")))
+          .child(opts().pkg(obj("name", "a", "version", "1.0.0")).build()));
+        assertThat(child(top, "a").canDedupe()).as("a top in another's folder has no parent").isFalse();
+    }
+
+    @Test
     void canDedupeReturnsTrueWhenExplicitRequestIsTrueRegardlessOfOtherConditions() {
         Node root = node(opts().pkg(obj("name", "root", "version", "1.0.0")).path("/root").realpath("/root"));
         Node duplicate = node(opts().pkg(obj("name", "dup", "version", "1.0.0")).parent(root));

@@ -1119,7 +1119,11 @@ public class Node {
             return false;
         }
 
-        if (getResolveParent() == null || getResolveParent().getResolveParent() == null) {
+        // before npm 7.14.0, this.parent.parent
+        boolean fromResolveParents = release.dedupesFromResolveParents();
+        Node up = fromResolveParents ? getResolveParent() : parent;
+        Node upper = up == null ? null : fromResolveParents ? up.getResolveParent() : up.parent;
+        if (up == null || upper == null) {
             return false;
         }
 
@@ -1127,7 +1131,7 @@ public class Node {
             return true;
         }
 
-        Node other = getResolveParent().getResolveParent().resolve(name);
+        Node other = upper.resolve(name);
 
         if (other == null) {
             return false;

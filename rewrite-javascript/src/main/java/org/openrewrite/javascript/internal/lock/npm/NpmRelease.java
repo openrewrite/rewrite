@@ -90,6 +90,14 @@ public final class NpmRelease implements Comparable<NpmRelease> {
     }
 
     /**
+     * {@code [_problemEdges]} builds what a workspace bundles as any of its dependencies, as it does the project
+     * root's, from npm 7.14.0; before, it leaves them to the bundle, as a dependency's.
+     */
+    boolean buildsWhatWorkspacesBundle() {
+        return atLeast(7, 14, 0);
+    }
+
+    /**
      * {@code #checkAllow}: {@code allow-git}, {@code allow-file}, {@code allow-directory} and {@code allow-remote} are
      * enforced before a spec is linked or fetched, from npm 11.15.0; before, pacote alone enforces them, on what it
      * fetches.
@@ -248,6 +256,15 @@ public final class NpmRelease implements Comparable<NpmRelease> {
      */
     boolean prefersSatisfyingWorkspace() {
         return atLeast(8, 5, 0);
+    }
+
+    /**
+     * {@code [_pruneDedupable]} descends into a node's children in location order, then into those of each node its
+     * folder holds outside node_modules, from npm 7.14.0; before, into its children alone, in the order they were
+     * added.
+     */
+    boolean prunesDedupableByLocation() {
+        return atLeast(7, 14, 0);
     }
 
     /**
@@ -587,6 +604,14 @@ public final class NpmRelease implements Comparable<NpmRelease> {
     }
 
     /**
+     * {@code canDedupe} looks for what can stand in for the node from its resolve parent's resolve parent, from npm
+     * 7.14.0; before, from its parent's parent, so a node under a top that lives in another's folder never dedupes.
+     */
+    boolean dedupesFromResolveParents() {
+        return atLeast(7, 14, 0);
+    }
+
+    /**
      * {@code replace}: a link the node replaces takes its target out of the tree, from npm 8.8.0; before, the target
      * stays.
      */
@@ -728,6 +753,25 @@ public final class NpmRelease implements Comparable<NpmRelease> {
         return atLeast(7, 24, 2);
     }
 
+    // @npmcli/arborist reify.js
+
+    /**
+     * {@code [_saveIdealTree]} writes the root package.json back on every install, until npm 7.14.0; from then, only
+     * where the install adds or removes a dependency, which a lock-only install of the edited manifest never does.
+     */
+    boolean rewritesRootPackageJson() {
+        return !atLeast(7, 14, 0);
+    }
+
+    /**
+     * {@code [_saveIdealTree]} writes the root package.json through update-root-package-json.js, the file's own
+     * fields kept and its dependency fields taken from the package arborist read, from npm 7.0.15; before, it writes
+     * that package whole.
+     */
+    boolean updatesRootPackageJsonDependencies() {
+        return atLeast(7, 0, 15);
+    }
+
     // @npmcli/arborist shrinkwrap.js
 
     /**
@@ -832,6 +876,24 @@ public final class NpmRelease implements Comparable<NpmRelease> {
      */
     boolean writesRootPackageName() {
         return atLeast(7, 20, 6);
+    }
+
+    // @npmcli/arborist update-root-package-json.js
+
+    /**
+     * A dependency the root package.json names in both {@code dependencies} and {@code peerDependencies} is written
+     * back into {@code dependencies} with the peer's spec, from npm 7.5.5.
+     */
+    boolean copiesPeerSpecsOverDependencies() {
+        return atLeast(7, 5, 5);
+    }
+
+    /**
+     * {@code dependencies} is written back without what {@code optionalDependencies} names, and left out when that
+     * empties it, from npm 7.5.3.
+     */
+    boolean prunesRepeatedOptionalsOfRootPackageJson() {
+        return atLeast(7, 5, 3);
     }
 
     // @npmcli/arborist yarn-lock.js

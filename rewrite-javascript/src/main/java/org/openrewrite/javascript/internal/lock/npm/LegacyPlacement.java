@@ -275,7 +275,15 @@ final class LegacyPlacement {
             node.setRoot(null);
             return;
         }
-        if (descend) {
+        if (descend && !options.getRelease().prunesDedupableByLocation()) {
+            // for (const child of node.children.values()): a JavaScript Map iterator skips the children deleted
+            // before it reaches them
+            for (Node child : node.getChildren().values()) {
+                if (node.getChildren().get(child.getName()) == child) {
+                    pruneDedupable(child, true);
+                }
+            }
+        } else if (descend) {
             Comparator<Node> nodeSort = (a, b) -> LocaleCompare.en(a.getLocation(), b.getLocation());
 
             List<Node> children = node.getChildren().values();

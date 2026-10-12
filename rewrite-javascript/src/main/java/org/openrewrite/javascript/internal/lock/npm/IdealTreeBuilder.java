@@ -845,7 +845,9 @@ public final class IdealTreeBuilder {
     }
 
     private List<Edge> problemEdges(Node node) {
-        Object bd = node.isProjectRoot() || node.isWorkspace() ? null : node.getPackage().get("bundleDependencies");
+        // before npm 7.14.0 a workspace's bundle is left to it
+        Object bd = node.isProjectRoot() || node.isWorkspace() && options.getRelease().buildsWhatWorkspacesBundle() ?
+                null : node.getPackage().get("bundleDependencies");
         Set<Object> bundled = new LinkedHashSet<>();
         if (bd instanceof List) {
             bundled.addAll((List<?>) bd);
