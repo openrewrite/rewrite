@@ -77,7 +77,8 @@ the upstream source being the tag `v<release>` of pnpm/pnpm); the marker's relea
 no other the engine follows. Without a marker 11.2.2 runs and hands the install to the release the project names,
 which the engine follows where it reproduces it; where the inputs leave that release at a range (corepack or pnpm run
 directly, a range the root's lock pins one of), a question the range's releases answer differently is cannot-know,
-so each question is asked only where its answers differ for the inputs. To add releases:
+so each question is asked only where its answers differ for the inputs; the node-semver each pnpm release bundles is
+asked through `PnpmRelease.underSemver` the same way. To add releases:
 
 1. Sweep them: the fixtures repository's sweep runs each real release over every scenario against the scenario's
    recorded registry, and its export writes what each release wrote into the `releases` files and `release/`

@@ -393,7 +393,16 @@ npm's; `Main.RUNS_AS_PORTED`, which let every 11.x release run as 11.2.2, is gon
   left out, every release's replay of every scenario being the same without them. `PnpmScenarioTest` replays the
   first and last release of every range, and every release with `REWRITE_LOCK_EVERY_RELEASE`. A recording a release
   outside `PROVEN` made is held to cannot-know until the engine reproduces that release. `PROVEN` widens a boundary at
-  a time, once every replay of its releases passes and every pair of releases in it is reviewed: 11.0.3 to 11.5.2 so
-  far. 11.5.2 resolves peers a second time from the peer contexts the lock records, reads a locked package it does not
-  update from its snapshot, and binds each locked tarball URL to the registry's; a pnpm 11 release before 11.0.6
-  writes pnpm-workspace.yaml as pnpm 10 does, which the recipes follow.
+  a time, once every replay of its releases passes and every pair of releases in it is reviewed, every module of the
+  bundle and every library it bundles: 11.0.3 to 11.11.0 so far. 11.5.2 resolves peers a second time from the peer
+  contexts the lock records, reads a locked package it does not update from its snapshot, and binds each locked
+  tarball URL to the registry's; 11.7.0 resolves the children of a package several occurrences reach in the context of
+  the lowest of them (pnpm/pnpm#12358); a pnpm 11 release before 11.0.6 writes pnpm-workspace.yaml as pnpm 10 does,
+  which the recipes follow.
+- **A bundled library is a question too.** Each release bundles its own node-semver (7.7.4 to 11.1.3, 7.8.0, 7.8.1
+  from 11.3.0, 7.8.4 from 11.7.0, 7.8.5 from 11.9.0), whose range functions the port asks through
+  `PnpmRelease.underSemver`, only where the node-semvers of the releases the install may be answer otherwise; yaml
+  2.8.4 (11.0.7) prints a negative number's fraction digits, which the recipes' pnpm-workspace.yaml writer asks the
+  release that installs. Where pnpm writes a file the regeneration does not (loose minimumReleaseAge adding immature
+  picks to pnpm-workspace.yaml from 11.1.3) or reads one the host does not give (a user .npmrc the environment names,
+  from 11.0.6), the regeneration is cannot-know.
