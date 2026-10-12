@@ -2386,4 +2386,53 @@ class PnpmReleaseTest {
           release("11.9.0"))).hasMessage("The \"dependencies\" field must be an object.");
         assertThat(Manifests.invalidDependenciesField(obj("{'dependencies':[]}"), release("11.8.0"))).isNull();
     }
+
+    /**
+     * config/reader loadNpmrcFiles.ts readJsonAuthEnv and index.ts (11.10.0): pnpm_config__auth routes the default
+     * registry and a scope to the registry it names, over the workspace's registries, and fails where it is no such
+     * object; before, pnpm reads no such setting.
+     */
+    @Test
+    void readsTheAuthSettingFrom11100() {
+        Map<String, String> env = Collections.singletonMap("pnpm_config__auth", "{\"https://npm.example.com/\":" +
+                                                                                "{\"@\":{\"authToken\":\"t\"}," +
+                                                                                "\"@org\":{\"authToken\":\"u\"}}}");
+        String workspace = "registries:\n  '@org': https://yaml.example.com/\n";
+        assertThat(options(workspace, null, null, env, "11.10.0").getRegistries())
+          .containsEntry("default", "https://npm.example.com/")
+          .containsEntry("@org", "https://npm.example.com/");
+        assertThat(options(workspace, null, null, env, "11.9.0").getRegistries())
+          .containsEntry("default", REGISTRY)
+          .containsEntry("@org", "https://yaml.example.com/");
+        assertThatThrownBy(() -> options("", null, null, Collections.singletonMap("PNPM_CONFIG__AUTH",
+          "{\"ftp://x.test/\":{}}"), "11.10.0"))
+          .isInstanceOfSatisfying(PnpmError.class, e -> {
+              assertThat(e.getCode()).isEqualTo("ERR_PNPM_INVALID_AUTH_SETTING");
+              assertThat(e.getMessage()).isEqualTo("pnpm_config__auth[entry 1]: key must be an http(s) registry URL");
+          });
+        assertThatThrownBy(() -> options("", null, null, Collections.singletonMap("pnpm_config__auth",
+          "{\"https://x.test/\":{\"@\":{\"_password\":\"p\"}}}"), "11.10.0"))
+          .hasMessage("pnpm_config__auth[entry 1 (https://x.test)][\"@\"][\"_password\"]: unsupported auth field " +
+                      "(only \"authToken\" is supported)");
+        assertThat(options("", null, null, Collections.singletonMap("pnpm_config__auth", "[]"), "11.9.0")
+          .getRegistries()).containsEntry("default", REGISTRY);
+    }
+
+    /**
+     * config/reader index.ts getConfig (11.10.0): pnpm-workspace.yaml's registry is the default registry, over its
+     * registries' default; before, the setting is no registry pnpm resolves from.
+     */
+    @Test
+    void takesTheRegistrySettingAsTheDefaultFrom11100() {
+        String workspace = "registry: https://r.example/\n";
+        assertThat(options(workspace, null, null, Collections.emptyMap(), "11.10.0").getRegistries())
+          .containsEntry("default", "https://r.example/");
+        assertThat(options(workspace, null, null, Collections.emptyMap(), "11.9.0").getRegistries())
+          .containsEntry("default", REGISTRY);
+        String both = "registry: https://r.example/\nregistries:\n  default: https://s.example/\n";
+        assertThat(options(both, null, null, Collections.emptyMap(), "11.10.0").getRegistries())
+          .containsEntry("default", "https://r.example/");
+        assertThat(options(both, null, null, Collections.emptyMap(), "11.9.0").getRegistries())
+          .containsEntry("default", "https://s.example/");
+    }
 }

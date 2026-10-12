@@ -21,6 +21,7 @@ import lombok.Value;
 import lombok.With;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.javascript.internal.lock.CannotKnow;
+import org.openrewrite.javascript.internal.lock.EcmaScript;
 import org.openrewrite.javascript.internal.lock.Ini;
 import org.openrewrite.javascript.internal.lock.JsError;
 import org.openrewrite.javascript.internal.lock.PosixPath;
@@ -208,10 +209,12 @@ public final class PnpmOptions {
         if (!envScopedConfig.isEmpty() && !release.readsUrlScopedConfigFromTheEnvironment()) {
             envScopedConfig = new LinkedHashMap<>();
         }
+        // from 11.10.0 pnpm_config__auth's tokens follow them (PnpmRelease#readsTheAuthSetting)
+        JsonAuth jsonAuth = readJsonAuthEnv(env, release);
         Map<String, @Nullable Object> rawConfig = new LinkedHashMap<>();
         Map<String, @Nullable Object> mergedConfig = new LinkedHashMap<>();
         for (Map<String, @Nullable Object> source : Arrays.asList(builtin, defaultOptions, userConfig,
-                workspaceNpmrc, envScopedConfig)) {
+                workspaceNpmrc, envScopedConfig, jsonAuth.auth)) {
             for (String key : Js.keys(source)) {
                 rawConfig.put(key, source.get(key));
                 if (isNpmrcReadableKey(key)) {
@@ -240,7 +243,7 @@ public final class PnpmOptions {
         registriesFromNpmrc.put("default", normalizeRegistryUrl(authConfig.get("registry")));
         registriesFromNpmrc.putAll(networkRegistries);
         Map<String, String> packageManagerRegistries = trustedRegistries(builtin, defaultOptions, userConfig,
-                envScopedConfig, release);
+                envScopedConfig, jsonAuth, release);
         if (holdsUnscopedCreds(authConfig) && !release.rescopesUnscopedCredentials()) {
             getDefaultCreds(authConfig, release);
         }
@@ -298,6 +301,19 @@ public final class PnpmOptions {
         } else if (workspaceRegistries != null) {
             throw new CannotKnow("what pnpm makes of registries (" + Js.typeOf(workspaceRegistries) +
                                  ", where pnpm reads an object)");
+        }
+        // from 11.10.0 pnpm_config__auth's routes win over the workspace's (PnpmRelease#readsTheAuthSetting)
+        registries.putAll(jsonAuth.registries);
+        // from 11.10.0 the registry setting (pnpm-workspace.yaml's) is the default registry, which before it is not
+        // (PnpmRelease#takesTheRegistrySettingAsTheDefault), asked where it is another
+        Object registrySetting = config.get("registry");
+        if (explicitlySetKeys.contains("registry") && registrySetting instanceof String) {
+            String setting = normalizeRegistryUrl(registrySetting);
+            String current = Js.truthy(registries.get("default")) ? registries.get("default") :
+                    registriesFromNpmrc.get("default");
+            if (!setting.equals(normalizeRegistryUrl(current)) && release.takesTheRegistrySettingAsTheDefault()) {
+                registries.put("default", setting);
+            }
         }
         if (!Js.truthy(registries.get("default"))) {
             registries.put("default", registriesFromNpmrc.get("default"));
@@ -364,10 +380,10 @@ public final class PnpmOptions {
                                                                    Map<String, @Nullable Object> defaultOptions,
                                                                    Map<String, @Nullable Object> userConfig,
                                                                    Map<String, @Nullable Object> envScopedConfig,
-                                                                   PnpmRelease release) {
+                                                                   JsonAuth jsonAuth, PnpmRelease release) {
         Map<String, @Nullable Object> trustedConfig = new LinkedHashMap<>();
         for (Map<String, @Nullable Object> source : Arrays.asList(builtin, defaultOptions, userConfig,
-                envScopedConfig)) {
+                envScopedConfig, jsonAuth.auth)) {
             for (String key : Js.keys(source)) {
                 if (isNpmrcReadableKey(key)) {
                     trustedConfig.put(key, source.get(key));
@@ -387,7 +403,123 @@ public final class PnpmOptions {
         Map<String, String> packageManagerRegistries = new LinkedHashMap<>();
         packageManagerRegistries.put("default", normalizeRegistryUrl(trustedAuthConfig.get("registry")));
         packageManagerRegistries.putAll(trustedNetworkRegistries);
+        // from 11.10.0 pnpm_config__auth's routes too (PnpmRelease#readsTheAuthSetting)
+        packageManagerRegistries.putAll(jsonAuth.registries);
         return packageManagerRegistries;
+    }
+
+    /**
+     * loadNpmrcFiles' {@code jsonAuth} of 11.10.0: the {@code //…:_authToken} keys the {@code _auth} setting gives,
+     * after the environment's URL-scoped config, and the registry it routes each scope to.
+     */
+    private static final class JsonAuth {
+        static final JsonAuth NONE = new JsonAuth(Collections.emptyMap(), Collections.emptyMap());
+
+        final Map<String, @Nullable Object> auth;
+        final Map<String, String> registries;
+
+        JsonAuth(Map<String, @Nullable Object> auth, Map<String, String> registries) {
+            this.auth = auth;
+            this.registries = registries;
+        }
+    }
+
+    /**
+     * loadNpmrcFiles' {@code readJsonAuthEnv} of 11.10.0: {@code pnpm_config__auth}, else {@code PNPM_CONFIG__AUTH},
+     * where set and not empty, a JSON object of http(s) registry URLs, each an object of scopes ({@code @} the
+     * default, {@code @org}) with an {@code authToken} alone, else {@code ERR_PNPM_INVALID_AUTH_SETTING}; before,
+     * pnpm reads no such setting ({@link PnpmRelease#readsTheAuthSetting}). The global config.yaml's {@code _auth},
+     * which the port reads no global config of, is none.
+     */
+    @SuppressWarnings("unchecked")
+    private static JsonAuth readJsonAuthEnv(@Nullable Map<String, String> env, PnpmRelease release) {
+        String value = env == null ? null : env.get("pnpm_config__auth") != null &&
+                                            !env.get("pnpm_config__auth").isEmpty() ? env.get("pnpm_config__auth") :
+                env.get("PNPM_CONFIG__AUTH") != null && !env.get("PNPM_CONFIG__AUTH").isEmpty() ?
+                        env.get("PNPM_CONFIG__AUTH") : null;
+        if (value == null || !release.readsTheAuthSetting()) {
+            return JsonAuth.NONE;
+        }
+        String source = "pnpm_config__auth";
+        Object parsed;
+        try {
+            parsed = EcmaScript.jsonParse(value);
+        } catch (EcmaScript.JsonSyntaxError e) {
+            throw new PnpmError("INVALID_AUTH_SETTING", "Failed to parse " + source + " as JSON: " + e.getMessage());
+        }
+        if (!(parsed instanceof Map)) {
+            throw new PnpmError("INVALID_AUTH_SETTING", source + " must be a JSON object");
+        }
+        Map<String, @Nullable Object> auth = new LinkedHashMap<>();
+        Map<String, String> registries = new LinkedHashMap<>();
+        int entryNumber = 0;
+        for (String url : Js.keys((Map<String, @Nullable Object>) parsed)) {
+            Object scopes = ((Map<String, @Nullable Object>) parsed).get(url);
+            String label = jsonAuthRegistryLabel(url, ++entryNumber);
+            String[] registry = parseJsonAuthRegistry(url, label, source);
+            if (!(scopes instanceof Map)) {
+                throw new PnpmError("INVALID_AUTH_SETTING", source + "[" + label + "] must be an object keyed by " +
+                                                            "scope");
+            }
+            for (String scope : Js.keys((Map<String, @Nullable Object>) scopes)) {
+                Object creds = ((Map<String, @Nullable Object>) scopes).get(scope);
+                String at = source + "[" + label + "][" + Js.jsonStringify(scope) + "]";
+                if (!("@".equals(scope) || scope.startsWith("@") && scope.length() > 1 && !scope.contains("/") &&
+                                           !scope.contains(":"))) {
+                    throw new PnpmError("INVALID_AUTH_SETTING", at + ": scope must be \"@\" or a package scope like " +
+                                                                "\"@org\"");
+                }
+                if (!(creds instanceof Map)) {
+                    throw new PnpmError("INVALID_AUTH_SETTING", at + " must be an auth object");
+                }
+                for (String field : Js.keys((Map<String, @Nullable Object>) creds)) {
+                    if (!"authToken".equals(field)) {
+                        throw new PnpmError("INVALID_AUTH_SETTING", at + "[" + Js.jsonStringify(field) + "]: " +
+                                                                    "unsupported auth field (only \"authToken\" is " +
+                                                                    "supported)");
+                    }
+                }
+                Object token = ((Map<String, @Nullable Object>) creds).get("authToken");
+                if (!(token instanceof String)) {
+                    throw new PnpmError("INVALID_AUTH_SETTING", at + ": \"authToken\" must be a string");
+                }
+                auth.put(registry[1] + ":" + ("@".equals(scope) ? "" : scope + ":") + "_authToken", token);
+                registries.put("@".equals(scope) ? "default" : scope, registry[0]);
+            }
+        }
+        return new JsonAuth(auth, registries);
+    }
+
+    // jsonAuthRegistryLabel: the entry's number, and its http(s) URL's origin where it has one
+    private static String jsonAuthRegistryLabel(String url, int entryNumber) {
+        String entryLabel = "entry " + entryNumber;
+        WhatwgUrl parsed = WhatwgUrl.tryParse(url);
+        if (parsed != null && ("https:".equals(parsed.getProtocol()) || "http:".equals(parsed.getProtocol())) &&
+            !parsed.getHostname().isEmpty()) {
+            return entryLabel + " (" + parsed.getProtocol() + "//" + parsed.getHost() + ")";
+        }
+        return entryLabel;
+    }
+
+    // parseJsonAuthRegistry: the registry URL normalized, and its nerf dart
+    private static String[] parseJsonAuthRegistry(String url, String label, String source) {
+        WhatwgUrl parsed = WhatwgUrl.tryParse(url);
+        String notARegistry = source + "[" + label + "]: key must be an http(s) registry URL";
+        if (parsed == null || !"https:".equals(parsed.getProtocol()) && !"http:".equals(parsed.getProtocol()) ||
+            parsed.getHostname().isEmpty()) {
+            throw new PnpmError("INVALID_AUTH_SETTING", notARegistry);
+        }
+        if (!parsed.getUsername().isEmpty() || !parsed.getPassword().isEmpty() || !parsed.getSearch().isEmpty() ||
+            !parsed.getHash().isEmpty()) {
+            throw new PnpmError("INVALID_AUTH_SETTING", source + "[" + label + "]: registry URL must not include " +
+                                                        "credentials, query, or fragment");
+        }
+        String normalized = normalizeRegistryUrl(parsed.getHref());
+        String nerfed = nerfDart(normalized);
+        if (nerfed == null || nerfed.isEmpty()) {
+            throw new PnpmError("INVALID_AUTH_SETTING", notARegistry);
+        }
+        return new String[]{normalized, nerfed};
     }
 
     /**

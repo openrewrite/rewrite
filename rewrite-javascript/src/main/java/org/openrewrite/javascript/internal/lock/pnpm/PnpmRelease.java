@@ -312,6 +312,15 @@ public final class PnpmRelease {
         return atLeast(11, 3, 0);
     }
 
+    /**
+     * An explicit {@code registry} setting (pnpm-workspace.yaml's) is the default registry the install resolves from,
+     * over the workspace's {@code registries} and pnpm_config__auth's, from 11.10.0; before, it is the setting alone,
+     * and the default registry the .npmrc's.
+     */
+    boolean takesTheRegistrySettingAsTheDefault() {
+        return atLeast(11, 10, 0);
+    }
+
     // @pnpm/config.reader src/loadNpmrcFiles.ts, getNetworkConfigs.ts
 
     /**
@@ -347,6 +356,17 @@ public final class PnpmRelease {
      */
     boolean groupsCredentialsByRegistryAndScope() {
         return atLeast(11, 7, 0);
+    }
+
+    /**
+     * The environment's {@code pnpm_config__auth} (else {@code PNPM_CONFIG__AUTH}), a JSON object of registry URLs and
+     * the {@code authToken} of each scope ({@code @} the default), sets those tokens after the URL-scoped config and
+     * routes each scope to its registry, over the workspace's {@code registries} and for pnpm's own bootstrap too,
+     * {@code ERR_PNPM_INVALID_AUTH_SETTING} where it is no such object, from 11.10.0 (readJsonAuthEnv); before, pnpm
+     * reads no such setting.
+     */
+    boolean readsTheAuthSetting() {
+        return atLeast(11, 10, 0);
     }
 
     // @pnpm/store.connection-manager src/createNewStoreController.ts, @pnpm/store.index (ReadOnlyStoreIndex)
