@@ -21,6 +21,8 @@ import org.jspecify.annotations.Nullable;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Recipe;
 import org.openrewrite.TreeVisitor;
+import org.openrewrite.internal.ListUtils;
+import org.openrewrite.internal.StringUtils;
 import org.openrewrite.maven.internal.MavenPomDownloader;
 import org.openrewrite.maven.tree.*;
 import org.openrewrite.xml.XPathMatcher;
@@ -31,15 +33,19 @@ import org.openrewrite.xml.tree.Xml;
 import java.util.*;
 import java.util.function.BinaryOperator;
 import java.util.function.Function;
+import java.util.stream.Stream;
 
-import static java.util.Collections.emptyList;
-import static java.util.stream.Collectors.toList;
+import static java.util.stream.Collectors.toSet;
+import static org.openrewrite.maven.tree.Plugin.PLUGIN_DEFAULT_GROUPID;
 
 public class RemoveDuplicatePluginDeclarations extends Recipe {
 
-    private static final XPathMatcher PLUGINS_MATCHER = new XPathMatcher("//build/plugins");
-    private static final XPathMatcher PLUGIN_MANAGEMENT_PLUGINS_MATCHER = new XPathMatcher("//build/pluginManagement/plugins");
-    private static final XPathMatcher REPORTING_PLUGINS_MATCHER = new XPathMatcher("//reporting/plugins");
+    private static final XPathMatcher BUILD_PLUGINS = new XPathMatcher("/project/build/plugins");
+    private static final XPathMatcher PROFILE_BUILD_PLUGINS = new XPathMatcher("/project/profiles/profile/build/plugins");
+    private static final XPathMatcher MANAGED_PLUGINS = new XPathMatcher("/project/build/pluginManagement/plugins");
+    private static final XPathMatcher PROFILE_MANAGED_PLUGINS = new XPathMatcher("/project/profiles/profile/build/pluginManagement/plugins");
+    private static final XPathMatcher REPORTING_PLUGINS = new XPathMatcher("/project/reporting/plugins");
+    private static final XPathMatcher PROFILE_REPORTING_PLUGINS = new XPathMatcher("/project/profiles/profile/reporting/plugins");
 
     /// Plugins the Maven 3.9 super POM manages, which every POM's plugin management inherits.
     private static final Set<String> SUPER_POM_MANAGED_PLUGINS = new HashSet<>(Arrays.asList(
@@ -63,60 +69,58 @@ public class RemoveDuplicatePluginDeclarations extends Recipe {
     public TreeVisitor<?, ExecutionContext> getVisitor() {
         return new MavenIsoVisitor<ExecutionContext>() {
             @Nullable
-            Set<String> inheritedPlugins;
-
-            @Nullable
-            Set<String> inheritedPluginManagement;
+            InheritedKeys inherited;
 
             @Override
             public Xml.Document visitDocument(Xml.Document document, ExecutionContext ctx) {
-                inheritedPlugins = null;
-                inheritedPluginManagement = null;
+                inherited = null;
                 return super.visitDocument(document, ctx);
             }
 
             @Override
             public Xml.Tag visitTag(Xml.Tag tag, ExecutionContext ctx) {
                 Xml.Tag t = super.visitTag(tag, ctx);
-
-                // Plugin configuration is free-form XML a plugin interprets itself, so repeated elements there are
-                // meaningful rather than duplicates
-                if (isInside("configuration")) {
+                if (!"plugins".equals(t.getName())) {
                     return t;
                 }
 
-                if (PLUGINS_MATCHER.matches(getCursor())) {
-                    boolean inProfile = isInside("profile");
-                    return collapseDuplicates(t, key -> !inProfile ? MERGE :
-                            mainBuildKeys(false).contains(key) ? MERGE_INTO_MAIN_BUILD :
-                            inheritedKeys(false, ctx).contains(key) ? MERGE : KEEP_LAST);
-                } else if (PLUGIN_MANAGEMENT_PLUGINS_MATCHER.matches(getCursor())) {
-                    boolean inProfile = isInside("profile");
-                    return collapseDuplicates(t, key -> inProfile && mainBuildKeys(true).contains(key) ?
-                            MERGE_INTO_MAIN_BUILD :
-                            SUPER_POM_MANAGED_PLUGINS.contains(key) || inheritedKeys(true, ctx).contains(key) ?
-                                    MERGE : KEEP_LAST);
-                } else if (REPORTING_PLUGINS_MATCHER.matches(getCursor())) {
-                    return collapseDuplicates(t, key -> (earlier, later) -> earlier);
+                if (BUILD_PLUGINS.matches(getCursor())) {
+                    return collapseDuplicates(t, key -> Collapse.MERGE);
+                } else if (PROFILE_BUILD_PLUGINS.matches(getCursor())) {
+                    return collapseDuplicates(t, key -> mainBuildKeys(false).contains(key) ?
+                            Collapse.MERGE_INTO_MAIN_BUILD :
+                            inheritedKeys(ctx).plugins.contains(key) ? Collapse.MERGE : Collapse.KEEP_LAST);
+                } else if (MANAGED_PLUGINS.matches(getCursor())) {
+                    return collapseDuplicates(t, key -> managedPluginCollapse(key, ctx));
+                } else if (PROFILE_MANAGED_PLUGINS.matches(getCursor())) {
+                    return collapseDuplicates(t, key -> mainBuildKeys(true).contains(key) ?
+                            Collapse.MERGE_INTO_MAIN_BUILD : managedPluginCollapse(key, ctx));
+                } else if (REPORTING_PLUGINS.matches(getCursor()) || PROFILE_REPORTING_PLUGINS.matches(getCursor())) {
+                    return collapseDuplicates(t, key -> Collapse.KEEP_FIRST);
                 }
-
                 return t;
+            }
+
+            private Collapse managedPluginCollapse(String key, ExecutionContext ctx) {
+                return SUPER_POM_MANAGED_PLUGINS.contains(key) || inheritedKeys(ctx).pluginManagement.contains(key) ?
+                        Collapse.MERGE : Collapse.KEEP_LAST;
             }
 
             private Set<String> mainBuildKeys(boolean management) {
                 Pom requested = getResolutionResult().getPom().getRequested();
-                return pluginKeys(management ? requested.getPluginManagement() : requested.getPlugins());
+                return pluginKeys((management ? requested.getPluginManagement() : requested.getPlugins()).stream());
             }
 
             /// Plugins the parent's effective model declares, which Maven 3 merged a child's duplicates into while
             /// assembling inheritance, so the child's duplicates were merged rather than the last one winning.
-            private Set<String> inheritedKeys(boolean management, ExecutionContext ctx) {
-                if (inheritedPlugins == null || inheritedPluginManagement == null) {
+            private InheritedKeys inheritedKeys(ExecutionContext ctx) {
+                if (inherited == null) {
                     ResolvedPom parent = parentPom(ctx);
-                    inheritedPlugins = inheritedPluginKeys(parent == null ? emptyList() : parent.getPlugins());
-                    inheritedPluginManagement = inheritedPluginKeys(parent == null ? emptyList() : parent.getPluginManagement());
+                    inherited = parent == null ? new InheritedKeys(Collections.emptySet(), Collections.emptySet()) :
+                            new InheritedKeys(inheritedPluginKeys(parent.getPlugins()),
+                                    inheritedPluginKeys(parent.getPluginManagement()));
                 }
-                return management ? inheritedPluginManagement : inheritedPlugins;
+                return inherited;
             }
 
             private @Nullable ResolvedPom parentPom(ExecutionContext ctx) {
@@ -131,118 +135,130 @@ public class RemoveDuplicatePluginDeclarations extends Recipe {
                 try {
                     MavenPomDownloader downloader = new MavenPomDownloader(mrr.getProjectPoms(), ctx,
                             MavenExecutionContextView.view(ctx).effectiveSettings(mrr), mrr.getActiveProfiles());
-                    return downloader.download(parent.getGav(), parent.getRelativePath(), mrr.getPom(), mrr.getPom().getRepositories())
+                    return downloader.download(parent.getGav(), parent.getRelativePath(), mrr.getPom(),
+                                    mrr.getPom().getRepositories())
                             .resolve(mrr.getActiveProfiles(), downloader, ctx);
                 } catch (MavenDownloadingException e) {
                     return null;
                 }
             }
 
-            private boolean isInside(String tagName) {
-                return getCursor().getPathAsStream(o -> o instanceof Xml.Tag && tagName.equals(((Xml.Tag) o).getName()))
-                        .findAny()
-                        .isPresent();
-            }
         };
     }
 
     private static final List<String> COORDINATES_FIRST = Arrays.asList(
             "groupId", "artifactId", "version", "extensions", "id", "phase");
 
-    private static final BinaryOperator<Xml.Tag> MERGE = (earlier, later) -> mergePlugin(later, earlier, true);
-    /// Profile injection merges each duplicate into the main build's declaration in turn, and unlike inheritance
-    /// and duplicate normalization it keeps every execution, whether inherited or not.
-    private static final BinaryOperator<Xml.Tag> MERGE_INTO_MAIN_BUILD = (earlier, later) -> mergePlugin(later, earlier, false);
-    private static final BinaryOperator<Xml.Tag> KEEP_LAST = (earlier, later) -> later;
+    private enum Collapse {
+        MERGE,
+        /// Profile injection merges each duplicate into the main build's declaration in turn, and unlike
+        /// inheritance and duplicate normalization it keeps every execution, whether inherited or not.
+        MERGE_INTO_MAIN_BUILD,
+        KEEP_FIRST,
+        KEEP_LAST
+    }
+
+    @Value
+    private static class InheritedKeys {
+        Set<String> plugins;
+        Set<String> pluginManagement;
+    }
 
     private static Set<String> inheritedPluginKeys(List<Plugin> plugins) {
         return pluginKeys(plugins.stream()
                 .filter(p -> p.getInherited() == null || Boolean.parseBoolean(p.getInherited().trim()) ||
-                             !p.getExecutions().isEmpty())
-                .collect(toList()));
+                             !p.getExecutions().isEmpty()));
     }
 
-    private static Set<String> pluginKeys(List<Plugin> plugins) {
-        Set<String> keys = new HashSet<>();
-        for (Plugin plugin : plugins) {
-            keys.add(plugin.getGroupId() + ":" + plugin.getArtifactId());
-        }
-        return keys;
+    private static Set<String> pluginKeys(Stream<Plugin> plugins) {
+        return plugins.map(p -> p.getGroupId() + ":" + p.getArtifactId()).collect(toSet());
     }
 
-    private static Xml.Tag collapseDuplicates(Xml.Tag plugins, Function<String, BinaryOperator<Xml.Tag>> combineFor) {
+    private static Xml.Tag collapseDuplicates(Xml.Tag plugins, Function<String, Collapse> collapseFor) {
         if (plugins.getContent() == null) {
             return plugins;
         }
         Map<String, List<Xml.Tag>> occurrences = new HashMap<>();
+        boolean duplicated = false;
         for (Content content : plugins.getContent()) {
             String key = pluginKey(content);
             if (key != null) {
-                occurrences.computeIfAbsent(key, k -> new ArrayList<>()).add((Xml.Tag) content);
+                List<Xml.Tag> declarations = occurrences.computeIfAbsent(key, k -> new ArrayList<>(1));
+                declarations.add((Xml.Tag) content);
+                duplicated |= declarations.size() > 1;
             }
         }
-        if (occurrences.values().stream().allMatch(o -> o.size() == 1)) {
+        if (!duplicated) {
             return plugins;
         }
 
         Indent style = siblingIndent(plugins);
         Map<Content, List<Content>> comments = leadingComments(plugins.getContent());
-        Set<Content> removed = Collections.newSetFromMap(new IdentityHashMap<>());
-        for (List<Xml.Tag> duplicates : occurrences.values()) {
-            for (Xml.Tag duplicate : duplicates.subList(1, duplicates.size())) {
-                removed.add(duplicate);
-                removed.addAll(comments.get(duplicate));
+        Map<Content, @Nullable Object> replacements = new IdentityHashMap<>();
+        occurrences.forEach((key, duplicates) -> {
+            if (duplicates.size() == 1) {
+                return;
             }
-        }
-
-        List<Content> collapsed = new ArrayList<>(plugins.getContent().size());
-        for (Content content : plugins.getContent()) {
-            if (removed.contains(content)) {
-                continue;
-            }
-            String key = pluginKey(content);
-            List<Xml.Tag> duplicates = key == null ? null : occurrences.get(key);
-            if (duplicates == null || duplicates.size() == 1) {
-                collapsed.add(content);
-                continue;
-            }
-            BinaryOperator<Xml.Tag> combine = combineFor.apply(key);
-            Xml.Tag first = reindent(duplicates.get(0), Indent.of(duplicates.get(0)), style);
-            Xml.Tag result = first;
-            for (Xml.Tag later : duplicates.subList(1, duplicates.size())) {
-                result = combine.apply(result, reindent(later, Indent.of(later), style));
-            }
-            result = withGroupIdOf(result, first);
-            String prefix = withIndent(content.getPrefix(), style.base);
-            boolean ownComments = !comments.get(content).isEmpty();
-            for (Xml.Tag later : duplicates.subList(1, duplicates.size())) {
-                for (Content comment : comments.get(later)) {
-                    Content moved = reindent(comment, Indent.of(later), style);
-                    collapsed.add((Content) moved.withPrefix(ownComments ? singleLine(moved.getPrefix()) : prefix));
-                    ownComments = true;
-                    prefix = singleLine(prefix);
+            Xml.Tag first = duplicates.get(0);
+            List<Xml.Tag> later = duplicates.subList(1, duplicates.size());
+            List<Content> moved = new ArrayList<>();
+            for (Xml.Tag duplicate : later) {
+                replacements.put(duplicate, null);
+                for (Content comment : comments.get(duplicate)) {
+                    replacements.put(comment, null);
+                    moved.add(reindent(comment, Indent.of(duplicate), style));
                 }
             }
-            collapsed.add(result.withPrefix(prefix));
+            Xml.Tag result = withGroupIdOf(collapse(duplicates, collapseFor.apply(key), style), first, style);
+            replacements.put(first, afterMovedComments(moved, !comments.get(first).isEmpty(),
+                    withIndent(first.getPrefix(), style.base), result));
+        });
+        return plugins.withContent(ListUtils.flatMap(children(plugins),
+                c -> replacements.containsKey(c) ? replacements.get(c) : c));
+    }
+
+    private static Xml.Tag collapse(List<Xml.Tag> duplicates, Collapse collapse, Indent style) {
+        if (collapse == Collapse.KEEP_FIRST || collapse == Collapse.KEEP_LAST) {
+            Xml.Tag kept = duplicates.get(collapse == Collapse.KEEP_FIRST ? 0 : duplicates.size() - 1);
+            return reindent(kept, Indent.of(kept), style);
         }
-        return plugins.withContent(collapsed);
+        Xml.Tag result = null;
+        for (Xml.Tag duplicate : duplicates) {
+            Xml.Tag declaration = reindent(duplicate, Indent.of(duplicate), style);
+            result = result == null ? declaration : mergePlugin(declaration, result, collapse == Collapse.MERGE);
+        }
+        return result;
+    }
+
+    /// Places `element` after the comments that moved along with it. With no comments of its own above it, the
+    /// first moved comment takes over the element's prefix, so blank lines stay above the whole group.
+    private static List<Content> afterMovedComments(List<Content> moved, boolean ownComments, String prefix,
+                                                    Xml.Tag element) {
+        List<Content> content = new ArrayList<>(moved.size() + 1);
+        for (Content comment : moved) {
+            content.add((Content) comment.withPrefix(ownComments ? singleLine(comment.getPrefix()) : prefix));
+            ownComments = true;
+            prefix = singleLine(prefix);
+        }
+        content.add(element.withPrefix(prefix));
+        return content;
     }
 
     /// Keeps whether `<groupId>` is spelled out the way the first declaration had it, which Maven treats the
     /// same, so the diff doesn't churn on it.
-    private static Xml.Tag withGroupIdOf(Xml.Tag result, Xml.Tag first) {
-        Xml.Tag firstGroupId = first.getChild("groupId").orElse(null);
+    private static Xml.Tag withGroupIdOf(Xml.Tag result, Xml.Tag first, Indent style) {
+        boolean firstHasGroupId = first.getChild("groupId").isPresent();
         Xml.Tag resultGroupId = result.getChild("groupId").orElse(null);
-        List<Content> content = contentOf(result);
-        if (firstGroupId != null && resultGroupId == null) {
-            content.add(insertionIndex(content, first, firstGroupId), firstGroupId);
-        } else if (firstGroupId == null && resultGroupId != null &&
-                   "org.apache.maven.plugins".equals(trimmedChildValue(result, "groupId", null))) {
-            content.remove(indexOf(content, resultGroupId));
-        } else {
-            return result;
+        if (firstHasGroupId && resultGroupId == null) {
+            Xml.Tag reindented = reindent(first, Indent.of(first), style);
+            Xml.Tag firstGroupId = reindented.getChild("groupId").get();
+            return result.withContent(ListUtils.insert(children(result), firstGroupId,
+                    insertionIndex(children(result), reindented, firstGroupId)));
+        } else if (!firstHasGroupId && resultGroupId != null &&
+                   PLUGIN_DEFAULT_GROUPID.equals(trimmedChildValue(result, "groupId", null))) {
+            return result.withContent(ListUtils.map(children(result), c -> c == resultGroupId ? null : c));
         }
-        return result.withContent(content);
+        return result;
     }
 
     private static @Nullable String pluginKey(Content content) {
@@ -254,20 +270,20 @@ public class RemoveDuplicatePluginDeclarations extends Recipe {
         if (artifactId == null) {
             return null;
         }
-        return trimmedChildValue(plugin, "groupId", "org.apache.maven.plugins") + ":" + artifactId;
+        return trimmedChildValue(plugin, "groupId", PLUGIN_DEFAULT_GROUPID) + ":" + artifactId;
     }
 
     /// Mirrors `DuplicateMerger` in Maven 3's `DefaultModelNormalizer`, which merges each duplicate
     /// build plugin into the one before it with the later declaration dominant.
-    private static Xml.Tag mergePlugin(Xml.Tag dominant, Xml.Tag earlier, boolean onlyInheritedExecutions) {
-        Xml.Tag recessive = reindent(earlier, Indent.of(earlier), Indent.of(dominant));
+    private static Xml.Tag mergePlugin(Xml.Tag dominant, Xml.Tag recessive, boolean onlyInheritedExecutions) {
         Xml.Tag merged = inheritChild(dominant, recessive, "version");
         merged = inheritChild(merged, recessive, "extensions");
         merged = inheritChild(merged, recessive, "inherited");
-        merged = mergeChild(merged, recessive, "configuration", (d, r) -> mergeDom(d, r, true));
-        merged = mergeChild(merged, recessive, "dependencies", RemoveDuplicatePluginDeclarations::mergeDependencies);
-        return mergeChild(merged, onlyInheritedExecutions ? withoutUninheritedExecutions(recessive) : recessive, "executions",
-                RemoveDuplicatePluginDeclarations::mergeExecutions);
+        merged = mergeChild(merged, recessive, "configuration", RemoveDuplicatePluginDeclarations::mergeConfiguration);
+        merged = mergeChild(merged, recessive, "dependencies",
+                (d, r) -> mergeByKey(d, r, "dependency", RemoveDuplicatePluginDeclarations::dependencyKey));
+        Xml.Tag executionSource = onlyInheritedExecutions ? withoutUninheritedExecutions(recessive) : recessive;
+        return mergeChild(merged, executionSource, "executions", RemoveDuplicatePluginDeclarations::mergeExecutions);
     }
 
     /// Maven's merge only carries over the earlier declaration's executions that are inherited, so one marked
@@ -278,7 +294,7 @@ public class RemoveDuplicatePluginDeclarations extends Recipe {
             return plugin;
         }
         boolean pluginInherited = isInherited(plugin, true);
-        Map<Content, List<Content>> comments = leadingComments(contentOf(executions));
+        Map<Content, List<Content>> comments = leadingComments(children(executions));
         Set<Content> dropped = Collections.newSetFromMap(new IdentityHashMap<>());
         for (Xml.Tag execution : executions.getChildren("execution")) {
             if (!isInherited(execution, pluginInherited)) {
@@ -289,15 +305,10 @@ public class RemoveDuplicatePluginDeclarations extends Recipe {
         if (dropped.isEmpty()) {
             return plugin;
         }
-        List<Content> content = contentOf(plugin);
-        List<Content> remaining = contentOf(executions);
-        remaining.removeIf(dropped::contains);
-        if (remaining.stream().noneMatch(c -> c instanceof Xml.Tag && "execution".equals(((Xml.Tag) c).getName()))) {
-            content.remove(indexOf(content, executions));
-        } else {
-            content.set(indexOf(content, executions), executions.withContent(remaining));
-        }
-        return plugin.withContent(content);
+        Xml.Tag remaining = executions.withContent(ListUtils.filter(children(executions), c -> !dropped.contains(c)));
+        boolean anyLeft = remaining.getChild("execution").isPresent();
+        Xml.Tag replacement = anyLeft ? remaining : null;
+        return plugin.withContent(ListUtils.map(children(plugin), c -> c == executions ? replacement : c));
     }
 
     private static boolean isInherited(Xml.Tag tag, boolean otherwise) {
@@ -305,20 +316,22 @@ public class RemoveDuplicatePluginDeclarations extends Recipe {
         return inherited == null ? otherwise : Boolean.parseBoolean(inherited);
     }
 
-    private static Xml.Tag mergeDependencies(Xml.Tag dominant, Xml.Tag recessive) {
-        Set<String> dominantKeys = new HashSet<>();
-        for (Xml.Tag dependency : dominant.getChildren("dependency")) {
-            dominantKeys.add(dependencyKey(dependency));
+    /// Keeps the dominant children and adds the recessive ones whose key isn't among them yet.
+    private static Xml.Tag mergeByKey(Xml.Tag dominant, Xml.Tag recessive, String childName,
+                                      Function<Xml.Tag, String> key) {
+        Set<String> keys = new HashSet<>();
+        for (Xml.Tag child : dominant.getChildren(childName)) {
+            keys.add(key.apply(child));
         }
-        List<Content> content = contentOf(dominant);
-        Map<Content, List<Content>> comments = leadingComments(contentOf(recessive));
-        for (Xml.Tag dependency : recessive.getChildren("dependency")) {
-            if (!dominantKeys.contains(dependencyKey(dependency))) {
-                content.addAll(comments.get(dependency));
-                content.add(dependency);
+        Map<Content, List<Content>> comments = leadingComments(children(recessive));
+        List<Content> added = new ArrayList<>();
+        for (Xml.Tag child : recessive.getChildren(childName)) {
+            if (keys.add(key.apply(child))) {
+                added.addAll(comments.get(child));
+                added.add(child);
             }
         }
-        return dominant.withContent(content);
+        return dominant.withContent(ListUtils.concatAll(children(dominant), added));
     }
 
     private static String dependencyKey(Xml.Tag dependency) {
@@ -334,34 +347,22 @@ public class RemoveDuplicatePluginDeclarations extends Recipe {
         for (Xml.Tag execution : dominant.getChildren("execution")) {
             dominantById.put(executionId(execution), execution);
         }
-        Map<Content, List<Content>> dominantComments = leadingComments(contentOf(dominant));
-        Map<Content, List<Content>> recessiveComments = leadingComments(contentOf(recessive));
+        Map<Content, List<Content>> dominantComments = leadingComments(children(dominant));
+        Map<Content, List<Content>> recessiveComments = leadingComments(children(recessive));
         Set<Content> moved = Collections.newSetFromMap(new IdentityHashMap<>());
-        List<Content> content = new ArrayList<>();
-        for (Content c : contentOf(recessive)) {
+        List<Content> recessiveFirst = ListUtils.flatMap(children(recessive), c -> {
             Xml.Tag sameId = c instanceof Xml.Tag && "execution".equals(((Xml.Tag) c).getName()) ?
                     dominantById.get(executionId((Xml.Tag) c)) : null;
             if (sameId == null) {
-                content.add(c);
-            } else {
-                moved.add(sameId);
-                String prefix = withIndent(c.getPrefix(), indentOf(sameId));
-                boolean ownComments = !recessiveComments.get(c).isEmpty();
-                for (Content comment : dominantComments.get(sameId)) {
-                    moved.add(comment);
-                    content.add((Content) comment.withPrefix(ownComments ? singleLine(comment.getPrefix()) : prefix));
-                    ownComments = true;
-                    prefix = singleLine(prefix);
-                }
-                content.add(mergeExecution(sameId, (Xml.Tag) c).withPrefix(prefix));
+                return c;
             }
-        }
-        for (Content c : contentOf(dominant)) {
-            if (!moved.contains(c)) {
-                content.add(c);
-            }
-        }
-        return dominant.withContent(content);
+            moved.add(sameId);
+            moved.addAll(dominantComments.get(sameId));
+            return afterMovedComments(dominantComments.get(sameId), !recessiveComments.get(c).isEmpty(),
+                    withIndent(c.getPrefix(), indentOf(sameId)), mergeExecution(sameId, (Xml.Tag) c));
+        });
+        return dominant.withContent(ListUtils.concatAll(recessiveFirst,
+                ListUtils.filter(children(dominant), c -> !moved.contains(c))));
     }
 
     private static String executionId(Xml.Tag execution) {
@@ -371,30 +372,19 @@ public class RemoveDuplicatePluginDeclarations extends Recipe {
     private static Xml.Tag mergeExecution(Xml.Tag dominant, Xml.Tag recessive) {
         Xml.Tag merged = inheritChild(dominant, recessive, "phase");
         merged = inheritChild(merged, recessive, "inherited");
-        merged = mergeChild(merged, recessive, "configuration", (d, r) -> mergeDom(d, r, true));
-        return mergeChild(merged, recessive, "goals", RemoveDuplicatePluginDeclarations::mergeGoals);
-    }
-
-    private static Xml.Tag mergeGoals(Xml.Tag dominant, Xml.Tag recessive) {
-        Set<String> dominantGoals = new HashSet<>();
-        for (Xml.Tag goal : dominant.getChildren("goal")) {
-            dominantGoals.add(goal.getValue().map(String::trim).orElse(""));
-        }
-        List<Content> content = contentOf(dominant);
-        Map<Content, List<Content>> comments = leadingComments(contentOf(recessive));
-        for (Xml.Tag goal : recessive.getChildren("goal")) {
-            if (dominantGoals.add(goal.getValue().map(String::trim).orElse(""))) {
-                content.addAll(comments.get(goal));
-                content.add(goal);
-            }
-        }
-        return dominant.withContent(content);
+        merged = mergeChild(merged, recessive, "configuration", RemoveDuplicatePluginDeclarations::mergeConfiguration);
+        return mergeChild(merged, recessive, "goals",
+                (d, r) -> mergeByKey(d, r, "goal", goal -> goal.getValue().map(String::trim).orElse("")));
     }
 
     /// Mirrors `Xpp3Dom.mergeXpp3Dom(dominant, recessive)`, including its `combine.self` and
     /// `combine.children` attributes, which is how Maven merges plugin and execution configuration.
     /// Directly inside `<configuration>` the elements are plugin parameters, which Maven looks up by name, so
     /// there a parameter only the earlier declaration had keeps its place instead of being appended.
+    private static Xml.Tag mergeConfiguration(Xml.Tag dominant, Xml.Tag recessive) {
+        return mergeDom(dominant, recessive, true);
+    }
+
     private static Xml.Tag mergeDom(Xml.Tag dominant, Xml.Tag recessive, boolean parameters) {
         if ("override".equals(attribute(dominant, "combine.self"))) {
             return dominant;
@@ -402,26 +392,23 @@ public class RemoveDuplicatePluginDeclarations extends Recipe {
 
         Xml.Tag merged = dominant;
         if (dominant.getChildren().isEmpty() && recessive.getChildren().isEmpty() &&
-            isBlank(dominant.getValue().orElse(null)) && !isBlank(recessive.getValue().orElse(null))) {
+            StringUtils.isBlank(dominant.getValue().orElse(null)) &&
+            !StringUtils.isBlank(recessive.getValue().orElse(null))) {
             merged = merged.withContent(recessive.getContent());
         }
 
-        List<Xml.Attribute> attributes = new ArrayList<>(merged.getAttributes());
-        for (Xml.Attribute attribute : recessive.getAttributes()) {
-            if (isBlank(attribute(merged, attribute.getKeyAsString()))) {
-                attributes.removeIf(a -> a.getKeyAsString().equals(attribute.getKeyAsString()));
-                attributes.add(attribute);
-            }
-        }
-        merged = merged.withAttributes(attributes);
+        Xml.Tag withValue = merged;
+        List<Xml.Attribute> inherited = ListUtils.filter(recessive.getAttributes(),
+                a -> StringUtils.isBlank(attribute(withValue, a.getKeyAsString())));
+        Set<String> inheritedKeys = inherited.stream().map(Xml.Attribute::getKeyAsString).collect(toSet());
+        merged = merged.withAttributes(ListUtils.concatAll(
+                ListUtils.filter(merged.getAttributes(), a -> !inheritedKeys.contains(a.getKeyAsString())), inherited));
 
         if (recessive.getChildren().isEmpty()) {
             return merged;
         }
         if ("append".equals(attribute(merged, "combine.children"))) {
-            List<Content> content = contentOf(recessive);
-            content.addAll(contentOf(merged));
-            return merged.withContent(content);
+            return merged.withContent(ListUtils.concatAll(children(recessive), children(merged)));
         }
 
         Map<String, Iterator<Xml.Tag>> sameName = new HashMap<>();
@@ -431,28 +418,31 @@ public class RemoveDuplicatePluginDeclarations extends Recipe {
                 sameName.putIfAbsent(child.getName(), dominantChildren.iterator());
             }
         }
-        List<Content> content = contentOf(merged);
-        Map<Content, List<Content>> dominantComments = leadingComments(content);
-        Map<Content, List<Content>> recessiveComments = leadingComments(contentOf(recessive));
+        Map<Content, List<Content>> dominantComments = leadingComments(children(merged));
+        Map<Content, List<Content>> recessiveComments = leadingComments(children(recessive));
+        Map<Content, @Nullable Object> replacements = new IdentityHashMap<>();
+        List<Xml.Tag> unmatched = new ArrayList<>();
         for (Xml.Tag recessiveChild : recessive.getChildren()) {
             Iterator<Xml.Tag> candidates = sameName.get(recessiveChild.getName());
-            List<Content> comments = recessiveComments.get(recessiveChild);
             if (candidates == null) {
-                int index = parameters ? insertionIndex(content, recessive, recessiveChild) : content.size();
-                content.add(index, recessiveChild);
-                content.addAll(index, comments);
+                unmatched.add(recessiveChild);
             } else if (candidates.hasNext()) {
                 Xml.Tag dominantChild = candidates.next();
-                int index = indexOf(content, dominantChild);
                 if ("remove".equals(attribute(dominantChild, "combine.self"))) {
-                    content.subList(index - dominantComments.get(dominantChild).size(), index + 1).clear();
+                    replacements.put(dominantChild, null);
+                    dominantComments.get(dominantChild).forEach(comment -> replacements.put(comment, null));
                 } else {
-                    content.set(index, mergeDom(dominantChild, recessiveChild, false));
-                    if (dominantComments.get(dominantChild).isEmpty()) {
-                        content.addAll(index, comments);
-                    }
+                    Xml.Tag mergedChild = mergeDom(dominantChild, recessiveChild, false);
+                    replacements.put(dominantChild, dominantComments.get(dominantChild).isEmpty() ?
+                            ListUtils.concat(recessiveComments.get(recessiveChild), mergedChild) : mergedChild);
                 }
             }
+        }
+        List<Content> content = ListUtils.flatMap(children(merged),
+                c -> replacements.containsKey(c) ? replacements.get(c) : c);
+        for (Xml.Tag child : unmatched) {
+            int index = parameters ? insertionIndex(content, recessive, child) : content == null ? 0 : content.size();
+            content = ListUtils.insertAll(content, index, ListUtils.concat(recessiveComments.get(child), child));
         }
         return merged.withContent(content);
     }
@@ -466,21 +456,23 @@ public class RemoveDuplicatePluginDeclarations extends Recipe {
         if (recessiveChild == null) {
             return dominant;
         }
-        List<Content> content = contentOf(dominant);
         Xml.Tag dominantChild = dominant.getChild(name).orElse(null);
         if (dominantChild != null) {
-            content.set(indexOf(content, dominantChild), merge.apply(dominantChild, recessiveChild));
-        } else {
-            int index = insertionIndex(content, recessive, recessiveChild);
-            content.add(index, recessiveChild);
-            content.addAll(index, leadingComments(contentOf(recessive)).get(recessiveChild));
+            Xml.Tag merged = merge.apply(dominantChild, recessiveChild);
+            return dominant.withContent(ListUtils.map(children(dominant), c -> c == dominantChild ? merged : c));
         }
-        return dominant.withContent(content);
+        List<Content> withComments = ListUtils.concat(leadingComments(children(recessive)).get(recessiveChild),
+                recessiveChild);
+        return dominant.withContent(ListUtils.insertAll(children(dominant),
+                insertionIndex(children(dominant), recessive, recessiveChild), withComments));
     }
 
     /// Places a child copied over from the earlier declaration next to the same neighbours it had there, keeping
     /// the author's element order.
-    private static int insertionIndex(List<Content> content, Xml.Tag recessive, Xml.Tag recessiveChild) {
+    private static int insertionIndex(@Nullable List<Content> content, Xml.Tag recessive, Xml.Tag recessiveChild) {
+        if (content == null) {
+            return 0;
+        }
         List<Xml.Tag> siblings = recessive.getChildren();
         int at = siblings.indexOf(recessiveChild);
         for (int i = at - 1; i >= 0; i--) {
@@ -490,10 +482,10 @@ public class RemoveDuplicatePluginDeclarations extends Recipe {
                 while (index + 1 < content.size()) {
                     Content next = content.get(index + 1);
                     boolean trailingComment = next instanceof Xml.Comment && !next.getPrefix().contains("\n");
-                    boolean conventionallyEarlier = next instanceof Xml.Tag &&
-                                                    !recessive.getChild(((Xml.Tag) next).getName()).isPresent() &&
-                                                    COORDINATES_FIRST.contains(((Xml.Tag) next).getName()) &&
-                                                    (rank < 0 || COORDINATES_FIRST.indexOf(((Xml.Tag) next).getName()) < rank);
+                    String nextName = next instanceof Xml.Tag ? ((Xml.Tag) next).getName() : null;
+                    boolean conventionallyEarlier = nextName != null && !recessive.getChild(nextName).isPresent() &&
+                                                    COORDINATES_FIRST.contains(nextName) &&
+                                                    (rank < 0 || COORDINATES_FIRST.indexOf(nextName) < rank);
                     if (!trailingComment && !conventionallyEarlier) {
                         break;
                     }
@@ -522,8 +514,11 @@ public class RemoveDuplicatePluginDeclarations extends Recipe {
     }
 
     /// Comments on their own lines directly above a tag describe it, so they travel with it when it is merged.
-    private static Map<Content, List<Content>> leadingComments(List<? extends Content> content) {
+    private static Map<Content, List<Content>> leadingComments(@Nullable List<? extends Content> content) {
         Map<Content, List<Content>> comments = new IdentityHashMap<>();
+        if (content == null) {
+            return comments;
+        }
         List<Content> pending = new ArrayList<>();
         for (Content c : content) {
             if (c instanceof Xml.Comment) {
@@ -575,11 +570,7 @@ public class RemoveDuplicatePluginDeclarations extends Recipe {
                     String current = prefix.substring(lineStart);
                     indent = current.startsWith(from.base) ? to.base + current.substring(from.base.length()) : current;
                 } else {
-                    StringBuilder levels = new StringBuilder(to.base);
-                    for (int i = depth(tree); i > 0; i--) {
-                        levels.append(unit);
-                    }
-                    indent = levels.toString();
+                    indent = to.base + StringUtils.repeat(unit, depth(tree));
                 }
                 return tree.withPrefix(prefix.substring(0, lineStart) + indent);
             }
@@ -594,7 +585,8 @@ public class RemoveDuplicatePluginDeclarations extends Recipe {
     /// The indentation most of the plugins in the list use, which the collapsed declaration is written in,
     /// preferring one that continues the indentation of the `<plugins>` element itself.
     private static Indent siblingIndent(Xml.Tag container) {
-        List<? extends Content> plugins = contentOf(container);
+        List<? extends Content> plugins = container.getContent() == null ?
+                Collections.emptyList() : container.getContent();
         String containerIndent = indentOf(container);
         Map<String, Integer> counts = new LinkedHashMap<>();
         for (Content plugin : plugins) {
@@ -608,9 +600,11 @@ public class RemoveDuplicatePluginDeclarations extends Recipe {
                 .map(Map.Entry::getKey)
                 .orElse("");
         for (Content plugin : plugins) {
-            if (plugin instanceof Xml.Tag && plugin.getPrefix().contains("\n") && indentOf(plugin).equals(base) &&
-                !indentUnit((Xml.Tag) plugin).isEmpty()) {
-                return new Indent(base, indentUnit((Xml.Tag) plugin));
+            if (plugin instanceof Xml.Tag && plugin.getPrefix().contains("\n") && indentOf(plugin).equals(base)) {
+                String unit = indentUnit((Xml.Tag) plugin);
+                if (!unit.isEmpty()) {
+                    return new Indent(base, unit);
+                }
             }
         }
         return new Indent(base, "");
@@ -628,7 +622,7 @@ public class RemoveDuplicatePluginDeclarations extends Recipe {
 
     private static String indentUnit(Xml.Tag tag) {
         String indent = indentOf(tag);
-        for (Content child : contentOf(tag)) {
+        for (Content child : tag.getContent() == null ? Collections.<Content>emptyList() : tag.getContent()) {
             if (child.getPrefix().contains("\n")) {
                 String childIndent = indentOf(child);
                 return childIndent.startsWith(indent) ? childIndent.substring(indent.length()) : "";
@@ -637,17 +631,11 @@ public class RemoveDuplicatePluginDeclarations extends Recipe {
         return "";
     }
 
-    private static int indexOf(List<Content> content, Content child) {
-        for (int i = 0; i < content.size(); i++) {
-            if (content.get(i) == child) {
-                return i;
-            }
-        }
-        throw new IllegalStateException("Expected " + child + " among the content of its parent");
-    }
-
-    private static List<Content> contentOf(Xml.Tag tag) {
-        return tag.getContent() == null ? new ArrayList<>() : new ArrayList<>(tag.getContent());
+    /// The tag's own content list, uncopied, so `ListUtils` can hand it back unchanged and `withContent` can
+    /// recognize that nothing changed.
+    @SuppressWarnings("unchecked")
+    private static @Nullable List<Content> children(Xml.Tag tag) {
+        return (List<Content>) tag.getContent();
     }
 
     private static @Nullable String attribute(Xml.Tag tag, String key) {
@@ -661,9 +649,5 @@ public class RemoveDuplicatePluginDeclarations extends Recipe {
 
     private static @Nullable String trimmedChildValue(Xml.Tag tag, String name, @Nullable String defaultValue) {
         return tag.getChildValue(name).map(String::trim).filter(v -> !v.isEmpty()).orElse(defaultValue);
-    }
-
-    private static boolean isBlank(@Nullable String s) {
-        return s == null || s.trim().isEmpty();
     }
 }
