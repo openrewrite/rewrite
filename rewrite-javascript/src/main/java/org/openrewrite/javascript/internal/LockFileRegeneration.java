@@ -287,8 +287,19 @@ public final class LockFileRegeneration {
         this.port = requireNonNull(NativeLockEngine.port(pm));
     }
 
+    public PackageManager getPackageManager() {
+        return pm;
+    }
+
     public String getLockFile() {
         return port.lockFile();
+    }
+
+    /**
+     * Whether a file of its lock's name that holds {@code lock} is one the package manager writes.
+     */
+    public boolean writes(String lock) {
+        return port.writes(lock);
     }
 
     /**

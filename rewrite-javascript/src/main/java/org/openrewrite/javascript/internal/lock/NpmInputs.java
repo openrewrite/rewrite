@@ -89,14 +89,28 @@ final class NpmInputs implements Port {
                 .yarnLock(dir.file("yarn.lock"))
                 .npmrc(dir.file(".npmrc"))
                 .userNpmrc(host.userNpmrc(HostInputs.GLOBAL_AND_USER))
-                .paths(dir.pathsUnder(""))
+                .paths(dir.getPaths())
+                .directory(dir.getPaths() == null ? null : dir.getPath())
                 .host(host.getHost())
                 .now(host.getNow())
                 .directoryName(dir.name())
-                .manifests(dir.getManifests())
+                .manifests(manifests(dir))
                 .runsIn(dir.getRunsIn())
                 .parentTrees(parentTrees(dir))
                 .build();
+    }
+
+    // every package.json the host read, by location from the lock's directory: a link leads to one outside it too
+    private static Map<String, String> manifests(LockDirectory dir) {
+        Map<String, String> manifests = new LinkedHashMap<>();
+        for (Map.Entry<String, String> file : dir.getFiles().entrySet()) {
+            String location = manifestLocation(file.getKey());
+            if (location != null) {
+                manifests.put(location, file.getValue());
+            }
+        }
+        manifests.putAll(dir.getManifests());
+        return manifests;
     }
 
     private static Map<String, Map<String, @Nullable String>> parentTrees(LockDirectory dir) {

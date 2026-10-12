@@ -25,6 +25,7 @@ import org.openrewrite.javascript.internal.NodeDependencyEdits;
 import org.openrewrite.javascript.internal.PackageJsonHelper;
 import org.openrewrite.javascript.internal.lock.Rejected;
 import org.openrewrite.javascript.internal.lock.Spec;
+import org.openrewrite.javascript.semver.NodeSemver;
 import org.openrewrite.javascript.table.NodeDependencyProtocolsSkipped;
 import org.openrewrite.javascript.table.NodeDependencyEditsDeclined;
 import org.openrewrite.javascript.table.NodeLockRegenerationFailures;
@@ -69,8 +70,10 @@ public class UpgradeDependencyVersion extends ScanningRecipe<NodeDependencyEdits
     @Override public String getDescription() {
         return "Upgrades the version constraint of matching npm dependencies in `package.json` and regenerates the " +
                 "lock file natively, without executing the package manager. Matching is by exact package name or " +
-                "glob pattern. A version range is replaced whenever it differs from the new one, a `catalog:` " +
-                "reference is upgraded in its catalog entry, and any other value is left as it is. Not safe to use " +
+                "glob pattern. A version range is replaced when it admits a version below the new range's lowest; " +
+                "one that already starts at or above it is left, and so is a `peerDependencies` range that admits " +
+                "every version the new one does. A `catalog:` reference is upgraded in its catalog entry by the " +
+                "same rule, and any other value is left as it is. Not safe to use " +
                 "as a precondition: consults the package registry over the network and publishes per-project state " +
                 "shared with other dependency recipes.";
     }
@@ -121,7 +124,9 @@ public class UpgradeDependencyVersion extends ScanningRecipe<NodeDependencyEdits
                 }
                 Spec spec = Spec.ofDependencyOrNull(name, value);
                 if (spec != null && spec.isVersionSpec()) {
-                    matches.add(new MatchedDependency(name, scope.getKey(), value));
+                    if (!startsAtOrAbove(value) && !("peerDependencies".equals(scope.getKey()) && admits(value))) {
+                        matches.add(new MatchedDependency(name, scope.getKey(), value));
+                    }
                 } else if (spec == null || spec.getType() != Spec.Type.CATALOG ||
                            !followCatalog(decision, name, value)) {
                     String protocol = spec == null || spec.getProtocol() == null ? "" : spec.getProtocol();
@@ -152,7 +157,32 @@ public class UpgradeDependencyVersion extends ScanningRecipe<NodeDependencyEdits
             decision.decline(name + "'s catalog entry was not upgraded: " + catalogs.declined());
             return true;
         }
-        return decision.editCatalogs(c -> c.withSpecifier(catalog, name, newVersion));
+        return decision.editCatalogs(c -> {
+            String entry = c.specifier(catalog, name);
+            return entry != null && startsAtOrAbove(entry) ? c : c.withSpecifier(catalog, name, newVersion);
+        });
+    }
+
+    // whether a range's lowest version is the new range's lowest or a later one: an upgrade lowers nothing
+    private boolean startsAtOrAbove(String range) {
+        try {
+            String lowest = NodeSemver.minVersion(range, NodeSemver.Options.LOOSE);
+            String wanted = NodeSemver.minVersion(newVersion, NodeSemver.Options.LOOSE);
+            return lowest != null && wanted != null &&
+                   NodeSemver.compare(lowest, wanted, NodeSemver.Options.LOOSE) >= 0;
+        } catch (IllegalArgumentException e) {
+            // a dist-tag on either side names no lowest version
+            return false;
+        }
+    }
+
+    // whether a range admits every version the new one does: a peer range that does keeps what its package declared
+    private boolean admits(String range) {
+        try {
+            return NodeSemver.subset(newVersion, range, NodeSemver.Options.LOOSE);
+        } catch (IllegalArgumentException e) {
+            return false;
+        }
     }
 
     private Predicate<String> buildNameMatcher() {

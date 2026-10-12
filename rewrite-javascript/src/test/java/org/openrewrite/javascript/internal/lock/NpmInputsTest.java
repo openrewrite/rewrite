@@ -90,7 +90,8 @@ class NpmInputsTest {
 
     /**
      * npm run in a member walks from there, nearest first: the root the host sent the edit to, then the directories
-     * above it.
+     * above it. A package.json the host read above the lock's directory is at its location from there, where a link
+     * that climbs out of the project finds it.
      */
     @Test
     void aMemberEditWalksFromTheMember() {
@@ -105,7 +106,7 @@ class NpmInputsTest {
 
         Inputs inputs = NpmInputs.from(LockDirectory.of(request), HostRegistries.NONE);
 
-        assertThat(inputs.getManifests()).containsOnlyKeys("", "packages/a");
+        assertThat(inputs.getManifests()).containsOnlyKeys("..", "", "packages/a");
         assertThat(inputs.getRunsIn()).isEqualTo("packages/a");
         assertThat(inputs.getParentTrees().keySet()).containsExactly("packages/a", "repo/packages/a");
         assertThat(inputs.getParentTrees().get("packages/a")).containsOnly(

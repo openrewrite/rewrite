@@ -47,6 +47,10 @@ package manager writes, byte for byte, or a failure of a `LockFileRegeneration.K
   scenario's (`cross`), never a lock written from scratch, which no regeneration does.
 - **Recipes:** `*Dependency*Test`, `*LockRegenTest` and `*CatalogTest` in `org.openrewrite.javascript` run the
   recipes over the same scenarios.
+- **Repositories:** `RepositoryScenarioTest` replays `lock/repository/<pm>/<scenario>/` (a whole repository tree, its
+  lock anywhere in it) through the recipes' scan, decisions and visitor. A fix that depends on what the scan hands a
+  port (workspace members, a `file:` target outside the lock's directory, a wrong or missing marker) is recorded
+  there, with `record-<pm>-repository.sh`.
 
 ```bash
 ./gradlew :rewrite-javascript:test --tests 'org.openrewrite.javascript.internal.lock*'

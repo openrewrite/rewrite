@@ -26,6 +26,7 @@ import org.openrewrite.javascript.internal.LockFileRegeneration.InstallRoot;
 import org.openrewrite.javascript.internal.LockFileRegeneration.Reason;
 import org.openrewrite.javascript.internal.LockFileRegeneration.Result;
 import org.openrewrite.javascript.internal.lock.CannotKnow;
+import org.openrewrite.javascript.internal.lock.EcmaScript;
 import org.openrewrite.javascript.internal.lock.Host;
 import org.openrewrite.javascript.internal.lock.HostEnvironment;
 import org.openrewrite.javascript.internal.lock.LockOnlyInstall;
@@ -291,6 +292,7 @@ public final class BunLockRegenerator {
         }
         Inputs these = lock.equals(inputs.getLock()) ? inputs : inputs.toBuilder().lock(lock).build();
         requireConfigFiles(these);
+        requireWorkspaceManifests(these);
         Log log = new Log();
         PendingInstall install;
         try {
@@ -373,6 +375,51 @@ public final class BunLockRegenerator {
         }
         CannotKnow.requireRead(inputs.getBunfig(), inputs.getPaths(), "bunfig.toml");
         CannotKnow.requireRead(inputs.getNpmrc(), inputs.getPaths(), ".npmrc");
+    }
+
+    // the root's workspaces name directories whose package.json bun reads: one the host holds without its contents is
+    // unknown, where the install over the manifests it was given would report the workspace missing or pass it over
+    private static void requireWorkspaceManifests(Inputs inputs) {
+        String root = inputs.getManifests().get("");
+        if (inputs.getPaths() == null || root == null) {
+            return;
+        }
+        Map<String, String> held = new LinkedHashMap<>(inputs.getManifests());
+        Set<String> unread = new LinkedHashSet<>();
+        for (String path : inputs.getPaths()) {
+            String location = path.endsWith("/package.json") ?
+                    path.substring(0, path.length() - "/package.json".length()) : null;
+            if (location != null && !held.containsKey(location)) {
+                unread.add(location);
+                // named after its directory, which no other workspace is
+                held.put(location, "{\"name\":" + EcmaScript.quote(location) + "}");
+            }
+        }
+        if (unread.isEmpty()) {
+            return;
+        }
+        Json.Expr packages;
+        try {
+            Json.Expr workspaces = Json.parse(root).get("workspaces");
+            packages = workspaces != null && workspaces.isObject() ? workspaces.get("packages") : workspaces;
+        } catch (RuntimeException e) {
+            // a root bun cannot parse is the install's to reject
+            return;
+        }
+        if (packages == null || !packages.isArray()) {
+            return;
+        }
+        Workspaces names = new Workspaces(inputs.getRelease());
+        try {
+            names.processNamesArray(new Log(), packages.items(), held);
+        } catch (IllegalArgumentException ignored) {
+            // an error of bun's own, which the install reports
+        }
+        for (String location : names.map.keySet()) {
+            if (unread.contains(location)) {
+                throw CannotKnow.unread(location + "/package.json");
+            }
+        }
     }
 
     // patch_install.zig calcHash: bun joins each patch path onto the root (joinZBuf), so ./ and .. spellings name the

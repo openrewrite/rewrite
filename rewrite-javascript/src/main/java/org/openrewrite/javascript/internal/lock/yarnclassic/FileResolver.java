@@ -39,7 +39,7 @@ final class FileResolver {
 
     Promise<Manifest> resolve() {
         PackageResolver resolver = request.resolver;
-        String location = location(loc, "file:");
+        String location = location(resolver.files, loc, "file:");
         if (request.config.isLinkFileDependencies()) {
             Manifest manifest = new Manifest();
             manifest.put("_uid", "");
@@ -80,16 +80,17 @@ final class FileResolver {
     }
 
     /**
-     * {@code path.resolve(config.lockfileFolder, loc)} as a location in the project.
+     * {@code path.resolve(config.lockfileFolder, loc)} as a location from the project's root, among the directories
+     * the host holds.
      */
-    static String location(String loc, String protocol) {
+    static String location(ProjectFiles files, String loc, String protocol) {
         if (PosixPath.isAbsolute(loc)) {
             throw new CannotKnow("where the project sits on disk, which the " + protocol + loc + " target is read " +
                                  "relative to");
         }
         String location = ProjectFiles.location(loc);
-        if (location == null) {
-            throw new CannotKnow("the package.json of " + protocol + loc + ", outside the project");
+        if (location == null || files.isOutside(location)) {
+            throw new CannotKnow("the package.json of " + protocol + loc + ", " + files.outside());
         }
         return location;
     }

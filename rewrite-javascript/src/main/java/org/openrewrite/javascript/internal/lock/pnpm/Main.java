@@ -345,6 +345,9 @@ public final class Main {
             return Manifests.normalizedForTheWriter(Manifests.readProjectManifest(text,
                     RootRelativePath.join(dir, "package.json"), release), running());
         }
+        if (others.isEmpty()) {
+            throw CannotKnow.unread(RootRelativePath.join(dir, "package.json"));
+        }
         String path = others.get(0);
         String other = inputs.getFiles().get(path);
         if (other == null) {
@@ -356,11 +359,15 @@ public final class Main {
         return Manifests.normalizedForTheWriter(Manifests.readJson5(other, path, release), running());
     }
 
-    // the directories holding a manifest findPackages' patterns can match
+    // the directories holding a manifest findPackages' patterns can match: those the host read, and those it holds
+    // a package.json or another manifest in without having read it
     static Set<String> manifestDirs(PnpmLockRegenerator.Inputs inputs) {
         Set<String> dirs = new LinkedHashSet<>(inputs.getManifests().keySet());
         if (inputs.getPaths() != null) {
             for (String path : inputs.getPaths()) {
+                if ("package.json".equals(path) || path.endsWith("/package.json")) {
+                    dirs.add(RootRelativePath.dirname(path));
+                }
                 for (String other : PnpmLockRegenerator.OTHER_MANIFEST_NAMES) {
                     if (path.equals(other) || path.endsWith("/" + other)) {
                         dirs.add(RootRelativePath.dirname(path));

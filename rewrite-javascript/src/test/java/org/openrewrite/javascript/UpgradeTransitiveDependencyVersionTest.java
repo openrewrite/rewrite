@@ -83,6 +83,7 @@ import static org.openrewrite.javascript.Assertions.nodeResolutionResult;
 import static org.openrewrite.javascript.Assertions.packageJson;
 import static org.openrewrite.javascript.Assertions.packageLock;
 import static org.openrewrite.javascript.Assertions.pnpmLock;
+import static org.openrewrite.json.Assertions.json;
 import static org.openrewrite.test.SourceSpecs.text;
 import static org.openrewrite.yaml.Assertions.yaml;
 
@@ -488,6 +489,80 @@ class UpgradeTransitiveDependencyVersionTest implements RewriteTest {
         golden("yarn-berry/override-recipe-member", PackageManager.YarnBerry, "7.0.0", null);
     }
 
+    /**
+     * A host that parses a workspace member beside its installed node_modules marks it as npm's. It is still its
+     * workspace's member: the override is the root's, where that package manager reads it, and the member gets none
+     * of npm's.
+     */
+    @ParameterizedTest
+    @CsvSource({"pnpm, Pnpm", "bun, Bun", "yarn-classic, YarnClassic", "yarn-berry, YarnBerry"})
+    void aMemberMarkedAsNpmsIsStillItsWorkspacesMember(String family, PackageManager pm) {
+        golden(family + "/override-recipe-member", pm, PackageManager.Npm, "7.0.0", null, null);
+    }
+
+    /**
+     * In the same workspace an edit of a member's own dependency goes to the workspace's lock, whose regeneration
+     * reports the workspace manifest it cannot read; the member is not a project of npm's with no lock to write.
+     */
+    @Test
+    void anEditOfAMemberOfAWorkspaceWhoseManifestIsUnreadFailsWithTheWorkspacesLock() {
+        Scenario s = new Scenario("pnpm/override-recipe-member");
+        String member = requireNonNull(s.file("tree-before/" + MEMBER));
+        rewriteRun(
+          spec -> spec.recipe(new UpgradeDependencyVersion("is-odd", null, "^4.0.0")).executionContext(s.ctx())
+            .dataTable(NodeLockRegenerationFailures.Row.class, rows -> assertThat(rows).singleElement()
+              .satisfies(row -> {
+                  assertThat(row.getSourcePath()).isEqualTo(MEMBER);
+                  assertThat(row.getKind()).isEqualTo(LockFileRegeneration.Kind.CANNOT_KNOW.toString());
+                  assertThat(row.getDetail())
+                    .isEqualTo("the engine cannot know pnpm-workspace.yaml (its contents were not read)");
+              })),
+          s.root(PackageManager.Pnpm, s.file("pkg-before")),
+          packageJson(member, null, nodeResolutionResult(PackageManager.Npm, dependencies(member)),
+            spec -> spec.path(MEMBER).noTrim().after(actual -> actual)),
+          SourceSpecs.other(s.file("workspace-before"), spec -> spec.path("pnpm-workspace.yaml")),
+          pnpmLock(requireNonNull(s.file("before")), null, spec -> spec.path("pnpm-lock.yaml").noTrim()
+            .after(actual -> {
+                assertThat(actual).endsWith(requireNonNull(s.file("before")));
+                return actual;
+            }))
+        );
+    }
+
+    /**
+     * A member the host parsed without its marker is its workspace's member too: its package manager reads its
+     * manifest for the lock, and the override is the root's.
+     */
+    @ParameterizedTest
+    @CsvSource({"npm, Npm", "pnpm, Pnpm", "bun, Bun", "yarn-classic, YarnClassic", "yarn-berry, YarnBerry"})
+    void aMemberParsedWithoutItsMarkerIsStillItsWorkspacesMember(String family, PackageManager pm) {
+        golden(family + "/override-recipe-member", pm, null, "7.0.0", null, null);
+    }
+
+    /**
+     * urql's shape: the workspace manifest is a parse error and the members are marked as npm's. No member is edited
+     * as a root of its own, and the root reports what it cannot know.
+     */
+    @Test
+    void membersOfAWorkspaceWhoseManifestIsUnreadAreNotEditedAsRootsOfTheirOwn() {
+        Scenario s = new Scenario("pnpm/override-recipe-member");
+        String member = requireNonNull(s.file("tree-before/" + MEMBER));
+        rewriteRun(
+          spec -> s.spec(spec, "7.0.0", null)
+            .dataTable(NodeLockRegenerationFailures.Row.class, rows -> assertThat(rows).singleElement()
+              .satisfies(row -> {
+                  assertThat(row.getSourcePath()).isEqualTo("package.json");
+                  assertThat(row.getDetail())
+                    .isEqualTo("the engine cannot know pnpm-workspace.yaml (its contents were not read)");
+              })),
+          s.root(PackageManager.Pnpm, s.file("pkg-before")),
+          packageJson(member, null, nodeResolutionResult(PackageManager.Npm, dependencies(member)),
+            spec -> spec.path(MEMBER).noTrim()),
+          SourceSpecs.other(s.file("workspace-before"), spec -> spec.path("pnpm-workspace.yaml")),
+          s.lock(PackageManager.Pnpm, null)
+        );
+    }
+
     @Test
     void pnpm10WritesTheWorkspaceManifestAndTheLockIsCannotKnow() {
         otherPnpmRelease("pnpm/override-pnpm10-recipe-workspace", "is-odd", "10.34.6");
@@ -679,13 +754,20 @@ class UpgradeTransitiveDependencyVersionTest implements RewriteTest {
 
     private void golden(String scenario, PackageManager pm, String version, @Nullable String path,
                         @Nullable String declined) {
+        golden(scenario, pm, pm, version, path, declined);
+    }
+
+    // memberPm: the package manager the member's marker names; null for a member parsed without its marker
+    private void golden(String scenario, PackageManager pm, @Nullable PackageManager memberPm, String version,
+                        @Nullable String path, @Nullable String declined) {
         Scenario s = new Scenario(scenario);
         List<SourceSpecs> sources = new ArrayList<>();
         sources.add(s.root(pm, s.file("pkg")));
         String member = s.file("tree-before/" + MEMBER);
         if (member != null) {
-            sources.add(packageJson(member, null, nodeResolutionResult(pm, dependencies(member)),
-              spec -> spec.path(MEMBER).noTrim()));
+            sources.add(memberPm == null ? json(member, spec -> spec.path(MEMBER).noTrim()) :
+              packageJson(member, null, nodeResolutionResult(memberPm, dependencies(member)),
+                spec -> spec.path(MEMBER).noTrim()));
         }
         if (s.file("workspace") != null) {
             sources.add(s.workspace());

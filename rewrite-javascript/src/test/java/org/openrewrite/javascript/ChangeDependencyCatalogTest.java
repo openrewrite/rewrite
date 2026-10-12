@@ -197,15 +197,15 @@ class ChangeDependencyCatalogTest implements RewriteTest {
 
     @Test
     void anUpgradeOfTheEntryAnEarlierRenameAdded() {
-        CatalogRecording recording = new CatalogRecording("pnpm", "catalog-compose-rename-then-upgrade");
+        CatalogRecording recording = new CatalogRecording("pnpm", "catalog-compose-rename-then-upgrade-above");
         rewriteRun(
-          spec -> spec.recipes(new ChangeDependency("wrappy", "is-number", "7.0.0", null),
-              new UpgradeDependencyVersion("is-number", null, "6.0.0"))
+          spec -> spec.recipes(new ChangeDependency("wrappy", "is-number", "6.0.0", null),
+              new UpgradeDependencyVersion("is-number", null, "7.0.0"))
             .executionContext(recording.ctx()),
           recording.sources()
         );
-        recording.assertEveryVisitOrder(new ChangeDependency("wrappy", "is-number", "7.0.0", null),
-          new UpgradeDependencyVersion("is-number", null, "6.0.0"));
+        recording.assertEveryVisitOrder(new ChangeDependency("wrappy", "is-number", "6.0.0", null),
+          new UpgradeDependencyVersion("is-number", null, "7.0.0"));
     }
 
     @Test

@@ -11,7 +11,7 @@ again: one port per library, the host's registries as the user's config, corepac
 Amended 2026-10-11: later releases of the ported pnpm and Yarn majors; the npm release that built the LST,
 with every npm release from 7.1.1 reproduced beside the one ported; every Yarn 4.x release reproduced beside
 4.10.3; Bun releases reproduced beside 1.3.10; and Yarn 1 releases reproduced beside 1.22.22. Amended 2026-10-12:
-pnpm releases reproduced beside 11.2.2.
+pnpm releases reproduced beside 11.2.2; and the manifests a port is given.
 
 ## Context
 
@@ -221,6 +221,36 @@ are edited in place, and a layout the port does not read (document markers, CR l
 flow mapping with entries) is declined. A workspace pnpm rejects (`catalog` beside `catalogs.default`, recorded) is
 declined. AddDependency sorts the dependency fields as each package manager's add saves them, and still keeps inline
 arrays and objects that npm, pnpm and yarn 1 print again with `JSON.stringify`.
+
+## Amendment 2026-10-11: the manifests a port is given
+
+Running the recipes on real repositories (openrewrite/rewrite#9151) showed locks written from an incomplete view of
+the project. The view is now the repository's, and the port decides what belongs to the project:
+
+- The scan gives a regeneration every package.json it read under the lock's directory and under each package.json
+  above it, and the package.json of each directory a `file:`, `link:` or `portal:` dependency or a bare path names,
+  wherever the repository holds it. Each port maps its workspaces over them with its own port of the package
+  manager's glob; the marker's `workspacePackagePaths` decide nothing. A lock's importers are the manifests whose
+  package manager's walk leads to it.
+- A package.json the host holds without its contents (a quark, a parse error without text) is cannot-know where the
+  package manager reads it, in every port: a workspace member is never left out of a lock, and npm's lock entry stands
+  in for a link target only where the host holds no package.json there. A target above the repository's root is
+  cannot-know. npm writes the name of a package only where its directory is named otherwise, so the package at the
+  repository's own root, whose directory name the host does not know, is read where the lock already holds the name
+  the manifest still declares, and is cannot-know otherwise.
+- A manifest's package manager is its marker's where a lock of that package manager lies beside it. One without such
+  a lock is installed by the nearest package manager above that holds its own lock and, run in the manifest's
+  directory, installs there or stops on the way. The marker says otherwise for a workspace member parsed beside its
+  installed node_modules (npm), which made the recipes edit it as a root of its own; the parser now walks up for a lock
+  before it falls back on node_modules.
+- A package.json parsed without its marker is kept as a file the package manager reads. A recipe that would edit it
+  leaves it as it is and says so in `NodeDependencyEditsDeclined`: the marker records the registries a lock is
+  regenerated from.
+
+Scenarios that need more than one directory of a repository are recorded as `lock/repository/<package manager>/`
+(`tree-before/`, `tree/`, `lock-dir`, an optional `seed/` for a lock the committed files have moved on from), and
+`RepositoryScenarioTest` replays them through the recipes' own scan, decisions and visitor, with markers that name the
+package manager only and again with every manifest that has no lock beside it marked as npm's.
 
 ## Amendment 2026-10-11: later releases of the ported majors
 

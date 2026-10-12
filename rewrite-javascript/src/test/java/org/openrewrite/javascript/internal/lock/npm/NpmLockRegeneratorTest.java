@@ -320,6 +320,24 @@ class NpmLockRegeneratorTest {
           "the manifest: directories.bin: ref.replace is not a function");
     }
 
+    /**
+     * A root package.json the host holds without its contents is not one npm fails on: the lock's root entry does not
+     * stand in for it, and the engine cannot know what npm reads there.
+     */
+    @Test
+    void aRootPackageJsonTheHostHoldsUnreadIsCannotKnow() {
+        Result result = new NpmLockRegenerator(NpmLockRegenerator.Inputs.builder()
+          .lock(LOCK)
+          .paths(new LinkedHashSet<>(Arrays.asList("package.json", "package-lock.json")))
+          .now(Instant.EPOCH)
+          .build(), NO_REGISTRY).regenerate();
+
+        assertThat(result.getFailure()).isNotNull();
+        assertThat(result.getFailure().getKind()).isEqualTo(Kind.CANNOT_KNOW);
+        assertThat(result.getFailure().getDetail())
+          .isEqualTo("the engine cannot know package.json (its contents were not read)");
+    }
+
     // run with engine-strict under Node 24, npm 10.8.3 rejects this manifest (EBADENGINE) and 10.9.0, 10.9.9 and
     // 11.17.0 write the lock: from 10.9.0 a root with devEngines has its engines left unchecked
     @ParameterizedTest

@@ -265,7 +265,10 @@ final class ScenarioReplay {
      */
     static Set<String> paths(NpmScenarios.Edit edit) {
         Set<String> paths = new LinkedHashSet<>();
-        paths.add("package.json");
+        // the oldest layout records a member's manifest alone, and a root package.json held unread is cannot-know
+        if (edit.manifests().containsKey("")) {
+            paths.add("package.json");
+        }
         paths.add("package-lock.json");
         if (edit.getScenario().npmrc() != null) {
             paths.add(".npmrc");

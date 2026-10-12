@@ -22,23 +22,30 @@ import java.util.Map;
 import java.util.Set;
 
 /**
- * What yarn reads from the filesystem during an install: the manifests by location ({@code ""} the root), the paths the
- * project holds when the host says, and the location yarn runs in.
+ * What yarn reads from the filesystem during an install: the manifests by location ({@code ""} the root,
+ * {@code ../lib} a directory above it), the paths the host holds when it says, how far above the project it holds
+ * them, and the location yarn runs in.
  */
 final class ProjectFiles {
 
     private final Map<String, String> manifests;
     private final @Nullable Set<String> paths;
     private final String cwd;
+    private final @Nullable Integer reach;
 
     ProjectFiles(Map<String, String> manifests, @Nullable Set<String> paths) {
-        this(manifests, paths, "");
+        this(manifests, paths, "", null);
     }
 
-    ProjectFiles(Map<String, String> manifests, @Nullable Set<String> paths, String cwd) {
+    /**
+     * @param reach how many directories above the project's the host holds, the project's depth in the repository;
+     *              null when the host has not said where the project is
+     */
+    ProjectFiles(Map<String, String> manifests, @Nullable Set<String> paths, String cwd, @Nullable Integer reach) {
         this.manifests = manifests;
         this.paths = paths;
         this.cwd = cwd;
+        this.reach = reach;
     }
 
     String cwd() {
@@ -46,17 +53,39 @@ final class ProjectFiles {
     }
 
     /**
-     * The location a path relative to the project's root names, or null when it leaves the project.
+     * The location a path relative to the project's root names, {@code ../lib} above it; null for a path from the
+     * filesystem's root.
      */
     static @Nullable String location(String... path) {
         String joined = PosixPath.join(path);
         if (".".equals(joined) || "./".equals(joined)) {
             return "";
         }
-        if (PosixPath.isAbsolute(joined) || "..".equals(joined) || joined.startsWith("../")) {
+        if (PosixPath.isAbsolute(joined)) {
             return null;
         }
         return joined.endsWith("/") ? joined.substring(0, joined.length() - 1) : joined;
+    }
+
+    /**
+     * Whether a location lies above every directory the host holds, where the engine is given nothing.
+     */
+    boolean isOutside(String location) {
+        int up = 0;
+        for (String segment : location.split("/")) {
+            if (!"..".equals(segment)) {
+                break;
+            }
+            up++;
+        }
+        return up > (reach == null ? 0 : reach);
+    }
+
+    /**
+     * What a location that {@link #isOutside} is outside of, as a failure words it.
+     */
+    String outside() {
+        return reach == null ? "outside the project" : "outside the repository";
     }
 
     boolean hasManifest(@Nullable String location) {
@@ -71,10 +100,12 @@ final class ProjectFiles {
     }
 
     /**
-     * Whether the host says the project holds nothing at this location, neither a file nor a directory with files.
+     * Whether the host says the project holds nothing at this location, neither a file nor a directory with files. Of
+     * a directory above the project the host gives its package.json only, which does not say.
      */
     boolean isMissing(String location) {
-        if (paths == null || manifests.containsKey(location)) {
+        if (paths == null || manifests.containsKey(location) || "..".equals(location) ||
+            location.startsWith("../")) {
             return false;
         }
         for (String path : paths) {

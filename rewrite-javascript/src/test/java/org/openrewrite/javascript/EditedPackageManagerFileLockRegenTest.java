@@ -116,7 +116,7 @@ class EditedPackageManagerFileLockRegenTest implements RewriteTest {
                 .withMarkers(Markers.build(singletonList(
                         nodeResolutionResult(PackageManager.Pnpm, dependency("wrappy", "^1.0.2")))));
         NodeDependencyScan.ProjectFiles files = new NodeDependencyScan.ProjectFiles(Collections.emptyMap(),
-                Collections.singletonMap(WORKSPACE_MANIFEST, resource(SCENARIO + "workspace-before")), null);
+                Collections.singletonMap(WORKSPACE_MANIFEST, resource(SCENARIO + "workspace-before")), null, null);
 
         EditAndRegenerateResult result = PackageJsonHelper.editAndRegenerate(packageJson, Function.identity(),
                 Collections.singletonMap(WORKSPACE_MANIFEST, resource(SCENARIO + "workspace")),

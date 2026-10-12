@@ -173,9 +173,9 @@ final class PackageRequest {
         }
         if (NodeSemver.validRange(pattern, Config.SEMVER) == null) {
             String location = ProjectFiles.location(resolver.files.cwd(), pattern);
-            if (location == null) {
-                throw new CannotKnow("whether " + pattern + "/package.json exists outside the project, which makes " +
-                                     "the range " + pattern + " a file: dependency");
+            if (location == null || resolver.files.isOutside(location)) {
+                throw new CannotKnow("whether " + pattern + "/package.json exists " + resolver.files.outside() +
+                                     ", which makes the range " + pattern + " a file: dependency");
             }
             Io<Boolean> exists = Io.issue(loop, io, () -> resolver.files.hasManifest(location) ||
                                                               resolver.files.holds(PosixPath.join(location,

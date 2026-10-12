@@ -370,7 +370,7 @@ public final class IdealTreeBuilder {
         try {
             rootManifest = files.manifest("");
             root = rootNodeFromPackage(rootManifest != null ? rootManifest.getContent() : new LinkedHashMap<>());
-        } catch (JsonParseEvenBetterErrors.JsonParseException | PackageJson.NeedsPackageFiles err) {
+        } catch (JsonParseEvenBetterErrors.JsonParseException | PackageJson.NeedsPackageFiles | CannotKnow err) {
             throw err;
         } catch (RuntimeException err) {
             // arborist starts over from an empty manifest here and writes an empty lock
@@ -1118,7 +1118,7 @@ public final class IdealTreeBuilder {
         PackageJson manifest;
         try {
             manifest = files.manifest(location);
-        } catch (PackageJson.NeedsPackageFiles e) {
+        } catch (PackageJson.NeedsPackageFiles | CannotKnow e) {
             throw e;
         } catch (RuntimeException e) {
             return new LinkedHashMap<>();
