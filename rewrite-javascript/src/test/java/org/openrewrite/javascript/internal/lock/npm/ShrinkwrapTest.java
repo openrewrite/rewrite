@@ -514,6 +514,26 @@ class ShrinkwrapTest {
         }
     }
 
+    // shrinkwrap.js commit from npm 7.1.1 (arborist 2.0.0) writes the inventory of the tree's root; before, the tree's
+    // own, which a tree that arborist 1's link target setter roots under a link to the project no longer holds
+    @Test
+    @SuppressWarnings("unchecked")
+    void commitsTheTreesOwnInventoryBefore7_1_1() {
+        String dir = "/fixtures/self";
+        for (String release : new String[]{"7.1.0", "7.1.1"}) {
+            NpmRelease npm = NpmRelease.of(release);
+            Shrinkwrap sw = new Shrinkwrap(dir, NpmOptions.builder().release(npm).build())
+              .load(projectFiles(null, null, null));
+            Node root = node(opts().path(dir).realpath(dir).pkg(obj("name", "self", "version", "1.0.0")).release(npm));
+            node(opts().pkg(obj("name", "a", "version", "1.0.0")).parent(root).release(npm));
+            sw.add(root);
+            link(opts().path(dir + "/node_modules/self").realpath(dir).target(root).release(npm));
+            Map<String, Object> packages = (Map<String, Object>) sw.commit().get("packages");
+            assertThat(packages.keySet()).as(release).containsExactlyElementsOf("7.1.0".equals(release) ?
+              Arrays.asList("") : Arrays.asList("", "node_modules/a", "node_modules/self"));
+        }
+    }
+
     // arborist 2.8.1 (npm 7.20.6) names the root entry whatever the directory; before, only a package named otherwise
     @Test
     void rootEntryNamedOnlyAfterAnotherDirectoryBefore7_20_6() {

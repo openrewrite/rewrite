@@ -117,11 +117,14 @@ final class LegacyPlacement {
             }
 
             Edge checkEdge = check.getEdgesOut().get(edge.getName());
-            if (!check.isTop() && checkEdge != null && checkEdge.isPeer()) {
+            if (options.getRelease().skipsPlacesWithPeerEdgeOfName() && !check.isTop() && checkEdge != null &&
+                checkEdge.isPeer()) {
                 continue;
             }
 
-            CanPlaceDep.Result cp = canPlaceDep(dep, check, edge, peerEntryEdge, peerPath, isSource);
+            // before npm 7.0.11 only the source itself is checked as the source
+            CanPlaceDep.Result cp = canPlaceDep(dep, check, edge, peerEntryEdge, peerPath,
+                    options.getRelease().treatsFirstPlaceAsPeerSetSource() && isSource);
             isSource = false;
 
             if (cp != CONFLICT) {
@@ -210,7 +213,12 @@ final class LegacyPlacement {
                 Edge e = entry.getValue();
                 if (!newDep.getEdgesOut().has(entry.getKey()) && e.getTo() != null) {
                     Node oldDep = e.getTo();
-                    oldDeps.addAll(gatherDepSet(singletonList(oldDep), x -> x.getTo() != oldDep));
+                    if (options.getRelease().prunesReplacedDepsByValidEdges()) {
+                        oldDeps.addAll(gatherDepSet(singletonList(oldDep), x -> x.getTo() != oldDep));
+                    } else {
+                        // before npm 7.0.11 the dropped dependency alone
+                        oldDeps.add(oldDep);
+                    }
                 }
             }
             newDep.replace(oldChild);
@@ -269,7 +277,19 @@ final class LegacyPlacement {
             }
             Node peer = virtualRoot.getChildren().get(peerEdge.getName());
 
-            if (!peerEdge.isPeer() || peerEdge.isValid() || peer == null) {
+            if (!peerEdge.isPeer() || peerEdge.isValid()) {
+                continue;
+            }
+            if (peer == null) {
+                if (!options.getRelease().skipsPeersVirtualRootLacks()) {
+                    // before npm 7.0.8 the missing peer is placed: [_canPlaceDep] reads it at the first place up
+                    Node peerStart = !newDep.isRoot() && newDep.getResolveParent() != null ?
+                            newDep.getResolveParent() : newDep;
+                    Edge entryEdge = peerEntryEdge != null ? peerEntryEdge : edge;
+                    throw new IllegalArgumentException("Cannot read properties of undefined (reading '" +
+                                                       readOfMissingDep(peerStart, peerEdge.getName(),
+                                                               entryEdge.getFrom()) + "')");
+                }
                 continue;
             }
 
@@ -293,13 +313,29 @@ final class LegacyPlacement {
             !node.isInBundle() &&
             node.canReplaceWith(newDep)) {
             Node parent = node.getParent();
-            Node mask = parent != target && parent != null && parent.getParent() != null &&
-                        parent.getParent() != target ? parent.getParent().resolve(newDep.getName()) : null;
+            Node mask;
+            if (!node.getRelease().prunesReplaceableWithoutGrandparent() && parent != target) {
+                // before npm 7.1.1 a missing parent or grandparent is read
+                if (parent == null) {
+                    throw new IllegalArgumentException("Cannot read properties of null (reading 'parent')");
+                }
+                if (parent.getParent() == null) {
+                    throw new IllegalArgumentException("Cannot read properties of undefined (reading 'resolve')");
+                }
+            }
+            mask = parent != target && parent != null && parent.getParent() != null &&
+                   parent.getParent() != target ? parent.getParent().resolve(newDep.getName()) : null;
 
             if (mask == null || mask == newDep || node.canReplaceWith(mask)) {
                 node.setParent(null);
             }
         }
+    }
+
+    // what [_canPlaceDep] (npm 7.0.7) reads first of a dep that is undefined, checking target: dep.matches for the node in
+    // place, dep.name where the target is not the entry edge's dependent, else [_canPlacePeers]'s dep.parent
+    private static String readOfMissingDep(Node target, String name, @Nullable Node entryFrom) {
+        return target.getChildren().has(name) ? "matches" : target != entryFrom ? "name" : "parent";
     }
 
     private void pruneDedupable(Node node, boolean descend) {
@@ -342,12 +378,18 @@ final class LegacyPlacement {
                 invalidDeps.add(e.getTo());
             }
         }
+        // before npm 7.0.11 each old dependency alone, and any edge from outside, valid or not, holds a node
+        boolean byValidEdges = options.getRelease().prunesReplacedDepsByValidEdges();
         for (Node dep : oldDeps) {
-            invalidDeps.addAll(gatherDepSet(singletonList(dep), e -> e.getTo() != dep && e.isValid()));
+            if (byValidEdges) {
+                invalidDeps.addAll(gatherDepSet(singletonList(dep), e -> e.getTo() != dep && e.isValid()));
+            } else {
+                invalidDeps.add(dep);
+            }
         }
 
         Set<Node> deps = gatherDepSet(invalidDeps, edge ->
-                edge.getFrom() != node && edge.getTo() != node && edge.isValid());
+                edge.getFrom() != node && edge.getTo() != node && (!byValidEdges || edge.isValid()));
 
         for (Node dep : deps) {
             dep.setParent(null);
@@ -395,7 +437,9 @@ final class LegacyPlacement {
                 return KEEP;
             }
 
-            boolean preferDedupe = options.isPreferDedupe() || edge.isPeer();
+            // before npm 7.0.8 only under prefer-dedupe
+            boolean preferDedupe = options.isPreferDedupe() ||
+                                   edge.isPeer() && options.getRelease().prefersDedupeForPeers();
             if (preferDedupe && !tryReplace && dep.canReplace(current)) {
                 CanPlaceDep.Result res = canPlacePeers(dep, target, edge, REPLACE, peerEntryEdge, peerPath, isSource);
                 if (res != CONFLICT) {
@@ -598,7 +642,8 @@ final class LegacyPlacement {
                 continue;
             }
             Node peer = peerEdge.getTo();
-            CanPlaceDep.Result canPlacePeer = canPlaceDep(peer, target, peerEdge, entryEdge, path, isSource);
+            CanPlaceDep.Result canPlacePeer = canPlaceDep(peer, target, peerEdge, entryEdge, path,
+                    options.getRelease().treatsFirstPlaceAsPeerSetSource() && isSource);
             if (canPlacePeer != CONFLICT) {
                 continue;
             }
@@ -641,6 +686,12 @@ final class LegacyPlacement {
     // [_warnPeerConflict]: marks the edge, which is then never built again (this[_edgesOverridden]), and warns
     private void warnPeerConflict(Edge edge) {
         edge.setPeerConflicted(true);
-        warnings.add(explainPeerConflict(edge, null));
+        PlaceDep.PeerConflict conflict = explainPeerConflict(edge, null);
+        if (!options.getRelease().namesRootProjectAmongMoreDependents()) {
+            // npm's log.warn renders an ERESOLVE warning's explanation at depth 2 (setup-log.js), which before npm
+            // 7.0.11 fails on the root project among the dependents past the first
+            ExplainEresolve.explain(conflict.getExplanation(), 2, options.getRelease());
+        }
+        warnings.add(conflict);
     }
 }

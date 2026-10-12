@@ -187,6 +187,14 @@ public final class NpmRelease implements Comparable<NpmRelease> {
     }
 
     /**
+     * {@code [_inflateAncientLockfile]} fetches a node without a version, or with a {@code file:} resolved, by its
+     * resolved, from npm 7.1.1; before, every node by {@code name@version}, read from the working directory.
+     */
+    boolean inflatesLocalNodesByResolved() {
+        return atLeast(7, 1, 1);
+    }
+
+    /**
      * {@code #nodeFromSpec}: under {@code install-links}, a directory dependency of an installed {@code file:} package
      * is installed from that package's source instead of linked, from npm 11.6.0.
      */
@@ -233,6 +241,15 @@ public final class NpmRelease implements Comparable<NpmRelease> {
      */
     boolean letsUnrequiredPeersConflict() {
         return atLeast(7, 5, 4);
+    }
+
+    /**
+     * {@code [_nodeFromEdge]}: the link a nesting loop (a1 -> b1 -> a2 -> b2 -> a1) gets to the earlier instance is
+     * made under the dependent, or its resolve parent for a peer, from npm 7.1.1; before, under the virtual root the
+     * dependency was loaded into.
+     */
+    boolean linksNestingLoopsUnderDependent() {
+        return atLeast(7, 1, 1);
     }
 
     /**
@@ -321,6 +338,14 @@ public final class NpmRelease implements Comparable<NpmRelease> {
     }
 
     /**
+     * {@code [_canPlaceDep]} tries an older node over the one in place for a peer edge, as prefer-dedupe does for any
+     * edge, since peers try harder to be singletons, from npm 7.0.8; before, only under prefer-dedupe.
+     */
+    boolean prefersDedupeForPeers() {
+        return atLeast(7, 0, 8);
+    }
+
+    /**
      * {@code #nodeFromSpec}: a spec naming a workspace that satisfies the edge takes the workspace instead of a
      * registry manifest, from npm 8.5.0.
      */
@@ -352,6 +377,23 @@ public final class NpmRelease implements Comparable<NpmRelease> {
      */
     boolean prunesOptionalPeers() {
         return atLeast(11, 5, 0) && !atLeast(11, 6, 3);
+    }
+
+    /**
+     * {@code [_placeDep]}: a deeper node of the placed name that it can replace is pruned where the node's parent or
+     * grandparent is missing, which masks nothing, from npm 7.1.1; before, reading the missing one fails.
+     */
+    boolean prunesReplaceableWithoutGrandparent() {
+        return atLeast(7, 1, 1);
+    }
+
+    /**
+     * {@code [_pruneForReplacement]}: what the replaced node alone held is pruned, with what only it reaches, unless a
+     * valid edge from outside holds it, from npm 7.0.11; before, its direct dependencies alone, any edge from outside,
+     * valid or not, holding one.
+     */
+    boolean prunesReplacedDepsByValidEdges() {
+        return atLeast(7, 0, 11);
     }
 
     /**
@@ -392,6 +434,14 @@ public final class NpmRelease implements Comparable<NpmRelease> {
      */
     boolean recalculatesFlagsOfInflatedLock() {
         return atLeast(7, 5, 4);
+    }
+
+    /**
+     * {@code [_applyUserRequests]} assigns the root its own package again, which detaches and remakes its edges, only
+     * for packages added or removed, from npm 7.1.1; before, for every install.
+     */
+    boolean refreshesRootPackageForAddOrRemoveOnly() {
+        return atLeast(7, 1, 1);
     }
 
     /**
@@ -476,11 +526,38 @@ public final class NpmRelease implements Comparable<NpmRelease> {
     }
 
     /**
+     * {@code [_placeDep]} passes over an unmet peer of the placed node that its virtual root does not hold, an optional
+     * peer {@code [_loadPeerSet]} never loads, from npm 7.0.8, as 7.0.0 does; npm 7.0.1 to 7.0.7, whose one peer loop
+     * dropped 7.0.0's check, place the missing peer, a TypeError.
+     */
+    boolean skipsPeersVirtualRootLacks() {
+        return atLeast(7, 0, 8) || !atLeast(7, 0, 1);
+    }
+
+    /**
+     * {@code [_placeDep]} passes over a place, other than a top, that has a peer edge of the name it places, from npm
+     * 7.0.8; before, every place from the start up is checked.
+     */
+    boolean skipsPlacesWithPeerEdgeOfName() {
+        return atLeast(7, 0, 8);
+    }
+
+    /**
      * A placement leaves tops out: it prunes none of the name as deduplicable, and a top's edge to what the name
      * resolves to under the target does not hold the dependency back, from npm 7.20.0.
      */
     boolean skipsTopsWhenPlacing() {
         return atLeast(7, 20, 0);
+    }
+
+    /**
+     * {@code [_resolveLinks]} passes over a link that was never placed in the ideal tree, from npm 7.1.1 (arborist
+     * 2.0.0, whose root setter gives a link target its fsParent); before, it takes the node the inventory holds at the
+     * link's realpath as the link's target, and gives a target with neither parent nor fsParent the first node of the
+     * tree walking up from it as fsParent, and queues it.
+     */
+    boolean skipsUnplacedLinks() {
+        return atLeast(7, 1, 1);
     }
 
     /**
@@ -500,12 +577,30 @@ public final class NpmRelease implements Comparable<NpmRelease> {
     }
 
     /**
+     * {@code [_placeDep]}: past a source that peer-depends on the name, the next place up is checked as the peer set's
+     * source, its peers too, and whether a conflict there is the project's is read from that place, from npm 7.0.11;
+     * before, only the source itself, the conflict the project's where the source is the root or a workspace.
+     */
+    boolean treatsFirstPlaceAsPeerSetSource() {
+        return atLeast(7, 0, 11);
+    }
+
+    /**
      * {@code [_loadPeerSet]}: where a peer the set lacks has an edge of its name from the virtual root, a second node
      * by the peer's own spec is loaded and kept where it satisfies both, from npm 7.5.0; before, the root's edge alone
      * decides.
      */
     boolean triesPeerSpecForParentEdge() {
         return atLeast(7, 5, 0);
+    }
+
+    /**
+     * {@code [_resolveLinks]} finds a link target's fsParent walking up the directories of its realpath, outside the
+     * project too, and only then passes over an external link, from npm 7.0.10; before, walking up the segments of its
+     * location, the project root last, and an external link is passed over first.
+     */
+    boolean walksUpRealpathOfLinkTargets() {
+        return atLeast(7, 0, 10);
     }
 
     // @npmcli/arborist calc-dep-flags.js
@@ -609,6 +704,14 @@ public final class NpmRelease implements Comparable<NpmRelease> {
      */
     boolean comparesLockedGitCommittish() {
         return atLeast(11, 17, 0);
+    }
+
+    /**
+     * {@code tarballValid} compares a {@code file:} tarball's resolved and spec with their backslashes read as
+     * slashes, from npm 7.0.13; before, as written, so that a resolved that is no string matches nothing.
+     */
+    boolean comparesTarballPathsWithSlashes() {
+        return atLeast(7, 0, 13);
     }
 
     /**
@@ -736,6 +839,24 @@ public final class NpmRelease implements Comparable<NpmRelease> {
     }
 
     /**
+     * A link's {@code version} is its target's, which dep-valid.js reads in place of the package's, from npm 7.1.1
+     * (arborist 2.0.0); before, the version of the package it took from its target when the target was set, which a
+     * later read of the target's package.json leaves as it was.
+     */
+    boolean readsLinkVersionFromTarget() {
+        return atLeast(7, 1, 1);
+    }
+
+    /**
+     * A link takes the root of its parent, fsParent or target when made, and roots its target with it whenever the
+     * target is set, from npm 7.1.1 (arborist 2.0.0); before, a link made without a parent is its own root until one
+     * is set, and a target is rooted with the link only while it is its own root.
+     */
+    boolean rootsTargetWithLink() {
+        return atLeast(7, 1, 1);
+    }
+
+    /**
      * A link made without a target whose realpath is the root's path takes the root as its target, from npm 7.8.0;
      * before, a new node at that path.
      */
@@ -772,6 +893,15 @@ public final class NpmRelease implements Comparable<NpmRelease> {
     }
 
     /**
+     * The nodes and links of the lock are placed by the root they are made with, from npm 7.1.1 (arborist 2.0.0);
+     * before, arborist 1's {@code [assignParentage]} gives each its parent or fsParent, the first node the lock holds
+     * walking up its path, once the links are made and their targets read.
+     */
+    boolean placesLockNodesByRoot() {
+        return atLeast(7, 1, 1);
+    }
+
+    /**
      * {@code [resolveLinks]} reads each link target's package.json, which its user may have changed, from npm 7.0.9;
      * before, only for a lock older than version 2.
      */
@@ -796,6 +926,13 @@ public final class NpmRelease implements Comparable<NpmRelease> {
     }
 
     /**
+     * {@code [assignParentage]} passes over the root, and a node it finds as its own parent, from npm 7.0.10.
+     */
+    boolean skipsRootParentage() {
+        return atLeast(7, 0, 10);
+    }
+
+    /**
      * {@code [loadFromShrinkwrap]} holds the flags of a lock loaded under a root the caller provides, as the ideal
      * tree builder does, suspect: it calculates the flags of the lock's nodes again, that root's left alone, from npm
      * 7.5.4; before, it resets the root's flags and calculates every node's again only where the root's edges and the
@@ -806,6 +943,14 @@ public final class NpmRelease implements Comparable<NpmRelease> {
     }
 
     // @npmcli/arborist node.js
+
+    /**
+     * A node at the filesystem root may go without a name, from npm 7.1.0; before, a node with neither a name nor a
+     * folder or package to name it after is a TypeError wherever it is.
+     */
+    boolean acceptsUnnamedFilesystemRoot() {
+        return atLeast(7, 1, 0);
+    }
 
     /**
      * {@code canReplaceWith}: a node of another package name, such as an alias, cannot replace this one, from npm
@@ -840,11 +985,35 @@ public final class NpmRelease implements Comparable<NpmRelease> {
     }
 
     /**
+     * The {@code parent} setter ignores a node as its own parent, and the {@code fsParent} setter a node as its own
+     * fsParent or one at its own realpath, from npm 7.0.10 ({@link LegacyNode}).
+     */
+    boolean ignoresNodeAsOwnParent() {
+        return atLeast(7, 0, 10);
+    }
+
+    /**
+     * {@code canReplaceWith} leaves out the edges into the node from its own dependencies, which are replaced with it,
+     * from npm 7.0.11; before, every edge in must accept the replacement, so a dependency cycle holds a node in place.
+     */
+    boolean ignoresOwnDepSetToReplace() {
+        return atLeast(7, 0, 11);
+    }
+
+    /**
      * The root is in its own inventory, so that what walks the inventory, as {@code [_checkEngineAndPlatform]} does,
      * reaches it, from npm 7.1.1 (arborist 2.0.0); before, the root setter returns before it lists the root.
      */
     boolean inventoriesRoot() {
         return atLeast(7, 1, 1);
+    }
+
+    /**
+     * {@code replaceWith} leaves the children and fsChildren of a node a link replaces where they are, from npm 7.0.6
+     * ({@link LegacyNode}); before, they move under the link, which puts them under its target.
+     */
+    boolean keepsChildrenOfNodeLinkReplaces() {
+        return atLeast(7, 0, 6);
     }
 
     /**
@@ -900,6 +1069,16 @@ public final class NpmRelease implements Comparable<NpmRelease> {
      */
     boolean omitsUnderProjectTopsOnly() {
         return atLeast(11, 6, 1);
+    }
+
+    /**
+     * The {@code root} setter places a node, taking the parent or fsParent it finds walking up the node's path and the
+     * tops below it as children, and the {@code parent} and {@code fsParent} setters change the path and set the root,
+     * from npm 7.1.1 (arborist 2.0.0); before, arborist 1's setters ({@link LegacyNode}): the parent and fsParent
+     * setters place a node and reload its edges, and the root setter only roots it, never listing the root itself.
+     */
+    boolean placesNodesFromRoot() {
+        return atLeast(7, 1, 1);
     }
 
     /**
@@ -1056,6 +1235,14 @@ public final class NpmRelease implements Comparable<NpmRelease> {
      */
     boolean checksVersionOfLockedEntry() {
         return atLeast(7, 15, 1);
+    }
+
+    /**
+     * {@code commit} writes an entry for each node of the inventory of the tree's root but the root, from npm 7.1.1
+     * (arborist 2.0.0); before, for each node of the tree's own inventory, which never lists the root.
+     */
+    boolean commitsInventoryOfTreeRoot() {
+        return atLeast(7, 1, 1);
     }
 
     /**
@@ -1224,6 +1411,15 @@ public final class NpmRelease implements Comparable<NpmRelease> {
      */
     boolean quotesYarnLockAsYarnDoes() {
         return atLeast(9, 0, 1);
+    }
+
+    /**
+     * {@code parse} reads a line ending in {@code \r\n} without its {@code \r}, from npm 7.0.13; before, the {@code \r}
+     * stays on the line, so that a yarn.lock written with CRLF is invalid from its first blank line, and only the
+     * entries before it are read.
+     */
+    boolean readsCrlfYarnLock() {
+        return atLeast(7, 0, 13);
     }
 
     // @npmcli/config definitions.js
@@ -1511,6 +1707,17 @@ public final class NpmRelease implements Comparable<NpmRelease> {
         return atLeast(12, 0, 0);
     }
 
+    // npm explain-dep.js
+
+    /**
+     * {@code explainDependents} names a dependent without a name, the root project, {@code the root project} among
+     * those past the first it explains, from npm 7.0.11 (npm/cli#2134); before, it reads that name's length, a
+     * TypeError that fails an install as npm logs a peer conflict it warns about.
+     */
+    boolean namesRootProjectAmongMoreDependents() {
+        return atLeast(7, 0, 11);
+    }
+
     // npm explain-eresolve.js
 
     /**
@@ -1660,8 +1867,10 @@ public final class NpmRelease implements Comparable<NpmRelease> {
      * a wildcard for no range); 7.8.1 from npm 11.16.0, which strips build metadata from a whole range; 7.7.3 from npm
      * 11.6.2 and 7.7.4 from npm 10.9.5, which strip it from a comparator as 7.8.0 does; 7.7.2, as every release from
      * 7.5.4 (npm 9.8.1) answers; 7.5.2 in npm 9.7.2 to 9.8.0, which reads a loose range's {@code ||} groups untrimmed;
-     * before, 7.7.2 again, as 7.3.6 to 7.5.1 (npm 8.7.0 to 9.7.1) answer, and 7.3.5 (npm 8.0.0 to 8.6.0) but for
-     * {@code >=} and a 0, any character, 0, any character, 0, which its {@code GTE0} (dots unescaped) reads as any.
+     * before, 7.7.2 again, as 7.3.6 to 7.5.1 (npm 8.7.0 to 9.7.1) answer, and 7.3.5 (npm 7.7.0 to 8.6.0) and 7.3.4
+     * (npm 7.1.0 to 7.6.3) but for {@code >=} and a 0, any character, 0, any character, 0, which their {@code GTE0}
+     * (dots unescaped) reads as any; 7.3.2 before npm 7.1.0, which also keeps every set and comparator as parsed, so
+     * that a prerelease another group admits satisfies a range with a group of any version.
      */
     NodeSemver.Release semver() {
         return atLeast(11, 18, 0) ? NodeSemver.Release.V7_8_5 :
@@ -1670,7 +1879,8 @@ public final class NpmRelease implements Comparable<NpmRelease> {
                                 atLeast(11, 6, 2) || atLeast(10, 9, 5) && !atLeast(11, 0, 0) ?
                                         NodeSemver.Release.V7_8_0 :
                                         atLeast(9, 7, 2) && !atLeast(9, 8, 1) ? NodeSemver.Release.V7_5_2 :
-                                                NodeSemver.Release.V7_7_2;
+                                                atLeast(7, 1, 0) ? NodeSemver.Release.V7_7_2 :
+                                                        NodeSemver.Release.V7_3_2;
     }
 
     // ssri

@@ -59,6 +59,9 @@ final class NodeSemverRange {
     private static final Pattern DERIVED_UPPER_BOUND = Pattern.compile("(^|\\s)<([0-9]+\\.[0-9]+\\.[0-9]+)-0(?=\\s|$)");
     private static final Pattern GTE0 = Pattern.compile("^\\s*>=\\s*0\\.0\\.0\\s*$");
     private static final Pattern GTE0_PRE = Pattern.compile("^\\s*>=\\s*0\\.0\\.0-0\\s*$");
+    // 7.3.2's re.js writes the dots of GTE0 and GTE0PRE unescaped, so each matches any character
+    private static final Pattern GTE0_ANY_DOT = Pattern.compile("^\\s*>=\\s*0.0.0\\s*$");
+    private static final Pattern GTE0_PRE_ANY_DOT = Pattern.compile("^\\s*>=\\s*0.0.0-0\\s*$");
 
     // The caret, tilde and x-range grammars; groups: (operator,) major, minor, patch, prerelease.
     private static final Pattern CARET = Pattern.compile("^(?:\\^)" + XRANGE_PLAIN + "$");
@@ -118,7 +121,7 @@ final class NodeSemverRange {
         if (set.isEmpty()) {
             return null;
         }
-        if (set.size() > 1 && !v5(options)) {
+        if (set.size() > 1 && simplifies(options)) {
             List<NodeSemverComparator> first = set.get(0);
             List<List<NodeSemverComparator>> notNull = new ArrayList<>();
             for (List<NodeSemverComparator> c : set) {
@@ -143,10 +146,11 @@ final class NodeSemverRange {
     }
 
     // Port of node-semver classes/range.js parseRange; null when a comparator is invalid. 5.5.0 keeps duplicate,
-    // `>=0.0.0` and empty comparators and writes no `-0` on the upper bounds it derives.
+    // `>=0.0.0` and empty comparators and writes no `-0` on the upper bounds it derives; 7.3.2 keeps duplicate and
+    // empty comparators, and a null set among others.
     private static @Nullable List<NodeSemverComparator> parseRange(String range, Options options) {
         List<String> rangeList = comparators(range, options);
-        if (v5(options)) {
+        if (!simplifies(options)) {
             List<NodeSemverComparator> comparators = new ArrayList<>();
             for (String comp : rangeList) {
                 NodeSemverComparator c = NodeSemverComparator.parse(comp, options);
@@ -195,21 +199,30 @@ final class NodeSemverRange {
         return options.release == Release.V5_5_0;
     }
 
+    // 7.3.3 drops the null sets of a range, takes a range with any for any, and drops a set's duplicate comparators,
+    // and its empty one among others
+    private static boolean simplifies(Options options) {
+        return options.release != Release.V5_5_0 && options.release != Release.V7_3_2;
+    }
+
     // 7.8.1 strips build metadata from the whole range before anything reads it
     private static boolean stripsBuildFromRange(Options options) {
-        return options.release != Release.V7_5_2 && options.release != Release.V7_7_2 &&
+        return options.release != Release.V7_3_2 && options.release != Release.V7_5_2 &&
+               options.release != Release.V7_7_2 &&
                options.release != Release.V7_8_0;
     }
 
     // 7.7.3 strips the first build metadata of a comparator, by re.js's length-bounded BUILD
     private static boolean stripsBuildFromComparator(Options options) {
-        return options.release != Release.V7_5_2 && options.release != Release.V7_7_2;
+        return options.release != Release.V7_3_2 && options.release != Release.V7_5_2 &&
+               options.release != Release.V7_7_2;
     }
 
     // 7.8.2 leaves a caret range below 1.0.0 without the -0 includePrerelease adds to other lower bounds, and takes an
     // x-range with a number after a wildcard for no x-range
     private static boolean followsXRangeOrder(Options options) {
-        return options.release != Release.V7_5_2 && options.release != Release.V7_7_2 &&
+        return options.release != Release.V7_3_2 && options.release != Release.V7_5_2 &&
+               options.release != Release.V7_7_2 &&
                options.release != Release.V7_8_0 && options.release != Release.V7_8_1;
     }
 
@@ -233,8 +246,9 @@ final class NodeSemverRange {
         }
         List<String> rangeList = new ArrayList<>();
         for (String comp : joined.toString().split("\\s+", -1)) {
-            rangeList.add(v5(options) ? comp.trim() :
-                    (options.includePrerelease ? GTE0_PRE : GTE0).matcher(comp.trim()).replaceFirst(""));
+            rangeList.add(v5(options) ? comp.trim() : (options.release == Release.V7_3_2 ?
+                    options.includePrerelease ? GTE0_PRE_ANY_DOT : GTE0_ANY_DOT :
+                    options.includePrerelease ? GTE0_PRE : GTE0).matcher(comp.trim()).replaceFirst(""));
         }
         if (options.loose) {
             rangeList.removeIf(comp -> !NodeSemverComparator.COMPARATOR_LOOSE.matcher(comp).find());
