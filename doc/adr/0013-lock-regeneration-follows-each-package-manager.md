@@ -394,7 +394,7 @@ npm's; `Main.RUNS_AS_PORTED`, which let every 11.x release run as 11.2.2, is gon
   first and last release of every range, and every release with `REWRITE_LOCK_EVERY_RELEASE`. A recording a release
   outside `PROVEN` made is held to cannot-know until the engine reproduces that release. `PROVEN` widens a boundary at
   a time, once every replay of its releases passes and every pair of releases in it is reviewed, every module of the
-  bundle and every library it bundles: 11.0.3 to 11.11.0 so far. 11.5.2 resolves peers a second time from the peer
+  bundle and every library it bundles: 11.0.3 to 11.16.0 so far. 11.5.2 resolves peers a second time from the peer
   contexts the lock records, reads a locked package it does not update from its snapshot, and binds each locked
   tarball URL to the registry's; 11.7.0 resolves the children of a package several occurrences reach in the context of
   the lowest of them (pnpm/pnpm#12358); a pnpm 11 release before 11.0.6 writes pnpm-workspace.yaml as pnpm 10 does,
