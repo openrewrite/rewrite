@@ -64,7 +64,7 @@ final class InstallDeps {
         Object runtimeOnFail = opts.get("runtimeOnFail");
         if (allProjects != null && Js.truthy(runtimeOnFail)) {
             for (Verification.Project project : allProjects) {
-                PkgManifestUtils.applyRuntimeOnFailOverride(project.getManifest(), runtimeOnFail);
+                PkgManifestUtils.applyRuntimeOnFailOverride(project.getManifest(), runtimeOnFail, opts.getRelease());
             }
         }
         if (allProjects != null && allProjectsGraph != null) {
@@ -73,7 +73,7 @@ final class InstallDeps {
         }
         Verification.Project project = tryReadProjectManifest(opts);
         if (project != null && Js.truthy(runtimeOnFail)) {
-            PkgManifestUtils.applyRuntimeOnFailOverride(project.getManifest(), runtimeOnFail);
+            PkgManifestUtils.applyRuntimeOnFailOverride(project.getManifest(), runtimeOnFail, opts.getRelease());
         }
         return install.install(project, new InstallOptions(opts, opts.getOverrides(), null, false, store,
                 setupPolicyHandlers(opts)));
@@ -146,8 +146,8 @@ final class InstallDeps {
         if (text == null) {
             return null;
         }
-        Map<String, @Nullable Object> manifest = Manifests.normalizedForTheWriter(
-                Manifests.readProjectManifest(text, RootRelativePath.join(dir, "package.json")), opts.getRelease());
+        Map<String, @Nullable Object> manifest = Manifests.normalizedForTheWriter(Manifests.readProjectManifest(text,
+                RootRelativePath.join(dir, "package.json"), opts.getRelease()), opts.getRelease());
         PackageIsInstallable.projectIsInstallable(".", manifest, opts.isTrue("engineStrict"),
                 opts.getNodeVersion(), opts.get("supportedArchitectures"), inputs.getHost(), opts.getRelease());
         return new Verification.Project(dir, ".", manifest);

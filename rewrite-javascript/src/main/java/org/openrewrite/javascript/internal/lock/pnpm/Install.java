@@ -116,6 +116,26 @@ final class Install {
         return lockDir;
     }
 
+    /**
+     * What the run fails on once the lock is written (the manifest writes of a recursive install), the first one.
+     */
+    private @Nullable RuntimeException failureAfterWrite;
+
+    void failAfterWrite(RuntimeException failure) {
+        if (failureAfterWrite == null) {
+            failureAfterWrite = failure;
+        }
+    }
+
+    /**
+     * Fails as the run does once it wrote the lock, where it does.
+     */
+    void throwFailureAfterWrite() {
+        if (failureAfterWrite != null) {
+            throw failureAfterWrite;
+        }
+    }
+
     // the install command's dryRun of 11.8.0, which resolves without writing the lock
     // (PnpmRelease#stopsTheLockWriteOnADryRun); before, pnpm install does not read it
     static boolean dryRun(PnpmOptions options) {

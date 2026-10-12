@@ -208,7 +208,9 @@ public final class PnpmLockRegenerator {
      */
     String writeLock() {
         Install.Result install = install();
-        return install.getResolution() == null ? install.getWritten() : lockInstall.installInContext(install);
+        String written = install.getResolution() == null ? install.getWritten() : lockInstall.installInContext(install);
+        lockInstall.throwFailureAfterWrite();
+        return written;
     }
 
     /**

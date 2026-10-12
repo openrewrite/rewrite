@@ -17,6 +17,7 @@ package org.openrewrite.javascript.internal.lock.pnpm;
 
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.javascript.internal.lock.CannotKnow;
+import org.openrewrite.javascript.internal.lock.EcmaScript;
 import org.openrewrite.javascript.internal.lock.JsError;
 import org.openrewrite.javascript.semver.NodeSemver;
 
@@ -67,7 +68,7 @@ final class NodeRuntimeResolver {
             result.resolution = current.getResolution();
             return result;
         }
-        String versionSpec = bareSpecifier.substring("runtime:".length());
+        String versionSpec = runtimeSpec(bareSpecifier.substring("runtime:".length()), release);
         String[] parsed = parseNodeSpecifier(versionSpec);
         String nodeMirrorBaseUrl = getNodeMirror(mirrors, parsed[0]);
         String version = resolveNodeVersion(fetch, parsed[1], nodeMirrorBaseUrl, release);
@@ -92,6 +93,17 @@ final class NodeRuntimeResolver {
         result.resolution.put("type", "variations");
         result.resolution.put("variants", variants);
         return result;
+    }
+
+    /**
+     * A runtime's version specifier as {@code release} takes it: from 11.9.0 trimmed, a blank one {@code latest}
+     * (normalizeRuntimeSpec, of which the node, bun and deno resolvers each hold a copy,
+     * {@link PnpmRelease#trimsRuntimeVersions}); before, as written, asked where the two differ.
+     */
+    static String runtimeSpec(String versionSpec, PnpmRelease release) {
+        String trimmed = EcmaScript.trim(versionSpec);
+        String normalized = trimmed.isEmpty() ? "latest" : trimmed;
+        return normalized.equals(versionSpec) || !release.trimsRuntimeVersions() ? versionSpec : normalized;
     }
 
     // createNodeRuntimeVersionSpec (11.8.0)
@@ -204,6 +216,8 @@ final class NodeRuntimeResolver {
             all.add(Js.string(indexEntry.get("version")).substring(1));
             lts.add(indexEntry.get("lts"));
         }
+        // from 11.9.0 the specifier after a release channel is trimmed too
+        versionSpec = runtimeSpec(versionSpec, release);
         if ("latest".equals(versionSpec)) {
             return all.isEmpty() ? null : all.get(0);
         }

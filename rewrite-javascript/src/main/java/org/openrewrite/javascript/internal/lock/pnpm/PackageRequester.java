@@ -497,8 +497,8 @@ final class PackageRequester {
     private @Nullable Map<String, @Nullable Object> readManifest(String dir) {
         String path = dir.isEmpty() ? "package.json" : dir + "/package.json";
         String text = files.get(path);
-        return text == null ? null : Manifests.normalizedForTheWriter(Manifests.readProjectManifest(text, path),
-                npmResolver.getRelease());
+        return text == null ? null : Manifests.normalizedForTheWriter(Manifests.readProjectManifest(text, path,
+                npmResolver.getRelease()), npmResolver.getRelease());
     }
 
     private @Nullable Boolean packageIsInstallable(String pkgId, Map<String, @Nullable Object> manifest,

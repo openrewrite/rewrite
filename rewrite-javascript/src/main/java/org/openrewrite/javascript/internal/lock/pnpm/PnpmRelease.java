@@ -456,6 +456,16 @@ public final class PnpmRelease {
         return atLeast(11, 8, 0);
     }
 
+    /**
+     * A runtime's version is trimmed, both where engines.runtime gives it (pkg-manifest.utils'
+     * convertEnginesRuntimeToDependencies, which skips a version that is no string) and where the node, bun and deno
+     * resolvers read a {@code runtime:} specifier, a blank one {@code latest} (normalizeRuntimeSpec), from 11.9.0;
+     * before, any truthy version is taken as written ({@code 22} a {@code runtime:22}, an empty one none).
+     */
+    boolean trimsRuntimeVersions() {
+        return atLeast(11, 9, 0);
+    }
+
     // @pnpm/config.version-policy src/index.ts
 
     /**
@@ -496,6 +506,16 @@ public final class PnpmRelease {
      */
     boolean readsANullDependencyField() {
         return atLeast(11, 3, 0);
+    }
+
+    /**
+     * The manifest writer, which a recursive install runs over each project it installs once the lock is written,
+     * fails on a devDependencies, then dependencies field that is null, an array or no object
+     * ({@code ERR_PNPM_INVALID_DEPENDENCIES_FIELD}), from 11.9.0 (readDependenciesField); before, it reads no such
+     * field.
+     */
+    boolean rejectsANonObjectDependenciesFieldOnWrite() {
+        return atLeast(11, 9, 0);
     }
 
     // @pnpm/config.pick-registry-for-package src/index.ts

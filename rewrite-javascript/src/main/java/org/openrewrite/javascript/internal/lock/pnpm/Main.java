@@ -312,7 +312,8 @@ public final class Main {
         List<Verification.Project> projects = new ArrayList<>();
         for (String dir : FindPackages.findWorkspaceProjects(manifestDirs(inputs),
                 options.getWorkspacePackagePatterns())) {
-            projects.add(new Verification.Project(dir, FindPackages.getLockfileImporterId(dir), readManifest(dir)));
+            projects.add(new Verification.Project(dir, FindPackages.getLockfileImporterId(dir), readManifest(dir,
+                    options.getRelease())));
         }
         for (Verification.Project project : projects) {
             PackageIsInstallable.projectIsInstallable(project.getId(), project.getManifest(),
@@ -323,8 +324,9 @@ public final class Main {
                 Js.truthy(options.get("linkWorkspacePackages")), options.getRelease()));
     }
 
-    // project-manifest-reader over the one manifest findPackages lists in dir
-    private Map<String, @Nullable Object> readManifest(String dir) {
+    // project-manifest-reader over the one manifest findPackages lists in dir, which release, the one that installs,
+    // converts
+    private Map<String, @Nullable Object> readManifest(String dir, PnpmRelease release) {
         String text = inputs.getManifests().get(dir);
         List<String> others = new ArrayList<>();
         for (String other : PnpmLockRegenerator.OTHER_MANIFEST_NAMES) {
@@ -341,7 +343,7 @@ public final class Main {
         }
         if (text != null) {
             return Manifests.normalizedForTheWriter(Manifests.readProjectManifest(text,
-                    RootRelativePath.join(dir, "package.json")), running());
+                    RootRelativePath.join(dir, "package.json"), release), running());
         }
         String path = others.get(0);
         String other = inputs.getFiles().get(path);
@@ -349,9 +351,9 @@ public final class Main {
             throw CannotKnow.unread(path);
         }
         if (path.endsWith("/package.yaml") || "package.yaml".equals(path)) {
-            return Manifests.normalizedForTheWriter(Manifests.readPackageYaml(other, path), running());
+            return Manifests.normalizedForTheWriter(Manifests.readPackageYaml(other, path, release), running());
         }
-        return Manifests.normalizedForTheWriter(Manifests.readJson5(other, path), running());
+        return Manifests.normalizedForTheWriter(Manifests.readJson5(other, path, release), running());
     }
 
     // the directories holding a manifest findPackages' patterns can match

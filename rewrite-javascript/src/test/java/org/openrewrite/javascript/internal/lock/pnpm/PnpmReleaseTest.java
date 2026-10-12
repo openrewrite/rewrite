@@ -2305,4 +2305,85 @@ class PnpmReleaseTest {
         assertThat(installDeepShared("11.8.0")).isEqualTo(deepSharedSnapshots("(p@1.0.0)"));
         assertThat(installDeepShared("11.9.0")).isEqualTo(deepSharedSnapshots(""));
     }
+
+    // the dependencies engines.runtime of node asks pnpm to download with this version
+    private static @Nullable Object runtimeDependencies(String version, String release) {
+        Map<String, @Nullable Object> manifest = obj("{'engines':{'runtime':{'name':'node','version':" + version +
+                                                     ",'onFail':'download'}}}");
+        PkgManifestUtils.convertEnginesRuntimeToDependencies(manifest, "engines", "dependencies", release(release));
+        return manifest.get("dependencies");
+    }
+
+    // a Node.js release index whose LTS line is 20
+    private static final RegistryMetadata NODE_20_LTS = new RegistryMetadata() {
+        @Override
+        public @Nullable String packument(String registry, String name, boolean fullMetadata) {
+            return null;
+        }
+
+        @Override
+        public @Nullable String attestations(String registry, String name, String version) {
+            return null;
+        }
+
+        @Override
+        public @Nullable String document(String url) {
+            if (url.endsWith("/release/index.json")) {
+                return "[{\"version\":\"v22.0.0\",\"lts\":false},{\"version\":\"v20.0.0\",\"lts\":\"Iron\"}]";
+            }
+            if (url.endsWith("/release/v20.0.0/SHASUMS256.txt")) {
+                return "aa  node-v20.0.0-linux-x64.tar.gz\n";
+            }
+            return null;
+        }
+    };
+
+    /**
+     * pkg-manifest/utils convertEnginesRuntimeToDependencies and engine/runtime/node-resolver normalizeRuntimeSpec
+     * (11.9.0): a runtime's version is trimmed and must be a string, a blank one latest, so that runtime:lts with a
+     * space resolves the LTS line; before, a truthy version is taken as written, and that one is no version pnpm finds.
+     */
+    @Test
+    void trimsRuntimeVersionsFrom1190() {
+        assertThat(json(runtimeDependencies("' 22 '", "11.9.0"))).isEqualTo("{'node':'runtime:22'}");
+        assertThat(json(runtimeDependencies("' 22 '", "11.8.0"))).isEqualTo("{'node':'runtime: 22 '}");
+        assertThat(runtimeDependencies("22", "11.9.0")).isNull();
+        assertThat(json(runtimeDependencies("22", "11.8.0"))).isEqualTo("{'node':'runtime:22'}");
+        assertThat(json(runtimeDependencies("''", "11.9.0"))).isEqualTo("{'node':'runtime:'}");
+        assertThat(runtimeDependencies("''", "11.8.0")).isNull();
+
+        ResolveDependencies.WantedDependency lts = new ResolveDependencies.WantedDependency("node", "runtime:lts ",
+          false, false);
+        NpmResolver.ResolveResult resolved = NodeRuntimeResolver.resolveNodeRuntime(NODE_20_LTS, lts, null, null, null,
+          "linux", release("11.9.0"));
+        assertThat(resolved).isNotNull();
+        assertThat(resolved.id).isEqualTo("node@runtime:20.0.0");
+        assertThatThrownBy(() -> NodeRuntimeResolver.resolveNodeRuntime(NODE_20_LTS, lts, null, null, null, "linux",
+          release("11.8.0")))
+          .isInstanceOfSatisfying(PnpmError.class, e -> {
+              assertThat(e.getCode()).isEqualTo("ERR_PNPM_NODEJS_VERSION_NOT_FOUND");
+              assertThat(e.getMessage()).isEqualTo("Could not find a Node.js version that satisfies lts ");
+          });
+    }
+
+    /**
+     * workspace/project-manifest-reader readDependenciesField (11.9.0): the manifest writer a recursive install runs
+     * once the lock is written fails on a devDependencies field that is null; before, it reads no such field. pnpm
+     * 11.9.0 wrote the lock and exited with this error, and 11.8.0 wrote it and exited 0, when run on such a root.
+     */
+    @Test
+    void rejectsANonObjectDependenciesFieldOnWriteFrom1190() {
+        String workspace = "packages:\n  - '.'\nminimumReleaseAge: 0\n";
+        assertThatThrownBy(() -> regenerator("11.9.0", ",\"devDependencies\":null", workspace, WRAPPY_ONLY)
+          .writeLock())
+          .isInstanceOfSatisfying(PnpmError.class, e -> {
+              assertThat(e.getCode()).isEqualTo("ERR_PNPM_INVALID_DEPENDENCIES_FIELD");
+              assertThat(e.getMessage()).isEqualTo("The \"devDependencies\" field must be an object.");
+          });
+        assertThat(regenerator("11.8.0", ",\"devDependencies\":null", workspace, WRAPPY_ONLY).writeLock())
+          .isEqualTo(WRAPPY_LOCK);
+        assertThat(Manifests.invalidDependenciesField(obj("{'dependencies':'x','devDependencies':{}}"),
+          release("11.9.0"))).hasMessage("The \"dependencies\" field must be an object.");
+        assertThat(Manifests.invalidDependenciesField(obj("{'dependencies':[]}"), release("11.8.0"))).isNull();
+    }
 }

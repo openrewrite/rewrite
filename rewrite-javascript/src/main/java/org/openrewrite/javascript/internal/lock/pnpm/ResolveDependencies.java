@@ -2167,7 +2167,7 @@ final class ResolveDependencies {
         }
         Object engines = pkg.get("engines");
         if (engines instanceof Map && ((Map<?, ?>) engines).get("runtime") != null) {
-            PkgManifestUtils.convertEnginesRuntimeToDependencies(pkg, "engines", "dependencies");
+            PkgManifestUtils.convertEnginesRuntimeToDependencies(pkg, "engines", "dependencies", ctx.getRelease());
         }
         if (!Js.truthy(pkg.get("name"))) {
             throw new PnpmError("MISSING_PACKAGE_NAME", "Can't install " + wantedDependency.getBareSpecifier() +

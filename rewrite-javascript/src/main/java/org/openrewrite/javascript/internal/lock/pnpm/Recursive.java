@@ -63,6 +63,7 @@ final class Recursive {
         Map<String, Map<String, @Nullable Object>> projectConfigRecord =
                 ProjectConfigs.createProjectConfigRecord(opts.get("packageConfigs"));
         if (lockfileDir != null) {
+            failOnAnInvalidDependenciesField(allProjects, opts.getRelease());
             if (!lockfileDir.equals(lockDir)) {
                 return install.unchanged(installOpts);
             }
@@ -80,6 +81,7 @@ final class Recursive {
             }
         }
         Install.Result result;
+        PnpmError ownInvalid = null;
         if (own == null) {
             result = install.unchanged(installOpts);
         } else {
@@ -88,9 +90,44 @@ final class Recursive {
                     own.getManifest().get("name")), opts.getOverrides());
             result = install.install(new Verification.Project(lockDir, ".", own.getManifest()),
                     new InstallOptions(opts, overrides, allProjects, true, storeController, policyHandlers));
+            // from 11.9.0 the project's manifest, written once its lock is, fails on a dependencies field that is no
+            // object (PnpmRelease#rejectsANonObjectDependenciesFieldOnWrite)
+            ownInvalid = Manifests.invalidDependenciesField(own.getManifest(), opts.getRelease());
         }
-        requireOtherInstalls(allProjects, opts, storeController, projectConfigRecord, policyHandlers);
+        requireOtherInstalls(allProjects, opts, storeController, projectConfigRecord, policyHandlers,
+                ownInvalid != null && !opts.isTrue("bail") ? 1 : 0);
+        if (ownInvalid != null) {
+            // under bail it ends the run
+            install.failAfterWrite(ownInvalid);
+        }
         return result;
+    }
+
+    // the manifest writes of the projects mutateModules installed into one lock, each once the lock is written, from
+    // 11.9.0 failing on a dependencies field that is no object (PnpmRelease#rejectsANonObjectDependenciesFieldOnWrite):
+    // the first project's failure ends the run
+    private void failOnAnInvalidDependenciesField(List<Verification.Project> projects, PnpmRelease release) {
+        PnpmError first = null;
+        String firstDir = null;
+        for (Verification.Project project : projects) {
+            PnpmError invalid = Manifests.invalidDependenciesField(project.getManifest(), release);
+            if (invalid == null) {
+                continue;
+            }
+            if (first == null) {
+                first = invalid;
+                firstDir = project.getRootDir();
+            } else if (!String.valueOf(first.getMessage()).equals(invalid.getMessage())) {
+                install.failAfterWrite(new CannotKnow("which of the manifests of " + project(firstDir) + " and " +
+                                                      project(project.getRootDir()) + " pnpm writes first once it " +
+                                                      "wrote the lock (each has a dependencies field that is no " +
+                                                      "object)"));
+                return;
+            }
+        }
+        if (first != null) {
+            install.failAfterWrite(first);
+        }
     }
 
     // the other projects install in the same run: one that resolves shares pnpm's resolution cache with this lock's;
@@ -98,10 +135,11 @@ final class Recursive {
     private void requireOtherInstalls(List<Verification.Project> allProjects, PnpmOptions opts,
                                       NpmResolver storeController,
                                       @Nullable Map<String, Map<String, @Nullable Object>> projectConfigRecord,
-                                      @Nullable Consumer<List<ResolveDependencies.PolicyViolation>> policyHandlers) {
+                                      @Nullable Consumer<List<ResolveDependencies.PolicyViolation>> policyHandlers,
+                                      int ownFailures) {
         String lockDir = install.getLockDir();
         boolean bail = opts.isTrue("bail");
-        int failures = 0;
+        int failures = ownFailures;
         Map<String, String> ownOverrides = null;
         for (Verification.Project project : allProjects) {
             String dir = project.getRootDir();
@@ -141,16 +179,23 @@ final class Recursive {
                 failures++;
                 continue;
             }
-            if (otherInstall.getResolution() == null) {
-                continue;
+            if (otherInstall.getResolution() != null) {
+                if (!ownOverrides.equals(overrides)) {
+                    throw sharesCacheWith(dir);
+                }
+                try {
+                    other.installInContext(otherInstall);
+                } catch (RuntimeException e) {
+                    failed(dir, e, bail);
+                    failures++;
+                    continue;
+                }
             }
-            if (!ownOverrides.equals(overrides)) {
-                throw sharesCacheWith(dir);
-            }
-            try {
-                other.installInContext(otherInstall);
-            } catch (RuntimeException e) {
-                failed(dir, e, bail);
+            // from 11.9.0 its manifest, written once its lock is, fails on a dependencies field that is no object
+            // (PnpmRelease#rejectsANonObjectDependenciesFieldOnWrite)
+            PnpmError invalid = Manifests.invalidDependenciesField(project.getManifest(), opts.getRelease());
+            if (invalid != null) {
+                failed(dir, invalid, bail);
                 failures++;
             }
         }
