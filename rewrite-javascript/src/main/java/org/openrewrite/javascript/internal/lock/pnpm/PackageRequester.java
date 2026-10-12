@@ -40,6 +40,7 @@ final class PackageRequester {
 
     private static final Set<String> GIT_PROTOCOLS = new LinkedHashSet<>(Arrays.asList("git", "git+http",
             "git+https", "git+rsync", "git+ftp", "git+file", "git+ssh", "ssh"));
+    private static final Pattern HTTP_URL = Pattern.compile("^https?://", Pattern.CASE_INSENSITIVE);
     private static final Pattern HOSTED_SHORTCUT = Pattern.compile("^(github|gitlab|bitbucket|gist):.+");
     private static final Pattern GITHUB_SHORTHAND = Pattern.compile("^[^@:/\\s.][^@:/\\s]*/[^@:/\\s]+(#.*)?$");
     private static final Pattern GIT_URL_SUFFIX = Pattern.compile("\\.git(?:#|$)");
@@ -177,6 +178,18 @@ final class PackageRequester {
             resolveResult.resolution.put("integrity", previousIntegrity);
         }
         String id = resolveResult.id;
+        // from 11.9.0 a remote tarball without an integrity is downloaded to fill it, under --lockfile-only too
+        // (resolutionNeedsFetch, PnpmRelease#fetchesATarballToFillAMissingIntegrity); no input holds the tarball
+        Object tarball = resolveResult.resolution.get("tarball");
+        Object integrity = resolveResult.resolution.get("integrity");
+        if (!Js.truthy(resolveResult.resolution.get("type")) && tarball instanceof String &&
+            HTTP_URL.matcher((String) tarball).find() &&
+            !Boolean.TRUE.equals(resolveResult.resolution.get("gitHosted")) &&
+            !LockfileUtils.isGitHostedTarballUrlInAnyCase((String) tarball) &&
+            !(integrity instanceof String && !((String) integrity).isEmpty()) &&
+            npmResolver.getRelease().fetchesATarballToFillAMissingIntegrity()) {
+            throw new CannotKnow("the integrity of " + tarball + ", which pnpm downloads to write it");
+        }
 
         if ("directory".equals(resolveResult.resolution.get("type")) && !id.startsWith("file:")) {
             if (manifest == null) {

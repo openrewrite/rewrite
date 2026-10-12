@@ -21,6 +21,7 @@ import lombok.With;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.javascript.internal.lock.CannotKnow;
 import org.openrewrite.javascript.internal.lock.V8Date;
+import org.openrewrite.javascript.internal.lock.WhatwgUrl;
 import org.openrewrite.javascript.semver.NodeSemver;
 
 import java.time.Instant;
@@ -167,9 +168,17 @@ final class PickPackage {
                     "Package name " + name + " is invalid, it should have a @scope");
         }
         boolean fullMetadata = optional || filterMetadata;
-        String cacheKey = fullMetadata ? name + ":full" : name;
-        Map<String, @Nullable Object> cached = metaCache.get(cacheKey);
         PnpmRelease release = pickerOpts.getRelease();
+        // from 11.9.0 the packuments the run holds are keyed by registry too, a filtered one apart
+        // (PnpmRelease#keysThePackumentCacheByRegistry); the run keeps both keys, the release asked where they differ
+        String nameKey = fullMetadata ? name + ":full" : name;
+        String registryKey = getPkgMetaCacheKey(registryUrl, name, fullMetadata, filterMetadata);
+        Map<String, @Nullable Object> heldByName = metaCache.get(nameKey);
+        Map<String, @Nullable Object> heldByRegistry = metaCache.get(registryKey);
+        Map<String, @Nullable Object> cached = heldByName == heldByRegistry ||
+                                               !release.keysThePackumentCacheByRegistry() ? heldByName :
+                heldByRegistry;
+        CacheKeys cacheKey = new CacheKeys(nameKey, registryKey);
         if (cached != null) {
             // from 11.1.2 a held packument changed after the cutoff is fetched again in full
             if (!needsUpgradeForReleaseAge(spec, pickerOpts, cached) ||
@@ -177,7 +186,7 @@ final class PickPackage {
                 return new PickResult(cached, pickMatchingVersionFinal(pickerOpts, spec, cached));
             }
             Map<String, @Nullable Object> upgraded = fetch(registry, registryUrl, spec.getName(), true);
-            metaCache.put(cacheKey, upgraded);
+            cacheKey.put(metaCache, upgraded);
             return new PickResult(upgraded, pickMatchingVersionFinal(pickerOpts, spec, upgraded));
         }
         Map<String, @Nullable Object> meta = fetch(registry, registryUrl, name, fullMetadata);
@@ -194,8 +203,39 @@ final class PickPackage {
         if (filterMetadata) {
             meta = clearMeta(meta);
         }
-        metaCache.put(cacheKey, meta);
+        cacheKey.put(metaCache, meta);
         return new PickResult(meta, pickMatchingVersionFinal(pickerOpts, spec, meta));
+    }
+
+    // a packument's two cache keys: 11.2.2's name and 11.9.0's registry and name
+    @Value
+    private static class CacheKeys {
+        String byName;
+        String byRegistry;
+
+        void put(Map<String, Map<String, @Nullable Object>> metaCache, Map<String, @Nullable Object> meta) {
+            metaCache.put(byName, meta);
+            metaCache.put(byRegistry, meta);
+        }
+    }
+
+    // getPkgMetaCacheKey (11.9.0)
+    static String getPkgMetaCacheKey(String registry, String pkgName, boolean fullMetadata, boolean filterMetadata) {
+        String key = canonicalizeRegistry(registry) + "\0" + pkgName;
+        if (!fullMetadata) {
+            return key;
+        }
+        return filterMetadata ? key + ":full:filtered" : key + ":full";
+    }
+
+    private static String canonicalizeRegistry(String registry) {
+        try {
+            WhatwgUrl parsed = WhatwgUrl.parse(registry);
+            String pathname = parsed.getPathname().endsWith("/") ? parsed.getPathname() : parsed.getPathname() + "/";
+            return parsed.getOrigin() + pathname;
+        } catch (IllegalArgumentException e) {
+            return registry;
+        }
     }
 
     // maybeUpgradeAbbreviatedMetaForReleaseAge's test: whether it fetches the held packument again in full

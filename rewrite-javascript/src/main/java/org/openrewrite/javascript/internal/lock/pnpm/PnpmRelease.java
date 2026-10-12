@@ -417,6 +417,17 @@ public final class PnpmRelease {
         return atLeast(11, 8, 0);
     }
 
+    // @pnpm/config.version-policy src/index.ts
+
+    /**
+     * A version policy (minimumReleaseAgeExclude, trustPolicyExclude) merges the exact versions of every rule that
+     * matches a name until a rule of the bare name, from 11.9.0; before, the first rule that matches decides
+     * ({@code foo@1.0.0, foo@2.0.0} exempts 1.0.0 alone).
+     */
+    boolean mergesExactVersionsAcrossPolicyRules() {
+        return atLeast(11, 9, 0);
+    }
+
     // @pnpm/lockfile.preferred-versions src/index.ts
 
     /**
@@ -466,6 +477,14 @@ public final class PnpmRelease {
      */
     boolean upgradesAHeldPackumentForTheReleaseAge() {
         return atLeast(11, 1, 2);
+    }
+
+    /**
+     * The packuments a run holds are keyed by registry and name, a filtered one apart, from 11.9.0
+     * (getPkgMetaCacheKey); before, by name, so that a name from a second registry takes the first one's packument.
+     */
+    boolean keysThePackumentCacheByRegistry() {
+        return atLeast(11, 9, 0);
     }
 
     /**
@@ -669,6 +688,14 @@ public final class PnpmRelease {
      */
     boolean keepsALockedIntegrityTheResolverDoesNotGive() {
         return atLeast(11, 5, 0);
+    }
+
+    /**
+     * A remote tarball whose resolution has no integrity is downloaded to fill it, under --lockfile-only too, from
+     * 11.9.0 (the tarball fetcher's resolutionNeedsFetch); before, it is written without one.
+     */
+    boolean fetchesATarballToFillAMissingIntegrity() {
+        return atLeast(11, 9, 0);
     }
 
     // @pnpm/installing.deps-resolver src/resolvePeers.ts

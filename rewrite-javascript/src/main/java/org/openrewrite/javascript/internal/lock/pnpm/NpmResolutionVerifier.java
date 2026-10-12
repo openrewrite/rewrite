@@ -113,10 +113,10 @@ final class NpmResolutionVerifier implements ResolutionVerifier {
         this.excludePolicy = opts.getMinimumReleaseAgeExclude() != null &&
                              !opts.getMinimumReleaseAgeExclude().isEmpty() ?
                 PackageVersionPolicy.createPackageVersionPolicyOrThrow(opts.getMinimumReleaseAgeExclude(),
-                        "minimumReleaseAgeExclude") : null;
+                        "minimumReleaseAgeExclude", opts.getRelease()) : null;
         this.trustExcludePolicy = opts.getTrustPolicyExclude() != null && !opts.getTrustPolicyExclude().isEmpty() ?
                 PackageVersionPolicy.createPackageVersionPolicyOrThrow(opts.getTrustPolicyExclude(),
-                        "trustPolicyExclude") : null;
+                        "trustPolicyExclude", opts.getRelease()) : null;
         this.namedRegistryPrefixes = namedRegistryPrefixes(opts.getNamedRegistries());
     }
 

@@ -368,14 +368,14 @@ final class Install {
         }
         if (minimumReleaseAgeExclude != null) {
             ctx.setPublishedByExclude(PackageVersionPolicy.createPackageVersionPolicyOrThrow(minimumReleaseAgeExclude,
-                    "minimumReleaseAgeExclude"));
+                    "minimumReleaseAgeExclude", options.getRelease()));
         }
         Object trustPolicy = options.get("trustPolicy");
         ctx.setTrustPolicy(trustPolicy == null || trustPolicy == Js.UNDEFINED ? null : Js.string(trustPolicy));
         List<String> trustPolicyExclude = options.getStrings("trustPolicyExclude");
         if (trustPolicyExclude != null) {
             ctx.setTrustPolicyExclude(PackageVersionPolicy.createPackageVersionPolicyOrThrow(trustPolicyExclude,
-                    "trustPolicyExclude"));
+                    "trustPolicyExclude", options.getRelease()));
         }
         ctx.setTrustPolicyIgnoreAfter(options.getNumber("trustPolicyIgnoreAfter"));
         Object peersSuffixMaxLength = options.get("peersSuffixMaxLength");
