@@ -51,7 +51,8 @@ final class Dependency {
     }
 
     /**
-     * {@code isLessThan} in the release's order of behaviors ({@link Behavior#cmp(Behavior, BunRelease)}), then by name.
+     * {@code isLessThan} in the release's order of behaviors ({@link Behavior#cmp(Behavior, BunRelease)}), then by
+     * name.
      */
     static int compare(Dependency lhs, Dependency rhs, BunRelease release) {
         int behavior = lhs.behavior.cmp(rhs.behavior, release);

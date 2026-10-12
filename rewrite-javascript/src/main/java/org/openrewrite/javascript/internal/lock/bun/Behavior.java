@@ -109,8 +109,8 @@ final class Behavior {
 
     /**
      * {@code cmp} as the release orders behaviors: from 1.2.19 a workspace, then dev, optional, prod and peer
-     * dependencies first ({@link #cmp(Behavior)}); before, each of prod, dev, optional, peer and workspace last, in that
-     * order of precedence.
+     * dependencies first ({@link #cmp(Behavior)}); before, each of prod, dev, optional, peer and workspace last, in
+     * that order of precedence.
      */
     int cmp(Behavior rhs, BunRelease release) {
         if (release.tellsDependencyGroupsApart() || eq(rhs)) {

@@ -358,8 +358,8 @@ final class Package {
         if (impliesMetaPeers) {
             // what is left was listed in peerDependenciesMeta alone: an optional peer of "*", as pnpm and Yarn take it
             for (String externalName : optionalPeerDependencies.names) {
-                Dependency dep = parseDependency(lockfile, options, log, sourceDir, Behavior.of(Behavior.PEER), features,
-                        packageDependencies, duplicateCheckerMap, null, null, externalName, "*", false);
+                Dependency dep = parseDependency(lockfile, options, log, sourceDir, Behavior.of(Behavior.PEER),
+                        features, packageDependencies, duplicateCheckerMap, null, null, externalName, "*", false);
                 if (dep != null) {
                     dep.behavior = dep.behavior.add(Behavior.OPTIONAL);
                     packageDependencies.add(dep);

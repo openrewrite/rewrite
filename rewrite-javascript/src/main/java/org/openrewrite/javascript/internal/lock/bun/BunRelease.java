@@ -99,7 +99,7 @@ public final class BunRelease implements Comparable<BunRelease> {
         return atLeast(1, 3, 2);
     }
 
-    // src/install/dependency.zig, lockfile/Package.zig, lockfile/bun.lock.zig, lockfile/Tree.zig, PackageManagerEnqueue.zig
+    // src/install: dependency.zig, lockfile/Package.zig, bun.lock.zig, Tree.zig, PackageManagerEnqueue.zig
 
     /**
      * A package's dependencies are told apart by their group, from 1.2.19 ("fix resolving duplicate dependencies"):
@@ -115,7 +115,7 @@ public final class BunRelease implements Comparable<BunRelease> {
         return atLeast(1, 2, 19);
     }
 
-    // src/install/dependency.zig Tag.infer, lockfile/Package.zig parseWithJSON, lockfile/CatalogMap.zig, bun.lock.zig
+    // src/install: dependency.zig Tag.infer, lockfile/Package.zig parseWithJSON, CatalogMap.zig, bun.lock.zig
 
     /**
      * Catalogs, from 1.2.14: a {@code catalog:} spec names an entry of the root's workspaces {@code catalog} or

@@ -747,7 +747,8 @@ final class TextLockfileReader {
                 }
                 Behavior behavior = groupBehavior.isPeer() && optionalPeers.contains(nameHash) ?
                         groupBehavior.add(Behavior.OPTIONAL) : groupBehavior;
-                DependencyVersion version = DependencyVersion.parse(nameStr, nameHash, versionStr, options.getRelease());
+                DependencyVersion version = DependencyVersion.parse(nameStr, nameHash, versionStr,
+                        options.getRelease());
                 if (version == null) {
                     throw error("InvalidDependencyVersion", "Invalid dependency version");
                 }
