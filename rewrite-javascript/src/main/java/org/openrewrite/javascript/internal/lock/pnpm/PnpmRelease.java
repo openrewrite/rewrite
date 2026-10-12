@@ -226,6 +226,15 @@ public final class PnpmRelease {
     }
 
     /**
+     * pnpm-workspace.yaml's {@code update} and {@code audit} settings are objects, read into updateConfig, auditConfig
+     * and auditLevel ({@code ERR_PNPM_INVALID_SETTING} otherwise), and {@code update} no longer sets the install's
+     * update, from 11.16.0; before, both are read as they are.
+     */
+    boolean translatesTheUpdateAndAuditSettings() {
+        return atLeast(11, 16, 0);
+    }
+
+    /**
      * {@code trustLockfile} skips the verification of the lock's resolutions, from 11.3.0; before, it is no setting.
      */
     boolean readsTrustLockfile() {

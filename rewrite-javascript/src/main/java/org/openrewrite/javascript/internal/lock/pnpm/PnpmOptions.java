@@ -1069,7 +1069,98 @@ public final class PnpmOptions {
                 settings.put("overrides", replaced);
             }
         }
+        if ((pnpmSettings.containsKey("update") || pnpmSettings.containsKey("audit")) &&
+            release.translatesTheUpdateAndAuditSettings()) {
+            translateUpdateSettings(pnpmSettings, settings);
+            translateAuditSettings(pnpmSettings, settings);
+        }
         return settings;
+    }
+
+    private static final List<String> AUDIT_LEVELS = Arrays.asList("info", "low", "moderate", "high", "critical");
+
+    // translateUpdateSettings (11.16.0): the update setting is an object, read into updateConfig, never update itself
+    @SuppressWarnings("unchecked")
+    private static void translateUpdateSettings(Map<String, @Nullable Object> pnpmSettings,
+                                                Map<String, @Nullable Object> settings) {
+        settings.remove("update");
+        Object update = pnpmSettings.get("update");
+        if (update == null || update == Js.UNDEFINED) {
+            return;
+        }
+        assertObjectSetting(update, "update");
+        Map<String, @Nullable Object> updateSetting = (Map<String, @Nullable Object>) update;
+        Map<String, @Nullable Object> updateConfig = new LinkedHashMap<>();
+        if (updateSetting.get("ignoreDeps") != null) {
+            assertStringArray(updateSetting.get("ignoreDeps"), "update.ignoreDeps");
+            updateConfig.put("ignoreDependencies", updateSetting.get("ignoreDeps"));
+        }
+        if (updateSetting.get("changeset") != null) {
+            assertBoolean(updateSetting.get("changeset"), "update.changeset");
+            updateConfig.put("changeset", updateSetting.get("changeset"));
+        }
+        if (updateSetting.get("githubActions") != null) {
+            assertBoolean(updateSetting.get("githubActions"), "update.githubActions");
+            updateConfig.put("githubActions", updateSetting.get("githubActions"));
+        }
+        settings.put("updateConfig", updateConfig);
+    }
+
+    // translateAuditSettings (11.16.0): the audit setting is an object, read into auditConfig and auditLevel
+    @SuppressWarnings("unchecked")
+    private static void translateAuditSettings(Map<String, @Nullable Object> pnpmSettings,
+                                               Map<String, @Nullable Object> settings) {
+        settings.remove("audit");
+        Object audit = pnpmSettings.get("audit");
+        if (audit == null || audit == Js.UNDEFINED) {
+            return;
+        }
+        assertObjectSetting(audit, "audit");
+        Map<String, @Nullable Object> auditSetting = (Map<String, @Nullable Object>) audit;
+        if (auditSetting.get("ignore") != null) {
+            assertStringArray(auditSetting.get("ignore"), "audit.ignore");
+            Map<String, @Nullable Object> auditConfig = settings.get("auditConfig") instanceof Map ?
+                    new LinkedHashMap<>((Map<String, @Nullable Object>) settings.get("auditConfig")) :
+                    new LinkedHashMap<>();
+            auditConfig.put("ignoreGhsas", auditSetting.get("ignore"));
+            settings.put("auditConfig", auditConfig);
+        }
+        Object level = auditSetting.get("level");
+        if (level != null) {
+            if (!AUDIT_LEVELS.contains(level)) {
+                throw new PnpmError("INVALID_SETTING", "The \"audit.level\" setting should be one of " +
+                                                       String.join(", ", AUDIT_LEVELS) + ", but got " +
+                                                       Js.jsonStringify(level));
+            }
+            settings.put("auditLevel", level);
+        }
+    }
+
+    private static void assertStringArray(@Nullable Object value, String settingName) {
+        boolean strings = value instanceof List;
+        if (strings) {
+            for (Object item : (List<?>) value) {
+                strings &= item instanceof String;
+            }
+        }
+        if (!strings) {
+            throw new PnpmError("INVALID_SETTING", "The \"" + settingName + "\" setting should be an array of " +
+                                                   "strings, but got " + renderReceivedType(value));
+        }
+    }
+
+    private static void assertBoolean(@Nullable Object value, String settingName) {
+        if (!(value instanceof Boolean)) {
+            throw new PnpmError("INVALID_SETTING", "The \"" + settingName + "\" setting should be a boolean, but " +
+                                                   "got " + renderReceivedType(value));
+        }
+    }
+
+    private static void assertObjectSetting(@Nullable Object value, String settingName) {
+        if (!(value instanceof Map)) {
+            throw new PnpmError("INVALID_SETTING", "The \"" + settingName + "\" setting should be an object, but " +
+                                                   "got " + renderReceivedType(value));
+        }
     }
 
     // whether a map setting holds a string env-replace would read a ${VAR} of; one that holds none reads the same
