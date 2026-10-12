@@ -54,6 +54,9 @@ public class RemoveDuplicateDependencies extends Recipe {
             @Override
             public Xml.Tag visitTag(Xml.Tag tag, ExecutionContext ctx) {
                 Xml.Tag t = super.visitTag(tag, ctx);
+                if (!"dependencies".equals(t.getName())) {
+                    return t;
+                }
                 if (MANAGED_DEPENDENCIES_MATCHER.matches(getCursor())) {
                     return removeDuplicates(t, false);
                 }
@@ -77,16 +80,17 @@ public class RemoveDuplicateDependencies extends Recipe {
                     return dependencies;
                 }
 
-                Set<String> seen = new HashSet<>();
                 List<Content> content = new ArrayList<>();
                 for (Content c : dependencies.getContent()) {
                     String key = c instanceof Xml.Tag && "dependency".equals(((Xml.Tag) c).getName()) ?
                             managementKey((Xml.Tag) c) : null;
                     if (key == null) {
                         content.add(c);
-                    } else if (seen.add(key)) {
+                        continue;
+                    }
+                    List<Xml.Tag> duplicates = declarations.remove(key);
+                    if (duplicates != null) {
                         Xml.Tag first = (Xml.Tag) c;
-                        List<Xml.Tag> duplicates = declarations.get(key);
                         Xml.Tag winner = duplicates.get(lastDeclarationWins ? duplicates.size() - 1 : 0);
                         content.add(sameDeclaration(first, winner) ? first : winner.withPrefix(first.getPrefix()));
                     }
@@ -101,7 +105,8 @@ public class RemoveDuplicateDependencies extends Recipe {
                     return null;
                 }
                 String type = value(dependency, "type");
-                String classifier = value(dependency, "classifier");
+                String classifier = dependency.getChild("classifier").isPresent() ?
+                        Objects.toString(value(dependency, "classifier"), "") : null;
                 return value(dependency, "groupId") + ":" + artifactId + ":" +
                        (type == null ? "jar" : type) +
                        (classifier == null ? "" : ":" + classifier);

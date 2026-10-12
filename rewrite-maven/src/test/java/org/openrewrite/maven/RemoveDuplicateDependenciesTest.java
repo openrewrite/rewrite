@@ -829,20 +829,51 @@ class RemoveDuplicateDependenciesTest implements RewriteTest {
                       <artifactId>maven-dependency-plugin</artifactId>
                       <version>3.8.1</version>
                       <dependencies>
-                          <dependency>
-                            <groupId>com.google.guava</groupId>
-                            <artifactId>guava</artifactId>
-                            <version>29.0-jre</version>
-                          </dependency>
-                          <dependency>
-                            <groupId>com.google.guava</groupId>
-                            <artifactId>guava</artifactId>
-                            <version>30.1-jre</version>
-                          </dependency>
+                        <dependency>
+                          <groupId>com.google.guava</groupId>
+                          <artifactId>guava</artifactId>
+                          <version>29.0-jre</version>
+                        </dependency>
+                        <dependency>
+                          <groupId>com.google.guava</groupId>
+                          <artifactId>guava</artifactId>
+                          <version>30.1-jre</version>
+                        </dependency>
                       </dependencies>
                     </plugin>
                   </plugins>
                 </build>
+              </project>
+              """
+          )
+        );
+    }
+
+    @Test
+    void keepDependencyWithEmptyClassifier() {
+        rewriteRun(
+          pomXml(
+            """
+              <project>
+                <modelVersion>4.0.0</modelVersion>
+
+                <groupId>com.mycompany.app</groupId>
+                <artifactId>my-app</artifactId>
+                <version>1</version>
+
+                <dependencies>
+                  <dependency>
+                    <groupId>junit</groupId>
+                    <artifactId>junit</artifactId>
+                    <version>4.13.2</version>
+                  </dependency>
+                  <dependency>
+                    <groupId>junit</groupId>
+                    <artifactId>junit</artifactId>
+                    <version>4.12</version>
+                    <classifier></classifier>
+                  </dependency>
+                </dependencies>
               </project>
               """
           )
