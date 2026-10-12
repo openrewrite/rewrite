@@ -10,7 +10,8 @@ what `internal.lock` holds, and how the recipes write overrides and follow catal
 again: one port per library, the host's registries as the user's config, corepack, the regenerators by module.
 Amended 2026-10-11: later releases of the ported pnpm and Yarn majors; the npm release that built the LST,
 with every npm release from 7.1.1 reproduced beside the one ported; every Yarn 4.x release reproduced beside
-4.10.3; Bun releases reproduced beside 1.3.10; and Yarn 1 releases reproduced beside 1.22.22.
+4.10.3; Bun releases reproduced beside 1.3.10; and Yarn 1 releases reproduced beside 1.22.22. Amended 2026-10-12:
+pnpm releases reproduced beside 11.2.2.
 
 ## Context
 
@@ -128,8 +129,8 @@ Overrides are written where the project's package manager reads them, at the wor
   range open between majors, or a release whose writes are not recorded, is declined): 11 reads
   pnpm-workspace.yaml only; 10 reads package.json's `pnpm.overrides` and `resolutions` instead of the workspace's when
   they hold any; 9 reads package.json only. The recipe writes where that release's own writer would, editing
-  pnpm-workspace.yaml in place or creating the key or file as pnpm places it; a release outside 11.0.6 - 11 makes
-  the regeneration cannot-know.
+  pnpm-workspace.yaml in place or creating the key or file as pnpm places it; a release outside
+  `PnpmReleases.PROVEN` makes the regeneration cannot-know.
 - An override the package manager cannot read (its own parser's answer: pnpm's `parsePkgAndParentSelector`, Berry's
   `parseResolution`), or one that would win over a declaration through a value that is no version range (a catalog or
   workspace reference), is declined with a `NodeDependencyEditsDeclined` row and writes nothing; an override scoped to
@@ -214,7 +215,8 @@ and read only afterwards, beside `Rc`, `Cli` and `Install`; Berry's Configuratio
 
 pnpm-workspace.yaml is printed as pnpm 10 and 11 print it, through `YamlDocument` and `WorkspaceManifestWriter`
 (pnpm 10's sortKeysByPriority, pnpm 11's reorderRecursive and propagateBlankLinesToNewPairs), for the releases whose
-writes are recorded (9.5.0 - 9.15.9, 10.32.1 - 10.34.6, 11.0.6 - 11); pnpm 9's catalogs and Yarn's .yarnrc.yml
+writes are recorded (9.5.0 - 9.15.9, 10.32.1 - 10.34.6, and the 11.x releases of `PnpmReleases.PROVEN`); pnpm 9's
+catalogs and Yarn's .yarnrc.yml
 are edited in place, and a layout the port does not read (document markers, CR line ends, a tab before a comment, a
 flow mapping with entries) is declined. A workspace pnpm rejects (`catalog` beside `catalogs.default`, recorded) is
 declined. AddDependency sorts the dependency fields as each package manager's add saves them, and still keeps inline
@@ -222,7 +224,9 @@ arrays and objects that npm, pnpm and yarn 1 print again with `JSON.stringify`.
 
 ## Amendment 2026-10-11: later releases of the ported majors
 
-- pnpm: a release from 11.0.6 to below 12 (`Main.RUNS_AS_PORTED`) runs as the port of 11.2.2, for the port
+- pnpm (superseded by the amendment on pnpm releases below, which replaces `Main.RUNS_AS_PORTED` with
+  `PnpmReleases.PROVEN`): a release from 11.0.6 to below 12 (`Main.RUNS_AS_PORTED`) runs as the port of 11.2.2,
+  for the port
   (`SwitchCliVersion`, `Main.release`) and the recipes (`PnpmRelease`) alike; 11.0.5 sorts what 11.0.6 appends, and
   another major stays cannot-know. What a later 11.x release changed in a ported module is an option of that module's
   class, a range of releases asked of the release that installs (`Main.releaseIn`): the package manager check names
