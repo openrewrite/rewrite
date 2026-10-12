@@ -2065,7 +2065,6 @@ class PnpmReleaseTest {
               assertThat(node.children()).isEmpty();
           });
     }
-}
 
     private static final String SHA = "0123456789abcdef0123456789abcdef01234567";
 
@@ -2306,3 +2305,4 @@ class PnpmReleaseTest {
         assertThat(installDeepShared("11.8.0")).isEqualTo(deepSharedSnapshots("(p@1.0.0)"));
         assertThat(installDeepShared("11.9.0")).isEqualTo(deepSharedSnapshots(""));
     }
+}

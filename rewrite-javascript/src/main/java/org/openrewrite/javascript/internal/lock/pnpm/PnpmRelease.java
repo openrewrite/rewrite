@@ -641,39 +641,6 @@ public final class PnpmRelease {
         return atLeast(11, 5, 2);
     }
 
-    // @pnpm/installing.deps-installer src/install/verifyLockfileResolutions.ts
-
-    /**
-     * A lock entry whose dep path is a registry version ({@code name@version}) but whose resolution is no registry
-     * tarball (typed, git-hosted, or a tarball URL neither http nor https) fails the lock's verification with
-     * {@code ERR_PNPM_RESOLUTION_SHAPE_MISMATCH}, ahead of any verifier and with none active, from 11.5.3; before, it
-     * is read as it is.
-     */
-    boolean rejectsARegistryDepPathWithANonRegistryResolution() {
-        return atLeast(11, 5, 3);
-    }
-
-    /**
-     * A dependency alias of the lock's importers or snapshots that is no package name fails the lock's verification
-     * first ({@code ERR_PNPM_INVALID_DEPENDENCY_NAME}), from 11.7.0; before, it is read as it is.
-     */
-    boolean rejectsAnInvalidDependencyAliasInTheLock() {
-        return atLeast(11, 7, 0);
-    }
-
-    // @pnpm/installing.deps-installer src/install/index.ts (mutateModules)
-
-    /**
-     * The lock's verification runs beside the install, so that a project without a package.json fails with that
-     * first, from 11.7.0; before, the verification comes first.
-     */
-    boolean verifiesTheLockBesideTheInstall() {
-        return atLeast(11, 7, 0);
-    }
-
-    /**
-     * {@code updateChecksums} makes the install resolve in full, from 11.4.0; before, a lock-only install does not
-     * read it.
     /**
      * Every untyped resolution but a {@code file:}, non-http or git-hosted tarball's is a registry tarball to verify,
      * and one without an integrity fails the lock's verification ({@code ERR_PNPM_MISSING_TARBALL_INTEGRITY}) ahead of
@@ -707,6 +674,39 @@ public final class PnpmRelease {
         return atLeast(11, 9, 0);
     }
 
+    // @pnpm/installing.deps-installer src/install/verifyLockfileResolutions.ts
+
+    /**
+     * A lock entry whose dep path is a registry version ({@code name@version}) but whose resolution is no registry
+     * tarball (typed, git-hosted, or a tarball URL neither http nor https) fails the lock's verification with
+     * {@code ERR_PNPM_RESOLUTION_SHAPE_MISMATCH}, ahead of any verifier and with none active, from 11.5.3; before, it
+     * is read as it is.
+     */
+    boolean rejectsARegistryDepPathWithANonRegistryResolution() {
+        return atLeast(11, 5, 3);
+    }
+
+    /**
+     * A dependency alias of the lock's importers or snapshots that is no package name fails the lock's verification
+     * first ({@code ERR_PNPM_INVALID_DEPENDENCY_NAME}), from 11.7.0; before, it is read as it is.
+     */
+    boolean rejectsAnInvalidDependencyAliasInTheLock() {
+        return atLeast(11, 7, 0);
+    }
+
+    // @pnpm/installing.deps-installer src/install/index.ts (mutateModules)
+
+    /**
+     * The lock's verification runs beside the install, so that a project without a package.json fails with that
+     * first, from 11.7.0; before, the verification comes first.
+     */
+    boolean verifiesTheLockBesideTheInstall() {
+        return atLeast(11, 7, 0);
+    }
+
+    /**
+     * {@code updateChecksums} makes the install resolve in full, from 11.4.0; before, a lock-only install does not
+     * read it.
      */
     boolean resolvesInFullToUpdateChecksums() {
         return atLeast(11, 4, 0);
@@ -813,6 +813,15 @@ public final class PnpmRelease {
     }
 
     /**
+     * An occurrence of a package that does not resolve its children shares their missing peers only with an owner as
+     * deep as it, from 11.9.0 (claimChildrenResolution); before, also with a shallower owner whose children are
+     * resolved already, so that a deeper occurrence reports their missing peers to its own parents.
+     */
+    boolean sharesMissingPeersOfChildrenOnlyWithAnOwnerAsDeep() {
+        return atLeast(11, 9, 0);
+    }
+
+    /**
      * Peers are resolved a second time from the peer contexts the lock records, where their providers are still in
      * the graph, satisfy the ranges and no current manifest choice must win, from 11.5.2 (pnpm/pnpm#12083); before,
      * once, from the current graph alone.
@@ -845,15 +854,6 @@ public final class PnpmRelease {
      * A remote tarball whose resolution has no integrity is downloaded to fill it, under --lockfile-only too, from
      * 11.9.0 (the tarball fetcher's resolutionNeedsFetch); before, it is written without one.
      */
-    /**
-     * An occurrence of a package that does not resolve its children shares their missing peers only with an owner as
-     * deep as it, from 11.9.0 (claimChildrenResolution); before, also with a shallower owner whose children are
-     * resolved already, so that a deeper occurrence reports their missing peers to its own parents.
-     */
-    boolean sharesMissingPeersOfChildrenOnlyWithAnOwnerAsDeep() {
-        return atLeast(11, 9, 0);
-    }
-
     boolean fetchesATarballToFillAMissingIntegrity() {
         return atLeast(11, 9, 0);
     }
