@@ -19,7 +19,7 @@ import org.jspecify.annotations.Nullable;
 
 /**
  * Port of bun's src/install/dependency.zig {@code Dependency.Version} with {@code parseWithTag} and
- * {@code Tag.infer} (bun 1.3.10): a spec, its tag and the tag's value.
+ * {@code Tag.infer} (bun 1.3.10), with dependency.rs (1.4.x) beside it: a spec, its tag and the tag's value.
  */
 final class DependencyVersion {
 

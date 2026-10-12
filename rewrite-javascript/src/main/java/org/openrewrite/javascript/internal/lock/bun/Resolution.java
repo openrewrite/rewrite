@@ -18,7 +18,8 @@ package org.openrewrite.javascript.internal.lock.bun;
 import org.jspecify.annotations.Nullable;
 
 /**
- * Port of bun's src/install/resolution.zig with versioned_url.zig (bun 1.3.10): how a package was resolved.
+ * Port of bun's src/install/resolution.zig with versioned_url.zig (bun 1.3.10), with resolution.rs (1.4.x) beside it:
+ * how a package was resolved.
  */
 final class Resolution {
 

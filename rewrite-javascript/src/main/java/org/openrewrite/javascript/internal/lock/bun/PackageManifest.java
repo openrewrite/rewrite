@@ -30,7 +30,7 @@ import java.util.Set;
 /**
  * Port of bun's src/install/npm.zig {@code PackageManifest} and {@code PackageVersion} (bun 1.3.10), with
  * {@code findBestVersion} and the minimum release age filter, as the release that installs reads a packument
- * ({@link BunRelease}).
+ * ({@link BunRelease}; npm.rs for 1.4.x).
  */
 final class PackageManifest {
 
