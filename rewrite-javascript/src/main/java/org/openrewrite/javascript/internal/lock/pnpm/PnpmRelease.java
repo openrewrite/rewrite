@@ -277,6 +277,15 @@ public final class PnpmRelease {
     }
 
     /**
+     * The environment's {@code npm_config_//…} and {@code pnpm_config_//…} variables set their {@code //…} key (a
+     * registry's credentials, certificates) after the project's .npmrc, the pnpm one winning, from 11.6.0; before,
+     * they set nothing.
+     */
+    boolean readsUrlScopedConfigFromTheEnvironment() {
+        return atLeast(11, 6, 0);
+    }
+
+    /**
      * An {@code _auth} or {@code _password} that is no base64 is decoded again with its padding mended, else is
      * {@code ERR_PNPM_AUTH_INVALID_BASE64}, from 11.1.3; before, Node's atob throws its InvalidCharacterError.
      */
@@ -352,6 +361,16 @@ public final class PnpmRelease {
      */
     boolean verifiesTheNodeShasumsSignature() {
         return atLeast(11, 5, 3);
+    }
+
+    // @pnpm/config.package-is-installable src/index.ts, inferPlatformFromPackageName.ts
+
+    /**
+     * An optional package that does not declare all of os, cpu and libc takes the rest from the tokens of its name
+     * ({@code foo-win32-x64} is win32 and x64), from 11.6.0; before, an undeclared one is any.
+     */
+    boolean infersAnOptionalPackagesPlatformFromItsName() {
+        return atLeast(11, 6, 0);
     }
 
     // @pnpm/config.pick-registry-for-package src/index.ts

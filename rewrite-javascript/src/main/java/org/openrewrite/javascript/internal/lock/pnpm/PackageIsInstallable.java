@@ -24,8 +24,12 @@ import org.openrewrite.javascript.semver.NodeSemver;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
+import java.util.Set;
+import java.util.regex.Pattern;
 
 /**
  * Port of @pnpm/config.package-is-installable (pnpm 11.2.2) and @pnpm/cli.utils src/packageIsInstallable.ts; a
@@ -79,6 +83,16 @@ final class PackageIsInstallable {
                                                   @Nullable Object supportedArchitectures, Host host,
                                                   PnpmRelease release) {
         PnpmError warn = checkPackage(pkgId, pkg, nodeVersion, null, supportedArchitectures, host, release);
+        // from 11.6.0 an optional package that does not declare its whole platform takes the rest from its name
+        // (PnpmRelease#infersAnOptionalPackagesPlatformFromItsName), asked where that makes it installable otherwise
+        Map<String, @Nullable Object> effective = optional ? effectivePlatform(pkg) : null;
+        if (effective != null) {
+            PnpmError inferred = checkPackage(pkgId, effective, nodeVersion, null, supportedArchitectures, host,
+                    release);
+            if ((inferred == null) != (warn == null) && release.infersAnOptionalPackagesPlatformFromItsName()) {
+                warn = inferred;
+            }
+        }
         if (warn == null) {
             return true;
         }
@@ -89,6 +103,93 @@ final class PackageIsInstallable {
             throw warn;
         }
         return null;
+    }
+
+    /**
+     * index.ts {@code effectivePlatform} of 11.6.0 for an optional package: its engines, and the os, cpu and libc it
+     * does not declare from {@link #inferPlatformFromPackageName}; null where that changes nothing.
+     */
+    static @Nullable Map<String, @Nullable Object> effectivePlatform(Map<String, @Nullable Object> pkg) {
+        Object os = pkg.get("os");
+        Object cpu = pkg.get("cpu");
+        Object libc = pkg.get("libc");
+        if (isPresent(os) && isPresent(cpu) && isPresent(libc)) {
+            return null;
+        }
+        Map<String, List<String>> inferred = inferPlatformFromPackageName(pkg.get("name"));
+        if (inferred == null || !isPresent(os) && !isPresent(cpu) && !isPresent(libc) &&
+                                !inferred.containsKey("os")) {
+            return null;
+        }
+        Map<String, @Nullable Object> effective = new LinkedHashMap<>();
+        effective.put("engines", pkg.get("engines"));
+        effective.put("os", isPresent(os) ? os : inferred.get("os"));
+        effective.put("cpu", isPresent(cpu) ? cpu : inferred.get("cpu"));
+        effective.put("libc", isPresent(libc) ? libc : inferred.get("libc"));
+        return effective;
+    }
+
+    // `value != null`, which undefined fails too
+    private static boolean isPresent(@Nullable Object value) {
+        return value != null && value != Js.UNDEFINED;
+    }
+
+    private static final Pattern NAME_TOKEN_SEPARATOR = Pattern.compile("[-_.]");
+    private static final Map<String, String> OS_BY_TOKEN = new LinkedHashMap<>();
+    private static final Map<String, String> CPU_BY_TOKEN = new LinkedHashMap<>();
+    private static final Map<String, String> LIBC_BY_TOKEN = new LinkedHashMap<>();
+
+    static {
+        String[] os = {"aix", "aix", "android", "android", "darwin", "darwin", "macos", "darwin", "osx", "darwin",
+                "freebsd", "freebsd", "linux", "linux", "netbsd", "netbsd", "openbsd", "openbsd", "openharmony",
+                "openharmony", "sunos", "sunos", "win32", "win32", "windows", "win32"};
+        String[] cpu = {"arm", "arm", "armv6", "arm", "armv7", "arm", "arm64", "arm64", "aarch64", "arm64", "ia32",
+                "ia32", "loong64", "loong64", "mips64el", "mips64el", "ppc64", "ppc64", "ppc64le", "ppc64", "riscv64",
+                "riscv64", "s390x", "s390x", "x64", "x64", "amd64", "x64", "wasm32", "wasm32"};
+        String[] libc = {"glibc", "glibc", "gnu", "glibc", "gnueabihf", "glibc", "musl", "musl", "musleabihf",
+                "musl"};
+        for (int i = 0; i < os.length; i += 2) {
+            OS_BY_TOKEN.put(os[i], os[i + 1]);
+        }
+        for (int i = 0; i < cpu.length; i += 2) {
+            CPU_BY_TOKEN.put(cpu[i], cpu[i + 1]);
+        }
+        for (int i = 0; i < libc.length; i += 2) {
+            LIBC_BY_TOKEN.put(libc[i], libc[i + 1]);
+        }
+    }
+
+    /**
+     * inferPlatformFromPackageName.ts (11.6.0): the os, cpu and libc the tokens of a package's unscoped name
+     * ({@code -}, {@code _} or {@code .} apart) name; null where none does.
+     */
+    static @Nullable Map<String, List<String>> inferPlatformFromPackageName(@Nullable Object name) {
+        if (!(name instanceof String)) {
+            throw new JsError(JsError.TYPE_ERROR, name == null || name == Js.UNDEFINED ?
+                    "Cannot read properties of undefined (reading 'includes')" : "name.includes is not a function");
+        }
+        String pkgName = (String) name;
+        String nameWithoutScope = pkgName.contains("/") ? pkgName.substring(pkgName.indexOf('/') + 1) : pkgName;
+        String[] tokens = NAME_TOKEN_SEPARATOR.split(nameWithoutScope.toLowerCase(Locale.ROOT), -1);
+        Map<String, List<String>> inferred = new LinkedHashMap<>();
+        pickTokenValues(tokens, OS_BY_TOKEN, "os", inferred);
+        pickTokenValues(tokens, CPU_BY_TOKEN, "cpu", inferred);
+        pickTokenValues(tokens, LIBC_BY_TOKEN, "libc", inferred);
+        return inferred.isEmpty() ? null : inferred;
+    }
+
+    private static void pickTokenValues(String[] tokens, Map<String, String> valueByToken, String field,
+                                        Map<String, List<String>> into) {
+        Set<String> values = new LinkedHashSet<>();
+        for (String token : tokens) {
+            String value = valueByToken.get(token);
+            if (value != null) {
+                values.add(value);
+            }
+        }
+        if (!values.isEmpty()) {
+            into.put(field, new ArrayList<>(values));
+        }
     }
 
     /**

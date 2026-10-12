@@ -360,6 +360,47 @@ class PnpmReleaseTest {
     }
 
     /**
+     * config/reader loadNpmrcFiles.ts readUrlScopedEnvConfig (11.6.0): an npm_config_//… variable sets its key after
+     * the project's .npmrc; before, nothing. "foo" has no user:password separator.
+     */
+    @Test
+    void readsUrlScopedConfigFromTheEnvironmentFrom1160() {
+        Map<String, String> env = Collections.singletonMap("npm_config_//registry.npmjs.org/:_auth", "Zm9v");
+        assertThatThrownBy(() -> options("", null, null, env, "11.6.0"))
+          .isInstanceOfSatisfying(PnpmError.class,
+            e -> assertThat(e.getCode()).isEqualTo("ERR_PNPM_AUTH_MISSING_SEPARATOR"));
+        options("", null, null, env, "11.5.3");
+        String bad = "//registry.npmjs.org/:_auth=Zm9v\n";
+        Map<String, String> good = Collections.singletonMap("pnpm_config_//registry.npmjs.org/:_auth",
+          "dXNlcjpwYXNz");
+        options("", bad, null, good, "11.6.0");
+        assertThatThrownBy(() -> options("", bad, null, good, "11.5.3"))
+          .isInstanceOfSatisfying(PnpmError.class,
+            e -> assertThat(e.getCode()).isEqualTo("ERR_PNPM_AUTH_MISSING_SEPARATOR"));
+    }
+
+    /**
+     * config/package-is-installable inferPlatformFromPackageName.ts (11.6.0): an optional package's os and cpu come
+     * from its name where it declares none; before, it is any platform's.
+     */
+    @Test
+    void infersAnOptionalPackagesPlatformFromItsNameFrom1160() {
+        Host linux = Host.builder().nodeVersion("v24.21.0").os("linux").cpu("x64").build();
+        Map<String, @Nullable Object> win = obj("{'name':'foo-win32-x64','version':'1.0.0'}");
+        assertThat(PackageIsInstallable.packageIsInstallable("foo-win32-x64@1.0.0", win, false, null, true, null,
+          linux, release("11.6.0"))).isFalse();
+        assertThat(PackageIsInstallable.packageIsInstallable("foo-win32-x64@1.0.0", win, false, null, true, null,
+          linux, release("11.5.3"))).isTrue();
+        assertThat(PackageIsInstallable.packageIsInstallable("foo-win32-x64@1.0.0", win, false, null, false, null,
+          linux, release("11.6.0"))).isTrue();
+        Map<String, @Nullable Object> arm = obj("{'name':'@scope/foo-arm64','version':'1.0.0'}");
+        assertThat(PackageIsInstallable.packageIsInstallable("@scope/foo-arm64@1.0.0", arm, false, null, true, null,
+          linux, release("11.6.0"))).isTrue();
+        assertThat(PackageIsInstallable.inferPlatformFromPackageName("@esbuild/linux-arm64-musl"))
+          .isEqualTo(obj("{'os':['linux'],'cpu':['arm64'],'libc':['musl']}"));
+    }
+
+    /**
      * pnpm syncEnvLockfile.ts (11.1.3, pnpm/pnpm#11674): the package manager check records the release that runs in
      * an env document without a pnpm entry; before, only over an entry the wanted range does not satisfy.
      */

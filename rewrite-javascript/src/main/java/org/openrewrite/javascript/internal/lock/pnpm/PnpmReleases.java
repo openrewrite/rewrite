@@ -39,7 +39,7 @@ public final class PnpmReleases {
      * gives what that release wrote ({@code PnpmScenarioTest} with {@code REWRITE_LOCK_EVERY_RELEASE}), and every
      * upstream change between them and 11.2.2 in the modules the port names is a question of {@link PnpmRelease}.
      */
-    public static final String PROVEN = "11.0.3 - 11.5.3";
+    public static final String PROVEN = "11.0.3 - 11.6.0";
 
     private static final List<String> ALL = load();
 

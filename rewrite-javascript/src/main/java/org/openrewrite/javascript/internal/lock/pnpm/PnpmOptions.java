@@ -199,10 +199,16 @@ public final class PnpmOptions {
         Map<String, @Nullable Object> builtin = new LinkedHashMap<>();
         builtin.put("registry", DEFAULT_REGISTRY);
         builtin.put("@jsr:registry", "https://npm.jsr.io/");
+        // from 11.6.0 the environment's npm_config_//… and pnpm_config_//… variables follow the project's .npmrc
+        // (PnpmRelease#readsUrlScopedConfigFromTheEnvironment)
+        Map<String, @Nullable Object> envScopedConfig = readUrlScopedEnvConfig(env);
+        if (!envScopedConfig.isEmpty() && !release.readsUrlScopedConfigFromTheEnvironment()) {
+            envScopedConfig = new LinkedHashMap<>();
+        }
         Map<String, @Nullable Object> rawConfig = new LinkedHashMap<>();
         Map<String, @Nullable Object> mergedConfig = new LinkedHashMap<>();
         for (Map<String, @Nullable Object> source : Arrays.asList(builtin, defaultOptions, userConfig,
-                workspaceNpmrc)) {
+                workspaceNpmrc, envScopedConfig)) {
             for (String key : Js.keys(source)) {
                 rawConfig.put(key, source.get(key));
                 if (isNpmrcReadableKey(key)) {
@@ -230,7 +236,8 @@ public final class PnpmOptions {
         Map<String, String> registriesFromNpmrc = new LinkedHashMap<>();
         registriesFromNpmrc.put("default", normalizeRegistryUrl(authConfig.get("registry")));
         registriesFromNpmrc.putAll(networkRegistries);
-        Map<String, String> packageManagerRegistries = trustedRegistries(builtin, defaultOptions, userConfig, release);
+        Map<String, String> packageManagerRegistries = trustedRegistries(builtin, defaultOptions, userConfig,
+                envScopedConfig, release);
         if (holdsUnscopedCreds(authConfig) && !release.rescopesUnscopedCredentials()) {
             getDefaultCreds(authConfig, release);
         }
@@ -353,9 +360,11 @@ public final class PnpmOptions {
     private static @Nullable Map<String, String> trustedRegistries(Map<String, @Nullable Object> builtin,
                                                                    Map<String, @Nullable Object> defaultOptions,
                                                                    Map<String, @Nullable Object> userConfig,
+                                                                   Map<String, @Nullable Object> envScopedConfig,
                                                                    PnpmRelease release) {
         Map<String, @Nullable Object> trustedConfig = new LinkedHashMap<>();
-        for (Map<String, @Nullable Object> source : Arrays.asList(builtin, defaultOptions, userConfig)) {
+        for (Map<String, @Nullable Object> source : Arrays.asList(builtin, defaultOptions, userConfig,
+                envScopedConfig)) {
             for (String key : Js.keys(source)) {
                 if (isNpmrcReadableKey(key)) {
                     trustedConfig.put(key, source.get(key));
@@ -669,6 +678,44 @@ public final class PnpmOptions {
             kept = value;
         }
         return lossy.equals(kept) || release.dropsAnUnresolvedNpmrcPlaceholder() ? lossy : kept;
+    }
+
+    private static final Pattern URL_SCOPED_ENV = Pattern.compile("^p?npm_config_(//.+)$", Pattern.CASE_INSENSITIVE);
+
+    /**
+     * loadNpmrcFiles' {@code readUrlScopedEnvConfig} of 11.6.0: each set {@code npm_config_//…} and
+     * {@code pnpm_config_//…} variable as its {@code //…} key (a tokenHelper none), the pnpm one winning; nothing
+     * from an environment the host does not know.
+     */
+    static Map<String, @Nullable Object> readUrlScopedEnvConfig(@Nullable Map<String, String> env) {
+        Map<String, @Nullable Object> npmScoped = new LinkedHashMap<>();
+        Map<String, @Nullable Object> pnpmScoped = new LinkedHashMap<>();
+        if (env == null) {
+            return npmScoped;
+        }
+        Map<String, String> envKeys = new LinkedHashMap<>();
+        for (Map.Entry<String, String> variable : env.entrySet()) {
+            String value = variable.getValue();
+            if (value == null || value.isEmpty()) {
+                continue;
+            }
+            Matcher match = URL_SCOPED_ENV.matcher(variable.getKey());
+            if (!match.matches() || match.group(1).endsWith(":tokenHelper")) {
+                continue;
+            }
+            boolean pnpm = variable.getKey().substring(0, 5).toLowerCase(Locale.ROOT).equals("pnpm_");
+            Map<String, @Nullable Object> target = pnpm ? pnpmScoped : npmScoped;
+            String key = match.group(1);
+            String previous = envKeys.put((pnpm ? "pnpm " : "npm ") + key, variable.getKey());
+            if (previous != null && !value.equals(target.get(key))) {
+                throw new CannotKnow("which of " + previous + " and " + variable.getKey() + " pnpm reads (the " +
+                                     "order of the environment)");
+            }
+            target.put(key, value);
+        }
+        Map<String, @Nullable Object> scoped = new LinkedHashMap<>(npmScoped);
+        scoped.putAll(pnpmScoped);
+        return scoped;
     }
 
     // an entry a lock-only install does not read ends the same kept or left out, so the release is asked of the others
