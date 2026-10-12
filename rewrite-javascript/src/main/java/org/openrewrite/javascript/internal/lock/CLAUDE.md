@@ -94,8 +94,3 @@ asked through `PnpmRelease.underSemver` the same way. To add releases:
 3. Widen `NpmReleases.PROVEN` once every replay of the new releases passes. Yarn Berry (`YarnRelease`,
    `YarnReleases.PROVEN`), Bun (`BunRelease`, `BunReleases.PROVEN`), Yarn classic (`YarnClassicRelease`,
    `YarnClassicReleases.PROVEN`) and pnpm (`PnpmRelease`, `PnpmReleases.PROVEN`) take releases the same way.
-
-The other ports follow one release each: diff the upstream source between the ported tag and the new one, limited
-to the modules the port's classes name, port the differences, update the release in each class's Javadoc, then
-re-record the scenarios with the new release. A scenario whose lock changes is the new release's behavior, kept as
-recorded.
