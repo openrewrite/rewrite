@@ -303,6 +303,24 @@ class YarnClassicReleaseTest {
     }
 
     /**
+     * link-resolver.js {@code resolve}: a link to a directory without a package.json is a package of its name from
+     * 1.17.0; before, yarn reads the directory's manifest and fails.
+     */
+    @Test
+    void linksADirectoryWithoutAManifestFrom1170() {
+        YarnClassicLockRegenerator.Inputs.InputsBuilder inputs = YarnClassicLockRegenerator.Inputs.builder()
+                .manifest("", "{\"name\":\"p\",\"version\":\"1.0.0\",\"dependencies\":{\"x\":\"link:./lib\"}}")
+                .lock("# yarn lockfile v1\n\n\n")
+                .paths(new LinkedHashSet<>(Arrays.asList("package.json", "yarn.lock", "lib/index.js")))
+                .env(Collections.emptyMap());
+        assertThat(new YarnClassicLockRegenerator(inputs.release(release("1.16.0")).build(),
+                YarnClassicScenarios.NO_REGISTRY).regenerate().getErrorMessage())
+                .contains("Couldn't find a package.json file in \"lib\"");
+        assertThat(new YarnClassicLockRegenerator(inputs.release(release("1.17.0")).build(),
+                YarnClassicScenarios.NO_REGISTRY).regenerate().isSuccess()).isTrue();
+    }
+
+    /**
      * npm-resolver.js {@code findVersionInRegistryResponse}: a malformed response names the package asked for from
      * 1.12.0, the one the response names before.
      */
