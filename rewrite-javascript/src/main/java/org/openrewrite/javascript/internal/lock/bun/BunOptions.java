@@ -61,6 +61,12 @@ public final class BunOptions {
      * manifest cache.
      */
     private boolean readsTheManifestCache;
+
+    /**
+     * From 1.2.22, bunfig.toml's {@code install.security.scanner}: the package whose code bun runs over the resolution
+     * before it saves the lock ({@link BunRelease#runsTheSecurityScannerOnInstall()}).
+     */
+    private @Nullable String securityScanner;
     private @Nullable Double minimumReleaseAgeMs;
     private List<String> minimumReleaseAgeExcludes = Collections.emptyList();
 
@@ -134,6 +140,9 @@ public final class BunOptions {
         }
         readsTheManifestCache = release.readsTheManifestCacheOffline() &&
                                (Boolean.TRUE.equals(install.offline) || install.preferOffline);
+        if (release.runsTheSecurityScannerOnInstall()) {
+            securityScanner = install.securityScanner;
+        }
         for (Map.Entry<String, String> scope : install.scoped.entrySet()) {
             String url = scope.getValue().isEmpty() ? base : scope.getValue();
             scopes.put(scope.getKey(), scopeUrl(expandEnv(url, env)));
@@ -207,6 +216,7 @@ public final class BunOptions {
         @Nullable Boolean linkWorkspacePackages;
         @Nullable Boolean offline;
         boolean preferOffline;
+        @Nullable String securityScanner;
         @Nullable Boolean saveDev;
         @Nullable Boolean saveOptional;
         @Nullable Boolean savePeer;
@@ -242,6 +252,11 @@ public final class BunOptions {
             Json.Expr prefer = installObj.get("prefer");
             if (prefer != null && prefer.isString()) {
                 preferOffline = "offline".equals(prefer.asString());
+            }
+            Json.Expr security = installObj.get("security");
+            Json.Expr scanner = security != null && security.isObject() ? security.get("scanner") : null;
+            if (scanner != null && scanner.isString()) {
+                securityScanner = scanner.asString();
             }
             Json.Expr minAge = installObj.get("minimumReleaseAge");
             if (minAge != null && minAge.kind == Json.Kind.NUMBER && minAge.asNumber() >= 0) {

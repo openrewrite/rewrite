@@ -454,6 +454,16 @@ public final class BunRelease implements Comparable<BunRelease> {
     }
 
     /**
+     * bunfig.toml's {@code [install.security] scanner} names a package whose code bun runs over the resolution before
+     * it saves the lock, for {@code bun install} as for {@code add}, {@code update} and {@code remove}
+     * ({@code runAndWait}), from 1.2.22; its advisories may end the install, which is not the engine's to know. 1.2.21
+     * runs it for {@code bun add} alone, and before, bunfig has no such setting.
+     */
+    boolean runsTheSecurityScannerOnInstall() {
+        return atLeast(1, 2, 22);
+    }
+
+    /**
      * Before it waits for the peers, the install processes the peer queue until it is empty, so that the peers of a
      * package a peer added with nothing to fetch are resolved too, from 1.3.11; before, it processes the queue once,
      * and those peers stay unresolved when no request is pending.

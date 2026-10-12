@@ -259,6 +259,33 @@ class BunReleaseTest {
     }
 
     /**
+     * install_with_manager.zig runAndWait (1.2.22): bunfig's security scanner runs for {@code bun install} too, whose
+     * verdict the engine cannot know; 1.2.21 runs it for {@code bun add} alone. (A lock-only install naming a scanner
+     * not installed: 1.2.21 saves the lock; 1.2.22 {@code error: Security scanner 'zz-no-such-scanner' is configured in
+     * bunfig.toml but is not installed.})
+     */
+    @Test
+    void runsTheSecurityScannerOnInstallFrom1222() {
+        String bunfig = "[install.security]\nscanner = \"@acme/bun-scanner\"\n";
+        assertThat(BunOptions.load(BunRelease.of("1.2.22"), bunfig, null, null, HostEnvironment.UNKNOWN)
+          .getSecurityScanner()).isEqualTo("@acme/bun-scanner");
+        assertThat(BunOptions.load(BunRelease.of("1.2.21"), bunfig, null, null, HostEnvironment.UNKNOWN)
+          .getSecurityScanner()).isNull();
+        BunLockRegenerator.Inputs.InputsBuilder inputs = BunLockRegenerator.Inputs.builder()
+          .lock(EMPTY_ROOT)
+          .manifest("", "{\"name\":\"root\",\"dependencies\":{\"ms\":\"2.1.3\"}}")
+          .bunfig(bunfig)
+          .now(java.time.Instant.parse("2026-10-11T00:00:00Z"));
+        ManifestSource registry = (url, name, extended) -> "ms".equals(name) ?
+          registryPackument("ms", "2.1.3", registryVersion("ms", "2.1.3", "")) : null;
+        assertThat(failure(new BunLockRegenerator(inputs.release(BunRelease.of("1.3.10")).build(), registry)
+          .regenerate()))
+          .startsWith("CANNOT_KNOW the engine cannot know whether bun 1.3.10 saves the lock past the security scanner");
+        assertThat(written(new BunLockRegenerator(inputs.release(BunRelease.of("1.2.21")).build(), registry)
+          .regenerate())).contains("\"ms\": [\"ms@2.1.3\"");
+    }
+
+    /**
      * ini.zig loadNpmrcConfig (1.2.13): an .npmrc's byte order mark is dropped; before, it starts the first key. (With
      * bunfig naming one local registry and such an .npmrc another, 1.2.13 asks the .npmrc's, 1.2.12 bunfig's.)
      */

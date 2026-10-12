@@ -477,6 +477,11 @@ public final class BunLockRegenerator {
             throw new CannotKnow("what bun " + release + " resolves from its manifest cache, which bunfig.toml's " +
                                  "install.offline or install.prefer = \"offline\" has it read");
         }
+        if (options.getSecurityScanner() != null) {
+            throw new CannotKnow("whether bun " + release + " saves the lock past the security scanner " +
+                                 options.getSecurityScanner() + " bunfig.toml's install.security.scanner names, " +
+                                 "a package's code it runs over the resolution");
+        }
         LoadResult loadResult = loadFromCwd(options.isLoadLockfile() ? inputs.getLock() : null, options);
         int configVersion = loadResult.chooseConfigVersion();
         Map<String, String> manifests = inputs.getManifests();
