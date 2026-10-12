@@ -126,7 +126,7 @@ class NodeCatalogsTest {
       {"devEngines":{"packageManager":{"name":"pnpm","version":">=9"}}}     | (pnpm@>=9); expected a semver version
       {"devEngines":{"packageManager":{"name":"pnpm","version":"^10.0.0"}}} | (pnpm@^10.0.0); expected a semver
       {"packageManager":"pnpm@12.0.0"}                                      | pnpm 12.0.0 is not
-      {"packageManager":"pnpm@11.0.5"}                                      | pnpm 11.0.5 is not
+      {"packageManager":"pnpm@11.0.2"}                                      | pnpm 11.0.2 is not
       {"packageManager":"pnpm@10.31.0"}                                     | pnpm 10.31.0 is not
       {"packageManager":"pnpm@10.0.0"}                                      | pnpm 10.0.0 is not
       {"packageManager":"pnpm@9.4.0"}                                       | pnpm 9.4.0 is not
