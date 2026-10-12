@@ -373,7 +373,9 @@ final class LegacyPlacement {
             Node current = target.getChildren().get(edge.getName());
 
             if (dep.matches(current)) {
-                if (current.satisfies(edge) || !dep.satisfies(edge)) {
+                // before npm 7.8.0 a match is kept whether or not it satisfies the edge
+                if (!options.getRelease().replacesMatchThatFailsEdge() || current.satisfies(edge) ||
+                    !dep.satisfies(edge)) {
                     return KEEP;
                 }
             }

@@ -922,7 +922,9 @@ public class Node {
             }
         }
 
-        if (isLink() && target != null && getTarget() == null && root != this) {
+        // before npm 7.8.0 a link taken out of the tree takes its target out with it
+        if (isLink() && target != null && getTarget() == null &&
+            (root != this || !release.keepsTargetOfDetachedLink())) {
             target.setRoot(root);
         }
 

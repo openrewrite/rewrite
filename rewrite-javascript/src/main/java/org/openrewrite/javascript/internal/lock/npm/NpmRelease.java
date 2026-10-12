@@ -327,6 +327,14 @@ public final class NpmRelease implements Comparable<NpmRelease> {
     }
 
     /**
+     * {@code [_canPlaceDep]}: a node that matches the one in place, as a link to a like target elsewhere does, replaces
+     * it where only it satisfies the edge, from npm 7.8.0; before, a match is always kept.
+     */
+    boolean replacesMatchThatFailsEdge() {
+        return atLeast(7, 8, 0);
+    }
+
+    /**
      * {@code [_loadPeerSet]}: a peer whose current node does not satisfy it is loaded into the peer set where what the
      * edge would load can replace that node, from npm 7.11.0; before, the current node stands.
      */
@@ -619,6 +627,14 @@ public final class NpmRelease implements Comparable<NpmRelease> {
         return atLeast(11, 18, 0);
     }
 
+    /**
+     * A link made without a target whose realpath is the root's path takes the root as its target, from npm 7.8.0;
+     * before, a new node at that path.
+     */
+    boolean targetsRootItLinksTo() {
+        return atLeast(7, 8, 0);
+    }
+
     // @npmcli/arborist load-virtual.js
 
     /**
@@ -687,6 +703,14 @@ public final class NpmRelease implements Comparable<NpmRelease> {
      */
     boolean dropsTargetOfReplacedLink() {
         return atLeast(8, 8, 0);
+    }
+
+    /**
+     * The {@code root} setter brings along the target a link lost only where the link joins another tree, from npm
+     * 7.8.0; before, also where the link is taken out of its tree, which takes the target out with it.
+     */
+    boolean keepsTargetOfDetachedLink() {
+        return atLeast(7, 8, 0);
     }
 
     /**
@@ -1255,6 +1279,16 @@ public final class NpmRelease implements Comparable<NpmRelease> {
         return atLeast(11, 15, 0) ? GitHost.Release.V9_0_3 :
                 atLeast(8, 19, 3) ? GitHost.Release.V9_0_2 :
                         atLeast(8, 3, 1) ? GitHost.Release.V4_1_0 : GitHost.Release.V4_0_2;
+    }
+
+    // json-stringify-nice
+
+    /**
+     * The json-stringify-nice that writes the lock: 1.1.3 from npm 7.8.0, which sorts as 1.1.4 (npm 7.12.1) does;
+     * before, 1.1.1, which takes an empty string or another falsy value for neither a scalar nor an object.
+     */
+    JsonStringifyNice.Release jsonStringifyNice() {
+        return atLeast(7, 8, 0) ? JsonStringifyNice.Release.V1_1_4 : JsonStringifyNice.Release.V1_1_1;
     }
 
     // npm base-cmd.js

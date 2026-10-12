@@ -1198,6 +1198,7 @@ public final class Shrinkwrap {
         Object defaultIndent = truthy(indent) ? indent : 2;
         Object indent = Boolean.TRUE.equals(format) ? defaultIndent : truthy(format) ? format : 0;
         String eol = truthy(format) ? (truthy(newline) ? newline : "\n") : "";
-        return JsonStringifyNice.stringify(data, KEY_ORDER, indent).replace("\n", eol);
+        return JsonStringifyNice.stringify(data, KEY_ORDER, indent, resolveOptions.getRelease().jsonStringifyNice())
+                .replace("\n", eol);
     }
 }
