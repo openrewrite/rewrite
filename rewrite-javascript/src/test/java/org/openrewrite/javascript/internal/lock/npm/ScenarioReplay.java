@@ -15,6 +15,8 @@
  */
 package org.openrewrite.javascript.internal.lock.npm;
 
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.params.provider.Arguments;
 import org.openrewrite.ipc.http.HttpSender;
@@ -27,7 +29,10 @@ import org.openrewrite.javascript.internal.registry.NodeRegistries;
 import org.openrewrite.javascript.internal.registry.NpmRegistryClient;
 
 import java.io.ByteArrayInputStream;
+import java.io.IOException;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.time.Instant;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
@@ -51,6 +56,8 @@ final class ScenarioReplay {
      * Where the corpus was recorded before {@code recorded-with} said so.
      */
     static final Host RECORDED_ON = Host.builder().os("darwin").cpu("arm64").build();
+
+    private static final ObjectMapper JSON = new ObjectMapper();
 
     private ScenarioReplay() {
     }
@@ -212,8 +219,41 @@ final class ScenarioReplay {
           .userNpmrc(scenario.host().userNpmrc(HostInputs.GLOBAL_AND_USER))
           .host(host(scenario))
           .now(now(scenario))
+          .directoryName(directoryName(scenario))
           .paths(paths(edit))
           .build();
+    }
+
+    /**
+     * The name of the directory each release installed the scenario in ({@code sweep-npm.js}): {@code project}, or,
+     * where a root manifest has no name, the name npm gave the lock it recorded there. npm before 7.20.6 writes the
+     * root's name in the lock only when the directory is named otherwise.
+     */
+    static String directoryName(NpmScenarios.Scenario scenario) {
+        Path dir = scenario.getDir();
+        String name = "project";
+        String[][] written = {{"before", "pkg-before"},
+                {"after", Files.isRegularFile(dir.resolve("pkg")) ? "pkg" : "pkg-after"}};
+        for (String[] lockAndManifest : written) {
+            Path lock = dir.resolve(lockAndManifest[0]);
+            Path manifest = dir.resolve(lockAndManifest[1]);
+            if (!Files.isRegularFile(lock) || !Files.isRegularFile(manifest)) {
+                continue;
+            }
+            try {
+                JsonNode pkg = JSON.readTree(manifest.toFile());
+                if (pkg == null || pkg.isNull() || pkg.isObject() && pkg.has("name")) {
+                    continue;
+                }
+                JsonNode named = JSON.readTree(lock.toFile()).get("name");
+                if (named != null && named.isTextual() && named.asText().matches("[A-Za-z0-9._-]+")) {
+                    name = named.asText();
+                }
+            } catch (IOException | RuntimeException e) {
+                // a manifest or lock that does not parse names nothing
+            }
+        }
+        return name;
     }
 
     /**

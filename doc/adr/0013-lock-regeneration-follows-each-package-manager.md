@@ -9,7 +9,7 @@ regenerates through the port of its own resolver, and the shared engine of ADR 0
 what `internal.lock` holds, and how the recipes write overrides and follow catalogs for each package manager; and
 again: one port per library, the host's registries as the user's config, corepack, the regenerators by module.
 Amended 2026-10-11: later releases of the ported pnpm and Yarn majors; the npm release that built the LST,
-with every npm release from 8.1.0 reproduced beside the one ported; and every Yarn 4.x release reproduced beside
+with every npm release from 7.20.3 reproduced beside the one ported; and every Yarn 4.x release reproduced beside
 4.10.3.
 
 ## Context
