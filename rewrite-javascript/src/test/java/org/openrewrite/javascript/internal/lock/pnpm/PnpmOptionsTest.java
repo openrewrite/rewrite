@@ -573,7 +573,7 @@ class PnpmOptionsTest {
     private static final String FOO = "'@foo:registry':'https://example.com/foo'";
 
     private static Map<String, String> networkRegistries(String... keys) {
-        return PnpmOptions.getNetworkConfigs(obj("{" + String.join(",", keys) + "}"));
+        return PnpmOptions.getNetworkConfigs(obj("{" + String.join(",", keys) + "}"), PnpmRelease.PORTED);
     }
 
     @Test

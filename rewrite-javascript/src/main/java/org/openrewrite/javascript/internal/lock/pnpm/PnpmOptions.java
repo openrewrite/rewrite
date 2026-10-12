@@ -226,13 +226,13 @@ public final class PnpmOptions {
         }
 
         Map<String, @Nullable Object> authConfig = pickIniConfig(rawConfig);
-        Map<String, String> networkRegistries = getNetworkConfigs(authConfig);
+        Map<String, String> networkRegistries = getNetworkConfigs(authConfig, release);
         Map<String, String> registriesFromNpmrc = new LinkedHashMap<>();
         registriesFromNpmrc.put("default", normalizeRegistryUrl(authConfig.get("registry")));
         registriesFromNpmrc.putAll(networkRegistries);
         Map<String, String> packageManagerRegistries = trustedRegistries(builtin, defaultOptions, userConfig, release);
         if (holdsUnscopedCreds(authConfig) && !release.rescopesUnscopedCredentials()) {
-            getDefaultCreds(authConfig);
+            getDefaultCreds(authConfig, release);
         }
         for (String key : Js.keys(authConfig)) {
             if (key.endsWith("tokenHelper") && !(userConfig.containsKey(key) &&
@@ -365,7 +365,7 @@ public final class PnpmOptions {
         Map<String, @Nullable Object> trustedAuthConfig = pickIniConfig(trustedConfig);
         Map<String, String> trustedNetworkRegistries;
         try {
-            trustedNetworkRegistries = getNetworkConfigs(trustedAuthConfig);
+            trustedNetworkRegistries = getNetworkConfigs(trustedAuthConfig, release);
         } catch (PnpmError e) {
             if (release.resolvesThePackageManagerFromTrustedConfig()) {
                 throw e;
@@ -633,7 +633,7 @@ public final class PnpmOptions {
                 leavesOutAnEntryFromTheEnvironment(rawKey, release)) {
                 continue;
             }
-            String key = envReplaceLossy(rawKey, env);
+            String key = substituteEnv(rawKey, env, release);
             if (keyFromEnv && (isRequestDestinationKey(key) || isAuthValueKey(key)) &&
                 leavesOutAnEntryFromTheEnvironment(key, release)) {
                 continue;
@@ -647,7 +647,7 @@ public final class PnpmOptions {
                 }
                 // a credential or network value reaches no lock, so an environment the host does not know is no matter
                 value = env == null && !readByALockOnlyInstall(key) ? rawValue :
-                        envReplaceLossy((String) rawValue, env);
+                        substituteEnv((String) rawValue, env, release);
             }
             if (isNpmrcReadableKey(key)) {
                 result.put(key, value);
@@ -655,6 +655,20 @@ public final class PnpmOptions {
         }
         return holdsUnscopedCreds(result) && release.rescopesUnscopedCredentials() ? rescopeUnscopedCreds(result) :
                 result;
+    }
+
+    // loadNpmrcFiles' substituteEnv: from 11.1.3 envReplaceLossy, which drops a placeholder the environment does not
+    // set; before, envReplace, whose failure keeps the value as written, every placeholder in it
+    // (PnpmRelease#dropsAnUnresolvedNpmrcPlaceholder)
+    private static String substituteEnv(String value, @Nullable Map<String, String> env, PnpmRelease release) {
+        String lossy = envReplaceLossy(value, env);
+        String kept;
+        try {
+            kept = envReplace(value, env);
+        } catch (JsError e) {
+            kept = value;
+        }
+        return lossy.equals(kept) || release.dropsAnUnresolvedNpmrcPlaceholder() ? lossy : kept;
     }
 
     // an entry a lock-only install does not read ends the same kept or left out, so the release is asked of the others
@@ -790,7 +804,7 @@ public final class PnpmOptions {
      * getNetworkConfigs: the scoped registries, after the checks pnpm makes of each registry's credentials; the
      * credentials themselves and the certificates are the host's.
      */
-    static Map<String, String> getNetworkConfigs(Map<String, @Nullable Object> rawConfig) {
+    static Map<String, String> getNetworkConfigs(Map<String, @Nullable Object> rawConfig, PnpmRelease release) {
         Map<String, String> registries = new LinkedHashMap<>();
         Map<String, Map<String, String>> rawCredsMap = new LinkedHashMap<>();
         for (String configKey : Js.keys(rawConfig)) {
@@ -811,12 +825,12 @@ public final class PnpmOptions {
             }
         }
         for (Map<String, String> creds : rawCredsMap.values()) {
-            parseCreds(creds);
+            parseCreds(creds, release);
         }
         return registries;
     }
 
-    private static void getDefaultCreds(Map<String, @Nullable Object> rawConfig) {
+    private static void getDefaultCreds(Map<String, @Nullable Object> rawConfig, PnpmRelease release) {
         Map<String, String> input = new LinkedHashMap<>();
         for (Map.Entry<String, String> entry : AUTH_SUFFIX_KEY_MAP.entrySet()) {
             Object value = rawConfig.get(entry.getKey());
@@ -824,11 +838,15 @@ public final class PnpmOptions {
                 input.put(entry.getValue(), Js.string(value));
             }
         }
-        parseCreds(input);
+        parseCreds(input, release);
     }
 
     // parseCreds' checks: what it throws for a token helper, _auth or _password pnpm cannot use
     static void parseCreds(Map<String, String> input) {
+        parseCreds(input, PnpmRelease.PORTED);
+    }
+
+    static void parseCreds(Map<String, String> input, PnpmRelease release) {
         String tokenHelper = input.get("tokenHelper");
         if (tokenHelper != null && !tokenHelper.isEmpty()) {
             for (char c : Js.trim(tokenHelper).toCharArray()) {
@@ -847,7 +865,7 @@ public final class PnpmOptions {
         }
         String authPairBase64 = input.get("authPairBase64");
         if (authPairBase64 != null && !authPairBase64.isEmpty()) {
-            if (decodeBase64Credential(authPairBase64, "_auth").indexOf(':') < 0) {
+            if (decodeBase64Credential(authPairBase64, "_auth", release).indexOf(':') < 0) {
                 throw new PnpmError("AUTH_MISSING_SEPARATOR", "No separator found in the decoded form of _auth",
                         "_auth is a base64 encoded form of <username>:<password> where the colon (:) serves as the " +
                         "separator");
@@ -857,12 +875,17 @@ public final class PnpmOptions {
         String authUsername = input.get("authUsername");
         String authPassword = input.get("authPassword");
         if (authUsername != null && !authUsername.isEmpty() && authPassword != null && !authPassword.isEmpty()) {
-            decodeBase64Credential(authPassword, "_password");
+            decodeBase64Credential(authPassword, "_password", release);
         }
     }
 
-    private static String decodeBase64Credential(String value, String key) {
+    // parseCreds' decodeBase64Credential of 11.1.3, its padding mended before it fails; before, atob alone, whose
+    // InvalidCharacterError pnpm does not catch (PnpmRelease#decodesACredentialForgivingItsPadding)
+    private static String decodeBase64Credential(String value, String key, PnpmRelease release) {
         String decoded = atob(value);
+        if (decoded == null && !release.decodesACredentialForgivingItsPadding()) {
+            throw new JsError("InvalidCharacterError", atobError(value));
+        }
         if (decoded == null) {
             String normalizedValue = normalizeBase64Padding(value);
             if (!normalizedValue.equals(value)) {
@@ -900,6 +923,38 @@ public final class PnpmOptions {
     private static final String BASE64 = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
 
     // the HTML standard's forgiving-base64 decode, which atob runs; null where atob throws
+    /**
+     * The message of the InvalidCharacterError Node's {@code atob} throws for {@code input}, which it does not decode.
+     */
+    static String atobError(String input) {
+        int nonAsciiWhitespaceCharCount = 0;
+        int equalCharCount = 0;
+        for (char c : input.toCharArray()) {
+            if (c == '\t' || c == '\n' || c == '\f' || c == '\r' || c == ' ') {
+                continue;
+            }
+            if (c != '=' && BASE64.indexOf(c) < 0) {
+                return "Invalid character";
+            }
+            nonAsciiWhitespaceCharCount++;
+            if (c == '=') {
+                equalCharCount++;
+            } else if (equalCharCount > 0) {
+                return "Invalid character";
+            }
+            if (equalCharCount > 2) {
+                return "Invalid character";
+            }
+        }
+        int reminder = nonAsciiWhitespaceCharCount % 4;
+        if (reminder == 0) {
+            reminder = (nonAsciiWhitespaceCharCount - equalCharCount) % 4;
+        } else if (equalCharCount > 0) {
+            return "Invalid character";
+        }
+        return reminder == 1 ? "The string to be decoded is not correctly encoded." : "Invalid character";
+    }
+
     private static @Nullable String atob(String data) {
         StringBuilder s = new StringBuilder();
         for (char c : data.toCharArray()) {

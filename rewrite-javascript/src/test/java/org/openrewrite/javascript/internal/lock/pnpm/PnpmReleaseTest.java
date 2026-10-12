@@ -326,6 +326,40 @@ class PnpmReleaseTest {
     }
 
     /**
+     * config/reader loadNpmrcFiles.ts substituteEnv (11.1.3): a placeholder the environment does not set is dropped;
+     * before, envReplace failed and the value was kept as written.
+     */
+    @Test
+    void dropsAnUnresolvedNpmrcPlaceholderFrom1113() {
+        String npmrc = "@org:registry=https://${UNSET}.test/\n";
+        assertThat(options("", npmrc, null, Collections.emptyMap(), "11.1.3").getRegistries())
+          .containsEntry("@org", "https://.test/");
+        assertThat(options("", npmrc, null, Collections.emptyMap(), "11.1.2").getRegistries())
+          .containsEntry("@org", "https://${unset}.test/");
+    }
+
+    /**
+     * config/reader parseCreds.ts decodeBase64Credential (11.1.3): an over-padded _auth decodes with its padding
+     * mended; before, Node's atob throws.
+     */
+    @Test
+    void decodesACredentialForgivingItsPaddingFrom1113() {
+        // "user:pass" with one = too many
+        String npmrc = "//registry.npmjs.org/:_auth=dXNlcjpwYXNz=\n";
+        options("", npmrc, null, Collections.emptyMap(), "11.1.3");
+        assertThatThrownBy(() -> options("", npmrc, null, Collections.emptyMap(), "11.1.2"))
+          .isInstanceOfSatisfying(JsError.class, e -> {
+              assertThat(e.getName()).isEqualTo("InvalidCharacterError");
+              assertThat(e.getMessage()).isEqualTo("Invalid character");
+          });
+        assertThatThrownBy(() -> options("", "//registry.npmjs.org/:_auth=%%%\n", null, Collections.emptyMap(),
+          "11.1.3"))
+          .isInstanceOfSatisfying(PnpmError.class,
+            e -> assertThat(e.getCode()).isEqualTo("ERR_PNPM_AUTH_INVALID_BASE64"));
+        assertThat(PnpmOptions.atobError("abcde")).isEqualTo("The string to be decoded is not correctly encoded.");
+    }
+
+    /**
      * pnpm syncEnvLockfile.ts (11.1.3, pnpm/pnpm#11674): the package manager check records the release that runs in
      * an env document without a pnpm entry; before, only over an entry the wanted range does not satisfy.
      */

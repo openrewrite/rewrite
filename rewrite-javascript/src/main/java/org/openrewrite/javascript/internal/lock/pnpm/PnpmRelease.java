@@ -269,6 +269,22 @@ public final class PnpmRelease {
     }
 
     /**
+     * An .npmrc value with a placeholder the environment does not set loses that placeholder, the others substituted
+     * (envReplaceLossy), from 11.1.3; before, the value is kept as written, every placeholder in it.
+     */
+    boolean dropsAnUnresolvedNpmrcPlaceholder() {
+        return atLeast(11, 1, 3);
+    }
+
+    /**
+     * An {@code _auth} or {@code _password} that is no base64 is decoded again with its padding mended, else is
+     * {@code ERR_PNPM_AUTH_INVALID_BASE64}, from 11.1.3; before, Node's atob throws its InvalidCharacterError.
+     */
+    boolean decodesACredentialForgivingItsPadding() {
+        return atLeast(11, 1, 3);
+    }
+
+    /**
      * The project's own .npmrc expands no environment variable in a request destination (a registry, a {@code //}
      * key, a proxy) or a credential, and its pnpm-workspace.yaml none in {@code registry}, {@code pnprServer},
      * {@code registries} or {@code namedRegistries}: such an entry is left out with a warning, from 11.5.3; before,
