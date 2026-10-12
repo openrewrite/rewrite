@@ -45,6 +45,8 @@ import org.openrewrite.rpc.request.Print;
 import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
 import org.openrewrite.tree.ParseError;
+import org.openrewrite.tree.ParsingEventListener;
+import org.openrewrite.tree.ParsingExecutionContextView;
 import org.openrewrite.yaml.tree.Yaml;
 
 import java.io.ByteArrayInputStream;
@@ -498,6 +500,49 @@ class JavaScriptRewriteRpcTest implements RewriteTest {
         assertThat(paths)
           .containsExactlyInAnyOrder("package.json", "index.js")
           .noneMatch(p -> p.contains("vendor"));
+    }
+
+    @Test
+    void parseProjectFailureReadsFileUnderRelativeTo(@TempDir Path repo) throws Exception {
+        Path project = Files.createDirectories(repo.resolve("app"));
+        Files.writeString(project.resolve("package.json"), """
+          {"name": "app", "version": "1.0.0"}
+          """);
+        Files.writeString(project.resolve("index.js"), "const x = 1;");
+        String workspace = """
+          packages:
+            - 'packages/*'
+          """;
+        Files.writeString(project.resolve("pnpm-workspace.yaml"), workspace);
+
+        // Refusing a file once it has arrived takes the same path as failing to receive it.
+        Path failing = Path.of("app", "pnpm-workspace.yaml");
+        ExecutionContext ctx = new InMemoryExecutionContext();
+        ParsingExecutionContextView.view(ctx).setParsingListener(new ParsingEventListener() {
+            @Override
+            public void startedParsing(Parser.Input input) {
+                if (input.getPath().equals(failing)) {
+                    throw new IllegalStateException("Cannot take " + input.getPath());
+                }
+            }
+        });
+
+        // Source paths are relative to the repository, a directory above the project being parsed.
+        List<SourceFile> sourceFiles = client()
+          .parseProject(project, null, repo, ctx)
+          .toList();
+
+        assertThat(sourceFiles)
+          .extracting(SourceFile::getSourcePath)
+          .containsExactlyInAnyOrder(Path.of("app", "package.json"), Path.of("app", "index.js"), failing);
+        assertThat(sourceFiles)
+          .filteredOn(sf -> sf.getSourcePath().equals(failing))
+          .singleElement()
+          .isInstanceOfSatisfying(ParseError.class, parseError ->
+            assertThat(parseError.getText()).isEqualTo(workspace));
+        assertThat(sourceFiles)
+          .filteredOn(sf -> !sf.getSourcePath().equals(failing))
+          .noneMatch(sf -> sf instanceof ParseError);
     }
 
     @Test

@@ -227,12 +227,15 @@ public class JavaScriptRewriteRpc extends RewriteRpc {
                     // a usable ParseError rather than crashing the whole stream with an NPE.
                     String relativePath = item.getSourcePath() != null ? item.getSourcePath() : item.getId();
                     Path sourcePath = Paths.get(relativePath);
-                    Path absoluteSourcePath = projectPath.resolve(sourcePath);
+                    // The server relativized the path against `base`, which is not `projectPath`
+                    // when the caller named a `relativeTo`. Resolved against anything else, the
+                    // error carries no text, or the text of whatever file happens to be there.
+                    Path absoluteSourcePath = base.resolve(sourcePath);
                     try {
                         sourceFile = ParseError.build(
                                 JavaScriptParser.builder().build(),
                                 Parser.Input.fromFile(absoluteSourcePath),
-                                projectPath,
+                                base,
                                 ctx,
                                 e);
                     } catch (Exception readFailure) {
