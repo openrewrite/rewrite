@@ -36,9 +36,11 @@ final class Toml {
     }
 
     private final TomlLexer lexer;
+    private final BunRelease release;
 
-    private Toml(TomlLexer lexer) {
+    private Toml(TomlLexer lexer, BunRelease release) {
         this.lexer = lexer;
+        this.release = release;
     }
 
     static Json.Expr parse(String source) {
@@ -62,7 +64,7 @@ final class Toml {
         }
         Json.Expr root;
         try {
-            root = new Toml(TomlLexer.init(source, log)).runParser();
+            root = new Toml(TomlLexer.init(source, log), release).runParser();
         } catch (Json.Failure f) {
             throw new SyntaxError(f.error, log.first(f.error));
         }
@@ -264,7 +266,10 @@ final class Toml {
                     parseAssignment(expr);
                     lexer.allowDoubleBracket = false;
                 }
-                lexer.allowDoubleBracket = true;
+                // before 1.2.16 the close is consumed as the assignments left the lexer
+                if (release.lexesADoubleBracketAfterAValue()) {
+                    lexer.allowDoubleBracket = true;
+                }
                 lexer.expect(TomlLexer.T.CLOSE_BRACE);
                 return expr;
             }
@@ -282,8 +287,14 @@ final class Toml {
                     }
                     array.items().add(parseValue());
                 }
-                lexer.allowDoubleBracket = true;
-                lexer.expect(TomlLexer.T.CLOSE_BRACKET);
+                // before 1.2.16 the close is consumed as the elements left the lexer, and [[ allowed after
+                if (release.lexesADoubleBracketAfterAValue()) {
+                    lexer.allowDoubleBracket = true;
+                    lexer.expect(TomlLexer.T.CLOSE_BRACKET);
+                } else {
+                    lexer.expect(TomlLexer.T.CLOSE_BRACKET);
+                    lexer.allowDoubleBracket = true;
+                }
                 return array;
             }
             default:

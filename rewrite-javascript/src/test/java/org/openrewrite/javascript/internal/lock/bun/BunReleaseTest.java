@@ -225,6 +225,95 @@ class BunReleaseTest {
     }
 
     /**
+     * ini.zig loadNpmrcConfig (1.2.13): an .npmrc's byte order mark is dropped; before, it starts the first key. (With
+     * bunfig naming one local registry and such an .npmrc another, 1.2.13 asks the .npmrc's, 1.2.12 bunfig's.)
+     */
+    @Test
+    void stripsTheByteOrderMarkOfNpmrcFrom1213() {
+        String npmrc = "﻿registry=https://registry.npmmirror.com/\n";
+        assertThat(options("1.2.13", npmrc).scopeForPackageName("ms")).isEqualTo("https://registry.npmmirror.com/");
+        assertThat(options("1.2.12", npmrc).scopeForPackageName("ms")).isEqualTo("https://registry.npmjs.org/");
+    }
+
+    /**
+     * bunfig.zig (1.2.16) and ini.zig loadNpmrc (1.2.19): {@code linkWorkspacePackages} and
+     * {@code link-workspace-packages} are read from those releases; before, neither is a setting. (Turned off, a
+     * root's {@code "a": "1.0.0"} beside the member a 1.0.0 goes to the registry with 1.2.16 and 1.2.19 and links the
+     * member with 1.2.15 and 1.2.18.)
+     */
+    @Test
+    void readsLinkWorkspacePackagesFromBunfigFrom1216AndNpmrcFrom1219() {
+        String bunfig = "[install]\nlinkWorkspacePackages = false\n";
+        assertThat(BunOptions.load(BunRelease.of("1.2.16"), bunfig, null, null, HostEnvironment.UNKNOWN)
+          .isLinkWorkspacePackages()).isFalse();
+        assertThat(BunOptions.load(BunRelease.of("1.2.15"), bunfig, null, null, HostEnvironment.UNKNOWN)
+          .isLinkWorkspacePackages()).isTrue();
+        String npmrc = "link-workspace-packages=false\n";
+        assertThat(options("1.2.19", npmrc).isLinkWorkspacePackages()).isFalse();
+        assertThat(options("1.2.18", npmrc).isLinkWorkspacePackages()).isTrue();
+    }
+
+    /**
+     * toml_parser.zig parseValue (1.2.16): {@code [[} is one token again after an inline table's close; before, a
+     * table array header there is two {@code [}s, and bunfig does not parse ({@code bun install} of 1.2.15:
+     * {@code error: Expected key but found [}, {@code SyntaxError: failed to load bunfig}; 1.2.16 installs).
+     */
+    @Test
+    void lexesADoubleBracketAfterAValueFrom1216() {
+        String bunfig = "[install]\nscopes = { a = \"https://a.example/\" }\n[[x]]\ny = 1\n";
+        assertThat(Toml.parse(bunfig, BunRelease.of("1.2.16")).getObject("install")).isNotNull();
+        assertThatThrownBy(() -> Toml.parse(bunfig, BunRelease.of("1.2.15")))
+          .isInstanceOf(Toml.SyntaxError.class)
+          .hasMessage("Expected key but found [");
+        String afterAnArray = "[install]\nx = [1]\n[[x]]\ny = 1\n";
+        assertThat(Toml.parse(afterAnArray, BunRelease.of("1.2.15")).getObject("install")).isNotNull();
+    }
+
+    /**
+     * lockfile.zig Package.parseWithJSON (1.2.14): a workspaces object without packages declares none; before, it
+     * fails as a value neither array nor object does, with the old wording ({@code "workspaces": {"nohoist": []}}:
+     * 1.2.13 {@code error: Workspaces expects an array of strings, e.g.}; 1.2.14 installs).
+     */
+    @Test
+    void acceptsAWorkspacesObjectWithoutPackagesFrom1214() {
+        String catalogOnly = "{\"name\":\"r\",\"workspaces\":{\"catalog\":{\"ms\":\"2.1.3\"}}}";
+        assertThat(rootParseErrors("1.2.14", catalogOnly)).isEmpty();
+        assertThat(rootParseErrors("1.2.13", catalogOnly)).containsExactly("Workspaces expects an array of strings");
+        String string = "{\"name\":\"r\",\"workspaces\":\"packages/*\"}";
+        assertThat(rootParseErrors("1.2.14", string)).containsExactly("\"workspaces\" expects an array of strings");
+        assertThat(rootParseErrors("1.2.13", string)).containsExactly("Workspaces expects an array of strings");
+    }
+
+    // the errors parsing the root's package.json logs
+    private static List<String> rootParseErrors(String release, String manifest) {
+        Log log = new Log();
+        try {
+            new Package().parseWithJSON(new Lockfile(BunRelease.of(release)), options(release, null), log, "",
+              Json.parse(manifest), Features.MAIN, java.util.Collections.singletonMap("", manifest));
+        } catch (IllegalArgumentException e) {
+            assertThat(e).hasMessage("InvalidPackageJSON");
+        }
+        return log.errors;
+    }
+
+    /**
+     * default-trusted-dependencies.txt: {@code opencode-ai} from 1.2.16, {@code yarn} until 1.2.19,
+     * {@code @anthropic-ai/claude-code} from 1.3.12.
+     */
+    @Test
+    void trustsTheDefaultListOfTheRelease() {
+        int opencode = (int) Wyhash11.stringHash("opencode-ai");
+        int yarn = (int) Wyhash11.stringHash("yarn");
+        int claude = (int) Wyhash11.stringHash("@anthropic-ai/claude-code");
+        assertThat(DefaultTrustedDependencies.of(BunRelease.of("1.2.16"))).contains(opencode, yarn).doesNotContain(claude);
+        assertThat(DefaultTrustedDependencies.of(BunRelease.of("1.2.15"))).contains(yarn).doesNotContain(opencode);
+        assertThat(DefaultTrustedDependencies.of(BunRelease.of("1.2.19"))).contains(opencode).doesNotContain(yarn);
+        assertThat(DefaultTrustedDependencies.of(BunRelease.of("1.3.12"))).contains(claude);
+        assertThat(DefaultTrustedDependencies.of(BunRelease.of("1.3.11"))).doesNotContain(claude)
+          .isEqualTo(DefaultTrustedDependencies.HASHES);
+    }
+
+    /**
      * js_printer.zig writePreQuotedString over highway_strings.cpp's escape search (1.2.11 until 1.3.0): a tab in the
      * last {@code len % N} bytes after a printed character is written as it is. As the darwin-arm64 releases (N = 16)
      * write a root named {@code p<tab>q}: 1.2.10 and 1.3.0 {@code "p\tq"}, 1.2.11 and 1.2.23 the tab itself; and

@@ -197,6 +197,30 @@ public final class BunRelease implements Comparable<BunRelease> {
         return atLeast(1, 2, 11) && !atLeast(1, 3, 0);
     }
 
+    // src/install/default-trusted-dependencies.txt, which the root's diff compares a lock's trustedDependencies against
+    // where package.json lists none
+
+    /**
+     * The default trusted dependencies list {@code opencode-ai}, from 1.2.16.
+     */
+    boolean trustsOpencodeAiByDefault() {
+        return atLeast(1, 2, 16);
+    }
+
+    /**
+     * The default trusted dependencies list {@code yarn} until 1.2.19, which drops it.
+     */
+    boolean trustsYarnByDefault() {
+        return !atLeast(1, 2, 19);
+    }
+
+    /**
+     * The default trusted dependencies list {@code @anthropic-ai/claude-code}, from 1.3.12.
+     */
+    boolean trustsClaudeCodeByDefault() {
+        return atLeast(1, 3, 12);
+    }
+
     // src/install/lockfile.zig Package.Diff.generate, src/install/install.zig enqueueDependencyWithMainAndSuccessFn
 
     /**
@@ -308,6 +332,16 @@ public final class BunRelease implements Comparable<BunRelease> {
     }
 
     /**
+     * A {@code workspaces} object without {@code packages} declares no workspace (it may hold the catalogs alone), and
+     * one whose {@code packages} is no array is {@code "workspaces.packages" expects an array of strings}, from 1.2.14;
+     * before, any object without a {@code packages} array fails as {@code Workspaces expects an array of strings}, as
+     * does a value neither array nor object (from 1.2.14 {@code "workspaces" expects an array of strings}).
+     */
+    boolean acceptsAWorkspacesObjectWithoutPackages() {
+        return atLeast(1, 2, 14);
+    }
+
+    /**
      * The root's own {@code catalog} and {@code catalogs} are its catalogs when it has workspaces whose object holds
      * neither, from 1.2.19; before, only the workspaces object's are.
      */
@@ -325,7 +359,45 @@ public final class BunRelease implements Comparable<BunRelease> {
         return atLeast(1, 3, 5);
     }
 
+    /**
+     * Each .npmrc bun reads loses its leading byte order mark ({@code loadNpmrcConfig}'s
+     * {@code toSource(.{ .convert_bom = true })}), from 1.2.13; before, the mark starts the first line's key, so that
+     * its setting is not read.
+     */
+    boolean stripsTheByteOrderMarkOfNpmrc() {
+        return atLeast(1, 2, 13);
+    }
+
+    /**
+     * .npmrc's {@code link-workspace-packages} sets whether an npm range links to the workspace of its name
+     * ({@code loadNpmrc}), from 1.2.19; before, it is not read.
+     */
+    boolean readsLinkWorkspacePackagesFromNpmrc() {
+        return atLeast(1, 2, 19);
+    }
+
+    // src/toml/toml_parser.zig
+
+    /**
+     * bunfig.toml's parser has the lexer take {@code [[} as one token again before it consumes an array's or an inline
+     * table's close ({@code parseValue}), from 1.2.16; before, the token after the close is lexed as the elements left
+     * the lexer, which after an inline table's assignment or in an array of none reads a {@code [[table]]} header on
+     * the next line as two {@code [}s, so that bunfig fails to load.
+     */
+    boolean lexesADoubleBracketAfterAValue() {
+        return atLeast(1, 2, 16);
+    }
+
     // src/bunfig.zig and src/install/PackageManager/PackageManagerOptions.zig
+
+    /**
+     * bunfig.toml's {@code [install] linkWorkspacePackages} sets whether an npm range links to the workspace of its
+     * name ({@code link_workspace_packages}), from 1.2.16; before, there is no such setting, and such a range always
+     * links.
+     */
+    boolean readsLinkWorkspacePackages() {
+        return atLeast(1, 2, 16);
+    }
 
     /**
      * bunfig.toml's {@code minimumReleaseAge} and {@code minimumReleaseAgeExcludes} hold back versions published
