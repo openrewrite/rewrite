@@ -1346,6 +1346,15 @@ public final class NpmRelease implements Comparable<NpmRelease> {
         return atLeast(9, 0, 1);
     }
 
+    /**
+     * {@code parse} reads a line ending in {@code \r\n} without its {@code \r}, from npm 7.0.13; before, the {@code \r}
+     * stays on the line, so that a yarn.lock written with CRLF is invalid from its first blank line, and only the
+     * entries before it are read.
+     */
+    boolean readsCrlfYarnLock() {
+        return atLeast(7, 0, 13);
+    }
+
     // @npmcli/config definitions.js
 
     /**

@@ -67,6 +67,26 @@ class YarnLockTest {
         assertThat(yarnLock2.toString()).isEqualTo(lockOutput);
     }
 
+    // yarn-lock.js from npm 7.0.13 reads CRLF lines; before, the \r stays on the line and a blank line is invalid,
+    // which arborist's load ignores, keeping the entries read before it
+    @Test
+    void readsCrlfLinesFrom7_0_13() {
+        String crlf = "# yarn lockfile v1\r\n" +
+                      "\r\n" +
+                      "\"a@^1.0.0\":\r\n" +
+                      "  version \"1.0.0\"\r\n";
+        YarnLock v7013 = new YarnLock(NpmRelease.of("7.0.13")).parse(crlf);
+        assertThat(v7013.getEntries().keySet()).containsExactly("a@^1.0.0");
+
+        YarnLock v7012 = new YarnLock(NpmRelease.of("7.0.12"));
+        assertThatThrownBy(() -> v7012.parse(crlf))
+          .isInstanceOfSatisfying(YarnLock.InvalidYarnLock.class, e -> {
+              assertThat(e.getContent()).isEqualTo("\r\n");
+              assertThat(e.getLine()).isEqualTo(2);
+          });
+        assertThat(v7012.getEntries()).isEmpty();
+    }
+
     @Test
     void invalidYarnLockfileDataThrows() {
         assertThatThrownBy(() -> new YarnLock().parse("\n" +
