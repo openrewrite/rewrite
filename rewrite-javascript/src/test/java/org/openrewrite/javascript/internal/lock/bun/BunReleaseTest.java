@@ -179,6 +179,24 @@ class BunReleaseTest {
     }
 
     /**
+     * npm.rs {@code Scope::set_url} (1.4.0): a registry is its WHATWG serialization; bunfig.rs (1.4.1): offline reads
+     * bun's manifest cache.
+     */
+    @Test
+    void canonicalizesTheRegistryFrom140AndReadsTheCacheOfflineFrom141() {
+        String npmrc = "registry=https://NPM.Example.com:443/x/../\n";
+        assertThat(BunOptions.load(BunRelease.of("1.4.0"), null, npmrc, null, HostEnvironment.UNKNOWN)
+          .scopeForPackageName("ms")).isEqualTo("https://npm.example.com/");
+        assertThat(BunOptions.load(BunRelease.of("1.3.14"), null, npmrc, null, HostEnvironment.UNKNOWN)
+          .scopeForPackageName("ms")).isEqualTo("https://NPM.Example.com:443/x/../");
+        String offline = "[install]\noffline = true\n";
+        assertThat(BunOptions.load(BunRelease.of("1.4.1"), offline, null, null, HostEnvironment.UNKNOWN)
+          .isReadsTheManifestCache()).isTrue();
+        assertThat(BunOptions.load(BunRelease.of("1.4.0"), offline, null, null, HostEnvironment.UNKNOWN)
+          .isReadsTheManifestCache()).isFalse();
+    }
+
+    /**
      * bun.lock.zig (1.3.7): a {@code ""} registry is the package's scope registry; before, npmjs.
      */
     @Test

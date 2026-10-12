@@ -452,6 +452,10 @@ public final class BunLockRegenerator {
                                                      Log log) {
         BunOptions options = BunOptions.load(release, inputs.getBunfig(), inputs.getUserNpmrc(), inputs.getNpmrc(),
                 DotEnv.load(HostEnvironment.UNKNOWN, inputs.getFiles()));
+        if (options.isReadsTheManifestCache()) {
+            throw new CannotKnow("what bun " + release + " resolves from its manifest cache, which bunfig.toml's " +
+                                 "install.offline or install.prefer = \"offline\" has it read");
+        }
         LoadResult loadResult = loadFromCwd(options.isLoadLockfile() ? inputs.getLock() : null, options);
         int configVersion = loadResult.chooseConfigVersion();
         Map<String, String> manifests = inputs.getManifests();

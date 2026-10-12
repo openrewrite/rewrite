@@ -399,6 +399,24 @@ public final class BunRelease implements Comparable<BunRelease> {
         return atLeast(1, 4, 0);
     }
 
+    /**
+     * A registry's url is its WHATWG serialization, credentials split off (host lowercased, default port dropped, dot
+     * segments resolved), from 1.4.0 (npm.rs {@code Scope::set_url}, bun#38183); before, the url as written. It is
+     * what a {@code ""} registry in bun.lock expands to, and what the default registry's {@code ""} is told by.
+     */
+    boolean canonicalizesTheRegistryUrl() {
+        return atLeast(1, 4, 0);
+    }
+
+    /**
+     * bunfig.toml's {@code install.offline}, and {@code install.prefer = "offline"}, have the install read versions from
+     * bun's manifest cache, from 1.4.1 (bunfig.rs, PackageManagerOptions.rs, bun#40010); before, neither reaches the
+     * install. What that cache holds is the machine's: such an install is cannot-know.
+     */
+    boolean readsTheManifestCacheOffline() {
+        return atLeast(1, 4, 1);
+    }
+
     @Override
     public int compareTo(BunRelease o) {
         int c = Integer.compare(major, o.major);
