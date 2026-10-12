@@ -81,6 +81,12 @@ public abstract class LockScenarioTest extends ScenarioTest {
             failed(label, http, "wrong-failure", "expected " + expect + " got " + thrown,
                     " expected \"" + expect + "\" but got " + thrown);
         }
+        if ("unstable".equals(expect.getKind()) && expected != null && failure.getWritten() != null &&
+            !expected.equals(failure.getWritten())) {
+            // the lock the second install changes is the one the package manager wrote first
+            failed(label, http, "mismatch", firstDifference(expected, failure.getWritten()),
+                    " wrote another first lock than " + packageManager + " before its second install changes it");
+        }
         record(label, "expected-failure", thrown + http.describe());
     }
 
