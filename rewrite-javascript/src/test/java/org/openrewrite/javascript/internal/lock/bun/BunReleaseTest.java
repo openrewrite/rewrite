@@ -2158,6 +2158,40 @@ class BunReleaseTest {
         }
     }
 
+    private static String json(String release, String text, boolean quote) {
+        StringBuilder out = new StringBuilder();
+        Strings.appendJsonString(out, text, quote, BunRelease.of(release));
+        return out.toString();
+    }
+
+    /**
+     * fmt.rs (1.4.0, bun#30412): a quoted string is escaped by {@code encode_json_string_chars}, lowercase and nothing
+     * above the control characters; until 1.4.1 (bun#40718) quotes it by the printer again. The printer quoting for
+     * JSON writes BEL and VT as <code>&#92;u0007</code> and <code>&#92;u000B</code> from 1.4.0 (bun#36746).
+     */
+    @Test
+    void escapesQuotedStringsMinimallyIn140AndBelAndVtAsUnicodeFrom140() {
+        String text = "a\u0007b\u000Bc\u001F ﻿\"\\";
+        assertThat(json("1.3.14", text, true)).isEqualTo("\"a\\x07b\\vc\\u001F\\u2028\\uFEFF\\\"\\\\\"");
+        assertThat(json("1.4.0", text, true)).isEqualTo("\"a\\u0007b\\u000bc\\u001f ﻿\\\"\\\\\"");
+        assertThat(json("1.4.0", text, false)).isEqualTo("a\\u0007b\\u000Bc\\u001F\\u2028\\uFEFF\\\"\\\\");
+        assertThat(json("1.4.1", text, true)).isEqualTo("\"a\\u0007b\\u000Bc\\u001F\\u2028\\uFEFF\\\"\\\\\"");
+    }
+
+    /**
+     * bun.lock.rs (1.4.0, bun#31417): an npm package's registry url and a git package's resolution are JSON-escaped;
+     * before, written as they are.
+     */
+    @Test
+    void escapesTheRegistryAndTheGitResolutionFrom140() {
+        String npm = "\"ms\": [\"ms@2.1.3\", \"https://r.example/a\\u2028b/ms/-/ms-2.1.3.tgz\", {}, \"" + INTEGRITY +
+                     "\"],";
+        String later = writtenBack("1.4.0", lock("", npm));
+        assertThat(later).contains("\"https://r.example/a\\u2028b/ms/-/ms-2.1.3.tgz\"");
+        String earlier = writtenBack("1.3.14", lock("", npm));
+        assertThat(earlier).contains("\"https://r.example/a b/ms/-/ms-2.1.3.tgz\"");
+    }
+
     private static String repeat(char c, int n) {
         char[] chars = new char[n];
         java.util.Arrays.fill(chars, c);

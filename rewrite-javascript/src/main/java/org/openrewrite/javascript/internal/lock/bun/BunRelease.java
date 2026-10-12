@@ -356,6 +356,33 @@ public final class BunRelease implements Comparable<BunRelease> {
         return atLeast(1, 4, 0);
     }
 
+    /**
+     * A quoted string in bun.lock ({@code format_json_string_utf8} with {@code quote}) is escaped by
+     * src/bun_core/fmt.rs {@code encode_json_string_chars}, from 1.4.0 (bun#30412) until 1.4.1 (bun#40718): only
+     * {@code "}, {@code \}, the short escapes and the other control characters, those as <code>&#92;u00xx</code> in lowercase
+     * hex, so that U+2028, U+2029, U+FEFF and a lone surrogate are written as they are. Before and after, by the
+     * printer ({@code writePreQuotedString}), as an unquoted one is.
+     */
+    boolean escapesQuotedJsonStringsMinimally() {
+        return atLeast(1, 4, 0) && !atLeast(1, 4, 1);
+    }
+
+    /**
+     * The printer quoting a string for JSON writes BEL and VT as <code>&#92;u0007</code> and <code>&#92;u000B</code>, from 1.4.0
+     * (bun#36746); before, as {@code \x07} and {@code \v}.
+     */
+    boolean escapesBelAndVtAsUnicodeInJson() {
+        return atLeast(1, 4, 0);
+    }
+
+    /**
+     * bun.lock's npm registry url and git or GitHub resolution are written JSON-escaped
+     * ({@code format_json_string_utf8} without quotes), from 1.4.0 (bun#31417); before, as they are.
+     */
+    boolean escapesTheRegistryAndRepositoryInBunLock() {
+        return atLeast(1, 4, 0);
+    }
+
     // ----
 
     // 1.4.x: src/install (dependency.rs, integrity.rs, repository.rs, npm.rs, resolution.rs) and src/semver
