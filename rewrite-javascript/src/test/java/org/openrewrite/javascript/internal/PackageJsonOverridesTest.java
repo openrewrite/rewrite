@@ -247,10 +247,16 @@ class PackageJsonOverridesTest {
     void bunReadsAnOverrideAsTheReleaseTheMarkerNames() {
         Json.Document root = manifest("{\"name\":\"p\"}");
         List<DependencyPathSegment> oneParent = PackageJsonOverrides.parsePath("is-odd");
+        List<DependencyPathSegment> twoParents = PackageJsonOverrides.parsePath("is-even>is-odd");
         assertThat(declined(Bun, ranBy(root, Bun, "1.3.10"), oneParent))
           .isEqualTo("bun does not support nested overrides");
-        assertThat(declined(Bun, ranBy(root, Bun, "1.4.0"), oneParent)).contains("cannot know what bun 1.4.0 writes");
+        // from 1.4.0 bun reads an override one parent deep, and warns of a deeper one
+        assertThat(declined(Bun, ranBy(root, Bun, "1.4.0"), oneParent)).isNull();
+        assertThat(declined(Bun, ranBy(root, Bun, "1.4.0"), twoParents))
+          .isEqualTo("Bun currently only supports one level of nested \"overrides\"");
         assertThat(declined(Bun, ranBy(root, Bun, "1.4.0"), null)).isNull();
+        // a release the engine does not reproduce
+        assertThat(declined(Bun, ranBy(root, Bun, "1.2.0"), oneParent)).contains("cannot know what bun 1.2.0 writes");
         // a marker of another package manager names no Bun release: 1.3.10 installs
         assertThat(declined(Bun, ranBy(root, Npm, "1.4.0"), oneParent))
           .isEqualTo("bun does not support nested overrides");
