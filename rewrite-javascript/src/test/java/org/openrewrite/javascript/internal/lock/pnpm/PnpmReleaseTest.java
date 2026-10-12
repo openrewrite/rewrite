@@ -255,6 +255,30 @@ class PnpmReleaseTest {
     }
 
     /**
+     * config/reader getOptionsFromRootManifest.ts translateUpdateSettings and translateAuditSettings (11.16.0): the
+     * update and audit settings are objects, and update no longer the install's; before, both are read as they are
+     * (open-install-options-as-if-unset records it).
+     */
+    @Test
+    void translatesTheUpdateAndAuditSettingsFrom11160() {
+        assertThatThrownBy(() -> options("update: false\n", null, null, Collections.emptyMap(), "11.16.0"))
+          .isInstanceOfSatisfying(PnpmError.class, e -> {
+              assertThat(e.getCode()).isEqualTo("ERR_PNPM_INVALID_SETTING");
+              assertThat(e.getMessage()).isEqualTo("The \"update\" setting should be an object, but got boolean");
+          });
+        assertThat(options("update: false\n", null, null, Collections.emptyMap(), "11.15.1").get("update"))
+          .isEqualTo(false);
+        PnpmOptions translated = options("update:\n  ignoreDeps: [foo]\naudit:\n  level: high\n", null, null,
+          Collections.emptyMap(), "11.16.0");
+        assertThat(translated.get("update")).isNull();
+        assertThat(json(translated.get("updateConfig"))).isEqualTo("{'ignoreDependencies':['foo']}");
+        assertThat(translated.get("auditLevel")).isEqualTo("high");
+        assertThatThrownBy(() -> options("audit:\n  level: severe\n", null, null, Collections.emptyMap(), "11.16.0"))
+          .hasMessage("The \"audit.level\" setting should be one of info, low, moderate, high, critical, but got " +
+                      "\"severe\"");
+    }
+
+    /**
      * config/reader index.ts parseDevEnginesPackageManager (11.1.3, pnpm/pnpm#11676): devEngines.packageManager as
      * one object without onFail takes pmOnFail's default, download; before, error.
      */
