@@ -19,6 +19,7 @@ import lombok.Value;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.javascript.internal.lock.JsError;
 
+import java.util.Arrays;
 import java.util.Collection;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
@@ -118,16 +119,28 @@ final class PreferredVersions {
         if (snapshots == null) {
             return preferredVersions;
         }
-        addPreferredVersionsFromLockfile(snapshots, preferredVersions);
+        addPreferredVersionsFromLockfile(snapshots, preferredVersions, release);
         return preferredVersions;
     }
 
+    // Object.prototype's own properties, which a plain object keyed by package name answers with before 11.10.0
+    private static final Set<String> OBJECT_PROTOTYPE = new LinkedHashSet<>(Arrays.asList("constructor",
+            "__defineGetter__", "__defineSetter__", "hasOwnProperty", "__lookupGetter__", "__lookupSetter__",
+            "isPrototypeOf", "propertyIsEnumerable", "toString", "valueOf", "__proto__", "toLocaleString"));
+
     private static void addPreferredVersionsFromLockfile(Map<String, PackageSnapshot> snapshots,
-                                                         Map<String, Map<String, Selector>> preferredVersions) {
+                                                         Map<String, Map<String, Selector>> preferredVersions,
+                                                         PnpmRelease release) {
         Map<String, Set<String>> uniqueNameVersions = new LinkedHashMap<>();
         for (Map.Entry<String, PackageSnapshot> entry : snapshots.entrySet()) {
             DepPath.DependencyPath pkgInfo = DepPath.parse(entry.getKey());
             String name = Js.string(pkgInfo.getName() == null ? Js.UNDEFINED : pkgInfo.getName());
+            // a lock package named after a member of Object.prototype ({@code constructor}) finds that member in
+            // uniqueNameVersions before 11.10.0, which seeds it without a prototype
+            // (PnpmRelease#seedsPreferredVersionsWithoutAPrototype)
+            if (OBJECT_PROTOTYPE.contains(name) && !release.seedsPreferredVersionsWithoutAPrototype()) {
+                throw new JsError(JsError.TYPE_ERROR, "uniqueNameVersions[name].add is not a function");
+            }
             String version = entry.getValue().getVersion() != null ? entry.getValue().getVersion() :
                     pkgInfo.getVersion() != null ? pkgInfo.getVersion() : "undefined";
             uniqueNameVersions.computeIfAbsent(name, n -> new LinkedHashSet<>()).add(version);

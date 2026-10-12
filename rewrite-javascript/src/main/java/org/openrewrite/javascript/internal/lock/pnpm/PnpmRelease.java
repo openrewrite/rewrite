@@ -417,6 +417,17 @@ public final class PnpmRelease {
         return atLeast(11, 8, 0);
     }
 
+    // @pnpm/lockfile.preferred-versions src/index.ts
+
+    /**
+     * The preferred versions are seeded without a prototype, so that a lock package named after an Object.prototype
+     * member ({@code constructor}) is a package as any other, from 11.10.0; before, pnpm finds that member and throws
+     * {@code TypeError: uniqueNameVersions[name].add is not a function}.
+     */
+    boolean seedsPreferredVersionsWithoutAPrototype() {
+        return atLeast(11, 10, 0);
+    }
+
     // @pnpm/config.package-is-installable src/index.ts, inferPlatformFromPackageName.ts
 
     /**

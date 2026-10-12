@@ -1289,6 +1289,24 @@ class PnpmReleaseTest {
     }
 
     /**
+     * lockfile/preferred-versions (11.10.0): a lock package named constructor is a package as any other; before,
+     * pnpm finds Object.prototype.constructor and throws.
+     */
+    @Test
+    void seedsPreferredVersionsWithoutAPrototypeFrom11100() {
+        Map<String, PackageSnapshot> snapshots = new LinkedHashMap<>();
+        snapshots.put("constructor@1.0.0", new PackageSnapshot());
+        assertThat(PreferredVersions.getPreferredVersionsFromLockfileAndManifests(snapshots,
+          Collections.emptyList(), release("11.10.0"))).containsKey("constructor");
+        assertThatThrownBy(() -> PreferredVersions.getPreferredVersionsFromLockfileAndManifests(snapshots,
+          Collections.emptyList(), release("11.9.0")))
+          .isInstanceOfSatisfying(JsError.class, e -> {
+              assertThat(e.getName()).isEqualTo("TypeError");
+              assertThat(e.getMessage()).isEqualTo("uniqueNameVersions[name].add is not a function");
+          });
+    }
+
+    /**
      * installing/env-installer verifyEnvLockfile.ts (11.8.0): a config dependency's version must be exact; before,
      * nothing checks it.
      */
