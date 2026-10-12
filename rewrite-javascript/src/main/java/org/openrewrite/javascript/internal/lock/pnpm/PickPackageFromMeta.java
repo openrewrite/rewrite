@@ -21,6 +21,7 @@ import org.openrewrite.javascript.internal.lock.CannotKnow;
 import org.openrewrite.javascript.internal.lock.JsError;
 import org.openrewrite.javascript.internal.lock.UriComponent;
 import org.openrewrite.javascript.internal.lock.V8Date;
+import org.openrewrite.javascript.internal.lock.ValidateNpmPackageName;
 import org.openrewrite.javascript.internal.lock.WhatwgUrl;
 import org.openrewrite.javascript.semver.NodeSemver;
 
@@ -177,7 +178,7 @@ final class PickPackageFromMeta {
                                                                                    @Nullable String alias,
                                                                                    String defaultTag,
                                                                                    PnpmRelease release) {
-        JsrSpecifierParser.JsrSpec spec = JsrSpecifierParser.parseJsrSpecifier(rawSpecifier, alias);
+        JsrSpecifierParser.JsrSpec spec = JsrSpecifierParser.parseJsrSpecifier(rawSpecifier, alias, release);
         if (spec == null || !Js.truthy(spec.getNpmPkgName())) {
             return null;
         }
@@ -200,6 +201,7 @@ final class PickPackageFromMeta {
         String body = rawSpecifier.substring(colon + 1);
         String pkgName;
         String versionSelector = null;
+        boolean scopeWithoutName = false;
         if (ResolveDependencies.validRange(body, release) != null) {
             if (!Js.truthy(packageAlias)) {
                 return null;
@@ -214,10 +216,7 @@ final class PickPackageFromMeta {
                 pkgName = body.substring(0, index);
                 versionSelector = body.substring(index + 1);
             }
-            if (pkgName.indexOf('/') == -1 || pkgName.endsWith("/")) {
-                throw new PnpmError("INVALID_NAMED_REGISTRY_PACKAGE_NAME", "The package name '" + pkgName +
-                        "' in named registry '" + registryName + ":' is invalid");
-            }
+            scopeWithoutName = pkgName.indexOf('/') == -1 || pkgName.endsWith("/");
         } else if (packageAlias != null && packageAlias.startsWith("@")) {
             pkgName = packageAlias;
             versionSelector = body;
@@ -232,6 +231,15 @@ final class PickPackageFromMeta {
             if (pkgName.isEmpty()) {
                 return null;
             }
+        }
+        // from 11.10.0 any form's name validate-npm-package-name 7.0.2 rejects is invalid; before, only a scope's
+        // without a name (PnpmRelease#validatesANamedRegistryPackageName), asked where the two differ
+        boolean invalidName = !ValidateNpmPackageName.validForOldPackages(pkgName,
+                ValidateNpmPackageName.Release.V7_0_2);
+        if (invalidName == scopeWithoutName ? invalidName :
+                release.validatesANamedRegistryPackageName() ? invalidName : scopeWithoutName) {
+            throw new PnpmError("INVALID_NAMED_REGISTRY_PACKAGE_NAME", "The package name '" + pkgName +
+                    "' in named registry '" + registryName + ":' is invalid");
         }
         RegistryPackageSpec selector = selectorSpec(pkgName, versionSelector != null ? versionSelector : defaultTag,
                 release);

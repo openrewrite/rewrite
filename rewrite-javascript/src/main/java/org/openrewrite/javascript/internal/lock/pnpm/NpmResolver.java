@@ -179,8 +179,14 @@ final class NpmResolver {
             if (workspacePackages != null && opts.projectDir != null) {
                 try {
                     return tryResolveFromWorkspacePackages(workspacePackages, spec, wantedDependency, opts, false);
-                } catch (PnpmError ignored) {
-                    // the registry's error is the one pnpm reports
+                } catch (PnpmError workspaceErr) {
+                    // the registry's error is the one pnpm reports, but from 11.10.0 after a 404 that no version of
+                    // the workspace matches (PnpmRelease#reportsTheWorkspaceVersionsTheRegistryLacks)
+                    if ("ERR_PNPM_FETCH_404".equals(e.getCode()) &&
+                        "ERR_PNPM_NO_MATCHING_VERSION_INSIDE_WORKSPACE".equals(workspaceErr.getCode()) &&
+                        release.reportsTheWorkspaceVersionsTheRegistryLacks()) {
+                        throw workspaceErr;
+                    }
                 }
             }
             throw e;
@@ -191,8 +197,13 @@ final class NpmResolver {
             if (workspacePackages != null && opts.projectDir != null) {
                 try {
                     return tryResolveFromWorkspacePackages(workspacePackages, spec, wantedDependency, opts, false);
-                } catch (PnpmError ignored) {
-                    // pnpm reports that no version matches
+                } catch (PnpmError workspaceErr) {
+                    // pnpm reports that no version matches, from 11.10.0 that none of the workspace does
+                    // (PnpmRelease#reportsTheWorkspaceVersionsTheRegistryLacks)
+                    if ("ERR_PNPM_NO_MATCHING_VERSION_INSIDE_WORKSPACE".equals(workspaceErr.getCode()) &&
+                        release.reportsTheWorkspaceVersionsTheRegistryLacks()) {
+                        throw workspaceErr;
+                    }
                 }
             }
             String dep = alias != null && !alias.isEmpty() ?

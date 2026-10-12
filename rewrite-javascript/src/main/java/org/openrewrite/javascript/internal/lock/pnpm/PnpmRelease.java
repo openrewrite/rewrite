@@ -645,6 +645,38 @@ public final class PnpmRelease {
         return atLeast(11, 1, 0);
     }
 
+    // @pnpm/resolving.npm-resolver src/index.ts, parseBareSpecifier.ts, @pnpm/resolving.jsr-specifier-parser
+    // src/index.ts
+
+    /**
+     * A JSR package name validate-npm-package-name rejects ({@code @s/}, {@code @/x}) is
+     * {@code ERR_PNPM_INVALID_JSR_PACKAGE_NAME}, from 11.10.0 (jsrToNpmPackageName's validForOldPackages); before, only
+     * one without a slash, the rest named {@code @jsr/<scope>__<name>} as they are.
+     */
+    boolean validatesAJsrPackageName() {
+        return atLeast(11, 10, 0);
+    }
+
+    /**
+     * A named registry spec's package name validate-npm-package-name rejects, in whatever form the spec gives it, is
+     * {@code ERR_PNPM_INVALID_NAMED_REGISTRY_PACKAGE_NAME}, from 11.10.0
+     * (parseNamedRegistrySpecifierToRegistryPackageSpec); before, only a scope without a name ({@code gh:@s},
+     * {@code gh:@s/}), so that {@code gh:@/bar} resolves.
+     */
+    boolean validatesANamedRegistryPackageName() {
+        return atLeast(11, 10, 0);
+    }
+
+    /**
+     * Where the registry has no version of a package (its 404, or no version in range) and the workspace's are tried
+     * (linkWorkspacePackages), a workspace without a matching version fails the resolution
+     * ({@code ERR_PNPM_NO_MATCHING_VERSION_INSIDE_WORKSPACE}), from 11.10.0 (resolveNpm); before, the registry's error
+     * is reported.
+     */
+    boolean reportsTheWorkspaceVersionsTheRegistryLacks() {
+        return atLeast(11, 10, 0);
+    }
+
     // @pnpm/resolving.npm-resolver src/trustChecks.ts, createNpmResolutionVerifier.ts
 
     /**

@@ -2435,4 +2435,100 @@ class PnpmReleaseTest {
         assertThat(options(both, null, null, Collections.emptyMap(), "11.9.0").getRegistries())
           .containsEntry("default", "https://s.example/");
     }
+
+    /**
+     * resolving/jsr-specifier-parser jsrToNpmPackageName (11.10.0): a JSR name validate-npm-package-name rejects is
+     * invalid; before, only one without a slash, the rest taken as they are.
+     */
+    @Test
+    void validatesAJsrPackageNameFrom11100() {
+        assertThatThrownBy(() -> JsrSpecifierParser.parseJsrSpecifier("jsr:@s/", null, release("11.10.0")))
+          .isInstanceOfSatisfying(PnpmError.class, e -> {
+              assertThat(e.getCode()).isEqualTo("ERR_PNPM_INVALID_JSR_PACKAGE_NAME");
+              assertThat(e.getMessage()).isEqualTo("The package name '@s/' is invalid");
+          });
+        JsrSpecifierParser.JsrSpec scopeAlone = JsrSpecifierParser.parseJsrSpecifier("jsr:@s/", null,
+          release("11.9.0"));
+        assertThat(scopeAlone).isNotNull();
+        assertThat(scopeAlone.getNpmPkgName()).isEqualTo("@jsr/s__");
+        assertThatThrownBy(() -> JsrSpecifierParser.parseJsrSpecifier("jsr:@/x", null, release("11.10.0")))
+          .hasMessage("The package name '@/x' is invalid");
+        JsrSpecifierParser.JsrSpec nameAlone = JsrSpecifierParser.parseJsrSpecifier("jsr:@/x", null,
+          release("11.9.0"));
+        assertThat(nameAlone).isNotNull();
+        assertThat(nameAlone.getNpmPkgName()).isEqualTo("@jsr/__x");
+        JsrSpecifierParser.JsrSpec valid = JsrSpecifierParser.parseJsrSpecifier("jsr:@std/path@1", null,
+          release("11.10.0"));
+        assertThat(valid).isNotNull();
+        assertThat(valid.getNpmPkgName()).isEqualTo("@jsr/std__path");
+    }
+
+    /**
+     * resolving/npm-resolver parseBareSpecifier.ts parseNamedRegistrySpecifierToRegistryPackageSpec (11.10.0): a
+     * named registry spec's name validate-npm-package-name rejects is invalid in every form; before, only a scope
+     * without a name.
+     */
+    @Test
+    void validatesANamedRegistryPackageNameFrom11100() {
+        Set<String> gh = Collections.singleton("gh");
+        assertThatThrownBy(() -> PickPackageFromMeta.parseNamedRegistrySpecifierToRegistryPackageSpec("gh:@/bar", gh,
+          null, "latest", release("11.10.0")))
+          .isInstanceOfSatisfying(PnpmError.class, e -> {
+              assertThat(e.getCode()).isEqualTo("ERR_PNPM_INVALID_NAMED_REGISTRY_PACKAGE_NAME");
+              assertThat(e.getMessage()).isEqualTo("The package name '@/bar' in named registry 'gh:' is invalid");
+          });
+        PickPackageFromMeta.NamedRegistryPackageSpec before = PickPackageFromMeta
+          .parseNamedRegistrySpecifierToRegistryPackageSpec("gh:@/bar", gh, null, "latest", release("11.9.0"));
+        assertThat(before).isNotNull();
+        assertThat(before.getSpec().getName()).isEqualTo("@/bar");
+        assertThatThrownBy(() -> PickPackageFromMeta.parseNamedRegistrySpecifierToRegistryPackageSpec("gh:@s/../n@1",
+          gh, null, "latest", release("11.10.0")))
+          .hasMessage("The package name '@s/../n' in named registry 'gh:' is invalid");
+        for (String release : Arrays.asList("11.9.0", "11.10.0")) {
+            assertThatThrownBy(() -> PickPackageFromMeta.parseNamedRegistrySpecifierToRegistryPackageSpec("gh:@s@1",
+              gh, null, "latest", release(release)))
+              .hasMessage("The package name '@s' in named registry 'gh:' is invalid");
+        }
+    }
+
+    // foo's resolution as release from registry, linkWorkspacePackages trying the workspace's foo 2.0.0
+    private static NpmResolver.@Nullable ResolveResult resolveFooBesideTheWorkspace(String range, String release,
+                                                                                    RegistryMetadata registry) {
+        NpmResolver resolver = new NpmResolver(registry, Collections.singletonMap("default", REGISTRY),
+          Collections.emptyMap(), null, false, false, NOW, release(release), false);
+        PackageRequester.RequestPackageOptions opts = new PackageRequester.RequestPackageOptions();
+        opts.alwaysTryWorkspacePackages = true;
+        opts.projectDir = "";
+        opts.lockfileDir = "";
+        opts.workspacePackages = Collections.singletonMap("foo", Collections.singletonMap("2.0.0",
+          new Verification.Project("foo", "foo", obj("{'name':'foo','version':'2.0.0'}"))));
+        return resolver.resolveNpm(new ResolveDependencies.WantedDependency("foo", range, false, false), opts, null);
+    }
+
+    /**
+     * resolving/npm-resolver index.ts resolveNpm (11.10.0): where the registry lacks foo, or any version of it in
+     * range, and no version of the workspace's matches, that is the error; before, the registry's.
+     */
+    @Test
+    void reportsTheWorkspaceVersionsTheRegistryLacksFrom11100() {
+        String inside = "In : No matching version found for foo@^1.0.0 inside the workspace. Available versions: 2.0.0";
+        assertThatThrownBy(() -> resolveFooBesideTheWorkspace("^1.0.0", "11.10.0", NOT_FOUND))
+          .isInstanceOfSatisfying(PnpmError.class, e -> {
+              assertThat(e.getCode()).isEqualTo("ERR_PNPM_NO_MATCHING_VERSION_INSIDE_WORKSPACE");
+              assertThat(e.getMessage()).isEqualTo(inside);
+          });
+        assertThatThrownBy(() -> resolveFooBesideTheWorkspace("^1.0.0", "11.9.0", NOT_FOUND))
+          .isInstanceOfSatisfying(PnpmError.class, e -> {
+              assertThat(e.getCode()).isEqualTo("ERR_PNPM_FETCH_404");
+              assertThat(e.getMessage()).isEqualTo("GET " + REGISTRY + "foo: Not Found - 404");
+          });
+        RegistryMetadata foo1 = registry(new String[]{"foo", "", ""});
+        assertThatThrownBy(() -> resolveFooBesideTheWorkspace("^5.0.0", "11.10.0", foo1))
+          .isInstanceOfSatisfying(PnpmError.class,
+            e -> assertThat(e.getCode()).isEqualTo("ERR_PNPM_NO_MATCHING_VERSION_INSIDE_WORKSPACE"));
+        assertThatThrownBy(() -> resolveFooBesideTheWorkspace("^5.0.0", "11.9.0", foo1))
+          .isInstanceOfSatisfying(PnpmError.class,
+            e -> assertThat(e.getCode()).isEqualTo("ERR_PNPM_NO_MATCHING_VERSION"));
+        assertThat(resolveFooBesideTheWorkspace("^2.0.0", "11.10.0", NOT_FOUND)).isNotNull();
+    }
 }
