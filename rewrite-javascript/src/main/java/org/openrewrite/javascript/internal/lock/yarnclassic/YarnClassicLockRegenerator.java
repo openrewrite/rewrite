@@ -246,7 +246,7 @@ public final class YarnClassicLockRegenerator {
         Cli cli = new Cli(inputs);
         cli.start(rc);
         cli.main();
-        return Rc.getRcArgs(rc);
+        return Rc.getRcArgs(rc, inputs.installsAs());
     }
 
     // every install reads the config files of the directory it runs in and of each directory above it

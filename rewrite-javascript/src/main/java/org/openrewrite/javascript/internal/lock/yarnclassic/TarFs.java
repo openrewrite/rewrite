@@ -45,12 +45,22 @@ final class TarFs {
         private int offset;
         private int size;
 
+        /**
+         * The entry's name where the archive ends inside its content: its write runs on after the extract finishes, so
+         * what a read finds there follows the timing of the disk.
+         */
+        private @Nullable String cut;
+
         private Node(boolean directory, @Nullable String symlink) {
             this.directory = directory;
             this.symlink = symlink;
         }
 
         byte[] content() {
+            if (cut != null) {
+                throw new CannotKnow("what yarn reads of " + cut + ", which the tarball's archive ends inside: the " +
+                                     "extract finishes there, the file's write runs on");
+            }
             return Arrays.copyOfRange(archive, offset, offset + size);
         }
     }
@@ -61,7 +71,8 @@ final class TarFs {
 
     /**
      * The tar-fs yarn bundles: 1.16.3 from yarn 1.10.0; before, 1.16.0, which neither refuses an entry whose directory
-     * is a link ({@code validate}) nor keeps a hard link's target inside the directory.
+     * is a link ({@code validate}) nor keeps a hard link's target inside the directory (1.15.2, before yarn 1.7.0,
+     * extracts as 1.16.0 does on POSIX).
      */
     enum Release {
         V1_16_0,
@@ -93,8 +104,17 @@ final class TarFs {
      * yarn 1.22.0 and later extract; before, a link out of the directory reaches the disk around yarn's cache.
      */
     static TarFs extract(byte[] tar, boolean jail, Release release) {
+        return extract(tar, jail, release, TarStream.Release.V1_6_1, true);
+    }
+
+    /**
+     * {@code extract} with tar-stream {@code streamRelease}, on a Writable that fails an archive that ends early or
+     * not ({@link TarStream#extract(byte[], TarStream.OnEntry, TarStream.Release, boolean)}).
+     */
+    static TarFs extract(byte[] tar, boolean jail, Release release, TarStream.Release streamRelease,
+                         boolean failsWhereTheDataEnds) {
         TarFs fs = new TarFs(jail, release);
-        TarStream.extract(tar, fs::entry);
+        TarStream.extract(tar, fs::entry, streamRelease, failsWhereTheDataEnds);
         return fs;
     }
 
@@ -119,7 +139,7 @@ final class TarFs {
         }
         mkdirp(dir);
         if ("file".equals(header.type)) {
-            write(name, archive, offset, size);
+            write(name, archive, offset, size, header.cut);
         } else if ("link".equals(header.type) || "symlink".equals(header.type)) {
             if (header.linkname == null) {
                 throw Js.invalidArgType("The \"" + ("link".equals(header.type) ? "path" : "target") +
@@ -243,7 +263,7 @@ final class TarFs {
     }
 
     // createWriteStream opens through symbolic links; a directory is no file to write
-    private void write(String name, byte[] archive, int offset, int size) {
+    private void write(String name, byte[] archive, int offset, int size, boolean cut) {
         String real = real(name, true);
         Node node = node(real);
         if (node == null) {
@@ -259,6 +279,7 @@ final class TarFs {
         node.archive = archive;
         node.offset = offset;
         node.size = size;
+        node.cut = cut ? name : null;
     }
 
     // tar-fs ignores what unlink says: a directory stays

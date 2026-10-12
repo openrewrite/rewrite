@@ -51,6 +51,11 @@ final class ResolutionMap {
     final Config config;
     final Set<DependencyRequestPattern> delayQueue = new LinkedHashSet<>();
 
+    /**
+     * The root's patterns, whose lock entries a resolution keeps from 1.3.1 to 1.5.1 ({@code setTopLevelPatterns}).
+     */
+    Set<String> topLevelPatterns = new LinkedHashSet<>();
+
     ResolutionMap(Config config) {
         this.config = config;
     }

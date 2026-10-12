@@ -161,6 +161,14 @@ final class Rc {
      * a flag passes itself when the value is true.
      */
     static Map<String, @Nullable Object> getRcArgs(Map<String, @Nullable Object> rc) {
+        return getRcArgs(rc, YarnClassicRelease.PORTED);
+    }
+
+    /**
+     * {@code getRcArgs} as {@code release}'s commander sets the flags: an option the release does not declare is one
+     * commander drops with the value after it.
+     */
+    static Map<String, @Nullable Object> getRcArgs(Map<String, @Nullable Object> rc, YarnClassicRelease release) {
         Map<String, @Nullable Object> args = new LinkedHashMap<>();
         for (String command : Arrays.asList("*", "install")) {
             for (String key : Js.keys(rc)) {
@@ -174,6 +182,9 @@ final class Rc {
                 }
                 String arg = keyMatch.group(2);
                 Object value = rc.get(key);
+                if (!declares(arg, release)) {
+                    continue;
+                }
                 switch (arg) {
                     case "prod":
                     case "production":
@@ -200,6 +211,11 @@ final class Rc {
             }
         }
         return args;
+    }
+
+    // whether the release's commander knows an option the port reads: cli/index.js's and install.js setFlags'
+    private static boolean declares(String arg, YarnClassicRelease release) {
+        return !"focus".equals(arg) || release.declaresFocus();
     }
 
     private static String camelCase(String flag) {

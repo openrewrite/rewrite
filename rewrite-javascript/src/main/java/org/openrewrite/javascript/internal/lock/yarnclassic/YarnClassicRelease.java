@@ -108,6 +108,14 @@ public final class YarnClassicRelease implements Comparable<YarnClassicRelease> 
     // yarn src/cli/commands/install.js
 
     /**
+     * {@code setFlags} declares {@code --focus}, from 1.7.0; before, a .yarnrc's {@code --focus} is an option commander
+     * does not know, which it drops with the value after it.
+     */
+    boolean declaresFocus() {
+        return atLeast(1, 7, 0);
+    }
+
+    /**
      * {@code fetchRequestFromCwd} makes the resolution of a package the root's optionalDependencies name optional
      * under {@code --ignore-optional}, from 1.17.0; before, every resolution is required.
      */
@@ -420,6 +428,31 @@ public final class YarnClassicRelease implements Comparable<YarnClassicRelease> 
         return atLeast(1, 12, 0);
     }
 
+    // yarn src/package-resolver.js, src/resolution-map.js
+
+    /**
+     * {@code resolveToResolution} keeps the lock entry of a pattern a resolution resolves where the pattern is one of
+     * the root's ({@code topLevelPatterns}), from 1.3.1; before, it removes the entry of every such pattern.
+     */
+    boolean keepsTheLockEntryOfATopLevelPattern() {
+        return atLeast(1, 3, 1);
+    }
+
+    /**
+     * {@code resolveToResolution} keeps the lock entry of every pattern a resolution resolves, from 1.6.0.
+     */
+    boolean keepsTheLockEntryOfAResolvedPattern() {
+        return atLeast(1, 6, 0);
+    }
+
+    /**
+     * {@code resolveToResolution} removes the lock entry of a pattern a resolution resolves where the entry's
+     * {@code resolved} is not the resolution's ({@code shouldUpdateLockfile}), from 1.7.0.
+     */
+    boolean removesTheLockEntryOfAPatternResolvedElsewhere() {
+        return atLeast(1, 7, 0);
+    }
+
     // yarn src/resolvers/registries/npm-resolver.js
 
     /**
@@ -500,6 +533,27 @@ public final class YarnClassicRelease implements Comparable<YarnClassicRelease> 
      */
     TarFs.Release tarFs() {
         return atLeast(1, 10, 0) ? TarFs.Release.V1_16_3 : TarFs.Release.V1_16_0;
+    }
+
+    // tar-stream
+
+    /**
+     * The tar-stream yarn extracts a tarball with: 1.6.0 from 1.7.0 (1.6.1 from 1.8.0, the same extract), whose
+     * {@code mixinPax} takes a pax header's {@code size}; before, 1.5.4, which keeps the entry header's size.
+     */
+    TarStream.Release tarStream() {
+        return atLeast(1, 7, 0) ? TarStream.Release.V1_6_1 : TarStream.Release.V1_5_4;
+    }
+
+    // readable-stream
+
+    /**
+     * tar-stream's extract fails an archive that ends inside an entry, its padding or a header ({@code _final}'s
+     * {@code Unexpected end of data}), from 1.8.0, whose readable-stream 2.3.6 calls a Writable's {@code _final};
+     * before, readable-stream 2.2.9 finishes the extract where the archive ends.
+     */
+    boolean failsAnArchiveThatEndsEarly() {
+        return atLeast(1, 8, 0);
     }
 
     @Override

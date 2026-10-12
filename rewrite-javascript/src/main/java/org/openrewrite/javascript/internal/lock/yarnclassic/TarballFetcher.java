@@ -198,7 +198,8 @@ final class TarballFetcher {
             throw new JsError(e.getName(), url + ": " + e.getMessage());
         }
         try {
-            return TarFs.extract(tar, release.jailsTarballLinks(), release.tarFs());
+            return TarFs.extract(tar, release.jailsTarballLinks(), release.tarFs(), release.tarStream(),
+                    release.failsAnArchiveThatEndsEarly());
         } catch (JsError e) {
             if (!release.reportsCorruptArchives()) {
                 throw new JsError(e.getName(), url + ": " + e.getMessage());

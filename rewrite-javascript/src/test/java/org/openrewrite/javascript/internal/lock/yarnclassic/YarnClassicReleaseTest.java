@@ -787,6 +787,162 @@ class YarnClassicReleaseTest {
                 .hasMessageEndingWith("the file appears to be corrupt: \"lib is not a valid path\"");
     }
 
+    /**
+     * install.js {@code setFlags} declares {@code --focus} from 1.7.0; before, a .yarnrc's {@code --focus} is an
+     * option commander drops, and the install at the workspace root runs as any other (the sweep's
+     * open-opt-focus-standalone).
+     */
+    @ParameterizedTest(name = "{0}")
+    @CsvSource(delimiter = '|', value = {
+            "1.6.0|installs",
+            "1.7.0|RESOLUTION_REQUIRED: yarn rejects this edit: This command can only be run inside an individual " +
+            "workspace.",
+    })
+    void declaresFocusFrom170(String version, String outcome) {
+        YarnClassicLockRegenerator.Inputs inputs = YarnClassicLockRegenerator.Inputs.builder()
+                .release(release(version))
+                .manifest("", "{\"name\":\"r\",\"version\":\"1.0.0\",\"private\":true,\"workspaces\":[\"a\"]}")
+                .manifest("a", "{\"name\":\"a\",\"version\":\"1.0.0\"}")
+                .lock("# yarn lockfile v1\n\n\n")
+                .configFile(".yarnrc", "--focus true\n")
+                .paths(new LinkedHashSet<>(Arrays.asList("package.json", "yarn.lock", ".yarnrc", "a/package.json")))
+                .env(Collections.emptyMap())
+                .build();
+        LockFileRegeneration.Result result = new YarnClassicLockRegenerator(inputs, YarnClassicScenarios.NO_REGISTRY)
+                .regenerate();
+        assertThat(result.isSuccess() ? "installs" : result.getErrorMessage()).isEqualTo(outcome);
+    }
+
+    /**
+     * package-resolver.js {@code resolveToResolution}: the lock entry of a pattern a resolution takes is removed
+     * before 1.3.1, kept for the root's own patterns from 1.3.1, kept always from 1.6.0, removed where the resolution's
+     * tarball is another from 1.7.0. A later request of the pattern then resolves anew and joins the resolution, or reads
+     * the entry and makes a second reference, whose fetch races the resolution's for the pattern (as yarn 1.2.1, 1.3.1,
+     * 1.5.1, 1.6.0 and 1.7.0 installed these: the races wrote both entries over repeated runs).
+     */
+    @ParameterizedTest(name = "{0} {1}")
+    @CsvSource(delimiter = '|', value = {
+            "1.2.1|root|shares",
+            "1.3.1|root|races",
+            "1.6.0|root|races",
+            "1.7.0|root|shares",
+            "1.2.1|nested|shares",
+            "1.3.1|nested|shares",
+            "1.6.0|nested|races",
+            "1.7.0|nested|shares",
+    })
+    void keepsTheLockEntryOfAResolvedPatternAsItsReleaseDoes(String version, String where, String outcome) {
+        boolean root = "root".equals(where);
+        String lock = "# yarn lockfile v1\n\n\n" +
+                      "a@^1.0.0:\n  version \"1.0.0\"\n  resolved \"https://registry.yarnpkg.com/a/-/a-1.0.0.tgz#a\"\n" +
+                      "  dependencies:\n    b \"^1.0.0\"\n\n" +
+                      "b@1.0.1:\n  version \"1.0.1\"\n  resolved \"https://registry.yarnpkg.com/b/-/b-1.0.1.tgz#b1\"\n\n" +
+                      "b@^1.0.0:\n  version \"1.0.0\"\n  resolved \"https://registry.yarnpkg.com/b/-/b-1.0.0.tgz#b0\"\n" +
+                      (root ? "" : "\nc@^1.0.0:\n  version \"1.0.0\"\n  resolved \"https://registry.yarnpkg.com/c/-/" +
+                                   "c-1.0.0.tgz#c\"\n  dependencies:\n    b \"^1.0.0\"\n");
+        String manifest = root ?
+                "{\"name\":\"p\",\"version\":\"1.0.0\",\"dependencies\":{\"a\":\"^1.0.0\",\"b\":\"^1.0.0\"}," +
+                "\"resolutions\":{\"b\":\"1.0.1\"}}" :
+                "{\"name\":\"p\",\"version\":\"1.0.0\",\"dependencies\":{\"a\":\"^1.0.0\",\"c\":\"^1.0.0\"}," +
+                "\"resolutions\":{\"a/b\":\"1.0.1\"}}";
+        String b = "{\"name\":\"b\",\"dist-tags\":{\"latest\":\"1.0.1\"},\"versions\":{" +
+                   "\"1.0.0\":{\"name\":\"b\",\"version\":\"1.0.0\",\"dist\":{\"tarball\":" +
+                   "\"https://registry.yarnpkg.com/b/-/b-1.0.0.tgz\",\"shasum\":\"b0\"}}," +
+                   "\"1.0.1\":{\"name\":\"b\",\"version\":\"1.0.1\",\"dist\":{\"tarball\":" +
+                   "\"https://registry.yarnpkg.com/b/-/b-1.0.1.tgz\",\"shasum\":\"b1\"}}}}";
+        YarnClassicLockRegenerator.Inputs inputs = YarnClassicLockRegenerator.Inputs.builder()
+                .release(release(version))
+                .manifest("", manifest)
+                .lock(lock)
+                .env(Collections.emptyMap())
+                .build();
+        LockFileRegeneration.Result result = new YarnClassicLockRegenerator(inputs,
+                YarnClassicScenarios.packuments((registry, name) -> "b".equals(name) ? b : null)).regenerate();
+        if ("shares".equals(outcome)) {
+            assertThat(result.getLockFileContent()).contains("b@1.0.1, b@^1.0.0:\n  version \"1.0.1\"\n");
+        } else {
+            assertThat(result.getErrorMessage()).contains("yarn finishes last: both their references hold b@^1.0.0");
+        }
+    }
+
+    /**
+     * tar-stream and readable-stream as each release bundles them, as yarn 1.6.0, 1.7.0 and 1.8.0 installed these
+     * tarballs from a registry: an archive cut inside a file after package.json extracts before 1.8.0 (readable-stream
+     * 2.2.9 calls no {@code _final}) and is corrupt from 1.8.0; cut inside package.json, what yarn reads of it follows
+     * its write (1.6.0 installed, 1.7.0 read ten bytes); a package.json whose size a pax header gives is read from
+     * 1.7.0 (tar-stream 1.6.0), and before, its content is the next header, which tar-stream rejects.
+     */
+    @Test
+    void extractsAnArchiveAsItsTarStreamDoes() {
+        byte[] manifest = entry("package/package.json", "{\"name\":\"x\",\"version\":\"1.0.0\"}", null);
+        byte[] later = entry("package/later.txt", repeat('x', 2000), null);
+        byte[] cutLater = concat(manifest, Arrays.copyOfRange(later, 0, 512 + 100));
+        assertThat(new String(TarballFetcher.untar("<url>", cutLater, release("1.7.0")).get("package.json")
+                .content(), StandardCharsets.UTF_8)).isEqualTo("{\"name\":\"x\",\"version\":\"1.0.0\"}");
+        assertThatThrownBy(() -> TarballFetcher.untar("<url>", cutLater, release("1.8.0")))
+                .isInstanceOf(MessageError.class)
+                .hasMessageEndingWith("the file appears to be corrupt: \"Unexpected end of data\"");
+
+        byte[] cutManifest = Arrays.copyOfRange(manifest, 0, 512 + 10);
+        TarFs extracted = TarballFetcher.untar("<url>", cutManifest, release("1.7.0"));
+        assertThatThrownBy(() -> extracted.get("package.json").content())
+                .isInstanceOf(CannotKnow.class)
+                .hasMessageContaining("which the tarball's archive ends inside");
+
+        String text = "{\"name\":\"x\",\"version\":\"1.0.0\"}";
+        String record = " size=" + text.length() + "\n";
+        record = (record.length() + 2) + record;
+        byte[] paxSize = concat(header("package/PaxHeader", record.length(), 'x'), block(record),
+                header("package/package.json", 0, '0'), block(text), new byte[1024]);
+        assertThatThrownBy(() -> TarballFetcher.untar("<url>", paxSize, release("1.6.0")))
+                .isInstanceOf(JsError.class)
+                .hasMessage("<url>: Invalid tar header. Maybe the tar is corrupted or it needs to be gunzipped?");
+        assertThat(new String(TarballFetcher.untar("<url>", paxSize, release("1.7.0")).get("package.json").content(),
+                StandardCharsets.UTF_8)).isEqualTo(text);
+    }
+
+    private static String repeat(char c, int times) {
+        char[] chars = new char[times];
+        Arrays.fill(chars, c);
+        return new String(chars);
+    }
+
+    private static byte[] concat(byte[]... parts) {
+        ByteArrayOutputStream out = new ByteArrayOutputStream();
+        for (byte[] part : parts) {
+            out.write(part, 0, part.length);
+        }
+        return out.toByteArray();
+    }
+
+    // a ustar header of a size and type, its content to follow
+    private static byte[] header(String name, int size, char type) {
+        byte[] header = new byte[512];
+        put(header, 0, name);
+        put(header, 100, "0000644");
+        put(header, 108, "0000000");
+        put(header, 116, "0000000");
+        put(header, 124, String.format("%011o", size));
+        put(header, 136, "00000000000");
+        header[156] = (byte) type;
+        put(header, 257, "ustar");
+        put(header, 263, "00");
+        Arrays.fill(header, 148, 156, (byte) ' ');
+        int sum = 0;
+        for (byte b : header) {
+            sum += b & 0xff;
+        }
+        put(header, 148, String.format("%06o", sum));
+        header[154] = 0;
+        return header;
+    }
+
+    // text padded to whole blocks
+    private static byte[] block(String text) {
+        byte[] data = text.getBytes(StandardCharsets.UTF_8);
+        return Arrays.copyOf(data, (data.length + 511) / 512 * 512);
+    }
+
     // an uncompressed ustar archive of one file, or of one symbolic link to a target
     private static byte[] tar(String name, @Nullable String content, @Nullable String target) {
         byte[] entry = entry(name, content, target);

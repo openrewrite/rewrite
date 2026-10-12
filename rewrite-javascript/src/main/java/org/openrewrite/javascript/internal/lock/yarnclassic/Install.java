@@ -33,6 +33,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -152,6 +153,10 @@ final class Install {
                             inputs.getDirectory() == null ? null : inputs.reach()), inputs.getHost());
             resolver.focus = config.isFocus();
             resolver.focusedWorkspaceName = config.getFocusedWorkspaceName();
+            YarnClassicRelease release = config.getRelease();
+            if (release.keepsTheLockEntryOfATopLevelPattern() && !release.keepsTheLockEntryOfAResolvedPattern()) {
+                resolutionMap.topLevelPatterns = new LinkedHashSet<>(request.getPatterns());
+            }
             resolver.init(request.getRequests(), request.isFlat(), flags.isFrozenLockfile(),
                     request.getWorkspaceLayout());
             List<String> topLevelPatterns = request.getPatterns();

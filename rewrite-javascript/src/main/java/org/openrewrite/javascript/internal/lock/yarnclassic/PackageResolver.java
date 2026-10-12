@@ -113,12 +113,41 @@ final class PackageResolver {
     }
 
     void updateManifests(List<Manifest> newPkgs) {
+        requireOneManifestPerPattern(newPkgs);
         for (Manifest newPkg : newPkgs) {
             if (newPkg.reference != null) {
                 for (String pattern : newPkg.reference.patterns) {
                     Manifest oldPkg = patterns.get(pattern);
                     newPkg.put("prebuiltVariants", oldPkg.get("prebuiltVariants"));
                     patterns.put(pattern, newPkg);
+                }
+            }
+        }
+    }
+
+    /**
+     * package-fetcher.js's queue hands the fetched manifests over as their fetches finish, and {@code updateManifests}
+     * gives each the patterns its reference holds: a pattern two fetched references hold (a resolution's, which
+     * {@code resolveToResolution} gave it, and the one a later request of it made) takes the manifest of the fetch that
+     * finishes last.
+     */
+    private void requireOneManifestPerPattern(List<Manifest> newPkgs) {
+        Map<String, Manifest> claimed = new LinkedHashMap<>();
+        for (Manifest newPkg : newPkgs) {
+            PackageReference ref = newPkg.reference;
+            if (ref == null) {
+                continue;
+            }
+            for (String pattern : ref.patterns) {
+                Manifest other = claimed.putIfAbsent(pattern, newPkg);
+                if (other != null && other.reference != ref &&
+                    !(fingerprint(other.remote).equals(fingerprint(newPkg.remote)) &&
+                      Js.strictEquals(other.getVersion(), newPkg.getVersion()))) {
+                    throw new CannotKnow("which of the fetches of " + Js.templateString(other.getName()) + "@" +
+                                         Js.templateString(other.getVersion()) + " and " +
+                                         Js.templateString(newPkg.getName()) + "@" +
+                                         Js.templateString(newPkg.getVersion()) + " yarn finishes last: both their " +
+                                         "references hold " + pattern + ", which takes the last one's manifest");
                 }
             }
         }
@@ -496,8 +525,15 @@ final class PackageResolver {
                 }
                 reference.patterns.add(pattern);
                 addPattern(pattern, resolutionManifest);
-                Map<String, @Nullable Object> lockManifest = lockfile.getLocked(pattern);
-                if (ResolutionMap.shouldUpdateLockfile(lockManifest, reference)) {
+                YarnClassicRelease release = config.getRelease();
+                if (release.removesTheLockEntryOfAPatternResolvedElsewhere()) {
+                    Map<String, @Nullable Object> lockManifest = lockfile.getLocked(pattern);
+                    if (ResolutionMap.shouldUpdateLockfile(lockManifest, reference)) {
+                        lockfile.removePattern(pattern);
+                    }
+                } else if (!release.keepsTheLockEntryOfAResolvedPattern() &&
+                           !(release.keepsTheLockEntryOfATopLevelPattern() &&
+                             resolutionMap.topLevelPatterns.contains(pattern))) {
                     lockfile.removePattern(pattern);
                 }
             } else {
