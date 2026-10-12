@@ -242,7 +242,9 @@ public final class VirtualTreeLoader {
 
     @SuppressWarnings("unchecked")
     private void loadFromShrinkwrap(Shrinkwrap s, Node root) {
-        if (rootOptionProvided == null) {
+        // before npm 7.5.4 a root the caller provides is treated as any other
+        boolean suspectsProvidedRoot = options.getRelease().suspectsFlagsUnderProvidedRoot();
+        if (rootOptionProvided == null || !suspectsProvidedRoot) {
             root.unsetDepFlags();
         } else {
             flagsSuspect = true;
@@ -272,7 +274,13 @@ public final class VirtualTreeLoader {
         } else if (!(Js.toNumber(s.getOriginalLockfileVersion()) >= 2)) {
             assignBundles(nodes);
         }
-        if (flagsSuspect) {
+        if (flagsSuspect && !suspectsProvidedRoot) {
+            // [reCalcDepFlags] before npm 7.5.4: every node of the tree, the root's flags calculated again too
+            for (Node node : Objects.requireNonNull(virtualTree).getInventory().values()) {
+                node.resetDepFlags();
+            }
+            DepFlags.calcDepFlags(virtualTree, true);
+        } else if (flagsSuspect) {
             for (Node node : nodes.values()) {
                 if (node.isRoot() || node == rootOptionProvided) {
                     continue;

@@ -530,7 +530,9 @@ public final class IdealTreeBuilder {
         if (options.getRelease().resetsDepFlagsOfInflatedLock()) {
             DepFlags.resetDepFlags(tree);
         }
-        DepFlags.calcDepFlags(tree);
+        if (options.getRelease().recalculatesFlagsOfInflatedLock()) {
+            DepFlags.calcDepFlags(tree);
+        }
 
         if (options.getLockfileVersion() == null) {
             meta.setOriginalLockfileVersion(options.getRelease().defaultLockfileVersion());
@@ -808,7 +810,9 @@ public final class IdealTreeBuilder {
             // here, under the dependent, or under its resolve parent for a peer
             Node realParent = edge.isPeer() ? from.getResolveParent() : from;
             for (Node p = from.getResolveParent(); p != null; p = p.getResolveParent()) {
-                if (p.matches(node) && !p.isTop()) {
+                // before npm 7.5.0 only the root is passed over, not every top
+                boolean passedOver = options.getRelease().passesOverTopsInNestingLoops() ? p.isTop() : p.isRoot();
+                if (p.matches(node) && !passedOver) {
                     return new Link(Node.options().release(options.getRelease()).parent(realParent).target(p).build());
                 }
             }
@@ -1110,9 +1114,12 @@ public final class IdealTreeBuilder {
     }
 
     private Node loadPeerSet(Node node, Set<Node> required) {
+        // before npm 7.5.0 only a non-optional peer edge that is invalid
+        boolean loadsOptionalPeers = options.getRelease().loadsOptionalPeersIntoPeerSets();
         List<Edge> peerEdges = new ArrayList<>();
         for (Edge e : node.getEdgesOut().values()) {
-            if (e.isPeer() && !(e.isValid() && e.getTo() != null)) {
+            if (loadsOptionalPeers ? e.isPeer() && !(e.isValid() && e.getTo() != null) :
+                    e.isPeer() && !e.isValid() && !e.isOptional()) {
                 peerEdges.add(e);
             }
         }
@@ -1123,7 +1130,7 @@ public final class IdealTreeBuilder {
             if (nodeParent == null && options.getRelease().stopsPeerSetOfDetachedNode()) {
                 break;
             }
-            if (edge.isValid() && edge.getTo() != null) {
+            if (edge.isValid() && (edge.getTo() != null || !loadsOptionalPeers)) {
                 continue;
             }
             if (nodeParent == null) {
@@ -1147,13 +1154,16 @@ public final class IdealTreeBuilder {
                     nodeFromEdge(edge, nodeParent, null, required);
                     continue;
                 } else {
-                    Node dep = nodeFromEdge(parentEdge, nodeParent, edge, required);
+                    // before npm 7.5.0 the parent's edge alone, with no second node by the peer's own spec
+                    Node dep = nodeFromEdge(parentEdge, nodeParent,
+                            options.getRelease().triesPeerSpecForParentEdge() ? edge : null, required);
 
                     if (edge.isValid()) {
                         continue;
                     }
 
-                    if (conflictOK || !required.contains(dep)) {
+                    // before npm 7.5.4 a conflict stands only where it is forced or not the project's
+                    if (conflictOK || !required.contains(dep) && options.getRelease().letsUnrequiredPeersConflict()) {
                         if (options.getRelease().marksPeerConflictsOfLoadedPeerSet()) {
                             edge.setPeerConflicted(true);
                         }
@@ -1177,7 +1187,9 @@ public final class IdealTreeBuilder {
                 }
             }
 
-            if (conflictOK || !required.contains(edge.getFrom())) {
+            // before npm 7.5.5 a conflict stands only where it is forced or not the project's
+            if (conflictOK || !required.contains(edge.getFrom()) &&
+                              options.getRelease().letsUnrequiredDependentsConflict()) {
                 continue;
             }
 

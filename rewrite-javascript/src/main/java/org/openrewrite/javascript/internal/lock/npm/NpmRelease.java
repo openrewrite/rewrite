@@ -186,6 +186,14 @@ public final class NpmRelease implements Comparable<NpmRelease> {
     }
 
     /**
+     * {@code [_placeDep]}: where no target will take the dependency and the install is forced, the node in the way is
+     * kept and the conflict warned about, from npm 7.5.4; before, it is npm's {@code ERESOLVE} even forced.
+     */
+    boolean keepsConflictWhenForced() {
+        return atLeast(7, 5, 4);
+    }
+
+    /**
      * {@code #pruneFailedOptional}: an optional dependency that failed to load stays in the tree, inert, from npm
      * 11.3.0; before, it and its optional set are removed.
      */
@@ -201,11 +209,38 @@ public final class NpmRelease implements Comparable<NpmRelease> {
     }
 
     /**
+     * {@code [_loadPeerSet]} lets a peer whose current node does not satisfy it conflict where its dependent is not
+     * required by the project (it came in only through an optional peer), from npm 7.5.5; before, only where forced
+     * or not the project's own.
+     */
+    boolean letsUnrequiredDependentsConflict() {
+        return atLeast(7, 5, 5);
+    }
+
+    /**
+     * {@code [_loadPeerSet]} lets a missing peer whose parent's edge loads a node that does not satisfy it conflict
+     * where that node is not required by the project, from npm 7.5.4; before, only where forced or not the project's
+     * own.
+     */
+    boolean letsUnrequiredPeersConflict() {
+        return atLeast(7, 5, 4);
+    }
+
+    /**
      * {@code #nodeFromSpec}: a {@code file:./} or {@code file:../} dependency inside the project is linked whatever
      * {@code install-links} says, from npm 11.5.0.
      */
     boolean linksProjectInternalFileSpecs() {
         return atLeast(11, 5, 0);
+    }
+
+    /**
+     * {@code [_loadPeerSet]} loads optional peers into the set too, so that a conflict among them shows, and a peer
+     * edge that is valid only because nothing is there, from npm 7.5.0; before, only an invalid edge to a required
+     * peer.
+     */
+    boolean loadsOptionalPeersIntoPeerSets() {
+        return atLeast(7, 5, 0);
     }
 
     /**
@@ -232,6 +267,14 @@ public final class NpmRelease implements Comparable<NpmRelease> {
      */
     boolean nestsReplacedPeerSets() {
         return atLeast(7, 11, 2);
+    }
+
+    /**
+     * {@code [_nodeFromEdge]}: a nesting loop is not linked to a top, a workspace or link target, from npm 7.5.0;
+     * before, only the root is passed over.
+     */
+    boolean passesOverTopsInNestingLoops() {
+        return atLeast(7, 5, 0);
     }
 
     /**
@@ -335,6 +378,14 @@ public final class NpmRelease implements Comparable<NpmRelease> {
     }
 
     /**
+     * {@code [_inflateAncientLockfile]} calculates the dependency flags again once the old lock's manifests are
+     * fetched, from npm 7.5.4; before, it leaves the flags as loaded.
+     */
+    boolean recalculatesFlagsOfInflatedLock() {
+        return atLeast(7, 5, 4);
+    }
+
+    /**
      * {@code [_canPlaceDep]}: a node that matches the one in place, as a link to a like target elsewhere does, replaces
      * it where only it satisfies the edge, from npm 7.8.0; before, a match is always kept.
      */
@@ -431,6 +482,15 @@ public final class NpmRelease implements Comparable<NpmRelease> {
         return atLeast(11, 6, 0);
     }
 
+    /**
+     * {@code [_loadPeerSet]}: where a peer the set lacks has an edge of its name from the virtual root, a second node
+     * by the peer's own spec is loaded and kept where it satisfies both, from npm 7.5.0; before, the root's edge alone
+     * decides.
+     */
+    boolean triesPeerSpecForParentEdge() {
+        return atLeast(7, 5, 0);
+    }
+
     // @npmcli/arborist calc-dep-flags.js
 
     /**
@@ -462,6 +522,22 @@ public final class NpmRelease implements Comparable<NpmRelease> {
      */
     boolean passesOverLinkWithoutTarget() {
         return atLeast(10, 8, 2);
+    }
+
+    /**
+     * {@code calcDepFlagsStep} unsets each flag a node lacks up its resolve parents that still carry it, and a link's
+     * target takes a step of its own, from npm 7.18.0; before, the link's step walks the target's edges.
+     */
+    boolean resetsFlagsOfParents() {
+        return atLeast(7, 18, 0);
+    }
+
+    /**
+     * The depth walk descends from what a node's step returns, a link's target, from npm 7.5.4; before, from the node
+     * itself, so not past a link.
+     */
+    boolean walksDepsOfLinkTargets() {
+        return atLeast(7, 5, 4);
     }
 
     // @npmcli/arborist can-place-dep.js
@@ -677,6 +753,16 @@ public final class NpmRelease implements Comparable<NpmRelease> {
      */
     boolean rejectsLinkWithoutTarget() {
         return atLeast(11, 4, 0);
+    }
+
+    /**
+     * {@code [loadFromShrinkwrap]} holds the flags of a lock loaded under a root the caller provides, as the ideal
+     * tree builder does, suspect: it calculates the flags of the lock's nodes again, that root's left alone, from npm
+     * 7.5.4; before, it resets the root's flags and calculates every node's again only where the root's edges and the
+     * lock disagree.
+     */
+    boolean suspectsFlagsUnderProvidedRoot() {
+        return atLeast(7, 5, 4);
     }
 
     // @npmcli/arborist node.js

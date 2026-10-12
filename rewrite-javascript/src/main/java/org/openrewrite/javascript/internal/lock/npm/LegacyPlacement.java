@@ -143,7 +143,7 @@ final class LegacyPlacement {
         }
 
         if (target == null) {
-            if (options.isForce()) {
+            if (options.isForce() && options.getRelease().keepsConflictWhenForced()) {
                 Node to = edge.getTo();
                 if (to == null) {
                     throw new IllegalArgumentException("Cannot read properties of null (reading 'resolveParent')");
