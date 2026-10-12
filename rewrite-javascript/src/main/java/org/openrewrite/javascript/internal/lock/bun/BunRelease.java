@@ -526,9 +526,9 @@ public final class BunRelease implements Comparable<BunRelease> {
 
     /**
      * The clean keeps a package that only optional peers resolve to only where the install changes no resolution
-     * ({@code keep_optional_peer_targets}: frozen, or no add, remove, update, override or catalog change), binding those
-     * peers after the clone to what survived it, from 1.4.0 (bun#35681, bun#37426, bun#38333, bun#38853); before, it
-     * keeps it whatever changed.
+     * ({@code keep_optional_peer_targets}: frozen, or no add, remove, update, override or catalog change), binding
+     * those peers after the clone to what survived it, from 1.4.0 (bun#35681, bun#37426, bun#38333, bun#38853);
+     * before, it keeps it whatever changed.
      */
     boolean dropsWhatOnlyOptionalPeersHold() {
         return atLeast(1, 4, 0);
@@ -615,7 +615,8 @@ public final class BunRelease implements Comparable<BunRelease> {
 
     /**
      * The text lockfile's parser reads a package's {@code "bundled": true} from the first object of its entry, from
-     * 1.4.3 (bun#42884); before, only from its third element, so that a git, tarball or folder package is never bundled.
+     * 1.4.3 (bun#42884); before, only from its third element, so that a git, tarball or folder package is never
+     * bundled.
      */
     boolean findsTheBundledMarkInAnyEntry() {
         return atLeast(1, 4, 3);

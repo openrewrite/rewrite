@@ -711,10 +711,10 @@ final class TextLockfileReader {
 
     /**
      * {@code resolve_peer_dep_version_based} (from 1.4.0): a required peer whose range, its catalog entry's for a
-     * {@code catalog:} peer, is not {@code *} and that no override names binds as the resolver's peer pass binds it, to
-     * the first package of the range's name, highest first, that satisfies the range, else to the highest when it is
-     * of the range's kind; null leaves it to the path walk. A peer cannot be bound from the printed tree as another edge
-     * is: it never gets its own path where the version hoisted above satisfies it.
+     * {@code catalog:} peer, is not {@code *} and that no override names binds as the resolver's peer pass binds it,
+     * to the first package of the range's name, highest first, that satisfies the range, else to the highest when it
+     * is of the range's kind; null leaves it to the path walk. A peer cannot be bound from the printed tree as another
+     * edge is: it never gets its own path where the version hoisted above satisfies it.
      */
     private @Nullable Integer resolvePeerDepVersionBased(Dependency dep) {
         if (!options.getRelease().bindsALoadedPeerByVersion() || !dep.behavior.isPeer() ||

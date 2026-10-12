@@ -353,10 +353,10 @@ public final class Lockfile {
     }
 
     /**
-     * {@code tag_workspace_links} (from 1.4.1): a loader rebuilds each dependency from its literal, so it ends by giving
-     * an edge resolved to a workspace the shape a parse of its package.json gives it: a {@code workspace:} edge takes
-     * the workspace's path, and an npm range becomes a workspace edge where {@link #linkedWorkspacePath}, asked with
-     * the workspaces this lockfile records, links it. A range bound to a workspace any other way stays a range.
+     * {@code tag_workspace_links} (from 1.4.1): a loader rebuilds each dependency from its literal, so it ends by
+     * giving an edge resolved to a workspace the shape a parse of its package.json gives it: a {@code workspace:} edge
+     * takes the workspace's path, and an npm range becomes a workspace edge where {@link #linkedWorkspacePath}, asked
+     * with the workspaces this lockfile records, links it. A range bound to a workspace any other way stays a range.
      */
     void tagWorkspaceLinks(boolean linkWorkspacePackages) {
         for (int i = 0; i < dependencies.size(); i++) {

@@ -1305,8 +1305,8 @@ class BunReleaseTest {
     }
 
     /**
-     * bun.lock.rs {@code find_resolution_bounded_at_bundle} (1.4.0): the optional peer c of the bundled b/a is looked up
-     * no higher than b, so that it stays unresolved; before, the walk reaches the root's c.
+     * bun.lock.rs {@code find_resolution_bounded_at_bundle} (1.4.0): the optional peer c of the bundled b/a is looked
+     * up no higher than b, so that it stays unresolved; before, the walk reaches the root's c.
      */
     @Test
     void boundsTheOptionalPeersOfABundleFrom140() {
@@ -1449,7 +1449,8 @@ class BunReleaseTest {
     @Test
     void dedupesAPackagesEdgesToOneNameFrom140() {
         String root = "{\"name\":\"r\",\"workspaces\":[\"packages/w\"]}";
-        String member = "{\"name\":\"w\",\"dependencies\":{\"foo\":\"^1.0.0\"},\"devDependencies\":{\"foo\":\"^2.0.0\"}}";
+        String member = "{\"name\":\"w\",\"dependencies\":{\"foo\":\"^1.0.0\"},\"devDependencies\":" +
+                        "{\"foo\":\"^2.0.0\"}}";
         ManifestSource registry = (url, name, extended) -> "foo".equals(name) ?
           "{\"name\":\"foo\",\"modified\":\"2026-01-01T00:00:00.000Z\",\"dist-tags\":{\"latest\":\"2.0.0\"}," +
           "\"versions\":{" + fooVersion("1.0.0") + "," + fooVersion("2.0.0") + "}}" : null;
@@ -1674,7 +1675,8 @@ class BunReleaseTest {
             Lockfile lockfile = Cleaner.clean(TextLockfileReader.load(lock, options));
             // as assign_resolution renames an edge named by its literal
             lockfile.dependencies.get(dependencyIdOf(lockfile, "r", "c")).name = "a";
-            String workspaces = TextLockfileWriter.saveFromBinary(lockfile, 0, options.getRelease()).split("\"packages\"")[0];
+            String workspaces = TextLockfileWriter.saveFromBinary(lockfile, 0, options.getRelease())
+              .split("\"packages\"")[0];
             assertThat(workspaces.indexOf("\"a\": \"1.0.0\"") < workspaces.indexOf("\"b\": \"1.0.0\"")).as(release)
               .isEqualTo("1.4.1".equals(release));
         }
