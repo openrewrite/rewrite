@@ -623,11 +623,12 @@ final class ResolveDependencies {
             if (!ctx.isHoistPeers()) {
                 return Promise.resolved(ctx.getLoop(), new RootResult(addressesOf(byImporters), time));
             }
-            List<PkgAddress> workspaceRootDeps = new ArrayList<>();
+            List<RootDep> workspaceRootDeps = new ArrayList<>();
             if (ctx.isResolvePeersFromWorkspaceRoot()) {
                 for (int i = 0; i < importers.size(); i++) {
                     if (".".equals(importers.get(i).getOptions().getParentIds().get(0))) {
-                        workspaceRootDeps = byImporters.get(i).getPkgAddresses();
+                        workspaceRootDeps = hoistableRootDeps(importers.get(i), byImporters.get(i).getPkgAddresses(),
+                                ctx.getRelease());
                         break;
                     }
                 }
@@ -640,7 +641,7 @@ final class ResolveDependencies {
     // resolveRootDependencies' while (true): every importer's required peers, then the optional peers it can hoist
     private static Promise<Void> hoistMissingPeers(ResolutionContext ctx, List<ImporterToResolve> importers,
                                                    List<PkgAddressesByImporter> byImporters,
-                                                   List<PkgAddress> workspaceRootDeps,
+                                                   List<RootDep> workspaceRootDeps,
                                                    @Nullable Instant publishedBy) {
         List<Promise<Map<String, List<String>>>> byImporter = new ArrayList<>();
         for (int index = 0; index < byImporters.size(); index++) {
@@ -693,7 +694,7 @@ final class ResolveDependencies {
     // the inner while (true) of one importer: hoist its missing required peers until none is left to hoist
     private static Promise<Map<String, List<String>>> hoistRequiredPeers(
             ResolutionContext ctx, ImporterToResolve importer, PkgAddressesByImporter result,
-            List<PkgAddress> workspaceRootDeps, @Nullable Instant publishedBy,
+            List<RootDep> workspaceRootDeps, @Nullable Instant publishedBy,
             Map<String, List<String>> allMissingOptionalPeers) {
         return Promise.async(ctx.getLoop(), () -> {
             ParentPkgAliases parentPkgAliases = importer.getParentPkgAliases();
@@ -730,7 +731,7 @@ final class ResolveDependencies {
                 return Promise.resolved(ctx.getLoop(), allMissingOptionalPeers);
             }
             Map<String, String> dependencies = hoistPeers(ctx.isAutoInstallPeers(), ctx.getAllPreferredVersions(),
-                    workspaceRootDeps, missingRequiredPeers);
+                    workspaceRootDeps, missingRequiredPeers, ctx.getRelease());
             if (dependencies.isEmpty()) {
                 return Promise.resolved(ctx.getLoop(), allMissingOptionalPeers);
             }
@@ -2029,18 +2030,81 @@ final class ResolveDependencies {
     }
 
     /**
-     * hoistPeers.ts {@code hoistPeers}: the version each missing required peer is installed at.
+     * A dependency of the workspace root a missing peer may be hoisted as: its alias, the name of its package, and
+     * the specifier it is saved with.
+     */
+    @Value
+    static class RootDep {
+        String alias;
+
+        @Nullable
+        Object pkgName;
+
+        @Nullable
+        String normalizedBareSpecifier;
+    }
+
+    // the root's resolved dependencies; from 11.12.0 getHoistableRootDeps, which takes a dependency's wanted
+    // specifier where it saves none, and the wanted ones that resolved to nothing (PnpmRelease#hoistsAPeerInRange)
+    private static List<RootDep> hoistableRootDeps(@Nullable ImporterToResolve rootImporter,
+                                                   List<PkgAddress> rootPkgAddresses, PnpmRelease release) {
+        List<RootDep> rootDeps = new ArrayList<>();
+        Map<String, String> wantedSpecifierByAlias = new LinkedHashMap<>();
+        if (rootImporter != null) {
+            for (WantedDependency wanted : rootImporter.getWantedDependencies()) {
+                if (Js.truthy(wanted.getAlias()) && Js.truthy(wanted.getBareSpecifier())) {
+                    wantedSpecifierByAlias.put(wanted.getAlias(), wanted.getBareSpecifier());
+                }
+            }
+        }
+        boolean hoistable = !wantedSpecifierByAlias.isEmpty() && release.hoistsAPeerInRange();
+        Set<String> coveredAliases = new LinkedHashSet<>();
+        for (PkgAddress pkgAddress : rootPkgAddresses) {
+            String specifier = pkgAddress.getNormalizedBareSpecifier();
+            if (specifier == null && hoistable) {
+                specifier = wantedSpecifierByAlias.get(pkgAddress.getAlias());
+            }
+            rootDeps.add(new RootDep(pkgAddress.getAlias(), pkgAddress.getPkg().get("name"), specifier));
+            coveredAliases.add(pkgAddress.getAlias());
+        }
+        if (hoistable) {
+            for (Map.Entry<String, String> wanted : wantedSpecifierByAlias.entrySet()) {
+                if (!coveredAliases.contains(wanted.getKey())) {
+                    rootDeps.add(new RootDep(wanted.getKey(), unwrapPackageName(wanted.getKey(), wanted.getValue())[0],
+                            wanted.getValue()));
+                }
+            }
+        }
+        return rootDeps;
+    }
+
+    /**
+     * hoistPeers.ts {@code hoistPeers} as 11.2.2 runs it over the root's resolved dependencies.
      */
     static Map<String, String> hoistPeers(boolean autoInstallPeers,
                                           @Nullable Map<String, Map<String, PreferredVersions.Selector>> allPreferred,
                                           List<PkgAddress> workspaceRootDeps,
                                           List<Map.Entry<String, MissingPeerInfo>> missingRequiredPeers) {
+        return hoistPeers(autoInstallPeers, allPreferred, hoistableRootDeps(null, workspaceRootDeps,
+                PnpmRelease.PORTED), missingRequiredPeers, PnpmRelease.PORTED);
+    }
+
+    /**
+     * hoistPeers.ts {@code hoistPeers}: the version each missing required peer is installed at; from 11.12.0 a peer
+     * range, not only an exact version, takes the highest preferred version it satisfies
+     * ({@link PnpmRelease#hoistsAPeerInRange}).
+     */
+    static Map<String, String> hoistPeers(boolean autoInstallPeers,
+                                          @Nullable Map<String, Map<String, PreferredVersions.Selector>> allPreferred,
+                                          List<RootDep> workspaceRootDeps,
+                                          List<Map.Entry<String, MissingPeerInfo>> missingRequiredPeers,
+                                          PnpmRelease release) {
         Map<String, String> dependencies = new LinkedHashMap<>();
         for (Map.Entry<String, MissingPeerInfo> peer : missingRequiredPeers) {
             String peerName = peer.getKey();
             String range = peer.getValue().getRange();
-            PkgAddress rootDepByAlias = null;
-            for (PkgAddress rootDep : workspaceRootDeps) {
+            RootDep rootDepByAlias = null;
+            for (RootDep rootDep : workspaceRootDeps) {
                 if (rootDep.getAlias().equals(peerName)) {
                     rootDepByAlias = rootDep;
                     break;
@@ -2050,9 +2114,9 @@ final class ResolveDependencies {
                 dependencies.put(peerName, rootDepByAlias.getNormalizedBareSpecifier());
                 continue;
             }
-            PkgAddress rootDep = null;
-            for (PkgAddress candidate : workspaceRootDeps) {
-                if (peerName.equals(candidate.getPkg().get("name")) &&
+            RootDep rootDep = null;
+            for (RootDep candidate : workspaceRootDeps) {
+                if (peerName.equals(candidate.getPkgName()) &&
                     (rootDep == null || KeySorting.lexCompare(candidate.getAlias(), rootDep.getAlias()) < 0)) {
                     rootDep = candidate;
                 }
@@ -2073,29 +2137,46 @@ final class ResolveDependencies {
                         nonVersions.add(selector.getKey());
                     }
                 }
+                // 11.2.2 takes the preferred versions an exact peer version names; 11.12.0 those any peer range
+                // satisfies, and where a range none, the range or nothing (PnpmRelease#hoistsAPeerInRange)
                 boolean isExactVersion = NodeSemver.valid(range, NodeSemver.Options.DEFAULT) != null;
-                String satisfyingVersion = isExactVersion ?
+                String exactSatisfying = isExactVersion ?
                         NodeSemver.maxSatisfying(versions, range, NodeSemver.Options.INCLUDE_PRERELEASE) : null;
-                List<String> specs = new ArrayList<>();
-                if (satisfyingVersion != null) {
-                    specs.add(satisfyingVersion);
-                    specs.addAll(nonVersions);
-                    dependencies.put(peerName, String.join(" || ", specs));
-                } else if (isExactVersion && autoInstallPeers) {
-                    dependencies.put(peerName, range);
-                } else {
-                    String highest = NodeSemver.maxSatisfying(versions, "*", NodeSemver.Options.INCLUDE_PRERELEASE);
-                    if (highest != null) {
-                        specs.add(highest);
-                    }
-                    specs.addAll(nonVersions);
-                    dependencies.put(peerName, String.join(" || ", specs));
+                String hoisted = exactSatisfying != null ? join(exactSatisfying, nonVersions) :
+                        isExactVersion && autoInstallPeers ? range : highest(versions, nonVersions);
+                boolean isSemverRange = NodeSemver.validRange(range, NodeSemver.Options.INCLUDE_PRERELEASE) != null;
+                String rangeSatisfying = isSemverRange ?
+                        NodeSemver.maxSatisfying(versions, range, NodeSemver.Options.INCLUDE_PRERELEASE) : null;
+                String inRange = rangeSatisfying != null ? join(rangeSatisfying, nonVersions) :
+                        isSemverRange && !versions.isEmpty() ? autoInstallPeers ? range : null :
+                                highest(versions, nonVersions);
+                String chosen = Objects.equals(hoisted, inRange) || release.hoistsAPeerInRange() ? inRange : hoisted;
+                if (chosen != null) {
+                    dependencies.put(peerName, chosen);
                 }
             } else if (autoInstallPeers) {
                 dependencies.put(peerName, range);
             }
         }
         return dependencies;
+    }
+
+    private static String join(String version, List<String> nonVersions) {
+        List<String> specs = new ArrayList<>();
+        specs.add(version);
+        specs.addAll(nonVersions);
+        return String.join(" || ", specs);
+    }
+
+    // [semver.maxSatisfying(versions, '*'), ...nonVersions].filter(spec => spec != null).join(' || ')
+    private static String highest(List<String> versions, List<String> nonVersions) {
+        List<String> specs = new ArrayList<>();
+        String highest = NodeSemver.maxSatisfying(versions, "*", NodeSemver.Options.INCLUDE_PRERELEASE);
+        if (highest != null) {
+            specs.add(highest);
+        }
+        specs.addAll(nonVersions);
+        return String.join(" || ", specs);
     }
 
     /**

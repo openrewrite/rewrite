@@ -977,6 +977,30 @@ class PnpmReleaseTest {
           .hasMessageContaining("ERR_PNPM_CATALOG_VERSION_MISMATCH");
     }
 
+    private static Map<String, String> hoistFoo(String range, String release) {
+        Map<String, PreferredVersions.Selector> preferred = new LinkedHashMap<>();
+        preferred.put("1.2.0", PreferredVersions.Selector.of("version"));
+        preferred.put("2.0.0", PreferredVersions.Selector.of("version"));
+        Map<String, Map<String, PreferredVersions.Selector>> allPreferred = Collections.singletonMap("foo", preferred);
+        return ResolveDependencies.hoistPeers(true, allPreferred, Collections.emptyList(),
+          Collections.singletonList(new java.util.AbstractMap.SimpleEntry<>("foo",
+            new ResolveDependencies.MissingPeerInfo(range, false))), release(release));
+    }
+
+    /**
+     * installing/deps-resolver hoistPeers.ts (11.12.0): a missing peer's range takes the highest preferred version
+     * it satisfies, or itself; before, only an exact version is matched, and a range takes the highest preferred
+     * version (peer-cycle-bump and small-peer-only-provider-fork record it).
+     */
+    @Test
+    void hoistsAPeerInRangeFrom11120() {
+        assertThat(hoistFoo("^1.0.0", "11.12.0")).containsEntry("foo", "1.2.0");
+        assertThat(hoistFoo("^1.0.0", "11.11.0")).containsEntry("foo", "2.0.0");
+        assertThat(hoistFoo("^3.0.0", "11.12.0")).containsEntry("foo", "^3.0.0");
+        assertThat(hoistFoo("^3.0.0", "11.11.0")).containsEntry("foo", "2.0.0");
+        assertThat(hoistFoo("2.0.0", "11.11.0")).containsEntry("foo", "2.0.0");
+    }
+
     /**
      * installing/deps-resolver hoistPeers.ts (11.5.1, pnpm/pnpm#12075): a version only the lock holds is a candidate
      * for a missing optional peer. #9151 asks it through {@link ResolveDependencies#LOCKED_OPTIONAL_PEER_CANDIDATES},

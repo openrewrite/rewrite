@@ -264,10 +264,15 @@ final class ResolvePeers {
         final Map<String, NodeId> resolvedPeers;
         final Map<String, MissingPeerInfo> missingPeers;
 
-        PeersCacheItem(Deferred depPath, Map<String, NodeId> resolvedPeers, Map<String, MissingPeerInfo> missingPeers) {
+        // the node that resolved it (11.12.0's ownerNodeId)
+        final NodeId ownerNodeId;
+
+        PeersCacheItem(Deferred depPath, Map<String, NodeId> resolvedPeers, Map<String, MissingPeerInfo> missingPeers,
+                       NodeId ownerNodeId) {
             this.depPath = depPath;
             this.resolvedPeers = resolvedPeers;
             this.missingPeers = missingPeers;
+            this.ownerNodeId = ownerNodeId;
         }
     }
 
@@ -295,6 +300,13 @@ final class ResolvePeers {
         final Map<String, NodeId> nodeIdsByPreviousDepPath;
         final @Nullable Map<NodeId, String> resolvedPeerProviderPaths;
         final List<CurrentProviderSource> currentProviderSources;
+
+        // 11.12.0: which nodes wait on which peers' paths, whose peers cache a node took, and the nodes whose
+        // path a cycle settled as name@version
+        final Map<NodeId, Set<NodeId>> awaitedPeerNodeIdsByNodeId = new LinkedHashMap<>();
+        final Map<NodeId, NodeId> peersCacheOwnerByNodeId = new LinkedHashMap<>();
+        final Set<NodeId> cycleBrokenNodeIds = new LinkedHashSet<>();
+        @Nullable Ctx run;
 
         Ctx(Set<String> allPeerDepNames, Map<NodeId, Map<String, ParentPkgInfo>> parentPkgsOfNode,
             Map<NodeId, DependenciesTreeNode> dependenciesTree, Map<String, DependenciesGraphNode> depGraph,
@@ -328,17 +340,26 @@ final class ResolvePeers {
         }
 
         Ctx with(List<NodeId> parentNodeIds, List<String> parentDepPathsChain) {
-            return new Ctx(allPeerDepNames, parentPkgsOfNode, dependenciesTree, depGraph, pathsByNodeId,
+            Ctx copy = new Ctx(allPeerDepNames, parentPkgsOfNode, dependenciesTree, depGraph, pathsByNodeId,
                     pathsByNodeIdPromises, depPathsByPkgId, peersCache, peerDependencyIssues, purePkgs, dedupePeers,
                     peersSuffixMaxLength, microtasks, parentNodeIds, parentDepPathsChain, pending, release,
                     nodeIdsByPreviousDepPath, resolvedPeerProviderPaths, currentProviderSources);
+            copy.run = shared();
+            return copy;
         }
 
         Ctx forProject(PeerDependencyIssues issues, List<CurrentProviderSource> sources) {
-            return new Ctx(allPeerDepNames, parentPkgsOfNode, dependenciesTree, depGraph, pathsByNodeId,
+            Ctx copy = new Ctx(allPeerDepNames, parentPkgsOfNode, dependenciesTree, depGraph, pathsByNodeId,
                     pathsByNodeIdPromises, depPathsByPkgId, peersCache, issues, purePkgs, dedupePeers,
                     peersSuffixMaxLength, microtasks, parentNodeIds, parentDepPathsChain, pending, release,
                     nodeIdsByPreviousDepPath, resolvedPeerProviderPaths, sources);
+            copy.run = shared();
+            return copy;
+        }
+
+        // the context of the whole run, which holds what 11.12.0 tracks across it
+        Ctx shared() {
+            return run == null ? this : run;
         }
 
         void drain() {
@@ -463,6 +484,9 @@ final class ResolvePeers {
             }
         }
         base.drain();
+        if (pending[0] != 0 && breakDepPathAwaitCycles(base, dependenciesTree) && release.breaksPeerPathAwaitCycles()) {
+            base.drain();
+        }
         if (pending[0] != 0) {
             throw new IllegalStateException("peers of " + pending[0] + " dependency paths never settled");
         }
@@ -634,6 +658,71 @@ final class ResolvePeers {
             peerPathPromise.resolve(previousPeerDepPath);
             parentPkgs.put(peerName, lockedPeer);
         }
+    }
+
+    /**
+     * breakDepPathAwaitCycles (11.12.0): each node whose peer path waits, through peers' paths or the peers cache it
+     * took, in a cycle of nodes that wait on each other gets its {@code name@version}. Whether there is such a cycle;
+     * its paths are resolved only where the release breaks them, the caller asking it once there is one.
+     */
+    private static boolean breakDepPathAwaitCycles(Ctx run, Map<NodeId, DependenciesTreeNode> dependenciesTree) {
+        Set<NodeId> awaitingNodeIds = new LinkedHashSet<>(run.awaitedPeerNodeIdsByNodeId.keySet());
+        awaitingNodeIds.addAll(run.peersCacheOwnerByNodeId.keySet());
+        Map<NodeId, String> keysByNodeId = new LinkedHashMap<>();
+        Map<String, NodeId> nodeIdsByKey = new LinkedHashMap<>();
+        Map<String, List<String>> graph = new LinkedHashMap<>();
+        for (NodeId nodeId : awaitingNodeIds) {
+            if (run.pathsByNodeId.containsKey(nodeId) || run.cycleBrokenNodeIds.contains(nodeId)) {
+                continue;
+            }
+            NodeId cacheOwnerNodeId = run.peersCacheOwnerByNodeId.get(nodeId);
+            Set<NodeId> awaitedNodeIds = run.awaitedPeerNodeIdsByNodeId.get(nodeId);
+            if (awaitedNodeIds == null && cacheOwnerNodeId != null) {
+                awaitedNodeIds = run.awaitedPeerNodeIdsByNodeId.get(cacheOwnerNodeId);
+            }
+            if (awaitedNodeIds == null) {
+                continue;
+            }
+            List<String> liveTargets = new ArrayList<>();
+            for (NodeId awaitedNodeId : awaitedNodeIds) {
+                if (!run.pathsByNodeId.containsKey(awaitedNodeId) && !run.cycleBrokenNodeIds.contains(awaitedNodeId)) {
+                    liveTargets.add(keyOf(awaitedNodeId, keysByNodeId, nodeIdsByKey));
+                }
+            }
+            if (!liveTargets.isEmpty()) {
+                graph.put(keyOf(nodeId, keysByNodeId, nodeIdsByKey), liveTargets);
+            }
+        }
+        if (graph.isEmpty()) {
+            return false;
+        }
+        Set<String> inCycles = new LinkedHashSet<>();
+        for (List<String> cycle : GraphCycles.cycles(graph)) {
+            inCycles.addAll(cycle);
+        }
+        if (inCycles.isEmpty() || !run.release.breaksPeerPathAwaitCycles()) {
+            return !inCycles.isEmpty();
+        }
+        for (String key : inCycles) {
+            NodeId nodeId = nodeIdsByKey.get(key);
+            ResolvedPackage resolvedPackage = dependenciesTree.get(nodeId).getResolvedPackage();
+            run.cycleBrokenNodeIds.add(nodeId);
+            Deferred deferred = run.pathsByNodeIdPromises.get(nodeId);
+            if (deferred != null) {
+                deferred.resolve(resolvedPackage.getName() + "@" + resolvedPackage.getVersion());
+            }
+        }
+        return true;
+    }
+
+    private static String keyOf(NodeId nodeId, Map<NodeId, String> keysByNodeId, Map<String, NodeId> nodeIdsByKey) {
+        String key = keysByNodeId.get(nodeId);
+        if (key == null) {
+            key = String.valueOf(keysByNodeId.size());
+            keysByNodeId.put(nodeId, key);
+            nodeIdsByKey.put(key, nodeId);
+        }
+        return key;
     }
 
     private static CurrentProviderSource currentProviderSource(ProjectToResolve project) {
@@ -816,6 +905,7 @@ final class ResolvePeers {
                         .add(new MissingPeerIssue(getLocationFromParentNodeIds(ctx.dependenciesTree, parentNodeIds),
                                 missing.getValue().isOptional(), missing.getValue().getRange()));
             }
+            ctx.shared().peersCacheOwnerByNodeId.put(nodeId, hit.ownerNodeId);
             ctx.pending[0]++;
             hit.depPath.then(depPath -> {
                 ctx.pathsByNodeId.put(nodeId, depPath);
@@ -853,7 +943,7 @@ final class ResolvePeers {
         if (isPure) {
             ctx.purePkgs.add(pkgIdWithPatchHash);
         } else {
-            cache = new PeersCacheItem(new Deferred(ctx.microtasks), allResolvedPeers, allMissingPeers);
+            cache = new PeersCacheItem(new Deferred(ctx.microtasks), allResolvedPeers, allMissingPeers, nodeId);
             ctx.peersCache.computeIfAbsent(pkgIdWithPatchHash, k -> new ArrayList<>()).add(cache);
         }
         PeersCacheItem cacheItem = cache;
@@ -878,14 +968,14 @@ final class ResolvePeers {
                 addDepPathToGraph.accept(pkgIdWithPatchHash +
                                          DepPath.createPeerDepGraphHash(peerIds, ctx.peersSuffixMaxLength));
             } else {
-                calculateDepPathIfNeeded = cycles -> calculateDepPath(ctx, currentAlias, pkgIdWithPatchHash, peerIds,
-                        pendingPeers, cycles, addDepPathToGraph);
+                calculateDepPathIfNeeded = cycles -> calculateDepPath(ctx, nodeId, currentAlias, pkgIdWithPatchHash,
+                        peerIds, pendingPeers, cycles, addDepPathToGraph);
             }
         }
         return new NodeResolution(allResolvedPeers, allMissingPeers, calculateDepPathIfNeeded);
     }
 
-    private static void calculateDepPath(Ctx ctx, String currentAlias, String pkgIdWithPatchHash,
+    private static void calculateDepPath(Ctx ctx, NodeId nodeId, String currentAlias, String pkgIdWithPatchHash,
                                          List<DepPath.PeerId> peerIds, List<PendingPeer> pendingPeerNodes,
                                          List<List<String>> cycles, Consumer<String> addDepPathToGraph) {
         Set<String> cyclicPeerAliases = new LinkedHashSet<>();
@@ -908,6 +998,7 @@ final class ResolvePeers {
             if (cyclicPeerAliases.contains(alias)) {
                 ResolvedPackage peer = ctx.dependenciesTree.get(peerNodeId).getResolvedPackage();
                 String id = peer.getName() + "@" + peer.getVersion();
+                ctx.shared().cycleBrokenNodeIds.add(peerNodeId);
                 Deferred deferred = ctx.pathsByNodeIdPromises.get(peerNodeId);
                 if (deferred != null) {
                     deferred.resolve(id);
@@ -923,6 +1014,8 @@ final class ResolvePeers {
                     continue;
                 }
             }
+            ctx.shared().awaitedPeerNodeIdsByNodeId.computeIfAbsent(nodeId, k -> new LinkedHashSet<>())
+                    .add(peerNodeId);
             awaited.add(ctx.pathsByNodeIdPromises.get(peerNodeId));
             awaitedAt.add(i);
         }

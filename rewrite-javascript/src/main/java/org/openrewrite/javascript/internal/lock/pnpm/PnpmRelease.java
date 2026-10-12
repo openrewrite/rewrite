@@ -459,6 +459,24 @@ public final class PnpmRelease {
         return atLeast(11, 5, 2);
     }
 
+    /**
+     * A missing peer's range, not only an exact version, takes the highest preferred version it satisfies, and where
+     * none does, the range itself under autoInstallPeers or nothing; the workspace root's dependencies it may be
+     * hoisted as include those wanted but not resolved, by their wanted specifier, from 11.12.0; before, a range takes
+     * the highest preferred version of any.
+     */
+    boolean hoistsAPeerInRange() {
+        return atLeast(11, 12, 0);
+    }
+
+    /**
+     * Nodes whose peer paths wait on each other in a cycle are given their {@code name@version}, from 11.12.0
+     * (breakDepPathAwaitCycles); before, pnpm waits for them forever.
+     */
+    boolean breaksPeerPathAwaitCycles() {
+        return atLeast(11, 12, 0);
+    }
+
     // @pnpm/installing.deps-resolver src/hoistPeers.ts (ResolveDependencies.LOCKED_OPTIONAL_PEER_CANDIDATES)
 
     /**
