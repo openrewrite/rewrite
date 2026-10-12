@@ -49,6 +49,12 @@ final class TextLockfileWriter {
         }
         TrustedDependencies<String[]> foundPatchedDependencies = new TrustedDependencies<>();
         foundPatchedDependencies.ensureTotalCapacity(lockfile.patchedDependencies.size());
+        // before 1.2.8 the overrides a dependency of the tree is named for, by the name's hash
+        boolean writesEveryOverride = release.writesEveryOverride();
+        TrustedDependencies<String[]> foundOverrides = new TrustedDependencies<>();
+        if (!writesEveryOverride) {
+            foundOverrides.ensureTotalCapacity(lockfile.overrides.map.size());
+        }
 
         Tree.Iterator pkgsIter = new Tree.Iterator(lockfile);
         int[] indent = {0};
@@ -112,6 +118,12 @@ final class TextLockfileWriter {
                 if (lockfile.trustedDependencies != null && lockfile.trustedDependencies.contains((int) dep.nameHash)) {
                     foundTrustedDependencies.put(dep.nameHash, dep.name);
                 }
+                if (!writesEveryOverride && !lockfile.overrides.map.isEmpty()) {
+                    Dependency override = lockfile.overrides.map.get(dep.nameHash);
+                    if (override != null) {
+                        foundOverrides.put(dep.nameHash, new String[]{dep.name, override.version.literal});
+                    }
+                }
             }
         }
         pkgsIter.reset();
@@ -137,17 +149,30 @@ final class TextLockfileWriter {
             indent[0]++;
             for (String[] value : foundPatchedDependencies.values()) {
                 writeIndent(writer, indent);
-                Strings.appendJsonString(writer, value[0], true, release);
+                appendOverrideOrPatchString(writer, value[0], release);
                 writer.append(": ");
-                Strings.appendJsonString(writer, value[1], true, release);
+                appendOverrideOrPatchString(writer, value[1], release);
                 writer.append(",\n");
             }
             decIndent(writer, indent);
             writer.append("},\n");
         }
 
-        if (!lockfile.overrides.isEmpty()) {
-            lockfile.overrides.sort();
+        if (!writesEveryOverride) {
+            if (foundOverrides.count() > 0) {
+                writeIndent(writer, indent);
+                writer.append("\"overrides\": {\n");
+                indent[0]++;
+                for (String[] value : foundOverrides.values()) {
+                    writeOverrideRule(writer, indent[0], value[0], "", value[1], release);
+                }
+                decIndent(writer, indent);
+                writer.append("},\n");
+            }
+        } else if (!lockfile.overrides.isEmpty()) {
+            if (release.sortsOverridesInBunLock()) {
+                lockfile.overrides.sort();
+            }
             writeIndent(writer, indent);
             writer.append("\"overrides\": {\n");
             indent[0]++;
@@ -564,10 +589,19 @@ final class TextLockfileWriter {
     private static void writeOverrideRule(StringBuilder writer, int indent, String name, String range, String value,
                                           BunRelease release) {
         writeIndent(writer, new int[]{indent});
-        Strings.appendJsonString(writer, overrideSelectorKey(name, range), true, release);
+        appendOverrideOrPatchString(writer, overrideSelectorKey(name, range), release);
         writer.append(": ");
-        Strings.appendJsonString(writer, value, true, release);
+        appendOverrideOrPatchString(writer, value, release);
         writer.append(",\n");
+    }
+
+    // a key or value of the overrides or the patched dependencies: before 1.2.3 quoted as it is
+    private static void appendOverrideOrPatchString(StringBuilder writer, String s, BunRelease release) {
+        if (release.escapesOverridesAndPatchesInBunLock()) {
+            Strings.appendJsonString(writer, s, true, release);
+        } else {
+            writer.append('"').append(s).append('"');
+        }
     }
 
     // a group of write_override_rules: a parent's, or a ranged rule's without a parent, both keyed name[@range]

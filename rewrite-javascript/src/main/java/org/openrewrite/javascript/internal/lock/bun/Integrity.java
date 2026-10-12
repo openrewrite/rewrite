@@ -15,6 +15,8 @@
  */
 package org.openrewrite.javascript.internal.lock.bun;
 
+import org.openrewrite.javascript.internal.lock.CannotKnow;
+
 import java.util.Arrays;
 import java.util.Base64;
 
@@ -127,17 +129,21 @@ final class Integrity {
 
     /**
      * {@code parse}: the whole string is one hash; from 1.4.0 the strongest of the hashes it holds separated by ASCII
-     * whitespace, each read up to a {@code ?} ({@link BunRelease#keepsTheStrongestOfSeveralHashes()}).
+     * whitespace, each read up to a {@code ?} ({@link BunRelease#keepsTheStrongestOfSeveralHashes()}); before 1.2.20
+     * decoded from its eighth character ({@link BunRelease#decodesAnIntegrityPastItsAlgorithm()}), and before 1.2.21
+     * into 64 bytes whatever its algorithm ({@link BunRelease#refusesAnIntegrityLongerThanItsDigest()}).
+     *
+     * @throws CannotKnow before 1.2.21 for a hash of more than 64 bytes, which bun decodes past its buffer
      */
     static Integrity parse(String buf, BunRelease release) {
         if (!release.keepsTheStrongestOfSeveralHashes()) {
-            return parseEntry(buf, false);
+            return parseEntry(buf, false, release);
         }
         Integrity strongest = UNKNOWN;
         int start = 0;
         for (int i = 0; i <= buf.length(); i++) {
             if (i == buf.length() || isAsciiWhitespace(buf.charAt(i))) {
-                Integrity parsed = parseEntry(buf.substring(start, i), true);
+                Integrity parsed = parseEntry(buf.substring(start, i), true, release);
                 if (parsed.tag.ordinal() > strongest.tag.ordinal()) {
                     strongest = parsed;
                 }
@@ -153,12 +159,13 @@ final class Integrity {
     }
 
     // parse_entry, the hash read up to a '?' from 1.4.0
-    private static Integrity parseEntry(String buf, boolean cutAtQuery) {
+    private static Integrity parseEntry(String buf, boolean cutAtQuery, BunRelease release) {
         if (buf.length() < "sha256-".length()) {
             return UNKNOWN;
         }
         int dash = buf.substring(0, Math.min(buf.length(), 7)).indexOf('-');
-        if (dash < 0 || buf.length() <= dash + 1) {
+        boolean pastAlgorithm = release.decodesAnIntegrityPastItsAlgorithm();
+        if (dash < 0 || pastAlgorithm && buf.length() <= dash + 1) {
             return UNKNOWN;
         }
         Tag tag;
@@ -178,7 +185,8 @@ final class Integrity {
             default:
                 return UNKNOWN;
         }
-        String hash = buf.substring(dash + 1);
+        // before 1.2.20 from past "sha256-" whatever the algorithm, two characters into a sha1's hash
+        String hash = buf.substring(pastAlgorithm ? dash + 1 : "sha256-".length());
         int query = cutAtQuery ? hash.indexOf('?') : -1;
         String input = Strings.trimRight(query >= 0 ? hash.substring(0, query) : hash, "=");
         int leftover = input.length() % 4;
@@ -186,8 +194,13 @@ final class Integrity {
             return UNKNOWN;
         }
         int decodedSize = input.length() / 4 * 3 + leftover * 3 / 4;
-        if (decodedSize > tag.digestLen) {
-            return UNKNOWN;
+        if (release.refusesAnIntegrityLongerThanItsDigest()) {
+            if (decodedSize > tag.digestLen) {
+                return UNKNOWN;
+            }
+        } else if (decodedSize > DIGEST_BUF_LEN && writesPastTheBuffer(input)) {
+            throw new CannotKnow("what bun " + release + " makes of the integrity " + buf + ", whose hash it decodes " +
+                                 "past its 64-byte buffer");
         }
         byte[] out = new byte[DIGEST_BUF_LEN];
         int acc = 0;
@@ -209,6 +222,17 @@ final class Integrity {
             return UNKNOWN;
         }
         return new Integrity(tag, out);
+    }
+
+    // std.base64 Decoder.decode into 64 bytes: its chunked loops stop short of the buffer's end, and the byte-a-time
+    // loop after them writes the 65th byte at the 87th character unchecked, unless a character before it is invalid
+    private static boolean writesPastTheBuffer(String input) {
+        for (int k = 0; k <= 86; k++) {
+            if (base64Index(input.charAt(k)) < 0) {
+                return false;
+            }
+        }
+        return true;
     }
 
     private static int base64Index(char c) {

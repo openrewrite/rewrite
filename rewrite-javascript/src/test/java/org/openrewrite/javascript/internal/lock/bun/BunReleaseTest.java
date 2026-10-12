@@ -225,6 +225,466 @@ class BunReleaseTest {
     }
 
     /**
+     * integrity.zig Integrity.parse (1.2.20, 1.2.21): a sha1 is decoded from past its {@code -} from 1.2.20, and a
+     * hash longer than its digest is unknown from 1.2.21. As a lock's sha1 of 20 bytes and sha1 of 32 bytes are
+     * written back: 1.2.19 both {@code ""}; 1.2.20 both, the second cut to 20 bytes; 1.2.21 the first alone.
+     */
+    @Test
+    void decodesAnIntegrityPastItsAlgorithmFrom1220AndRefusesOneLongerThanItsDigestFrom1221() {
+        String sha1 = "sha1-AQIDBAUGBwgJCgsMDQ4PEBESExQ=";
+        String long32 = "sha1-AQIDBAUGBwgJCgsMDQ4PEBESExQVFhcYGRobHB0eHyA=";
+        assertThat(Integrity.parse(sha1, BunRelease.of("1.2.20"))).hasToString(sha1);
+        assertThat(Integrity.parse(sha1, BunRelease.of("1.2.19"))).hasToString("");
+        assertThat(Integrity.parse(long32, BunRelease.of("1.2.21"))).hasToString("");
+        assertThat(Integrity.parse(long32, BunRelease.of("1.2.20"))).hasToString(sha1);
+        assertThat(Integrity.parse(long32, BunRelease.of("1.2.19"))).hasToString("");
+        assertThat(Integrity.parse("sha256-", BunRelease.of("1.2.19")))
+          .hasToString("sha256-AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA==");
+        assertThat(Integrity.parse("sha256-", BunRelease.of("1.2.20"))).hasToString("");
+
+        String lock = lock("", "\"ms\": [\"ms@2.1.3\", \"\", {}, \"" + sha1 + "\"],");
+        assertThat(writtenBack("1.2.20", lock)).isEqualTo(lock);
+        assertThat(writtenBack("1.2.19", lock)).isEqualTo(lock.replace(sha1, ""));
+
+        StringBuilder past64 = new StringBuilder("sha512-");
+        for (int i = 0; i < 88; i++) {
+            past64.append('A');
+        }
+        assertThatThrownBy(() -> Integrity.parse(past64.toString(), BunRelease.of("1.2.20")))
+          .isInstanceOf(CannotKnow.class)
+          .hasMessageContaining("past its 64-byte buffer");
+        assertThat(Integrity.parse(past64.toString(), BunRelease.of("1.2.21"))).hasToString("");
+        assertThat(Integrity.parse(past64.toString().replaceFirst("AAAA", "!AAA"), BunRelease.of("1.2.20")))
+          .hasToString("");
+    }
+
+    /**
+     * migration.zig (1.2.23): a pnpm-lock.yaml is migrated where no package-lock.json or yarn.lock comes first, and
+     * package.json rewritten; before, it is ignored, so that only a bun.lockb stops the walk for the install root.
+     * (Beside a pnpm-lock.yaml, 1.2.23 prints {@code migrated lockfile from pnpm-lock.yaml}; 1.2.22 installs afresh.)
+     */
+    @Test
+    void migratesAPnpmLockFrom1223() {
+        java.util.Set<String> pnpm = java.util.Collections.singleton("pnpm-lock.yaml");
+        assertThat(Lockfile.rewritesAnotherFile(pnpm::contains, BunRelease.of("1.2.23"))).isTrue();
+        assertThat(Lockfile.rewritesAnotherFile(pnpm::contains, BunRelease.of("1.2.22"))).isFalse();
+        java.util.Set<String> yarnFirst = new java.util.HashSet<>(java.util.Arrays.asList("pnpm-lock.yaml", "yarn.lock"));
+        assertThat(Lockfile.rewritesAnotherFile(yarnFirst::contains, BunRelease.of("1.2.23"))).isFalse();
+        java.util.Set<String> lockb = java.util.Collections.singleton("bun.lockb");
+        assertThat(Lockfile.rewritesAnotherFile(lockb::contains, BunRelease.of("1.2.0"))).isTrue();
+    }
+
+    /**
+     * install_with_manager.zig runAndWait (1.2.22): bunfig's security scanner runs for {@code bun install} too, whose
+     * verdict the engine cannot know; 1.2.21 runs it for {@code bun add} alone. (A lock-only install naming a scanner
+     * not installed: 1.2.21 saves the lock; 1.2.22 {@code error: Security scanner 'zz-no-such-scanner' is configured in
+     * bunfig.toml but is not installed.})
+     */
+    @Test
+    void runsTheSecurityScannerOnInstallFrom1222() {
+        String bunfig = "[install.security]\nscanner = \"@acme/bun-scanner\"\n";
+        assertThat(BunOptions.load(BunRelease.of("1.2.22"), bunfig, null, null, HostEnvironment.UNKNOWN)
+          .getSecurityScanner()).isEqualTo("@acme/bun-scanner");
+        assertThat(BunOptions.load(BunRelease.of("1.2.21"), bunfig, null, null, HostEnvironment.UNKNOWN)
+          .getSecurityScanner()).isNull();
+        BunLockRegenerator.Inputs.InputsBuilder inputs = BunLockRegenerator.Inputs.builder()
+          .lock(EMPTY_ROOT)
+          .manifest("", "{\"name\":\"root\",\"dependencies\":{\"ms\":\"2.1.3\"}}")
+          .bunfig(bunfig)
+          .now(java.time.Instant.parse("2026-10-11T00:00:00Z"));
+        ManifestSource registry = (url, name, extended) -> "ms".equals(name) ?
+          registryPackument("ms", "2.1.3", registryVersion("ms", "2.1.3", "")) : null;
+        assertThat(failure(new BunLockRegenerator(inputs.release(BunRelease.of("1.3.10")).build(), registry)
+          .regenerate()))
+          .startsWith("CANNOT_KNOW the engine cannot know whether bun 1.3.10 saves the lock past the security scanner");
+        assertThat(written(new BunLockRegenerator(inputs.release(BunRelease.of("1.2.21")).build(), registry)
+          .regenerate())).contains("\"ms\": [\"ms@2.1.3\"");
+    }
+
+    /**
+     * ini.zig loadNpmrcConfig (1.2.13): an .npmrc's byte order mark is dropped; before, it starts the first key. (With
+     * bunfig naming one local registry and such an .npmrc another, 1.2.13 asks the .npmrc's, 1.2.12 bunfig's.)
+     */
+    @Test
+    void stripsTheByteOrderMarkOfNpmrcFrom1213() {
+        String npmrc = "﻿registry=https://registry.npmmirror.com/\n";
+        assertThat(options("1.2.13", npmrc).scopeForPackageName("ms")).isEqualTo("https://registry.npmmirror.com/");
+        assertThat(options("1.2.12", npmrc).scopeForPackageName("ms")).isEqualTo("https://registry.npmjs.org/");
+    }
+
+    /**
+     * bunfig.zig (1.2.16) and ini.zig loadNpmrc (1.2.19): {@code linkWorkspacePackages} and
+     * {@code link-workspace-packages} are read from those releases; before, neither is a setting. (Turned off, a
+     * root's {@code "a": "1.0.0"} beside the member a 1.0.0 goes to the registry with 1.2.16 and 1.2.19 and links the
+     * member with 1.2.15 and 1.2.18.)
+     */
+    @Test
+    void readsLinkWorkspacePackagesFromBunfigFrom1216AndNpmrcFrom1219() {
+        String bunfig = "[install]\nlinkWorkspacePackages = false\n";
+        assertThat(BunOptions.load(BunRelease.of("1.2.16"), bunfig, null, null, HostEnvironment.UNKNOWN)
+          .isLinkWorkspacePackages()).isFalse();
+        assertThat(BunOptions.load(BunRelease.of("1.2.15"), bunfig, null, null, HostEnvironment.UNKNOWN)
+          .isLinkWorkspacePackages()).isTrue();
+        String npmrc = "link-workspace-packages=false\n";
+        assertThat(options("1.2.19", npmrc).isLinkWorkspacePackages()).isFalse();
+        assertThat(options("1.2.18", npmrc).isLinkWorkspacePackages()).isTrue();
+    }
+
+    /**
+     * toml_parser.zig parseValue (1.2.16): {@code [[} is one token again after an inline table's close; before, a
+     * table array header there is two {@code [}s, and bunfig does not parse ({@code bun install} of 1.2.15:
+     * {@code error: Expected key but found [}, {@code SyntaxError: failed to load bunfig}; 1.2.16 installs).
+     */
+    @Test
+    void lexesADoubleBracketAfterAValueFrom1216() {
+        String bunfig = "[install]\nscopes = { a = \"https://a.example/\" }\n[[x]]\ny = 1\n";
+        assertThat(Toml.parse(bunfig, BunRelease.of("1.2.16")).getObject("install")).isNotNull();
+        assertThatThrownBy(() -> Toml.parse(bunfig, BunRelease.of("1.2.15")))
+          .isInstanceOf(Toml.SyntaxError.class)
+          .hasMessage("Expected key but found [");
+        String afterAnArray = "[install]\nx = [1]\n[[x]]\ny = 1\n";
+        assertThat(Toml.parse(afterAnArray, BunRelease.of("1.2.15")).getObject("install")).isNotNull();
+    }
+
+    /**
+     * lockfile.zig Package.parseWithJSON (1.2.14): a workspaces object without packages declares none; before, it
+     * fails as a value neither array nor object does, with the old wording ({@code "workspaces": {"nohoist": []}}:
+     * 1.2.13 {@code error: Workspaces expects an array of strings, e.g.}; 1.2.14 installs).
+     */
+    @Test
+    void acceptsAWorkspacesObjectWithoutPackagesFrom1214() {
+        String catalogOnly = "{\"name\":\"r\",\"workspaces\":{\"catalog\":{\"ms\":\"2.1.3\"}}}";
+        assertThat(rootParseErrors("1.2.14", catalogOnly)).isEmpty();
+        assertThat(rootParseErrors("1.2.13", catalogOnly)).containsExactly("Workspaces expects an array of strings");
+        String string = "{\"name\":\"r\",\"workspaces\":\"packages/*\"}";
+        assertThat(rootParseErrors("1.2.14", string)).containsExactly("\"workspaces\" expects an array of strings");
+        assertThat(rootParseErrors("1.2.13", string)).containsExactly("Workspaces expects an array of strings");
+    }
+
+    // the errors parsing the root's package.json logs
+    private static List<String> rootParseErrors(String release, String manifest) {
+        Log log = new Log();
+        try {
+            new Package().parseWithJSON(new Lockfile(BunRelease.of(release)), options(release, null), log, "",
+              Json.parse(manifest), Features.MAIN, java.util.Collections.singletonMap("", manifest));
+        } catch (IllegalArgumentException e) {
+            assertThat(e).hasMessage("InvalidPackageJSON");
+        }
+        return log.errors;
+    }
+
+    /**
+     * The recipes' reading of catalogs: none before 1.2.14 ({@code catalog:} a git spec), the workspaces object's
+     * alone before 1.2.19, the root's own where the workspaces hold none from 1.2.19.
+     */
+    @Test
+    void theRecipesReadCatalogsAsTheReleaseDoes() {
+        String topLevel = "{\"name\":\"r\",\"workspaces\":[\"packages/*\"],\"catalog\":{\"ms\":\"2.1.3\"}}";
+        String nested = "{\"name\":\"r\",\"workspaces\":{\"packages\":[\"packages/*\"],\"catalog\":{\"ms\":\"2.1.3\"}}}";
+        BunManifestRules before = BunManifestRules.of(BunRelease.of("1.2.13"));
+        assertThat(before.catalogFile()).isNull();
+        assertThat(before.catalogsAt(nested)).isNull();
+        assertThat(before.catalogOf("catalog:")).isNull();
+        BunManifestRules workspacesOnly = BunManifestRules.of(BunRelease.of("1.2.18"));
+        assertThat(workspacesOnly.catalogsAt(nested)).containsExactly("workspaces");
+        assertThat(workspacesOnly.catalogsAt(topLevel)).isNull();
+        assertThat(workspacesOnly.catalogs(nested)).containsOnlyKeys("");
+        assertThat(workspacesOnly.catalogOf("catalog:")).isEqualTo("");
+        BunManifestRules later = BunManifestRules.of(BunRelease.of("1.2.19"));
+        assertThat(later.catalogsAt(topLevel)).isEmpty();
+        assertThat(later.catalogs(topLevel).get("")).containsEntry("ms", "2.1.3");
+    }
+
+    /**
+     * default-trusted-dependencies.txt: {@code opencode-ai} from 1.2.16, {@code yarn} until 1.2.19,
+     * {@code @anthropic-ai/claude-code} from 1.3.12.
+     */
+    @Test
+    void trustsTheDefaultListOfTheRelease() {
+        int opencode = (int) Wyhash11.stringHash("opencode-ai");
+        int yarn = (int) Wyhash11.stringHash("yarn");
+        int claude = (int) Wyhash11.stringHash("@anthropic-ai/claude-code");
+        assertThat(DefaultTrustedDependencies.of(BunRelease.of("1.2.16"))).contains(opencode, yarn).doesNotContain(claude);
+        assertThat(DefaultTrustedDependencies.of(BunRelease.of("1.2.15"))).contains(yarn).doesNotContain(opencode);
+        assertThat(DefaultTrustedDependencies.of(BunRelease.of("1.2.19"))).contains(opencode).doesNotContain(yarn);
+        assertThat(DefaultTrustedDependencies.of(BunRelease.of("1.3.12"))).contains(claude);
+        assertThat(DefaultTrustedDependencies.of(BunRelease.of("1.3.11"))).doesNotContain(claude)
+          .isEqualTo(DefaultTrustedDependencies.HASHES);
+    }
+
+    /**
+     * js_printer.zig writePreQuotedString over highway_strings.cpp's escape search (1.2.11 until 1.3.0): a tab in the
+     * last {@code len % N} bytes after a printed character is written as it is. As the darwin-arm64 releases (N = 16)
+     * write a root named {@code p<tab>q}: 1.2.10 and 1.3.0 {@code "p\tq"}, 1.2.11 and 1.2.23 the tab itself; and
+     * {@code p<tab>} and 20 {@code q}s escaped by 1.2.11, the tab in its vectors, which wider ones would not hold.
+     */
+    @Test
+    void leavesATabInTheEscapeSearchsTailFrom1211Until130() {
+        assertThat(json("p\tq", "1.3.0")).isEqualTo("\"p\\tq\"");
+        assertThat(json("p\tq", "1.2.10")).isEqualTo("\"p\\tq\"");
+        assertThat(json("p\tq", "1.2.11")).isEqualTo("\"p\tq\"");
+        assertThat(json("p\tq", "1.2.23")).isEqualTo("\"p\tq\"");
+        assertThat(json("\tq", "1.2.11")).isEqualTo("\"\\tq\"");
+        StringBuilder q = new StringBuilder();
+        for (int i = 0; i < 80; i++) {
+            q.append('q');
+        }
+        // 81 bytes after the p: the tab is in the vectors of every width
+        assertThat(json("p\t" + q, "1.2.11")).startsWith("\"p\\tq");
+        // 21 bytes: in 16 lanes' vectors, in 32 lanes' scalar tail
+        assertThatThrownBy(() -> json("p\t" + q.substring(0, 20), "1.2.11"))
+          .isInstanceOf(CannotKnow.class)
+          .hasMessageContaining("vector width");
+    }
+
+    private static String json(String text, String release) {
+        StringBuilder out = new StringBuilder();
+        Strings.appendJsonString(out, text, true, BunRelease.of(release));
+        return out.toString();
+    }
+
+    /**
+     * bun.lock.zig Stringifier (1.2.3): overrides and patched dependencies are JSON-escaped; before, written as they
+     * are (an override {@code "x": "file:./a\"b"} the tree uses: 1.2.2 writes {@code "x": "file:./a"b",}, 1.2.3
+     * {@code "x": "file:./a\"b",}).
+     */
+    @Test
+    void escapesOverridesAndPatchedDependenciesFrom123() {
+        String lock = lock("  \"patchedDependencies\": {\n    \"ms@2.1.3\": \"patches\\\\ms.patch\",\n  },\n" +
+                           "  \"overrides\": {\n    \"ms\": \"file:..\\\\ms\",\n  },\n", MS);
+        assertThat(writtenBack("1.2.3", lock))
+          .contains("    \"ms@2.1.3\": \"patches\\\\ms.patch\",\n")
+          .contains("    \"ms\": \"file:..\\\\ms\",\n");
+        assertThat(writtenBack("1.2.2", lock))
+          .contains("    \"ms@2.1.3\": \"patches\\ms.patch\",\n")
+          .contains("    \"ms\": \"file:..\\ms\",\n");
+    }
+
+    /**
+     * bun.lock.zig Stringifier (1.2.8, 1.2.14): bun.lock lists every override from 1.2.8, sorted by name from 1.2.14;
+     * before 1.2.8 only those the hoisted tree's dependencies are named for.
+     */
+    @Test
+    void writesEveryOverrideFrom128SortedFrom1214() {
+        String lock = lock("  \"overrides\": {\n    \"zz\": \"1.0.0\",\n    \"ms\": \"2.1.3\",\n  },\n", MS);
+        assertThat(writtenBack("1.2.14", lock)).contains("  \"overrides\": {\n    \"ms\": \"2.1.3\",\n" +
+                                                         "    \"zz\": \"1.0.0\",\n  },\n");
+        assertThat(writtenBack("1.2.13", lock)).contains("  \"overrides\": {\n    \"zz\": \"1.0.0\",\n" +
+                                                         "    \"ms\": \"2.1.3\",\n  },\n");
+        assertThat(writtenBack("1.2.8", lock)).contains("    \"zz\": \"1.0.0\",\n");
+        assertThat(writtenBack("1.2.7", lock)).contains("  \"overrides\": {\n    \"ms\": \"2.1.3\",\n  },\n")
+          .doesNotContain("zz");
+    }
+
+    /**
+     * bun.lock.zig Stringifier over an install: three folder dependencies each overridden and an override nothing uses,
+     * in package.json's order zz, c, a, b. As the real releases wrote it: 1.2.7 a, c, b (the used ones in their hash
+     * map's slot order), 1.2.8 and 1.2.13 zz, c, a, b, 1.2.14 a, b, c, zz. A second install of 1.2.8 rewrites its lock
+     * with a, b, c, zz, the diff having sorted the overrides in place, so that the engine declines the edit there.
+     */
+    @Test
+    void writesTheOverridesOfAnInstallAsEachReleaseDid() {
+        java.util.Map<String, String> manifests = new java.util.LinkedHashMap<>();
+        manifests.put("", "{\"name\":\"p\",\"dependencies\":{\"a\":\"file:./a\",\"b\":\"file:./b\",\"c\":\"file:./c\"}," +
+                          "\"overrides\":{\"zz\":\"1.0.0\",\"c\":\"file:./c\",\"a\":\"file:./a\",\"b\":\"file:./b\"}}");
+        for (String name : new String[]{"a", "b", "c"}) {
+            manifests.put(name, "{\"name\":\"" + name + "\",\"version\":\"1.0.0\"}");
+        }
+        String lock = "{\n  \"lockfileVersion\": 1,\n  \"workspaces\": {\n    \"\": {\n      \"name\": \"p\",\n    },\n" +
+                      "  },\n  \"packages\": {}\n}\n";
+        java.util.Map<String, String> none = java.util.Collections.emptyMap();
+        assertThat(overridesOf(written(install("1.2.7", lock, manifests, none)))).containsExactly("a", "c", "b");
+        for (String release : new String[]{"1.2.8", "1.2.13"}) {
+            assertThat(failure(install(release, lock, manifests, none))).isEqualTo("SECOND_INSTALL a second bun " +
+              "install over the lock written for this edit would rewrite it: line 14 \"\"zz\": \"1.0.0\",\" becomes " +
+              "\"\"a\": \"file:./a\",\"");
+        }
+        assertThat(overridesOf(written(install("1.2.14", lock, manifests, none)))).containsExactly("a", "b", "c", "zz");
+    }
+
+    // the keys of a written lock's overrides, in order
+    private static List<String> overridesOf(String lock) {
+        List<String> keys = new java.util.ArrayList<>();
+        int start = lock.indexOf("  \"overrides\": {\n");
+        if (start < 0) {
+            return keys;
+        }
+        for (String line : lock.substring(start).split("\n")) {
+            if (line.equals("  },")) {
+                break;
+            }
+            if (line.startsWith("    \"")) {
+                keys.add(line.substring(5, line.indexOf('"', 5)));
+            }
+        }
+        return keys;
+    }
+
+    /**
+     * lockfile.zig Package.Diff.generate (1.2.8): both sides' overrides are sorted before they are compared; before,
+     * compared as read, so that the same overrides in another order are a change.
+     */
+    @Test
+    void sortsOverridesBeforeComparingThemFrom128() {
+        BunRelease later = BunRelease.of("1.2.8");
+        BunRelease earlier = BunRelease.of("1.2.7");
+        assertThat(OverrideMap.changed(overrideMap("ms", "zz"), overrideMap("zz", "ms"), later)).isFalse();
+        assertThat(OverrideMap.changed(overrideMap("ms", "zz"), overrideMap("zz", "ms"), earlier)).isTrue();
+        assertThat(OverrideMap.changed(overrideMap("ms", "zz"), overrideMap("ms", "zz"), earlier)).isFalse();
+    }
+
+    // plain overrides of the names, each to 1.0.0, in that order
+    private static OverrideMap overrideMap(String... names) {
+        OverrideMap overrides = new OverrideMap();
+        for (String name : names) {
+            long nameHash = Wyhash11.stringHash(name);
+            overrides.map.put(nameHash, new Dependency(nameHash, name,
+              requireNonNull(DependencyVersion.parse(name, nameHash, "1.0.0", BunRelease.PORTED)), Behavior.NONE));
+        }
+        return overrides;
+    }
+
+    /**
+     * bun.lock.zig parseIntoBinaryLockfile (1.2.3 only): each package entry is a package of its own; before and after,
+     * an entry equal to an earlier one is that package.
+     */
+    @Test
+    void readsEveryPackageEntryAsItsOwnPackageIn123() {
+        String lock = lockWith(rootWith("{ \"a\": \"1.0.0\", \"b\": \"1.0.0\" }"),
+          npm("a", "a@1.0.0", "{ \"dependencies\": { \"b\": \"1.0.0\" } }") +
+          npm("b", "b@1.0.0", "{}") +
+          npm("a/b", "b@1.0.0", "{}"));
+        assertThat(TextLockfileReader.load(lock, options("1.2.3", null)).packages).hasSize(4);
+        assertThat(TextLockfileReader.load(lock, options("1.2.2", null)).packages).hasSize(3);
+        assertThat(TextLockfileReader.load(lock, options("1.2.4", null)).packages).hasSize(3);
+    }
+
+    /**
+     * bun.lock.zig parseIntoBinaryLockfile and mapDepToPkg (1.2.4): a dependency is bundled where its own key is
+     * marked so; before, wherever the entry it binds to is, and a mark that is no boolean fails.
+     */
+    @Test
+    void bundlesADependencyByItsOwnKeyFrom124() {
+        String lock = lockWith(rootWith("{ \"a\": \"1.0.0\" }"),
+          npm("a", "a@1.0.0", "{ \"dependencies\": { \"b\": \"1.0.0\", \"c\": \"1.0.0\" } }") +
+          npm("a/b", "b@1.0.0", "{ \"bundled\": true }") +
+          npm("a/c", "c@1.0.0", "{ \"dependencies\": { \"b\": \"1.0.0\" }, \"bundled\": true }"));
+        Lockfile later = TextLockfileReader.load(lock, options("1.2.4", null));
+        assertThat(dependencyOf(later, "a", "b").behavior.isBundled()).isTrue();
+        assertThat(dependencyOf(later, "c", "b").behavior.isBundled()).isFalse();
+        Lockfile earlier = TextLockfileReader.load(lock, options("1.2.3", null));
+        assertThat(dependencyOf(earlier, "a", "b").behavior.isBundled()).isTrue();
+        assertThat(dependencyOf(earlier, "c", "b").behavior.isBundled()).isTrue();
+
+        String notABoolean = lock.replace("{ \"bundled\": true }", "{ \"bundled\": \"yes\" }");
+        TextLockfileReader.load(notABoolean, options("1.2.4", null));
+        assertThatThrownBy(() -> TextLockfileReader.load(notABoolean, options("1.2.3", null)))
+          .isInstanceOf(TextLockfileReader.ParseError.class)
+          .hasMessage("Expected a boolean");
+    }
+
+    /**
+     * bun.lock.zig parseIntoBinaryLockfile (1.2.5): a workspace entry under a key no member took is bound to its
+     * member; before, it is {@code Unknown workspace}. (A root's {@code "x": "workspace:packages/a"}: 1.2.4 writes the
+     * entry {@code "x": ["a@workspace:packages/a"]} and, installing again, fails it with {@code error: Unknown
+     * workspace: 'packages/a'}, {@code InvalidPackageInfo: failed to parse lockfile} and ignores the lock; 1.2.5 reads
+     * it.)
+     */
+    @Test
+    void readsAWorkspaceEntryUnderAnotherKeyFrom125() {
+        String lock = "{\n  \"lockfileVersion\": 1,\n  \"workspaces\": {\n" +
+                      rootWith("{ \"x\": \"workspace:*\" }") +
+                      "    \"packages/a\": {\n      \"name\": \"a\",\n    },\n" +
+                      "  },\n  \"packages\": {\n    \"a\": [\"a@workspace:packages/a\"],\n" +
+                      "    \"x\": [\"a@workspace:packages/a\"],\n  }\n}\n";
+        TextLockfileReader.load(lock, options("1.2.5", null));
+        assertThatThrownBy(() -> TextLockfileReader.load(lock, options("1.2.4", null)))
+          .isInstanceOf(TextLockfileReader.ParseError.class)
+          .hasMessage("Unknown workspace: 'packages/a'");
+    }
+
+    /**
+     * bin.zig Bin.toJson(.multi_line) (1.2.3): a workspace's bin map has an entry a line; before, the entries follow
+     * one another.
+     */
+    @Test
+    void writesAWorkspaceBinAnEntryALineFrom123() {
+        Bin map = new Bin(Bin.Tag.MAP, java.util.Arrays.asList("a", "a.js", "b", "b.js"));
+        Bin named = new Bin(Bin.Tag.NAMED_FILE, java.util.Arrays.asList("a", "a.js"));
+        assertThat(multiLine(map, "1.2.3")).isEqualTo("{\n      \"a\": \"a.js\",\n      \"b\": \"b.js\",\n    }");
+        assertThat(multiLine(map, "1.2.2")).isEqualTo("{\n      \"a\": \"a.js\",      \"b\": \"b.js\"    }");
+        assertThat(multiLine(named, "1.2.3")).isEqualTo("{\n      \"a\": \"a.js\",\n    }");
+        assertThat(multiLine(named, "1.2.2")).isEqualTo("{\n      \"a\": \"a.js\"\n    }");
+    }
+
+    /**
+     * As 1.2.2 and 1.2.3 wrote the workspaces m, of bins m1 and m2, and n, of the bin n1.
+     */
+    @Test
+    void writesAWorkspacesBinAsEachReleaseDid() {
+        java.util.Map<String, String> manifests = new java.util.LinkedHashMap<>();
+        manifests.put("", "{\"name\":\"p\",\"workspaces\":[\"packages/*\"]}");
+        manifests.put("packages/m", "{\"name\":\"m\",\"version\":\"1.0.0\",\"bin\":{\"m1\":\"m1.js\",\"m2\":\"m2.js\"}}");
+        manifests.put("packages/n", "{\"name\":\"n\",\"version\":\"1.0.0\",\"bin\":{\"n1\":\"n1.js\"}}");
+        String lock = "{\n  \"lockfileVersion\": 1,\n  \"workspaces\": {\n    \"\": {\n      \"name\": \"p\",\n    },\n" +
+                      "  },\n  \"packages\": {}\n}\n";
+        java.util.Map<String, String> none = java.util.Collections.emptyMap();
+        assertThat(written(install("1.2.2", lock, manifests, none)))
+          .contains("      \"bin\": {\n        \"m1\": \"m1.js\",        \"m2\": \"m2.js\"      },\n")
+          .contains("      \"bin\": {\n        \"n1\": \"n1.js\"\n      },\n");
+        assertThat(written(install("1.2.3", lock, manifests, none)))
+          .contains("      \"bin\": {\n        \"m1\": \"m1.js\",\n        \"m2\": \"m2.js\",\n      },\n")
+          .contains("      \"bin\": {\n        \"n1\": \"n1.js\",\n      },\n");
+    }
+
+    // a bin as a workspace's in bun.lock, two levels in
+    private static String multiLine(Bin bin, String release) {
+        StringBuilder out = new StringBuilder();
+        bin.toJsonMultiLine(out, new int[]{2}, BunRelease.of(release));
+        return out.toString();
+    }
+
+    /**
+     * install.zig enqueueDependencyWithMainAndSuccessFn (1.2.3): no override applies to the root's edge to a member;
+     * before, an override of the member's name replaces it.
+     */
+    @Test
+    void keepsOverridesOffTheRootsEdgeToAMemberFrom123() {
+        java.util.Map<String, String> manifests = new java.util.LinkedHashMap<>();
+        manifests.put("", "{\"name\":\"r\",\"workspaces\":[\"packages/a\"],\"overrides\":{\"a\":\"1.0.0\"}}");
+        manifests.put("packages/a", "{\"name\":\"a\",\"version\":\"2.0.0\"}");
+        java.util.Map<String, String> packuments = java.util.Collections.singletonMap("a",
+          registryPackument("a", "1.0.0", registryVersion("a", "1.0.0", "")));
+        String lock = "{\n  \"lockfileVersion\": 1,\n  \"workspaces\": {\n    \"\": {\n      \"name\": \"r\",\n    },\n" +
+                      "    \"packages/a\": {\n      \"name\": \"a\",\n      \"version\": \"2.0.0\",\n    },\n  },\n" +
+                      "  \"packages\": {\n    \"a\": [\"a@workspace:packages/a\"],\n  }\n}\n";
+        assertThat(written(install("1.2.3", lock, manifests, packuments)))
+          .contains("\"a\": [\"a@workspace:packages/a\"]");
+        assertThat(written(install("1.2.2", lock, manifests, packuments)))
+          .contains("\"a\": [\"a@1.0.0\", \"\", {}, \"" + INTEGRITY + "\"]");
+    }
+
+    /**
+     * As 1.2.2 and 1.2.3 installed a member a overridden by a folder b of the same name: 1.2.2 resolves the root's edge
+     * to the folder and lists no workspace, 1.2.3 links the member.
+     */
+    @Test
+    void overridesTheRootsEdgeToAMemberAsEachReleaseDid() {
+        java.util.Map<String, String> manifests = new java.util.LinkedHashMap<>();
+        manifests.put("", "{\"name\":\"p\",\"workspaces\":[\"packages/a\"],\"overrides\":{\"a\":\"file:./b\"}}");
+        manifests.put("packages/a", "{\"name\":\"a\",\"version\":\"1.0.0\"}");
+        manifests.put("b", "{\"name\":\"a\",\"version\":\"9.0.0\"}");
+        String lock = "{\n  \"lockfileVersion\": 1,\n  \"workspaces\": {\n    \"\": {\n      \"name\": \"p\",\n    },\n" +
+                      "  },\n  \"packages\": {}\n}\n";
+        java.util.Map<String, String> none = java.util.Collections.emptyMap();
+        assertThat(written(install("1.2.2", lock, manifests, none))).isEqualTo("{\n  \"lockfileVersion\": 1,\n" +
+          "  \"workspaces\": {\n    \"\": {\n      \"name\": \"p\",\n    },\n  },\n  \"overrides\": {\n" +
+          "    \"a\": \"file:./b\",\n  },\n  \"packages\": {\n    \"a\": [\"a@file:b\", {}],\n  }\n}\n");
+        assertThat(written(install("1.2.3", lock, manifests, none))).contains("    \"packages/a\": {\n")
+          .contains("    \"a\": [\"a@workspace:packages/a\"],\n");
+    }
+
+    /**
      * npm.zig PackageManifest.parse (1.3.14): a name peerDependenciesMeta marks optional and the peers do not list is
      * an optional peer of {@code "*"}, at the front of the peers; the peers no longer reset the bundled names.
      */
@@ -2014,6 +2474,60 @@ class BunReleaseTest {
         assertThat(SemverQuery.parse("^0.0." + max, earlier).satisfies(patch)).isFalse();
     }
 
+    /**
+     * semver.zig Version.parse (1.2.2): a wildcard right after the patch number is skipped; before, the parser reaches
+     * code it takes for unreachable. The darwin-arm64 builds of 1.2.0 and 1.2.1 skip it as 1.2.2 does
+     * ({@code Bun.semver.satisfies("1.2.4", "^1.2.3x")} is true), which another target's build need not.
+     */
+    @Test
+    void skipsAWildcardAfterThePatchNumberFrom122() {
+        SemverVersion.ParseResult later = SemverVersion.parse("1.2.3x", BunRelease.of("1.2.2"));
+        assertThat(later.valid).isTrue();
+        assertThat(later.wildcard).isEqualTo(SemverQuery.Wildcard.NONE);
+        assertThat(later.version.min()).hasToString("1.2.3");
+        assertThat(SemverQuery.parse("^1.2.3x", BunRelease.of("1.2.2")).satisfies(SemverVersion.of(1, 2, 4))).isTrue();
+        assertThatThrownBy(() -> SemverQuery.parse("^1.2.3*", BunRelease.of("1.2.1")))
+          .isInstanceOf(CannotKnow.class)
+          .hasMessageContaining("takes for unreachable");
+    }
+
+    /**
+     * Version.zig {@code VersionType(u64)} (1.2.23): a version's numbers are u64s; before, u32s, as
+     * {@code Bun.semver} of 1.2.22 and 1.2.23 answer: {@code satisfies("1.0.0", "1.0.4294967296")} is true before and
+     * false after, as is {@code satisfies("1.0.0", "1.0.12345678901")}; {@code satisfies("4294967295.0.0",
+     * "^4294967295")} is false before and true after; {@code order("1.0.0-alpha.10000000000",
+     * "1.0.0-alpha.5000000000")} is -1 before and 1 after.
+     */
+    @Test
+    void readsSixtyFourBitVersionNumbersFrom1223() {
+        BunRelease later = BunRelease.of("1.2.23");
+        BunRelease earlier = BunRelease.of("1.2.22");
+        assertThat(SemverVersion.parse("1.0.4294967296", later).version.patch).isEqualTo(4294967296L);
+        assertThat(SemverVersion.parse("1.0.4294967296", earlier).version.patch).isZero();
+        assertThat(SemverVersion.parse("1.0.12345678901", later).version.patch).isEqualTo(12345678901L);
+        assertThat(SemverVersion.parse("1.0.12345678901", earlier).version.patch).isNull();
+        assertThat(SemverVersion.parse("1.0.1709012345678", earlier).version.min()).hasToString("1.0.0");
+
+        SemverVersion one = SemverVersion.of(1, 0, 0);
+        assertThat(SemverQuery.parse("1.0.4294967296", later).satisfies(one)).isFalse();
+        assertThat(SemverQuery.parse("1.0.4294967296", earlier).satisfies(one)).isTrue();
+        assertThat(SemverQuery.parse("1.0.12345678901", later).satisfies(one)).isFalse();
+        assertThat(SemverQuery.parse("1.0.12345678901", earlier).satisfies(one)).isTrue();
+
+        SemverVersion top = SemverVersion.of(SemverVersion.MAX_U32, 0, 0);
+        assertThat(SemverQuery.parse("^4294967295", later).satisfies(top)).isTrue();
+        assertThat(SemverQuery.parse("^4294967295", earlier).satisfies(top)).isFalse();
+        assertThat(SemverQuery.parse("<=1", earlier).head.head.range.left.version)
+          .hasToString("1.4294967295.4294967295");
+
+        SemverVersion big = SemverVersion.parse("1.0.0-alpha.10000000000", later).version.min();
+        SemverVersion small = SemverVersion.parse("1.0.0-alpha.5000000000", later).version.min();
+        assertThat(big.order(small, later)).isPositive();
+        assertThat(big.order(small, earlier)).isNegative();
+        assertThat(SemverQuery.parse(">1.0.0-alpha.5000000000", later).satisfies(big)).isTrue();
+        assertThat(SemverQuery.parse(">1.0.0-alpha.5000000000", earlier).satisfies(big)).isFalse();
+    }
+
     private static PackageManifest.PackageVersion picked(BunRelease release, String packument, String name) {
         PackageManifest manifest = requireNonNull(PackageManifest.parse(release, new Log(), packument, name, false));
         return requireNonNull(manifest.findByDistTag("latest")).packageVersion;
@@ -2073,6 +2587,50 @@ class BunReleaseTest {
           .containsOnly(".github/actions/a", "packages/c", ".h/d");
         assertThat(workspaces("1.3.14", "[\".github/actions/*\", \"packages/**\", \"*/d\", \".*/d\"]", locations))
           .containsOnly("packages/c");
+    }
+
+    /**
+     * GlobWalker.zig matchPatternSlow's matcher: src/glob/ascii.zig before 1.2.3, src/glob/match.zig from 1.2.3
+     * (bun#16824), whose skipBranch goes to its own group's close from 1.2.4. Each row is what
+     * {@code new Bun.Glob(pattern).match(path)}, which calls the same matcher, answers in 1.2.2, 1.2.3 and 1.2.4.
+     */
+    @ParameterizedTest
+    @org.junit.jupiter.params.provider.CsvSource(delimiter = '|', value = {
+      "{a,ab}b|ab|false|true|true",
+      "{a,ab}b|abb|true|true|true",
+      "{ab,a}b|ab|false|true|true",
+      "{a,{b,c}x}|a|true|false|true",
+      "{a,{b,c}x}|ax|false|true|false",
+      "{a,{b,c}x}|bx|false|true|true",
+      "{a,{b,c}x}|b|true|false|false",
+      "![ab|a|false|true|true",
+      "[ab|a|false|false|false",
+      "a}|a}|false|true|true",
+      "'a,b'|'a,b'|false|true|true",
+      "pkg-*|pkg-a|true|true|true",
+      "{pkg,lib}-*|lib-x|true|true|true",
+      "*{a,b}|xb|true|true|true",
+      "{*a,b}c|xac|true|true|true",
+      "!{a,b}|c|true|true|true",
+      "!{a,b}|a|false|false|false",
+      "{a,b|a|false|true|true",
+      "{a,b}}|a}|false|true|true",
+    })
+    void triesEveryBraceBranchFrom123AndSkipsToTheBranchsOwnCloseFrom124(String pattern, String path, boolean in122,
+                                                                         boolean in123, boolean in124) {
+        assertThat(Glob.match(pattern, path, BunRelease.of("1.2.2")).matches()).as("1.2.2").isEqualTo(in122);
+        assertThat(Glob.match(pattern, path, BunRelease.of("1.2.3")).matches()).as("1.2.3").isEqualTo(in123);
+        assertThat(Glob.match(pattern, path, BunRelease.of("1.2.4")).matches()).as("1.2.4").isEqualTo(in124);
+    }
+
+    /**
+     * As 1.2.2 and 1.2.3 read {@code "workspaces": ["packages/{a,ab}b"]} beside packages/ab and packages/abb.
+     */
+    @Test
+    void matchesAWorkspacesGlobsBranchesAsTheReleaseDoes() {
+        String[] locations = {"packages/ab", "packages/abb"};
+        assertThat(workspaces("1.2.3", "[\"packages/{a,ab}b\"]", locations)).containsOnly("packages/ab", "packages/abb");
+        assertThat(workspaces("1.2.2", "[\"packages/{a,ab}b\"]", locations)).containsOnly("packages/abb");
     }
 
     // the error the release's JSON parser fails a package.json or bun.lock with, as "name: first message"; "reads past"

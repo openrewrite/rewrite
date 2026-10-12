@@ -92,7 +92,7 @@ final class PackageDiff {
             summary.catalogsChanged = catalogsChanged(fromLockfile.catalogs, toLockfile.catalogs, options.getRelease());
         }
 
-        trustedDependencies(fromLockfile, toLockfile, summary);
+        trustedDependencies(fromLockfile, toLockfile, summary, options.getRelease());
 
         summary.patchedDependenciesChanged = patchedDependenciesChanged(fromLockfile, toLockfile);
 
@@ -350,7 +350,9 @@ final class PackageDiff {
         return true;
     }
 
-    private static void trustedDependencies(Lockfile fromLockfile, Lockfile toLockfile, Summary summary) {
+    // against the release's default list where package.json lists none
+    private static void trustedDependencies(Lockfile fromLockfile, Lockfile toLockfile, Summary summary,
+                                            BunRelease release) {
         Set<Integer> from = fromLockfile.trustedDependencies;
         Set<Integer> to = toLockfile.trustedDependencies;
         if (from == null && to == null) {
@@ -370,13 +372,14 @@ final class PackageDiff {
             return;
         }
         if (from != null) {
-            for (int hash : DefaultTrustedDependencies.HASHES) {
+            Set<Integer> defaults = DefaultTrustedDependencies.of(release);
+            for (int hash : defaults) {
                 if (!from.contains(hash)) {
                     summary.addedTrustedDependencies.put(hash, false);
                 }
             }
             for (int f : from) {
-                if (!DefaultTrustedDependencies.HASHES.contains(f)) {
+                if (!defaults.contains(f)) {
                     summary.removedTrustedDependencies.add(f);
                 }
             }

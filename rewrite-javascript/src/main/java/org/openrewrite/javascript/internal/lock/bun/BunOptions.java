@@ -61,6 +61,12 @@ public final class BunOptions {
      * manifest cache.
      */
     private boolean readsTheManifestCache;
+
+    /**
+     * From 1.2.22, bunfig.toml's {@code install.security.scanner}: the package whose code bun runs over the resolution
+     * before it saves the lock ({@link BunRelease#runsTheSecurityScannerOnInstall()}).
+     */
+    private @Nullable String securityScanner;
     private @Nullable Double minimumReleaseAgeMs;
     private List<String> minimumReleaseAgeExcludes = Collections.emptyList();
 
@@ -93,7 +99,7 @@ public final class BunOptions {
             Json.Expr bunfig = Toml.parse(bunfigToml, release);
             installObj = bunfig.getObject("install");
             if (installObj != null && !release.letsBunfigOverrideNpmrc()) {
-                install.readBunfig(installObj);
+                install.readBunfig(installObj, release);
             }
         }
         if (userNpmrc != null) {
@@ -104,7 +110,7 @@ public final class BunOptions {
         }
         if (installObj != null && release.letsBunfigOverrideNpmrc()) {
             // PackageManager.rs init: npmrc < bunfig < CLI (overlay_bunfig_install)
-            install.readBunfig(installObj);
+            install.readBunfig(installObj, release);
         }
         BunOptions options = new BunOptions();
         options.release = release;
@@ -134,6 +140,9 @@ public final class BunOptions {
         }
         readsTheManifestCache = release.readsTheManifestCacheOffline() &&
                                (Boolean.TRUE.equals(install.offline) || install.preferOffline);
+        if (release.runsTheSecurityScannerOnInstall()) {
+            securityScanner = install.securityScanner;
+        }
         for (Map.Entry<String, String> scope : install.scoped.entrySet()) {
             String url = scope.getValue().isEmpty() ? base : scope.getValue();
             scopes.put(scope.getKey(), scopeUrl(expandEnv(url, env)));
@@ -207,6 +216,7 @@ public final class BunOptions {
         @Nullable Boolean linkWorkspacePackages;
         @Nullable Boolean offline;
         boolean preferOffline;
+        @Nullable String securityScanner;
         @Nullable Boolean saveDev;
         @Nullable Boolean saveOptional;
         @Nullable Boolean savePeer;
@@ -215,7 +225,7 @@ public final class BunOptions {
         @Nullable Double minimumReleaseAgeMs;
         List<String> minimumReleaseAgeExcludes = Collections.emptyList();
 
-        void readBunfig(Json.Expr installObj) {
+        void readBunfig(Json.Expr installObj, BunRelease release) {
             Json.Expr registry = installObj.get("registry");
             if (registry != null) {
                 defaultRegistry = parseRegistry(registry);
@@ -235,11 +245,18 @@ public final class BunOptions {
             saveOptional = bool(installObj, "optional", saveOptional);
             savePeer = bool(installObj, "peer", savePeer);
             saveDev = bool(installObj, "dev", saveDev);
-            linkWorkspacePackages = bool(installObj, "linkWorkspacePackages", linkWorkspacePackages);
+            if (release.readsLinkWorkspacePackages()) {
+                linkWorkspacePackages = bool(installObj, "linkWorkspacePackages", linkWorkspacePackages);
+            }
             offline = bool(installObj, "offline", offline);
             Json.Expr prefer = installObj.get("prefer");
             if (prefer != null && prefer.isString()) {
                 preferOffline = "offline".equals(prefer.asString());
+            }
+            Json.Expr security = installObj.get("security");
+            Json.Expr scanner = security != null && security.isObject() ? security.get("scanner") : null;
+            if (scanner != null && scanner.isString()) {
+                securityScanner = scanner.asString();
             }
             Json.Expr minAge = installObj.get("minimumReleaseAge");
             if (minAge != null && minAge.kind == Json.Kind.NUMBER && minAge.asNumber() >= 0) {
@@ -274,9 +291,12 @@ public final class BunOptions {
             return b != null ? b : current;
         }
 
-        // ini.zig loadNpmrc: the top-level keys a lock-only install uses, each of the type it takes
+        // ini.zig loadNpmrc: the top-level keys a lock-only install uses, each of the type it takes; from 1.2.13 the file
+        // without its byte order mark
         void readNpmrc(String npmrc, HostEnvironment env, BunRelease release) {
-            Map<String, @Nullable Object> out = Ini.parse(npmrc, env, release);
+            String text = release.stripsTheByteOrderMarkOfNpmrc() && npmrc.startsWith("﻿") ? npmrc.substring(1) :
+                    npmrc;
+            Map<String, @Nullable Object> out = Ini.parse(text, env, release);
             Object registry = out.get("registry");
             if (registry instanceof String) {
                 defaultRegistry = (String) registry;
@@ -295,7 +315,7 @@ public final class BunOptions {
                     }
                 }
             }
-            Object link = out.get("link-workspace-packages");
+            Object link = release.readsLinkWorkspacePackagesFromNpmrc() ? out.get("link-workspace-packages") : null;
             if (link instanceof Boolean) {
                 linkWorkspacePackages = (Boolean) link;
             }

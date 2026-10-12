@@ -227,6 +227,12 @@ final class Package {
             } else if (dependencies.isObject()) {
                 if (isWorkspace) {
                     Json.Expr packages = dependencies.get("packages");
+                    // before 1.2.14 an object declares its workspaces by a packages array or fails
+                    if (!options.getRelease().acceptsAWorkspacesObjectWithoutPackages() &&
+                        (packages == null || !packages.isArray())) {
+                        log.addError("Workspaces expects an array of strings");
+                        throw new IllegalArgumentException("InvalidPackageJSON");
+                    }
                     if (packages != null) {
                         if (!packages.isArray()) {
                             log.addError("\"workspaces.packages\" expects an array of strings");
@@ -259,8 +265,9 @@ final class Package {
                     }
                 }
             } else {
-                log.addError(isWorkspace ? "\"workspaces\" expects an array of strings" :
-                        GROUP_PROPS[g] + " expects a map of specifiers");
+                log.addError(!isWorkspace ? GROUP_PROPS[g] + " expects a map of specifiers" :
+                        options.getRelease().acceptsAWorkspacesObjectWithoutPackages() ?
+                                "\"workspaces\" expects an array of strings" : "Workspaces expects an array of strings");
                 throw new IllegalArgumentException("InvalidPackageJSON");
             }
         }

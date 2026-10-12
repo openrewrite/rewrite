@@ -325,11 +325,20 @@ The Bun port follows Bun 1.3.10 and reproduces other releases beside it, as the 
   package's second edge to a name, and the clean drops what only optional peers hold. What the engine cannot see is
   cannot-know: bun's manifest cache (`install.offline`, from 1.4.1), a frozen install over a pruned checkout, and two
   1.4.0 bugs whose bytes depend on memory or response headers.
-- **What is reproduced.** `BunReleases.PROVEN` is 1.3.0 to 1.4.3: every scenario replays as each of them, and every
-  upstream change in the files the port names between them and 1.3.10 that reaches a lock is a question. Every
-  scenario replays as 1.2.0 to 1.2.23 too, but those miss questions still (changes before 1.2.13 in bun.lock's writer
-  and reader, the overrides and the globs; .npmrc, semver and the workspaces object before 1.2.24), so they stay
-  cannot-know.
+- **1.2.x.** Every consecutive pair from 1.2.0 to 1.3.0 was diffed in the files the port names and in what Bun builds
+  into them (its semver, glob matcher, .npmrc and TOML parsers and bunfig reader, Zig's standard library, Highway's
+  string search), each change written down before it was ported. Among the questions: a version's numbers are u32s
+  before 1.2.23; workspaces globs are matched by glob-match before 1.2.3; bun.lock lists only the overrides its tree
+  uses before 1.2.8 and sorts them from 1.2.14, escapes overrides and patches from 1.2.3, keeps duplicate entries apart
+  in 1.2.3 alone, takes a dependency's bundled mark from the entry it binds to before 1.2.4, and reads a workspace entry
+  under another key from 1.2.5; an integrity is decoded past its algorithm from 1.2.20 and refused past its digest from
+  1.2.21; .npmrc loses its byte order mark from 1.2.13; `linkWorkspacePackages` is read from bunfig from 1.2.16 and
+  from .npmrc from 1.2.19; bunfig's security scanner runs on install from 1.2.22. What a release build leaves
+  undefined (code it takes for unreachable, a write past a buffer) or to the CPU (1.2.11 to 1.2.23 leave a tab in the
+  escape search's scalar tail unescaped, the tail's length set by the vector width) is cannot-know.
+- **What is reproduced.** `BunReleases.PROVEN` is 1.2.0 to 1.4.3: every scenario replays as each of them, and every
+  upstream change in the files the port names between them and 1.3.10 that reaches a lock is a question. 1.1.39 to
+  1.1.45 write and read bun.lock's version 0 alone, which no recording holds, so they stay cannot-know.
 
 ## Amendment 2026-10-11: Yarn classic releases
 

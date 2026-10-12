@@ -44,12 +44,13 @@ final class SemverQuery {
         return rhs.next != null && next.eql(rhs.next);
     }
 
-    boolean satisfies(SemverVersion version) {
-        return range.satisfies(version) && (next == null || next.satisfies(version));
+    boolean satisfies(SemverVersion version, BunRelease release) {
+        return range.satisfies(version, release) && (next == null || next.satisfies(version, release));
     }
 
-    boolean satisfiesPre(SemverVersion version, boolean[] preMatched) {
-        return range.satisfiesPre(version, preMatched) && (next == null || next.satisfiesPre(version, preMatched));
+    boolean satisfiesPre(SemverVersion version, boolean[] preMatched, BunRelease release) {
+        return range.satisfiesPre(version, preMatched, release) &&
+               (next == null || next.satisfiesPre(version, preMatched, release));
     }
 
     @Override
@@ -65,14 +66,14 @@ final class SemverQuery {
         @Nullable SemverQuery tail;
         @Nullable List next;
 
-        boolean satisfies(SemverVersion version) {
-            return head.satisfies(version) || next != null && next.satisfies(version);
+        boolean satisfies(SemverVersion version, BunRelease release) {
+            return head.satisfies(version, release) || next != null && next.satisfies(version, release);
         }
 
-        boolean satisfiesPre(SemverVersion version) {
+        boolean satisfiesPre(SemverVersion version, BunRelease release) {
             boolean[] preMatched = {false};
-            return head.satisfiesPre(version, preMatched) && preMatched[0] ||
-                   next != null && next.satisfiesPre(version);
+            return head.satisfiesPre(version, preMatched, release) && preMatched[0] ||
+                   next != null && next.satisfiesPre(version, release);
         }
 
         boolean eql(List rhs) {
@@ -103,6 +104,9 @@ final class SemverQuery {
         }
     }
 
+    /**
+     * A range as the release that parsed it reads it, and compares versions with it ({@link SemverVersion#orderPre}).
+     */
     static final class Group {
         static final int FLAG_BUILD = 1;
         static final int FLAG_PRE = 2;
@@ -110,16 +114,12 @@ final class SemverQuery {
         final List head = new List();
         @Nullable List tail;
         final String input;
+        final BunRelease release;
         int flags;
 
-        Group(String input) {
+        Group(String input, BunRelease release) {
             this.input = input;
-        }
-
-        static Group from(SemverVersion version) {
-            Group group = new Group("");
-            group.head.head.range = new SemverRange(new SemverRange.Comparator(SemverRange.Op.EQL, version));
-            return group;
+            this.release = release;
         }
 
         boolean isStar() {
@@ -163,7 +163,7 @@ final class SemverQuery {
         }
 
         boolean satisfies(SemverVersion version) {
-            return version.hasPre() ? head.satisfiesPre(version) : head.satisfies(version);
+            return version.hasPre() ? head.satisfiesPre(version, release) : head.satisfies(version, release);
         }
 
         @Override
@@ -198,9 +198,10 @@ final class SemverQuery {
 
         /**
          * {@code toRange}, an upper bound that would pass the ceiling ending at it from 1.4.0
-         * ({@link SemverRange.Comparator#ltNextMajor}).
+         * ({@link SemverRange.Comparator#ltNextMajor}), the ceiling being the release's ({@link SemverVersion#max}).
          */
         SemverRange toRange(SemverVersion.Partial version, BunRelease release) {
+            long max = SemverVersion.max(release);
             switch (tag) {
                 case CARET: {
                     if (version.major == null) {
@@ -262,26 +263,26 @@ final class SemverQuery {
             switch (wildcard) {
                 case MAJOR:
                     return new SemverRange(new SemverRange.Comparator(SemverRange.Op.GTE, version.min()),
-                            new SemverRange.Comparator(SemverRange.Op.LTE, SemverVersion.of(MAX, MAX, MAX)));
+                            new SemverRange.Comparator(SemverRange.Op.LTE, SemverVersion.of(max, max, max)));
                 case MINOR:
                     switch (tag) {
                         case LTE:
-                            return left(SemverRange.Op.LTE, SemverVersion.of(major, MAX, MAX));
+                            return left(SemverRange.Op.LTE, SemverVersion.of(major, max, max));
                         case LT:
                             return left(SemverRange.Op.LT, SemverVersion.of(major, 0, 0));
                         case GT:
-                            return left(SemverRange.Op.GT, SemverVersion.of(major, MAX, MAX));
+                            return left(SemverRange.Op.GT, SemverVersion.of(major, max, max));
                         default:
                             return left(SemverRange.Op.GTE, SemverVersion.of(major, 0, 0));
                     }
                 case PATCH:
                     switch (tag) {
                         case LTE:
-                            return left(SemverRange.Op.LTE, SemverVersion.of(major, minor, MAX));
+                            return left(SemverRange.Op.LTE, SemverVersion.of(major, minor, max));
                         case LT:
                             return left(SemverRange.Op.LT, SemverVersion.of(major, minor, 0));
                         case GT:
-                            return left(SemverRange.Op.GT, SemverVersion.of(major, minor, MAX));
+                            return left(SemverRange.Op.GT, SemverVersion.of(major, minor, max));
                         default:
                             return left(SemverRange.Op.GTE, SemverVersion.of(major, minor, 0));
                     }
@@ -321,7 +322,7 @@ final class SemverQuery {
      */
     static Group parse(String input, BunRelease release) {
         int i = 0;
-        Group list = new Group(input);
+        Group list = new Group(input, release);
         Token token = new Token();
         Token prevToken = new Token();
         int count = 0;
@@ -478,14 +479,15 @@ final class SemverQuery {
                                 inclusiveCeiling && second.major == MAX ?
                                         SemverRange.Comparator.ltNextMajor(second.major, release) :
                                         new SemverRange.Comparator(SemverRange.Op.LT,
-                                                second.with(saturatingIncrement(second.major), 0, 0)));
+                                                second.with(saturatingIncrement(second.major, release), 0, 0)));
                         break;
                     case PATCH:
                         range = new SemverRange(new SemverRange.Comparator(SemverRange.Op.GTE, version),
                                 inclusiveCeiling && second.minor == MAX ?
                                         SemverRange.Comparator.ltNextMinor(second.major, second.minor, release) :
                                         new SemverRange.Comparator(SemverRange.Op.LT,
-                                                second.with(second.major, saturatingIncrement(second.minor), 0)));
+                                                second.with(second.major, saturatingIncrement(second.minor, release),
+                                                        0)));
                         break;
                     default:
                         range = new SemverRange(new SemverRange.Comparator(SemverRange.Op.GTE, version),

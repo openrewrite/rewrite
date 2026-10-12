@@ -63,6 +63,27 @@ public final class BunRelease implements Comparable<BunRelease> {
         return compareTo(new BunRelease(major, minor, patch)) >= 0;
     }
 
+    // src/semver: Version.zig, SemverQuery.zig, SemverRange.zig (src/install/semver.zig before 1.2.3)
+
+    /**
+     * A version whose {@code x}, {@code X} or {@code *} directly follows its patch number ({@code 1.2.3x}) is that
+     * version, the wildcard skipped ({@code Version.parse}), from 1.2.2; before, the parser reaches code it takes for
+     * unreachable ({@code else => unreachable}), which its release build does not check.
+     */
+    boolean skipsAWildcardAfterThePatchNumber() {
+        return atLeast(1, 2, 2);
+    }
+
+    /**
+     * A version's major, minor and patch are u64s ({@code VersionType(u64)}), from 1.2.23: read from up to 20 digits,
+     * 0 past the u64 maximum. Before, u32s: more than 10 digits is a missing number, a value past 4294967295 is 0, the
+     * ceilings of a range and a saturated bound are 4294967295, and a numeric prerelease identifier past it compares
+     * as text ({@code Tag.orderPre}'s {@code parseUnsigned(u32)}).
+     */
+    boolean readsSixtyFourBitVersionNumbers() {
+        return atLeast(1, 2, 23);
+    }
+
     // src/install/lockfile/bun.lock.zig
 
     /**
@@ -97,6 +118,158 @@ public final class BunRelease implements Comparable<BunRelease> {
      */
     boolean writesConfigVersion() {
         return atLeast(1, 3, 2);
+    }
+
+    /**
+     * bun.lock's overrides and patched dependencies are written JSON-escaped ({@code fmtJson}), from 1.2.3; before,
+     * as they are ({@code "{s}": "{s}"}), so that a {@code "} or {@code \} in a name, range or patch path is written
+     * bare.
+     */
+    boolean escapesOverridesAndPatchesInBunLock() {
+        return atLeast(1, 2, 3);
+    }
+
+    /**
+     * The text lockfile's parser reads each package entry as a package of its own ({@code appendPackageNoDedupe}),
+     * in 1.2.3 alone (bun#16952); before and after, an entry whose name and resolution equal an earlier entry's is
+     * that package ({@code appendPackageDedupe}), so that its dependencies are bound once per key it stands at.
+     */
+    boolean readsEveryPackageEntryAsItsOwnPackage() {
+        return atLeast(1, 2, 3) && !atLeast(1, 2, 4);
+    }
+
+    /**
+     * A package's dependency is bundled where bun.lock marks the key {@code <package's key>/<name>} {@code "bundled":
+     * true}, read from each entry's third element in a pass of its own ({@code bundled_pkgs}), from 1.2.4; before,
+     * every dependency the parser binds to an entry takes that entry's own {@code "bundled"} ({@code mapDepToPkg}),
+     * read from its info object, where anything but a boolean is {@code Expected a boolean}.
+     */
+    boolean bundlesADependencyByItsOwnKey() {
+        return atLeast(1, 2, 4);
+    }
+
+    /**
+     * The text lockfile's parser binds a {@code workspace:} entry under a key no member took (an alias of a member) to
+     * the member its resolution names and goes on, from 1.2.5; before, it falls through to {@code Unknown workspace:
+     * '<path>'}, and bun ignores the lock.
+     */
+    boolean readsAWorkspaceEntryUnderAnotherKey() {
+        return atLeast(1, 2, 5);
+    }
+
+    /**
+     * bun.lock lists every override, from 1.2.8; before, only those a dependency of the hoisted tree is named for,
+     * under the dependency's name, in the slot order of a hash map keyed by the name's hash ({@code found_overrides}).
+     */
+    boolean writesEveryOverride() {
+        return atLeast(1, 2, 8);
+    }
+
+    /**
+     * bun.lock's overrides are sorted by name before they are written ({@code overrides.sort}), from 1.2.14; 1.2.8 to
+     * 1.2.13 write them in the order the lockfile holds them.
+     */
+    boolean sortsOverridesInBunLock() {
+        return atLeast(1, 2, 14);
+    }
+
+    // src/install/bin.zig
+
+    /**
+     * A workspace's {@code bin} object in bun.lock has an entry a line ({@code Bin.toJson(.multi_line)}, bun#17041),
+     * from 1.2.3; before, a named file's entry ends without a comma, and a map's entries follow its first line with a
+     * {@code ,} and the indentation between them, the last followed by the indentation of the close.
+     */
+    boolean writesAWorkspaceBinAnEntryALine() {
+        return atLeast(1, 2, 3);
+    }
+
+    // src/js_printer.zig writePreQuotedString, src/string_immutable.zig indexOfNeedsEscapeForJavaScriptString
+
+    /**
+     * The printer quoting a string writes what follows a character it prints as it is, up to the next byte its escape
+     * search flags; from 1.2.11 that search is src/bun.js/bindings/highway_strings.cpp's, whose vectors flag a tab
+     * but whose scalar loop over the last {@code len % N} bytes does not, N being the lane count of the CPU's widest
+     * vector (16 on NEON and SSE, 32 on AVX2, 64 on AVX-512), so that a tab there is written as it is, until 1.3.0
+     * (bun#23298). Before 1.2.11 the search flags every tab.
+     */
+    boolean leavesATabInTheEscapeSearchsTail() {
+        return atLeast(1, 2, 11) && !atLeast(1, 3, 0);
+    }
+
+    // src/install/migration.zig detectAndLoadOtherLockfile
+
+    /**
+     * An install without bun.lock migrates a pnpm-lock.yaml where neither a package-lock.json nor a yarn.lock comes
+     * first, rewriting package.json (src/install/pnpm.zig), from 1.2.23; before, it ignores a pnpm-lock.yaml.
+     */
+    boolean migratesAPnpmLock() {
+        return atLeast(1, 2, 23);
+    }
+
+    // src/install/integrity.zig Integrity.parse, which reads bun.lock's and a packument's integrities
+
+    /**
+     * An integrity's hash is decoded from past its algorithm's {@code -}, and one with nothing past it is unknown
+     * ({@code Tag.parse}'s offset), from 1.2.20 (bun#21220); before, from its eighth character whatever the
+     * algorithm, two characters into a sha1's hash, which then does not decode, so that a sha1 integrity is unknown
+     * (a packument falls back to its {@code shasum}, a lock's is written {@code ""}), and {@code sha256-} alone is a
+     * sha256 of zeros.
+     */
+    boolean decodesAnIntegrityPastItsAlgorithm() {
+        return atLeast(1, 2, 20);
+    }
+
+    /**
+     * A hash that decodes to more bytes than its algorithm's digest is unknown ({@code calcSizeForSlice}), from 1.2.21;
+     * before, it is decoded into 64 bytes whatever the algorithm and kept, cut to the digest where it is written, and
+     * one of more than 64 bytes is decoded past that buffer, which the release build does not check.
+     */
+    boolean refusesAnIntegrityLongerThanItsDigest() {
+        return atLeast(1, 2, 21);
+    }
+
+    // src/install/default-trusted-dependencies.txt, which the root's diff compares a lock's trustedDependencies against
+    // where package.json lists none
+
+    /**
+     * The default trusted dependencies list {@code opencode-ai}, from 1.2.16.
+     */
+    boolean trustsOpencodeAiByDefault() {
+        return atLeast(1, 2, 16);
+    }
+
+    /**
+     * The default trusted dependencies list {@code yarn} until 1.2.19, which drops it.
+     */
+    boolean trustsYarnByDefault() {
+        return !atLeast(1, 2, 19);
+    }
+
+    /**
+     * The default trusted dependencies list {@code @anthropic-ai/claude-code}, from 1.3.12.
+     */
+    boolean trustsClaudeCodeByDefault() {
+        return atLeast(1, 3, 12);
+    }
+
+    // src/install/lockfile.zig Package.Diff.generate, src/install/install.zig enqueueDependencyWithMainAndSuccessFn
+
+    /**
+     * The root's diff sorts both sides' overrides by name, in place, before it compares them pair by pair
+     * ({@code OverrideMap.sort}), from 1.2.8; before, it compares them in the orders they were read in, so that the
+     * same overrides in another order are a change, and the dependencies they name are resolved again.
+     */
+    boolean sortsOverridesBeforeComparingThem() {
+        return atLeast(1, 2, 8);
+    }
+
+    /**
+     * No override applies to the root's dependency on a member ({@code isWorkspaceOnly}), from 1.2.3; before, an
+     * override named as the member replaces that dependency's version.
+     */
+    boolean keepsOverridesOffWorkspaceEdges() {
+        return atLeast(1, 2, 3);
     }
 
     // src/install/lockfile/bun.lock.rs
@@ -191,6 +364,16 @@ public final class BunRelease implements Comparable<BunRelease> {
     }
 
     /**
+     * A {@code workspaces} object without {@code packages} declares no workspace (it may hold the catalogs alone), and
+     * one whose {@code packages} is no array is {@code "workspaces.packages" expects an array of strings}, from 1.2.14;
+     * before, any object without a {@code packages} array fails as {@code Workspaces expects an array of strings}, as
+     * does a value neither array nor object (from 1.2.14 {@code "workspaces" expects an array of strings}).
+     */
+    boolean acceptsAWorkspacesObjectWithoutPackages() {
+        return atLeast(1, 2, 14);
+    }
+
+    /**
      * The root's own {@code catalog} and {@code catalogs} are its catalogs when it has workspaces whose object holds
      * neither, from 1.2.19; before, only the workspaces object's are.
      */
@@ -208,7 +391,45 @@ public final class BunRelease implements Comparable<BunRelease> {
         return atLeast(1, 3, 5);
     }
 
+    /**
+     * Each .npmrc bun reads loses its leading byte order mark ({@code loadNpmrcConfig}'s
+     * {@code toSource(.{ .convert_bom = true })}), from 1.2.13; before, the mark starts the first line's key, so that
+     * its setting is not read.
+     */
+    boolean stripsTheByteOrderMarkOfNpmrc() {
+        return atLeast(1, 2, 13);
+    }
+
+    /**
+     * .npmrc's {@code link-workspace-packages} sets whether an npm range links to the workspace of its name
+     * ({@code loadNpmrc}), from 1.2.19; before, it is not read.
+     */
+    boolean readsLinkWorkspacePackagesFromNpmrc() {
+        return atLeast(1, 2, 19);
+    }
+
+    // src/toml/toml_parser.zig
+
+    /**
+     * bunfig.toml's parser has the lexer take {@code [[} as one token again before it consumes an array's or an inline
+     * table's close ({@code parseValue}), from 1.2.16; before, the token after the close is lexed as the elements left
+     * the lexer, which after an inline table's assignment or in an array of none reads a {@code [[table]]} header on
+     * the next line as two {@code [}s, so that bunfig fails to load.
+     */
+    boolean lexesADoubleBracketAfterAValue() {
+        return atLeast(1, 2, 16);
+    }
+
     // src/bunfig.zig and src/install/PackageManager/PackageManagerOptions.zig
+
+    /**
+     * bunfig.toml's {@code [install] linkWorkspacePackages} sets whether an npm range links to the workspace of its
+     * name ({@code link_workspace_packages}), from 1.2.16; before, there is no such setting, and such a range always
+     * links.
+     */
+    boolean readsLinkWorkspacePackages() {
+        return atLeast(1, 2, 16);
+    }
 
     /**
      * bunfig.toml's {@code minimumReleaseAge} and {@code minimumReleaseAgeExcludes} hold back versions published
@@ -243,6 +464,16 @@ public final class BunRelease implements Comparable<BunRelease> {
     }
 
     /**
+     * bunfig.toml's {@code [install.security] scanner} names a package whose code bun runs over the resolution before
+     * it saves the lock, for {@code bun install} as for {@code add}, {@code update} and {@code remove}
+     * ({@code runAndWait}), from 1.2.22; its advisories may end the install, which is not the engine's to know. 1.2.21
+     * runs it for {@code bun add} alone, and before, bunfig has no such setting.
+     */
+    boolean runsTheSecurityScannerOnInstall() {
+        return atLeast(1, 2, 22);
+    }
+
+    /**
      * Before it waits for the peers, the install processes the peer queue until it is empty, so that the peers of a
      * package a peer added with nothing to fetch are resolved too, from 1.3.11; before, it processes the queue once,
      * and those peers stay unresolved when no request is pending.
@@ -268,6 +499,29 @@ public final class BunRelease implements Comparable<BunRelease> {
      */
     boolean walksDotComponentsAsWritten() {
         return atLeast(1, 3, 4);
+    }
+
+    // src/glob: GlobWalker.zig matchPatternSlow, match.zig (from 1.2.3), ascii.zig (before 1.2.3)
+
+    /**
+     * A workspaces glob component with syntax beyond {@code *}, {@code **} and {@code *.ext} is matched by
+     * src/glob/match.zig, which tries each brace branch with the rest of the pattern, from 1.2.3 (bun#16824); before,
+     * by Devon Govett's glob-match (src/glob/ascii.zig, over code points in GlobWalker.zig's {@code matchImpl}), which
+     * keeps the longest branch that matched and never tries a shorter one again ({@code {a,ab}b} does not match
+     * {@code ab}), matches no {@code ,} or {@code }} outside a group, and takes a pattern it cannot read for no match
+     * under {@code !} too.
+     */
+    boolean triesEveryBraceBranch() {
+        return atLeast(1, 2, 3);
+    }
+
+    /**
+     * Past the branch that matched, the matcher skips to the {@code }} that closes the branch's own group
+     * ({@code skipBranch}), from 1.2.4; 1.2.3 stops at the first {@code }}, a nested group's too, and goes on
+     * matching after it ({@code {a,{b,c}x}} matches {@code ax}, not {@code a}).
+     */
+    boolean skipsABraceBranchToItsOwnClose() {
+        return atLeast(1, 2, 4);
     }
 
     // src/install/patch_install.zig PatchTask.calcHash

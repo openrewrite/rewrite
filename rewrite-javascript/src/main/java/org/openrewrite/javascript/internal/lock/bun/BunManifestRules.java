@@ -32,8 +32,9 @@ import static java.util.Collections.singletonList;
 
 /**
  * Bun's reading of the files the dependency recipes edit, as the release that installs reads them
- * ({@link #installedAs}): OverrideMap's field and the rules it reads, the root package.json's catalogs as
- * Package.parse reads them, and its add, which sorts the field it saves to only.
+ * ({@link #installedAs}): OverrideMap's field and the rules it reads (flat before 1.4.0), the root package.json's
+ * catalogs as Package.parse reads them (none before 1.2.14, the workspaces object's alone before 1.2.19), and its add,
+ * which sorts the field it saves to only.
  */
 public final class BunManifestRules implements ManifestRules {
 
@@ -125,21 +126,34 @@ public final class BunManifestRules implements ManifestRules {
         return segment.getVersion() == null ? segment.getName() : segment.getName() + "@" + segment.getVersion();
     }
 
+    // none before 1.2.14, whose catalog: is a git spec (BunRelease.parsesCatalogSpecs)
     @Override
-    public String catalogFile() {
-        return "package.json";
+    public @Nullable String catalogFile() {
+        return readsCatalogs() ? "package.json" : null;
     }
 
-    // Package.parse: the workspaces value when it holds a catalog or catalogs, else the root when it has workspaces
+    // Package.parse: the workspaces value when it holds a catalog or catalogs, else the root when it has workspaces;
+    // before 1.2.19 the workspaces object alone (BunRelease.readsTopLevelCatalogs)
     @Override
     public @Nullable List<String> catalogsAt(String text) {
+        if (!readsCatalogs()) {
+            return null;
+        }
         Json.Expr json = parsed(text);
         Json.Expr workspaces = json == null ? null : json.get("workspaces");
         if (workspaces == null) {
             return null;
         }
+        if (release != null && !release.readsTopLevelCatalogs()) {
+            return workspaces.isObject() ? singletonList("workspaces") : null;
+        }
         return workspaces.get("catalog") != null || workspaces.get("catalogs") != null ?
                 singletonList("workspaces") : emptyList();
+    }
+
+    // where the release is not known, as 1.3.10 reads them
+    private boolean readsCatalogs() {
+        return release == null || release.parsesCatalogSpecs();
     }
 
     @Override
@@ -187,7 +201,7 @@ public final class BunManifestRules implements ManifestRules {
 
     @Override
     public @Nullable String catalogOf(String value) {
-        return CatalogMap.groupOf(value);
+        return readsCatalogs() ? CatalogMap.groupOf(value) : null;
     }
 
     @Override
