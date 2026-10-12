@@ -46,13 +46,18 @@ import java.util.function.Supplier;
  * getNonDevWantedDependencies, hoistPeers, replaceVersionInBareSpecifier, unwrapPackageName and their siblings.
  * hoistPeers.ts' getHoistableOptionalPeers follows the release that installs
  * ({@link ResolutionContext#getPnpmVersion()}): 11.2.2's up to 11.5.0, 11.5.1's from 11.5.1
- * ({@link #LOCKED_OPTIONAL_PEER_CANDIDATES}).
+ * ({@link #LOCKED_OPTIONAL_PEER_CANDIDATES}). From 11.7.0 a package's children are resolved by the occurrence that
+ * claims them and no request starts while a shallower one is active, which moved buildTree here from
+ * resolveDependencyTree.ts ({@link PnpmRelease#resolvesSharedChildrenInADeterministicContext}).
  */
 final class ResolveDependencies {
 
     private static final Set<String> NON_EXOTIC_RESOLVED_VIA = new LinkedHashSet<>(Arrays.asList(
             "custom-resolver", "github.com/denoland/deno", "github.com/oven-sh/bun", "jsr-registry",
             "local-filesystem", "named-registry", "nodejs.org", "npm-registry", "workspace"));
+
+    // Number.MAX_SAFE_INTEGER, the order of an importer the install does not name
+    private static final long MAX_SAFE_INTEGER = (1L << 53) - 1;
 
     /**
      * The releases whose getHoistableOptionalPeers reads a selector with a weight by its type, as hoistPeers does
@@ -212,6 +217,12 @@ final class ResolveDependencies {
         private @Nullable String rootDir;
         private Map<String, MissingPeerInfo> missingPeers = new LinkedHashMap<>();
         private @Nullable MissingPeersOfChildren missingPeersOfChildren;
+
+        /**
+         * From 11.7.0: the claim on the package's children the occurrence found ({@link ChildrenResolution#getId()}).
+         */
+        private long childrenResolutionId;
+
         private @Nullable String publishedAt;
         private @Nullable String saveCatalogName;
         private boolean dev;
@@ -247,6 +258,10 @@ final class ResolveDependencies {
             promise.resolve(missingPeers);
         }
 
+        void reject(RuntimeException error) {
+            promise.reject(error);
+        }
+
         boolean isResolved() {
             return resolved;
         }
@@ -257,13 +272,73 @@ final class ResolveDependencies {
     }
 
     /**
-     * {@code missingPeersOfChildrenByPkgId}'s entry: the depth a package was first reached at, and its children's
-     * missing peers.
+     * {@code missingPeersOfChildrenByPkgId}'s entry: the depth of the occurrence that holds the claim on a package's
+     * children, and their missing peers. 11.2.2 shares the missing peers from here, 11.7.0 from the claim, which
+     * gives the same where no claim is taken over; the port reads the claim's for every release.
      */
     @Value
     static class MissingPeersOfChildrenAtDepth {
         int depth;
         MissingPeersOfChildren missingPeersOfChildren;
+    }
+
+    /**
+     * An occurrence of a package as 11.7.0 orders those that claim its children: by depth, by its importer's place in
+     * the install, then by the ids of its parents.
+     */
+    @Value
+    static class ChildrenResolutionOwner {
+        int depth;
+        long importerOrder;
+        List<String> parentPath;
+    }
+
+    /**
+     * {@code childrenResolutionByPkgId}'s entry (11.7.0): the claim in force on a package's children, the occurrence
+     * that holds it, and the missing peers of the children it resolves.
+     */
+    @Value
+    static class ChildrenResolution {
+        long id;
+        ChildrenResolutionOwner owner;
+
+        @Nullable
+        MissingPeersOfChildren missingPeersOfChildren;
+    }
+
+    /**
+     * What claimChildrenResolution gives an occurrence (11.7.0): the claim in force, whether the occurrence holds it,
+     * and the missing peers of children it shares.
+     */
+    @Value
+    static class ChildrenResolutionClaim {
+        long id;
+        boolean owner;
+
+        @Nullable
+        MissingPeersOfChildren missingPeersOfChildren;
+    }
+
+    /**
+     * {@code nodeResolutionContextByNodeId}'s entry (11.7.0): where a node stands that builds its children from those
+     * its package's current owner resolves.
+     */
+    @Value
+    static class NodeResolutionContext {
+        int depth;
+        boolean installable;
+        List<String> parentIds;
+        String pkgId;
+    }
+
+    /**
+     * {@code packageResolutionBarrier} (11.7.0): the package resolutions active at each depth, and the requests that
+     * wait for a shallower one to end.
+     */
+    @Getter
+    static final class PackageResolutionBarrier {
+        private final Map<Integer, Integer> activeByDepth = new LinkedHashMap<>();
+        private final List<Promise<Void>> waiters = new ArrayList<>();
     }
 
     /**
@@ -596,6 +671,19 @@ final class ResolveDependencies {
         private final Set<String> allPeerDepNames = new LinkedHashSet<>();
         private @Nullable Map<String, PatchingConfig.PatchGroup> patchedDependencies;
         private final Set<String> appliedPatches = new LinkedHashSet<>();
+
+        /**
+         * From 11.7.0 (pnpm/pnpm#12358, {@link PnpmRelease#resolvesSharedChildrenInADeterministicContext}): the package
+         * resolutions active at each depth, the claims on each package's children, each importer's place in the
+         * install, and the nodes whose children are built from those of their package's current owner. Before 11.7.0
+         * they are kept all the same, where only a release from 11.7.0 waits on them or takes a claim over.
+         */
+        private final PackageResolutionBarrier packageResolutionBarrier = new PackageResolutionBarrier();
+        private final Map<String, ChildrenResolution> childrenResolutionByPkgId = new LinkedHashMap<>();
+        private long childrenResolutionId;
+        private final Map<String, Integer> importerResolutionOrder = new LinkedHashMap<>();
+        private final Map<NodeId, NodeResolutionContext> nodeResolutionContextByNodeId = new LinkedHashMap<>();
+
         private final EventLoop loop = new EventLoop();
         private long nodeIdCounter;
 
@@ -607,6 +695,10 @@ final class ResolveDependencies {
 
         NodeId nextNodeId() {
             return NodeId.of(++nodeIdCounter);
+        }
+
+        long nextChildrenResolutionId() {
+            return ++childrenResolutionId;
         }
     }
 
@@ -1244,16 +1336,30 @@ final class ResolveDependencies {
             parentIds.add(resolveDependencyResult.getPkgId());
             PackageSnapshot dependencyLockfile = info == null ? null : info.getDependencyLockfile();
             int parentDepth = options.getCurrentDepth();
+            String pkgId = resolveDependencyResult.getPkgId();
+            long childrenResolutionId = resolveDependencyResult.getChildrenResolutionId();
             return Promise.resolved(ctx.getLoop(), new DependencyResolution(resolveDependencyResult,
-                    postponedResolutionOpts -> resolveChildren(ctx, resolveDependencyResult, parentIds,
-                            dependencyLockfile, parentDepth, updateDepth, options.getPrefix(),
-                            postponedResolutionOpts).then(result -> {
-                        if (resolveDependencyResult.getMissingPeersOfChildren() != null) {
-                            resolveDependencyResult.getMissingPeersOfChildren().resolve(result.getMissingPeers());
+                    postponedResolutionOpts -> {
+                        // 11.7.0: a claim a lower occurrence took over leaves the children to that occurrence
+                        if (!isCurrentChildrenResolution(ctx, pkgId, childrenResolutionId)) {
+                            setDependencyTreeNodeWithCurrentChildren(ctx, parentDepth, parentIds,
+                                    resolveDependencyResult);
+                            return resolveMissingPeersFromCurrentChildrenResolution(ctx, pkgId,
+                                    postponedResolutionOpts.getParentPkgAliases());
                         }
-                        return Promise.resolved(ctx.getLoop(),
-                                filterMissingPeers(result, postponedResolutionOpts.getParentPkgAliases()));
-                    }), null));
+                        return resolveChildren(ctx, resolveDependencyResult, parentIds, dependencyLockfile,
+                                parentDepth, updateDepth, options.getPrefix(), postponedResolutionOpts).then(result -> {
+                            if (!isCurrentChildrenResolution(ctx, pkgId, childrenResolutionId)) {
+                                return resolveMissingPeersFromCurrentChildrenResolution(ctx, pkgId,
+                                        postponedResolutionOpts.getParentPkgAliases());
+                            }
+                            if (resolveDependencyResult.getMissingPeersOfChildren() != null) {
+                                resolveDependencyResult.getMissingPeersOfChildren().resolve(result.getMissingPeers());
+                            }
+                            return Promise.resolved(ctx.getLoop(),
+                                    filterMissingPeers(result, postponedResolutionOpts.getParentPkgAliases()));
+                        });
+                    }, null));
         });
     }
 
@@ -1283,6 +1389,12 @@ final class ResolveDependencies {
                                                                   @Nullable PackageSnapshot dependencyLockfile,
                                                                   int parentDepth, int updateDepth, String prefix,
                                                                   PostponedResolutionOpts opts) {
+        // 11.7.0: a claim a lower occurrence took over builds the node from the children that occurrence resolves
+        if (!isCurrentChildrenResolution(ctx, parentPkg.getPkgId(), parentPkg.getChildrenResolutionId())) {
+            setDependencyTreeNodeWithCurrentChildren(ctx, parentDepth, parentIds, parentPkg);
+            return Promise.resolved(ctx.getLoop(), new PeersResolutionResult(new LinkedHashMap<>(),
+                    new LinkedHashMap<>()));
+        }
         Map<String, @Nullable String> currentResolvedDependencies = null;
         if (dependencyLockfile != null) {
             currentResolvedDependencies = new LinkedHashMap<>();
@@ -1312,6 +1424,10 @@ final class ResolveDependencies {
         options.setUpdateDepth(updateDepth);
         options.setParentIds(parentIds);
         return resolveDependencies(ctx, opts.getPreferredVersions(), wantedDependencies, options).then(result -> {
+            if (!isCurrentChildrenResolution(ctx, parentPkg.getPkgId(), parentPkg.getChildrenResolutionId())) {
+                setDependencyTreeNodeWithCurrentChildren(ctx, parentDepth, parentIds, parentPkg);
+                return result.getResolvingPeers();
+            }
             List<ChildId> children = new ArrayList<>();
             Map<String, NodeId> childNodeIds = new LinkedHashMap<>();
             for (PkgAddress child : result.getPkgAddresses()) {
@@ -1329,8 +1445,239 @@ final class ResolveDependencies {
             node.setLockedPeerContext(parentPkg.getLockedPeerContext());
             node.setPreviousDepPath(parentPkg.getPreviousDepPath());
             ctx.getDependenciesTree().put(parentPkg.getNodeId(), node);
+            ctx.getNodeResolutionContextByNodeId().put(parentPkg.getNodeId(), new NodeResolutionContext(parentDepth,
+                    parentPkg.isInstallable(), parentIds, parentPkg.getPkgId()));
+            updateChildrenResolutionNodes(ctx, parentPkg.getPkgId(), parentPkg.getNodeId());
             return result.getResolvingPeers();
         });
+    }
+
+    // startPackageResolution (11.7.0): the package's resolution is active at its depth until the function it gives is
+    // run, once, which wakes every request waiting for its turn
+    private static Runnable startPackageResolution(ResolutionContext ctx, int depth) {
+        PackageResolutionBarrier barrier = ctx.getPackageResolutionBarrier();
+        Integer activeCount = barrier.getActiveByDepth().get(depth);
+        barrier.getActiveByDepth().put(depth, (activeCount == null ? 0 : activeCount) + 1);
+        boolean[] finished = {false};
+        return () -> {
+            if (finished[0]) {
+                return;
+            }
+            finished[0] = true;
+            Integer count = barrier.getActiveByDepth().get(depth);
+            int nextActiveCount = (count == null ? 1 : count) - 1;
+            if (nextActiveCount > 0) {
+                barrier.getActiveByDepth().put(depth, nextActiveCount);
+            } else {
+                barrier.getActiveByDepth().remove(depth);
+            }
+            List<Promise<Void>> waiters = new ArrayList<>(barrier.getWaiters());
+            barrier.getWaiters().clear();
+            for (Promise<Void> waiter : waiters) {
+                waiter.resolve(null);
+            }
+        };
+    }
+
+    /**
+     * waitForPackageResolutionTurn (11.7.0): what a request at {@code depth} waits for while a shallower package's
+     * resolution is active, checked again each time one ends; null where it waits for nothing and is made at once.
+     * Before 11.7.0 no request waits, which only a shallower active resolution tells apart. 11.7.0 makes a request
+     * that waits for nothing an await later, as it makes every such request, which leaves their order as it is.
+     */
+    private static @Nullable Promise<Void> waitForPackageResolutionTurn(ResolutionContext ctx, int depth) {
+        if (!hasActivePackageResolutionBeforeDepth(ctx, depth) ||
+            !ctx.getRelease().resolvesSharedChildrenInADeterministicContext()) {
+            return null;
+        }
+        Promise<Void> turn = new Promise<>(ctx.getLoop());
+        ctx.getPackageResolutionBarrier().getWaiters().add(turn);
+        return turn.then(v -> {
+            Promise<Void> next = waitForPackageResolutionTurn(ctx, depth);
+            return next != null ? next : Promise.resolved(ctx.getLoop(), null);
+        });
+    }
+
+    private static boolean hasActivePackageResolutionBeforeDepth(ResolutionContext ctx, int depth) {
+        for (Map.Entry<Integer, Integer> active : ctx.getPackageResolutionBarrier().getActiveByDepth().entrySet()) {
+            if (active.getKey() < depth && active.getValue() > 0) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /**
+     * claimChildrenResolution (11.7.0): the claim on the package's children of the occurrence at
+     * {@code currentDepth} under {@code parentIds}. The first occurrence to resolve claims them, and from 11.7.0 a
+     * lower one ({@link #compareChildrenResolutionOwners}) takes them over, its missing peers of children settling
+     * the previous owner's; a release before 11.7.0, whose first occurrence keeps them, is told apart there alone. An
+     * occurrence that holds no claim shares the owner's missing peers of children, as 11.2.2 shares the first's.
+     */
+    private static ChildrenResolutionClaim claimChildrenResolution(ResolutionContext ctx, int currentDepth,
+                                                                   List<String> parentIds, String pkgId) {
+        Integer importerOrder = ctx.getImporterResolutionOrder().get(parentIds.get(0));
+        ChildrenResolutionOwner owner = new ChildrenResolutionOwner(currentDepth,
+                importerOrder == null ? MAX_SAFE_INTEGER : importerOrder, parentIds);
+        ChildrenResolution existing = ctx.getChildrenResolutionByPkgId().get(pkgId);
+        if (existing == null || compareChildrenResolutionOwners(owner, existing.getOwner()) < 0 &&
+                                ctx.getRelease().resolvesSharedChildrenInADeterministicContext()) {
+            MissingPeersOfChildren previousMissingPeersOfChildren = existing == null ? null :
+                    existing.getMissingPeersOfChildren();
+            MissingPeersOfChildren missingPeersOfChildren = ctx.isHoistPeers() && !parentIds.contains(pkgId) ?
+                    new MissingPeersOfChildren(ctx.getLoop()) : null;
+            ChildrenResolution resolution = new ChildrenResolution(ctx.nextChildrenResolutionId(), owner,
+                    missingPeersOfChildren);
+            ctx.getChildrenResolutionByPkgId().put(pkgId, resolution);
+            if (missingPeersOfChildren != null) {
+                ctx.getMissingPeersOfChildrenByPkgId().put(pkgId, new MissingPeersOfChildrenAtDepth(owner.getDepth(),
+                        missingPeersOfChildren));
+            }
+            if (previousMissingPeersOfChildren != null) {
+                if (missingPeersOfChildren != null) {
+                    missingPeersOfChildren.get().then(missingPeers -> {
+                        previousMissingPeersOfChildren.resolve(missingPeers);
+                        return Promise.<Void>resolved(ctx.getLoop(), null);
+                    }).recover(e -> {
+                        previousMissingPeersOfChildren.reject(e);
+                        return Promise.resolved(ctx.getLoop(), null);
+                    });
+                } else {
+                    previousMissingPeersOfChildren.resolve(new LinkedHashMap<>());
+                }
+            }
+            return new ChildrenResolutionClaim(resolution.getId(), true, missingPeersOfChildren);
+        }
+        MissingPeersOfChildren missingPeersOfChildren = null;
+        if (ctx.isHoistPeers() && !parentIds.contains(pkgId) && existing.getMissingPeersOfChildren() != null &&
+            (existing.getOwner().getDepth() >= currentDepth || existing.getMissingPeersOfChildren().isResolved())) {
+            missingPeersOfChildren = existing.getMissingPeersOfChildren();
+        }
+        return new ChildrenResolutionClaim(existing.getId(), false, missingPeersOfChildren);
+    }
+
+    // compareChildrenResolutionOwners (11.7.0): by depth, by importer, by each parent's id in turn, then the shorter
+    // path first
+    private static int compareChildrenResolutionOwners(ChildrenResolutionOwner owner1, ChildrenResolutionOwner owner2) {
+        if (owner1.getDepth() != owner2.getDepth()) {
+            return Integer.compare(owner1.getDepth(), owner2.getDepth());
+        }
+        if (owner1.getImporterOrder() != owner2.getImporterOrder()) {
+            return Long.compare(owner1.getImporterOrder(), owner2.getImporterOrder());
+        }
+        int pathLength = Math.min(owner1.getParentPath().size(), owner2.getParentPath().size());
+        for (int i = 0; i < pathLength; i++) {
+            int result = KeySorting.lexCompare(owner1.getParentPath().get(i), owner2.getParentPath().get(i));
+            if (result != 0) {
+                return result;
+            }
+        }
+        return Integer.compare(owner1.getParentPath().size(), owner2.getParentPath().size());
+    }
+
+    // isCurrentChildrenResolution (11.7.0): whether the claim is still in force, which only a release from 11.7.0
+    // takes over
+    private static boolean isCurrentChildrenResolution(ResolutionContext ctx, String pkgId, long childrenResolutionId) {
+        ChildrenResolution current = ctx.getChildrenResolutionByPkgId().get(pkgId);
+        return current != null && current.getId() == childrenResolutionId;
+    }
+
+    // resolveMissingPeersFromCurrentChildrenResolution (11.7.0): the missing peers of the children the package's
+    // current owner resolves, as a claim it took over reports them
+    private static Promise<PeersResolutionResult> resolveMissingPeersFromCurrentChildrenResolution(
+            ResolutionContext ctx, String pkgId, ParentPkgAliases parentPkgAliases) {
+        ChildrenResolution current = ctx.getChildrenResolutionByPkgId().get(pkgId);
+        MissingPeersOfChildren missingPeersOfChildren = current == null ? null : current.getMissingPeersOfChildren();
+        if (missingPeersOfChildren == null) {
+            return Promise.resolved(ctx.getLoop(), new PeersResolutionResult(new LinkedHashMap<>(),
+                    new LinkedHashMap<>()));
+        }
+        return missingPeersOfChildren.get().then(missingPeers -> Promise.resolved(ctx.getLoop(),
+                filterMissingPeers(new PeersResolutionResult(missingPeers, new LinkedHashMap<>()), parentPkgAliases)));
+    }
+
+    // setDependencyTreeNodeWithCurrentChildren (11.7.0): the node of an occurrence whose claim a lower one took over,
+    // its children built from those the package's current owner resolves
+    private static void setDependencyTreeNodeWithCurrentChildren(ResolutionContext ctx, int parentDepth,
+                                                                 List<String> parentIds, PkgAddress parentPkg) {
+        String pkgId = parentPkg.getPkgId();
+        boolean installable = parentPkg.isInstallable();
+        DependenciesTreeNode node = new DependenciesTreeNode(ctx.getResolvedPkgsById().get(pkgId), parentDepth);
+        node.setLazyChildren(() -> buildTree(ctx, pkgId, parentIds, currentChildren(ctx, pkgId), parentDepth + 1,
+                installable));
+        node.setInstallable(installable);
+        node.setLockedPeerContext(parentPkg.getLockedPeerContext());
+        node.setPreviousDepPath(parentPkg.getPreviousDepPath());
+        ctx.getDependenciesTree().put(parentPkg.getNodeId(), node);
+        ctx.getNodeResolutionContextByNodeId().put(parentPkg.getNodeId(), new NodeResolutionContext(parentDepth,
+                installable, parentIds, pkgId));
+    }
+
+    // updateChildrenResolutionNodes (11.7.0): every other node of the package builds its children from those the
+    // occurrence at currentNodeId resolved
+    private static void updateChildrenResolutionNodes(ResolutionContext ctx, String pkgId,
+                                                      @Nullable NodeId currentNodeId) {
+        for (Map.Entry<NodeId, NodeResolutionContext> resolution :
+                ctx.getNodeResolutionContextByNodeId().entrySet()) {
+            NodeResolutionContext nodeContext = resolution.getValue();
+            if (resolution.getKey().equals(currentNodeId) || !nodeContext.getPkgId().equals(pkgId)) {
+                continue;
+            }
+            DependenciesTreeNode node = ctx.getDependenciesTree().get(resolution.getKey());
+            if (node == null || node.getDepth() == -1) {
+                continue;
+            }
+            node.setChildren(null);
+            node.setLazyChildren(() -> buildTree(ctx, pkgId, nodeContext.getParentIds(), currentChildren(ctx, pkgId),
+                    nodeContext.getDepth() + 1, nodeContext.isInstallable()));
+        }
+    }
+
+    // ctx.childrenByParentId[pkgId] ?? []
+    private static List<ChildId> currentChildren(ResolutionContext ctx, String pkgId) {
+        List<ChildId> children = ctx.getChildrenByParentId().get(pkgId);
+        return children == null ? Collections.emptyList() : children;
+    }
+
+    /**
+     * buildTree, which 11.7.0 moved here from resolveDependencyTree.ts: the nodes of a package's children, each of
+     * which builds its own children when first asked for.
+     */
+    static Map<String, NodeId> buildTree(ResolutionContext ctx, String parentId, List<String> parentIds,
+                                         @Nullable List<ChildId> children, int depth, boolean installable) {
+        Map<String, NodeId> childrenNodeIds = new LinkedHashMap<>();
+        if (children == null) {
+            return childrenNodeIds;
+        }
+        boolean installableSoFar = installable;
+        for (ChildId child : children) {
+            String alias = child.getAlias();
+            String id = child.getId();
+            if (id.startsWith("link:")) {
+                childrenNodeIds.put(alias, NodeId.of(id));
+                continue;
+            }
+            if (parentIdsContainSequence(parentIds, parentId, id) || parentId.equals(id)) {
+                continue;
+            }
+            ResolvedPackage resolved = ctx.getResolvedPkgsById().get(id);
+            if (resolved.isLeaf()) {
+                childrenNodeIds.put(alias, NodeId.of(id));
+                continue;
+            }
+            NodeId childNodeId = ctx.nextNodeId();
+            childrenNodeIds.put(alias, childNodeId);
+            installableSoFar = installableSoFar || !ctx.getSkipped().contains(id);
+            boolean childInstallable = installableSoFar;
+            List<String> childParentIds = new ArrayList<>(parentIds);
+            childParentIds.add(id);
+            DependenciesTreeNode node = new DependenciesTreeNode(resolved, depth);
+            node.setInstallable(childInstallable);
+            node.setLazyChildren(() -> buildTree(ctx, id, childParentIds, ctx.getChildrenByParentId().get(id),
+                    depth + 1, childInstallable));
+            ctx.getDependenciesTree().put(childNodeId, node);
+        }
+        return childrenNodeIds;
     }
 
     // the children whose provider is not the one the lock records under the parent (11.5.2): a new child, a linked
@@ -1643,11 +1990,25 @@ final class ResolveDependencies {
             wanted = wantedDependency.copy();
             wanted.setOptional(true);
         }
+        // 11.7.0: the package's resolution is active from here to its end, and its request waits while a shallower
+        // one is active (startPackageResolution, waitForPackageResolutionTurn)
+        Runnable finishPackageResolution = startPackageResolution(ctx, options.currentDepth);
+        Promise<Void> turn = waitForPackageResolutionTurn(ctx, options.currentDepth);
+        return turn == null ? requestDependency(wanted, ctx, options, currentPkg, finishPackageResolution) :
+                turn.then(v -> requestDependency(wanted, ctx, options, currentPkg, finishPackageResolution));
+    }
+
+    // resolveDependency from the package's request on, which ends its resolution however it ends
+    private static Promise<@Nullable PkgAddress> requestDependency(WantedDependency wanted, ResolutionContext ctx,
+                                                                   ResolveDependencyOptions options,
+                                                                   @Nullable InfoFromLockfile currentPkg,
+                                                                   Runnable finishPackageResolution) {
         PreferredVersions.ByName preferredVersions = !options.updateRequested && options.preferredVersion != null ?
                 getExactSinglePreferredVersions(wanted, options.preferredVersion) :
                 options.preferredVersions;
         return Promise.async(ctx.getLoop(), () -> requestPackage(wanted, ctx, options, currentPkg, preferredVersions))
                 .recover(e -> {
+                    finishPackageResolution.run();
                     String code = e instanceof PnpmError ? ((PnpmError) e).getCode() : null;
                     // before 11.1.3 an immature pick also fails an optional dependency
                     boolean kept = "ERR_PNPM_TRUST_DOWNGRADE".equals(code) ||
@@ -1658,8 +2019,18 @@ final class ResolveDependencies {
                     }
                     throw e;
                 })
-                .then(pkgResponse -> pkgResponse == null ? Promise.resolved(ctx.getLoop(), null) :
-                        resolvedDependency(wanted, ctx, options, currentPkg, pkgResponse));
+                .then(pkgResponse -> {
+                    if (pkgResponse == null) {
+                        return Promise.resolved(ctx.getLoop(), null);
+                    }
+                    try {
+                        return resolvedDependency(wanted, ctx, options, currentPkg, pkgResponse,
+                                finishPackageResolution);
+                    } catch (RuntimeException e) {
+                        finishPackageResolution.run();
+                        throw e;
+                    }
+                });
     }
 
     private static Promise<PackageRequester.PackageResponse> requestPackage(
@@ -1696,12 +2067,14 @@ final class ResolveDependencies {
         return ctx.getLoop().request(() -> ctx.getStoreController().requestPackage(wantedDependency, request));
     }
 
-    // resolveDependency after the package is requested
+    // resolveDependency after the package is requested, which ends the package's resolution unless it throws, when
+    // its caller does
     private static Promise<@Nullable PkgAddress> resolvedDependency(WantedDependency wantedDependency,
                                                                     ResolutionContext ctx,
                                                                     ResolveDependencyOptions options,
                                                                     @Nullable InfoFromLockfile currentPkg,
-                                                                    PackageRequester.PackageResponse pkgResponse) {
+                                                                    PackageRequester.PackageResponse pkgResponse,
+                                                                    Runnable finishPackageResolution) {
         if (pkgResponse.getPolicyViolation() != null) {
             ctx.getResolutionPolicyViolations().add(pkgResponse.getPolicyViolation());
         }
@@ -1739,6 +2112,7 @@ final class ResolveDependencies {
                     Js.string(responseManifest.get("version")));
             linked.setNormalizedBareSpecifier(pkgResponse.getNormalizedBareSpecifier());
             linked.setPkg(responseManifest);
+            finishPackageResolution.run();
             return Promise.resolved(ctx.getLoop(), linked);
         }
 
@@ -1748,12 +2122,22 @@ final class ResolveDependencies {
         }
         ReadPackageHook readPackageHook = ctx.getReadPackageHook();
         if (readPackageHook == null) {
-            return Promise.resolved(ctx.getLoop(),
-                    pkgAddress(wantedDependency, ctx, options, currentPkg, pkgResponse, manifest));
+            return Promise.resolved(ctx.getLoop(), finishing(finishPackageResolution, () ->
+                    pkgAddress(wantedDependency, ctx, options, currentPkg, pkgResponse, manifest)));
         }
         return Promise.resolved(ctx.getLoop(), readPackageHook.apply(manifest, null)).then(hooked ->
-                Promise.resolved(ctx.getLoop(), pkgAddress(wantedDependency, ctx, options, currentPkg, pkgResponse,
-                        hooked)));
+                Promise.resolved(ctx.getLoop(), finishing(finishPackageResolution, () ->
+                        pkgAddress(wantedDependency, ctx, options, currentPkg, pkgResponse, hooked))));
+    }
+
+    // what pkgAddress gives, the package's resolution ended however it ends (resolveDependency's finally)
+    private static @Nullable PkgAddress finishing(Runnable finishPackageResolution,
+                                                  Supplier<@Nullable PkgAddress> pkgAddress) {
+        try {
+            return pkgAddress.get();
+        } finally {
+            finishPackageResolution.run();
+        }
     }
 
     // resolveDependency after the readPackage hook
@@ -1835,11 +2219,17 @@ final class ResolveDependencies {
 
         boolean parentIsInstallable = options.parentPkg.isInstallable();
         boolean installable = parentIsInstallable && !Boolean.FALSE.equals(pkgResponse.getIsInstallable());
-        boolean isNew = !ctx.getResolvedPkgsById().containsKey(pkgResponse.getId());
+        boolean packageIsNew = !ctx.getResolvedPkgsById().containsKey(pkgResponse.getId());
         String parentImporterId = options.parentIds.get(0);
         boolean currentIsOptional = wantedDependency.isOptional() || options.parentPkg.isOptional();
+        // 11.7.0: the occurrence that holds the claim on the package's children resolves them. Before 11.7.0 no claim
+        // is taken over from the first occurrence, so that isNew is 11.2.2's !resolvedPkgsById[id], and the missing
+        // peers of children the claim gives are those of 11.2.2's missingPeersOfChildrenByPkgId
+        ChildrenResolutionClaim childrenResolution = claimChildrenResolution(ctx, options.currentDepth,
+                options.parentIds, pkgResponse.getId());
+        boolean isNew = childrenResolution.isOwner();
 
-        if (isNew) {
+        if (packageIsNew) {
             if (Boolean.FALSE.equals(pkgResponse.getIsInstallable()) || !parentIsInstallable) {
                 ctx.getSkipped().add(pkgResponse.getId());
             }
@@ -1850,35 +2240,25 @@ final class ResolveDependencies {
             existing.setProd(existing.isProd() || !wantedDependency.isDev() && !wantedDependency.isOptional());
             existing.setDev(existing.isDev() || wantedDependency.isDev());
             existing.setOptional(existing.isOptional() && currentIsOptional);
-            DependenciesTreeNode node = ctx.getDependenciesTree().get(nodeId);
-            if (node != null) {
-                node.setDepth(Math.min(node.getDepth(), options.currentDepth));
-            } else {
-                String alias = wantedDependency.getAlias() != null ? wantedDependency.getAlias() :
-                        pkgResponse.getAlias() != null ? pkgResponse.getAlias() : pkgName;
-                ctx.getPendingNodes().add(new PendingNode(alias, nodeId, existing, options.currentDepth, installable,
-                        options.parentIds, currentPkg == null ? null : currentPkg.getLockedPeerContext(),
-                        currentPkg == null ? null : currentPkg.getDepPath()));
+            if (!isNew) {
+                DependenciesTreeNode node = ctx.getDependenciesTree().get(nodeId);
+                if (node != null) {
+                    node.setDepth(Math.min(node.getDepth(), options.currentDepth));
+                } else {
+                    String alias = wantedDependency.getAlias() != null ? wantedDependency.getAlias() :
+                            pkgResponse.getAlias() != null ? pkgResponse.getAlias() : pkgName;
+                    ctx.getPendingNodes().add(new PendingNode(alias, nodeId, existing, options.currentDepth,
+                            installable, options.parentIds,
+                            currentPkg == null ? null : currentPkg.getLockedPeerContext(),
+                            currentPkg == null ? null : currentPkg.getDepPath()));
+                }
             }
         }
 
         String rootDir = "directory".equals(pkgResponse.getResolution().get("type")) ?
                 RootRelativePath.join(ctx.getLockfileDir(), Js.string(pkgResponse.getResolution().get("directory"))) :
                 options.prefix;
-        MissingPeersOfChildren missingPeersOfChildren = null;
-        if (ctx.isHoistPeers() && !options.parentIds.contains(pkgResponse.getId())) {
-            MissingPeersOfChildrenAtDepth existing = ctx.getMissingPeersOfChildrenByPkgId().get(pkgResponse.getId());
-            if (existing != null) {
-                if (existing.getDepth() >= options.currentDepth ||
-                    existing.getMissingPeersOfChildren().isResolved()) {
-                    missingPeersOfChildren = existing.getMissingPeersOfChildren();
-                }
-            } else {
-                missingPeersOfChildren = new MissingPeersOfChildren(ctx.getLoop());
-                ctx.getMissingPeersOfChildrenByPkgId().put(pkgResponse.getId(),
-                        new MissingPeersOfChildrenAtDepth(options.currentDepth, missingPeersOfChildren));
-            }
-        }
+        MissingPeersOfChildren missingPeersOfChildren = childrenResolution.getMissingPeersOfChildren();
 
         ResolvedPackage resolvedPkg = ctx.getResolvedPkgsById().get(pkgResponse.getId());
         String alias = wantedDependency.getAlias() != null ? wantedDependency.getAlias() :
@@ -1890,6 +2270,7 @@ final class ResolveDependencies {
         address.setNodeId(nodeId);
         address.setNormalizedBareSpecifier(pkgResponse.getNormalizedBareSpecifier());
         address.setMissingPeersOfChildren(missingPeersOfChildren);
+        address.setChildrenResolutionId(childrenResolution.getId());
         address.setRootDir(rootDir);
         address.setMissingPeers(getMissingPeers(pkg));
         address.setOptional(resolvedPkg.isOptional());

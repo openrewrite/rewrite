@@ -699,6 +699,16 @@ public final class PnpmRelease {
     }
 
     /**
+     * The children of a package several occurrences reach are resolved in the context of the occurrence lowest by
+     * depth, importer and the ids of its parents, a lower one that resolves later taking them over from the one
+     * resolving them, and no package is requested while a shallower one's resolution is active, from 11.7.0
+     * (pnpm/pnpm#12358); before, in the context of the first occurrence to resolve.
+     */
+    boolean resolvesSharedChildrenInADeterministicContext() {
+        return atLeast(11, 7, 0);
+    }
+
+    /**
      * A child the lock pins below a version a direct dependency names, which the child's range admits, is resolved
      * again to that version, from 11.8.0 (getDepsToResolve's findHigherDirectDepVersion); before, the pin is kept.
      */

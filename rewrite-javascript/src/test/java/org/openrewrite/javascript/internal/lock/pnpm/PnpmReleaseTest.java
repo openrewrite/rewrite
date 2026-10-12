@@ -1721,4 +1721,76 @@ class PnpmReleaseTest {
           .isInstanceOfSatisfying(PnpmError.class,
             e -> assertThat(e.getCode()).isEqualTo("ERR_PNPM_FAILED_DOWNLOAD_SHASUM_FILE"));
     }
+
+    // a's x and b's y both depend on shared, which lists p as a dependency and as a peer, and a depends on p itself, so
+    // that under x the peer drops p from shared's dependencies (autoInstallPeers false)
+    private static final RegistryMetadata SHARED_CHILDREN = registry(
+      new String[]{"a", "\"x\":\"1.0.0\",\"p\":\"1.0.0\"", ""},
+      new String[]{"b", "\"y\":\"1.0.0\"", ""},
+      new String[]{"x", "\"shared\":\"1.0.0\"", ""},
+      new String[]{"y", "\"shared\":\"1.0.0\"", ""},
+      new String[]{"shared", "\"p\":\"1.0.0\"", "\"p\":\"1.0.0\""},
+      new String[]{"p", "", ""});
+
+    // the snapshots of the lock-only install of a root with b, then a
+    private static String installSharedChildren(String release) {
+        String lock = new PnpmLockRegenerator(PnpmLockRegenerator.Inputs.builder()
+          .manifest("", "{\"name\":\"root\",\"version\":\"1.0.0\",\"dependencies\":{\"b\":\"1.0.0\",\"a\":\"1.0.0\"}}")
+          .file("pnpm-workspace.yaml", "autoInstallPeers: false\nminimumReleaseAge: 0\n")
+          .env(Collections.emptyMap())
+          .now(NOW)
+          .release(release(release))
+          .build(), SHARED_CHILDREN).writeLock();
+        return lock.substring(lock.indexOf("\nsnapshots:\n"));
+    }
+
+    // the dependency tree deps-resolver resolves for a root with these dependencies as one of several releases, which
+    // only the release that installs can be (a range pnpm 11.2.2 hands the install to)
+    private static ResolveDependencyTree.Result resolveSharedChildren(PnpmRelease release, String dependencies) {
+        LockfileObject lockfile = new LockfileObject();
+        lockfile.set("lockfileVersion", LockfileObject.LOCKFILE_VERSION);
+        lockfile.getImporters().put(".", new ProjectSnapshot());
+        Map<String, String> registries = Collections.singletonMap("default", REGISTRY);
+        NpmResolver npmResolver = new NpmResolver(SHARED_CHILDREN, registries, Collections.emptyMap(), null, true,
+          false, NOW, release, false);
+        ResolveDependencies.ResolutionContext ctx = new ResolveDependencies.ResolutionContext(lockfile, "",
+          new PackageRequester(npmResolver, new LinkedHashMap<>(), Host.UNKNOWN, false, false, null, null,
+            SHARED_CHILDREN, null));
+        ctx.setRelease(release);
+        ctx.setRegistries(registries);
+        ctx.setHoistPeers(true);
+        Map<String, @Nullable Object> manifest = obj("{'name':'root','version':'1.0.0','dependencies':{" +
+                                                     dependencies + "}}");
+        return ResolveDependencyTree.resolveDependencyTree(Collections.singletonList(new ResolveDependencyTree.Importer(
+            ".", "", manifest, ResolveDependencyTree.getWantedDependencies(manifest, false, release))), ctx,
+          PreferredVersions.ByName.of(new LinkedHashMap<>()));
+    }
+
+    /**
+     * installing/deps-resolver resolveDependencies.ts claimChildrenResolution and waitForPackageResolutionTurn
+     * (11.7.0, pnpm/pnpm#12358): shared, reached under b's y first, resolves its children in the context of a's x,
+     * whose parents' ids are lower, where a's p drops p from shared's dependencies; before, in that of y, the first to
+     * resolve. The package is the first occurrence's all the same, without the peer. pnpm 11.6.0 and 11.7.0 wrote
+     * these snapshots when run on it. As one of a range across 11.7.0, the release is asked where a request would
+     * wait for a shallower one or a claim would be taken over, which a root with a alone reaches neither of.
+     */
+    @Test
+    void resolvesSharedChildrenInADeterministicContextFrom1170() {
+        String upToShared = "\nsnapshots:\n\n  a@1.0.0:\n    dependencies:\n      p: 1.0.0\n      x: 1.0.0\n\n" +
+                            "  b@1.0.0:\n    dependencies:\n      y: 1.0.0\n\n  p@1.0.0: {}\n\n";
+        String fromX = "  x@1.0.0:\n    dependencies:\n      shared: 1.0.0\n\n  y@1.0.0:\n    dependencies:\n" +
+                       "      shared: 1.0.0\n";
+        assertThat(installSharedChildren("11.6.0"))
+          .isEqualTo(upToShared + "  shared@1.0.0:\n    dependencies:\n      p: 1.0.0\n\n" + fromX);
+        assertThat(installSharedChildren("11.7.0")).isEqualTo(upToShared + "  shared@1.0.0: {}\n\n" + fromX);
+        PnpmRelease straddling = PnpmRelease.oneOf("11.6.0 || 11.7.0", Arrays.asList("11.6.0", "11.7.0"));
+        assertThatThrownBy(() -> resolveSharedChildren(straddling, "'b':'1.0.0','a':'1.0.0'"))
+          .isInstanceOf(CannotKnow.class)
+          .hasMessageContaining("one of 11.6.0 || 11.7.0, where the releases from 11.7.0 install it otherwise");
+        assertThat(resolveSharedChildren(straddling, "'a':'1.0.0'").getDependenciesTree().values())
+          .anySatisfy(node -> {
+              assertThat(node.getResolvedPackage().getName()).isEqualTo("shared");
+              assertThat(node.children()).isEmpty();
+          });
+    }
 }

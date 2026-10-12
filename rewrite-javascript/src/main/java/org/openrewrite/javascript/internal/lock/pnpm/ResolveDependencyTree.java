@@ -200,6 +200,11 @@ final class ResolveDependencyTree {
 
     static Result resolveDependencyTree(List<Importer> importers, ResolutionContext ctx,
                                         PreferredVersions.ByName preferredVersions) {
+        // 11.7.0's context: each importer's place in the install, by which the claims on a package's children are
+        // ordered (PnpmRelease#resolvesSharedChildrenInADeterministicContext)
+        for (int index = 0; index < importers.size(); index++) {
+            ctx.getImporterResolutionOrder().put(importers.get(index).getId(), index);
+        }
         List<ResolveDependencies.ImporterToResolve> resolveArgs = new ArrayList<>();
         for (Importer importer : importers) {
             validatePeerDependencies(importer.getRootDir(), importer.getManifest(), ctx.getRelease());
@@ -257,7 +262,7 @@ final class ResolveDependencyTree {
             node.setLockedPeerContext(pendingNode.getLockedPeerContext());
             node.setPreviousDepPath(pendingNode.getPreviousDepPath());
             String id = pendingNode.getResolvedPackage().getId();
-            node.setLazyChildren(() -> buildTree(ctx, id, pendingNode.getParentIds(),
+            node.setLazyChildren(() -> ResolveDependencies.buildTree(ctx, id, pendingNode.getParentIds(),
                     ctx.getChildrenByParentId().get(id), pendingNode.getDepth() + 1, pendingNode.isInstallable()));
             ctx.getDependenciesTree().put(pendingNode.getNodeId(), node);
         }
@@ -293,44 +298,6 @@ final class ResolveDependencyTree {
         }
         return new Result(ctx.getDependenciesTree(), resolvedImporters, root.getTime(), ctx.getAllPeerDepNames(),
                 ctx.getResolutionPolicyViolations());
-    }
-
-    private static Map<String, NodeId> buildTree(ResolutionContext ctx, String parentId, List<String> parentIds,
-                                                 @Nullable List<ResolveDependencies.ChildId> children, int depth,
-                                                 boolean installable) {
-        Map<String, NodeId> childrenNodeIds = new LinkedHashMap<>();
-        if (children == null) {
-            return childrenNodeIds;
-        }
-        boolean installableSoFar = installable;
-        for (ResolveDependencies.ChildId child : children) {
-            String alias = child.getAlias();
-            String id = child.getId();
-            if (id.startsWith("link:")) {
-                childrenNodeIds.put(alias, NodeId.of(id));
-                continue;
-            }
-            if (ResolveDependencies.parentIdsContainSequence(parentIds, parentId, id) || parentId.equals(id)) {
-                continue;
-            }
-            ResolveDependencies.ResolvedPackage resolved = ctx.getResolvedPkgsById().get(id);
-            if (resolved.isLeaf()) {
-                childrenNodeIds.put(alias, NodeId.of(id));
-                continue;
-            }
-            NodeId childNodeId = ctx.nextNodeId();
-            childrenNodeIds.put(alias, childNodeId);
-            installableSoFar = installableSoFar || !ctx.getSkipped().contains(id);
-            boolean childInstallable = installableSoFar;
-            List<String> childParentIds = new ArrayList<>(parentIds);
-            childParentIds.add(id);
-            DependenciesTreeNode node = new DependenciesTreeNode(resolved, depth);
-            node.setInstallable(childInstallable);
-            node.setLazyChildren(() -> buildTree(ctx, id, childParentIds, ctx.getChildrenByParentId().get(id),
-                    depth + 1, childInstallable));
-            ctx.getDependenciesTree().put(childNodeId, node);
-        }
-        return childrenNodeIds;
     }
 
     private static List<PkgAddress> dedupeSameAliasDirectDeps(List<PkgAddress> directDeps,
