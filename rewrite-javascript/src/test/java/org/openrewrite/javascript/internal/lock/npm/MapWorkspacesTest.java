@@ -249,6 +249,83 @@ class MapWorkspacesTest {
           .isEqualTo("x=packages/a b=packages/b");
     }
 
+    /**
+     * What the @npmcli/map-workspaces of each npm release, with the glob it runs, answered over these layouts on disk:
+     * a pattern ending in {@code /**} finds the directory it follows; {@code **} finds the project directory under
+     * glob 9 and 10 (npm 9.6.3 to 10.5.1) only; a {@code .} portion is walked through until 3.0.6 (npm 10.5.2) drops
+     * it again; from 2.0.1 (npm 8.5.3) a backslash is a slash, also in 3.0.6 and later, whose glob ignores a negated
+     * pattern as written; glob 7 and 8 (before npm 9.6.3) sort what they find with the slash the pattern ends in.
+     */
+    @ParameterizedTest
+    @CsvSource(delimiter = '|', quoteCharacter = '`', value = {
+      "globstar|[\"**\"]|9.6.2|libs=libs x=libs/x y=libs/x/y o=other/o",
+      "globstar|[\"**\"]|9.6.3|root=. libs=libs x=libs/x y=libs/x/y o=other/o",
+      "globstar|[\"**\"]|10.5.1|root=. libs=libs x=libs/x y=libs/x/y o=other/o",
+      "globstar|[\"**\"]|10.5.2|libs=libs x=libs/x y=libs/x/y o=other/o",
+      "globstar|[\"**/**\"]|9.6.2|libs=libs x=libs/x y=libs/x/y o=other/o",
+      "globstar|[\"**/**\"]|9.6.3|root=. libs=libs x=libs/x y=libs/x/y o=other/o",
+      "globstar|[\"libs/*/**\"]|9.6.2|x=libs/x y=libs/x/y",
+      "globstar|[\"libs/*/**\"]|11.17.0|x=libs/x y=libs/x/y",
+      "globstar|[\"*/**\"]|9.6.2|libs=libs x=libs/x y=libs/x/y o=other/o",
+      "globstar|[\"*/**\"]|11.17.0|libs=libs x=libs/x y=libs/x/y o=other/o",
+      "globstar|[\"libs/**\",\"!libs/x/**\"]|9.6.2|libs=libs",
+      "globstar|[\"libs/**\",\"!libs/x/**\"]|11.17.0|libs=libs",
+      "globstar|[\"libs/./x\"]|10.5.1|x=libs/x",
+      "globstar|[\"libs/./x\"]|10.5.2|``",
+      "globstar|[\"libs/x/.\"]|11.17.0|x=libs/x",
+      "globstar|[\"libs/*//\"]|11.17.0|x=libs/x",
+      "globstar|[\"libs\\\\*\\\\**\"]|11.17.0|x=libs/x y=libs/x/y",
+      "backslash|[\"packages\\\\*\"]|8.1.0|``",
+      "backslash|[\"packages\\\\*\"]|8.5.3|a=packages/a b=packages/b",
+      "backslash|[\"packages\\\\*\"]|11.17.0|a=packages/a b=packages/b",
+      "backslash|{\"packages\":[\"packages\\\\*\"]}|11.17.0|a=packages/a b=packages/b",
+      "backslash|[\"packages/*\",\"!packages\\\\a\"]|10.5.1|b=packages/b",
+      "backslash|[\"packages/*\",\"!packages\\\\a\"]|10.5.2|a=packages/a b=packages/b",
+    })
+    void membersAsTheReleaseGlobFindsThem(String layout, String workspaces, String release, String members) {
+        Map<String, String> manifests = new LinkedHashMap<>();
+        manifests.put("", "{\"name\":\"root\"}");
+        if ("globstar".equals(layout)) {
+            manifests.put("libs", "{\"name\":\"libs\"}");
+            manifests.put("libs/x", "{\"name\":\"x\"}");
+            manifests.put("libs/x/y", "{\"name\":\"y\"}");
+            manifests.put("libs/.z", "{\"name\":\"z\"}");
+            manifests.put("libs/x/node_modules/m", "{\"name\":\"m\"}");
+            manifests.put("other/o", "{\"name\":\"o\"}");
+        } else {
+            manifests.put("packages/a", "{\"name\":\"a\"}");
+            manifests.put("packages/b", "{\"name\":\"b\"}");
+        }
+        VirtualTreeLoader.ProjectFiles files = VirtualTreeLoader.ProjectFiles.builder().manifests(manifests).build();
+        Map<String, Object> pkg = obj("workspaces", json(workspaces));
+        assertThat(members(MapWorkspaces.mapWorkspaces(CWD, pkg, files, NpmRelease.of(release)))).isEqualTo(members);
+    }
+
+    // glob 8 (npm 9.6.2) sorts packages/a-b/ before packages/a/; map-workspaces 3.0.3 (npm 9.6.3) sorts what glob 9
+    // finds, which ends in no slash
+    @Test
+    void duplicatePathsInTheOrderGlobSortsThem() {
+        Map<String, String> manifests = new LinkedHashMap<>();
+        manifests.put("", "{\"name\":\"root\"}");
+        manifests.put("packages/a", "{\"name\":\"dup\"}");
+        manifests.put("packages/a-b", "{\"name\":\"dup\"}");
+        manifests.put("packages/a.b", "{\"name\":\"other\"}");
+        VirtualTreeLoader.ProjectFiles files = VirtualTreeLoader.ProjectFiles.builder().manifests(manifests).build();
+        Map<String, Object> pkg = obj("workspaces", json("[\"packages/*\"]"));
+        assertThatThrownBy(() -> MapWorkspaces.mapWorkspaces(CWD, pkg, files, NpmRelease.of("9.6.2")))
+          .hasMessage("must not have multiple workspaces with the same name\n" +
+                      "package 'dup' has conflicts in the following paths:\n" +
+                      "    /project/packages/a-b\n" +
+                      "    /project/packages/a");
+        for (String release : new String[]{"9.6.3", "11.17.0"}) {
+            assertThatThrownBy(() -> MapWorkspaces.mapWorkspaces(CWD, pkg, files, NpmRelease.of(release)))
+              .hasMessage("must not have multiple workspaces with the same name\n" +
+                          "package 'dup' has conflicts in the following paths:\n" +
+                          "    /project/packages/a\n" +
+                          "    /project/packages/a-b");
+        }
+    }
+
     private static Object parsed(String text) {
         try {
             return JsonParseEvenBetterErrors.parse(text).getValue();

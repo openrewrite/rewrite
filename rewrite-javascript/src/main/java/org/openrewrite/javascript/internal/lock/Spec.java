@@ -36,7 +36,7 @@ import static org.openrewrite.javascript.internal.lock.UriComponent.encodeURICom
 
 /**
  * Port of npm-package-arg ({@code npa.js}, its {@code Result}) on POSIX paths: 13.0.2, which npm 11.17.0 bundles, the
- * releases npm 8 to 11 bundled before it, and pnpm 11.2.2's fork of npa 8, {@code @pnpm/npm-package-arg} 2.0.0.
+ * releases npm 7 to 11 bundled before it, and pnpm 11.2.2's fork of npa 8, {@code @pnpm/npm-package-arg} 2.0.0.
  * {@link #ofDependency} also names other protocols.
  */
 @Getter
@@ -46,10 +46,16 @@ public final class Spec {
      * The npm-package-arg whose answers the functions give: 13.0.2, whose answers 13.0.1 gives too (npm 11.6.2 on);
      * 13.0.0, whose answers 12.0.2 gives too (npm 11.2.0 to 11.6.1); 12.0.1 (npm 11.0.0 and 11.1.0); 10.1.0, whose
      * answers 10.0.0 gives too (npm 9); 9.1.0 (npm 8.14.0 to 8.19.4); 9.0.0, whose answers 9.0.1 and 9.0.2 give too
-     * (npm 8.5.2 to 8.13.2); 8.1.5 (npm 8.0.0 to 8.5.1); or pnpm's fork.
+     * (npm 8.5.2 to 8.13.2); 8.1.5 (npm 7.18.0 to 8.5.1); 8.1.4 (npm 7.16.0 and 7.17.0), which reads a file: spec
+     * as a path rather than a URL; 8.1.1, whose answers 8.1.2 gives too (npm 7.5.5 to 7.15.1), which also strips
+     * the slashes after file: before any dot and trims no registry spec, as 8.1.0 (npm 7.0.0 to 7.5.4) does, which
+     * besides reads a whole scp-style git string ({@code npa('git@host:path')}, never a lock's) as a name and a
+     * spec; or pnpm's fork.
      */
     public enum Release {
         PNPM_2_0_0,
+        V8_1_1,
+        V8_1_4,
         V8_1_5,
         V9_0_0,
         V9_1_0,
@@ -77,12 +83,16 @@ public final class Spec {
 
         /**
          * The release with the libraries of the newest npm that bundles it: 11.17.0, 11.6.1, 11.1.0, 9.9.4, 8.19.4,
-         * 8.13.2 and 8.5.1.
+         * 8.13.2, 8.5.1, 7.17.0 and 7.15.1.
          */
         public static Options of(Release release) {
             switch (release) {
                 case PNPM_2_0_0:
                     return PNPM_2_0_0;
+                case V8_1_1:
+                case V8_1_4:
+                    return of(release, ValidateNpmPackageName.Release.V6_0_0, GitHost.Release.V4_0_2,
+                            NodeSemver.Release.V7_7_2);
                 case V8_1_5:
                 case V9_0_0:
                     return of(release, ValidateNpmPackageName.Release.V6_0_0, GitHost.Release.V4_1_0,
@@ -344,7 +354,18 @@ public final class Spec {
     // npm-package-arg before 10.0.0: a bare name, or a name with an empty spec, is the default tag; a file: URL with
     // one slash before its leading dots alone is relative
     private static boolean before10(Release release) {
-        return release == Release.V8_1_5 || release == Release.V9_0_0 || release == Release.V9_1_0;
+        return before8_1_5(release) || release == Release.V8_1_5 || release == Release.V9_0_0 ||
+               release == Release.V9_1_0;
+    }
+
+    // npm-package-arg before 8.1.5 reads a file: spec as a path, as the fork does
+    private static boolean before8_1_5(Release release) {
+        return release == Release.V8_1_1 || release == Release.V8_1_4;
+    }
+
+    // npm-package-arg 8 and the fork word an invalid name or tag without the package
+    private static boolean npa8(Release release) {
+        return release == Release.PNPM_2_0_0 || before8_1_5(release) || release == Release.V8_1_5;
     }
 
     // npm-package-arg before 11.0.0: a file: URL with a host that is not localhost is refused; also before 11.0.1 the
@@ -356,7 +377,7 @@ public final class Spec {
 
     // npm-package-arg before 9.1.0: a git committish is a semver: range or a ref, no :: separated list
     private static boolean before9_1(Release release) {
-        return release == Release.V8_1_5 || release == Release.V9_0_0;
+        return before8_1_5(release) || release == Release.V8_1_5 || release == Release.V9_0_0;
     }
 
     /**
@@ -491,7 +512,7 @@ public final class Spec {
         List<String> errors = ValidateNpmPackageName.errors(name, options.validateNpmPackageName);
         if (!errors.isEmpty()) {
             // npm-package-arg 8 words it as the fork does
-            throw new InvalidSpecException(options.release == Release.PNPM_2_0_0 || options.release == Release.V8_1_5 ?
+            throw new InvalidSpecException(npa8(options.release) ?
                     "Invalid package name \"" + name + "\": " + String.join("; ", errors) :
                     "Invalid package name \"" + name + "\" of package \"" + raw + "\": " + String.join("; ", errors) +
                     ".", "EINVALIDPACKAGENAME");
@@ -601,6 +622,9 @@ public final class Spec {
     private static final Pattern HOME_PATH = Pattern.compile("^/~(/|$)");
 
     private static Spec fromFile(Spec res, String where, Release release) {
+        if (before8_1_5(release)) {
+            return fromFilePath(res, where, release);
+        }
         if (release == Release.V12_0_1 || before11(release)) {
             return fromFile12(res, where, release);
         }
@@ -694,13 +718,21 @@ public final class Spec {
         return res;
     }
 
-    // the fork's fromFile, npa 8's: the path as given, resolved against where
+    // the fork's fromFile, npa 8.1.0's: the path as given, resolved against where
     private static Spec fromFilePnpm(Spec res, String where) {
+        return fromFilePath(res, where, Release.PNPM_2_0_0);
+    }
+
+    // fromFile before 8.1.5, which the fork keeps: the path as given, a '#', '?' or '%' in it a character of the path,
+    // resolved against where; 8.1.4 strips the slashes after file: only before ~/, dots and a slash, or a slash, so
+    // that file:/.x is absolute
+    private static Spec fromFilePath(Spec res, String where, Release release) {
         res.type = IS_FILENAME.matcher(res.rawSpec).find() ? Type.FILE : Type.DIRECTORY;
         res.where = where;
         String spec = res.rawSpec.replace('\\', '/')
                 .replaceFirst("^file:[/]*([A-Za-z]:)", "$1")
-                .replaceFirst("^file:(?:[/]*([~./]))?", "$1");
+                .replaceFirst(release == Release.V8_1_4 ? "^file:(?:[/]*(~/|\\.*/|[/]))?" : "^file:(?:[/]*([~./]))?",
+                        "$1");
         if (spec.startsWith("~/")) {
             res.fetchSpec = resolvePath(HOME, spec.substring(2));
             res.saveSpec = "file:" + spec;
@@ -805,8 +837,10 @@ public final class Spec {
         boolean pnpm = options.release == Release.PNPM_2_0_0;
         NodeSemver.Options loose = NodeSemver.Options.LOOSE.release(options.semver);
         res.registry = true;
-        // before 10.0.0, res.rawSpec === '' ? 'latest' : res.rawSpec.trim()
-        String spec = before10(options.release) ? res.rawSpec.isEmpty() ? "latest" : trim(res.rawSpec) :
+        // before 10.0.0, res.rawSpec === '' ? 'latest' : res.rawSpec.trim(); before 8.1.4 untrimmed
+        boolean trims = options.release != Release.V8_1_1;
+        String spec = before10(options.release) ? res.rawSpec.isEmpty() ? "latest" :
+                trims ? trim(res.rawSpec) : res.rawSpec :
                 !pnpm ? trim(res.rawSpec) : res.rawSpec.isEmpty() ? "latest" : res.rawSpec;
         res.saveSpec = null;
         res.fetchSpec = spec;
@@ -819,7 +853,7 @@ public final class Spec {
         } else {
             if (!encodeURIComponent(spec).equals(spec)) {
                 throw new InvalidSpecException("Invalid tag name \"" + spec + "\"" +
-                                               (pnpm || options.release == Release.V8_1_5 ? "" :
+                                               (npa8(options.release) ? "" :
                                                        " of package \"" + res.raw + "\"") +
                                                ": Tags may not have any characters that encodeURIComponent encodes.",
                         "EINVALIDTAGNAME");

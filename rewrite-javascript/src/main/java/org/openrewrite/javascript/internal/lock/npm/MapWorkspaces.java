@@ -40,12 +40,14 @@ final class MapWorkspaces {
     /**
      * The @npmcli/map-workspaces release whose answers these are: 5.0.3, which npm 11.17.0 bundles and every release
      * from 3.0.6 reads as here; 3.0.4, which applies the patterns one after another, a negated one taking away what
-     * the ones before it found, as every release from 2.0.2 does; 2.0.1, which refuses a name two paths share as soon
-     * as a pattern finds the second; 2.0.0, which also reads a backslash in a pattern as glob's escape, as 1.0.4 does;
-     * or 1.0.3, whose refusal of a name two paths share names neither.
+     * the ones before it found, and runs glob 10, as 3.0.3 runs glob 9; 2.0.2, which applies them alike, as every
+     * release to 3.0.2 does, but runs glob 7 or 8, which finds the project directory for {@code **} only after
+     * {@code ./} and sorts what it finds with the slash the pattern ends in; 2.0.1, which refuses a name two paths
+     * share as soon as a pattern finds the second; 2.0.0, which also reads a backslash in a pattern as glob's escape,
+     * as 1.0.4 does; or 1.0.3, whose refusal of a name two paths share names neither.
      */
     enum Release {
-        V1_0_3, V2_0_0, V2_0_1, V3_0_4, V5_0_3
+        V1_0_3, V2_0_0, V2_0_1, V2_0_2, V3_0_4, V5_0_3
     }
 
     /**
@@ -172,7 +174,7 @@ final class MapWorkspaces {
                 continue;
             }
             for (String pattern : p.patterns) {
-                if (Minimatch.minimatch(dir, globPattern(pattern), options)) {
+                if (globs(dir, getGlobPattern(pattern), options)) {
                     matches.add(dir);
                     break;
                 }
@@ -228,8 +230,38 @@ final class MapWorkspaces {
         return results;
     }
 
-    private static String globPattern(String pattern) {
-        return pattern.endsWith("/") ? pattern.substring(0, pattern.length() - 1) : pattern;
+    // make sure glob pattern only matches folders
+    private static String getGlobPattern(String pattern) {
+        pattern = pattern.replace('\\', '/');
+        return pattern.endsWith("/") ? pattern : pattern + "/";
+    }
+
+    // whether glob finds a directory for a pattern getGlobPattern made: the project directory where the pattern
+    // without its trailing slashes names it, any other where it matches with its own slash (a pattern ending in /**
+    // also finds the directory /** follows), the . and empty portions of the pattern dropped as glob drops them
+    private static boolean globs(String dir, String glob, Minimatch.Options options) {
+        if (".".equals(dir)) {
+            String stripped = glob;
+            while (stripped.endsWith("/")) {
+                stripped = stripped.substring(0, stripped.length() - 1);
+            }
+            return Minimatch.minimatch(dir, stripped, options);
+        }
+        return Minimatch.minimatch(dir + "/", levelTwoFileOptimize(glob), options);
+    }
+
+    // minimatch's levelTwoFileOptimize at the optimizationLevel 2 glob 9 and later ask for: the . and empty portions
+    // between the first and the last are dropped (glob 7 and 8 walk through them to the same directories)
+    private static String levelTwoFileOptimize(String glob) {
+        String[] parts = glob.split("/", -1);
+        List<String> kept = new ArrayList<>();
+        for (int i = 0; i < parts.length; i++) {
+            if (i > 0 && i < parts.length - 1 && (".".equals(parts[i]) || parts[i].isEmpty())) {
+                continue;
+            }
+            kept.add(parts[i]);
+        }
+        return String.join("/", kept);
     }
 
     // 3.0.4's appendNegatedPatterns: every pattern in its place, only a leading / stripped
@@ -256,10 +288,12 @@ final class MapWorkspaces {
         return results;
     }
 
-    // glob(getGlobPattern(pattern)): a leading ./ and a trailing / name nothing, and . and a lone ** find the
-    // directory itself; before 2.0.1 a backslash stays glob's escape
+    // glob(getGlobPattern(pattern)): a leading ./ and a trailing / name nothing, . finds the directory itself, and
+    // ** alone does too under glob 9 and 10, or after ./ under glob 7 and 8; any other directory matches with its
+    // own slash, the . and empty portions of the pattern dropped; before 2.0.1 a backslash stays glob's escape
     private static boolean globs3_0_4(String dir, String pattern, Release release) {
         String glob = release == Release.V1_0_3 || release == Release.V2_0_0 ? pattern : pattern.replace('\\', '/');
+        boolean dotSlash = glob.startsWith("./");
         while (glob.startsWith("./")) {
             glob = glob.substring(2);
         }
@@ -267,9 +301,20 @@ final class MapWorkspaces {
             glob = glob.substring(0, glob.length() - 1);
         }
         if (".".equals(dir)) {
-            return glob.isEmpty() || ".".equals(glob) || "**".equals(glob);
+            return glob.isEmpty() || ".".equals(glob) ||
+                   globstarsOnly(glob) && (dotSlash || release == Release.V3_0_4);
         }
-        return !glob.isEmpty() && Minimatch.minimatch(dir, glob, Minimatch.Release.V10_2_5);
+        return !glob.isEmpty() &&
+               Minimatch.minimatch(dir + "/", levelTwoFileOptimize(glob + "/"), Minimatch.Release.V10_2_5);
+    }
+
+    private static boolean globstarsOnly(String glob) {
+        for (String part : glob.split("/", -1)) {
+            if (!"**".equals(part)) {
+                return false;
+            }
+        }
+        return true;
     }
 
     private static Map<Object, String> mapWorkspaces3_0_4(String cwd, @Nullable Object workspaces,
@@ -295,7 +340,13 @@ final class MapWorkspaces {
                     matches.add(dir);
                 }
             }
-            matches.sort(LocaleCompare::en);
+            if (release == Release.V3_0_4) {
+                // 3.0.3 sorts what glob 9 and 10 find, which ends in no slash, as glob 8 sorted
+                matches.sort(LocaleCompare::en);
+            } else {
+                // glob 7 and 8 sort what they find, each ending in the slash the pattern asks for
+                matches.sort((a, b) -> LocaleCompare.en(a + "/", b + "/"));
+            }
 
             for (String match : matches) {
                 String location = ".".equals(match) ? "" : match;
