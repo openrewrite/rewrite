@@ -392,5 +392,8 @@ npm's; `Main.RUNS_AS_PORTED`, which let every 11.x release run as 11.2.2, is gon
   documents its replays need; pnpm's own packuments, which six scenarios that pin a release would copy (81 MB), are
   left out, every release's replay of every scenario being the same without them. `PnpmScenarioTest` replays the
   first and last release of every range, and every release with `REWRITE_LOCK_EVERY_RELEASE`. A recording a release
-  outside `PROVEN` made is held to cannot-know until the engine reproduces that release. `PROVEN` is 11.0.6 to 11.5.1;
-  11.5.2 resolves peers again from the contexts the lock records and binds each locked tarball URL to the registry's.
+  outside `PROVEN` made is held to cannot-know until the engine reproduces that release. `PROVEN` widens a boundary at
+  a time, once every replay of its releases passes and every pair of releases in it is reviewed: 11.0.3 to 11.5.2 so
+  far. 11.5.2 resolves peers a second time from the peer contexts the lock records, reads a locked package it does not
+  update from its snapshot, and binds each locked tarball URL to the registry's; a pnpm 11 release before 11.0.6
+  writes pnpm-workspace.yaml as pnpm 10 does, which the recipes follow.
