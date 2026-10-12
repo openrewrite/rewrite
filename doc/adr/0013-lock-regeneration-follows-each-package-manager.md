@@ -365,3 +365,32 @@ The Yarn classic port follows yarn 1.22.22 and reproduces the 1.x releases besid
   another release. `YarnClassicScenarioTest` replays the first and last release of every range, and every release
   with `REWRITE_LOCK_EVERY_RELEASE`. `PROVEN` is 1.7.0 to 1.22.22 but 1.22.12; 1.6.0 knows no `--focus`, and the
   releases before it word many failures otherwise.
+
+## Amendment 2026-10-12: pnpm releases
+
+The pnpm port follows pnpm 11.2.2 and reproduces the releases of `PnpmReleases.PROVEN` beside it, as the npm port does
+npm's; `Main.RUNS_AS_PORTED`, which let every 11.x release run as 11.2.2, is gone.
+
+- **The release that installs** is the one the `NodeRuntime` marker names, what `pnpm --version` answered in the
+  project's root: the release on the path or the one corepack starts, which main.ts answers before any switch. It runs
+  its own package manager check; a hand-over to another release is cannot-know, since the release that runs may write
+  the env document before it hands over. Without a marker 11.2.2 runs as before and hands the install to the release
+  the project names, which the engine follows where it reproduces it. Where the inputs leave the release at a range
+  (corepack or pnpm run directly, a range the root's lock pins one of), it is every reproduced release of the range,
+  and a question their answers differ on for the inputs is cannot-know; each question is asked only where its answers
+  differ. A release outside `PROVEN` is cannot-know, worded as the other package managers word it.
+- **One question per upstream change.** `PnpmRelease` holds each difference as a question named for what pnpm does,
+  answered through `atLeast` alone by the tag `v<release>` of pnpm/pnpm that made it, the ported class branching where
+  upstream changed with 11.2.2's code beside the other release's. pnpm names its own release only where it does (its
+  `packageManager.version`, `engines.pnpm`). The resolver's `LOCKED_OPTIONAL_PEER_CANDIDATES` (pnpm/pnpm#12075) stays
+  as #9151 wrote it, and `countsLockedVersionsAsOptionalPeerCandidates` answers the same for every reproduced release.
+  A change no scenario reaches is a question all the same, its unit test what the release did when run: pnpm before
+  11.5.0 writes a locked remote tarball without its integrity beside an edit (pnpm/pnpm#12001), where the port of
+  11.2.2 had filled in the locked one.
+- **How a release is proven.** Every stable release from 9.0.0 to 12.12.1 was swept over every pnpm scenario, and the
+  export wrote what each wrote into the scenarios' `releases` files and `release/` outcomes, with the registry
+  documents its replays need; pnpm's own packuments, which six scenarios that pin a release would copy (81 MB), are
+  left out, every release's replay of every scenario being the same without them. `PnpmScenarioTest` replays the
+  first and last release of every range, and every release with `REWRITE_LOCK_EVERY_RELEASE`. A recording a release
+  outside `PROVEN` made is held to cannot-know until the engine reproduces that release. `PROVEN` is 11.0.6 to 11.5.1;
+  11.5.2 resolves peers again from the contexts the lock records and binds each locked tarball URL to the registry's.
