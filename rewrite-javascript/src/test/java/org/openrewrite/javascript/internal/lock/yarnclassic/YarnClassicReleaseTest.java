@@ -814,6 +814,343 @@ class YarnClassicReleaseTest {
     }
 
     /**
+     * cli/index.js {@code start} runs a .yarnrc's yarn-path, which node cannot load where the project does not hold
+     * it: yarn ends with 0 before 1.2.0, the lock as it was, and with the yarn-path's exit code from 1.2.0 (as yarn
+     * 1.1.0 and 1.2.0 installed the sweep's open-yarn-path-missing-release: 1.1.0 ended with 0 and left the lock that
+     * pins another version than the manifest's, 1.2.0 failed with {@code Cannot find module}).
+     */
+    @Test
+    void exitsWithTheYarnPathsCodeFrom120() {
+        String lock = "# yarn lockfile v1\n\n\nms@2.1.2:\n  version \"2.1.2\"\n  resolved " +
+                      "\"https://registry.yarnpkg.com/ms/-/ms-2.1.2.tgz#d09d1f357b443f493382a8eb3ccd183872ae6009\"\n";
+        YarnClassicLockRegenerator.Inputs.InputsBuilder inputs = YarnClassicLockRegenerator.Inputs.builder()
+                .manifest("", "{\"name\":\"p\",\"version\":\"1.0.0\",\"dependencies\":{\"ms\":\"2.1.3\"}}")
+                .lock(lock)
+                .configFile(".yarnrc", "yarn-path \".yarn/releases/yarn-1.22.22.cjs\"\n")
+                .paths(new LinkedHashSet<>(Arrays.asList("package.json", "yarn.lock", ".yarnrc")))
+                .env(Collections.emptyMap());
+        LockFileRegeneration.Result before = new YarnClassicLockRegenerator(inputs.release(release("1.1.0")).build(),
+                YarnClassicScenarios.NO_REGISTRY).regenerate();
+        assertThat(before.getLockFileContent()).as(String.valueOf(before.getErrorMessage())).isEqualTo(lock);
+        LockFileRegeneration.Result from = new YarnClassicLockRegenerator(inputs.release(release("1.2.0")).build(),
+                YarnClassicScenarios.NO_REGISTRY).regenerate();
+        assertThat(from.getErrorMessage()).isEqualTo("RESOLUTION_REQUIRED: yarn fails on this edit: Error: Cannot " +
+                                                     "find module '.yarn/releases/yarn-1.22.22.cjs'");
+    }
+
+    /**
+     * cli/index.js {@code start} ignores the yarn-path where {@code boolifyWithDefault(YARN_IGNORE_PATH)} from 1.3.1;
+     * before, where the variable is {@code 1} only (as yarn 1.2.1 and 1.3.1 installed a project whose .yarnrc names a
+     * yarn-path it does not hold: under {@code YARN_IGNORE_PATH=true} 1.2.1 failed with {@code Cannot find module} and
+     * 1.3.1 installed, under {@code 1} both installed).
+     */
+    @ParameterizedTest(name = "{0} {1}")
+    @CsvSource(delimiter = '|', value = {
+            "1.2.1|true|crash Error: Cannot find module '.yarn/releases/yarn-1.22.22.cjs'",
+            "1.3.1|true|installs",
+            "1.2.1|1|installs",
+            "1.3.1|1|installs",
+    })
+    void boolifiesYarnIgnorePathFrom131(String version, String ignorePath, String outcome) {
+        YarnClassicLockRegenerator.Inputs inputs = YarnClassicLockRegenerator.Inputs.builder()
+                .release(release(version))
+                .manifest("", ROOT)
+                .lock("# yarn lockfile v1\n\n\n")
+                .configFile(".yarnrc", "yarn-path \".yarn/releases/yarn-1.22.22.cjs\"\n")
+                .paths(new LinkedHashSet<>(Arrays.asList("package.json", "yarn.lock", ".yarnrc")))
+                .env(Collections.singletonMap("YARN_IGNORE_PATH", ignorePath))
+                .build();
+        assertThat(start(inputs)).isEqualTo(outcome);
+    }
+
+    /**
+     * rc.js {@code buildRcArgs} turns a .yarnrc's {@code --<arg>} into arguments by the option it names from 1.1.0, and
+     * cli/index.js boolifies {@code --production}'s value from 1.1.0. Before, by the value's type: a flag's string
+     * value sets the flag and stays behind as an argument of install, which refuses it, and commander keeps
+     * {@code --production}'s string (as yarn 1.0.2 and 1.1.0 installed these: {@code --frozen-lockfile "true"} ended
+     * 1.0.2 with install's refusal and installed 1.1.0 without the flag; {@code --production "0"} left a member's
+     * devDependencies out of 1.0.2's lock and in 1.1.0's).
+     */
+    @Test
+    void buildsRcArgsByTheirOptionFrom110() {
+        Map<String, @Nullable Object> frozen = Collections.singletonMap("--frozen-lockfile", "true");
+        assertThat(Rc.getRcArgs(frozen, release("1.0.2"))).containsEntry("frozenLockfile", true)
+                .containsEntry(Rc.ARGS, Collections.singletonList("true"));
+        assertThat(Rc.getRcArgs(frozen, release("1.1.0"))).doesNotContainKeys("frozenLockfile", Rc.ARGS);
+        YarnClassicLockRegenerator.Inputs.InputsBuilder inputs = YarnClassicLockRegenerator.Inputs.builder()
+                .manifest("", ROOT)
+                .lock("# yarn lockfile v1\n\n\n")
+                .configFile(".yarnrc", "--frozen-lockfile \"true\"\n")
+                .env(Collections.emptyMap());
+        assertThat(new YarnClassicLockRegenerator(inputs.release(release("1.0.2")).build(),
+                YarnClassicScenarios.NO_REGISTRY).regenerate().getErrorMessage())
+                .endsWith("`install` has been replaced with `add` to add new dependencies. Run \"yarn add true\" " +
+                          "instead.");
+        assertThat(new YarnClassicLockRegenerator(inputs.release(release("1.1.0")).build(),
+                YarnClassicScenarios.NO_REGISTRY).regenerate().isSuccess()).isTrue();
+
+        Map<String, @Nullable Object> production = Collections.singletonMap("--production", "0");
+        assertThat(Rc.getRcArgs(production, release("1.0.2"))).containsEntry("production", "0");
+        assertThat(Rc.getRcArgs(production, release("1.1.0"))).containsEntry("production", false);
+        assertThat(requestsMemberDevDependencies("1.0.2", "--production \"0\"\n")).isFalse();
+        assertThat(requestsMemberDevDependencies("1.1.0", "--production \"0\"\n")).isTrue();
+    }
+
+    /**
+     * cli/index.js declares {@code --registry <url>} from 1.2.0, which config.js hands the registries over their rc
+     * files; before, a .yarnrc's {@code --registry} is an option commander drops with its value (as yarn 1.1.0 and
+     * 1.2.0 installed a project whose .yarnrc gives another registry than its .npmrc: 1.1.0 asked the .npmrc's, 1.2.0
+     * the .yarnrc's).
+     */
+    @ParameterizedTest(name = "{0}")
+    @CsvSource(delimiter = '|', value = {
+            "1.1.0|https://n.example/",
+            "1.2.0|https://y.example/",
+    })
+    void declaresRegistryFrom120(String version, String registry) {
+        Map<String, String> files = new LinkedHashMap<>();
+        files.put(".npmrc", "registry=https://n.example/\n");
+        files.put(".yarnrc", "--registry \"https://y.example/\"\n");
+        assertThat(config(version, files, Collections.emptyMap()).getRegistry("x")).isEqualTo(registry);
+    }
+
+    /**
+     * cli/index.js declares {@code --update-checksums} from 1.4.0; before, a .yarnrc's {@code --update-checksums} is an
+     * option commander drops with its value (as yarn 1.3.2 and 1.4.0 installed a lock whose hash is not the tarball's:
+     * 1.3.2 refused the tarball, 1.4.0 wrote its hash). What the flag writes is the hash of what yarn downloads, which
+     * the engine cannot know.
+     */
+    @ParameterizedTest(name = "{0}")
+    @CsvSource(delimiter = '|', value = {
+            "1.3.2|installs",
+            "1.4.0|RESOLUTION_REQUIRED: the engine cannot know whether yarn's cache holds a@1.0.0: " +
+            "--update-checksums rewrites the integrity of each package it downloads, not of one it finds there",
+    })
+    void declaresUpdateChecksumsFrom140(String version, String outcome) {
+        YarnClassicLockRegenerator.Inputs inputs = YarnClassicLockRegenerator.Inputs.builder()
+                .release(release(version))
+                .manifest("", "{\"name\":\"p\",\"version\":\"1.0.0\",\"dependencies\":{\"a\":\"1.0.0\"}}")
+                .lock("# yarn lockfile v1\n\n\n" +
+                      "a@1.0.0:\n  version \"1.0.0\"\n  resolved \"https://registry.yarnpkg.com/a/-/a-1.0.0.tgz#a\"\n")
+                .configFile(".yarnrc", "--update-checksums true\n")
+                .env(Collections.emptyMap())
+                .build();
+        LockFileRegeneration.Result result = new YarnClassicLockRegenerator(inputs, YarnClassicScenarios.NO_REGISTRY)
+                .regenerate();
+        assertThat(result.isSuccess() ? "installs" : result.getErrorMessage()).isEqualTo(outcome);
+    }
+
+    /**
+     * install.js {@code saveLockfileAndIntegrity} writes no lock under {@code --frozen-lockfile} from 1.0.2 (#4385);
+     * before, a frozen install that passes {@code bailout}'s check writes the lock as any install does (as yarn 1.0.1
+     * and 1.0.2 installed a frozen lock that misses a dependency's entry: 1.0.1 wrote the entry, 1.0.2 left the lock
+     * as it was; the sweep's open-fetch-tarball-file-dependency-frozen-lockfile).
+     */
+    @Test
+    void keepsTheLockUnderFrozenLockfileFrom102() {
+        String lock = "# yarn lockfile v1\n\n\na@1.0.0:\n  version \"1.0.0\"\n  resolved " +
+                      "\"https://registry.yarnpkg.com/a/-/a-1.0.0.tgz#a\"\n  dependencies:\n    b \"1.0.0\"\n";
+        YarnClassicLockRegenerator.Inputs.InputsBuilder inputs = YarnClassicLockRegenerator.Inputs.builder()
+                .manifest("", "{\"name\":\"p\",\"version\":\"1.0.0\",\"dependencies\":{\"a\":\"1.0.0\"}}")
+                .lock(lock)
+                .configFile(".yarnrc", "--frozen-lockfile true\n")
+                .env(Collections.emptyMap());
+        RegistrySource registry = published("b", "1.0.0");
+        LockFileRegeneration.Result before = new YarnClassicLockRegenerator(inputs.release(release("1.0.1")).build(),
+                registry).regenerate();
+        assertThat(before.getLockFileContent()).as(String.valueOf(before.getErrorMessage()))
+                .contains("\nb@1.0.0:\n  version \"1.0.0\"\n");
+        LockFileRegeneration.Result from = new YarnClassicLockRegenerator(inputs.release(release("1.0.2")).build(),
+                registry).regenerate();
+        assertThat(from.getLockFileContent()).as(String.valueOf(from.getErrorMessage())).isEqualTo(lock);
+    }
+
+    /**
+     * install.js {@code fetchRequestFromCwd}: the workspace aggregator depends on the root's own dependencies beside
+     * the workspaces from 1.2.0, so that they are requested again with parent names, which a resolution reaches;
+     * before, on the workspaces alone (as yarn 1.1.0 and 1.2.0 installed the sweep's open-ws-empty-list-resolution:
+     * 1.1.0 locked the root's {@code left-pad@1.3.0} apart from the resolution's 1.2.0, 1.2.0 in the resolution's
+     * entry).
+     */
+    @Test
+    void requestsTheRootsDependenciesFromTheAggregatorFrom120() {
+        YarnClassicLockRegenerator.Inputs.InputsBuilder inputs = YarnClassicLockRegenerator.Inputs.builder()
+                .manifest("", "{\"name\":\"r\",\"version\":\"1.0.0\",\"private\":true,\"workspaces\":[]," +
+                              "\"dependencies\":{\"x\":\"1.3.0\"},\"resolutions\":{\"x\":\"1.2.0\"}}")
+                .lock("# yarn lockfile v1\n\n\n")
+                .env(Collections.emptyMap());
+        RegistrySource registry = published("x", "1.2.0", "1.3.0");
+        LockFileRegeneration.Result before = new YarnClassicLockRegenerator(inputs.release(release("1.1.0")).build(),
+                registry).regenerate();
+        assertThat(before.getLockFileContent()).as(String.valueOf(before.getErrorMessage()))
+                .contains("\nx@1.2.0:\n  version \"1.2.0\"\n").contains("\nx@1.3.0:\n  version \"1.3.0\"\n");
+        LockFileRegeneration.Result from = new YarnClassicLockRegenerator(inputs.release(release("1.2.0")).build(),
+                registry).regenerate();
+        assertThat(from.getLockFileContent()).as(String.valueOf(from.getErrorMessage()))
+                .contains("\nx@1.2.0, x@1.3.0:\n  version \"1.2.0\"\n");
+    }
+
+    /**
+     * config.js {@code init} takes the {@code --production} flag wherever it is given from 1.2.0; before, the config's
+     * {@code production} makes a production install whatever the flag says (as yarn 1.1.0 and 1.2.0 installed under a
+     * .yarnrc of {@code production true} and {@code --production false}: 1.1.0 left a member's devDependencies out of
+     * the lock, 1.2.0 locked them).
+     */
+    @ParameterizedTest(name = "{0}")
+    @CsvSource({"1.1.0,false", "1.2.0,true"})
+    void letsTheProductionFlagWinFrom120(String version, boolean devDependencies) {
+        assertThat(requestsMemberDevDependencies(version, "production true\n--production false\n"))
+                .isEqualTo(devDependencies);
+    }
+
+    /**
+     * lockfile/parse.js {@code tokenise} ends a line at {@code \r} from 1.1.0, a {@code \r\n} or {@code \n\n} being
+     * one line end of two characters, so that a blank line of LF line ends no longer ends the object it is in; before,
+     * {@code \r} is an invalid token, so that a .yarnrc of CRLF lines, which rc.js reads raw, is no rc file at all. As
+     * yarn 1.0.2, 1.1.0 and 1.22.22 installed under these .yarnrc files: a CRLF {@code --frozen-lockfile true} froze
+     * 1.1.0, not 1.0.2; one after a blank line in a nested object froze 1.1.0 and 1.22.22 with LF line ends, not 1.0.2,
+     * and none with CRLF line ends, whose blank line is a line end of its own. An error names the raw file's lines and
+     * columns (yarn 1.22.22 reported {@code 3:7} with CRLF line ends, {@code 2:7} with LF).
+     */
+    @Test
+    void readsCarriageReturnsAsLineEndsFrom110() {
+        Map<String, String> frozen = Collections.singletonMap(".yarnrc", "--frozen-lockfile true\r\n");
+        assertThat(rc("1.0.2", frozen)).isEqualTo("{}");
+        assertThat(rc("1.1.0", frozen)).isEqualTo("{--frozen-lockfile=true}");
+        String nested = "foo:\n  a b\n\n  c d\n--frozen-lockfile true\n";
+        Map<String, String> lf = Collections.singletonMap(".yarnrc", nested);
+        Map<String, String> crlf = Collections.singletonMap(".yarnrc", nested.replace("\n", "\r\n"));
+        assertThat(rc("1.0.2", lf)).isEqualTo("{foo={a=b}}");
+        assertThat(rc("1.1.0", lf)).isEqualTo("{foo={a=b, c=d}, --frozen-lockfile=true}");
+        assertThat(rc("1.22.22", lf)).isEqualTo("{foo={a=b, c=d}, --frozen-lockfile=true}");
+        assertThat(rc("1.1.0", crlf)).isEqualTo("{foo={a=b}}");
+        assertThat(rc("1.22.22", crlf)).isEqualTo("{foo={a=b}}");
+        assertThat(rc("1.22.22", Collections.singletonMap(".yarnrc", "a b\r\n\r\nfoo: [\r\n"))).isEqualTo(
+                "SyntaxError: Unknown token: { line: 3, col: 7, type: 'INVALID', value: undefined } 3:7 in .yarnrc");
+        assertThat(rc("1.22.22", Collections.singletonMap(".yarnrc", "a b\n\nfoo: [\n"))).isEqualTo(
+                "SyntaxError: Unknown token: { line: 2, col: 7, type: 'INVALID', value: undefined } 2:7 in .yarnrc");
+    }
+
+    /**
+     * lockfile/parse.js's {@code Unknown token} names the token ({@code util.inspect}) from 1.1.0 (as yarn 1.0.2 and
+     * 1.1.0 read the sweep's json-content-lock).
+     */
+    @ParameterizedTest(name = "{0}")
+    @CsvSource(delimiter = '|', value = {
+            "1.0.2|SyntaxError: Unknown token 1:0 in yarn.lock",
+            "1.1.0|SyntaxError: Unknown token: { line: 1, col: 0, type: 'INVALID', value: undefined } 1:0 in yarn.lock",
+    })
+    void inspectsTheUnknownTokenFrom110(String version, String error) {
+        assertThatThrownBy(() -> LockfileParser.parseLockfile("{\"not\":\"a yarn lock\"}\n", "yarn.lock",
+                release(version))).isInstanceOf(JsError.class).hasToString(error);
+    }
+
+    /**
+     * npm-registry.js {@code getRequestUrl} resolves a package's path against the registry with a slash added to it
+     * from 1.0.2 (#4350); before, {@code url.resolve} replaces the last segment of a registry path without one (as yarn
+     * 1.0.1 and 1.0.2 asked an .npmrc's registry {@code http://127.0.0.1:4879/sub} for a package: 1.0.1 at
+     * {@code /<name>}, 1.0.2 at {@code /sub/<name>}).
+     */
+    @ParameterizedTest(name = "{0} {1}")
+    @CsvSource(delimiter = '|', value = {
+            "1.0.1|https://r.example/sub|https://r.example/x",
+            "1.0.2|https://r.example/sub|https://r.example/sub/x",
+            "1.0.1|https://r.example/sub/|https://r.example/sub/x",
+            "1.0.1|https://r.example|https://r.example/x",
+    })
+    void addsASlashToTheRegistryFrom102(String version, String registry, String url) {
+        assertThat(NpmRegistry.getRequestUrl(registry, "x", release(version))).isEqualTo(url);
+    }
+
+    /**
+     * npm-registry.js {@code isRequestToRegistry} takes a request to registry.yarnpkg.com for one to a registry of
+     * registry.npmjs.org from 1.4.0; before, their hosts must be the same (as yarn 1.3.2 and 1.4.0 fetched a scoped
+     * package's registry.yarnpkg.com tarball under an .npmrc of registry.npmjs.org and its token: 1.3.2 sent no
+     * credentials, 1.4.0 sent them).
+     */
+    @ParameterizedTest(name = "{0}")
+    @CsvSource(delimiter = '|', nullValues = "-", value = {
+            "1.3.2|-",
+            "1.4.0|Bearer t",
+    })
+    void takesYarnsRegistryForNpmsFrom140(String version, @Nullable String authorization) {
+        String npmrc = "registry=https://registry.npmjs.org/\n//registry.npmjs.org/:_authToken=t\n";
+        assertThat(config(version, Collections.singletonMap(".npmrc", npmrc), Collections.emptyMap())
+                .getAuthorization("@s/x", "https://registry.yarnpkg.com/@s/x/-/x-1.0.0.tgz")).isEqualTo(authorization);
+    }
+
+    /**
+     * npm-registry.js {@code requestNeedsAuth}: a request to a host and path an {@code _authToken} key names carries
+     * the credentials of the package's registry from 1.4.0; a key whose host has a port splits at its colon and names
+     * none (as yarn 1.3.2 and 1.4.0 fetched a scoped package's tarball from another host than its registry's, under a
+     * token for that host: 1.4.0 sent credentials to cdn.npmmirror.com and none to localhost:4879, 1.3.2 to neither).
+     */
+    @ParameterizedTest(name = "{0} {1}")
+    @CsvSource(delimiter = '|', nullValues = "-", value = {
+            "1.3.2|o.example|-",
+            "1.4.0|o.example|Bearer t",
+            "1.4.0|o.example:4879|-",
+    })
+    void authenticatesToARegistryOfAnAuthTokenFrom140(String version, String host, @Nullable String authorization) {
+        String npmrc = "@s:registry=https://r.example/\n//r.example/:_authToken=t\n//" + host + "/:_authToken=u\n";
+        assertThat(config(version, Collections.singletonMap(".npmrc", npmrc), Collections.emptyMap())
+                .getAuthorization("@s/x", "https://" + host + "/x/-/x-1.0.0.tgz")).isEqualTo(authorization);
+    }
+
+    // whether yarn locks the devDependencies of a workspace member under this .yarnrc: whether it installs out of
+    // production
+    private static boolean requestsMemberDevDependencies(String version, String yarnrc) {
+        YarnClassicLockRegenerator.Inputs inputs = YarnClassicLockRegenerator.Inputs.builder()
+                .release(release(version))
+                .manifest("", "{\"name\":\"r\",\"version\":\"1.0.0\",\"private\":true,\"workspaces\":[\"a\"]}")
+                .manifest("a", "{\"name\":\"a\",\"version\":\"1.0.0\",\"devDependencies\":{\"d\":\"1.0.0\"}}")
+                .lock("# yarn lockfile v1\n\n\n")
+                .configFile(".yarnrc", yarnrc)
+                .env(Collections.emptyMap())
+                .build();
+        LockFileRegeneration.Result result = new YarnClassicLockRegenerator(inputs, published("d", "1.0.0"))
+                .regenerate();
+        assertThat(result.isSuccess()).as(String.valueOf(result.getErrorMessage())).isTrue();
+        return result.getLockFileContent().contains("\nd@1.0.0:\n");
+    }
+
+    // a registry that publishes these versions of one package, each a tarball of its manifest alone
+    private static RegistrySource published(String name, String... versions) {
+        Map<String, byte[]> tarballs = new LinkedHashMap<>();
+        StringBuilder packument = new StringBuilder("{\"name\":\"" + name + "\",\"dist-tags\":{\"latest\":\"" +
+                                                    versions[versions.length - 1] + "\"},\"versions\":{");
+        for (String version : versions) {
+            String manifest = "{\"name\":\"" + name + "\",\"version\":\"" + version + "\"";
+            byte[] tar = tar("package/package.json", manifest + "}", null);
+            String url = "https://registry.yarnpkg.com/" + name + "/-/" + name + "-" + version + ".tgz";
+            tarballs.put(url, tar);
+            StringBuilder shasum = new StringBuilder();
+            try {
+                for (byte digit : MessageDigest.getInstance("SHA-1").digest(tar)) {
+                    shasum.append(String.format("%02x", digit));
+                }
+            } catch (NoSuchAlgorithmException e) {
+                throw new IllegalStateException(e);
+            }
+            packument.append(tarballs.size() > 1 ? "," : "").append('"').append(version).append("\":").append(manifest)
+                    .append(",\"dist\":{\"tarball\":\"").append(url).append("\",\"shasum\":\"").append(shasum)
+                    .append("\"}}");
+        }
+        String document = packument.append("}}").toString();
+        return new RegistrySource() {
+            @Override
+            public @Nullable String packument(String registry, String n, boolean full, @Nullable String authorization) {
+                return name.equals(n) ? document : null;
+            }
+
+            @Override
+            public byte @Nullable [] tarball(String url, String n, String version, @Nullable String authorization) {
+                return tarballs.get(url);
+            }
+        };
+    }
+
+    /**
      * package-resolver.js {@code resolveToResolution}: the lock entry of a pattern a resolution takes is removed
      * before 1.3.1, kept for the root's own patterns from 1.3.1, kept always from 1.6.0, removed where the resolution's
      * tarball is another from 1.7.0. A later request of the pattern then resolves anew and joins the resolution, or reads

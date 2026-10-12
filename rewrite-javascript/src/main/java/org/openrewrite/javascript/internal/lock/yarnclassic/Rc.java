@@ -110,9 +110,9 @@ final class Rc {
     @SuppressWarnings("unchecked")
     static @Nullable Object loadRcFile(String text, String filePath, YarnClassicRelease release) {
         String fileLoc = release.parsesRcFilesByTheirPath() ? PosixPath.basename(filePath) : "yarnrc";
-        // rc.js reads the file raw: before 1.1.0 the tokenizer takes \r for an invalid token
-        Object values = LockfileParser.parseLockfile(release.readsCarriageReturnsAsLineEnds() ?
-                text.replace("\r\n", "\n") : text, fileLoc, release).getObject();
+        // rc.js reads the file raw: the tokenizer reads its \r (an invalid token before 1.1.0), and an error names the
+        // raw file's lines and columns
+        Object values = LockfileParser.parseLockfile(text, fileLoc, release).getObject();
         if (filePath.endsWith(".yml")) {
             if (!release.keepsYarnrcYmlSettings()) {
                 Map<String, @Nullable Object> path = new LinkedHashMap<>();
