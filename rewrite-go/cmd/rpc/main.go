@@ -447,12 +447,46 @@ func (s *server) readMessage() (*jsonRPCRequest, error) {
 	return &req, nil
 }
 
+// Only a page of object data, which is what every GetObject reply carries, goes through the
+// encoder; every other reply keeps the reflective path.
 func (s *server) writeMessage(resp *jsonRPCResponse) error {
+	if batch, ok := resp.Result.([]rpc.RpcObjectData); ok && resp.Error == nil && resp.JSONRPC == "2.0" {
+		bp := bodyPool.Get().(*[]byte)
+		defer bodyPool.Put(bp)
+		body, err := appendBatchResponse((*bp)[:0], resp.ID, batch)
+		*bp = body
+		if err != nil {
+			return err
+		}
+		return s.writeFramed(body)
+	}
+
 	body, err := json.Marshal(resp)
 	if err != nil {
 		return err
 	}
 	return s.writeFramed(body)
+}
+
+// Bodies are pooled separately from frames because a framed write copies the body into a frame
+// buffer, so both are live at once.
+var bodyPool = sync.Pool{New: func() any { b := make([]byte, 0, 1<<16); return &b }}
+
+// An id is a string, a number or null by the JSON-RPC spec — never a composite — so its raw bytes
+// hold no whitespace for json.Marshal to have compacted, and can be appended as they arrived.
+func appendBatchResponse(dst []byte, id json.RawMessage, batch []rpc.RpcObjectData) ([]byte, error) {
+	dst = append(dst, `{"jsonrpc":"2.0","id":`...)
+	if len(id) == 0 {
+		dst = append(dst, "null"...)
+	} else {
+		dst = append(dst, id...)
+	}
+	dst = append(dst, `,"result":`...)
+	dst, err := rpc.AppendBatch(dst, batch)
+	if err != nil {
+		return dst, err
+	}
+	return append(dst, '}'), nil
 }
 
 // Frame buffers are pooled rather than held on the server: a framed write is
