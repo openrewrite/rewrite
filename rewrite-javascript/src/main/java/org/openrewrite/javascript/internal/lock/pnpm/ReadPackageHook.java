@@ -573,6 +573,45 @@ final class ReadPackageHook {
                version.contains("catalog:");
     }
 
+    /**
+     * @pnpm/deps.peer-range {@code isAcceptablePeerSpec} (11.14.0): a peer range, or a dependency specifier.
+     */
+    static boolean isAcceptablePeerSpec(String version, PnpmRelease release) {
+        return isValidPeerRange(version, release) || version.contains(":");
+    }
+
+    /**
+     * @pnpm/deps.peer-range {@code getPeerVersionRange} (11.14.0): the range a peer spec gives, each of its
+     * {@code ||} parts read apart: a peer range less its {@code workspace:} prefix, the range after a specifier's
+     * protocol ({@code <registry>:^1}) or after the last {@code @} of what follows it ({@code npm:x@^1}), else any.
+     */
+    static String getPeerVersionRange(String version, PnpmRelease release) {
+        if (version.contains("||")) {
+            List<String> parts = new ArrayList<>();
+            for (String part : version.split("\\|\\|", -1)) {
+                parts.add(getPeerVersionRange(Js.trim(part), release));
+            }
+            return String.join(" || ", parts);
+        }
+        if (isValidPeerRange(version, release)) {
+            return version.startsWith("workspace:") ? version.substring("workspace:".length()) : version;
+        }
+        int colon = version.indexOf(':');
+        if (colon > 0) {
+            String body = version.substring(colon + 1);
+            if (release.underSemver(semver -> NodeSemver.validRange(body,
+                    NodeSemver.Options.DEFAULT.release(semver))) != null) {
+                return body;
+            }
+            int at = body.lastIndexOf('@');
+            if (at > 0 && release.underSemver(semver -> NodeSemver.validRange(body.substring(at + 1),
+                    NodeSemver.Options.DEFAULT.release(semver))) != null) {
+                return body.substring(at + 1);
+            }
+        }
+        return "*";
+    }
+
     @SuppressWarnings("unchecked")
     private static Hook createOptionalDependenciesRemover(List<String> toBeRemoved) {
         if (toBeRemoved.isEmpty()) {

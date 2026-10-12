@@ -703,9 +703,7 @@ final class ResolvePeers {
             }
             ParentRef lockedPeer = toPkgByName(Collections.singletonList(new ParentPkgNode(peerName,
                     ctx.dependenciesTree.get(peerNodeId), peerNodeId, parentNodeIds))).get(peerName);
-            String lockedPeerRange = peerDependency.getVersion().replaceFirst("^workspace:", "");
-            if (!ctx.release.underSemver(semver -> YarnpkgSemverUtils.satisfiesWithPrereleases(lockedPeer.version,
-                    lockedPeerRange, true, semver))) {
+            if (!satisfiesPeerRange(lockedPeer.version, peerDependency.getVersion(), ctx.release)) {
                 continue;
             }
             Deferred peerPathPromise = ctx.pathsByNodeIdPromises.get(peerNodeId);
@@ -1471,6 +1469,9 @@ final class ResolvePeers {
         for (Map.Entry<String, PeerDependency> peer : resolvedPackage.getPeerDependencies().entrySet()) {
             String peerName = peer.getKey();
             String version = peer.getValue().getVersion();
+            // the wanted range an issue records, 11.2.2's; 11.14.0's getPeerVersionRange gives the one it reads
+            // (satisfiesPeerRange), but mergePeers alone reads this one, of whose conflicts and intersections the
+            // report checks only that they are empty
             String peerVersionRange = version.startsWith("workspace:") ? version.substring("workspace:".length()) :
                     version;
             ParentRef resolved = parentPkgs.get(peerName);
@@ -1482,8 +1483,7 @@ final class ResolvePeers {
                                 optionalPeer, peerVersionRange));
                 continue;
             }
-            if (!ctx.release.underSemver(semver -> YarnpkgSemverUtils.satisfiesWithPrereleases(resolved.version,
-                    peerVersionRange, true, semver))) {
+            if (!satisfiesPeerRange(resolved.version, version, ctx.release)) {
                 List<ParentPackage> peerLocation = resolved.nodeId == null ? new ArrayList<>() :
                         getLocationFromParentNodeIds(ctx.dependenciesTree, resolved.parentNodeIds);
                 ctx.peerDependencyIssues.getBad().computeIfAbsent(peerName, k -> new ArrayList<>())
@@ -1495,6 +1495,23 @@ final class ResolvePeers {
                 resolvedPeers.put(peerName, resolved.nodeId);
             }
         }
+    }
+
+    // whether version satisfies the range of the peer spec, prereleases included: 11.2.2's range is the spec less a
+    // leading workspace:, 11.14.0's getPeerVersionRange's (PnpmRelease#readsAPeerRangeOutOfItsSpecifier), asked where
+    // the two answer otherwise
+    private static boolean satisfiesPeerRange(String version, String peerSpec, PnpmRelease release) {
+        String before = peerSpec.startsWith("workspace:") ? peerSpec.substring("workspace:".length()) : peerSpec;
+        String after = ReadPackageHook.getPeerVersionRange(peerSpec, release);
+        boolean satisfiesBefore = release.underSemver(semver -> YarnpkgSemverUtils.satisfiesWithPrereleases(version,
+                before, true, semver));
+        if (before.equals(after)) {
+            return satisfiesBefore;
+        }
+        boolean satisfiesAfter = release.underSemver(semver -> YarnpkgSemverUtils.satisfiesWithPrereleases(version,
+                after, true, semver));
+        return satisfiesBefore == satisfiesAfter || !release.readsAPeerRangeOutOfItsSpecifier() ? satisfiesBefore :
+                satisfiesAfter;
     }
 
     private static List<ParentPackage> getLocationFromParentNodeIds(Map<NodeId, DependenciesTreeNode> dependenciesTree,

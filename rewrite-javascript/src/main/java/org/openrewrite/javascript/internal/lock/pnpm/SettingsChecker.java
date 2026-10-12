@@ -77,9 +77,18 @@ final class SettingsChecker {
     /**
      * {@code getOutdatedLockfileSetting}: the name of the first setting that differs, null when none does.
      */
-    @SuppressWarnings("unchecked")
     static @Nullable String getOutdatedLockfileSetting(LockfileObject lockfile, Settings settings) {
-        if (!Verification.allCatalogsAreUpToDate(settings.getCatalogs(), lockfile.getCatalogs())) {
+        return getOutdatedLockfileSetting(lockfile, settings, PnpmRelease.PORTED);
+    }
+
+    /**
+     * {@link #getOutdatedLockfileSetting(LockfileObject, Settings)} as {@code release} compares the catalogs'
+     * specifiers ({@link Verification#specifiersAreEqual}).
+     */
+    @SuppressWarnings("unchecked")
+    static @Nullable String getOutdatedLockfileSetting(LockfileObject lockfile, Settings settings,
+                                                       PnpmRelease release) {
+        if (!Verification.allCatalogsAreUpToDate(settings.getCatalogs(), lockfile.getCatalogs(), release)) {
             return "catalogs";
         }
         if (!Js.equals(orEmptyObject(lockfile.getOverrides()), orEmptyObject(settings.getOverrides()))) {

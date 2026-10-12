@@ -188,6 +188,10 @@ final class ResolveDependencyTree {
         validatePeerDependencies(rootDir, manifest, PnpmRelease.PORTED);
     }
 
+    /**
+     * {@link #validatePeerDependencies(String, Map)} as {@code release} validates them: from 11.14.0 a dependency
+     * specifier passes too, and the hint names it ({@link PnpmRelease#readsAPeerRangeOutOfItsSpecifier}).
+     */
     static void validatePeerDependencies(String rootDir, Map<String, @Nullable Object> manifest,
                                          PnpmRelease release) {
         Map<String, @Nullable Object> peerDependencies = ResolveDependencies.asMap(manifest.get("peerDependencies"));
@@ -195,12 +199,21 @@ final class ResolveDependencyTree {
         String projectId = name != null ? Js.string(name) : rootDir;
         for (String depName : Js.keys(peerDependencies)) {
             String version = Js.string(peerDependencies.get(depName));
-            if (!ReadPackageHook.isValidPeerRange(version, release)) {
-                throw new PnpmError("INVALID_PEER_DEPENDENCY_SPECIFICATION", "The peerDependencies field named '" +
-                        depName + "' of package '" + projectId + "' has an invalid value: '" + version + "'",
-                        "The values in peerDependencies should be either a valid semver range, a `workspace:` spec, " +
-                        "or a `catalog:` spec");
+            if (ReadPackageHook.isValidPeerRange(version, release)) {
+                continue;
             }
+            boolean acceptable = ReadPackageHook.isAcceptablePeerSpec(version, release);
+            boolean readsSpecifiers = release.readsAPeerRangeOutOfItsSpecifier();
+            if (acceptable && readsSpecifiers) {
+                continue;
+            }
+            throw new PnpmError("INVALID_PEER_DEPENDENCY_SPECIFICATION", "The peerDependencies field named '" +
+                    depName + "' of package '" + projectId + "' has an invalid value: '" + version + "'",
+                    readsSpecifiers ? "The values in peerDependencies should be a valid semver range, a " +
+                                      "`workspace:`/`catalog:` spec, or a dependency specifier such as a " +
+                                      "named-registry (`<registry>:<version>`), `npm:`, `file:`, or git/URL spec" :
+                            "The values in peerDependencies should be either a valid semver range, a `workspace:` " +
+                            "spec, or a `catalog:` spec");
         }
     }
 

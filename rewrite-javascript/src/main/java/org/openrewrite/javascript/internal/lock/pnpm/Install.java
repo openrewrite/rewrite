@@ -253,7 +253,7 @@ final class Install {
                         .peersSuffixMaxLength(options.get("peersSuffixMaxLength"))
                         .pnpmfileChecksum(null)
                         .injectWorkspacePackages(options.get("injectWorkspacePackages"))
-                        .build());
+                        .build(), options.getRelease());
         boolean outdatedLockfileSettings = outdatedLockfileSettingName != null;
         boolean upToDateLockfileMajorVersion = Js.string(wantedLockfile.getLockfileVersion())
                 .startsWith(LockfileObject.LOCKFILE_MAJOR_VERSION + ".");
@@ -304,7 +304,8 @@ final class Install {
         if (reason != null) {
             return new Result(null, reason, ctx, opts, workspaceProjects, patches);
         }
-        return new Result(lockFile.writeWantedLockfile(wantedLockfile), null, ctx, opts, workspaceProjects, patches);
+        return new Result(lockFile.writeWantedLockfile(wantedLockfile, release), null, ctx, opts, workspaceProjects,
+                patches);
     }
 
     /**
@@ -430,7 +431,7 @@ final class Install {
                                      LockfileReader.WANTED_LOCKFILE);
             }
         } else {
-            written = lockFile.writeWantedLockfile(newLockfile);
+            written = lockFile.writeWantedLockfile(newLockfile, options.getRelease());
         }
         ReportPeerDependencyIssues.reportPeerDependencyIssues(result.getPeerDependencyIssuesByProjects(),
                 options.getPeerDependencyRules(), options.isTrue("strictPeerDependencies"), options.getRelease());

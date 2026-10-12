@@ -2907,4 +2907,206 @@ class PnpmReleaseTest {
         options("versioning:\n  fixed: [[a, b]]\n  changelog:\n    storage: registry\n", null, null,
           Collections.emptyMap(), "11.13.0");
     }
+
+    // y 1.2.0 and 2.0.0, which a and b depend on; x peers on y by the spec
+    private static RegistryMetadata peeringBySpec(String spec) {
+        return versions(
+          new String[]{"a", "1.0.0", "\"y\":\"1.2.0\"", ""},
+          new String[]{"b", "1.0.0", "\"y\":\"2.0.0\"", ""},
+          new String[]{"y", "1.2.0", "", ""},
+          new String[]{"y", "2.0.0", "", ""},
+          new String[]{"x", "1.0.0", "", "\"y\":\"" + spec + "\""});
+    }
+
+    // the lock-only install of a root depending on these under the settings
+    private static String installPeeringBySpec(String dependencies, String settings, String release) {
+        return new PnpmLockRegenerator(PnpmLockRegenerator.Inputs.builder()
+          .manifest("", "{\"name\":\"root\",\"version\":\"1.0.0\"," + dependencies + "}")
+          .file("pnpm-workspace.yaml", "minimumReleaseAge: 0\n" + settings)
+          .env(Collections.emptyMap())
+          .now(NOW)
+          .release(release(release))
+          .build(), peeringBySpec("npm:y@^1.0.0")).writeLock();
+    }
+
+    /**
+     * deps/peer-range getPeerVersionRange and isAcceptablePeerSpec (11.14.0), as installing/deps-resolver
+     * hoistPeers.ts, resolvePeers.ts and validatePeerDependencies.ts read them: x's peer spec npm:y@^1.0.0 is the range
+     * ^1.0.0, which hoists y 1.2.0 (as autoInstallPeersFromHighestMatch passes on the spec semver-range-intersect
+     * rejects) and which the root's y 1.2.0 satisfies under strictPeerDependencies, and a project may peer by it;
+     * before, it is no range, y 2.0.0, the highest, is hoisted, the root's y is a bad peer, and the project's spec is
+     * invalid. pnpm 11.13.1 and 11.14.0 wrote these locks, and 11.13.1 failed so after writing it and on the root's
+     * peer, when run on them.
+     */
+    @Test
+    void readsAPeerRangeOutOfItsSpecifierFrom11140() {
+        assertThat(hoistFoo("workspace:^1.0.0", "11.14.0")).containsEntry("foo", "1.2.0");
+        assertThat(hoistFoo("workspace:^1.0.0", "11.13.1")).containsEntry("foo", "2.0.0");
+        String highestMatch = "autoInstallPeersFromHighestMatch: true\n";
+        String abx = "\"dependencies\":{\"a\":\"1.0.0\",\"b\":\"1.0.0\",\"x\":\"1.0.0\"}";
+        assertThat(installPeeringBySpec(abx, highestMatch, "11.14.0"))
+          .contains("      x:\n        specifier: 1.0.0\n        version: 1.0.0(y@1.2.0)\n");
+        assertThat(installPeeringBySpec(abx, highestMatch, "11.13.1"))
+          .contains("      x:\n        specifier: 1.0.0\n        version: 1.0.0(y@2.0.0)\n");
+        String xy = "\"dependencies\":{\"x\":\"1.0.0\",\"y\":\"1.2.0\"}";
+        assertThat(installPeeringBySpec(xy, "strictPeerDependencies: true\n", "11.14.0"))
+          .contains("      x:\n        specifier: 1.0.0\n        version: 1.0.0(y@1.2.0)\n");
+        assertThatThrownBy(() -> installPeeringBySpec(xy, "strictPeerDependencies: true\n", "11.13.1"))
+          .isInstanceOfSatisfying(PnpmError.class,
+            e -> assertThat(e.getCode()).isEqualTo("ERR_PNPM_PEER_DEP_ISSUES"));
+        Map<String, @Nullable Object> project = obj("{'name':'root','peerDependencies':{'y':'npm:y@^1.0.0'}}");
+        ResolveDependencyTree.validatePeerDependencies("", project, release("11.14.0"));
+        assertThatThrownBy(() -> ResolveDependencyTree.validatePeerDependencies("", project, release("11.13.1")))
+          .isInstanceOfSatisfying(PnpmError.class, e -> {
+              assertThat(e.getMessage()).isEqualTo("The peerDependencies field named 'y' of package 'root' has an " +
+                                                   "invalid value: 'npm:y@^1.0.0'");
+              assertThat(e.getHint()).isEqualTo("The values in peerDependencies should be either a valid semver " +
+                                                "range, a `workspace:` spec, or a `catalog:` spec");
+          });
+        assertThatThrownBy(() -> ResolveDependencyTree.validatePeerDependencies("",
+          obj("{'name':'root','peerDependencies':{'y':'latest'}}"), release("11.14.0")))
+          .isInstanceOfSatisfying(PnpmError.class, e -> assertThat(e.getHint()).startsWith(
+            "The values in peerDependencies should be a valid semver range, a `workspace:`/`catalog:` spec, or a " +
+            "dependency specifier"));
+        assertThat(ReadPackageHook.getPeerVersionRange("workspace:^1 ||gh:^2|| file:../x", release("11.14.0")))
+          .isEqualTo("^1 || ^2 || *");
+    }
+
+    // a lock of foo from github:u/foo at a commit, locked as pnpm 11 locks it
+    private static final String GIT_HOSTED_LOCK =
+      "lockfileVersion: '9.0'\n\nsettings:\n  autoInstallPeers: true\n  excludeLinksFromLockfile: false\n\n" +
+      "importers:\n\n  .:\n    dependencies:\n      foo:\n" +
+      "        specifier: github:u/foo#98e8ff1da1a89f93d1397a24d7413ed15421c139\n        version: " + CODELOAD +
+      "\n\npackages:\n\n  foo@" + CODELOAD + ":\n    resolution: {gitHosted: true, integrity: sha512-x, tarball: " +
+      CODELOAD + "}\n    version: 1.0.0\n\nsnapshots:\n\n  foo@" + CODELOAD + ": {}\n";
+
+    // the lock-only install over that lock of a project wanting foo by the specifier
+    private static String installGitHosted(String specifier, String release) {
+        return new PnpmLockRegenerator(PnpmLockRegenerator.Inputs.builder()
+          .lock(GIT_HOSTED_LOCK)
+          .manifest("", "{\"name\":\"p\",\"version\":\"1.0.0\",\"dependencies\":{\"foo\":\"" + specifier + "\"}}")
+          .env(Collections.singletonMap("pnpm_config_minimum_release_age", "0"))
+          .now(NOW)
+          .release(release(release))
+          .build(), NOT_FOUND).writeLock();
+    }
+
+    /**
+     * lockfile/verification gitSpecifiersAreEquivalent.ts dependencySpecifiersAreEqual (11.14.0): the lock's
+     * github:u/foo#sha is the manifest's u/foo#sha and git+https://github.com/u/foo.git#sha, so the project is up to
+     * date and its lock kept; before, it is re-resolved from git, which the engine does not do.
+     */
+    @Test
+    void takesEquivalentGitSpecifiersAsEqualFrom11140() {
+        String sha = "98e8ff1da1a89f93d1397a24d7413ed15421c139";
+        assertThat(installGitHosted("u/foo#" + sha, "11.14.0")).isEqualTo(GIT_HOSTED_LOCK);
+        assertThat(installGitHosted("git+https://github.com/u/foo.git#" + sha, "11.14.0")).isEqualTo(GIT_HOSTED_LOCK);
+        assertThatThrownBy(() -> installGitHosted("u/foo#" + sha, "11.13.1")).isInstanceOf(CannotKnow.class);
+        assertThat(Verification.dependencySpecifiersAreEqual("gitlab:o/r", "git://GitLab.com/o/r.git")).isTrue();
+        assertThat(Verification.dependencySpecifiersAreEqual("o/r#x", "https://example.com/o/r#x")).isFalse();
+        assertThat(Verification.dependencySpecifiersAreEqual("o/r#x", "https://example.com/o/r.git#x")).isFalse();
+        assertThat(Verification.dependencySpecifiersAreEqual("github:o/r#x#y", "o/r#x#y")).isFalse();
+    }
+
+    // the lock-only install over the lock of a project wanting wrappy 1.0.2
+    private static String installWrappyOver(String lock, String release) {
+        return new PnpmLockRegenerator(PnpmLockRegenerator.Inputs.builder()
+          .lock(lock)
+          .manifest("", "{\"name\":\"p\",\"version\":\"1.0.0\",\"dependencies\":{\"wrappy\":\"1.0.2\"}}")
+          .env(Collections.singletonMap("pnpm_config_minimum_release_age", "0"))
+          .now(NOW)
+          .release(release(release))
+          .build(), WRAPPY_ONLY).writeLock();
+    }
+
+    /**
+     * lockfile/fs write.ts writeLockfileDoc (11.14.0): a lock that already reads as the one written, but for its BOM
+     * and CRLF line ends, keeps them; before, it is written over, LF and without a BOM. pnpm 11.13.1 and 11.14.0 did
+     * so when run on such a lock.
+     */
+    @Test
+    void leavesAnUnchangedLockAsItIsFrom11140() {
+        String bomCrLf = "﻿" + WRAPPY_LOCK.replace("\n", "\r\n");
+        assertThat(installWrappyOver(bomCrLf, "11.14.0")).isEqualTo(bomCrLf);
+        assertThat(installWrappyOver(bomCrLf, "11.13.1")).isEqualTo(WRAPPY_LOCK);
+        String stale = bomCrLf.replace("specifier: 1.0.2", "specifier: ^1.0.0");
+        assertThat(installWrappyOver(stale, "11.14.0")).isEqualTo(WRAPPY_LOCK);
+    }
+
+    // p 1.0.0 and 1.5.0; d peers on p
+    private static final RegistryMetadata PINNED_PEER = versions(
+      new String[]{"p", "1.0.0", "", ""},
+      new String[]{"p", "1.5.0", "", ""},
+      new String[]{"d", "1.0.0", "", "\"p\":\"*\""});
+
+    // proj's d, as the lock-only install of the root with p =1.0.0 and of proj with d writes it
+    private static String installBesideAnEqualsPin(String release) {
+        String lock = new PnpmLockRegenerator(PnpmLockRegenerator.Inputs.builder()
+          .manifest("", "{\"name\":\"root\",\"version\":\"1.0.0\",\"dependencies\":{\"p\":\"=1.0.0\"}}")
+          .manifest("proj", "{\"name\":\"proj\",\"version\":\"1.0.0\",\"dependencies\":{\"d\":\"1.0.0\"}}")
+          .file("pnpm-workspace.yaml", "packages:\n  - proj\nminimumReleaseAge: 0\n")
+          .env(Collections.emptyMap())
+          .now(NOW)
+          .release(release(release))
+          .build(), PINNED_PEER).writeLock();
+        int proj = lock.indexOf("\n  proj:\n");
+        return lock.substring(proj, lock.indexOf("\n\npackages:", proj));
+    }
+
+    /**
+     * resolving/npm-resolver whichVersionIsPinned.ts (11.14.0): =1.0.0 pins the patch, so that the root's p saves as
+     * 1.0.0, which proj's missing peer p is hoisted as; before, it pins nothing, the root's p saves as ^1.0.0, and
+     * proj's p resolves to 1.5.0. pnpm 11.13.1 and 11.14.0 wrote these importers when run on it.
+     */
+    @Test
+    void pinsAVersionPrefixedWithEqualsAsTheVersionFrom11140() {
+        assertThat(installBesideAnEqualsPin("11.14.0")).endsWith("        version: 1.0.0(p@1.0.0)");
+        assertThat(installBesideAnEqualsPin("11.13.1")).endsWith("        version: 1.0.0(p@1.5.0)");
+        assertThat(NpmResolver.whichVersionIsPinned("=1.2.3", release("11.14.0"))).isEqualTo("patch");
+        assertThat(NpmResolver.whichVersionIsPinned("=1.2", release("11.14.0"))).isEqualTo("minor");
+        assertThat(NpmResolver.whichVersionIsPinned("=1.2.3", release("11.13.1"))).isNull();
+        assertThat(NpmResolver.whichVersionIsPinned("catalog:=1", release("11.14.0"))).isNull();
+    }
+
+    // the install as runs over the WRAPPY lock of a project whose packageManager field names pnpm at the version,
+    // the registry holding pnpm and @pnpm/exe of it
+    private static PnpmLockRegenerator handingOverTo(String runs, String version) {
+        return new PnpmLockRegenerator(PnpmLockRegenerator.Inputs.builder()
+          .lock(WRAPPY_LOCK)
+          .manifest("", "{\"name\":\"p\",\"version\":\"1.0.0\",\"dependencies\":{\"wrappy\":\"1.0.2\"}," +
+                        "\"packageManager\":\"pnpm@" + version + "\"}")
+          .env(Collections.singletonMap("pnpm_config_minimum_release_age", "0"))
+          .now(NOW)
+          .host(Host.builder().nodeVersion("v24.21.0").os("darwin").cpu("arm64").build())
+          .release(release(runs))
+          .build(), versions(new String[]{"pnpm", version, "", ""}, new String[]{"@pnpm/exe", version, "", ""}));
+    }
+
+    /**
+     * pnpm switchCliVersion.ts and engine/pm installPnpm.ts assertReleaseIsInstallable (11.14.0): pnpm refuses to
+     * hand the install to 11.12.0 or 11.13.0, the env document's or the one it resolves for the packageManager field;
+     * before, it hands the install over, which the engine does not follow.
+     */
+    @Test
+    void refusesToSwitchToABrokenReleaseFrom11140() {
+        String integrity = "{integrity: sha512-x}";
+        assertThatThrownBy(() -> switching("11.14.0", "11.12.0", integrity).install())
+          .isInstanceOfSatisfying(PnpmError.class, e -> {
+              assertThat(e.getCode()).isEqualTo("ERR_PNPM_BROKEN_PNPM_RELEASE");
+              assertThat(e.getMessage()).isEqualTo("pnpm v11.12.0 is a broken release and cannot be installed");
+              assertThat(e.getHint()).startsWith("Its \"@pnpm/exe\" build shipped without a binary and does not run.");
+          });
+        assertThatThrownBy(() -> switching("11.13.1", "11.12.0", integrity).install())
+          .isInstanceOf(CannotKnow.class)
+          .hasMessageContaining("pnpm 11.12.0, which pnpm 11.13.1 downloads and hands the install over to");
+        assertThatThrownBy(() -> switching("11.14.0", "11.11.0", integrity).install())
+          .isInstanceOf(CannotKnow.class)
+          .hasMessageContaining("pnpm 11.11.0, which pnpm 11.14.0 downloads and hands the install over to");
+        assertThatThrownBy(() -> handingOverTo("11.14.0", "11.13.0").install())
+          .isInstanceOfSatisfying(PnpmError.class,
+            e -> assertThat(e.getMessage()).isEqualTo("pnpm v11.13.0 is a broken release and cannot be installed"));
+        assertThatThrownBy(() -> handingOverTo("11.13.1", "11.13.0").install())
+          .isInstanceOf(CannotKnow.class)
+          .hasMessageContaining("pnpm 11.13.0, which pnpm 11.13.1 downloads and hands the install over to");
+    }
 }

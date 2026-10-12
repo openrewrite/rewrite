@@ -28,6 +28,7 @@ import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.function.Function;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -701,14 +702,26 @@ final class NpmResolver {
     /**
      * {@link #whichVersionIsPinned(String)} as {@code release} reads it: from 11.8.0 a {@code catalog:} specifier pins
      * nothing ({@link PnpmRelease#takesNoPinFromACatalogSpecifier}); before, its catalog's name reads as a version.
+     * From 11.14.0 a version prefixed with {@code =} pins as the version does
+     * ({@link PnpmRelease#pinsAVersionPrefixedWithEqualsAsTheVersion}); before, it pins nothing.
      */
     static @Nullable String whichVersionIsPinned(String spec, PnpmRelease release) {
         String pinned = whichVersionIsPinned(spec);
-        return pinned != null && spec.startsWith("catalog:") && release.takesNoPinFromACatalogSpecifier() ? null :
-                pinned;
+        String pinnedFrom11140 = whichVersionIsPinned(spec, true);
+        if (spec.startsWith("catalog:") && (pinned != null || pinnedFrom11140 != null) &&
+            release.takesNoPinFromACatalogSpecifier()) {
+            return null;
+        }
+        return Objects.equals(pinned, pinnedFrom11140) || !release.pinsAVersionPrefixedWithEqualsAsTheVersion() ?
+                pinned : pinnedFrom11140;
     }
 
     static @Nullable String whichVersionIsPinned(String spec) {
+        return whichVersionIsPinned(spec, false);
+    }
+
+    // whichVersionIsPinned.ts, where 11.14.0 takes an = operator as none
+    private static @Nullable String whichVersionIsPinned(String spec, boolean equalsAsNoOperator) {
         int colonIndex = spec.indexOf(':');
         if (colonIndex != -1) {
             spec = spec.substring(colonIndex + 1);
@@ -730,7 +743,7 @@ final class NpmResolver {
             return null;
         }
         String[] versionObject = parsedRange.get(0);
-        if (versionObject[0] == null) {
+        if (versionObject[0] == null || equalsAsNoOperator && "=".equals(versionObject[0])) {
             if (versionObject[3] != null && !versionObject[3].isEmpty()) {
                 return "patch";
             }

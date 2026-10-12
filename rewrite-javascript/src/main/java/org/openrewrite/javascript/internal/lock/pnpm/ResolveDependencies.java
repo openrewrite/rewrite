@@ -2740,14 +2740,15 @@ final class ResolveDependencies {
                         versions, range, NodeSemver.Options.INCLUDE_PRERELEASE.release(semver))) : null;
                 String hoisted = exactSatisfying != null ? join(exactSatisfying, nonVersions) :
                         isExactVersion && autoInstallPeers ? range : highest(versions, nonVersions);
-                boolean isSemverRange = release.underSemver(semver -> NodeSemver.validRange(range,
-                        NodeSemver.Options.INCLUDE_PRERELEASE.release(semver))) != null;
-                String rangeSatisfying = isSemverRange ? release.underSemver(semver -> NodeSemver.maxSatisfying(
-                        versions, range, NodeSemver.Options.INCLUDE_PRERELEASE.release(semver))) : null;
-                String inRange = rangeSatisfying != null ? join(rangeSatisfying, nonVersions) :
-                        isSemverRange && !versions.isEmpty() ? autoInstallPeers ? range : null :
-                                highest(versions, nonVersions);
-                String chosen = Objects.equals(hoisted, inRange) || release.hoistsAPeerInRange() ? inRange : hoisted;
+                String inRange = inRange(range, range, versions, nonVersions, autoInstallPeers, release);
+                // 11.14.0 matches the range getPeerVersionRange reads out of the spec, writing the spec itself where
+                // it installs a range (PnpmRelease#readsAPeerRangeOutOfItsSpecifier)
+                String rangeForMatch = ReadPackageHook.getPeerVersionRange(range, release);
+                String inRangeForMatch = rangeForMatch.equals(range) ? inRange :
+                        inRange(range, rangeForMatch, versions, nonVersions, autoInstallPeers, release);
+                String chosen = !Objects.equals(inRange, inRangeForMatch) &&
+                                release.readsAPeerRangeOutOfItsSpecifier() ? inRangeForMatch :
+                        Objects.equals(hoisted, inRange) || release.hoistsAPeerInRange() ? inRange : hoisted;
                 if (chosen != null) {
                     dependencies.put(peerName, chosen);
                 }
@@ -2756,6 +2757,20 @@ final class ResolveDependencies {
             }
         }
         return dependencies;
+    }
+
+    // hoistPeers' pick from 11.12.0 for a peer of the spec range: where rangeForMatch is a range, the highest preferred
+    // version it satisfies, else (versions there being) the spec itself under autoInstallPeers or nothing; where it
+    // is none, the highest of all; a version beside the preferred specs that are no versions
+    private static @Nullable String inRange(String range, String rangeForMatch, List<String> versions,
+                                            List<String> nonVersions, boolean autoInstallPeers, PnpmRelease release) {
+        boolean isSemverRange = release.underSemver(semver -> NodeSemver.validRange(rangeForMatch,
+                NodeSemver.Options.INCLUDE_PRERELEASE.release(semver))) != null;
+        String rangeSatisfying = isSemverRange ? release.underSemver(semver -> NodeSemver.maxSatisfying(
+                versions, rangeForMatch, NodeSemver.Options.INCLUDE_PRERELEASE.release(semver))) : null;
+        return rangeSatisfying != null ? join(rangeSatisfying, nonVersions) :
+                isSemverRange && !versions.isEmpty() ? autoInstallPeers ? range : null :
+                        highest(versions, nonVersions);
     }
 
     private static String join(String version, List<String> nonVersions) {

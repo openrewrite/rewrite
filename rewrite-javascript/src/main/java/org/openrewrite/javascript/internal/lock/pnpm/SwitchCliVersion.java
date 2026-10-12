@@ -20,8 +20,10 @@ import org.jspecify.annotations.Nullable;
 import org.openrewrite.javascript.internal.lock.CannotKnow;
 import org.openrewrite.javascript.semver.NodeSemver;
 
+import java.util.Arrays;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.function.Supplier;
@@ -117,7 +119,7 @@ final class SwitchCliVersion {
         // the release that runs, resolving it only names another
         if (!Js.truthy(pmVersion) || !satisfies(pmVersion, version)) {
             storeToUse = stores.createStoreController(bootstrap.get());
-            if (!satisfies(current, version) && !follows(version)) {
+            if (!satisfies(current, version) && !follows(version) && !mayNameARefusedRelease(version)) {
                 throw switchesTo(version);
             }
             envLockfile = envInstaller.resolvePackageManagerIntegrities(version, envLockfile,
@@ -129,7 +131,8 @@ final class SwitchCliVersion {
             }
         } else if (!EnvInstaller.isPackageManagerResolved(envLockfile, Js.string(pmVersion))) {
             storeToUse = stores.createStoreController(bootstrap.get());
-            if (!(current.equals(pmVersion) || follows(Js.string(pmVersion)))) {
+            if (!(current.equals(pmVersion) || follows(Js.string(pmVersion)) ||
+                  refusesAsBroken(Js.string(pmVersion)))) {
                 throw switchesTo(Js.string(pmVersion));
             }
             envLockfile = envInstaller.resolvePackageManagerIntegrities(Js.string(pmVersion), envLockfile,
@@ -141,6 +144,14 @@ final class SwitchCliVersion {
         if (follows(Js.string(pmVersion))) {
             // a root lock the inputs do not hold may pin another release of the range than the one resolved here
             return new Switched(persistLockfile && lockFile == null ? version : Js.string(pmVersion), null);
+        }
+        // from 11.14.0 a broken release is refused, its env document saved already where the release was resolved
+        // (PnpmRelease#refusesToSwitchToABrokenRelease)
+        if (refusesAsBroken(Js.string(pmVersion))) {
+            throw new PnpmError("BROKEN_PNPM_RELEASE", "pnpm v" + pmVersion + " is a broken release and cannot " +
+                    "be installed", "Its \"@pnpm/exe\" build shipped without a binary and does not run. Even where " +
+                    "it does run, pinning it would break everyone on the project who uses \"@pnpm/exe\", because " +
+                    "the pin is shared. Choose another version, or run \"pnpm self-update latest\".");
         }
         // from 11.5.3 the env document's packageManagerDependencies must be registry packages that record only an
         // integrity, ahead of the store controller (PnpmRelease#checksTheEnvDocumentBeforeSwitching)
@@ -156,6 +167,25 @@ final class SwitchCliVersion {
     // the release that runs: the one that built the LST, else pnpm's own
     private PnpmRelease running() {
         return runs == null ? PnpmRelease.PORTED : runs;
+    }
+
+    // engine/pm installPnpm.ts' BROKEN_RELEASES (11.14.0, the same through 11.16.0)
+    private static final List<String> BROKEN_RELEASES = Arrays.asList("11.12.0", "11.13.0");
+
+    // assertReleaseIsInstallable: whether the release that runs refuses to hand the install to version as a broken
+    // release, from 11.14.0 (PnpmRelease#refusesToSwitchToABrokenRelease), asked only of a broken one
+    private boolean refusesAsBroken(String version) {
+        return BROKEN_RELEASES.contains(version) && running().refusesToSwitchToABrokenRelease();
+    }
+
+    // whether the range may resolve to a release the one that runs refuses as broken, which only resolving it tells
+    private boolean mayNameARefusedRelease(String range) {
+        for (String broken : BROKEN_RELEASES) {
+            if (satisfies(broken, range)) {
+                return running().refusesToSwitchToABrokenRelease();
+            }
+        }
+        return false;
     }
 
     // semver.satisfies(version, range, { includePrerelease: true }) of the node-semver the release that runs bundles

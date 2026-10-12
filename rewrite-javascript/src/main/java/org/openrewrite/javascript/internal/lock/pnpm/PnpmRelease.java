@@ -209,7 +209,29 @@ public final class PnpmRelease {
         return atLeast(11, 1, 3);
     }
 
-    // @pnpm/config.reader src/index.ts, env.ts, getOptionsFromRootManifest.ts
+    // @pnpm/lockfile.fs src/write.ts (EnvLockfile.OnDisk)
+
+    /**
+     * A lock file that already reads as the lock pnpm writes, its BOM stripped and its CRLF line ends read as LF, is
+     * left as it is, from 11.14.0 (writeLockfileDoc); before, it is written over, LF and without a BOM.
+     */
+    boolean leavesAnUnchangedLockAsItIs() {
+        return atLeast(11, 14, 0);
+    }
+
+    // @pnpm/lockfile.verification src/satisfiesPackageManifest.ts, allCatalogsAreUpToDate.ts,
+    // gitSpecifiersAreEquivalent.ts
+
+    /**
+     * A git specifier the lock records is the manifest's where both name one repository and committish
+     * ({@code github:o/r#x}, {@code o/r#x}, {@code git+https://github.com/o/r.git#x}; gitlab and bitbucket alike, and
+     * {@code git://}, {@code git+https://} and {@code https://} URLs of those hosts or ending in {@code .git}), so
+     * that the project and the catalogs are up to date and the lock is kept, from 11.14.0
+     * (dependencySpecifiersAreEqual); before, only the same specifier is.
+     */
+    boolean takesEquivalentGitSpecifiersAsEqual() {
+        return atLeast(11, 14, 0);
+    }
 
     /**
      * minimumReleaseAge set explicitly makes minimumReleaseAgeStrict default to true, from 11.0.4; before, it stays
@@ -471,6 +493,15 @@ public final class PnpmRelease {
         return atLeast(11, 5, 3);
     }
 
+    /**
+     * pnpm refuses to hand the install to a broken release, 11.12.0 or 11.13.0, which it resolved and recorded in the
+     * env document, with {@code ERR_PNPM_BROKEN_PNPM_RELEASE}, ahead of the env document's check, from 11.14.0
+     * (assertReleaseIsInstallable); before, it hands the install over.
+     */
+    boolean refusesToSwitchToABrokenRelease() {
+        return atLeast(11, 14, 0);
+    }
+
     // @pnpm/installing.commands src/installDeps.ts, verifyPacquetIdentity.ts
 
     /**
@@ -626,6 +657,15 @@ public final class PnpmRelease {
      */
     boolean takesNoPinFromACatalogSpecifier() {
         return atLeast(11, 8, 0);
+    }
+
+    /**
+     * A version prefixed with {@code =} ({@code =1.2.3}) pins as the version does, so that a specifier the resolver
+     * saves for it, or a peer hoisted as it, keeps it exact, from 11.14.0 (whichVersionIsPinned); before, it pins
+     * nothing, and the default pin ({@code ^}) applies.
+     */
+    boolean pinsAVersionPrefixedWithEqualsAsTheVersion() {
+        return atLeast(11, 14, 0);
     }
 
     /**
@@ -1109,6 +1149,21 @@ public final class PnpmRelease {
      */
     boolean breaksPeerPathAwaitCycles() {
         return atLeast(11, 12, 0);
+    }
+
+    // @pnpm/deps.peer-range src/index.ts (ReadPackageHook), as validatePeerDependencies.ts, resolvePeers.ts and
+    // hoistPeers.ts read it
+
+    /**
+     * A peer spec that is a dependency specifier ({@code npm:react@^18}, {@code <registry>:^1}, {@code file:} and
+     * git ones) is no invalid project peer ({@code ERR_PNPM_INVALID_PEER_DEPENDENCY_SPECIFICATION}, whose hint names
+     * them), and the range a peer is checked against, a locked one too, and a missing one hoisted by, is the one
+     * getPeerVersionRange reads out of the spec, each {@code ||} part apart ({@code workspace:^1} gives {@code ^1},
+     * {@code npm:x@^1} {@code ^1}, anything else any), from 11.14.0; before, the spec less a leading
+     * {@code workspace:}, a hoisted peer's as it is.
+     */
+    boolean readsAPeerRangeOutOfItsSpecifier() {
+        return atLeast(11, 14, 0);
     }
 
     // @pnpm/installing.deps-resolver src/hoistPeers.ts (ResolveDependencies.LOCKED_OPTIONAL_PEER_CANDIDATES)
