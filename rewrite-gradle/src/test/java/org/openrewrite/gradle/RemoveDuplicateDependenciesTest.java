@@ -391,4 +391,42 @@ class RemoveDuplicateDependenciesTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void keepTrailingCommentOfPrecedingDeclaration() {
+        rewriteRun(
+          buildGradle(
+            """
+              plugins {
+                  id 'java-library'
+              }
+
+              repositories {
+                  mavenCentral()
+              }
+
+              dependencies {
+                  implementation "com.google.guava:guava:29.0-jre" // keep me
+                  implementation "com.google.guava:guava:29.0-jre" // drop me
+                  testImplementation "junit:junit:4.13" // keep me too
+                  testImplementation "junit:junit:4.13" // drop me too
+              }
+              """,
+            """
+              plugins {
+                  id 'java-library'
+              }
+
+              repositories {
+                  mavenCentral()
+              }
+
+              dependencies {
+                  implementation "com.google.guava:guava:29.0-jre" // keep me
+                  testImplementation "junit:junit:4.13" // keep me too
+              }
+              """
+          )
+        );
+    }
 }
