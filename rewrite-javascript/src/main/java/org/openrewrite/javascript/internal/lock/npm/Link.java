@@ -68,6 +68,10 @@ public class Link extends Node {
 
     @Override
     public Object getVersion() {
+        if (!getRelease().readsLinkVersionFromTarget()) {
+            // arborist 1 has no getter of its own: node.js's reads the package the link took from its target
+            return super.getVersion();
+        }
         if (target != null) {
             return target.getVersion();
         }

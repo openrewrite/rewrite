@@ -185,6 +185,22 @@ class LinkTest {
         assertThat(link.getVersion()).isEqualTo("1.2.3");
     }
 
+    // link.js, from npm 7.1.1 (arborist 2.0.0): a link reads its version from its target; before, from the package it
+    // took when the target was set, which a later change of the target's package leaves as it was
+    @Test
+    void linkKeepsVersionItTookFromTargetBefore711() {
+        for (String version : new String[]{"7.1.0", "7.1.1"}) {
+            NpmRelease release = NpmRelease.of(version);
+            Node root = node(opts().release(release).path("/path/to/root").pkg(obj("name", "root")));
+            Node target = node(opts().release(release).path("/path/to/root/packages/b").root(root)
+              .pkg(obj("name", "b", "version", "1.0.0")));
+            Link link = link(opts().release(release).path("/path/to/root/node_modules/b")
+              .realpath("/path/to/root/packages/b").target(target).parent(root));
+            target.setPackage(obj("name", "b", "version", "2.0.0"));
+            assertThat(link.getVersion()).as("npm %s", version).isEqualTo("7.1.0".equals(version) ? "1.0.0" : "2.0.0");
+        }
+    }
+
     @Test
     void recalculateOutEdgesOverridesForwardsOverridesToTarget() {
         Node root = node(opts().path("/path/to/root").loadOverrides(true).pkg(obj("name", "root",

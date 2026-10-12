@@ -736,6 +736,15 @@ public final class NpmRelease implements Comparable<NpmRelease> {
     }
 
     /**
+     * A link's {@code version} is its target's, which dep-valid.js reads in place of the package's, from npm 7.1.1
+     * (arborist 2.0.0); before, the version of the package it took from its target when the target was set, which a
+     * later read of the target's package.json leaves as it was.
+     */
+    boolean readsLinkVersionFromTarget() {
+        return atLeast(7, 1, 1);
+    }
+
+    /**
      * A link made without a target whose realpath is the root's path takes the root as its target, from npm 7.8.0;
      * before, a new node at that path.
      */
