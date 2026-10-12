@@ -356,7 +356,7 @@ final class DependencyVersion {
         return new DependencyVersion(Tag.WORKSPACE, literal, path);
     }
 
-    boolean eql(DependencyVersion rhs) {
+    boolean eql(DependencyVersion rhs, BunRelease release) {
         if (tag != rhs.tag) {
             return false;
         }
@@ -374,6 +374,8 @@ final class DependencyVersion {
             case SYMLINK:
             case WORKSPACE:
                 return string().equals(rhs.string());
+            case CATALOG:
+                return !release.comparesCatalogNames() || string().equals(rhs.string());
             default:
                 return true;
         }

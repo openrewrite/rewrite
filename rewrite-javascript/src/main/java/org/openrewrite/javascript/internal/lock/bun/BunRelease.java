@@ -317,6 +317,88 @@ public final class BunRelease implements Comparable<BunRelease> {
 
     // 1.4.x: src/install/PackageManager (install_with_manager.rs, PackageManager.rs init), CatalogMap.rs, bunfig.rs
 
+    /**
+     * Two {@code catalog:} specs are the same dependency only when they name the same catalog, from 1.4.0
+     * (dependency.rs {@code Version::eql}, bun#38333), so that a member whose {@code catalog:} becomes
+     * {@code catalog:default} is diffed and written as package.json has it; before, any two are.
+     */
+    boolean comparesCatalogNames() {
+        return atLeast(1, 4, 0);
+    }
+
+    /**
+     * {@code catalog:} looks in {@code catalog}, then in {@code catalogs.default}, and {@code catalog:default} the other
+     * way round, from 1.4.0 (CatalogMap.rs {@code locate}, bun#38333); before, each in its own only.
+     */
+    boolean looksUpTheDefaultCatalogUnderBothNames() {
+        return atLeast(1, 4, 0);
+    }
+
+    /**
+     * A name both {@code catalog} and {@code catalogs.default} hold fails the install, {@code "<name>" is defined in both
+     * "catalog" and "catalogs.default"; keep one of them}, from 1.4.0 (CatalogMap.rs {@code parse_append},
+     * bun#38333); before, each is read.
+     */
+    boolean rejectsAnEntryOfBothDefaultCatalogs() {
+        return atLeast(1, 4, 0);
+    }
+
+    /**
+     * A {@code catalog:} dependency that did not resolve fails as {@code <name>@<literal>: there is no catalog named
+     * "<catalog>" in the root package.json}, {@code <name>@<literal> is not in the catalog} or {@code <name>@<literal>
+     * is not in catalog "<catalog>"}, from 1.4.0 (PackageManagerResolution.rs {@code verify_resolutions}); before, as
+     * any other dependency, {@code <name>@<literal> failed to resolve}.
+     */
+    boolean namesTheCatalogADependencyIsMissingFrom() {
+        return atLeast(1, 4, 0);
+    }
+
+    /**
+     * A frozen {@code --lockfile-only} install writes nothing, the lock being as it was, unless it migrates another
+     * lockfile, from 1.4.0 (install_with_manager.rs {@code save_lockfile_only}); before, it saves the lock, which may
+     * then hold the package.json's literals.
+     */
+    boolean writesNothingForAFrozenLockfileOnlyInstall() {
+        return atLeast(1, 4, 0);
+    }
+
+    /**
+     * A frozen install whose root's overrides or catalogs changed fails, noting {@code <overrides|resolutions|the
+     * catalog> in package.json changed since bun.lock was saved}, from 1.4.0 (install_with_manager.rs
+     * {@code frozen_changed_section}); before, only when the placements differ.
+     */
+    boolean failsAFrozenInstallWhoseOverridesOrCatalogsChanged() {
+        return atLeast(1, 4, 0);
+    }
+
+    /**
+     * The frozen install's comparison takes every placement, one of the lock before the clean bound to a package
+     * appended after loading being a change, from 1.4.0 (lockfile.rs {@code eql} with {@code loaded_package_count});
+     * before, both sides leave out the packages from the count before the install on.
+     */
+    boolean countsAPlacementBoundAfterLoadingAsAChange() {
+        return atLeast(1, 4, 0);
+    }
+
+    /**
+     * A frozen install keeps the workspaces bun.lock lists that the checkout lacks, and takes catalogs missing entries
+     * the lock does not use, as a pruned checkout, noting what it skipped, from 1.4.0 (lockfile/pruned_workspaces.rs,
+     * Package.rs {@code Diff}); before, either is a change. The engine does not reproduce it: such an install is
+     * cannot-know.
+     */
+    boolean toleratesAPrunedCheckoutWhenFrozen() {
+        return atLeast(1, 4, 0);
+    }
+
+    /**
+     * What bunfig.toml's {@code [install]} sets wins over the .npmrc files, its scopes name by name, from 1.4.0
+     * (PackageManager.rs {@code init}, {@code overlay_bunfig_install}: npmrc &lt; bunfig &lt; CLI); before, the .npmrc
+     * files are read over bunfig's settings and win.
+     */
+    boolean letsBunfigOverrideNpmrc() {
+        return atLeast(1, 4, 0);
+    }
+
     @Override
     public int compareTo(BunRelease o) {
         int c = Integer.compare(major, o.major);

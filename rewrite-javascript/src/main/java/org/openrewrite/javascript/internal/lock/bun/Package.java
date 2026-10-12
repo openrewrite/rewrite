@@ -382,11 +382,11 @@ final class Package {
             Json.Expr workspacesExpr = json.get("workspaces");
             // before 1.2.14 there are no catalogs
             if (workspacesExpr != null && options.getRelease().parsesCatalogSpecs()) {
-                foundAnyCatalogOrCatalogObject = lockfile.catalogs.parseAppend(log, workspacesExpr);
+                foundAnyCatalogOrCatalogObject = lockfile.catalogs.parseAppend(log, workspacesExpr, lockfile.release);
                 hasWorkspaces = true;
             }
             if (!foundAnyCatalogOrCatalogObject && hasWorkspaces && options.getRelease().readsTopLevelCatalogs()) {
-                lockfile.catalogs.parseAppend(log, json);
+                lockfile.catalogs.parseAppend(log, json, lockfile.release);
             }
         }
     }

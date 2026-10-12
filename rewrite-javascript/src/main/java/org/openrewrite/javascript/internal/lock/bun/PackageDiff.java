@@ -74,7 +74,7 @@ final class PackageDiff {
             while (fromIt.hasNext()) {
                 Map.Entry<Long, Dependency> f = fromIt.next();
                 Map.Entry<Long, Dependency> t = toIt.next();
-                if (!f.getKey().equals(t.getKey()) || !f.getValue().eql(t.getValue())) {
+                if (!f.getKey().equals(t.getKey()) || !f.getValue().eql(t.getValue(), options.getRelease())) {
                     summary.overridesChanged = true;
                     break;
                 }
@@ -82,7 +82,7 @@ final class PackageDiff {
         }
 
         if (isRoot) {
-            summary.catalogsChanged = catalogsChanged(fromLockfile.catalogs, toLockfile.catalogs);
+            summary.catalogsChanged = catalogsChanged(fromLockfile.catalogs, toLockfile.catalogs, options.getRelease());
         }
 
         trustedDependencies(fromLockfile, toLockfile, summary);
@@ -114,7 +114,7 @@ final class PackageDiff {
             }
             int matched = toI;
             toI++;
-            if (toDeps.get(matched).eql(fromDep)) {
+            if (toDeps.get(matched).eql(fromDep, release)) {
                 if (idMapping != null) {
                     boolean updateMapping = true;
                     // before 1.2.19 a member is diffed again where the dependency is a workspace spec
@@ -186,7 +186,7 @@ final class PackageDiff {
         return !diff.hasDiffs();
     }
 
-    private static boolean catalogsChanged(CatalogMap from, CatalogMap to) {
+    private static boolean catalogsChanged(CatalogMap from, CatalogMap to, BunRelease release) {
         if (from.defaultMap.size() != to.defaultMap.size()) {
             return true;
         }
@@ -195,7 +195,7 @@ final class PackageDiff {
         }
         from.sort();
         to.sort();
-        if (!sameDeps(from.defaultMap, to.defaultMap)) {
+        if (!sameDeps(from.defaultMap, to.defaultMap, release)) {
             return true;
         }
         Iterator<Map.Entry<String, LinkedHashMap<String, Dependency>>> fromIt = from.groups.entrySet().iterator();
@@ -209,20 +209,21 @@ final class PackageDiff {
             if (f.getValue().size() != t.getValue().size()) {
                 return true;
             }
-            if (!sameDeps(f.getValue(), t.getValue())) {
+            if (!sameDeps(f.getValue(), t.getValue(), release)) {
                 return true;
             }
         }
         return false;
     }
 
-    private static boolean sameDeps(Map<String, Dependency> from, Map<String, Dependency> to) {
+    private static boolean sameDeps(Map<String, Dependency> from, Map<String, Dependency> to,
+                                    BunRelease release) {
         Iterator<Map.Entry<String, Dependency>> fromIt = from.entrySet().iterator();
         Iterator<Map.Entry<String, Dependency>> toIt = to.entrySet().iterator();
         while (fromIt.hasNext() && toIt.hasNext()) {
             Map.Entry<String, Dependency> f = fromIt.next();
             Map.Entry<String, Dependency> t = toIt.next();
-            if (!f.getKey().equals(t.getKey()) || !f.getValue().eql(t.getValue())) {
+            if (!f.getKey().equals(t.getKey()) || !f.getValue().eql(t.getValue(), release)) {
                 return false;
             }
         }

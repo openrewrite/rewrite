@@ -88,8 +88,8 @@ final class Dependency {
         }
     }
 
-    boolean eql(Dependency b) {
-        return nameHash == b.nameHash && name.length() == b.name.length() && version.eql(b.version);
+    boolean eql(Dependency b, BunRelease release) {
+        return nameHash == b.nameHash && name.length() == b.name.length() && version.eql(b.version, release);
     }
 
     static boolean isSCPLikePath(String dependency) {

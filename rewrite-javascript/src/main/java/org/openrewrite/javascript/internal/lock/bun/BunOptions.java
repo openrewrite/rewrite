@@ -81,10 +81,11 @@ public final class BunOptions {
     static BunOptions load(BunRelease release, @Nullable String bunfigToml, @Nullable String userNpmrc,
                            @Nullable String npmrc, HostEnvironment env) {
         Install install = new Install();
+        Json.Expr installObj = null;
         if (bunfigToml != null) {
             Json.Expr bunfig = Toml.parse(bunfigToml);
-            Json.Expr installObj = bunfig.getObject("install");
-            if (installObj != null) {
+            installObj = bunfig.getObject("install");
+            if (installObj != null && !release.letsBunfigOverrideNpmrc()) {
                 install.readBunfig(installObj);
             }
         }
@@ -93,6 +94,10 @@ public final class BunOptions {
         }
         if (npmrc != null) {
             install.readNpmrc(npmrc, env, release);
+        }
+        if (installObj != null && release.letsBunfigOverrideNpmrc()) {
+            // PackageManager.rs init: npmrc < bunfig < CLI (overlay_bunfig_install)
+            install.readBunfig(installObj);
         }
         BunOptions options = new BunOptions();
         options.release = release;

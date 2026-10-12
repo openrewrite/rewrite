@@ -205,7 +205,7 @@ final class PackageManager {
                 nameHash = replacementNameHash(nameHash, override);
                 version = override;
                 if (override.tag == DependencyVersion.Tag.CATALOG) {
-                    Dependency catalogDep = lockfile.catalogs.get(override.string(), name);
+                    Dependency catalogDep = lockfile.catalogs.get(override.string(), name, lockfile.release);
                     if (catalogDep != null) {
                         name = replacementName(name, catalogDep.version);
                         nameHash = replacementNameHash(nameHash, catalogDep.version);
@@ -213,7 +213,7 @@ final class PackageManager {
                     }
                 }
             } else if (dependency.version.tag == DependencyVersion.Tag.CATALOG) {
-                Dependency catalogDep = lockfile.catalogs.get(dependency.version.string(), name);
+                Dependency catalogDep = lockfile.catalogs.get(dependency.version.string(), name, lockfile.release);
                 if (catalogDep != null) {
                     name = replacementName(name, catalogDep.version);
                     nameHash = replacementNameHash(nameHash, catalogDep.version);
@@ -831,10 +831,10 @@ final class PackageManager {
     }
 
     /**
-     * {@code verifyResolutions}: each required dependency that did not resolve, as bun reports it.
+     * {@code verifyResolutions}: each required dependency that did not resolve, as bun reports it, then its error.
      */
-    static List<String> verifyResolutions(Lockfile lockfile, BunOptions options) {
-        List<String> failed = new ArrayList<>();
+    static List<String[]> verifyResolutions(Lockfile lockfile, BunOptions options) {
+        List<String[]> failed = new ArrayList<>();
         int end = lockfile.packages.size();
         for (Package parent : lockfile.packages) {
             boolean local = parent.resolution.tag == Resolution.Tag.ROOT ||
@@ -852,11 +852,26 @@ final class PackageManager {
                     continue;
                 }
                 String literal = failedDep.version.literal;
-                failed.add(failedDep.name.isEmpty() || failedDep.name.equals(literal) ? literal :
-                        failedDep.name + "@" + literal);
+                String spec = failedDep.name.isEmpty() || failedDep.name.equals(literal) ? literal :
+                        failedDep.name + "@" + literal;
+                failed.add(new String[]{spec, failedDep.version.tag == DependencyVersion.Tag.CATALOG &&
+                                              options.getRelease().namesTheCatalogADependencyIsMissingFrom() ?
+                        catalogFailure(lockfile, failedDep) : spec + " failed to resolve"});
             }
         }
         return failed;
+    }
+
+    // PackageManagerResolution.rs verify_resolutions, from 1.4.0
+    private static String catalogFailure(Lockfile lockfile, Dependency failedDep) {
+        String nameAtLiteral = failedDep.name + "@" + failedDep.version.literal;
+        String catalogName = failedDep.version.string();
+        boolean isDefault = catalogName.isEmpty() || "default".equals(catalogName);
+        if (!isDefault && !lockfile.catalogs.groups.containsKey(catalogName)) {
+            return nameAtLiteral + ": there is no catalog named \"" + catalogName + "\" in the root package.json";
+        }
+        return isDefault ? nameAtLiteral + " is not in the catalog" :
+                nameAtLiteral + " is not in catalog \"" + catalogName + "\"";
     }
 
     private static boolean isEnabled(Behavior behavior, boolean local, BunOptions options) {

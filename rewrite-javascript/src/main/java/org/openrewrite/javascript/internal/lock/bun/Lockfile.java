@@ -234,11 +234,27 @@ public final class Lockfile {
      * the same paths, over the packages below {@code cutOffPkgId}.
      */
     boolean eql(Lockfile r, int cutOffPkgId) {
+        return eql(placements(cutOffPkgId), r, r.placements(cutOffPkgId));
+    }
+
+    /**
+     * {@code eql} from 1.4.0: every placement of each lockfile, one of {@code r} bound to a package past those it
+     * loaded being a change.
+     */
+    boolean eqlLoaded(Lockfile r, int rLoadedPackageCount) {
+        List<int[]> rBuf = r.placements(Integer.MAX_VALUE);
+        for (int[] placement : rBuf) {
+            if (placement[0] >= rLoadedPackageCount) {
+                return false;
+            }
+        }
+        return eql(placements(Integer.MAX_VALUE), r, rBuf);
+    }
+
+    private boolean eql(List<int[]> lBuf, Lockfile r, List<int[]> rBuf) {
         if (hoistedDependencies.size() != r.hoistedDependencies.size()) {
             return false;
         }
-        List<int[]> lBuf = placements(cutOffPkgId);
-        List<int[]> rBuf = r.placements(cutOffPkgId);
         if (lBuf.size() != rBuf.size()) {
             return false;
         }

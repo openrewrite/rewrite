@@ -174,11 +174,18 @@ public final class BunLockRegenerator {
         private final int configVersion;
         private final int packagesBefore;
 
-        PendingInstall(LoadResult loadResult, PackageManager manager, int configVersion, int packagesBefore) {
+        /**
+         * The root's diff against the lock; null when there was none to diff.
+         */
+        private final PackageDiff.@Nullable Summary summary;
+
+        PendingInstall(LoadResult loadResult, PackageManager manager, int configVersion, int packagesBefore,
+                       PackageDiff.@Nullable Summary summary) {
             this.loadResult = loadResult;
             this.manager = manager;
             this.configVersion = configVersion;
             this.packagesBefore = packagesBefore;
+            this.summary = summary;
         }
 
         Lockfile getLockfile() {
@@ -295,21 +302,50 @@ public final class BunLockRegenerator {
 
         Lockfile beforeClean = manager.lockfile;
         Lockfile cleaned = Cleaner.clean(beforeClean);
-        List<String> failed = PackageManager.verifyResolutions(cleaned, manager.options);
+        List<String[]> failed = PackageManager.verifyResolutions(cleaned, manager.options);
         if (!failed.isEmpty()) {
             String first = manager.log.errors.isEmpty() ? "" : manager.log.errors.get(0) + "; ";
             throw Rejected.rejects(reasonFor(manager.log.errors),
-                    failed.get(0).replaceFirst("@[^@]*$", ""),
-                    first + failed.get(0) + " failed to resolve");
+                    failed.get(0)[0].replaceFirst("@[^@]*$", ""),
+                    first + failed.get(0)[1]);
         }
-        if (manager.options.isFrozenLockfile() && !cleaned.eql(beforeClean, cleaned.packages.size())) {
-            throw Rejected.rejects(Reason.RESOLUTION_REQUIRED, "lockfile had changes, but lockfile is frozen");
+        if (manager.options.isFrozenLockfile()) {
+            BunRelease release = manager.options.getRelease();
+            PackageDiff.Summary summary = install.getSummary();
+            if (release.toleratesAPrunedCheckoutWhenFrozen() && summary != null && summary.catalogsChanged) {
+                throw new CannotKnow("what bun " + release + " makes of a frozen install whose catalogs changed, " +
+                                     "which it may take for a pruned checkout (pruned_workspaces.rs)");
+            }
+            String changedSection = frozenChangedSection(release, summary, these.getManifests().get(""));
+            if (changedSection != null || !(release.countsAPlacementBoundAfterLoadingAsAChange() ?
+                    cleaned.eqlLoaded(beforeClean, install.getPackagesBefore()) :
+                    cleaned.eql(beforeClean, cleaned.packages.size()))) {
+                throw Rejected.rejects(Reason.RESOLUTION_REQUIRED, "lockfile had changes, but lockfile is frozen" +
+                        (changedSection == null ? "" :
+                                "; note: " + changedSection + " in package.json changed since bun.lock was saved"));
+            }
+            if (release.writesNothingForAFrozenLockfileOnlyInstall()) {
+                return lock;
+            }
         }
         String written = install.write(cleaned);
         if (written == null) {
             throw Rejected.deletesLock("the root has no package left");
         }
         return written;
+    }
+
+    // install_with_manager.rs frozen_changed_section and overrides_field_name, from 1.4.0
+    private static @Nullable String frozenChangedSection(BunRelease release, PackageDiff.@Nullable Summary summary,
+                                                         @Nullable String rootManifest) {
+        if (!release.failsAFrozenInstallWhoseOverridesOrCatalogsChanged() || summary == null) {
+            return null;
+        }
+        if (summary.overridesChanged) {
+            return rootManifest != null && "resolutions".equals(OverrideMap.readsFrom(rootManifest)) ?
+                    "resolutions" : "overrides";
+        }
+        return summary.catalogsChanged ? "the catalog" : null;
     }
 
     // init loads the project's .env files, bunfig.toml and .npmrc: one it holds that the host did not read is unknown
@@ -430,9 +466,20 @@ public final class BunLockRegenerator {
         boolean needsNewLockfile = !loadResult.isOk();
         int packagesBefore = manager.lockfile.packages.size();
         if (!loadResult.isOk() && inputs.getLock() != null) {
-            return new PendingInstall(loadResult, manager, configVersion, packagesBefore);
+            return new PendingInstall(loadResult, manager, configVersion, packagesBefore, null);
         }
 
+        if (options.isFrozenLockfile() && release.toleratesAPrunedCheckoutWhenFrozen() && loaded != null) {
+            for (Package pkg : loaded.packages) {
+                if (pkg.resolution.tag == Resolution.Tag.WORKSPACE && !manifests.containsKey(pkg.resolution.value)) {
+                    throw new CannotKnow("what bun " + release + " makes of a frozen install over a checkout " +
+                                         "without the workspace " + pkg.resolution.value + " bun.lock lists " +
+                                         "(pruned_workspaces.rs)");
+                }
+            }
+        }
+
+        PackageDiff.Summary summary = null;
         if (loadResult.isOk()) {
             Package root = manager.lockfile.rootPackage();
             if (root == null || root.dependenciesLen == 0) {
@@ -445,7 +492,7 @@ public final class BunLockRegenerator {
                 manager.registerAliases(lockfile, maybeRoot);
                 int[] mapping = new int[maybeRoot.dependenciesLen];
                 Arrays.fill(mapping, INVALID_PACKAGE_ID);
-                PackageDiff.Summary summary = PackageDiff.generate(options, log, manager.lockfile, lockfile, root,
+                summary = PackageDiff.generate(options, log, manager.lockfile, lockfile, root,
                         maybeRoot, mapping, manifests);
                 if (summary.hasDiffs()) {
                     replaceRoot(manager, lockfile, maybeRoot, mapping, summary);
@@ -471,7 +518,7 @@ public final class BunLockRegenerator {
         } else {
             manager.drainDependencyList();
         }
-        return new PendingInstall(loadResult, manager, configVersion, packagesBefore);
+        return new PendingInstall(loadResult, manager, configVersion, packagesBefore, summary);
     }
 
     private static void replaceRoot(PackageManager manager, Lockfile lockfile, Package maybeRoot, int[] mapping,

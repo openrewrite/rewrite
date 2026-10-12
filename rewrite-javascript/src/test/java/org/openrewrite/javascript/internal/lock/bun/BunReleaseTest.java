@@ -137,6 +137,48 @@ class BunReleaseTest {
     }
 
     /**
+     * dependency.rs {@code Version::eql} and CatalogMap.rs {@code locate} and {@code parse_append} (1.4.0): catalog
+     * specs compare by catalog, the default catalog answers to both names, and a name in both default catalogs fails.
+     */
+    @Test
+    void comparesAndLooksUpCatalogsByNameFrom140() {
+        BunRelease later = BunRelease.of("1.4.0");
+        BunRelease earlier = BunRelease.of("1.3.14");
+        DependencyVersion plain = requireNonNull(DependencyVersion.parse("ms", null, "catalog:", later));
+        DependencyVersion named = requireNonNull(DependencyVersion.parse("ms", null, "catalog:default", later));
+        assertThat(plain.eql(named, later)).isFalse();
+        assertThat(plain.eql(named, earlier)).isTrue();
+
+        Log log = new Log();
+        CatalogMap catalogs = new CatalogMap();
+        catalogs.parseAppend(log, Json.parse("{\"catalog\":{\"ms\":\"2.1.3\"},\"catalogs\":{\"default\":{\"debug\":\"4\"}}}"),
+          later);
+        assertThat(catalogs.get("default", "ms", later)).isNotNull();
+        assertThat(catalogs.get("default", "ms", earlier)).isNull();
+        assertThat(catalogs.get("", "debug", later)).isNotNull();
+        assertThat(catalogs.get("", "debug", earlier)).isNull();
+
+        String both = "{\"catalog\":{\"ms\":\"2.1.3\"},\"catalogs\":{\"default\":{\"ms\":\"2.0.0\"}}}";
+        assertThatThrownBy(() -> new CatalogMap().parseAppend(log, Json.parse(both), later))
+          .hasMessage("InstallFailed");
+        assertThat(log.errors).contains("\"ms\" is defined in both \"catalog\" and \"catalogs.default\"; keep one of them");
+        new CatalogMap().parseAppend(new Log(), Json.parse(both), earlier);
+    }
+
+    /**
+     * PackageManager.rs {@code init} (1.4.0): bunfig.toml's registry wins over the .npmrc files; before, they win.
+     */
+    @Test
+    void letsBunfigsRegistryWinFrom140() {
+        String bunfig = "[install]\nregistry = \"https://registry.yarnpkg.com/\"\n";
+        String npmrc = "registry=https://registry.npmmirror.com/\n";
+        assertThat(BunOptions.load(BunRelease.of("1.4.0"), bunfig, npmrc, null, HostEnvironment.UNKNOWN)
+          .scopeForPackageName("ms")).isEqualTo("https://registry.yarnpkg.com/");
+        assertThat(BunOptions.load(BunRelease.of("1.3.14"), bunfig, npmrc, null, HostEnvironment.UNKNOWN)
+          .scopeForPackageName("ms")).isEqualTo("https://registry.npmmirror.com/");
+    }
+
+    /**
      * bun.lock.zig (1.3.7): a {@code ""} registry is the package's scope registry; before, npmjs.
      */
     @Test

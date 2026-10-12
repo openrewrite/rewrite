@@ -46,6 +46,28 @@ final class CatalogMap {
         return !defaultMap.isEmpty() || !groups.isEmpty();
     }
 
+    /**
+     * The catalog entry of a dependency, as the release looks it up.
+     */
+    @Nullable
+    Dependency get(String catalogName, String depName, BunRelease release) {
+        if (release.looksUpTheDefaultCatalogUnderBothNames()) {
+            // locate: the default catalog under both spellings, the one the name matches first
+            if (catalogName.isEmpty()) {
+                Dependency found = defaultMap.get(depName);
+                return found != null ? found : inGroup("default", depName);
+            }
+            Dependency found = inGroup(catalogName, depName);
+            return found != null || !"default".equals(catalogName) ? found : defaultMap.get(depName);
+        }
+        return get(catalogName, depName);
+    }
+
+    private @Nullable Dependency inGroup(String catalogName, String depName) {
+        LinkedHashMap<String, Dependency> group = groups.get(catalogName);
+        return group == null ? null : group.get(depName);
+    }
+
     @Nullable
     Dependency get(String catalogName, String depName) {
         if (catalogName.isEmpty()) {
@@ -66,6 +88,28 @@ final class CatalogMap {
             return defaultMap;
         }
         return groups.computeIfAbsent(catalogName, k -> new LinkedHashMap<>());
+    }
+
+    boolean parseAppend(Log log, Json.Expr expr, BunRelease release) {
+        boolean foundAny = parseAppend(log, expr);
+        Json.Expr catalogs = expr.get("catalogs");
+        Json.Expr defaultGroup = catalogs != null && catalogs.isObject() ? catalogs.get("default") : null;
+        if (release.rejectsAnEntryOfBothDefaultCatalogs() && !defaultMap.isEmpty() && defaultGroup != null &&
+            defaultGroup.isObject()) {
+            boolean conflict = false;
+            for (Json.Property item : defaultGroup.properties()) {
+                String depName = item.key.asString();
+                if (defaultMap.containsKey(depName)) {
+                    log.addError("\"" + depName + "\" is defined in both \"catalog\" and \"catalogs.default\"; " +
+                                 "keep one of them");
+                    conflict = true;
+                }
+            }
+            if (conflict) {
+                throw new IllegalArgumentException("InstallFailed");
+            }
+        }
+        return foundAny;
     }
 
     boolean parseAppend(Log log, Json.Expr expr) {
