@@ -395,6 +395,14 @@ final class PackageRequester {
         } else if (bareSpecifier.startsWith("file:")) {
             type = IS_FILENAME.matcher(bareSpecifier).find() ? "file" : "directory";
         } else if (bareSpecifier.startsWith("path:")) {
+            // before 11.1.1 a path: specifier of a path's shape (a /, a tarball name) is taken as a local path
+            // first (PnpmRelease#resolvesNamedRegistrySpecsBeforeLocalPaths)
+            if (!npmResolver.getRelease().resolvesNamedRegistrySpecsBeforeLocalPaths()) {
+                NpmResolver.ResolveResult asPath = resolveFromLocalPath(wd, options, currentPkg);
+                if (asPath != null) {
+                    return asPath;
+                }
+            }
             throw new PnpmError("PATH_IS_UNSUPPORTED_PROTOCOL", "Local dependencies via `path:` protocol are not " +
                                                                 "supported. Use the `link:` protocol for folder " +
                                                                 "dependencies and `file:` for local tarballs");
@@ -471,7 +479,8 @@ final class PackageRequester {
     private @Nullable Map<String, @Nullable Object> readManifest(String dir) {
         String path = dir.isEmpty() ? "package.json" : dir + "/package.json";
         String text = files.get(path);
-        return text == null ? null : Manifests.readProjectManifest(text, path);
+        return text == null ? null : Manifests.normalizedForTheWriter(Manifests.readProjectManifest(text, path),
+                npmResolver.getRelease());
     }
 
     private @Nullable Boolean packageIsInstallable(String pkgId, Map<String, @Nullable Object> manifest,

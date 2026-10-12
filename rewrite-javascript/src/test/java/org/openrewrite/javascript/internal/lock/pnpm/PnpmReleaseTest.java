@@ -326,6 +326,55 @@ class PnpmReleaseTest {
     }
 
     /**
+     * workspace/project-manifest-reader normalize (11.3.0): a dependency field of null is read; before, the manifest
+     * writer throws. pnpm 11.2.2 exited with this error and 11.3.0 wrote the lock when run on it.
+     */
+    @Test
+    void readsANullDependencyFieldFrom1130() {
+        Map<String, @Nullable Object> manifest = obj("{'name':'a','dependencies':null}");
+        Manifests.normalizedForTheWriter(manifest, release("11.3.0"));
+        assertThatThrownBy(() -> Manifests.normalizedForTheWriter(manifest, release("11.2.2")))
+          .isInstanceOfSatisfying(JsError.class, e -> {
+              assertThat(e.getName()).isEqualTo("TypeError");
+              assertThat(e.getMessage()).isEqualTo("Cannot convert undefined or null to object");
+          });
+    }
+
+    /**
+     * installing/deps-installer install/index.ts (11.4.0): updateChecksums resolves in full; before, the lock is up
+     * to date.
+     */
+    @Test
+    void resolvesInFullToUpdateChecksumsFrom1140() {
+        assertThat(install("11.4.0", "", "updateChecksums: true\n", WRAPPY_ONLY).getResolution())
+          .isEqualTo("updateChecksums");
+        assertThat(install("11.3.0", "", "updateChecksums: true\n", WRAPPY_ONLY).getWritten()).isEqualTo(WRAPPY_LOCK);
+    }
+
+    /**
+     * installing/deps-installer install/index.ts (11.5.2): pnprServer replaces agent, and from 11.1.3 neither runs
+     * under trustPolicy no-downgrade; before 11.1.3 the agent resolves.
+     */
+    @Test
+    void resolvesThroughAPnprServerFrom1152() {
+        String pnpr = "pnprServer: https://pnpr.test/\ntrustPolicy: no-downgrade\n";
+        assertThatThrownBy(() -> install("11.5.2", "", pnpr, WRAPPY_ONLY))
+          .isInstanceOfSatisfying(PnpmError.class,
+            e -> assertThat(e.getCode()).isEqualTo("ERR_PNPM_TRUST_POLICY_INCOMPATIBLE_WITH_PNPR"));
+        // 11.5.1 reads no pnprServer: the trust policy is checked locally
+        assertThatThrownBy(() -> install("11.5.1", "", pnpr, WRAPPY_ONLY))
+          .isInstanceOfSatisfying(PnpmError.class,
+            e -> assertThat(e.getMessage()).contains("The metadata of wrappy is missing the \"time\" field"));
+        String agent = "agent: https://agent.test/\ntrustPolicy: no-downgrade\n";
+        assertThatThrownBy(() -> install("11.5.1", "", agent, WRAPPY_ONLY))
+          .isInstanceOfSatisfying(PnpmError.class,
+            e -> assertThat(e.getCode()).isEqualTo("ERR_PNPM_TRUST_POLICY_INCOMPATIBLE_WITH_AGENT"));
+        assertThatThrownBy(() -> install("11.1.2", "", agent, WRAPPY_ONLY))
+          .isInstanceOf(CannotKnow.class)
+          .hasMessageContaining("what the pnpm agent at https://agent.test/ resolves");
+    }
+
+    /**
      * config/reader loadNpmrcFiles.ts substituteEnv (11.1.3): a placeholder the environment does not set is dropped;
      * before, envReplace failed and the value was kept as written.
      */

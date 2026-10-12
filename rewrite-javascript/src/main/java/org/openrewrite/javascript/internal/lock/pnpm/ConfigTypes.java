@@ -167,6 +167,8 @@ final class ConfigTypes {
         t.put("trust-policy", union("off", "no-downgrade"));
         t.put("trust-policy-exclude", union(STRING, ARRAY));
         t.put("trust-policy-ignore-after", NUMBER);
+        // read from 11.3.0 (PnpmRelease#readsTrustLockfile)
+        t.put("trust-lockfile", BOOLEAN);
         t.put("use-beta-cli", BOOLEAN);
         t.put("use-stderr", BOOLEAN);
         t.put("verify-deps-before-run", BOOLEAN);
@@ -185,6 +187,8 @@ final class ConfigTypes {
         t.put("embed-readme", BOOLEAN);
         t.put("update-notifier", BOOLEAN);
         t.put("agent", union(NULL, STRING));
+        // read from 11.5.2 (PnpmRelease#resolvesThroughAPnprServer)
+        t.put("pnpr-server", union(NULL, STRING));
         t.put("registry-supports-time-field", BOOLEAN);
         t.put("fail-if-no-match", BOOLEAN);
         t.put("sync-injected-deps-after-scripts", ARRAY);

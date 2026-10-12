@@ -449,6 +449,16 @@ public final class PnpmRelease {
         return atLeast(11, 6, 0);
     }
 
+    // @pnpm/workspace.project-manifest-reader src/index.ts
+
+    /**
+     * A project's or {@code file:} directory's manifest whose dependency field is {@code null} is read as any other,
+     * from 11.3.0; before, the manifest writer's normalize throws {@code Cannot convert undefined or null to object}.
+     */
+    boolean readsANullDependencyField() {
+        return atLeast(11, 3, 0);
+    }
+
     // @pnpm/config.pick-registry-for-package src/index.ts
 
     /**
@@ -587,6 +597,22 @@ public final class PnpmRelease {
      */
     boolean verifiesTheLockBesideTheInstall() {
         return atLeast(11, 7, 0);
+    }
+
+    /**
+     * {@code updateChecksums} makes the install resolve in full, from 11.4.0; before, a lock-only install does not
+     * read it.
+     */
+    boolean resolvesInFullToUpdateChecksums() {
+        return atLeast(11, 4, 0);
+    }
+
+    /**
+     * A {@code pnprServer} resolves the install ({@code ERR_PNPM_TRUST_POLICY_INCOMPATIBLE_WITH_PNPR} under trustPolicy
+     * no-downgrade), from 11.5.2; before, an {@code agent} does ({@code ..._WITH_AGENT}).
+     */
+    boolean resolvesThroughAPnprServer() {
+        return atLeast(11, 5, 2);
     }
 
     // @pnpm/installing.commands src/install.ts (dryRunInstall)

@@ -340,7 +340,8 @@ public final class Main {
                                  ", in the order the filesystem gives)");
         }
         if (text != null) {
-            return Manifests.readProjectManifest(text, RootRelativePath.join(dir, "package.json"));
+            return Manifests.normalizedForTheWriter(Manifests.readProjectManifest(text,
+                    RootRelativePath.join(dir, "package.json")), running());
         }
         String path = others.get(0);
         String other = inputs.getFiles().get(path);
@@ -348,9 +349,9 @@ public final class Main {
             throw CannotKnow.unread(path);
         }
         if (path.endsWith("/package.yaml") || "package.yaml".equals(path)) {
-            return Manifests.readPackageYaml(other, path);
+            return Manifests.normalizedForTheWriter(Manifests.readPackageYaml(other, path), running());
         }
-        return Manifests.readJson5(other, path);
+        return Manifests.normalizedForTheWriter(Manifests.readJson5(other, path), running());
     }
 
     // the directories holding a manifest findPackages' patterns can match

@@ -237,7 +237,10 @@ final class Install {
         boolean outdatedLockfileSettings = outdatedLockfileSettingName != null;
         boolean upToDateLockfileMajorVersion = Js.string(wantedLockfile.getLockfileVersion())
                 .startsWith(LockfileObject.LOCKFILE_MAJOR_VERSION + ".");
-        boolean needsFullResolution = outdatedLockfileSettings || !upToDateLockfileMajorVersion;
+        // from 11.4.0 updateChecksums resolves in full (PnpmRelease#resolvesInFullToUpdateChecksums)
+        boolean updateChecksums = options.isTrue("updateChecksums") &&
+                                  options.getRelease().resolvesInFullToUpdateChecksums();
+        boolean needsFullResolution = outdatedLockfileSettings || updateChecksums || !upToDateLockfileMajorVersion;
         wantedLockfile.set("settings", options.getLockfileSettings());
         if (needsFullResolution) {
             wantedLockfile.set("overrides", overridesMap);
@@ -249,7 +252,8 @@ final class Install {
             wantedLockfile.set("pnpmfileChecksum", Js.UNDEFINED);
             wantedLockfile.set("patchedDependencies", patchedDependencies);
             return new Result(null, outdatedLockfileSettings ? outdatedLockfileSettingName :
-                    "lockfileVersion " + Js.string(wantedLockfile.getLockfileVersion()), ctx, opts,
+                    updateChecksums ? "updateChecksums" :
+                            "lockfileVersion " + Js.string(wantedLockfile.getLockfileVersion()), ctx, opts,
                     workspaceProjects, patchHashes(patchedDependencies));
         }
 
@@ -492,17 +496,34 @@ final class Install {
     // install / mutateModules: with an agent configured, the agent server resolves the install
     private static void agent(PnpmOptions options) {
         Object agent = options.get("agent");
-        if (!Js.truthy(agent)) {
+        Object pnprServer = options.get("pnprServer");
+        if (!Js.truthy(agent) && !Js.truthy(pnprServer)) {
             return;
         }
-        if ("no-downgrade".equals(options.get("trustPolicy"))) {
+        PnpmRelease release = options.getRelease();
+        // from 11.5.2 a pnpr server replaces the agent (PnpmRelease#resolvesThroughAPnprServer)
+        boolean pnpr = release.resolvesThroughAPnprServer();
+        Object server = pnpr ? pnprServer : agent;
+        if (!Js.truthy(server)) {
+            return;
+        }
+        // from 11.1.3 neither enforces trustPolicy no-downgrade (PnpmRelease#checksTheReleaseAgeAsAPolicy)
+        if ("no-downgrade".equals(options.get("trustPolicy")) && release.checksTheReleaseAgeAsAPolicy()) {
+            if (pnpr) {
+                throw new PnpmError("TRUST_POLICY_INCOMPATIBLE_WITH_PNPR", "The pnpr server does not yet enforce " +
+                        "`trustPolicy: no-downgrade`, so running an install through it under this policy would " +
+                        "produce a lockfile that the local verifier rejects.", "Unset `trustPolicy` for this " +
+                        "install, or disable the pnpr server (unset `--pnpr-server` / `pnprServer` in " +
+                        "pnpm-workspace.yaml) so resolution runs locally and the trust check applies.");
+            }
             throw new PnpmError("TRUST_POLICY_INCOMPATIBLE_WITH_AGENT", "The pnpm agent does not yet enforce " +
                     "`trustPolicy: no-downgrade`, so running an install through the agent under this policy would " +
                     "produce a lockfile that the local verifier rejects.", "Unset `trustPolicy` for this install, or " +
                     "disable the agent (unset `--agent` / `agent` in pnpm-workspace.yaml) so resolution runs locally " +
                     "and the trust check applies.");
         }
-        throw new CannotKnow("what the pnpm agent at " + Js.string(agent) + " resolves");
+        throw new CannotKnow("what the " + (pnpr ? "pnpr server" : "pnpm agent") + " at " + Js.string(server) +
+                             " resolves");
     }
 
     /**

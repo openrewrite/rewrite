@@ -25,6 +25,7 @@ import com.fasterxml.jackson.databind.json.JsonMapper;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.javascript.internal.lock.CannotKnow;
 import org.openrewrite.javascript.internal.lock.EcmaScript.JsonSyntaxError;
+import org.openrewrite.javascript.internal.lock.JsError;
 import org.openrewrite.javascript.internal.lock.JsYaml;
 import org.openrewrite.javascript.internal.lock.StripBom;
 
@@ -91,6 +92,22 @@ final class Manifests {
             throw new CannotKnow("what pnpm makes of " + path + " (JSON5, but not an object)");
         }
         return convertManifestAfterRead((Map<String, @Nullable Object>) value);
+    }
+
+    /**
+     * project-manifest-reader's createManifestWriter, which normalizes the manifest it read for every project and
+     * {@code file:} directory: from 11.3.0 a dependency field of {@code null} is read as any other value
+     * ({@link PnpmRelease#readsANullDependencyField}); before, {@code Object.keys(null)} throws.
+     */
+    static Map<String, @Nullable Object> normalizedForTheWriter(Map<String, @Nullable Object> manifest,
+                                                                PnpmRelease release) {
+        for (String key : new String[]{"dependencies", "devDependencies", "optionalDependencies",
+                "peerDependencies"}) {
+            if (manifest.containsKey(key) && manifest.get(key) == null && !release.readsANullDependencyField()) {
+                throw new JsError(JsError.TYPE_ERROR, "Cannot convert undefined or null to object");
+            }
+        }
+        return manifest;
     }
 
     static Map<String, @Nullable Object> convertManifestAfterRead(Map<String, @Nullable Object> manifest) {

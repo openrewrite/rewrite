@@ -446,6 +446,10 @@ public final class PnpmOptions {
                 continue;
             }
             if (!(version instanceof String)) {
+                // from 11.4.0 semver.validRange swallows the TypeError and the runtime is skipped
+                if (release.skipsAnInvalidNodeRuntimeRange()) {
+                    continue;
+                }
                 throw new JsError(JsError.ERROR, "range.trim is not a function");
             }
             String range = (String) version;

@@ -146,8 +146,8 @@ final class InstallDeps {
         if (text == null) {
             return null;
         }
-        Map<String, @Nullable Object> manifest = Manifests.readProjectManifest(text,
-                RootRelativePath.join(dir, "package.json"));
+        Map<String, @Nullable Object> manifest = Manifests.normalizedForTheWriter(
+                Manifests.readProjectManifest(text, RootRelativePath.join(dir, "package.json")), opts.getRelease());
         PackageIsInstallable.projectIsInstallable(".", manifest, opts.isTrue("engineStrict"),
                 opts.getNodeVersion(), opts.get("supportedArchitectures"), inputs.getHost(), opts.getRelease());
         return new Verification.Project(dir, ".", manifest);
@@ -192,7 +192,7 @@ final class InstallDeps {
 
     private static void handleResolutionPolicyViolations(PnpmOptions opts,
                                                          List<ResolveDependencies.PolicyViolation> violations) {
-        if (violations.isEmpty() || !opts.isTrue("minimumReleaseAgeStrict")) {
+        if (violations.isEmpty()) {
             return;
         }
         List<ResolveDependencies.PolicyViolation> immature = new ArrayList<>();
@@ -205,6 +205,20 @@ final class InstallDeps {
             return;
         }
         immature.sort((a, b) -> (a.getName() + "@" + a.getVersion()).compareTo(b.getName() + "@" + b.getVersion()));
+        if (!opts.isTrue("minimumReleaseAgeStrict")) {
+            // loose mode: from 11.1.3 policyHandlers' pickManifestUpdates adds each immature pick to
+            // pnpm-workspace.yaml's minimumReleaseAgeExclude beside the lock (PnpmRelease#checksTheReleaseAgeAsAPolicy),
+            // a file the regeneration does not write
+            if (!Boolean.FALSE.equals(opts.get("save")) && opts.getRelease().checksTheReleaseAgeAsAPolicy()) {
+                List<String> picks = new ArrayList<>();
+                for (ResolveDependencies.PolicyViolation v : immature) {
+                    picks.add(v.getName() + "@" + v.getVersion());
+                }
+                throw new CannotKnow("the pnpm-workspace.yaml pnpm writes beside the lock, whose " +
+                                     "minimumReleaseAgeExclude takes " + String.join(", ", picks));
+            }
+            return;
+        }
         StringBuilder list = new StringBuilder();
         for (ResolveDependencies.PolicyViolation v : immature) {
             if (list.length() > 0) {
