@@ -598,7 +598,9 @@ public class Node {
     }
 
     public boolean isDescendantOf(Node node) {
-        for (Node p = this; p != null; p = p.getResolveParent()) {
+        // before npm 7.20.0, through parents only
+        boolean throughResolveParents = release.descendsThroughResolveParents();
+        for (Node p = this; p != null; p = throughResolveParents ? p.getResolveParent() : p.parent) {
             if (p == node) {
                 return true;
             }
@@ -920,7 +922,9 @@ public class Node {
             }
         }
 
-        if (isLink() && target != null && getTarget() == null && root != this) {
+        // before npm 7.8.0 a link taken out of the tree takes its target out with it
+        if (isLink() && target != null && getTarget() == null &&
+            (root != this || !release.keepsTargetOfDetachedLink())) {
             target.setRoot(root);
         }
 
@@ -947,6 +951,48 @@ public class Node {
     void loadDeps() {
         Object pd = pkg.get("peerDependencies");
         Object ad = truthy(pkg.get("acceptDependencies")) ? pkg.get("acceptDependencies") : Collections.emptyMap();
+        if (!release.loadsPeerDepsFirst()) {
+            loadDepsKeepingEarlierEdges(pd, ad);
+            return;
+        }
+        loadPeerDeps(pd, ad, true);
+
+        loadDepType(pkg.get("dependencies"), Edge.Type.PROD, ad, true);
+        loadDepType(pkg.get("optionalDependencies"), Edge.Type.OPTIONAL, ad, true);
+
+        boolean thisDev = isTop() && path != null;
+        boolean srcDev = sourceReference == null || (sourceReference.isTop() && sourceReference.getPath() != null);
+        if (thisDev && srcDev) {
+            loadDepType(pkg.get("devDependencies"), Edge.Type.DEV, ad, true);
+        }
+    }
+
+    // [_loadDeps] before npm 7.12.0: optional dependencies first, and an edge of a name already loaded kept
+    private void loadDepsKeepingEarlierEdges(@Nullable Object pd, Object ad) {
+        loadDepType(pkg.get("optionalDependencies"), Edge.Type.OPTIONAL, ad, false);
+        if (!release.loadsProdDepsLast()) {
+            loadDepType(pkg.get("dependencies"), Edge.Type.PROD, ad, false);
+        }
+
+        // before npm 7.1.1 a virtual root loads its source's devDependencies as any top; then none until 7.5.1
+        boolean srcDev = release.loadsDevDepsOfTopSources() ?
+                sourceReference == null || sourceReference.isTop() && sourceReference.getPath() != null :
+                sourceReference == null || !release.skipsDevDepsOfVirtualRoots();
+        boolean loadsDev = isTop() && path != null && srcDev;
+        if (loadsDev && release.loadsDevDepsBeforePeerDeps()) {
+            loadDepType(pkg.get("devDependencies"), Edge.Type.DEV, ad, false);
+        }
+        loadPeerDeps(pd, ad, false);
+        if (loadsDev && !release.loadsDevDepsBeforePeerDeps()) {
+            loadDepType(pkg.get("devDependencies"), Edge.Type.DEV, ad, false);
+        }
+
+        if (release.loadsProdDepsLast()) {
+            loadDepType(pkg.get("dependencies"), Edge.Type.PROD, ad, false);
+        }
+    }
+
+    private void loadPeerDeps(@Nullable Object pd, Object ad, boolean replaces) {
         if ((pd instanceof Map || pd instanceof List) && !legacyPeerDeps) {
             Object pm = pkg.get("peerDependenciesMeta");
             if (!truthy(pm)) {
@@ -966,24 +1012,21 @@ public class Node {
                     peerDependencies.put(dep.getKey(), dep.getValue());
                 }
             }
-            loadDepType(peerDependencies, Edge.Type.PEER, ad);
-            loadDepType(peerOptional, Edge.Type.PEER_OPTIONAL, ad);
-        }
-
-        loadDepType(pkg.get("dependencies"), Edge.Type.PROD, ad);
-        loadDepType(pkg.get("optionalDependencies"), Edge.Type.OPTIONAL, ad);
-
-        boolean thisDev = isTop() && path != null;
-        boolean srcDev = sourceReference == null || (sourceReference.isTop() && sourceReference.getPath() != null);
-        if (thisDev && srcDev) {
-            loadDepType(pkg.get("devDependencies"), Edge.Type.DEV, ad);
+            loadDepType(peerDependencies, Edge.Type.PEER, ad, replaces);
+            loadDepType(peerOptional, Edge.Type.PEER_OPTIONAL, ad, replaces);
         }
     }
 
-    private void loadDepType(@Nullable Object deps, Edge.Type type, Object ad) {
+    /**
+     * @param replaces whether an edge replaces an earlier one of its name that is no workspace's, as from npm 7.12.0;
+     *                 before, the earlier one is kept, but a dev edge a prod one replaces from npm 7.5.5.
+     */
+    private void loadDepType(@Nullable Object deps, Edge.Type type, Object ad, boolean replaces) {
         for (Map.Entry<String, Object> dep : Js.entries(truthy(deps) ? deps : Collections.emptyMap())) {
             Edge current = edgesOut.get(dep.getKey());
-            if (current == null || current.getType() != Edge.Type.WORKSPACE) {
+            boolean create = replaces ? current == null || current.getType() != Edge.Type.WORKSPACE :
+                    current == null || release.loadsProdDepsLast() && current.isDev() && type == Edge.Type.PROD;
+            if (create) {
                 if (!(dep.getValue() instanceof String)) {
                     throw new IllegalArgumentException("must provide string spec");
                 }
@@ -1063,7 +1106,7 @@ public class Node {
         if (!Objects.equals(node.name, name)) {
             return false;
         }
-        if (!Js.strictEquals(node.getPackageName(), getPackageName())) {
+        if (release.comparesPackageNamesToReplace() && !Js.strictEquals(node.getPackageName(), getPackageName())) {
             return false;
         }
 
@@ -1119,7 +1162,11 @@ public class Node {
             return false;
         }
 
-        if (getResolveParent() == null || getResolveParent().getResolveParent() == null) {
+        // before npm 7.14.0, this.parent.parent
+        boolean fromResolveParents = release.dedupesFromResolveParents();
+        Node up = fromResolveParents ? getResolveParent() : parent;
+        Node upper = up == null ? null : fromResolveParents ? up.getResolveParent() : up.parent;
+        if (up == null || upper == null) {
             return false;
         }
 
@@ -1127,7 +1174,7 @@ public class Node {
             return true;
         }
 
-        Node other = getResolveParent().getResolveParent().resolve(name);
+        Node other = upper.resolve(name);
 
         if (other == null) {
             return false;

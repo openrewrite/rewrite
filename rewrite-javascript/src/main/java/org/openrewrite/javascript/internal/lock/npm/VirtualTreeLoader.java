@@ -242,7 +242,9 @@ public final class VirtualTreeLoader {
 
     @SuppressWarnings("unchecked")
     private void loadFromShrinkwrap(Shrinkwrap s, Node root) {
-        if (rootOptionProvided == null) {
+        // before npm 7.5.4 a root the caller provides is treated as any other
+        boolean suspectsProvidedRoot = options.getRelease().suspectsFlagsUnderProvidedRoot();
+        if (rootOptionProvided == null || !suspectsProvidedRoot) {
             root.unsetDepFlags();
         } else {
             flagsSuspect = true;
@@ -267,10 +269,18 @@ public final class VirtualTreeLoader {
             }
         }
         resolveLinks(links, nodes);
-        if (!(Js.toNumber(s.getOriginalLockfileVersion()) >= 2)) {
+        if (!options.getRelease().assignsBundlesOfOldLocksOnly()) {
+            assignEveryBundle(nodes);
+        } else if (!(Js.toNumber(s.getOriginalLockfileVersion()) >= 2)) {
             assignBundles(nodes);
         }
-        if (flagsSuspect) {
+        if (flagsSuspect && !suspectsProvidedRoot) {
+            // [reCalcDepFlags] before npm 7.5.4: every node of the tree, the root's flags calculated again too
+            for (Node node : Objects.requireNonNull(virtualTree).getInventory().values()) {
+                node.resetDepFlags();
+            }
+            DepFlags.calcDepFlags(virtualTree, true);
+        } else if (flagsSuspect) {
             for (Node node : nodes.values()) {
                 if (node.isRoot() || node == rootOptionProvided) {
                     continue;
@@ -372,7 +382,14 @@ public final class VirtualTreeLoader {
             nodes.put(location, link);
             nodes.put(targetLoc, Objects.requireNonNull(link.getTarget()));
 
-            if (link.getTarget().getParent() == null) {
+            // before npm 7.0.9 only a lock older than version 2 has its link targets' package.json read; before 7.1.1
+            // a target in node_modules has it read too
+            Shrinkwrap lock = Objects.requireNonNull(Objects.requireNonNull(virtualTree).getMeta());
+            boolean readsTarget = options.getRelease().readsLinkTargetPackages() ||
+                                  lock.isLoadedFromDisk() && !(Js.toNumber(lock.getOriginalLockfileVersion()) >= 2);
+            boolean outsideNodeModules = link.getTarget().getParent() == null ||
+                                         !options.getRelease().readsPackagesOfTopLinkTargetsOnly();
+            if (outsideNodeModules && readsTarget) {
                 if (!options.getRelease().guardsLinkTargetPackage()) {
                     // rpj(pj).catch(() => null): only the read is guarded, and assigning the package may throw
                     PackageJson manifest = null;
@@ -423,6 +440,35 @@ public final class VirtualTreeLoader {
                     list.add(node.getName());
                     ppkg.put("bundleDependencies", list);
                 } else {
+                    ((List<Object>) bundleDependencies).add(node.getName());
+                }
+            }
+        }
+    }
+
+    // [assignBundles] before npm 7.11.0: for a lock of any version, and every flagged child, once; before 7.1.1
+    // ([assignParentage] of arborist 1), only a child its parent depends on
+    @SuppressWarnings("unchecked")
+    private void assignEveryBundle(Map<String, Node> nodes) {
+        for (Map.Entry<String, Node> entry : nodes.entrySet()) {
+            String location = entry.getKey();
+            Node node = entry.getValue();
+            if (location.isEmpty()) {
+                continue;
+            }
+            Node parent = node.getParent();
+            if (parent == null) {
+                continue;
+            }
+            Map<String, Object> ppkg = parent.getPackage();
+            if (truthy(node.getPackage().get("inBundle")) && !truthy(ppkg.get("inBundle")) &&
+                (options.getRelease().bundlesChildrenWithoutEdges() || parent.getEdgesOut().has(node.getName()))) {
+                Object bundleDependencies = ppkg.get("bundleDependencies");
+                if (!truthy(bundleDependencies)) {
+                    List<Object> list = new ArrayList<>();
+                    list.add(node.getName());
+                    ppkg.put("bundleDependencies", list);
+                } else if (!((List<Object>) bundleDependencies).contains(node.getName())) {
                     ((List<Object>) bundleDependencies).add(node.getName());
                 }
             }

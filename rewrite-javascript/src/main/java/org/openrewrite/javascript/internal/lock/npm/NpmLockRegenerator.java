@@ -168,6 +168,7 @@ public final class NpmLockRegenerator {
         String path;
         String written;
         String yarnLock;
+        Map<String, String> manifestsAgain;
         try {
             INSTALL.requireInstallsAt(NpmOptions.loadLocalPrefix(inputs.getRelease(),
                     inputs.getManifests().get(inputs.getRunsIn()), inputs.getParentTrees()), inputs.getRunsIn(),
@@ -205,13 +206,15 @@ public final class NpmLockRegenerator {
             }
             written = saveIdealTree(arb, options);
             yarnLock = Objects.requireNonNull(arb.buildIdealTree().getMeta()).yarnLockText();
+            manifestsAgain = manifestsAfterSave(arb);
         } catch (NodeRegistryException e) {
             throw e;
         } catch (RuntimeException e) {
             return Result.failure(failure(e));
         }
         Result verified = INSTALL.verify(written, lock -> {
-            IdealTreeBuilder again = arborist(path, projectFiles(new LockFile(lock)), options);
+            IdealTreeBuilder again = arborist(path, projectFiles(new LockFile(lock), inputs.getYarnLock(),
+                    manifestsAgain).readBy(inputs.getRelease(), inputs.getPaths()), options);
             again.buildIdealTree();
             return saveIdealTree(again, options);
         }, NpmLockRegenerator::failure);
@@ -371,6 +374,25 @@ public final class NpmLockRegenerator {
         return files.build();
     }
 
+    /**
+     * The project's manifests as the install leaves them for the next one: before npm 7.14.0 every install writes the
+     * root package.json back (update-root-package-json.js). Where the host holds no root package.json, the lock's
+     * root entry stands in for it on both installs alike.
+     */
+    private Map<String, String> manifestsAfterSave(IdealTreeBuilder arb) {
+        Map<String, String> manifests = inputs.getManifests();
+        String rootJson = manifests.get("");
+        PackageJson rootManifest = arb.getRootManifest();
+        if (!inputs.getRelease().rewritesRootPackageJson() || rootJson == null || rootManifest == null) {
+            return manifests;
+        }
+        Map<String, Object> pkg = Objects.requireNonNull(arb.getIdealTree()).getPackage();
+        Map<String, String> after = new LinkedHashMap<>(manifests);
+        after.put("", UpdateRootPackageJson.updateRootPackageJson(pkg, rootJson, rootManifest.getIndent(),
+                rootManifest.getNewline(), inputs.getRelease()));
+        return after;
+    }
+
     private IdealTreeBuilder arborist(String path, VirtualTreeLoader.ProjectFiles files, NpmOptions options) {
         return new IdealTreeBuilder(path, files, options, registry, inputs.getHost(), inputs.getNow());
     }
@@ -438,7 +460,7 @@ public final class NpmLockRegenerator {
         if (e instanceof PlaceDep.CouldNotResolve) {
             PlaceDep.PeerConflict conflict = ((PlaceDep.CouldNotResolve) e).getConflict();
             return Rejected.coded(Reason.PEER_CONFLICT, conflict.getEdge().getName(), "ERESOLVE",
-                    ExplainEresolve.explain(conflict.getExplanation(), 4));
+                    ExplainEresolve.explain(conflict.getExplanation(), 4, conflict.getEdge().getRelease()));
         }
         if (e instanceof CannotKnow || e instanceof Rejected) {
             return e;

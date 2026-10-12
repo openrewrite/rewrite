@@ -1194,6 +1194,18 @@ class NodeTest {
     }
 
     @Test
+    void canDedupeReadsParentsBeforeNpm7_14_0() {
+        NpmRelease release = NpmRelease.of("7.13.0");
+        Node root = node(opts().release(release).path("/path/to/root")
+          .pkg(obj("name", "root", "version", "1.2.3", "dependencies", obj("a", "1")))
+          .child(opts().pkg(obj("name", "a", "version", "1.2.3")).build()));
+        Node top = node(opts().release(release).fsParent(root).path(root.getPath() + "/packages/top")
+          .pkg(obj("name", "top", "version", "1.2.3", "dependencies", obj("a", "1")))
+          .child(opts().pkg(obj("name", "a", "version", "1.0.0")).build()));
+        assertThat(child(top, "a").canDedupe()).as("a top in another's folder has no parent").isFalse();
+    }
+
+    @Test
     void canDedupeReturnsTrueWhenExplicitRequestIsTrueRegardlessOfOtherConditions() {
         Node root = node(opts().pkg(obj("name", "root", "version", "1.0.0")).path("/root").realpath("/root"));
         Node duplicate = node(opts().pkg(obj("name", "dup", "version", "1.0.0")).parent(root));
@@ -1247,6 +1259,17 @@ class NodeTest {
           .pkg(obj("name", "bar", "version", "1.2.3")));
         assertThat(alias.canReplace(child(root, "alias"))).as("can replace alias with a different alias to same thing")
           .isTrue();
+    }
+
+    @Test
+    void canReplaceWithComparesNoPackageNamesBeforeNpm7_20_3() {
+        NpmRelease release = NpmRelease.of("7.20.2");
+        Node root = node(opts().release(release).path("/some/path")
+          .pkg(obj("dependencies", obj("foo", "1.2.3")))
+          .child(opts().pkg(obj("name", "foo", "version", "1.2.3")).build()));
+        Node rep = node(opts().release(release).path("/some/path/node_modules/foo").name("foo")
+          .pkg(obj("name", "bar", "version", "1.2.3")));
+        assertThat(rep.canReplace(child(root, "foo"))).as("an alias can replace the actual node").isTrue();
     }
 
     @Test

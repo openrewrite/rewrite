@@ -46,7 +46,9 @@ public final class Shrinkwrap {
      * by an npm {@code release} before 12.0.0.
      */
     public static boolean readsShrinkwrap(NpmRelease release, Predicate<String> holds) {
-        return holds.test("npm-shrinkwrap.json") && release.readsNpmShrinkwrap();
+        // before npm 7.4.2 a package-lock.json beside it is read and written instead
+        return holds.test("npm-shrinkwrap.json") && release.readsNpmShrinkwrap() &&
+               (release.prefersShrinkwrapToLock() || !holds.test("package-lock.json"));
     }
 
     /**
@@ -775,10 +777,12 @@ public final class Shrinkwrap {
                                  Js.strictEquals(node.getResolved(), pathFixed);
             boolean integrityOk = !truthy(integrity) || !truthy(node.getIntegrity()) ||
                                   Js.strictEquals(node.getIntegrity(), integrity);
-            boolean versionOk = !truthy(version) || !truthy(node.getVersion()) ||
+            // before npm 7.15.1 the version the lock records at the path is not compared
+            boolean checksVersion = resolveOptions.getRelease().checksVersionOfLockedEntry();
+            boolean versionOk = !checksVersion || !truthy(version) || !truthy(node.getVersion()) ||
                                 Js.strictEquals(version, node.getVersion());
 
-            boolean allOk = (truthy(resolved) || truthy(integrity) || truthy(version)) &&
+            boolean allOk = (truthy(resolved) || truthy(integrity) || checksVersion && truthy(version)) &&
                             resolvedOk && integrityOk && versionOk;
 
             if (!allOk) {
@@ -835,8 +839,9 @@ public final class Shrinkwrap {
         }
 
         Object entryResolved = entry.get("resolved");
-        if (entryResolved instanceof String && yarnRegRe().matcher((String) entryResolved).find() &&
-            spec.isRegistry()) {
+        // before npm 7.5.6 the yarn registry's URL is taken as it is
+        if (resolveOptions.getRelease().rewritesYarnRegistryOfEdgeEntries() && entryResolved instanceof String &&
+            yarnRegRe().matcher((String) entryResolved).find() && spec.isRegistry()) {
             entryResolved = yarnRegRe().matcher((String) entryResolved).replaceFirst("https://registry.npmjs.org/");
             entry.set("resolved", entryResolved);
         }
@@ -1127,7 +1132,8 @@ public final class Shrinkwrap {
                         continue;
                     }
                     String edgeSpec = v.getSpec();
-                    if (edgeSpec.startsWith("file:")) {
+                    // before npm 7.1.1 a file: spec is written as the manifest has it
+                    if (edgeSpec.startsWith("file:") && resolveOptions.getRelease().relativizesFileRequires()) {
                         String p = PosixPath.resolve(node.getRealpath(), edgeSpec.substring("file:".length()));
                         requires.put(entry.getKey(), "file:" + ConsistentResolve.escapeHash(
                                 Relpath.relpath(node.getRealpath(), p), resolveOptions.getRelease()));
@@ -1198,6 +1204,7 @@ public final class Shrinkwrap {
         Object defaultIndent = truthy(indent) ? indent : 2;
         Object indent = Boolean.TRUE.equals(format) ? defaultIndent : truthy(format) ? format : 0;
         String eol = truthy(format) ? (truthy(newline) ? newline : "\n") : "";
-        return JsonStringifyNice.stringify(data, KEY_ORDER, indent).replace("\n", eol);
+        return JsonStringifyNice.stringify(data, KEY_ORDER, indent, resolveOptions.getRelease().jsonStringifyNice())
+                .replace("\n", eol);
     }
 }

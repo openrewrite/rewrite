@@ -38,7 +38,7 @@ public class Link extends Node {
         Node target = options.getTarget();
         if (target != null) {
             setTarget(target);
-        } else if (Objects.equals(getRealpath(), getRoot().getPath())) {
+        } else if (getRelease().targetsRootItLinksTo() && Objects.equals(getRealpath(), getRoot().getPath())) {
             setTarget(getRoot());
         } else {
             setTarget(new Node(options.toBuilder()

@@ -32,6 +32,7 @@ import java.time.Instant;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.Deque;
 import java.util.HashMap;
 import java.util.IdentityHashMap;
@@ -180,6 +181,9 @@ public final class IdealTreeBuilder {
         Node dep;
     }
 
+    // where every virtual root stands before npm 7.6.3
+    private static final String VIRTUAL_ROOT = "/virtual-root";
+
     private final String path;
     private final VirtualTreeLoader.ProjectFiles files;
     private final NpmOptions options;
@@ -207,6 +211,9 @@ public final class IdealTreeBuilder {
     // something, with that replacement
     private @Nullable String replaced;
     private final Map<List<Object>, String> statesAfterReplace = new HashMap<>();
+
+    // before npm 7.20.3: build-ideal-tree.js's own placement, made when it is first asked
+    private @Nullable LegacyPlacement legacyPlacement;
 
     @Getter
     private @Nullable Node idealTree;
@@ -285,6 +292,10 @@ public final class IdealTreeBuilder {
 
         NpmRelease release = options.getRelease();
         for (Node node : tree.getInventory().values()) {
+            // before npm 7.1.1 (arborist 2.0.0) the root is not in its own inventory
+            if (node.isRoot() && !release.inventoriesRoot()) {
+                continue;
+            }
             if (!node.isOptional() && !(release.skipsEngineCheckOfOmitted() && node.shouldOmit(omitSet))) {
                 try {
                     if (!(options.getRelease().devEnginesReplaceRootEngines() && node.isRoot() &&
@@ -494,11 +505,21 @@ public final class IdealTreeBuilder {
             }
             Object resolved = node.getResolved();
             Object version = node.getVersion();
-            boolean useResolved = truthy(resolved) && (!truthy(version) || Js.string(resolved).startsWith("file:"));
-            // before npm 8.6.0, version || `file:${node.path}`
-            Object id = useResolved ? resolved :
-                    skipsLinkTargets || truthy(version) ? version : "file:" + node.getPath();
-            Spec spec = Spec.resolve(node.getName(), Js.string(id), PosixPath.dirname(node.getPath()),
+            Object id;
+            String where;
+            if (options.getRelease().inflatesFromParentDirectory()) {
+                boolean useResolved = truthy(resolved) && (!truthy(version) || Js.string(resolved).startsWith("file:"));
+                // before npm 8.6.0, version || `file:${node.path}`
+                id = useResolved ? resolved : skipsLinkTargets || truthy(version) ? version : "file:" + node.getPath();
+                where = PosixPath.dirname(node.getPath());
+            } else {
+                // before npm 7.18.0 the resolved of a node without a version, which may be none (the latest), read
+                // from the node's own path
+                boolean useResolved = !truthy(version) || truthy(resolved) && Js.string(resolved).startsWith("file:");
+                id = useResolved ? resolved : version;
+                where = node.getPath();
+            }
+            Spec spec = Spec.resolve(node.getName(), id == null ? "" : Js.string(id), where,
                     options.getRelease().npmPackageArg());
             try {
                 Pacote.Options pacoteOptions = Pacote.Options.builder()
@@ -523,7 +544,9 @@ public final class IdealTreeBuilder {
         if (options.getRelease().resetsDepFlagsOfInflatedLock()) {
             DepFlags.resetDepFlags(tree);
         }
-        DepFlags.calcDepFlags(tree);
+        if (options.getRelease().recalculatesFlagsOfInflatedLock()) {
+            DepFlags.calcDepFlags(tree);
+        }
 
         if (options.getLockfileVersion() == null) {
             meta.setOriginalLockfileVersion(options.getRelease().defaultLockfileVersion());
@@ -616,7 +639,32 @@ public final class IdealTreeBuilder {
             tasks.sort((a, b) -> LocaleCompare.en(a.getEdge().getName(), b.getEdge().getName()));
 
             List<Runnable> promises = new ArrayList<>();
-            if (options.getRelease().placesWholeStepBeforeVisiting()) {
+            if (!options.getRelease().placesWithPlaceDep()) {
+                // tasks.sort(...).map(({ edge, dep }) => this[_placeDep](dep, node, edge)), each placing its peers as
+                // it goes; then every node placed is queued and its problem edges' manifests fetched
+                List<List<Node>> placed = new ArrayList<>();
+                for (Task task : tasks) {
+                    placed.add(legacyPlacement().placeDep(task.getDep(), node, task.getEdge(), null,
+                            Collections.emptyList()));
+                }
+                for (List<Node> set : placed) {
+                    for (Node p : set) {
+                        mutateTree = true;
+                        depsQueue.push(p);
+                        String from = FromPath.fromPath(p, null);
+                        for (Edge e : problemEdges(p)) {
+                            Spec spec = Spec.resolve(e.getName(), e.getSpec(), from,
+                                    options.getRelease().npmPackageArg());
+                            promises.add(() -> {
+                                try {
+                                    fetchManifest(spec, null, null);
+                                } catch (RuntimeException ignored) {
+                                }
+                            });
+                        }
+                    }
+                }
+            } else if (options.getRelease().placesWholeStepBeforeVisiting()) {
                 // tasks.sort(...).map(({ edge, dep }) => new PlaceDep(...)), then the visits
                 List<PlaceDep> placeDeps = new ArrayList<>();
                 for (Task task : tasks) {
@@ -635,9 +683,13 @@ public final class IdealTreeBuilder {
                 }
             }
 
-            for (Edge edge : node.getEdgesOut().values()) {
+            // before npm 7.0.9 only the links the build makes are resolved
+            for (Edge edge : options.getRelease().resolvesLinksOfDependencies() ? node.getEdgesOut().values() :
+                    Collections.<Edge>emptyList()) {
                 Node to = edge.getTo();
-                if (to != null && to.isLink() && to.getTarget() != null) {
+                // before npm 7.20.0 a link that lost its target is queued too
+                if (to != null && to.isLink() &&
+                    (to.getTarget() != null || !options.getRelease().readsExternalLinksByTarget())) {
                     linkNodes.add(to);
                 }
             }
@@ -646,6 +698,14 @@ public final class IdealTreeBuilder {
                 prefetch.run();
             }
         }
+    }
+
+    private LegacyPlacement legacyPlacement() {
+        if (legacyPlacement == null) {
+            legacyPlacement = new LegacyPlacement(Objects.requireNonNull(idealTree), options, depsQueue::push,
+                    depsSeen, loadFailures, peerSetSource, virtualRoots, warnings);
+        }
+        return legacyPlacement;
     }
 
     // treeverse's depth with a visit only: a stack, so the children of a placement are visited last first
@@ -766,7 +826,9 @@ public final class IdealTreeBuilder {
             // here, under the dependent, or under its resolve parent for a peer
             Node realParent = edge.isPeer() ? from.getResolveParent() : from;
             for (Node p = from.getResolveParent(); p != null; p = p.getResolveParent()) {
-                if (p.matches(node) && !p.isTop()) {
+                // before npm 7.5.0 only the root is passed over, not every top
+                boolean passedOver = options.getRelease().passesOverTopsInNestingLoops() ? p.isTop() : p.isRoot();
+                if (p.matches(node) && !passedOver) {
                     return new Link(Node.options().release(options.getRelease()).parent(realParent).target(p).build());
                 }
             }
@@ -783,16 +845,18 @@ public final class IdealTreeBuilder {
             return virtualRoots.get(node);
         }
 
+        // before npm 7.6.3 every virtual root stands at /virtual-root, with no copies of link targets
+        boolean atSourcePath = options.getRelease().placesVirtualRootAtSourcePath();
         Node vr = new Node(Node.options()
                 .release(options.getRelease())
-                .path(node.getRealpath())
+                .path(atSourcePath ? node.getRealpath() : VIRTUAL_ROOT)
                 .sourceReference(node)
                 .installLinks(options.isInstallLinks())
                 .legacyPeerDeps(options.isLegacyPeerDeps())
                 .overrides(node.getOverrides())
                 .build());
 
-        for (Node child : node.getChildren().values()) {
+        for (Node child : atSourcePath ? node.getChildren().values() : Collections.<Node>emptyList()) {
             if (child.isLink()) {
                 new Node(Node.options()
                         .release(options.getRelease())
@@ -808,7 +872,9 @@ public final class IdealTreeBuilder {
     }
 
     private List<Edge> problemEdges(Node node) {
-        Object bd = node.isProjectRoot() || node.isWorkspace() ? null : node.getPackage().get("bundleDependencies");
+        // before npm 7.14.0 a workspace's bundle is left to it
+        Object bd = node.isProjectRoot() || node.isWorkspace() && options.getRelease().buildsWhatWorkspacesBundle() ?
+                null : node.getPackage().get("bundleDependencies");
         Set<Object> bundled = new LinkedHashSet<>();
         if (bd instanceof List) {
             bundled.addAll((List<?>) bd);
@@ -1042,6 +1108,12 @@ public final class IdealTreeBuilder {
 
     // PackageJson.normalize(realpath).catch(() => ({ content: {} })) over the project's files
     private Map<String, Object> directoryManifest(String realpath, Spec spec) {
+        if (!options.getRelease().placesVirtualRootAtSourcePath() &&
+            (VIRTUAL_ROOT.equals(realpath) || realpath.startsWith(VIRTUAL_ROOT + "/"))) {
+            // a directory spec of a node in a virtual root, which stands at /virtual-root before npm 7.6.3: npm
+            // reads a package.json under that made-up path, which fails, and the link takes an empty package
+            return new LinkedHashMap<>();
+        }
         String location = Relpath.relpath(Objects.requireNonNull(idealTree).getRealpath(), realpath);
         PackageJson manifest;
         try {
@@ -1058,9 +1130,12 @@ public final class IdealTreeBuilder {
     }
 
     private Node loadPeerSet(Node node, Set<Node> required) {
+        // before npm 7.5.0 only a non-optional peer edge that is invalid
+        boolean loadsOptionalPeers = options.getRelease().loadsOptionalPeersIntoPeerSets();
         List<Edge> peerEdges = new ArrayList<>();
         for (Edge e : node.getEdgesOut().values()) {
-            if (e.isPeer() && !(e.isValid() && e.getTo() != null)) {
+            if (loadsOptionalPeers ? e.isPeer() && !(e.isValid() && e.getTo() != null) :
+                    e.isPeer() && !e.isValid() && !e.isOptional()) {
                 peerEdges.add(e);
             }
         }
@@ -1071,7 +1146,7 @@ public final class IdealTreeBuilder {
             if (nodeParent == null && options.getRelease().stopsPeerSetOfDetachedNode()) {
                 break;
             }
-            if (edge.isValid() && edge.getTo() != null) {
+            if (edge.isValid() && (edge.getTo() != null || !loadsOptionalPeers)) {
                 continue;
             }
             if (nodeParent == null) {
@@ -1095,14 +1170,19 @@ public final class IdealTreeBuilder {
                     nodeFromEdge(edge, nodeParent, null, required);
                     continue;
                 } else {
-                    Node dep = nodeFromEdge(parentEdge, nodeParent, edge, required);
+                    // before npm 7.5.0 the parent's edge alone, with no second node by the peer's own spec
+                    Node dep = nodeFromEdge(parentEdge, nodeParent,
+                            options.getRelease().triesPeerSpecForParentEdge() ? edge : null, required);
 
                     if (edge.isValid()) {
                         continue;
                     }
 
-                    if (conflictOK || !required.contains(dep)) {
-                        edge.setPeerConflicted(true);
+                    // before npm 7.5.4 a conflict stands only where it is forced or not the project's
+                    if (conflictOK || !required.contains(dep) && options.getRelease().letsUnrequiredPeersConflict()) {
+                        if (options.getRelease().marksPeerConflictsOfLoadedPeerSet()) {
+                            edge.setPeerConflicted(true);
+                        }
                         continue;
                     }
 
@@ -1115,13 +1195,17 @@ public final class IdealTreeBuilder {
             }
 
             Node current = edge.getTo();
-            Node dep = nodeFromEdge(edge, null, null, required);
-            if (dep.canReplace(current)) {
-                nodeFromEdge(edge, nodeParent, null, required);
-                continue;
+            if (options.getRelease().replacesPeerWithReplacement()) {
+                Node dep = nodeFromEdge(edge, null, null, required);
+                if (dep.canReplace(current)) {
+                    nodeFromEdge(edge, nodeParent, null, required);
+                    continue;
+                }
             }
 
-            if (conflictOK || !required.contains(edge.getFrom())) {
+            // before npm 7.5.5 a conflict stands only where it is forced or not the project's
+            if (conflictOK || !required.contains(edge.getFrom()) &&
+                              options.getRelease().letsUnrequiredDependentsConflict()) {
                 continue;
             }
 
@@ -1131,6 +1215,10 @@ public final class IdealTreeBuilder {
     }
 
     private PlaceDep.CouldNotResolve failPeerConflict(Edge edge, @Nullable Edge currentEdge) {
+        if (!options.getRelease().placesWithPlaceDep()) {
+            // explained with the last peer conflict the placement found where the edge resolves to nothing
+            return legacyPlacement().failPeerConflict(edge, currentEdge);
+        }
         Node node = Objects.requireNonNull(edge.getFrom());
         Node curNode = node.resolve(edge.getName());
         if (curNode == null) {
@@ -1156,11 +1244,24 @@ public final class IdealTreeBuilder {
                 continue;
             }
 
-            Node target = Objects.requireNonNull(link.getTarget());
-            boolean external = !target.isDescendantOf(Objects.requireNonNull(tree.getTarget()));
+            Node target = link.getTarget();
+            boolean external;
+            if (options.getRelease().readsExternalLinksByTarget()) {
+                if (target == null) {
+                    throw new IllegalArgumentException("Cannot read properties of null (reading 'isDescendantOf')");
+                }
+                external = !target.isDescendantOf(Objects.requireNonNull(tree.getTarget()));
+            } else {
+                // /^\.\.(\/|$)/.test(relpath(this.path, link.realpath))
+                String loc = Relpath.relpath(path, link.getRealpath());
+                external = loc.equals("..") || loc.startsWith("../");
+            }
 
             if (external) {
                 continue;
+            }
+            if (target == null) {
+                throw new IllegalArgumentException("Cannot read properties of null (reading 'parent')");
             }
 
             boolean unseenLink = (target.getParent() != null || target.getFsParent() != null) &&

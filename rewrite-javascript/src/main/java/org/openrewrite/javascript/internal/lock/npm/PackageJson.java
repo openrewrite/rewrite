@@ -115,19 +115,25 @@ public final class PackageJson {
         }
         // an array has none of the properties the steps read, so it normalizes to an empty manifest
         Map<String, Object> data = value instanceof Map ? (Map<String, Object>) value : new LinkedHashMap<>();
+        // read-package-json-fast keeps the _ fields of a file before npm 7.5.6 (2.0.2)
+        List<String> steps = new ArrayList<>(NORMALIZE_STEPS);
+        if (!release.stripsUnderscoreFieldsOfFiles()) {
+            steps.remove("_attributes");
+        }
         Object directories = data.get("directories");
         Object binDir = directories instanceof Map ? ((Map<?, ?>) directories).get("bin") : null;
-        if (truthy(binDir) && !truthy(data.get("bin"))) {
+        // read-package-json-fast reads no directories.bin before npm 7.20.1 (2.0.3)
+        if (truthy(binDir) && !truthy(data.get("bin")) && release.readsBinDirectoryOfFiles()) {
             if (!(binDir instanceof String)) {
                 throw new FieldError("directories.bin", "ref.replace is not a function");
             }
             data.remove("bin");
             throw new NeedsPackageFiles("\"directories\": {\"bin\": " + Js.quote((String) binDir) +
                                         "} names the package's files, which are not known",
-                    syncSteps(data, NORMALIZE_STEPS, release));
+                    syncSteps(data, steps, release));
         }
         normalizeBin(data);
-        syncSteps(data, NORMALIZE_STEPS, release);
+        syncSteps(data, steps, release);
         return new PackageJson(data, parsed.getIndent(), parsed.getNewline());
     }
 
@@ -189,7 +195,21 @@ public final class PackageJson {
 
         Object dependencies = data.get("dependencies");
         Object optionalDependencies = data.get("optionalDependencies");
-        if (truthy(dependencies) && (optionalDependencies instanceof Map || optionalDependencies instanceof List)) {
+        if (release.foldsOptionalDependencies()) {
+            // read-package-json-fast 1.2.1's foldinOptionalDeps: the optional dependencies are listed as dependencies too
+            if (optionalDependencies instanceof Map || optionalDependencies instanceof List) {
+                if (!truthy(dependencies)) {
+                    dependencies = new LinkedHashMap<String, Object>();
+                    data.put("dependencies", dependencies);
+                }
+                for (Map.Entry<String, Object> optional : Js.entries(optionalDependencies)) {
+                    if (dependencies instanceof Map && !"__proto__".equals(optional.getKey())) {
+                        ((Map<String, Object>) dependencies).put(optional.getKey(), optional.getValue());
+                    }
+                }
+            }
+        } else if (truthy(dependencies) &&
+                   (optionalDependencies instanceof Map || optionalDependencies instanceof List)) {
             for (String optional : Js.keys(optionalDependencies)) {
                 Js.deleteSloppy(dependencies, optional);
             }

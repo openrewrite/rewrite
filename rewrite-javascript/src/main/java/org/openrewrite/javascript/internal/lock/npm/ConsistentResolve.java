@@ -79,7 +79,10 @@ final class ConsistentResolve {
         }
         GitHost hosted = spec.getHosted();
         if (hosted != null) {
-            return "git+" + (hosted.getAuth() != null && !hosted.getAuth().isEmpty() ||
+            // before npm 7.4.3 every hosted git URL resolves to ssh, credentials or not
+            boolean withAuth = hosted.getAuth() != null && !hosted.getAuth().isEmpty() &&
+                               release.keepsHttpsOfHostedGitWithAuth();
+            return "git+" + (withAuth ||
                              "https".equals(hosted.getDefaultRepresentation()) && release.keepsHostedGitHttps() ?
                     hosted.https(HOSTED_OPT) : hosted.sshurl(HOSTED_OPT));
         }

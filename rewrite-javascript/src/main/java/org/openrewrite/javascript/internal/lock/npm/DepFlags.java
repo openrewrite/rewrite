@@ -207,7 +207,9 @@ public final class DepFlags {
                 continue;
             }
             Node visited = calcDepFlagsStep(node);
-            for (Edge edge : visited.getEdgesOut().values()) {
+            // before npm 7.5.4 the children are those of the node visited: a link has none
+            Node parent = node.getRelease().walksDepsOfLinkTargets() ? visited : node;
+            for (Edge edge : parent.getEdgesOut().values()) {
                 if (edge.getTo() != null) {
                     stack.push(edge.getTo());
                 }
@@ -217,11 +219,14 @@ public final class DepFlags {
 
     private static Node calcDepFlagsStep(Node node) {
         node.setExtraneous(false);
-        resetParents(node, Flag.EXTRANEOUS);
-        resetParents(node, Flag.DEV);
-        resetParents(node, Flag.PEER);
-        resetParents(node, Flag.DEV_OPTIONAL);
-        resetParents(node, Flag.OPTIONAL);
+        boolean resetsParents = node.getRelease().resetsFlagsOfParents();
+        if (resetsParents) {
+            resetParents(node, Flag.EXTRANEOUS);
+            resetParents(node, Flag.DEV);
+            resetParents(node, Flag.PEER);
+            resetParents(node, Flag.DEV_OPTIONAL);
+            resetParents(node, Flag.OPTIONAL);
+        }
 
         if (node.isLink()) {
             Node target = node.getTarget();
@@ -235,7 +240,12 @@ public final class DepFlags {
             target.setOptional(node.isOptional());
             target.setDevOptional(node.isDevOptional());
             target.setPeer(node.isPeer());
-            return calcDepFlagsStep(target);
+            if (resetsParents) {
+                return calcDepFlagsStep(target);
+            }
+            // before npm 7.18.0 the target's edges are walked in the link's own step
+            target.setExtraneous(false);
+            node = target;
         }
 
         boolean marksPeers = node.getRelease().marksPeerEdgeTargetsPeer();
