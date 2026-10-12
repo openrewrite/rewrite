@@ -376,7 +376,7 @@ final class Package {
         }
 
         if (features.isMain) {
-            lockfile.overrides.parseAppend(lockfile, this, json);
+            lockfile.overrides.parseAppend(lockfile, this, json, workspaceNames, manifests);
             boolean foundAnyCatalogOrCatalogObject = false;
             boolean hasWorkspaces = false;
             Json.Expr workspacesExpr = json.get("workspaces");

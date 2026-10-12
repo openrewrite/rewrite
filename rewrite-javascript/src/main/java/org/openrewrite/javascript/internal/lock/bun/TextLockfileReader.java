@@ -74,6 +74,51 @@ final class TextLockfileReader {
                 error, message);
     }
 
+    /**
+     * A row of the overrides from 1.4.0, at every lockfile version: a string is the plain rule of its key, an object
+     * the rules of its key's group, {@code "."} the key's own and every other key a child scoped to it.
+     */
+    private void readOverrideRow(String nameStr, Json.Expr value) {
+        BunRelease release = options.getRelease();
+        String versionStr = value.asString();
+        if (versionStr != null) {
+            if (!lockfile.overrides.putLockfileRule(null, new OverrideSelector.PackageSelector(nameStr, ""),
+                    versionStr, release)) {
+                throw error("InvalidOverridesObject", "Invalid override version");
+            }
+            return;
+        }
+        if (!value.isObject()) {
+            throw error("InvalidOverridesObject", "Expected a string or an object");
+        }
+        OverrideSelector.PackageSelector parent;
+        try {
+            parent = OverrideSelector.parsePackageSegment(nameStr);
+        } catch (OverrideSelector.Invalid e) {
+            throw error("InvalidOverridesObject", "Invalid override key");
+        }
+        for (Json.Property child : value.properties()) {
+            String childKey = child.key.asString();
+            String childValue = child.value.asString();
+            if (childValue == null) {
+                throw error("InvalidOverridesObject", "Expected a string");
+            }
+            OverrideSelector.PackageSelector ruleParent = null;
+            OverrideSelector.PackageSelector ruleTarget = parent;
+            if (!".".equals(childKey)) {
+                try {
+                    ruleTarget = OverrideSelector.parsePackageSegment(childKey);
+                } catch (OverrideSelector.Invalid e) {
+                    throw error("InvalidOverridesObject", "Invalid override key");
+                }
+                ruleParent = parent;
+            }
+            if (!lockfile.overrides.putLockfileRule(ruleParent, ruleTarget, childValue, release)) {
+                throw error("InvalidOverridesObject", "Invalid override version");
+            }
+        }
+    }
+
     private Lockfile parseIntoBinaryLockfile(Json.Expr root) {
         Json.Expr lockfileVersionExpr = root.get("lockfileVersion");
         if (lockfileVersionExpr == null) {
@@ -140,6 +185,10 @@ final class TextLockfileReader {
                 String nameStr = prop.key.asString();
                 if (nameStr.isEmpty()) {
                     throw error("InvalidOverridesObject", "Expected a non-empty string");
+                }
+                if (release.readsScopedOverrides()) {
+                    readOverrideRow(nameStr, prop.value);
+                    continue;
                 }
                 if (!prop.value.isString()) {
                     throw error("InvalidOverridesObject", "Expected a string");

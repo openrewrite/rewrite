@@ -539,8 +539,8 @@ public final class BunLockRegenerator {
 
         Set<Long> allNameHashes = new LinkedHashSet<>();
         if (summary.overridesChanged) {
-            allNameHashes.addAll(managerLockfile.overrides.map.keySet());
-            allNameHashes.addAll(lockfile.overrides.map.keySet());
+            managerLockfile.overrides.appendOverriddenNameHashes(allNameHashes);
+            lockfile.overrides.appendOverriddenNameHashes(allNameHashes);
         }
 
         managerLockfile.overrides = lockfile.overrides.cloneMap(lockfile.release);
@@ -577,10 +577,14 @@ public final class BunLockRegenerator {
             }
         }
         if (summary.catalogsChanged) {
+            Set<Long> catalogOverridden = new HashSet<>();
+            if (manager.options.getRelease().reresolvesCatalogValuedOverrides()) {
+                managerLockfile.overrides.appendCatalogValuedNameHashes(catalogOverridden);
+            }
             int n = managerLockfile.dependencies.size();
             for (int i = 0; i < n; i++) {
                 Dependency dep = managerLockfile.dependencies.get(i);
-                if (dep.version.tag == DependencyVersion.Tag.CATALOG) {
+                if (dep.version.tag == DependencyVersion.Tag.CATALOG || catalogOverridden.contains(dep.nameHash)) {
                     managerLockfile.resolutions.set(i, INVALID_PACKAGE_ID);
                     manager.enqueueDependencyWithMain(i, dep, INVALID_PACKAGE_ID, false);
                 }

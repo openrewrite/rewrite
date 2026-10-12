@@ -64,22 +64,8 @@ final class PackageDiff {
         List<Integer> fromResolutions = fromLockfile.resolutionsOf(from);
         int toI = 0;
 
-        if (fromLockfile.overrides.map.size() != toLockfile.overrides.map.size()) {
-            summary.overridesChanged = true;
-        } else {
-            fromLockfile.overrides.sort();
-            toLockfile.overrides.sort();
-            Iterator<Map.Entry<Long, Dependency>> fromIt = fromLockfile.overrides.map.entrySet().iterator();
-            Iterator<Map.Entry<Long, Dependency>> toIt = toLockfile.overrides.map.entrySet().iterator();
-            while (fromIt.hasNext()) {
-                Map.Entry<Long, Dependency> f = fromIt.next();
-                Map.Entry<Long, Dependency> t = toIt.next();
-                if (!f.getKey().equals(t.getKey()) || !f.getValue().eql(t.getValue(), options.getRelease())) {
-                    summary.overridesChanged = true;
-                    break;
-                }
-            }
-        }
+        // from 1.4.0 the scoped rules count too
+        summary.overridesChanged = OverrideMap.changed(fromLockfile.overrides, toLockfile.overrides, options.getRelease());
 
         if (isRoot) {
             summary.catalogsChanged = catalogsChanged(fromLockfile.catalogs, toLockfile.catalogs, options.getRelease());

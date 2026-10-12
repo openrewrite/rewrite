@@ -451,6 +451,308 @@ class BunReleaseTest {
           .hasMessageContaining("whose .x its glob walker takes for ..");
     }
 
+    // 1.4.x: src/install/lockfile/OverrideMap.rs and override_selector.rs
+
+    // the overrides of a root manifest as the release reads them, its members by location, and what it warns of
+    private static OverrideMap overrides(String release, String manifest, java.util.Map<String, String> members,
+                                         List<String> warnings) {
+        BunOptions options = options(release, null);
+        java.util.Map<String, String> manifests = new java.util.LinkedHashMap<>(members);
+        manifests.put("", manifest);
+        Json.Expr json = Json.parse(manifest);
+        Lockfile lockfile = new Lockfile(options.getRelease());
+        Package root = new Package();
+        root.parseWithJSON(lockfile, options, new Log(), "", json, Features.MAIN, manifests);
+        Workspaces workspaces = new Workspaces(options.getRelease());
+        Json.Expr names = json.get("workspaces");
+        if (names != null) {
+            workspaces.processNamesArray(new Log(), names.items(), manifests);
+        }
+        OverrideMap overrides = new OverrideMap();
+        overrides.parseAppend(lockfile, root, json, workspaces, manifests, warnings);
+        return overrides;
+    }
+
+    private static OverrideMap overrides(String release, String manifest, List<String> warnings) {
+        return overrides(release, manifest, Collections.emptyMap(), warnings);
+    }
+
+    // a rule as the lock writes its key and value: "parent[@range]>name[@range]: value"
+    private static List<String> rules(OverrideMap overrides) {
+        List<String> out = new java.util.ArrayList<>();
+        for (Dependency dep : overrides.map.values()) {
+            out.add(dep.name + ": " + dep.version.literal);
+        }
+        for (OverrideMap.ScopedOverride rule : overrides.scoped) {
+            String parent = rule.parent == null ? "" : rule.parent.name +
+                    (rule.parent.version.literal.isEmpty() ? "" : "@" + rule.parent.version.literal) + ">";
+            String range = rule.targetRange.literal.isEmpty() ? "" : "@" + rule.targetRange.literal;
+            out.add(parent + rule.dep.name + range + ": " + rule.dep.version.literal);
+        }
+        return out;
+    }
+
+    /**
+     * OverrideMap.rs parse_from_overrides with override_selector.rs (1.4.0, bun#38333): an object's other keys are
+     * rules scoped to its key; a key is a pnpm or Yarn selector or {@code name@range}, {@code //} a comment; what is
+     * too deep, unnamed, unranged or no npm range is warned of and skipped. Before, every key is a plain rule as
+     * written, and an object counts for its {@code "."} alone.
+     */
+    @Test
+    void readsOverridesScopedToAParentOrARangeFrom140() {
+        String manifest = "{\"name\":\"p\",\"dependencies\":{\"debug\":\"2.6.9\"},\"overrides\":{" +
+                          "\"// note\":\"x\",\"foo\":\"1.0.0\",\"bar@^2\":\"2.1.0\",\"a>b\":\"5.0.0\"," +
+                          "\"debug\":{\".\":\"2.6.8\",\"ms\":\"2.1.3\",\"x>y\":\"1\",\"z\":{\"w\":\"1\"},\"v\":1}," +
+                          "\"parent@^1\":{\"child@<2\":\"1.5.0\"},\"x>y>z\":\"1.0.0\",\"@s\":\"1.0.0\"," +
+                          "\"c@\":\"1.0.0\",\"d\":\"-\",\"e\":\"\",\"i@latest\":{\"j\":\"1.0.0\"},\"k\":1," +
+                          "\"l@npm:^3\":\"3.1.0\",\"m\":\"patch:m@1.0.0#p.patch\"}}";
+        List<String> warnings = new java.util.ArrayList<>();
+        OverrideMap later = overrides("1.4.0", manifest, warnings);
+        assertThat(rules(later)).containsExactly("foo: 1.0.0", "debug: 2.6.8", "bar@^2: 2.1.0", "a>b: 5.0.0",
+          "debug>ms: 2.1.3", "parent@^1>child@<2: 1.5.0", "l@^3: 3.1.0");
+        assertThat(later.hasScoped()).isTrue();
+        assertThat(later.hasRuleForName(Wyhash11.stringHash("ms"))).isTrue();
+        assertThat(later.containsName(Wyhash11.stringHash("ms"), "ms")).isFalse();
+        assertThat(warnings).containsExactly(
+          "Bun currently only supports one level of nested \"overrides\"",
+          "Bun currently only supports one level of nested \"overrides\"",
+          "Invalid override value for \"v\"",
+          "Bun currently only supports one level of nested \"overrides\"",
+          "Invalid package name \"@s\"",
+          "Missing version range after \"c@\"",
+          "Removing \"d\" with \"-\" is not supported",
+          "Missing override value",
+          "Invalid version range \"latest\" for \"i\"",
+          "Invalid override value for \"k\"",
+          "Bun currently does not support patched package \"overrides\"");
+
+        OverrideMap earlier = overrides("1.3.14", manifest, new java.util.ArrayList<>());
+        assertThat(earlier.hasScoped()).isFalse();
+        assertThat(rules(earlier)).containsExactly("// note: x", "foo: 1.0.0", "bar@^2: 2.1.0", "a>b: 5.0.0",
+          "debug: 2.6.8", "x>y>z: 1.0.0", "@s: 1.0.0", "c@: 1.0.0", "d: -", "l@npm:^3: 3.1.0");
+    }
+
+    /**
+     * OverrideMap.rs parse_from_resolutions (1.4.0, bun#38333): a key is a Yarn path of at most one parent, a
+     * {@code **} dropped; before, a leading {@code **}{@code /} is dropped and a key with another slash skipped.
+     */
+    @Test
+    void readsResolutionsScopedToAParentFrom140() {
+        String manifest = "{\"name\":\"p\",\"resolutions\":{\"**/ms\":\"2.1.3\",\"debug/ms\":\"2.0.0\"," +
+                          "\"@s/p\":\"1.0.0\",\"a/b/c\":\"1.0.0\",\"**\":\"1.0.0\",\"@t/q/@u/r\":\"1.0.0\"," +
+                          "\"**/x/**/y\":\"1.0.0\",\"q>r\":\"1.0.0\",\"n\":{\"o\":\"1\"}}}";
+        List<String> warnings = new java.util.ArrayList<>();
+        assertThat(rules(overrides("1.4.0", manifest, warnings))).containsExactly("ms: 2.1.3", "@s/p: 1.0.0",
+          "debug>ms: 2.0.0", "@t/q>@u/r: 1.0.0", "x>y: 1.0.0", "q>r: 1.0.0");
+        assertThat(warnings).containsExactly("Bun currently only supports one level of nested \"resolutions\"",
+          "Missing resolution package name", "Invalid resolution value for \"n\"");
+        assertThat(rules(overrides("1.3.14", manifest, new java.util.ArrayList<>())))
+          .containsExactly("ms: 2.1.3", "@s/p: 1.0.0", "**: 1.0.0", "q>r: 1.0.0");
+    }
+
+    /**
+     * OverrideMap.rs parse_from_overrides (1.4.0, bun#38333): an {@code overrides} that is no object is warned of;
+     * before, it fails the install (OverrideMap.zig {@code error.Invalid}).
+     */
+    @Test
+    void anOverridesThatIsNoObjectIsWarnedOfFrom140() {
+        List<String> warnings = new java.util.ArrayList<>();
+        assertThat(overrides("1.4.0", "{\"name\":\"p\",\"overrides\":\"x\"}", warnings).isEmpty()).isTrue();
+        assertThat(warnings).containsExactly("\"overrides\" must be an object");
+        assertThatThrownBy(() -> overrides("1.3.14", "{\"name\":\"p\",\"overrides\":\"x\"}",
+          new java.util.ArrayList<>())).isInstanceOf(IllegalArgumentException.class).hasMessage("Invalid");
+    }
+
+    /**
+     * OverrideMap.rs parse_override_value (1.4.0, bun#38333): {@code "bar": "$foo"} is bar's rule of the spec the
+     * root declares for foo, else the one every workspace declares; before, the root's foo itself, which the lock
+     * writes as {@code "foo"}.
+     */
+    @Test
+    void takesAReferencedSpecForTheKeysOwnRuleFrom140() {
+        String manifest = "{\"name\":\"p\",\"workspaces\":[\"packages/a\",\"packages/b\"],\"dependencies\":" +
+                          "{\"foo\":\"^1.2.3\"},\"overrides\":{\"bar\":\"$foo\",\"y\":\"$z\",\"u\":\"$v\"," +
+                          "\"w\":\"$nowhere\"}}";
+        java.util.Map<String, String> members = new java.util.LinkedHashMap<>();
+        members.put("packages/a", "{\"name\":\"a\",\"dependencies\":{\"z\":\"^2.0.0\",\"v\":\"1\"}}");
+        members.put("packages/b", "{\"name\":\"b\",\"devDependencies\":{\"z\":\"^2.0.0\",\"v\":\"2\"}}");
+        List<String> warnings = new java.util.ArrayList<>();
+        assertThat(rules(overrides("1.4.0", manifest, members, warnings))).containsExactly("bar: ^1.2.3",
+          "y: ^2.0.0");
+        assertThat(warnings).containsExactly(
+          "Could not resolve \"$v\": workspaces declare different versions of \"v\"",
+          "Could not resolve \"$nowhere\": \"nowhere\" is not in dependencies");
+        assertThat(rules(overrides("1.3.14", manifest, members, new java.util.ArrayList<>())))
+          .containsExactly("foo: ^1.2.3");
+    }
+
+    /**
+     * OverrideMap.rs parse_override_value (1.4.1, bun#41302): {@code $a} skips the root's workspaces entry for a and
+     * reads the range the root declares as written; 1.4.0 takes that entry, the member's path, as a workspace spec.
+     */
+    @Test
+    void readsAReferencedSpecAsWrittenFrom141() {
+        String manifest = "{\"name\":\"p\",\"workspaces\":[\"packages/a\"],\"dependencies\":{\"a\":\"^1.0.0\"}," +
+                          "\"overrides\":{\"x\":\"$a\"}}";
+        java.util.Map<String, String> members = Collections.singletonMap("packages/a",
+          "{\"name\":\"a\",\"version\":\"1.0.0\"}");
+        Dependency later = overrides("1.4.1", manifest, members, new java.util.ArrayList<>()).map
+          .get(Wyhash11.stringHash("x"));
+        assertThat(later.version.tag).isEqualTo(DependencyVersion.Tag.NPM);
+        assertThat(later.version.literal).isEqualTo("^1.0.0");
+        Dependency earlier = overrides("1.4.0", manifest, members, new java.util.ArrayList<>()).map
+          .get(Wyhash11.stringHash("x"));
+        assertThat(earlier.version.tag).isEqualTo(DependencyVersion.Tag.WORKSPACE);
+        assertThat(earlier.version.literal).isEqualTo("packages/a");
+    }
+
+    private static final String SCOPED = "  \"overrides\": {\n" +
+                                         "    \"parent@^1\": { \"child@<2\": \"1.5.0\" },\n" +
+                                         "    \"foo\": \"1.0.0\",\n" +
+                                         "    \"baz\": { \"qux\": \"4.0.0\", \".\": \"3.0.0\" },\n" +
+                                         "    \"bar@^2\": { \".\": \"2.1.0\" },\n" +
+                                         "    \"a\": { \"b\": \"5.0.0\" },\n" +
+                                         "  },\n";
+
+    /**
+     * bun.lock.rs (1.4.0, bun#38333): an overrides row that is an object holds its key's rule ({@code "."}) and the
+     * rules scoped to it, read at every lockfile version; the lock writes the plain rules, the ranged rules without a
+     * parent and the parents' groups merged in key order, at version 3. Before, a row is a string.
+     */
+    @Test
+    void readsAndWritesScopedOverridesFrom140() {
+        String lock = lock("  \"configVersion\": 1,\n" + SCOPED, MS);
+        String written = writtenBack("1.4.0", lock);
+        assertThat(written).startsWith("{\n  \"lockfileVersion\": 3,\n").contains("  },\n" +
+          "  \"overrides\": {\n" +
+          "    \"a\": {\n" +
+          "      \"b\": \"5.0.0\",\n" +
+          "    },\n" +
+          "    \"bar@^2\": {\n" +
+          "      \".\": \"2.1.0\",\n" +
+          "    },\n" +
+          "    \"baz\": {\n" +
+          "      \".\": \"3.0.0\",\n" +
+          "      \"qux\": \"4.0.0\",\n" +
+          "    },\n" +
+          "    \"foo\": \"1.0.0\",\n" +
+          "    \"parent@^1\": {\n" +
+          "      \"child@<2\": \"1.5.0\",\n" +
+          "    },\n" +
+          "  },\n" +
+          "  \"packages\": {\n");
+        assertThat(writtenBack("1.4.0", written)).isEqualTo(written);
+        assertThatThrownBy(() -> TextLockfileReader.load(lock, options("1.3.14", null)))
+          .isInstanceOf(TextLockfileReader.ParseError.class)
+          .hasMessage("Expected a string");
+        assertThatThrownBy(() -> TextLockfileReader.load(lock("  \"overrides\": { \"a\": 1 },\n", MS),
+          options("1.4.0", null))).hasMessage("Expected a string or an object");
+        assertThatThrownBy(() -> TextLockfileReader.load(lock("  \"overrides\": { \"@s\": { \"a\": \"1\" } },\n",
+          MS), options("1.4.0", null))).hasMessage("Invalid override key");
+        assertThatThrownBy(() -> TextLockfileReader.load(lock("  \"overrides\": { \"a@latest\": { \"b\": \"1\" } }," +
+          "\n", MS), options("1.4.0", null))).hasMessage("Invalid override version");
+    }
+
+    // the id of the dependency of the package named owner on name
+    private static int edge(Lockfile lockfile, String owner, String name) {
+        for (Package pkg : lockfile.packages) {
+            if (pkg.name.equals(owner)) {
+                for (int id = pkg.dependenciesOff; id < pkg.dependenciesEnd(); id++) {
+                    if (lockfile.dependencies.get(id).name.equals(name)) {
+                        return id;
+                    }
+                }
+            }
+        }
+        throw new IllegalArgumentException(owner + " has no dependency on " + name);
+    }
+
+    /**
+     * OverrideMap.rs get and scoped_rule_for (1.4.0, bun#38333): the scoped rule of the edge's name that matches best
+     * wins over the plain one, a ranged parent the edge's owner satisfies over an unranged one over none, a target
+     * range the declared range intersects adding to that.
+     */
+    @Test
+    void anEdgeTakesTheScopedRuleItMatchesBestFrom140() {
+        String integrity = "\"sha512-6FlzubTLZG3J2a/NVCAleEhjzq5oxgHyaCU9yYXvcLsvoVaHJq/s5xXI6/XXP6tz7R9xAOtHnSO/tX" +
+                           "tF3WRTlA==\"";
+        String lock = "{\n  \"lockfileVersion\": 1,\n  \"workspaces\": {\n    \"\": {\n      \"name\": \"p\",\n" +
+                      "      \"dependencies\": { \"a\": \"1.0.0\", \"b\": \"2.0.0\", \"c\": \"^1.0.0\", \"d\": \"1.0.0\" },\n" +
+                      "    },\n  },\n  \"overrides\": {\n    \"c\": \"1.5.0\",\n" +
+                      "    \"c@^1\": { \".\": \"1.6.0\" },\n    \"a\": { \"c\": \"1.7.0\" },\n" +
+                      "    \"a@1\": { \"c@<2\": \"1.8.0\" },\n    \"b\": { \"c\": \"1.9.0\" },\n" +
+                      "    \"b@^3\": { \"c\": \"1.10.0\" },\n  },\n  \"packages\": {\n" +
+                      "    \"a\": [\"a@1.0.0\", \"\", { \"dependencies\": { \"c\": \"^1.0.0\" } }, " + integrity + "],\n" +
+                      "    \"b\": [\"b@2.0.0\", \"\", { \"dependencies\": { \"c\": \"^2.0.0\" } }, " + integrity + "],\n" +
+                      "    \"c\": [\"c@1.5.0\", \"\", {}, " + integrity + "],\n" +
+                      "    \"d\": [\"d@1.0.0\", \"\", { \"dependencies\": { \"c\": \"latest\" } }, " + integrity + "],\n" +
+                      "  }\n}\n";
+        Lockfile lockfile = TextLockfileReader.load(lock, options("1.4.0", null));
+        OverrideMap overrides = lockfile.overrides;
+        long c = Wyhash11.stringHash("c");
+        assertThat(requireNonNull(overrides.get(lockfile, edge(lockfile, "p", "c"), c)).literal).isEqualTo("1.6.0");
+        assertThat(requireNonNull(overrides.get(lockfile, edge(lockfile, "a", "c"), c)).literal).isEqualTo("1.8.0");
+        assertThat(requireNonNull(overrides.get(lockfile, edge(lockfile, "b", "c"), c)).literal).isEqualTo("1.9.0");
+        // a declared range that is no npm range matches no target range
+        assertThat(requireNonNull(overrides.get(lockfile, edge(lockfile, "d", "c"), c)).literal).isEqualTo("1.5.0");
+        assertThat(overrides.hasRuleForName(c)).isTrue();
+        assertThat(overrides.hasRuleForName(Wyhash11.stringHash("a"))).isFalse();
+    }
+
+    /**
+     * Package.rs Diff::generate with OverrideMap::changed (1.4.0, bun#38333): the scoped rules are compared too, a
+     * selector spelled otherwise reading as the same rule.
+     */
+    @Test
+    void comparesTheScopedRulesFrom140() {
+        List<String> none = new java.util.ArrayList<>();
+        OverrideMap nested = overrides("1.4.0", "{\"name\":\"p\",\"overrides\":{\"debug\":{\"ms\":\"2.1.3\"}}}", none);
+        OverrideMap pnpm = overrides("1.4.0", "{\"name\":\"p\",\"overrides\":{\"debug>ms\":\"2.1.3\"}}", none);
+        OverrideMap other = overrides("1.4.0", "{\"name\":\"p\",\"overrides\":{\"debug>ms\":\"2.1.2\"}}", none);
+        OverrideMap plain = overrides("1.4.0", "{\"name\":\"p\",\"overrides\":{\"ms\":\"2.1.3\"}}", none);
+        assertThat(OverrideMap.changed(nested, pnpm, BunRelease.of("1.4.0"))).isFalse();
+        assertThat(OverrideMap.changed(nested, other, BunRelease.of("1.4.0"))).isTrue();
+        assertThat(OverrideMap.changed(nested, plain, BunRelease.of("1.4.0"))).isTrue();
+    }
+
+    private static String packumentOf(String name, String... versions) {
+        StringBuilder out = new StringBuilder("{\"name\":\"" + name + "\",\"modified\":\"2026-01-01T00:00:00.000Z\"," +
+                                              "\"dist-tags\":{\"latest\":\"" + versions[versions.length - 2] +
+                                              "\"},\"versions\":{");
+        for (int i = 0; i < versions.length; i += 2) {
+            out.append(i == 0 ? "" : ",").append('"').append(versions[i]).append("\":{\"name\":\"").append(name)
+              .append("\",\"version\":\"").append(versions[i]).append("\",\"dependencies\":").append(versions[i + 1])
+              .append(",\"dist\":{\"tarball\":\"https://registry.npmjs.org/").append(name).append("/-/").append(name)
+              .append('-').append(versions[i]).append(".tgz\",\"integrity\":\"").append(INTEGRITY).append("\"}}");
+        }
+        return out.append("}}").toString();
+    }
+
+    private static String catalogInstall(String release, String lock, String catalogVersion) {
+        String manifest = "{\"name\":\"root\",\"dependencies\":{\"a\":\"1.0.0\"},\"workspaces\":{\"packages\":[]," +
+                          "\"catalog\":{\"b\":\"" + catalogVersion + "\"}},\"overrides\":{\"b\":\"catalog:\"}}";
+        ManifestSource registry = (url, name, extended) -> "a".equals(name) ?
+          packumentOf("a", "1.0.0", "{\"b\":\"^1.0.0\"}") : "b".equals(name) ?
+          packumentOf("b", "1.0.0", "{}", "2.0.0", "{}") : null;
+        org.openrewrite.javascript.internal.LockFileRegeneration.Result result = new BunLockRegenerator(
+          BunLockRegenerator.Inputs.builder().lock(lock).manifest("", manifest)
+            .now(java.time.Instant.parse("2026-10-11T00:00:00Z")).release(BunRelease.of(release)).build(),
+          registry).regenerate();
+        return requireNonNull(result.getLockFileContent(), String.valueOf(result.getErrorMessage()));
+    }
+
+    /**
+     * install_with_manager.rs (1.4.0, bun#38333): when the catalog changes, the edge on b, whose override is
+     * {@code catalog:}, is resolved again; before, only the {@code catalog:} edges are, and b stays where it was.
+     */
+    @Test
+    void resolvesAgainTheEdgesOfACatalogValuedOverrideFrom140() {
+        String later = catalogInstall("1.4.0", catalogInstall("1.4.0", EMPTY_ROOT, "1.0.0"), "2.0.0");
+        assertThat(later).contains("\"b\": [\"b@2.0.0\"").doesNotContain("\"b@1.0.0\"");
+        String earlier = catalogInstall("1.3.14", catalogInstall("1.3.14", EMPTY_ROOT, "1.0.0"), "2.0.0");
+        assertThat(earlier).contains("\"b\": [\"b@1.0.0\"").contains("\"b\": \"2.0.0\"");
+    }
+
     private static PackageManifest.PackageVersion version(BunRelease release, String packument) {
         PackageManifest manifest = requireNonNull(PackageManifest.parse(release, new Log(), packument, "debug", false));
         PackageManifest.FindResult pick = requireNonNull(manifest.findBestVersion(

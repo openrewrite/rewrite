@@ -145,17 +145,18 @@ final class TextLockfileWriter {
             writer.append("},\n");
         }
 
-        if (!lockfile.overrides.map.isEmpty()) {
+        if (!lockfile.overrides.isEmpty()) {
             lockfile.overrides.sort();
             writeIndent(writer, indent);
             writer.append("\"overrides\": {\n");
             indent[0]++;
-            for (Dependency overrideDep : lockfile.overrides.map.values()) {
-                writeIndent(writer, indent);
-                Strings.appendJsonString(writer, overrideDep.name, true);
-                writer.append(": ");
-                Strings.appendJsonString(writer, overrideDep.version.literal, true);
-                writer.append(",\n");
+            if (!lockfile.overrides.hasScoped()) {
+                for (Dependency overrideDep : lockfile.overrides.map.values()) {
+                    writeOverrideRule(writer, indent[0], overrideDep.name, "", overrideDep.version.literal);
+                }
+            } else {
+                // from 1.4.0
+                writeOverrideRules(writer, indent[0], lockfile.overrides);
             }
             decIndent(writer, indent);
             writer.append("},\n");
@@ -534,6 +535,118 @@ final class TextLockfileWriter {
             decIndent(writer, indent);
         }
         writer.append("},");
+    }
+
+    // override_selector_key: name when range is empty, else name@range
+    private static String overrideSelectorKey(String name, String range) {
+        return range.isEmpty() ? name : name + "@" + range;
+    }
+
+    private static void writeOverrideRule(StringBuilder writer, int indent, String name, String range, String value) {
+        writeIndent(writer, new int[]{indent});
+        Strings.appendJsonString(writer, overrideSelectorKey(name, range), true);
+        writer.append(": ");
+        Strings.appendJsonString(writer, value, true);
+        writer.append(",\n");
+    }
+
+    // a group of write_override_rules: a parent's, or a ranged rule's without a parent, both keyed name[@range]
+    private static final class GroupKey {
+        final long nameHash;
+        final String name;
+        final String literal;
+
+        GroupKey(long nameHash, String name, String literal) {
+            this.nameHash = nameHash;
+            this.name = name;
+            this.literal = literal;
+        }
+
+        int order(GroupKey rhs) {
+            int c = Strings.order(name, rhs.name);
+            return c != 0 ? c : Strings.order(literal, rhs.literal);
+        }
+    }
+
+    /**
+     * {@code write_override_rules} (from 1.4.0): the sorted plain rules, rules without a parent and parents' groups
+     * merged by key; scoped rules live in selector-keyed objects, and a plain rule folds into its name's unranged
+     * group as {@code "."}.
+     */
+    private static void writeOverrideRules(StringBuilder writer, int indent, OverrideMap overrides) {
+        List<Dependency> flat = new ArrayList<>(overrides.map.values());
+        List<OverrideMap.ScopedOverride> scoped = overrides.scoped;
+        int soloEnd = 0;
+        while (soloEnd < scoped.size() && scoped.get(soloEnd).parent == null) {
+            soloEnd++;
+        }
+        int f = 0;
+        int s = 0;
+        int g = soloEnd;
+        while (f < flat.size() || s < soloEnd || g < scoped.size()) {
+            GroupKey solo = s < soloEnd ? new GroupKey(scoped.get(s).dep.nameHash, scoped.get(s).dep.name,
+                    scoped.get(s).targetRange.literal) : null;
+            Dependency parent = g < scoped.size() ? scoped.get(g).parent : null;
+            GroupKey parented = parent == null ? null : new GroupKey(parent.nameHash, parent.name,
+                    parent.version.literal);
+            GroupKey group = solo != null && parented != null ? (parented.order(solo) < 0 ? parented : solo) :
+                    solo != null ? solo : parented;
+
+            if (f < flat.size()) {
+                Dependency flatDep = flat.get(f);
+                boolean flatFirst;
+                if (group == null) {
+                    flatFirst = true;
+                } else {
+                    int c = Strings.order(flatDep.name, group.name);
+                    flatFirst = c < 0 || c == 0 && !group.literal.isEmpty();
+                }
+                if (flatFirst) {
+                    writeOverrideRule(writer, indent, flatDep.name, "", flatDep.version.literal);
+                    f++;
+                    continue;
+                }
+            }
+            if (group == null) {
+                break;
+            }
+
+            writeIndent(writer, new int[]{indent});
+            Strings.appendJsonString(writer, overrideSelectorKey(group.name, group.literal), true);
+            writer.append(": {\n");
+
+            String dot = null;
+            if (group.literal.isEmpty()) {
+                if (f < flat.size() && flat.get(f).nameHash == group.nameHash) {
+                    dot = flat.get(f).version.literal;
+                    f++;
+                }
+            } else if (s < soloEnd && scoped.get(s).dep.nameHash == group.nameHash &&
+                       scoped.get(s).targetRange.literal.equals(group.literal)) {
+                dot = scoped.get(s).dep.version.literal;
+                s++;
+            }
+            if (dot != null) {
+                writeIndent(writer, new int[]{indent + 1});
+                writer.append("\".\": ");
+                Strings.appendJsonString(writer, dot, true);
+                writer.append(",\n");
+            }
+
+            while (g < scoped.size()) {
+                OverrideMap.ScopedOverride rule = scoped.get(g);
+                if (rule.parent == null || rule.parent.nameHash != group.nameHash ||
+                    !rule.parent.version.literal.equals(group.literal)) {
+                    break;
+                }
+                writeOverrideRule(writer, indent + 1, rule.dep.name, rule.targetRange.literal,
+                        rule.dep.version.literal);
+                g++;
+            }
+
+            writeIndent(writer, new int[]{indent});
+            writer.append("},\n");
+        }
     }
 
     /**

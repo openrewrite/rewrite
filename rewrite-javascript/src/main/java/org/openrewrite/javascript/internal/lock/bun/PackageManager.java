@@ -199,7 +199,8 @@ final class PackageManager {
         if (version == null &&
             !dependency.behavior.isWorkspace(options.getRelease()) &&
             (dependency.version.tag != DependencyVersion.Tag.NPM || !dependency.version.npm().isAlias)) {
-            DependencyVersion override = lockfile.overrides.get(nameHash);
+            // from 1.4.0 a scoped rule the edge's parent and declared range match comes first
+            DependencyVersion override = lockfile.overrides.get(lockfile, id, nameHash);
             if (override != null) {
                 name = replacementName(name, override);
                 nameHash = replacementNameHash(nameHash, override);

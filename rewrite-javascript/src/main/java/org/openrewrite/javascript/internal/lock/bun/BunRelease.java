@@ -301,6 +301,42 @@ public final class BunRelease implements Comparable<BunRelease> {
 
     // 1.4.x: src/install/lockfile/OverrideMap.rs and override_selector.rs
 
+    /**
+     * The overrides hold, beside the plain rules by name, rules scoped to the parent that declares the edge and to the
+     * range it declares, from 1.4.0 (bun#38333). A package.json key is a selector: pnpm's {@code parent>child}, Yarn's
+     * {@code parent/child} (one parent, {@code **} dropped), {@code name@range}; one starting {@code //} is a comment;
+     * an {@code overrides} object holds its key's children and, as {@code "."}, the key's own rule; a {@code $name}
+     * value is the spec the root declares for the name, else the one every workspace declares, as the key's rule; a
+     * value {@code -} is refused, and an {@code overrides} that is no object only warned of. An edge takes the scoped
+     * rule of its name whose parent, the parent's range and its own declared range match best, else the plain one;
+     * bun.lock writes the scoped rules grouped by parent at version 3 ({@link #keepsTheLockfileVersionItRead}) and
+     * reads such groups at every version; the diff and the edges resolved again count them. Before, every key is a
+     * plain rule as written, but that {@code resolutions} drops a leading {@code **}{@code /} and skips a key with
+     * another slash; an object counts for its {@code "."} alone; a {@code $name} value is the root's dependency itself,
+     * written under that dependency's name; and an {@code overrides} that is no object fails the install.
+     */
+    boolean readsScopedOverrides() {
+        return atLeast(1, 4, 0);
+    }
+
+    /**
+     * A {@code $name} override value is the spec the root declares for the name as written, the root's workspaces
+     * entries not counting, read as the key's own spec, from 1.4.1 (bun#41302); 1.4.0 counts a workspaces entry and
+     * reads the spec as the kind the root's dependency is, so that a range linked to a workspace reads as its path.
+     */
+    boolean readsAReferencedSpecAsWritten() {
+        return atLeast(1, 4, 1);
+    }
+
+    /**
+     * When the catalogs change, the install resolves again the edges whose name has a catalog-valued override,
+     * plain or scoped, as well as the {@code catalog:} edges, from 1.4.0 (bun#38333); before, the {@code catalog:}
+     * edges alone.
+     */
+    boolean reresolvesCatalogValuedOverrides() {
+        return atLeast(1, 4, 0);
+    }
+
     // ----
 
     // 1.4.x: src/parsers (json.rs, toml.rs), src/dotenv, src/glob, src/js_printer
