@@ -1513,6 +1513,31 @@ public final class NpmRelease implements Comparable<NpmRelease> {
         return !atLeast(9, 0, 0);
     }
 
+    // read-package-json-fast
+
+    /**
+     * {@code normalize} lists a manifest's optional dependencies among its dependencies too (1.2.1), until npm 7.5.3;
+     * from then (2.0.1) it drops them from {@code dependencies}.
+     */
+    boolean foldsOptionalDependencies() {
+        return !atLeast(7, 5, 3);
+    }
+
+    /**
+     * A package.json read from disk fills {@code bin} from the files of {@code directories.bin}, from npm 7.20.1
+     * (2.0.3); before, it is read without them.
+     */
+    boolean readsBinDirectoryOfFiles() {
+        return atLeast(7, 20, 1);
+    }
+
+    /**
+     * A package.json read from disk loses its fields whose names start with an underscore, from npm 7.5.6 (2.0.2).
+     */
+    boolean stripsUnderscoreFieldsOfFiles() {
+        return atLeast(7, 5, 6);
+    }
+
     // semver
 
     /**
