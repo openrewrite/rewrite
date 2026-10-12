@@ -1478,6 +1478,347 @@ class YarnClassicReleaseTest {
     }
 
     /**
+     * normalize-manifest/fix.js turns a dependency's falsy value into {@code ''} (#4461), a request of any version
+     * ({@code a@}), from 1.1.0; before, the value stays, and resolve-relative.js's {@code path.isAbsolute} throws for
+     * it (as yarn 1.0.2 and 1.1.0 installed a root dependency of {@code null}, {@code 0} and {@code false}).
+     */
+    @ParameterizedTest(name = "{0} {1}")
+    @CsvSource(delimiter = '|', value = {
+            "1.0.2|null|Received null",
+            "1.0.2|0|Received type number (0)",
+            "1.0.2|false|Received type boolean (false)",
+            "1.1.0|null|",
+            "1.1.0|0|",
+            "1.1.0|false|",
+    })
+    void emptiesAFalsyDependencyFrom110(String version, String value, @Nullable String received) {
+        Packages registry = new Packages("a@0.1.0", "{}", "a@1.0.0", "{}");
+        String installed = installAt(version, "{\"name\":\"p\",\"version\":\"1.0.0\",\"dependencies\":{\"a\":" +
+                                              value + "}}", registry);
+        if (received == null) {
+            assertThat(installed).isEqualTo(lockOf(registry.entry("a@", "a@1.0.0", "")));
+        } else {
+            assertThat(installed).endsWith(": An unexpected error occurred: \"The \\\"path\\\" argument must be of " +
+                                           "type string. " + received + "\".");
+        }
+    }
+
+    /**
+     * normalize-manifest/fix.js cleans the resolutions as it cleans the dependencies from 1.3.1 (constants.js
+     * {@code MANIFEST_FIELDS}), so that a falsy one is {@code ''}, a resolution to any version; before,
+     * resolution-map.js hands the value to the git resolver's {@code url.parse}, which throws (as yarn 1.2.1 and 1.3.1
+     * installed a resolution of {@code null}).
+     */
+    @Test
+    void cleansTheResolutionsFrom131() {
+        String manifest = "{\"name\":\"p\",\"version\":\"1.0.0\",\"dependencies\":{\"b\":\"1.0.0\"}," +
+                          "\"resolutions\":{\"a\":null}}";
+        Packages registry = new Packages("a@1.0.0", "{}", "a@2.0.0", "{}",
+                "b@1.0.0", "{\"dependencies\":{\"a\":\"^1.0.0\"}}");
+        assertThat(installAt("1.2.1", manifest, registry)).endsWith(": An unexpected error occurred: \"The " +
+                "\\\"url\\\" argument must be of type string. Received null\".");
+        assertThat(installAt("1.3.1", manifest, registry)).isEqualTo(lockOf(
+                registry.entry("a@, a@^1.0.0", "a@2.0.0", ""),
+                registry.entry("b@1.0.0", "b@1.0.0", "  dependencies:\n    a \"^1.0.0\"\n")));
+    }
+
+    /**
+     * package-request.js passes the parent names of a dependency request down from 1.2.0; before, each request starts
+     * from none, so that a dependency's are its parent's name alone: the resolution {@code b/c} takes b's c under a,
+     * and {@code a/b/c} takes nothing; from 1.2.0 the other way round (as yarn 1.1.0 and 1.2.0 installed both; the
+     * sweep's small-resolutions-parent-not-root).
+     */
+    @ParameterizedTest(name = "{0} {1}")
+    @CsvSource({"1.1.0,b/c,true", "1.2.0,b/c,false", "1.1.0,a/b/c,false", "1.2.0,a/b/c,true"})
+    void passesTheParentNamesDownFrom120(String version, String path, boolean resolved) {
+        Packages registry = new Packages("a@1.0.0", "{\"dependencies\":{\"b\":\"1.0.0\"}}",
+                "b@1.0.0", "{\"dependencies\":{\"c\":\"^1.0.0\"}}", "c@1.0.0", "{}", "c@2.0.0", "{}");
+        assertThat(installAt(version, "{\"name\":\"p\",\"version\":\"1.0.0\",\"dependencies\":{\"a\":\"1.0.0\"}," +
+                                      "\"resolutions\":{\"" + path + "\":\"2.0.0\"}}", registry)).isEqualTo(lockOf(
+                registry.entry("a@1.0.0", "a@1.0.0", "  dependencies:\n    b \"1.0.0\"\n"),
+                registry.entry("b@1.0.0", "b@1.0.0", "  dependencies:\n    c \"^1.0.0\"\n"),
+                resolved ? registry.entry("c@2.0.0, c@^1.0.0", "c@2.0.0", "") :
+                        registry.entry("c@2.0.0", "c@2.0.0", "") + "\n" + registry.entry("c@^1.0.0", "c@1.0.0", "")));
+    }
+
+    /**
+     * package-resolver.js {@code find} keys a request by its optional flag beside its pattern, and package-request.js
+     * {@code resolveToExistingVersion} adds the flag of a request that joins a version to its reference, from 1.1.0
+     * (#4448); before, the root's a@1.0.0, requested after b's optional one, is never made, so that a stays optional
+     * and its platform does not fail the install (as yarn 1.0.2 and 1.1.0 installed it on darwin).
+     */
+    @Test
+    void tellsOptionalRequestsApartFrom110() {
+        String manifest = "{\"name\":\"p\",\"version\":\"1.0.0\",\"dependencies\":{\"b\":\"1.0.0\",\"a\":\"1.0.0\"}}";
+        Packages registry = new Packages("a@1.0.0", "{\"os\":[\"win32\"]}",
+                "b@1.0.0", "{\"optionalDependencies\":{\"a\":\"1.0.0\"}}");
+        assertThat(installAt("1.0.2", manifest, registry)).isEqualTo(lockOf(
+                registry.entry("a@1.0.0", "a@1.0.0", ""),
+                registry.entry("b@1.0.0", "b@1.0.0", "  optionalDependencies:\n    a \"1.0.0\"\n")));
+        assertThat(installAt("1.1.0", manifest, registry)).endsWith(": a@1.0.0: The platform \"darwin\" is " +
+                                                                    "incompatible with this module. Found " +
+                                                                    "incompatible module");
+    }
+
+    /**
+     * package-resolver.js {@code find} runs a request whose pattern and optional flag were requested before from 1.4.0,
+     * which joins a version already resolved or resolves anew; before, it returns at once. c's a@^1.0.0 is requested
+     * first, b's is the resolution b/a, which points the pattern at a@1.0.0 and (before 1.6.0) takes its lock entry
+     * away, and d's, run again from 1.4.0, asks the registry for it: where the registry no longer has a version of
+     * ^1.0.0, the install fails; where it has a@1.2.0, d's makes a reference of its own, which holds the pattern beside
+     * the resolution's, so that the pattern takes the manifest of whichever fetch finishes last, which the engine
+     * cannot know (as yarn 1.3.2 and 1.4.0 installed both; 1.4.0 locked a@^1.0.0 at 1.2.0 in each of 12 runs).
+     */
+    @Test
+    void findsARepeatedRequestFrom140() {
+        String dependsOnA = "{\"dependencies\":{\"a\":\"^1.0.0\"}}";
+        String manifest = "{\"name\":\"p\",\"version\":\"1.0.0\",\"dependencies\":{\"c\":\"1.0.0\",\"b\":\"1.0.0\"," +
+                          "\"d\":\"1.0.0\"},\"resolutions\":{\"b/a\":\"1.0.0\"}}";
+        Packages locked = new Packages("a@1.0.0", "{}", "a@1.1.0", "{}", "b@1.0.0", dependsOnA,
+                "c@1.0.0", dependsOnA, "d@1.0.0", dependsOnA);
+        Packages published = new Packages("a@2.0.0", "{}");
+        RegistrySource unpublished = new RegistrySource() {
+            @Override
+            public @Nullable String packument(String registry, String name, boolean full,
+                                              @Nullable String authorization) {
+                return ("a".equals(name) ? published : locked).packument(registry, name, full, authorization);
+            }
+
+            @Override
+            public byte @Nullable [] tarball(String url, String name, String version, @Nullable String authorization) {
+                return locked.tarball(url, name, version, authorization);
+            }
+        };
+        String b = locked.entry("b@1.0.0", "b@1.0.0", "  dependencies:\n    a \"^1.0.0\"\n");
+        String c = locked.entry("c@1.0.0", "c@1.0.0", "  dependencies:\n    a \"^1.0.0\"\n");
+        String d = locked.entry("d@1.0.0", "d@1.0.0", "  dependencies:\n    a \"^1.0.0\"\n");
+        String lock = lockOf(locked.entry("a@1.0.0", "a@1.0.0", ""), locked.entry("a@^1.0.0", "a@1.1.0", ""), b, c, d);
+        assertThat(installAt("1.3.2", manifest, lock, unpublished))
+                .isEqualTo(lockOf(locked.entry("a@1.0.0, a@^1.0.0", "a@1.0.0", ""), b, c, d));
+        assertThat(installAt("1.4.0", manifest, lock, unpublished)).endsWith(": An unexpected error occurred: " +
+                "\"Couldn't find any versions for \\\"a\\\" that matches \\\"^1.0.0\\\"\".");
+
+        Packages registry = new Packages("a@1.0.0", "{}", "a@1.2.0", "{}", "b@1.0.0", dependsOnA,
+                "c@1.0.0", dependsOnA, "d@1.0.0", dependsOnA);
+        assertThat(installAt("1.3.2", manifest, registry))
+                .isEqualTo(lockOf(registry.entry("a@1.0.0, a@^1.0.0", "a@1.0.0", ""), b, c, d));
+        assertThat(installAt("1.4.0", manifest, registry)).endsWith(": the engine cannot know which of the fetches " +
+                "of a@1.0.0 and a@1.2.0 yarn finishes last: both their references hold a@^1.0.0, which takes the " +
+                "last one's manifest");
+    }
+
+    /**
+     * package-resolver.js {@code resolveToResolution} sets a request aside until every other is made where its
+     * resolution's target is not resolved yet, from 1.0.2 (#4372); before, {@code getStrictResolvedPattern}'s
+     * invariant fails. The resolution x@1.0.0, requested first, depends on y@^1.0.0, which the resolution y@1.0.0 takes
+     * before it is requested (as yarn 1.0.1 and 1.0.2 installed it).
+     */
+    @Test
+    void waitsForTheTargetOfAResolutionFrom102() {
+        String manifest = "{\"name\":\"p\",\"version\":\"1.0.0\",\"dependencies\":{\"x\":\"1.0.0\"}," +
+                          "\"resolutions\":{\"x\":\"1.0.0\",\"y\":\"1.0.0\"}}";
+        Packages registry = new Packages("x@1.0.0", "{\"dependencies\":{\"y\":\"^1.0.0\"}}", "y@1.0.0", "{}",
+                "y@1.1.0", "{}");
+        assertThat(installAt("1.0.1", manifest, registry))
+                .endsWith(": An unexpected error occurred: \"expected manifest\".");
+        assertThat(installAt("1.0.2", manifest, registry)).isEqualTo(lockOf(
+                registry.entry("x@1.0.0", "x@1.0.0", "  dependencies:\n    y \"^1.0.0\"\n"),
+                registry.entry("y@1.0.0, y@^1.0.0", "y@1.0.0", "")));
+    }
+
+    /**
+     * package-resolver.js {@code resolveToResolution} applies no resolution under {@code flat} from 1.0.2 (#4372),
+     * where install.js {@code flatten} asks which version of a package with two to keep unless a resolution names the
+     * package; before, the resolution b/a takes b's a@^1.0.0 there too (as yarn 1.0.1 and 1.0.2 installed it with and
+     * without {@code "flat": true}).
+     */
+    @Test
+    void appliesNoResolutionUnderFlatFrom102() {
+        String dependencies = "\"dependencies\":{\"b\":\"1.0.0\"},\"resolutions\":{\"b/a\":\"1.0.0\"}}";
+        Packages registry = new Packages("a@1.0.0", "{}", "a@1.1.0", "{}",
+                "b@1.0.0", "{\"dependencies\":{\"a\":\"^1.0.0\"}}");
+        String resolved = lockOf(registry.entry("a@1.0.0, a@^1.0.0", "a@1.0.0", ""),
+                registry.entry("b@1.0.0", "b@1.0.0", "  dependencies:\n    a \"^1.0.0\"\n"));
+        String flat = "{\"name\":\"p\",\"version\":\"1.0.0\",\"flat\":true," + dependencies;
+        assertThat(installAt("1.0.1", flat, registry)).isEqualTo(resolved);
+        assertThat(installAt("1.0.2", flat, registry))
+                .endsWith(": An unexpected error occurred: \"Can't answer a question unless a user TTY\".");
+        String nested = "{\"name\":\"p\",\"version\":\"1.0.0\"," + dependencies;
+        assertThat(installAt("1.0.1", nested, registry)).isEqualTo(resolved);
+        assertThat(installAt("1.0.2", nested, registry)).isEqualTo(resolved);
+    }
+
+    /**
+     * package-resolver.js {@code optimizeResolutions} collapses the unlocked patterns of a root dependency's name to
+     * one version from 1.1.0 (#4488), the highest of theirs that their ranges joined by spaces take; from 1.2.0 under
+     * {@code flat} only (#4613), and to the highest that every range takes (#4562). The root's a@~1.0.0 and b's
+     * a@^1.0.0 take 1.0.9 and 1.5.0 alone; the root's a@^1.5.0 and b's a@^1.0.0 || ^2.0.0 take 1.5.0 and 2.0.0, and
+     * their joined range ({@code ^1.5.0 ^1.0.0 || ^2.0.0}) takes 2.0.0, which ^1.5.0 does not: 1.1.0 locks both at
+     * 2.0.0, which its next install rewrites, or under flat fails on (as yarn 1.0.2, 1.1.0 and 1.2.0 installed each
+     * with and without {@code "flat": true}, and 1.1.0 again over its own lock; under flat, 1.0.2 asks which version
+     * to keep).
+     */
+    @Test
+    void optimizesResolutionsAsItsReleaseDoes() {
+        String asks = ": An unexpected error occurred: \"Can't answer a question unless a user TTY\".";
+        Packages caret = new Packages("a@1.0.9", "{}", "a@1.5.0", "{}", "a@2.0.0", "{}",
+                "b@1.0.0", "{\"dependencies\":{\"a\":\"^1.0.0\"}}");
+        String b = caret.entry("b@1.0.0", "b@1.0.0", "  dependencies:\n    a \"^1.0.0\"\n");
+        String apart = lockOf(caret.entry("a@^1.0.0", "a@1.5.0", ""), caret.entry("a@~1.0.0", "a@1.0.9", ""), b);
+        String collapsed = lockOf(caret.entry("a@^1.0.0, a@~1.0.0", "a@1.0.9", ""), b);
+        assertThat(optimized("1.0.2", "~1.0.0", false, caret)).isEqualTo(apart);
+        assertThat(optimized("1.1.0", "~1.0.0", false, caret)).isEqualTo(collapsed);
+        assertThat(optimized("1.2.0", "~1.0.0", false, caret)).isEqualTo(apart);
+        assertThat(optimized("1.0.2", "~1.0.0", true, caret)).endsWith(asks);
+        assertThat(optimized("1.1.0", "~1.0.0", true, caret)).isEqualTo(collapsed);
+        assertThat(optimized("1.2.0", "~1.0.0", true, caret)).isEqualTo(collapsed);
+
+        Packages either = new Packages("a@1.0.9", "{}", "a@1.5.0", "{}", "a@2.0.0", "{}",
+                "b@1.0.0", "{\"dependencies\":{\"a\":\"^1.0.0 || ^2.0.0\"}}");
+        String eitherB = either.entry("b@1.0.0", "b@1.0.0", "  dependencies:\n    a \"^1.0.0 || ^2.0.0\"\n");
+        String eitherApart = lockOf(either.entry("\"a@^1.0.0 || ^2.0.0\"", "a@2.0.0", ""),
+                either.entry("a@^1.5.0", "a@1.5.0", ""), eitherB);
+        assertThat(optimized("1.0.2", "^1.5.0", false, either)).isEqualTo(eitherApart);
+        assertThat(optimized("1.1.0", "^1.5.0", false, either)).endsWith(": a second yarn install over the lock " +
+                "written for this edit would rewrite it: line 5 \"\"a@^1.0.0 || ^2.0.0\", a@^1.5.0:\" becomes " +
+                "\"\"a@^1.0.0 || ^2.0.0\":\"");
+        assertThat(optimized("1.2.0", "^1.5.0", false, either)).isEqualTo(eitherApart);
+        assertThat(optimized("1.0.2", "^1.5.0", true, either)).endsWith(asks);
+        assertThat(optimized("1.1.0", "^1.5.0", true, either)).endsWith(": a second yarn install over the lock " +
+                "written for this edit would fail: yarn fails on this edit" + asks);
+        assertThat(optimized("1.2.0", "^1.5.0", true, either))
+                .isEqualTo(lockOf(either.entry("\"a@^1.0.0 || ^2.0.0\", a@^1.5.0", "a@1.5.0", ""), eitherB));
+    }
+
+    /**
+     * file-resolver.js and en.js {@code doesntExist} name the package of a file: dependency whose directory does not
+     * exist from 1.4.0; before, the directory alone (as yarn 1.3.2, 1.4.0 and 1.6.0 reported a root dependency on
+     * file:./missing, where yarn gives the absolute path the engine gives relative to the root; the sweep's
+     * open-member-cwd-implicit-file-member-dir).
+     */
+    @Test
+    void namesThePackageOfAMissingFileFrom140() {
+        assertThat(missingFile("1.3.2")).isEqualTo("\"missing\" doesn't exist.");
+        assertThat(missingFile("1.4.0")).isEqualTo("An unexpected error occurred: \"Package \\\"a\\\" refers to a " +
+                                                   "non-existing file '\\\"missing\\\"'.\".");
+        assertThat(missingFile("1.6.0")).isEqualTo("Package \"a\" refers to a non-existing file '\"missing\"'.");
+    }
+
+    // the lock the release writes, or what it reports, for a project of this manifest and an empty lock on darwin arm64
+    private static String installAt(String version, String manifest, RegistrySource registry) {
+        return installAt(version, manifest, "# yarn lockfile v1\n\n\n", registry);
+    }
+
+    // the lock the release writes, or what it reports, for a project of this manifest and lock on darwin arm64
+    private static String installAt(String version, String manifest, String lock, RegistrySource registry) {
+        YarnClassicLockRegenerator.Inputs inputs = YarnClassicLockRegenerator.Inputs.builder()
+                .release(release(version))
+                .manifest("", manifest)
+                .lock(lock)
+                .host(Host.builder().os("darwin").cpu("arm64").build())
+                .env(Collections.emptyMap())
+                .build();
+        LockFileRegeneration.Result result = new YarnClassicLockRegenerator(inputs, registry).regenerate();
+        return result.isSuccess() ? result.getLockFileContent() : String.valueOf(result.getErrorMessage());
+    }
+
+    // what the release writes or reports for a root dependency on a of this range and on b, of the registry given
+    private static String optimized(String version, String range, boolean flat, Packages registry) {
+        return installAt(version, "{\"name\":\"p\",\"version\":\"1.0.0\"," + (flat ? "\"flat\":true," : "") +
+                                  "\"dependencies\":{\"a\":\"" + range + "\",\"b\":\"1.0.0\"}}", registry);
+    }
+
+    // what the release reports for a root dependency on a directory the project does not hold
+    private static String missingFile(String version) {
+        YarnClassicLockRegenerator.Inputs inputs = YarnClassicLockRegenerator.Inputs.builder()
+                .release(release(version))
+                .manifest("", "{\"name\":\"p\",\"version\":\"1.0.0\",\"dependencies\":{\"a\":\"file:./missing\"}}")
+                .lock("# yarn lockfile v1\n\n\n")
+                .paths(new LinkedHashSet<>(Arrays.asList("package.json", "yarn.lock")))
+                .env(Collections.emptyMap())
+                .build();
+        String error = String.valueOf(new YarnClassicLockRegenerator(inputs, YarnClassicScenarios.NO_REGISTRY)
+                .regenerate().getErrorMessage());
+        return error.substring(error.indexOf(" this edit: ") + " this edit: ".length());
+    }
+
+    // the lock yarn writes of these entries
+    private static String lockOf(String... entries) {
+        return "# THIS IS AN AUTOGENERATED FILE. DO NOT EDIT THIS FILE DIRECTLY.\n# yarn lockfile v1\n\n\n" +
+               String.join("\n", entries);
+    }
+
+    /**
+     * A registry of packages, each given as name@version and its manifest's other fields: a name's last version is its
+     * latest, and its tarball https://registry.yarnpkg.com/name/-/name-version.tgz a tar of the manifest.
+     */
+    private static final class Packages implements RegistrySource {
+        private final Map<String, String> packuments = new LinkedHashMap<>();
+        private final Map<String, byte[]> tarballs = new LinkedHashMap<>();
+        private final Map<String, String> shasums = new LinkedHashMap<>();
+
+        Packages(String... packages) {
+            Map<String, String> versions = new LinkedHashMap<>();
+            Map<String, String> latest = new LinkedHashMap<>();
+            for (int i = 0; i < packages.length; i += 2) {
+                int at = packages[i].lastIndexOf('@');
+                String name = packages[i].substring(0, at);
+                String version = packages[i].substring(at + 1);
+                String fields = packages[i + 1].substring(1, packages[i + 1].length() - 1);
+                String manifest = "\"name\":\"" + name + "\",\"version\":\"" + version + "\"" +
+                                  (fields.isEmpty() ? "" : "," + fields);
+                byte[] tarball = tar("package/package.json", "{" + manifest + "}", null);
+                tarballs.put(packages[i], tarball);
+                shasums.put(packages[i], sha1(tarball));
+                versions.merge(name, "\"" + version + "\":{" + manifest + ",\"dist\":{\"tarball\":\"" +
+                                     url(packages[i]) + "\",\"shasum\":\"" + shasums.get(packages[i]) + "\"}}",
+                        (a, b) -> a + "," + b);
+                latest.put(name, version);
+            }
+            for (Map.Entry<String, String> each : versions.entrySet()) {
+                String name = each.getKey();
+                packuments.put(name, "{\"name\":\"" + name + "\",\"dist-tags\":{\"latest\":\"" + latest.get(name) +
+                                     "\"},\"versions\":{" + each.getValue() + "}}");
+            }
+        }
+
+        @Override
+        public @Nullable String packument(String registry, String name, boolean full, @Nullable String authorization) {
+            return packuments.get(name);
+        }
+
+        @Override
+        public byte @Nullable [] tarball(String url, String name, String version, @Nullable String authorization) {
+            return tarballs.get(name + "@" + version);
+        }
+
+        // the lock entry of these patterns, of one of the packages, with its other fields as the lock writes them
+        String entry(String patterns, String nameAndVersion, String fields) {
+            return patterns + ":\n  version \"" + nameAndVersion.substring(nameAndVersion.lastIndexOf('@') + 1) +
+                   "\"\n  resolved \"" + url(nameAndVersion) + "#" + shasums.get(nameAndVersion) + "\"\n" + fields;
+        }
+
+        private static String url(String nameAndVersion) {
+            int at = nameAndVersion.lastIndexOf('@');
+            String name = nameAndVersion.substring(0, at);
+            return "https://registry.yarnpkg.com/" + name + "/-/" + name + "-" + nameAndVersion.substring(at + 1) +
+                   ".tgz";
+        }
+
+        private static String sha1(byte[] bytes) {
+            try {
+                StringBuilder hex = new StringBuilder();
+                for (byte digit : MessageDigest.getInstance("SHA-1").digest(bytes)) {
+                    hex.append(String.format("%02x", digit));
+                }
+                return hex.toString();
+            } catch (NoSuchAlgorithmException e) {
+                throw new IllegalStateException(e);
+            }
+        }
+    }
+
+    /**
      * base-reporter.js {@code stringifyLangArgs}, as yarn 1.4.0, 1.5.0, 1.6.0 and 1.7.0 reported a range that holds a
      * backslash followed by an {@code n}, and one that holds a line break: the escapes of the JSON before 1.5.0, a line
      * break for each from 1.5.0, the backslash's {@code n} kept from 1.7.0; a message reported as unexpected (1.4.0 to

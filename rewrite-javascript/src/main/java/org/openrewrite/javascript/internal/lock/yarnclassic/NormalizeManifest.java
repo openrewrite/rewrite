@@ -226,7 +226,10 @@ final class NormalizeManifest {
             for (String name : Js.keys(dependencies)) {
                 Object raw = Js.get(dependencies, name);
                 if (!(raw instanceof String)) {
-                    throw Js.invalidArgType("The \"path\" argument must be of type string", raw);
+                    // a key's null is JSON's, which reaches here where fix.js keeps it (before 1.1.0)
+                    throw raw == null ? new JsError(Js.INVALID_ARG_TYPE,
+                            "The \"path\" argument must be of type string. Received null") :
+                            Js.invalidArgType("The \"path\" argument must be of type string", raw);
                 }
                 String value = (String) raw;
                 if (value.startsWith("/")) {

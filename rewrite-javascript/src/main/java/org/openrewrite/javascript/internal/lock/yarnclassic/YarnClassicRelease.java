@@ -522,7 +522,8 @@ public final class YarnClassicRelease implements Comparable<YarnClassicRelease> 
 
     /**
      * {@code fix} turns a dependency's falsy value into {@code ''} (#4461), from 1.1.0; before, the value stays, and
-     * the request's pattern is {@code <name>@null} ({@code @0}, {@code @false}).
+     * resolve-relative.js's {@code path.isAbsolute} throws for one that is no string ({@code null}, {@code 0},
+     * {@code false}).
      */
     boolean emptiesFalsyDependencies() {
         return atLeast(1, 1, 0);
@@ -678,8 +679,8 @@ public final class YarnClassicRelease implements Comparable<YarnClassicRelease> 
     // yarn src/package-resolver.js
 
     /**
-     * {@code find} runs a request whose key was requested before, as one that is not fresh, which then joins the
-     * version already resolved, from 1.4.0; before, it returns at once.
+     * {@code find} runs a request whose key was requested before, as one that is not fresh, which then joins a version
+     * already resolved or resolves anew, from 1.4.0; before, it returns at once.
      */
     boolean findsARepeatedRequest() {
         return atLeast(1, 4, 0);
@@ -701,8 +702,8 @@ public final class YarnClassicRelease implements Comparable<YarnClassicRelease> 
     }
 
     /**
-     * {@code init} collapses two or more unlocked patterns of a root request's name to one version that satisfies
-     * them all ({@code optimizeResolutions}, #4488), from 1.1.0; before, no such pass.
+     * {@code init} collapses two or more unlocked patterns of a root request's name to one version of theirs
+     * ({@code optimizeResolutions}, #4488), from 1.1.0; before, no such pass.
      */
     boolean optimizesResolutions() {
         return atLeast(1, 1, 0);
