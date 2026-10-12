@@ -2872,7 +2872,10 @@ final class ResolveDependencies {
         if (prefix == null) {
             return bareSpecifier;
         }
-        if (validRange(bareSpecifier.substring(prefix.length()), release) != null) {
+        // an npm: range is the alias's from 11.1.0 (PnpmRelease#takesTheAliasAsTheNameOfAnNpmRange); before, it
+        // takes the version after it, as a name would
+        if (validRange(bareSpecifier.substring(prefix.length()), release) != null &&
+            (!"npm:".equals(prefix) || release.takesTheAliasAsTheNameOfAnNpmRange())) {
             return prefix + version;
         }
         int versionDelimiter = bareSpecifier.lastIndexOf('@');

@@ -540,6 +540,11 @@ class PnpmReleaseTest {
      */
     @Test
     void takesTheAliasAsTheNameOfAnNpmRangeFrom1110() {
+        // replaceVersionInBareSpecifier of 11.0.9 takes the range for a name
+        assertThat(ResolveDependencies.replaceVersionInBareSpecifier("npm:^1.0.0", "1.2.3", Collections.emptyList(),
+          release("11.1.0"))).isEqualTo("npm:1.2.3");
+        assertThat(ResolveDependencies.replaceVersionInBareSpecifier("npm:^1.0.0", "1.2.3", Collections.emptyList(),
+          release("11.0.9"))).isEqualTo("npm:^1.0.0@1.2.3");
         PickPackageFromMeta.RegistryPackageSpec later = PickPackageFromMeta.parseBareSpecifier("npm:^1.0.0", "foo",
           "latest", REGISTRY, release("11.1.0"));
         assertThat(later).isNotNull();
