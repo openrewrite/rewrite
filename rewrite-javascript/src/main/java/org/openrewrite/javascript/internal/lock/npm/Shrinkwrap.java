@@ -948,8 +948,10 @@ public final class Shrinkwrap {
             if (!root.isEmpty()) {
                 packages.put("", root);
             }
-            for (Node node : tree.getRoot().getInventory().values()) {
-                if (node == tree || node.isRoot() || "".equals(node.getLocation())) {
+            // before npm 7.1.1 the tree's own inventory, which arborist 1 never lists the root in
+            boolean ofTreeRoot = resolveOptions.getRelease().commitsInventoryOfTreeRoot();
+            for (Node node : (ofTreeRoot ? tree.getRoot() : tree).getInventory().values()) {
+                if (ofTreeRoot && (node == tree || node.isRoot() || "".equals(node.getLocation()))) {
                     continue;
                 }
                 String loc = Relpath.relpath(path, node.getPath());

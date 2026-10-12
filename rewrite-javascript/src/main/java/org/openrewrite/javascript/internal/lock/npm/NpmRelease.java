@@ -236,6 +236,15 @@ public final class NpmRelease implements Comparable<NpmRelease> {
     }
 
     /**
+     * {@code [_nodeFromEdge]}: the link a nesting loop (a1 -> b1 -> a2 -> b2 -> a1) gets to the earlier instance is
+     * made under the dependent, or its resolve parent for a peer, from npm 7.1.1; before, under the virtual root the
+     * dependency was loaded into.
+     */
+    boolean linksNestingLoopsUnderDependent() {
+        return atLeast(7, 1, 1);
+    }
+
+    /**
      * {@code #nodeFromSpec}: a {@code file:./} or {@code file:../} dependency inside the project is linked whatever
      * {@code install-links} says, from npm 11.5.0.
      */
@@ -395,6 +404,14 @@ public final class NpmRelease implements Comparable<NpmRelease> {
     }
 
     /**
+     * {@code [_applyUserRequests]} assigns the root its own package again, which detaches and remakes its edges, only
+     * for packages added or removed, from npm 7.1.1; before, for every install.
+     */
+    boolean refreshesRootPackageForAddOrRemoveOnly() {
+        return atLeast(7, 1, 1);
+    }
+
+    /**
      * {@code [_canPlaceDep]}: a node that matches the one in place, as a link to a like target elsewhere does, replaces
      * it where only it satisfies the edge, from npm 7.8.0; before, a match is always kept.
      */
@@ -484,6 +501,16 @@ public final class NpmRelease implements Comparable<NpmRelease> {
     }
 
     /**
+     * {@code [_resolveLinks]} passes over a link that was never placed in the ideal tree, from npm 7.1.1 (arborist
+     * 2.0.0, whose root setter gives a link target its fsParent); before, it takes the node the inventory holds at the
+     * link's realpath as the link's target, and gives a target with neither parent nor fsParent the first node of the
+     * tree walking up from it as fsParent, and queues it.
+     */
+    boolean skipsUnplacedLinks() {
+        return atLeast(7, 1, 1);
+    }
+
+    /**
      * The queue of nodes to build is a plain array, duplicates and all, sorted by depth and path at every step, until
      * npm 9.6.6; from then, {@code DepsQueue} keeps each node once and sorts only after a push.
      */
@@ -506,6 +533,15 @@ public final class NpmRelease implements Comparable<NpmRelease> {
      */
     boolean triesPeerSpecForParentEdge() {
         return atLeast(7, 5, 0);
+    }
+
+    /**
+     * {@code [_resolveLinks]} finds a link target's fsParent walking up the directories of its realpath, outside the
+     * project too, and only then passes over an external link, from npm 7.0.10; before, walking up the segments of its
+     * location, the project root last, and an external link is passed over first.
+     */
+    boolean walksUpRealpathOfLinkTargets() {
+        return atLeast(7, 0, 10);
     }
 
     // @npmcli/arborist calc-dep-flags.js
@@ -745,6 +781,15 @@ public final class NpmRelease implements Comparable<NpmRelease> {
     }
 
     /**
+     * A link takes the root of its parent, fsParent or target when made, and roots its target with it whenever the
+     * target is set, from npm 7.1.1 (arborist 2.0.0); before, a link made without a parent is its own root until one
+     * is set, and a target is rooted with the link only while it is its own root.
+     */
+    boolean rootsTargetWithLink() {
+        return atLeast(7, 1, 1);
+    }
+
+    /**
      * A link made without a target whose realpath is the root's path takes the root as its target, from npm 7.8.0;
      * before, a new node at that path.
      */
@@ -781,6 +826,15 @@ public final class NpmRelease implements Comparable<NpmRelease> {
     }
 
     /**
+     * The nodes and links of the lock are placed by the root they are made with, from npm 7.1.1 (arborist 2.0.0);
+     * before, arborist 1's {@code [assignParentage]} gives each its parent or fsParent, the first node the lock holds
+     * walking up its path, once the links are made and their targets read.
+     */
+    boolean placesLockNodesByRoot() {
+        return atLeast(7, 1, 1);
+    }
+
+    /**
      * {@code [resolveLinks]} reads each link target's package.json, which its user may have changed, from npm 7.0.9;
      * before, only for a lock older than version 2.
      */
@@ -802,6 +856,13 @@ public final class NpmRelease implements Comparable<NpmRelease> {
      */
     boolean rejectsLinkWithoutTarget() {
         return atLeast(11, 4, 0);
+    }
+
+    /**
+     * {@code [assignParentage]} passes over the root, and a node it finds as its own parent, from npm 7.0.10.
+     */
+    boolean skipsRootParentage() {
+        return atLeast(7, 0, 10);
     }
 
     /**
@@ -849,11 +910,27 @@ public final class NpmRelease implements Comparable<NpmRelease> {
     }
 
     /**
+     * The {@code parent} setter ignores a node as its own parent, and the {@code fsParent} setter a node as its own
+     * fsParent or one at its own realpath, from npm 7.0.10 ({@link LegacyNode}).
+     */
+    boolean ignoresNodeAsOwnParent() {
+        return atLeast(7, 0, 10);
+    }
+
+    /**
      * The root is in its own inventory, so that what walks the inventory, as {@code [_checkEngineAndPlatform]} does,
      * reaches it, from npm 7.1.1 (arborist 2.0.0); before, the root setter returns before it lists the root.
      */
     boolean inventoriesRoot() {
         return atLeast(7, 1, 1);
+    }
+
+    /**
+     * {@code replaceWith} leaves the children and fsChildren of a node a link replaces where they are, from npm 7.0.6
+     * ({@link LegacyNode}); before, they move under the link, which puts them under its target.
+     */
+    boolean keepsChildrenOfNodeLinkReplaces() {
+        return atLeast(7, 0, 6);
     }
 
     /**
@@ -909,6 +986,16 @@ public final class NpmRelease implements Comparable<NpmRelease> {
      */
     boolean omitsUnderProjectTopsOnly() {
         return atLeast(11, 6, 1);
+    }
+
+    /**
+     * The {@code root} setter places a node, taking the parent or fsParent it finds walking up the node's path and the
+     * tops below it as children, and the {@code parent} and {@code fsParent} setters change the path and set the root,
+     * from npm 7.1.1 (arborist 2.0.0); before, arborist 1's setters ({@link LegacyNode}): the parent and fsParent
+     * setters place a node and reload its edges, and the root setter only roots it, never listing the root itself.
+     */
+    boolean placesNodesFromRoot() {
+        return atLeast(7, 1, 1);
     }
 
     /**
@@ -1065,6 +1152,14 @@ public final class NpmRelease implements Comparable<NpmRelease> {
      */
     boolean checksVersionOfLockedEntry() {
         return atLeast(7, 15, 1);
+    }
+
+    /**
+     * {@code commit} writes an entry for each node of the inventory of the tree's root but the root, from npm 7.1.1
+     * (arborist 2.0.0); before, for each node of the tree's own inventory, which never lists the root.
+     */
+    boolean commitsInventoryOfTreeRoot() {
+        return atLeast(7, 1, 1);
     }
 
     /**

@@ -1595,6 +1595,70 @@ class NodeTest {
         }
     }
 
+    /**
+     * Arborist 1's tree setters (node.js, npm 7.1.0), which arborist 2.0.0 (npm 7.1.1) replaced ({@link LegacyNode}).
+     */
+    @Nested
+    class ArboristOneSetters {
+
+        // from npm 7.1.1 the root setter places a node by its path and lists the root in its own inventory; before, it
+        // only roots the node, which the parent setter places
+        @Test
+        void rootSetterPlacesNodeFrom711() {
+            for (String version : new String[]{"7.1.0", "7.1.1"}) {
+                NpmRelease release = NpmRelease.of(version);
+                boolean places = "7.1.1".equals(version);
+                Node root = node(opts().release(release).path("/project")
+                  .pkg(obj("name", "root", "dependencies", obj("a", "1"))));
+                Node a = node(opts().release(release).path("/project/node_modules/a").root(root)
+                  .pkg(obj("name", "a", "version", "1.0.0")));
+                assertThat(a.getParent()).as("npm %s", version).isSameAs(places ? root : null);
+                assertThat(root.getInventory().get("")).as("npm %s", version).isSameAs(places ? root : null);
+                assertThat(root.getInventory().get("node_modules/a")).isSameAs(a);
+                assertThat(root.getEdgesOut().get("a").getTo()).as("npm %s", version).isSameAs(places ? a : null);
+
+                a.setParent(root);
+                assertThat(root.getChildren().get("a")).isSameAs(a);
+                assertThat(root.getEdgesOut().get("a").getTo()).isSameAs(a);
+                assertThat(root.getLocation()).isEqualTo("");
+                assertThat(a.getLocation()).isEqualTo("node_modules/a");
+            }
+        }
+
+        // from npm 7.0.10 the fsParent setter ignores a node at the node's own realpath
+        @Test
+        void fsParentAtOwnRealpathIsIgnoredFrom7010() {
+            for (String version : new String[]{"7.0.9", "7.0.10"}) {
+                NpmRelease release = NpmRelease.of(version);
+                Node root = node(opts().release(release).path("/project").pkg(obj("name", "root")));
+                Node other = node(opts().release(release).path("/project/packages/a").root(root)
+                  .pkg(obj("name", "other")));
+                Node a = node(opts().release(release).path("/project/packages/a").pkg(obj("name", "a")));
+                a.setFsParent(other);
+                assertThat(a.getFsParent()).as("npm %s", version).isSameAs("7.0.9".equals(version) ? other : null);
+            }
+        }
+
+        // from npm 7.0.6 replaceWith leaves the children of a node a link replaces where they are; before, they go
+        // under the link, which puts them under its target
+        @Test
+        void childrenOfNodeALinkReplacesStayFrom706() {
+            for (String version : new String[]{"7.0.5", "7.0.6"}) {
+                NpmRelease release = NpmRelease.of(version);
+                Node root = node(opts().release(release).path("/project").pkg(obj("name", "root")));
+                Node a = node(opts().release(release).parent(root).pkg(obj("name", "a", "version", "1.0.0")));
+                Node c = node(opts().release(release).parent(a).pkg(obj("name", "c", "version", "1.0.0")));
+                Node target = node(opts().release(release).path("/project/packages/a").fsParent(root)
+                  .pkg(obj("name", "a", "version", "2.0.0")));
+                Link link = link(opts().release(release).path("/project/node_modules/a")
+                  .realpath("/project/packages/a").target(target));
+                link.replace(a);
+                assertThat(root.getChildren().get("a")).isSameAs(link);
+                assertThat(c.getParent()).as("npm %s", version).isSameAs("7.0.5".equals(version) ? target : a);
+            }
+        }
+    }
+
     @Nested
     class ShouldOmit {
 

@@ -391,6 +391,11 @@ public class Node {
             setRoot(options.getRoot());
         }
 
+        // arborist 1's root setter returns before it locates a node that is its own root
+        if (!release.placesNodesFromRoot() && isRoot()) {
+            location = "";
+        }
+
         for (Options c : options.getChildren()) {
             new Node(c.toBuilder().parent(this).release(release).build());
         }
@@ -728,6 +733,10 @@ public class Node {
     }
 
     public void setRoot(@Nullable Node root) {
+        if (!release.placesNodesFromRoot()) {
+            LegacyNode.setRoot(this, root);
+            return;
+        }
         while (root != null && root.getRoot() != root) {
             root = root.getRoot();
         }
@@ -1045,6 +1054,10 @@ public class Node {
     }
 
     public void setFsParent(@Nullable Node fsParent) {
+        if (!release.placesNodesFromRoot()) {
+            LegacyNode.setFsParent(this, fsParent);
+            return;
+        }
         if (fsParent == null) {
             if (this.fsParent != null) {
                 setRoot(null);
@@ -1245,6 +1258,11 @@ public class Node {
     }
 
     public void replace(Node node) {
+        if (!release.placesNodesFromRoot()) {
+            // arborist 1's replace(node) is node.replaceWith(this)
+            LegacyNode.replaceWith(node, this);
+            return;
+        }
         delistFromMeta();
 
         if (node.parent != null && node.parent.getChildren().get(name) == node) {
@@ -1282,6 +1300,10 @@ public class Node {
     }
 
     public void setParent(@Nullable Node parent) {
+        if (!release.placesNodesFromRoot()) {
+            LegacyNode.setParent(this, parent);
+            return;
+        }
         if (parent == null) {
             if (this.parent != null) {
                 setRoot(null);
@@ -1371,6 +1393,25 @@ public class Node {
         if (root.meta != null) {
             root.meta.add(this);
         }
+    }
+
+    // this[_parent], this[_fsParent], this[_root] and this[_explanation], which arborist 1's setters (LegacyNode) assign
+    // directly
+
+    void parentReference(@Nullable Node parent) {
+        this.parent = parent;
+    }
+
+    void fsParentReference(@Nullable Node fsParent) {
+        this.fsParent = fsParent;
+    }
+
+    void rootReference(Node root) {
+        this.root = root;
+    }
+
+    void clearExplanation() {
+        explanation = null;
     }
 
     /**

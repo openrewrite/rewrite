@@ -481,7 +481,12 @@ public final class IdealTreeBuilder {
     }
 
     private void applyUserRequests() {
-        depsQueue.push(Objects.requireNonNull(Objects.requireNonNull(idealTree).getTarget()));
+        Node tree = Objects.requireNonNull(idealTree);
+        // before npm 7.1.1 every install triggers a refresh of all the root's edges out
+        if (!options.getRelease().refreshesRootPackageForAddOrRemoveOnly()) {
+            tree.setPackage(tree.getPackage());
+        }
+        depsQueue.push(Objects.requireNonNull(tree.getTarget()));
     }
 
     private void inflateAncientLockfile() {
@@ -823,8 +828,9 @@ public final class IdealTreeBuilder {
 
         if (!options.getRelease().linksNestingLoopsWherePlaced()) {
             // before npm 7.20.6 a nesting loop (a1 -> b1 -> a2 -> b2 -> a1 -> ...) is linked to the earlier instance
-            // here, under the dependent, or under its resolve parent for a peer
-            Node realParent = edge.isPeer() ? from.getResolveParent() : from;
+            // here, under the dependent, or under its resolve parent for a peer; before 7.1.1 under the virtual root
+            Node realParent = !options.getRelease().linksNestingLoopsUnderDependent() ? parent :
+                    edge.isPeer() ? from.getResolveParent() : from;
             for (Node p = from.getResolveParent(); p != null; p = p.getResolveParent()) {
                 // before npm 7.5.0 only the root is passed over, not every top
                 boolean passedOver = options.getRelease().passesOverTopsInNestingLoops() ? p.isTop() : p.isRoot();
@@ -1237,6 +1243,10 @@ public final class IdealTreeBuilder {
 
     private void resolveLinks() {
         Node tree = Objects.requireNonNull(idealTree);
+        if (!options.getRelease().skipsUnplacedLinks()) {
+            resolveLinksOfArborist1(tree);
+            return;
+        }
         for (Node link : new ArrayList<>(linkNodes)) {
             linkNodes.remove(link);
 
@@ -1274,6 +1284,80 @@ public final class IdealTreeBuilder {
                 depsQueue.push(target);
             }
         }
+    }
+
+    // [_resolveLinks] of arborist 1 (npm 7.1.0), whose root setter gives a link target no fsParent: the node the
+    // inventory holds at a link's realpath becomes its target, and a target with neither parent nor fsParent takes the
+    // first node of the tree walking up from it as fsParent and is queued
+    private void resolveLinksOfArborist1(Node tree) {
+        NpmRelease release = options.getRelease();
+        boolean walksUpRealpath = release.walksUpRealpathOfLinkTargets();
+        for (Node link : new ArrayList<>(linkNodes)) {
+            linkNodes.remove(link);
+            String realpath = Js.string(link.getRealpath());
+            String loc = Relpath.relpath(path, realpath);
+            Node fromInv = tree.getInventory().get(loc);
+            if (fromInv != null && fromInv != link.getTarget()) {
+                ((Link) link).setTarget(fromInv);
+            }
+
+            boolean external = loc.equals("..") || loc.startsWith("../");
+
+            // outside the root, somebody else's problem, ignore it: before npm 7.0.10, before the fsParent is found
+            if (external && !walksUpRealpath) {
+                continue;
+            }
+
+            if (targetOf(link).getParent() == null && targetOf(link).getFsParent() == null) {
+                // the fsParent is likely some node in the tree, possibly the root: where its deps may be installed
+                if (walksUpRealpath) {
+                    for (String p : PosixPath.walkUp(PosixPath.dirname(realpath))) {
+                        String ploc = Relpath.relpath(path, p);
+                        Node node = ploc.isEmpty() ? tree : tree.getInventory().get(ploc);
+                        if (node != null) {
+                            targetOf(link).setFsParent(node);
+                            depsQueue.push(targetOf(link));
+                            break;
+                        }
+                    }
+                } else {
+                    List<String> parts = Arrays.asList(loc.split("/", -1));
+                    for (int p = parts.size() - 1; p > -1; p--) {
+                        String ploc = String.join("/", parts.subList(0, p));
+                        if (ploc.isEmpty() && external) {
+                            break;
+                        }
+                        Node node = ploc.isEmpty() ? tree : tree.getInventory().get(ploc);
+                        if (node != null) {
+                            targetOf(link).setFsParent(node);
+                            depsQueue.push(targetOf(link));
+                            p = -1;
+                        }
+                    }
+                }
+            }
+
+            if (external) {
+                continue;
+            }
+
+            // before npm 7.0.9 a target is queued only where the walk up gives it an fsParent
+            Node target = targetOf(link);
+            boolean unseenLink = (target.getParent() != null || target.getFsParent() != null) &&
+                                 !depsSeen.contains(target);
+            if (unseenLink && release.resolvesLinksOfDependencies()) {
+                depsQueue.push(target);
+            }
+        }
+    }
+
+    // link.target, read where a missing one is a TypeError
+    private static Node targetOf(Node link) {
+        Node target = link.getTarget();
+        if (target == null) {
+            throw new IllegalArgumentException("Cannot read properties of null (reading 'parent')");
+        }
+        return target;
     }
 
     private void fixDepFlags() {
