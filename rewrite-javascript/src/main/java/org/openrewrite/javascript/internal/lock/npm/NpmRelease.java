@@ -178,6 +178,15 @@ public final class NpmRelease implements Comparable<NpmRelease> {
     }
 
     /**
+     * {@code [_inflateAncientLockfile]} fetches a node by its version, by {@code file:} of its path where it has
+     * neither version nor resolved, and reads a spec from the node's parent directory, from npm 7.18.0; before, by its
+     * resolved where it has no version (the latest where it has neither), read from the node's own path.
+     */
+    boolean inflatesFromParentDirectory() {
+        return atLeast(7, 18, 0);
+    }
+
+    /**
      * {@code #nodeFromSpec}: under {@code install-links}, a directory dependency of an installed {@code file:} package
      * is installed from that package's source instead of linked, from npm 11.6.0.
      */
@@ -1003,6 +1012,14 @@ public final class NpmRelease implements Comparable<NpmRelease> {
     // @npmcli/arborist shrinkwrap.js
 
     /**
+     * {@code add}: a node takes the resolved and integrity the lock records at its path only where the lock's version
+     * there is its own, from npm 7.15.1; before, whatever version the lock records.
+     */
+    boolean checksVersionOfLockedEntry() {
+        return atLeast(7, 15, 1);
+    }
+
+    /**
      * {@code defaultLockfileVersion}, what a lock is written as when neither the config nor the lock says: 3 from npm
      * 9.0.0; 2 before.
      */
@@ -1088,6 +1105,14 @@ public final class NpmRelease implements Comparable<NpmRelease> {
      */
     boolean refusesNewerLockfile() {
         return atLeast(12, 0, 0);
+    }
+
+    /**
+     * {@code addEdge}: a registry dependency a yarn.lock entry resolves at the yarn registry is resolved at the npm
+     * registry instead, from npm 7.5.6; before, at the yarn registry's URL as the entry writes it.
+     */
+    boolean rewritesYarnRegistryOfEdgeEntries() {
+        return atLeast(7, 5, 6);
     }
 
     /**

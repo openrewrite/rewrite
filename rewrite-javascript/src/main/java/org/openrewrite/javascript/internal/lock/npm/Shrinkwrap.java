@@ -775,10 +775,12 @@ public final class Shrinkwrap {
                                  Js.strictEquals(node.getResolved(), pathFixed);
             boolean integrityOk = !truthy(integrity) || !truthy(node.getIntegrity()) ||
                                   Js.strictEquals(node.getIntegrity(), integrity);
-            boolean versionOk = !truthy(version) || !truthy(node.getVersion()) ||
+            // before npm 7.15.1 the version the lock records at the path is not compared
+            boolean checksVersion = resolveOptions.getRelease().checksVersionOfLockedEntry();
+            boolean versionOk = !checksVersion || !truthy(version) || !truthy(node.getVersion()) ||
                                 Js.strictEquals(version, node.getVersion());
 
-            boolean allOk = (truthy(resolved) || truthy(integrity) || truthy(version)) &&
+            boolean allOk = (truthy(resolved) || truthy(integrity) || checksVersion && truthy(version)) &&
                             resolvedOk && integrityOk && versionOk;
 
             if (!allOk) {
@@ -835,8 +837,9 @@ public final class Shrinkwrap {
         }
 
         Object entryResolved = entry.get("resolved");
-        if (entryResolved instanceof String && yarnRegRe().matcher((String) entryResolved).find() &&
-            spec.isRegistry()) {
+        // before npm 7.5.6 the yarn registry's URL is taken as it is
+        if (resolveOptions.getRelease().rewritesYarnRegistryOfEdgeEntries() && entryResolved instanceof String &&
+            yarnRegRe().matcher((String) entryResolved).find() && spec.isRegistry()) {
             entryResolved = yarnRegRe().matcher((String) entryResolved).replaceFirst("https://registry.npmjs.org/");
             entry.set("resolved", entryResolved);
         }

@@ -501,11 +501,21 @@ public final class IdealTreeBuilder {
             }
             Object resolved = node.getResolved();
             Object version = node.getVersion();
-            boolean useResolved = truthy(resolved) && (!truthy(version) || Js.string(resolved).startsWith("file:"));
-            // before npm 8.6.0, version || `file:${node.path}`
-            Object id = useResolved ? resolved :
-                    skipsLinkTargets || truthy(version) ? version : "file:" + node.getPath();
-            Spec spec = Spec.resolve(node.getName(), Js.string(id), PosixPath.dirname(node.getPath()),
+            Object id;
+            String where;
+            if (options.getRelease().inflatesFromParentDirectory()) {
+                boolean useResolved = truthy(resolved) && (!truthy(version) || Js.string(resolved).startsWith("file:"));
+                // before npm 8.6.0, version || `file:${node.path}`
+                id = useResolved ? resolved : skipsLinkTargets || truthy(version) ? version : "file:" + node.getPath();
+                where = PosixPath.dirname(node.getPath());
+            } else {
+                // before npm 7.18.0 the resolved of a node without a version, which may be none (the latest), read
+                // from the node's own path
+                boolean useResolved = !truthy(version) || truthy(resolved) && Js.string(resolved).startsWith("file:");
+                id = useResolved ? resolved : version;
+                where = node.getPath();
+            }
+            Spec spec = Spec.resolve(node.getName(), id == null ? "" : Js.string(id), where,
                     options.getRelease().npmPackageArg());
             try {
                 Pacote.Options pacoteOptions = Pacote.Options.builder()
