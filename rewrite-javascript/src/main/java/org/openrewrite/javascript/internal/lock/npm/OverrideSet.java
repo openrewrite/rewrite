@@ -56,16 +56,31 @@ public final class OverrideSet {
     private @Nullable Object value;
 
     /**
+     * The npm release whose arborist reads the overrides.
+     */
+    private final NpmRelease release;
+
+    /**
      * @param overrides a package's {@code overrides}: a spec string or a map of keys to nested overrides.
      * @throws IllegalArgumentException for an override that is {@code null}, as arborist throws.
      */
     public OverrideSet(@Nullable Object overrides) {
-        this(overrides, null, null);
+        this(overrides, NpmRelease.PORTED);
+    }
+
+    public OverrideSet(@Nullable Object overrides, NpmRelease release) {
+        this(overrides, null, null, release);
+    }
+
+    OverrideSet(@Nullable Object overrides, @Nullable String key, @Nullable OverrideSet parent) {
+        this(overrides, key, parent, parent != null ? parent.release : NpmRelease.PORTED);
     }
 
     @SuppressWarnings("unchecked")
-    OverrideSet(@Nullable Object overrides, @Nullable String key, @Nullable OverrideSet parent) {
+    private OverrideSet(@Nullable Object overrides, @Nullable String key, @Nullable OverrideSet parent,
+                        NpmRelease release) {
         this.parent = parent;
+        this.release = release;
 
         if (overrides instanceof String) {
             Map<String, Object> rule = new LinkedHashMap<>();
@@ -78,13 +93,15 @@ public final class OverrideSet {
         }
 
         if (parent != null) {
-            Spec spec = Spec.npa(key);
+            Spec spec = Spec.npa(key, null, release.npmPackageArg());
             if (spec.getName() == null || spec.getName().isEmpty()) {
                 throw new IllegalArgumentException("Override without name: " + key);
             }
             this.name = spec.getName();
             this.key = key;
-            this.keySpec = spec.withoutName().toString();
+            // before npm 9.0.0, spec.rawSpec === '' ? '' : spec.toString()
+            this.keySpec = release.keepsEmptyOverrideKeySpec() && spec.getRawSpec().isEmpty() ? "" :
+                    spec.withoutName().toString();
             Object dot = Js.get(overrides, ".");
             this.value = truthy(dot) ? dot : this.keySpec;
         }
@@ -136,6 +153,9 @@ public final class OverrideSet {
     }
 
     public OverrideSet getEdgeRule(Edge edge) {
+        if (!release.matchesEdgeRuleByRawSpec()) {
+            return getEdgeRule(edge.getName(), edge::getSpec);
+        }
         return getEdgeRule(edge.getName(), () -> edge.getRawSpec().isEmpty() ? edge.getSpec() : edge.getRawSpec());
     }
 
@@ -145,6 +165,9 @@ public final class OverrideSet {
 
     // the spec is read only for a rule that compares it: reading an edge's can throw on an unresolvable $reference
     private OverrideSet getEdgeRule(String edgeName, Supplier<String> edgeSpec) {
+        if (!release.matchesEdgeRuleBySpecType()) {
+            return getEdgeRuleBySemver(edgeName, edgeSpec);
+        }
         for (OverrideSet rule : getRuleset().values()) {
             if (!Objects.equals(rule.name, edgeName)) {
                 continue;
@@ -154,27 +177,43 @@ public final class OverrideSet {
                 return rule;
             }
 
-            Spec spec = Spec.npa(edgeName + "@" + edgeSpec.get());
+            Spec spec = Spec.npa(edgeName + "@" + edgeSpec.get(), null, release.npmPackageArg());
             if (spec.getType() == Spec.Type.ALIAS) {
                 spec = spec.getSubSpec();
             }
 
             if (spec.getType() == Spec.Type.GIT) {
                 if (spec.getGitRange() != null && !spec.getGitRange().isEmpty() &&
-                    NodeSemver.intersects(spec.getGitRange(), rule.keySpec, DEFAULT)) {
+                    NodeSemver.intersects(spec.getGitRange(), rule.keySpec, DEFAULT.release(release.semver()))) {
                     return rule;
                 }
                 continue;
             }
 
             if (spec.getType() == Spec.Type.RANGE || spec.getType() == Spec.Type.VERSION) {
-                if (NodeSemver.intersects(spec.getFetchSpec(), rule.keySpec, DEFAULT)) {
+                if (NodeSemver.intersects(spec.getFetchSpec(), rule.keySpec, DEFAULT.release(release.semver()))) {
                     return rule;
                 }
                 continue;
             }
 
             return rule;
+        }
+        return this;
+    }
+
+    // getEdgeRule before npm 9.3.0: semver.intersects(edge.spec, rule.keySpec), which throws on a spec that is no
+    // range; before npm 9.0.0 a rule whose key names no spec applies first
+    private OverrideSet getEdgeRuleBySemver(String edgeName, Supplier<String> edgeSpec) {
+        for (OverrideSet rule : getRuleset().values()) {
+            if (!Objects.equals(rule.name, edgeName)) {
+                continue;
+            }
+            if (release.keepsEmptyOverrideKeySpec() && "".equals(rule.keySpec) ||
+                NodeSemver.intersects(edgeSpec.get(), Objects.requireNonNull(rule.keySpec),
+                        DEFAULT.release(release.semver()))) {
+                return rule;
+            }
         }
         return this;
     }
@@ -197,8 +236,10 @@ public final class OverrideSet {
             if (!Objects.equals(rule.name, nodeName)) {
                 continue;
             }
-            if (NodeSemver.satisfies(version, rule.keySpec, DEFAULT) ||
-                rule.value instanceof String && NodeSemver.satisfies(version, (String) rule.value, DEFAULT)) {
+            NodeSemver.Options semver = DEFAULT.release(release.semver());
+            if (release.keepsEmptyOverrideKeySpec() && "".equals(rule.keySpec) ||
+                NodeSemver.satisfies(version, rule.keySpec, semver) ||
+                rule.value instanceof String && NodeSemver.satisfies(version, (String) rule.value, semver)) {
                 return rule;
             }
         }
@@ -238,10 +279,17 @@ public final class OverrideSet {
         if (contains(first, second)) {
             return first;
         }
+        if (!release(first, second).fallsBackToCommonOverrideAncestor()) {
+            return null;
+        }
         if (haveConflictingRules(first, second)) {
             return null;
         }
         return findCommonAncestor(first, second);
+    }
+
+    private static NpmRelease release(@Nullable OverrideSet first, @Nullable OverrideSet second) {
+        return first != null ? first.release : second != null ? second.release : NpmRelease.PORTED;
     }
 
     private static boolean contains(@Nullable OverrideSet set, @Nullable OverrideSet ancestor) {
@@ -266,14 +314,20 @@ public final class OverrideSet {
     }
 
     // findSpecificOverrideSet's undefined (conflicting rules) and null (no common ancestor) are one value here.
-    public static boolean doOverrideSetsConflict(OverrideSet first, OverrideSet second) {
+    public static boolean doOverrideSetsConflict(OverrideSet first, @Nullable OverrideSet second) {
         if (contains(second, first) || contains(first, second)) {
             return false;
+        }
+        if (!first.release.comparesOverrideRulesForConflict()) {
+            return true;
         }
         return haveConflictingRules(first, second);
     }
 
-    public static boolean haveConflictingRules(OverrideSet first, OverrideSet second) {
+    public static boolean haveConflictingRules(OverrideSet first, @Nullable OverrideSet second) {
+        if (second == null) {
+            throw new IllegalArgumentException("Cannot read properties of undefined (reading 'ruleset')");
+        }
         Map<String, OverrideSet> firstRules = first.getRuleset();
         Map<String, OverrideSet> secondRules = second.getRuleset();
 
@@ -292,11 +346,13 @@ public final class OverrideSet {
             }
 
             try {
-                Spec firstSpec = Spec.npa(firstRule.name + "@" + firstRule.value);
-                Spec secondSpec = Spec.npa(secondRule.name + "@" + secondRule.value);
+                Spec.Options npa = first.release.npmPackageArg();
+                Spec firstSpec = Spec.npa(firstRule.name + "@" + firstRule.value, null, npa);
+                Spec secondSpec = Spec.npa(secondRule.name + "@" + secondRule.value, null, npa);
                 if ((firstSpec.getType() == Spec.Type.RANGE || firstSpec.getType() == Spec.Type.VERSION) &&
                     (secondSpec.getType() == Spec.Type.RANGE || secondSpec.getType() == Spec.Type.VERSION)) {
-                    if (!NodeSemver.intersects(firstSpec.getFetchSpec(), secondSpec.getFetchSpec(), DEFAULT)) {
+                    if (!NodeSemver.intersects(firstSpec.getFetchSpec(), secondSpec.getFetchSpec(),
+                            DEFAULT.release(first.release.semver()))) {
                         return true;
                     }
                 }

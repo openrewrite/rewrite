@@ -83,10 +83,10 @@ final class ExtendInstallOptions {
     static StrictInstallOptions extendOptions(InstallOptions opts, String lockfileDir) {
         PnpmOptions config = opts.getConfig();
         List<ParseOverrides.VersionOverride> parsedOverrides = ParseOverrides.parseOverrides(opts.getOverrides(),
-                config.getCatalogs());
+                config.getCatalogs(), config.getRelease());
         ReadPackageHook readPackageHook = ReadPackageHook.createReadPackageHook(
                 config.isTrue("ignoreCompatibilityDb"), lockfileDir, parsedOverrides,
-                config.get("ignoredOptionalDependencies"), config.get("packageExtensions"));
+                config.get("ignoredOptionalDependencies"), config.get("packageExtensions"), config.getRelease());
         if (Js.truthy(config.get("virtualStoreOnly")) && !Js.truthy(config.get("enableModulesDir")) &&
             !Js.truthy(config.get("enableGlobalVirtualStore"))) {
             throw new PnpmError("CONFIG_CONFLICT_VIRTUAL_STORE_ONLY_WITH_NO_MODULES_DIR", "Cannot use " +

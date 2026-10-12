@@ -58,6 +58,11 @@ final class PatchingConfig {
     }
 
     static Map<String, PatchGroup> groupPatchedDependencies(Map<String, String> patchedDependencies) {
+        return groupPatchedDependencies(patchedDependencies, PnpmRelease.PORTED);
+    }
+
+    static Map<String, PatchGroup> groupPatchedDependencies(Map<String, String> patchedDependencies,
+                                                            PnpmRelease release) {
         Map<String, PatchGroup> result = new LinkedHashMap<>();
         for (Map.Entry<String, String> entry : patchedDependencies.entrySet()) {
             String key = entry.getKey();
@@ -70,7 +75,7 @@ final class PatchingConfig {
             }
             String nonSemverVersion = parsed.getNonSemverVersion();
             if (Js.truthy(name) && Js.truthy(nonSemverVersion)) {
-                if (ResolveDependencies.validRange(nonSemverVersion) == null) {
+                if (ResolveDependencies.validRange(nonSemverVersion, release) == null) {
                     throw new PnpmError("PATCH_NON_SEMVER_RANGE", nonSemverVersion +
                                                                   " is not a valid semantic version range.");
                 }
@@ -89,6 +94,14 @@ final class PatchingConfig {
 
     static @Nullable PatchInfo getPatchInfo(@Nullable Map<String, PatchGroup> patchFileGroups, String pkgName,
                                             String pkgVersion) {
+        return getPatchInfo(patchFileGroups, pkgName, pkgVersion, PnpmRelease.PORTED);
+    }
+
+    /**
+     * {@link #getPatchInfo(Map, String, String)} over the node-semver {@code release} bundles.
+     */
+    static @Nullable PatchInfo getPatchInfo(@Nullable Map<String, PatchGroup> patchFileGroups, String pkgName,
+                                            String pkgVersion, PnpmRelease release) {
         PatchGroup group = patchFileGroups == null ? null : patchFileGroups.get(pkgName);
         if (group == null) {
             return null;
@@ -99,7 +112,7 @@ final class PatchingConfig {
         }
         List<PatchGroupRangeItem> satisfied = new ArrayList<>();
         for (PatchGroupRangeItem item : group.range) {
-            if (satisfies(pkgVersion, item.getVersion())) {
+            if (satisfies(pkgVersion, item.getVersion(), release)) {
                 satisfied.add(item);
             }
         }
@@ -152,9 +165,10 @@ final class PatchingConfig {
                 "dependencies.");
     }
 
-    private static boolean satisfies(String version, String range) {
+    private static boolean satisfies(String version, String range, PnpmRelease release) {
         try {
-            return NodeSemver.satisfies(version, range, NodeSemver.Options.DEFAULT);
+            return release.underSemver(semver -> NodeSemver.satisfies(version, range,
+                    NodeSemver.Options.DEFAULT.release(semver)));
         } catch (IllegalArgumentException e) {
             return false;
         }

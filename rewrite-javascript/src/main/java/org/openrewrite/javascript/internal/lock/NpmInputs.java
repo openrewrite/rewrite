@@ -21,8 +21,11 @@ import org.openrewrite.javascript.internal.LockFileRegeneration.Result;
 import org.openrewrite.javascript.internal.lock.npm.NpmLockRegenerator;
 import org.openrewrite.javascript.internal.lock.npm.NpmLockRegenerator.Inputs;
 import org.openrewrite.javascript.internal.lock.npm.NpmManifestRules;
+import org.openrewrite.javascript.internal.lock.npm.NpmRelease;
+import org.openrewrite.javascript.internal.lock.npm.NpmReleases;
 import org.openrewrite.javascript.internal.lock.npm.Shrinkwrap;
 import org.openrewrite.javascript.internal.registry.NpmRegistryClient;
+import org.openrewrite.javascript.marker.NodeResolutionResult.PackageManager;
 
 import java.util.Arrays;
 import java.util.LinkedHashMap;
@@ -63,16 +66,25 @@ final class NpmInputs implements Port {
 
     @Override
     public Result regenerate(LockDirectory dir, HostInputs host, NpmRegistryClient client) {
-        return new NpmLockRegenerator(from(dir, host), new NpmRegistryPackuments(host.transport(), client))
-                .regenerate();
+        Inputs inputs;
+        try {
+            inputs = from(dir, host);
+        } catch (CannotKnow e) {
+            return Result.failure(LockOnlyInstall.cannotKnow(e));
+        }
+        return new NpmLockRegenerator(inputs, new NpmRegistryPackuments(host.transport(), client)).regenerate();
     }
 
     /**
-     * With the host's registries as npm's user config, its global and user npmrc; the marker's project npmrc (the
-     * repository root's) npm reads only as the .npmrc where it installs there.
+     * As the npm release that built the LST, 11.17.0 where the host recorded none. With the host's registries as
+     * npm's user config, its global and user npmrc; the marker's project npmrc (the repository root's) npm reads only
+     * as the .npmrc where it installs there.
+     *
+     * @throws CannotKnow where the npm that built the LST is a release the engine does not reproduce
      */
     static Inputs from(LockDirectory dir, HostInputs host) {
         return Inputs.builder()
+                .release(NpmReleases.installedAs(host.packageManagerVersion(PackageManager.Npm)))
                 .lock(dir.getLock())
                 .yarnLock(dir.file("yarn.lock"))
                 .npmrc(dir.file(".npmrc"))
@@ -139,11 +151,19 @@ final class NpmInputs implements Port {
 
     @Override
     public InstallRoot installRoot(LockDirectory dir) {
-        InstallRoot walked = NpmLockRegenerator.installRoot(dir.getRunsIn(), dir.getManifests(), parentTrees(dir));
+        // the release from(...) installs as; the regeneration reports one the engine does not reproduce
+        NpmRelease release;
+        try {
+            release = NpmReleases.installedAs(dir.packageManagerVersion(PackageManager.Npm));
+        } catch (CannotKnow e) {
+            return InstallRoot.STOPS_HERE;
+        }
+        InstallRoot walked = NpmLockRegenerator.installRoot(release, dir.getRunsIn(), dir.getManifests(),
+                parentTrees(dir));
         String root = dir.aboveRunsIn(walked.getDepth());
         Predicate<String> holds = name -> dir.holds(RootRelativePath.join(root, name));
-        boolean another = Shrinkwrap.readsShrinkwrap(holds) || Shrinkwrap.writesBesideLock(holds) &&
-                                                                !holds.test("package-lock.json");
+        boolean another = Shrinkwrap.readsShrinkwrap(release, holds) ||
+                          Shrinkwrap.writesBesideLock(holds) && !holds.test("package-lock.json");
         return walked.isStopped() || !another ? walked :
                 InstallRoot.stops(walked.getDepth(), InstallRoot.Stop.WRITES_ANOTHER_FILE);
     }

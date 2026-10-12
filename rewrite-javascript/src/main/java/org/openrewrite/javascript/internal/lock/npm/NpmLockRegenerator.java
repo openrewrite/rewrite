@@ -16,6 +16,7 @@
 package org.openrewrite.javascript.internal.lock.npm;
 
 import lombok.Builder;
+import lombok.Getter;
 import lombok.NonNull;
 import lombok.Singular;
 import lombok.Value;
@@ -35,8 +36,11 @@ import org.openrewrite.javascript.internal.lock.Spec;
 import org.openrewrite.javascript.internal.registry.NodeRegistryException;
 
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
+import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
@@ -45,7 +49,8 @@ import static org.openrewrite.javascript.internal.lock.npm.Js.truthy;
 
 /**
  * Port of @npmcli/arborist lib/arborist/index.js and reify.js (npm 11.17.0) for {@code npm install
- * --package-lock-only}; the lock written must come back unchanged from a second install, or that install is reported.
+ * --package-lock-only}, after the {@code devEngines} check of npm's lib/base-cmd.js; the lock written must come back
+ * unchanged from a second install, or that install is reported.
  */
 public final class NpmLockRegenerator {
 
@@ -55,6 +60,12 @@ public final class NpmLockRegenerator {
     @Value
     @Builder
     public static class Inputs {
+        /**
+         * The npm release that installs the project: the one that built its LST ({@link NpmReleases#installedAs}).
+         */
+        @Builder.Default
+        NpmRelease release = NpmRelease.PORTED;
+
         /**
          * The package-lock.json; null when the project has none.
          */
@@ -120,6 +131,28 @@ public final class NpmLockRegenerator {
         Map<String, Map<String, @Nullable String>> parentTrees;
     }
 
+    /**
+     * {@code EBADDEVENGINES}: the {@code devEngines} of the package npm installs exclude the environment it runs in.
+     */
+    @Getter
+    static final class BadDevEngines extends IllegalStateException implements NpmError {
+        private final String engine;
+        private final transient Object current;
+        private final transient @Nullable Object required;
+
+        BadDevEngines(String message, NpmInstallChecks.InvalidDevEngine failure) {
+            super(message);
+            this.engine = failure.getEngine();
+            this.current = failure.getCurrent();
+            this.required = failure.getRequired();
+        }
+
+        @Override
+        public String getCode() {
+            return "EBADDEVENGINES";
+        }
+    }
+
     private static final LockOnlyInstall INSTALL = LockOnlyInstall.NPM;
 
     private final Inputs inputs;
@@ -135,16 +168,22 @@ public final class NpmLockRegenerator {
         String path;
         String written;
         String yarnLock;
+        Map<String, String> manifestsAgain;
         try {
-            INSTALL.requireInstallsAt(NpmOptions.loadLocalPrefix(inputs.getManifests().get(inputs.getRunsIn()),
-                    inputs.getParentTrees()), inputs.getRunsIn(), "lock");
-            if (inputs.getPaths() != null && Shrinkwrap.readsShrinkwrap(inputs.getPaths()::contains)) {
+            INSTALL.requireInstallsAt(NpmOptions.loadLocalPrefix(inputs.getRelease(),
+                    inputs.getManifests().get(inputs.getRunsIn()), inputs.getParentTrees()), inputs.getRunsIn(),
+                    "lock");
+            if (inputs.getPaths() != null &&
+                Shrinkwrap.readsShrinkwrap(inputs.getRelease(), inputs.getPaths()::contains)) {
                 throw new CannotKnow("the lock npm writes: it reads and writes the npm-shrinkwrap.json beside this " +
                                      "lock in its place");
             }
             CannotKnow.requireRead(inputs.getNpmrc(), inputs.getPaths(), ".npmrc");
             CannotKnow.requireRead(inputs.getYarnLock(), inputs.getPaths(), "yarn.lock");
-            options = NpmOptions.fromNpmrc(inputs.getUserNpmrc(), inputs.getNpmrc());
+            options = NpmOptions.fromNpmrc(inputs.getRelease(), inputs.getUserNpmrc(), inputs.getNpmrc());
+            if (!options.isGlobal()) {
+                checkDevEngines(inputs.getManifests().get(""), options, inputs.getHost());
+            }
             if (options.isGlobal()) {
                 throw new NpmRejection("ESHRINKWRAPGLOBAL", "cannot generate lockfile for global packages", null);
             }
@@ -156,15 +195,26 @@ public final class NpmLockRegenerator {
             if (!options.isSave() || options.isDryRun()) {
                 return Result.success(Objects.requireNonNull(inputs.getLock()));
             }
+            Object rootName = Objects.requireNonNull(Objects.requireNonNull(arb.getIdealTree()).getTarget())
+                    .getPackageName();
+            if (inputs.getDirectoryName() == null && !inputs.getRelease().writesRootPackageName() &&
+                rootName instanceof String && !((String) rootName).isEmpty()) {
+                // the root entry names the package only where the directory npm runs in is named otherwise, and the
+                // host knows no name of the repository's root
+                throw new CannotKnow("the project directory name (npm before 7.20.6 writes the package's name in " +
+                                     "the lock's root entry only when the directory it runs in has another)");
+            }
             written = saveIdealTree(arb, options);
             yarnLock = Objects.requireNonNull(arb.buildIdealTree().getMeta()).yarnLockText();
+            manifestsAgain = manifestsAfterSave(arb);
         } catch (NodeRegistryException e) {
             throw e;
         } catch (RuntimeException e) {
             return Result.failure(failure(e));
         }
         Result verified = INSTALL.verify(written, lock -> {
-            IdealTreeBuilder again = arborist(path, projectFiles(new LockFile(lock)), options);
+            IdealTreeBuilder again = arborist(path, projectFiles(new LockFile(lock), inputs.getYarnLock(),
+                    manifestsAgain).readBy(inputs.getRelease(), inputs.getPaths()), options);
             again.buildIdealTree();
             return saveIdealTree(again, options);
         }, NpmLockRegenerator::failure);
@@ -173,16 +223,94 @@ public final class NpmLockRegenerator {
     }
 
     /**
-     * Where npm run in {@code runsIn} installs and writes its lock, by {@link Inputs#getParentTrees()}; a walk that
-     * fails, which {@link #regenerate()} reports as it walks first, stops here.
+     * Where npm {@code release} run in {@code runsIn} installs and writes its lock, by {@link
+     * Inputs#getParentTrees()}; a walk that fails, which {@link #regenerate()} reports as it walks first, stops here.
      */
-    public static InstallRoot installRoot(String runsIn, Map<String, String> manifests,
+    public static InstallRoot installRoot(NpmRelease release, String runsIn, Map<String, String> manifests,
                                           Map<String, Map<String, @Nullable String>> parentTrees) {
         try {
-            return InstallRoot.at(NpmOptions.loadLocalPrefix(manifests.get(runsIn), parentTrees));
+            return InstallRoot.at(NpmOptions.loadLocalPrefix(release, manifests.get(runsIn), parentTrees));
         } catch (RuntimeException e) {
             return InstallRoot.STOPS_HERE;
         }
+    }
+
+    /**
+     * base-cmd.js {@code checkDevEngines}, which npm.js runs before a command that is not global: the
+     * {@code devEngines} of the package.json where npm installs against the environment npm runs in. Of the engines it
+     * does not satisfy, the first whose mismatch is an error is npm's {@code EBADDEVENGINES}; npm logs those that warn
+     * and, under {@code force}, the errors too.
+     *
+     * @param manifest that package.json; null without one
+     * @return what npm logs, each warning as it words it
+     */
+    static List<String> checkDevEngines(@Nullable String manifest, NpmOptions options, Host host) {
+        boolean force = options.isForce();
+
+        Object devEngines = Js.get(localPackage(manifest, options.getRelease()), "devEngines");
+
+        // a release without the check never reads the field
+        if (devEngines == Js.UNDEFINED || !options.getRelease().checksDevEngines()) {
+            return Collections.emptyList();
+        }
+
+        Map<String, Object> current = NpmInstallChecks.devEngines(host, options.getNpmVersion());
+
+        List<NpmInstallChecks.InvalidDevEngine> warnings = new ArrayList<>();
+        List<NpmInstallChecks.InvalidDevEngine> errors = new ArrayList<>();
+        for (NpmInstallChecks.InvalidDevEngine failure : NpmInstallChecks.checkDevEngines(devEngines, current,
+                options.getRelease())) {
+            if (failure.isWarn()) {
+                warnings.add(failure);
+            }
+            if (failure.isError()) {
+                errors.add(failure);
+            }
+        }
+
+        List<String> logged = new ArrayList<>();
+        for (NpmInstallChecks.InvalidDevEngine failure : warnings) {
+            logged.add(genMsg(failure, logged.size()));
+        }
+        if (force) {
+            for (NpmInstallChecks.InvalidDevEngine failure : errors) {
+                logged.add(genMsg(failure, logged.size()));
+            }
+            return logged;
+        }
+
+        if (!errors.isEmpty()) {
+            NpmInstallChecks.InvalidDevEngine failure = errors.get(0);
+            throw new BadDevEngines(genMsg(failure, 0), failure);
+        }
+        return logged;
+    }
+
+    private static String genMsg(NpmInstallChecks.InvalidDevEngine failure, int i) {
+        Set<String> lines = new LinkedHashSet<>();
+        lines.add(i == 0 ? "The developer of this package has specified the following through devEngines" : "");
+        lines.add(failure.getMessage());
+        lines.add(String.join("\n", failure.getErrors()));
+        lines.remove("");
+        return String.join("\n", lines);
+    }
+
+    /**
+     * {@code PackageJson.normalize(localPrefix).then(p => p.content).catch(() => ({}))}: the package.json where npm
+     * {@code release} installs as its own commands read it, an empty one where there is none or it does not normalize.
+     */
+    static Map<String, Object> localPackage(@Nullable String manifest, NpmRelease release) {
+        if (manifest != null) {
+            try {
+                return PackageJson.normalize(manifest, release).getContent();
+            } catch (PackageJson.NeedsPackageFiles e) {
+                // normalize fills bin from the package's files; every other field is as the manifest has it
+                return e.getContent();
+            } catch (RuntimeException e) {
+                return new LinkedHashMap<>();
+            }
+        }
+        return new LinkedHashMap<>();
     }
 
     /**
@@ -192,7 +320,7 @@ public final class NpmLockRegenerator {
     static Node setWorkspaces(Node node, VirtualTreeLoader.ProjectFiles files) {
         Map<String, String> workspaces = new LinkedHashMap<>();
         for (Map.Entry<Object, String> workspace : MapWorkspaces.mapWorkspaces(node.getPath(), node.getPackage(),
-                files).entrySet()) {
+                files, node.getRelease()).entrySet()) {
             // the workspace edge the name becomes is what refuses it
             if (!(workspace.getKey() instanceof String)) {
                 throw new IllegalArgumentException("must provide dependency name");
@@ -206,7 +334,8 @@ public final class NpmLockRegenerator {
     }
 
     private VirtualTreeLoader.ProjectFiles projectFiles(@Nullable LockFile lock) {
-        return projectFiles(lock, inputs.getYarnLock(), inputs.getManifests());
+        return projectFiles(lock, inputs.getYarnLock(), inputs.getManifests())
+                .readBy(inputs.getRelease(), inputs.getPaths());
     }
 
     /**
@@ -243,6 +372,25 @@ public final class NpmLockRegenerator {
             }
         }
         return files.build();
+    }
+
+    /**
+     * The project's manifests as the install leaves them for the next one: before npm 7.14.0 every install writes the
+     * root package.json back (update-root-package-json.js). Where the host holds no root package.json, the lock's
+     * root entry stands in for it on both installs alike.
+     */
+    private Map<String, String> manifestsAfterSave(IdealTreeBuilder arb) {
+        Map<String, String> manifests = inputs.getManifests();
+        String rootJson = manifests.get("");
+        PackageJson rootManifest = arb.getRootManifest();
+        if (!inputs.getRelease().rewritesRootPackageJson() || rootJson == null || rootManifest == null) {
+            return manifests;
+        }
+        Map<String, Object> pkg = Objects.requireNonNull(arb.getIdealTree()).getPackage();
+        Map<String, String> after = new LinkedHashMap<>(manifests);
+        after.put("", UpdateRootPackageJson.updateRootPackageJson(pkg, rootJson, rootManifest.getIndent(),
+                rootManifest.getNewline(), inputs.getRelease()));
+        return after;
     }
 
     private IdealTreeBuilder arborist(String path, VirtualTreeLoader.ProjectFiles files, NpmOptions options) {
@@ -312,9 +460,9 @@ public final class NpmLockRegenerator {
         if (e instanceof PlaceDep.CouldNotResolve) {
             PlaceDep.PeerConflict conflict = ((PlaceDep.CouldNotResolve) e).getConflict();
             return Rejected.coded(Reason.PEER_CONFLICT, conflict.getEdge().getName(), "ERESOLVE",
-                    ExplainEresolve.explain(conflict.getExplanation(), 4));
+                    ExplainEresolve.explain(conflict.getExplanation(), 4, conflict.getEdge().getRelease()));
         }
-        if (e instanceof CannotKnow) {
+        if (e instanceof CannotKnow || e instanceof Rejected) {
             return e;
         }
         if (e instanceof PackageJson.NeedsPackageFiles) {
@@ -345,6 +493,10 @@ public final class NpmLockRegenerator {
     }
 
     private static Reason reasonFor(String code) {
+        // npm 12's verdicts on the root's packageExtensions and patchedDependencies
+        if (code.startsWith("EEXTENSION") || code.startsWith("EPATCH")) {
+            return Reason.MALFORMED_MANIFEST;
+        }
         switch (code) {
             case "E404":
                 return SharedError.PACKAGE_NOT_FOUND.getReason();
@@ -357,6 +509,8 @@ public final class NpmLockRegenerator {
             case "ENOVERSIONS":
             case "E403":
                 return Reason.VERSION_NOT_FOUND;
+            case "ELOCKFILEVERSION":
+                return Reason.UNSUPPORTED_LOCKFILE_VERSION;
             case "EUNSUPPORTEDPROTOCOL":
             case "EALLOWGIT":
             case "EALLOWFILE":

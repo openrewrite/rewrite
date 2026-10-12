@@ -35,7 +35,7 @@ final class ExplainEresolve {
     private ExplainEresolve() {
     }
 
-    static String explain(Map<String, Object> expl, int depth) {
+    static String explain(Map<String, Object> expl, int depth, NpmRelease release) {
         Map<String, Object> edge = map(expl.get("edge"));
         Map<String, Object> dep = map(expl.get("dep"));
         Map<String, Object> current = map(expl.get("current"));
@@ -43,6 +43,25 @@ final class ExplainEresolve {
         Map<String, Object> currentEdge = map(expl.get("currentEdge"));
 
         List<String> out = new ArrayList<>();
+        if (!release.explainsPeerConflictAsCurrentAndPeer()) {
+            // the explanation build-ideal-tree.js gives before npm 7.20.3: its peerConflict is the conflicting peer
+            Map<String, Object> from = edge == null ? null : map(edge.get("from"));
+            if (from != null && map(from.get("whileInstalling")) != null) {
+                out.add("While resolving: " + printNode(map(from.get("whileInstalling"))));
+            }
+            if (current != null) {
+                out.add("Found: " + explainNode(current, depth, new LinkedHashSet<>()));
+            } else if (currentEdge != null) {
+                out.add("Found: " + explainEdge(currentEdge, depth, new LinkedHashSet<>()));
+            }
+            out.add("\nCould not resolve dependency:\n" + explainEdge(edge, depth, new LinkedHashSet<>()));
+            if (peerConflict != null) {
+                out.add("\nConflicting peer dependency: " + explainNode(peerConflict, depth, new LinkedHashSet<>()));
+            }
+            return String.join("\n", out);
+        }
+
+
         Map<String, Object> whileInstalling = dep != null && map(dep.get("whileInstalling")) != null ?
                 map(dep.get("whileInstalling")) :
                 current != null && map(current.get("whileInstalling")) != null ? map(current.get("whileInstalling")) :
@@ -134,8 +153,17 @@ final class ExplainEresolve {
             dep = "overridden " + dep + " (was \"" + string(edge.get("rawSpec")) + "\")";
         }
         String fromMsg = " from " + explainFrom(from, depth, seen);
+        // npm 12.0.0 notes an edge a root packageExtensions rule added, or a root .npm-extension changed
+        Map<String, Object> packageExtensions = map(edge.get("packageExtensions"));
+        String extMsg = packageExtensions == null ? "" :
+                " (added by packageExtensions[\"" + string(packageExtensions.get("selector")) + "\"]." +
+                string(packageExtensions.get("field")) + "." + name + ")";
+        Map<String, Object> npmExtension = map(edge.get("npmExtension"));
+        String npmExtMsg = npmExtension == null ? "" :
+                " (changed by .npm-extension " + string(npmExtension.get("extensionPoint")) + " " +
+                string(npmExtension.get("field")) + "." + name + ")";
         return ("prod".equals(type) ? "" : type + " ") + (truthy(edge.get("bundled")) ? "bundled " : "") + dep +
-                fromMsg;
+                fromMsg + extMsg + npmExtMsg;
     }
 
     private static String explainFrom(@Nullable Map<String, Object> from, int depth, Set<String> seen) {

@@ -31,12 +31,14 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 import java.util.function.Predicate;
+import java.util.function.Supplier;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.regex.PatternSyntaxException;
 
 /**
- * Port of minimatch on POSIX paths: 3.0.4, which yarn 1.22.22 bundles, and 10.2.5, which npm 11.17.0 bundles.
+ * Port of minimatch on POSIX paths: 3.0.4, which yarn 1.22.22 bundles, and 10.2.5, which npm 11.17.0 bundles, with the
+ * brace-expansion its bundler installs beside it.
  */
 public final class Minimatch {
 
@@ -64,6 +66,13 @@ public final class Minimatch {
         boolean flipNegate;
         boolean partial;
         boolean windowsPathsNoEscape;
+
+        /**
+         * The brace-expansion 10.2.5 calls, which its bundler chooses: asked for only by a pattern with braces, and
+         * 5.0.6 when null.
+         */
+        @Nullable
+        Supplier<BraceExpansion.Release> braceExpansion;
 
         public static OptionsBuilder builder(Release release) {
             return hiddenBuilder().release(release);
@@ -213,7 +222,9 @@ public final class Minimatch {
         if (!HAS_BRACE_10_2_5.matcher(pattern).find()) {
             return Collections.singletonList(pattern);
         }
-        return BraceExpansion.expand(pattern, BraceExpansion.Release.V5_0_6);
+        Supplier<BraceExpansion.Release> braceExpansion = options.getBraceExpansion();
+        return BraceExpansion.expand(pattern, braceExpansion == null ? BraceExpansion.Release.V5_0_6 :
+                braceExpansion.get());
     }
 
     public boolean match(String f) {

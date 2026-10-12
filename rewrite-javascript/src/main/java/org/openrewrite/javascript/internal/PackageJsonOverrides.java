@@ -28,6 +28,7 @@ import org.openrewrite.javascript.internal.lock.EcmaScript;
 import org.openrewrite.javascript.internal.lock.ManifestRules;
 import org.openrewrite.javascript.internal.lock.ManifestRules.OverridePlace;
 import org.openrewrite.javascript.marker.NodeResolutionResult.PackageManager;
+import org.openrewrite.javascript.marker.NodeRuntime;
 import org.openrewrite.json.tree.Json;
 import org.openrewrite.json.tree.JsonRightPadded;
 import org.openrewrite.json.tree.JsonValue;
@@ -92,9 +93,15 @@ public final class PackageJsonOverrides {
     public static PackageJsonOverrides of(PackageManager pm, Json.Document root, @Nullable String workspaceManifest,
                                           String packageName, String newVersion,
                                           @Nullable List<DependencyPathSegment> path) {
-        ManifestRules rules = LockFileRegeneration.manifestRules(pm);
+        ManifestRules rules = LockFileRegeneration.manifestRules(pm).installedAs(installingVersion(pm, root));
         return new PackageJsonOverrides(rules, root, new WorkspaceSettings(rules, workspaceManifest), packageName,
                 newVersion, path);
+    }
+
+    // the release of pm the root's NodeRuntime marker records, the one that built the LST and installs; null for none
+    private static @Nullable String installingVersion(PackageManager pm, Json.Document root) {
+        NodeRuntime runtime = root.getMarkers().findFirst(NodeRuntime.class).orElse(null);
+        return runtime != null && runtime.getPackageManager() == pm ? runtime.getPackageManagerVersion() : null;
     }
 
     /**
@@ -219,7 +226,7 @@ public final class PackageJsonOverrides {
         if (release != null && release.declined() != null) {
             return "the override is not written: " + release.declined();
         }
-        String rejected = rules.overrideDeclined(packageName, segments());
+        String rejected = rules.overrideDeclined(packageName, newVersion, segments(), place);
         if (rejected != null) {
             return rejected;
         }

@@ -256,15 +256,18 @@ public final class PlaceDep {
             return;
         }
 
-        for (Node p = target; p != null; p = p.getResolveParent()) {
+        // before npm 7.20.6 the ideal tree builder links a nesting loop when it loads the node
+        for (Node p = options.getRelease().linksNestingLoopsWherePlaced() ? target : null; p != null;
+             p = p.getResolveParent()) {
             if (p.matches(dep) && !p.isTop()) {
-                placed = new Link(Node.options().parent(target).target(p).build());
+                placed = new Link(Node.options().release(options.getRelease()).parent(target).target(p).build());
                 return;
             }
         }
 
         Node virtualRoot = dep.getParent();
         Node.Options.OptionsBuilder placedOptions = Node.options()
+                .release(options.getRelease())
                 .name(dep.getName())
                 .pkg(dep.getPackage())
                 .resolved(dep.getResolved())
@@ -272,6 +275,13 @@ public final class PlaceDep {
                 .installLinks(options.isInstallLinks())
                 .legacyPeerDeps(options.isLegacyPeerDeps())
                 .error(dep.getErrors().isEmpty() ? null : dep.getErrors().get(0));
+        // npm 12.0.0 carries what a root manifest extension did to the dep, which only it records
+        if (Js.truthy(dep.getPackageExtensionsApplied())) {
+            placedOptions.packageExtensionsApplied(dep.getPackageExtensionsApplied());
+        }
+        if (Js.truthy(dep.getNpmExtensionApplied())) {
+            placedOptions.npmExtensionApplied(dep.getNpmExtensionApplied());
+        }
         if (dep.getOverrides() != null) {
             placedOptions.overrides(dep.getOverrides());
         }
@@ -347,7 +357,9 @@ public final class PlaceDep {
         }
 
         List<Node> prunePeerSets = new ArrayList<>();
-        for (Edge edge : oldDep.getEdgesIn()) {
+        // before npm 7.24.2 the peer sets the replacement no longer satisfies are left as they are
+        for (Edge edge : options.getRelease().prunesConflictedPeerSets() ? oldDep.getEdgesIn() :
+                Collections.<Edge>emptySet()) {
             if (placed.satisfies(edge) ||
                 !edge.isPeer() ||
                 edge.getFrom().getParent() != target ||
@@ -357,8 +369,10 @@ public final class PlaceDep {
             for (Edge entryEdge : PeerEntrySets.peerEntrySets(edge.getFrom()).keySet()) {
                 Node entryNode = entryEdge.getTo();
                 Node deepestTarget = deepestNestingTarget(entryNode, null);
+                Node entryFrom = entryEdge.getFrom();
                 if (deepestTarget != target &&
-                    !(entryEdge.getFrom().isProjectRoot() || entryEdge.getFrom().isWorkspace())) {
+                    !(options.getRelease().leavesWorkspacePeerEntriesAlone() ?
+                            entryFrom.isProjectRoot() || entryFrom.isWorkspace() : entryFrom.isRoot())) {
                     prunePeerSets.addAll(gatherDepSet(singletonList(entryNode),
                             e -> e.getTo() != entryNode && !e.isPeerConflicted()));
                 } else {

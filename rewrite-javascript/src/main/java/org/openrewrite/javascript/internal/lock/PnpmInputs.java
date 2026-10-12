@@ -20,8 +20,10 @@ import org.openrewrite.javascript.internal.LockFileRegeneration.Result;
 import org.openrewrite.javascript.internal.lock.pnpm.PnpmLockRegenerator;
 import org.openrewrite.javascript.internal.lock.pnpm.PnpmLockRegenerator.Inputs;
 import org.openrewrite.javascript.internal.lock.pnpm.PnpmManifestRules;
+import org.openrewrite.javascript.internal.lock.pnpm.PnpmReleases;
 import org.openrewrite.javascript.internal.lock.pnpm.WorkspaceRootFinder;
 import org.openrewrite.javascript.internal.registry.NpmRegistryClient;
+import org.openrewrite.javascript.marker.NodeResolutionResult.PackageManager;
 
 import java.nio.file.Paths;
 import java.util.LinkedHashMap;
@@ -77,16 +79,25 @@ final class PnpmInputs implements Port {
 
     @Override
     public Result regenerate(LockDirectory dir, HostInputs host, NpmRegistryClient client) {
-        return new PnpmLockRegenerator(from(dir, host), new PnpmRegistryMetadata(host.transport(), client))
-                .regenerate();
+        Inputs inputs;
+        try {
+            inputs = from(dir, host);
+        } catch (CannotKnow e) {
+            return Result.failure(LockOnlyInstall.cannotKnow(e));
+        }
+        return new PnpmLockRegenerator(inputs, new PnpmRegistryMetadata(host.transport(), client)).regenerate();
     }
 
     /**
-     * With the host's registries as pnpm's user .npmrc, its user npmrc only: pnpm reads no global npmrc, and the
-     * marker's project npmrc (the repository root's) only as the workspace's .npmrc.
+     * Run by the pnpm release that built the LST ({@code NodeRuntime}), 11.2.2 where the host recorded none. With the
+     * host's registries as pnpm's user .npmrc, its user npmrc only: pnpm reads no global npmrc, and the marker's
+     * project npmrc (the repository root's) only as the workspace's .npmrc.
+     *
+     * @throws CannotKnow where the pnpm that built the LST is a release the engine does not reproduce
      */
     static Inputs from(LockDirectory dir, HostInputs host) {
         return project(dir)
+                .release(PnpmReleases.runs(host.packageManagerVersion(PackageManager.Pnpm)))
                 .userNpmrc(host.userNpmrc(HostInputs.USER))
                 .env(host.getEnvironment().process())
                 .host(host.getHost())

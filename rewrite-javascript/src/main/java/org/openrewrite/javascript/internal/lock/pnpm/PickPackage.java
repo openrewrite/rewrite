@@ -21,6 +21,7 @@ import lombok.With;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.javascript.internal.lock.CannotKnow;
 import org.openrewrite.javascript.internal.lock.V8Date;
+import org.openrewrite.javascript.internal.lock.WhatwgUrl;
 import org.openrewrite.javascript.semver.NodeSemver;
 
 import java.time.Instant;
@@ -55,6 +56,15 @@ final class PickPackage {
         boolean includeLatestTag;
 
         boolean ignoreMissingTimeField;
+
+        /**
+         * minimumReleaseAge under minimumReleaseAgeStrict, which before 11.1.3 leaves an immature range unpicked
+         * ({@link PnpmRelease#checksTheReleaseAgeAsAPolicy}).
+         */
+        boolean strictPublishedByCheck;
+
+        @Builder.Default
+        PnpmRelease release = PnpmRelease.PORTED;
     }
 
     private static @Nullable Map<String, @Nullable Object> runPicker(
@@ -83,29 +93,37 @@ final class PickPackage {
     private static @Nullable Map<String, @Nullable Object> pickHighest(
             @Nullable Map<String, PreferredVersions.Selector> preferredVersionSelectors, @Nullable Instant publishedBy,
             @Nullable Function<String, @Nullable Object> publishedByExclude, Map<String, @Nullable Object> meta,
-            PickPackageFromMeta.RegistryPackageSpec spec) {
+            PickPackageFromMeta.RegistryPackageSpec spec, PnpmRelease release) {
         return PickPackageFromMeta.pickPackageFromMeta(PickPackageFromMeta::pickVersionByVersionRange,
-                preferredVersionSelectors, publishedBy, publishedByExclude, meta, spec);
+                preferredVersionSelectors, publishedBy, publishedByExclude, meta, spec, release);
     }
 
     private static @Nullable Map<String, @Nullable Object> pickLowest(
             @Nullable Map<String, PreferredVersions.Selector> preferredVersionSelectors, @Nullable Instant publishedBy,
             @Nullable Function<String, @Nullable Object> publishedByExclude, Map<String, @Nullable Object> meta,
-            PickPackageFromMeta.RegistryPackageSpec spec) {
+            PickPackageFromMeta.RegistryPackageSpec spec, PnpmRelease release) {
         return PickPackageFromMeta.pickPackageFromMeta(PickPackageFromMeta::pickLowestVersionByVersionRange,
-                preferredVersionSelectors, publishedBy, publishedByExclude, meta, spec);
+                preferredVersionSelectors, publishedBy, publishedByExclude, meta, spec, release);
     }
 
     static @Nullable Map<String, @Nullable Object> pickRespectingMinReleaseAge(
             PickerOptions pickerOpts, PickPackageFromMeta.RegistryPackageSpec spec,
             Map<String, @Nullable Object> meta) {
         return runPicker(pickerOpts, spec, targetSpec -> {
-            Map<String, @Nullable Object> highest = pickHighest(pickerOpts.getPreferredVersionSelectors(),
-                    pickerOpts.getPublishedBy(), pickerOpts.getPublishedByExclude(), meta, targetSpec);
-            if (highest != null) {
+            // from 11.22.0 the lowest mature version where the resolution picks the lowest
+            Map<String, @Nullable Object> highest = pickerOpts.isPickLowestVersion() &&
+                                                    pickerOpts.getRelease().picksTheLowestMatureVersion() ?
+                    pickLowest(pickerOpts.getPreferredVersionSelectors(), pickerOpts.getPublishedBy(),
+                            pickerOpts.getPublishedByExclude(), meta, targetSpec, pickerOpts.getRelease()) :
+                    pickHighest(pickerOpts.getPreferredVersionSelectors(), pickerOpts.getPublishedBy(),
+                            pickerOpts.getPublishedByExclude(), meta, targetSpec, pickerOpts.getRelease());
+            // before 11.1.3 a strict check leaves an immature range unpicked
+            if (highest != null || pickerOpts.isStrictPublishedByCheck() &&
+                                   !pickerOpts.getRelease().checksTheReleaseAgeAsAPolicy()) {
                 return highest;
             }
-            return pickLowest(pickerOpts.getPreferredVersionSelectors(), null, null, meta, targetSpec);
+            return pickLowest(pickerOpts.getPreferredVersionSelectors(), null, null, meta, targetSpec,
+                    pickerOpts.getRelease());
         });
     }
 
@@ -114,9 +132,9 @@ final class PickPackage {
             Map<String, @Nullable Object> meta) {
         return runPicker(pickerOpts, spec, targetSpec -> pickerOpts.isPickLowestVersion() ?
                 pickLowest(pickerOpts.getPreferredVersionSelectors(), pickerOpts.getPublishedBy(),
-                        pickerOpts.getPublishedByExclude(), meta, targetSpec) :
+                        pickerOpts.getPublishedByExclude(), meta, targetSpec, pickerOpts.getRelease()) :
                 pickHighest(pickerOpts.getPreferredVersionSelectors(), pickerOpts.getPublishedBy(),
-                        pickerOpts.getPublishedByExclude(), meta, targetSpec));
+                        pickerOpts.getPublishedByExclude(), meta, targetSpec, pickerOpts.getRelease()));
     }
 
     static @Nullable Map<String, @Nullable Object> pickMatchingVersionFast(
@@ -150,42 +168,87 @@ final class PickPackage {
                     "Package name " + name + " is invalid, it should have a @scope");
         }
         boolean fullMetadata = optional || filterMetadata;
-        String cacheKey = fullMetadata ? name + ":full" : name;
-        Map<String, @Nullable Object> cached = metaCache.get(cacheKey);
+        PnpmRelease release = pickerOpts.getRelease();
+        // from 11.9.0 the packuments the run holds are keyed by registry too, a filtered one apart
+        // (PnpmRelease#keysThePackumentCacheByRegistry); the run keeps both keys, the release asked where they differ
+        String nameKey = fullMetadata ? name + ":full" : name;
+        String registryKey = getPkgMetaCacheKey(registryUrl, name, fullMetadata, filterMetadata);
+        Map<String, @Nullable Object> heldByName = metaCache.get(nameKey);
+        Map<String, @Nullable Object> heldByRegistry = metaCache.get(registryKey);
+        Map<String, @Nullable Object> cached = heldByName == heldByRegistry ||
+                                               !release.keysThePackumentCacheByRegistry() ? heldByName :
+                heldByRegistry;
+        CacheKeys cacheKey = new CacheKeys(nameKey, registryKey);
         if (cached != null) {
-            Map<String, @Nullable Object> upgraded = maybeUpgradeForReleaseAge(registry, spec, pickerOpts, registryUrl,
-                    cached);
-            if (upgraded != cached) {
-                metaCache.put(cacheKey, upgraded);
+            // from 11.1.2 a held packument changed after the cutoff is fetched again in full
+            if (!needsUpgradeForReleaseAge(spec, pickerOpts, cached) ||
+                !release.upgradesAHeldPackumentForTheReleaseAge()) {
+                return new PickResult(cached, pickMatchingVersionFinal(pickerOpts, spec, cached));
             }
+            Map<String, @Nullable Object> upgraded = fetch(registry, registryUrl, spec.getName(), true, release);
+            cacheKey.put(metaCache, upgraded);
             return new PickResult(upgraded, pickMatchingVersionFinal(pickerOpts, spec, upgraded));
         }
-        Map<String, @Nullable Object> meta = fetch(registry, registryUrl, name, fullMetadata);
+        Map<String, @Nullable Object> meta = fetch(registry, registryUrl, name, fullMetadata, release);
         if (pickerOpts.getPublishedBy() != null && !fullMetadata && meta.get("time") == null &&
             !excluded(pickerOpts, name)) {
             Instant modified = modifiedDate(meta);
-            if (modified == null || modified.isAfter(pickerOpts.getPublishedBy())) {
-                meta = fetch(registry, registryUrl, name, true);
+            // before 11.2.0 a packument modified at the cutoff is fetched in full too
+            if (modified == null || modified.isAfter(pickerOpts.getPublishedBy()) ||
+                modified.equals(pickerOpts.getPublishedBy()) &&
+                !release.takesAPackumentModifiedAtTheCutoffAsMature()) {
+                meta = fetch(registry, registryUrl, name, true, release);
             }
         }
         if (filterMetadata) {
             meta = clearMeta(meta);
         }
-        metaCache.put(cacheKey, meta);
+        cacheKey.put(metaCache, meta);
         return new PickResult(meta, pickMatchingVersionFinal(pickerOpts, spec, meta));
     }
 
-    private static Map<String, @Nullable Object> maybeUpgradeForReleaseAge(
-            RegistryMetadata registry, PickPackageFromMeta.RegistryPackageSpec spec, PickerOptions pickerOpts,
-            String registryUrl, Map<String, @Nullable Object> meta) {
+    // a packument's two cache keys: 11.2.2's name and 11.9.0's registry and name
+    @Value
+    private static class CacheKeys {
+        String byName;
+        String byRegistry;
+
+        void put(Map<String, Map<String, @Nullable Object>> metaCache, Map<String, @Nullable Object> meta) {
+            metaCache.put(byName, meta);
+            metaCache.put(byRegistry, meta);
+        }
+    }
+
+    // getPkgMetaCacheKey (11.9.0)
+    static String getPkgMetaCacheKey(String registry, String pkgName, boolean fullMetadata, boolean filterMetadata) {
+        String key = canonicalizeRegistry(registry) + "\0" + pkgName;
+        if (!fullMetadata) {
+            return key;
+        }
+        return filterMetadata ? key + ":full:filtered" : key + ":full";
+    }
+
+    private static String canonicalizeRegistry(String registry) {
+        try {
+            WhatwgUrl parsed = WhatwgUrl.parse(registry);
+            String pathname = parsed.getPathname().endsWith("/") ? parsed.getPathname() : parsed.getPathname() + "/";
+            return parsed.getOrigin() + pathname;
+        } catch (IllegalArgumentException e) {
+            return registry;
+        }
+    }
+
+    // maybeUpgradeAbbreviatedMetaForReleaseAge's test: whether it fetches the held packument again in full
+    private static boolean needsUpgradeForReleaseAge(PickPackageFromMeta.RegistryPackageSpec spec,
+                                                     PickerOptions pickerOpts, Map<String, @Nullable Object> meta) {
         if (pickerOpts.getPublishedBy() == null || meta.get("time") != null || excluded(pickerOpts, spec.getName())) {
-            return meta;
+            return false;
         }
         Instant modified = modifiedDate(meta);
-        if (modified != null && !modified.isAfter(pickerOpts.getPublishedBy())) {
-            return meta;
-        }
-        return fetch(registry, registryUrl, spec.getName(), true);
+        // before 11.2.0 a packument modified at the cutoff is upgraded too
+        return modified == null || !(modified.isBefore(pickerOpts.getPublishedBy()) ||
+                                     modified.equals(pickerOpts.getPublishedBy()) &&
+                                     pickerOpts.getRelease().takesAPackumentModifiedAtTheCutoffAsMature());
     }
 
     private static final String[] VERSION_FIELDS = {"name", "version", "bin", "directories", "devDependencies",
@@ -232,10 +295,11 @@ final class PickPackage {
 
     @SuppressWarnings("unchecked")
     private static Map<String, @Nullable Object> fetch(RegistryMetadata registry, String registryUrl, String name,
-                                                       boolean fullMetadata) {
+                                                       boolean fullMetadata, PnpmRelease release) {
         String text = registry.packument(registryUrl, name, fullMetadata);
         if (text == null) {
-            throw new PnpmError("FETCH_404", "GET " + registryUrl + encodeName(name) + ": Not Found - 404",
+            throw new PnpmError("FETCH_404", "GET " + PnpmError.requestUrl(registryUrl + encodeName(name), release) +
+                                             ": Not Found - 404",
                     name + " is not in the npm registry, or you have no permission to fetch it.");
         }
         Object meta = Manifests.parseValue(text, registryUrl + name);

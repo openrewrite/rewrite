@@ -17,6 +17,9 @@ package org.openrewrite.javascript.internal.lock.pnpm;
 
 import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
+import org.openrewrite.javascript.internal.lock.CannotKnow;
 import org.openrewrite.javascript.internal.lock.pnpm.PreferredVersions.Selector;
 import org.openrewrite.javascript.internal.lock.pnpm.ResolveDependencies.InfoFromLockfile;
 import org.openrewrite.javascript.internal.lock.pnpm.ResolveDependencies.MissingPeerInfo;
@@ -35,7 +38,8 @@ import static org.assertj.core.api.Assertions.entry;
 
 /**
  * Port of pnpm 11.2.2's installing/deps-resolver tests replaceVersionInPref, unwrapPackageName, hoistPeers,
- * parentIdsContainSequence, getManifestFromResponse and validatePeerDependencies.
+ * parentIdsContainSequence, getManifestFromResponse and validatePeerDependencies, with the case pnpm 11.5.1 adds to
+ * hoistPeers for the releases that have it.
  */
 class ResolveDependenciesTest {
 
@@ -241,24 +245,82 @@ class ResolveDependenciesTest {
           .containsExactly(entry("foo", "1.0.0"));
     }
 
-    @Test
-    void getHoistableOptionalPeersOnlyPicksAVersionThatSatisfiesAllOptionalRanges() {
+    @ParameterizedTest
+    @ValueSource(strings = {"11.2.2", "11.5.0", "11.5.1", "11.28.5"})
+    void getHoistableOptionalPeersOnlyPicksAVersionThatSatisfiesAllOptionalRanges(String pnpmVersion) {
         Map<String, Map<String, Selector>> preferred = preferred("foo", "1.0.0", Selector.of("version"));
         for (String version : Arrays.asList("2.0.0", "2.1.0", "3.0.0")) {
             preferred.get("foo").put(version, Selector.of("version"));
         }
         assertThat(ResolveDependencies.getHoistableOptionalPeers(
-          Collections.singletonMap("foo", Arrays.asList("2", "2.1")), preferred))
+          Collections.singletonMap("foo", Arrays.asList("2", "2.1")), preferred, pnpmVersion))
           .containsExactly(entry("foo", "2.1.0"));
     }
 
-    @Test
-    void getHoistableOptionalPeersPicksTheHighestVersionThatSatisfiesAllTheOptionalRanges() {
+    @ParameterizedTest
+    @ValueSource(strings = {"11.2.2", "11.5.0", "11.5.1", "11.28.5"})
+    void getHoistableOptionalPeersPicksTheHighestVersionThatSatisfiesAllTheOptionalRanges(String pnpmVersion) {
         Map<String, Map<String, Selector>> preferred = preferred("foo", "2.1.0", Selector.of("version"));
         preferred.get("foo").put("2.1.1", Selector.of("version"));
         assertThat(ResolveDependencies.getHoistableOptionalPeers(
-          Collections.singletonMap("foo", Arrays.asList("2", "2.1")), preferred))
+          Collections.singletonMap("foo", Arrays.asList("2", "2.1")), preferred, pnpmVersion))
           .containsExactly(entry("foo", "2.1.1"));
+    }
+
+    // pnpm 11.5.1's hoistPeers.test.ts: the version the lock seeded, a selector with a weight, is a candidate
+    private static Map<String, Map<String, Selector>> jsdomLockedAbove() {
+        Map<String, Map<String, Selector>> preferred = preferred("jsdom", "26.1.0", Selector.of("version"));
+        preferred.get("jsdom").put("27.4.0", Selector.of("version", 1));
+        return preferred;
+    }
+
+    /**
+     * pnpm 11.5.1's case (pnpm/pnpm#12075), which every later release keeps.
+     */
+    @ParameterizedTest
+    @ValueSource(strings = {"11.5.1", "11.15.1", "11.28.5", ">=11.5.1 <12", "11.5.1 || 11.28.5"})
+    void getHoistableOptionalPeersHandlesVersionSelectorWithWeight(String pnpmVersion) {
+        assertThat(ResolveDependencies.getHoistableOptionalPeers(
+          Collections.singletonMap("jsdom", Collections.singletonList("*")), jsdomLockedAbove(), pnpmVersion))
+          .containsExactly(entry("jsdom", "27.4.0"));
+    }
+
+    /**
+     * The same call before 11.5.1, where a selector with a weight is no {@code 'version'}: recorded with 11.5.0,
+     * which rewrites the peer to the version resolved in the run (release-11.5.0-ws-optional-peer-sibling-lowers), and
+     * with 11.2.2 and 11.5.0, which drop it (small- and release-11.5.0-optional-peer-provider-removed).
+     */
+    @ParameterizedTest
+    @ValueSource(strings = {"11.0.6", "11.2.2", "11.5.0", "11.0.6 - 11.5.0"})
+    void getHoistableOptionalPeersSkipsAVersionSelectorWithWeightBefore1151(String pnpmVersion) {
+        assertThat(ResolveDependencies.getHoistableOptionalPeers(
+          Collections.singletonMap("jsdom", Collections.singletonList("*")), jsdomLockedAbove(), pnpmVersion))
+          .containsExactly(entry("jsdom", "26.1.0"));
+        assertThat(ResolveDependencies.getHoistableOptionalPeers(
+          Collections.singletonMap("jsdom", Collections.singletonList("27")), jsdomLockedAbove(), pnpmVersion))
+          .isEmpty();
+    }
+
+    /**
+     * A range with releases on both sides of 11.5.1 is either: the same answer from both is the answer, and two
+     * answers are what the engine cannot know.
+     */
+    @ParameterizedTest
+    @ValueSource(strings = {"^11.0.6", "11.2.2 || 11.15.1", "11.0.6 - 11"})
+    void getHoistableOptionalPeersOfAReleaseOnEitherSideOf1151MustAgree(String pnpmVersion) {
+        Map<String, Map<String, Selector>> preferred = preferred("foo", "2.1.0", Selector.of("version"));
+        preferred.get("foo").put("1.0.0", Selector.of("version", 1));
+        assertThat(ResolveDependencies.getHoistableOptionalPeers(
+          Collections.singletonMap("foo", Collections.singletonList("2")), preferred, pnpmVersion))
+          .containsExactly(entry("foo", "2.1.0"));
+        assertThatThrownBy(() -> ResolveDependencies.getHoistableOptionalPeers(
+          Collections.singletonMap("jsdom", Collections.singletonList("*")), jsdomLockedAbove(), pnpmVersion))
+          .isInstanceOfSatisfying(CannotKnow.class, e -> assertThat(e.getSubject())
+            .contains("jsdom@27.4.0 from 11.5.1", "jsdom@26.1.0 before", "one of " + pnpmVersion));
+        assertThatThrownBy(() -> ResolveDependencies.getHoistableOptionalPeers(
+          Collections.singletonMap("jsdom", Collections.singletonList("27")), jsdomLockedAbove(), pnpmVersion))
+          .isInstanceOfSatisfying(CannotKnow.class, e -> assertThat(e.getSubject())
+            .contains("jsdom@27.4.0 from 11.5.1", "none before"));
     }
 
     private static Map<String, Map<String, Selector>> preferred(String name, String spec, Selector selector) {

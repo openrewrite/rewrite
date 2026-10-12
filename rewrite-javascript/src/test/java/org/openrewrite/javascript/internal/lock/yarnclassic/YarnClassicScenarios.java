@@ -22,6 +22,7 @@ import org.openrewrite.javascript.internal.lock.Host;
 import org.openrewrite.javascript.internal.lock.HostInputs;
 import org.openrewrite.javascript.internal.lock.HostRegistries;
 import org.openrewrite.javascript.internal.lock.LockScenario.Phase;
+import org.openrewrite.javascript.internal.lock.LockScenario.Replay;
 import org.openrewrite.javascript.internal.lock.LockScenario;
 import org.openrewrite.javascript.internal.lock.RegistrySource;
 
@@ -60,6 +61,8 @@ final class YarnClassicScenarios {
     private static final Pattern NODE_VERSION = Pattern.compile("node (v[0-9.]+)");
     private static final Pattern PLATFORM = Pattern.compile("(?m)^platform os=(\\S*) cpu=(\\S*)");
     private static final Pattern LAYOUT = Pattern.compile("(?m)^layout repo/(\\S+)");
+    private static final Pattern GIVEN = Pattern.compile("(?m)^before exit=given");
+    private static final Pattern RECORDED_RELEASE = Pattern.compile("^yarn (\\d+\\.\\d+\\.\\d+),");
     private static final String RECORDED_ON_OS = "darwin";
     private static final String RECORDED_ON_CPU = "arm64";
 
@@ -184,6 +187,35 @@ final class YarnClassicScenarios {
          */
         boolean isEdit() {
             return has("before") && (has("pkg") || has("pkg-after"));
+        }
+
+        /**
+         * Whether the recording was given the lock its edit starts from rather than writing it from {@code pkg-before}.
+         */
+        boolean isGiven() {
+            String recorded = recordedWith();
+            return has("before-given") || recorded != null && GIVEN.matcher(recorded).find();
+        }
+
+        /**
+         * The release that recorded the edit: {@code recorded-with}'s, and 1.22.22 for the downloaded fixtures, which
+         * it reproduces.
+         */
+        String recordedRelease() {
+            String recorded = recordedWith();
+            Matcher m = recorded == null ? null : RECORDED_RELEASE.matcher(recorded);
+            return m != null && m.find() ? m.group(1) : YarnClassicRelease.PORTED.toString();
+        }
+
+        /**
+         * This scenario replayed as each release its {@code releases} files name ({@link #releaseReplays}).
+         */
+        List<Replay> releases() {
+            List<String> all = new ArrayList<>();
+            for (YarnClassicRelease release : YarnClassicReleases.all()) {
+                all.add(release.toString());
+            }
+            return releaseReplays(all, YarnClassicReleases.PROVEN, recordedRelease());
         }
 
         /**

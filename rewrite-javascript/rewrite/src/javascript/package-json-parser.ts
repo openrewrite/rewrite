@@ -24,11 +24,12 @@ import {
     PackageManager,
     readNpmrcConfigs
 } from "./node-resolution-result";
+import {createNodeRuntimeMarker, NodeRuntime} from "./node-runtime";
 import * as fs from "fs";
 import * as fsp from "fs/promises";
 import * as path from "path";
 import * as YAML from "yaml";
-import {getLockFileDetectionConfig, runList} from "./package-manager";
+import {getLockFileDetectionConfig, getLockFileName, runList, runVersion} from "./package-manager";
 import picomatch from "picomatch";
 import {DEFAULT_DIR_EXCLUSIONS, walkDirs} from "../path-utils";
 
@@ -75,6 +76,9 @@ export interface PackageJsonParserOptions extends ParserOptions {
 export class PackageJsonParser extends Parser {
     private readonly jsonParser: JsonParser;
     private readonly skipDependencyResolution: boolean;
+
+    /** The NodeRuntime of each project root, by package manager and root directory, for the parser's lifetime */
+    private readonly runtimes = new Map<string, NodeRuntime>();
 
     /** Fields to copy from package.json that contain dependency maps */
     private static readonly DEPENDENCY_FIELDS = [
@@ -166,18 +170,50 @@ export class PackageJsonParser extends Parser {
                 markersByDir.set(dir, await this.createMarker(input, dir));
             }
             const marker = markersByDir.get(dir)!;
+            const runtime = this.nodeRuntime(dir, marker?.packageManager);
 
-            // Attach the marker to the JSON document
-            if (marker) {
-                yield {
-                    ...jsonDoc,
-                    markers: {
-                        ...jsonDoc.markers,
-                        markers: [...jsonDoc.markers.markers, marker]
-                    }
-                };
-            } else {
-                yield jsonDoc;
+            // Attach the markers to the JSON document: every one gets the NodeRuntime of its project
+            yield {
+                ...jsonDoc,
+                markers: {
+                    ...jsonDoc.markers,
+                    markers: [...jsonDoc.markers.markers, ...(marker ? [marker] : []), runtime]
+                }
+            };
+        }
+    }
+
+    /**
+     * The NodeRuntime of the project whose package.json is in `dir`, one instance per project root: the directory of
+     * the lock the parser found `packageManager` by, else `dir`. That package manager's `--version` is asked there,
+     * once per package manager and root directory; without one, as when dependency resolution is skipped, none is.
+     */
+    private nodeRuntime(dir: string, packageManager?: PackageManager): NodeRuntime {
+        const absoluteDir = path.resolve(this.relativeTo ?? '', dir);
+        const root = packageManager === undefined ? absoluteDir : this.projectRoot(absoluteDir, packageManager);
+        const key = `${packageManager ?? ''}:${root}`;
+        let runtime = this.runtimes.get(key);
+        if (!runtime) {
+            runtime = createNodeRuntimeMarker(packageManager,
+                packageManager === undefined ? undefined : runVersion(packageManager, root));
+            this.runtimes.set(key, runtime);
+        }
+        return runtime;
+    }
+
+    /**
+     * The nearest directory from `dir` up to relativeTo that holds `packageManager`'s lock, as the lock file walk
+     * finds it; `dir` where none does.
+     */
+    private projectRoot(dir: string, packageManager: PackageManager): string {
+        const lockFile = getLockFileName(packageManager);
+        const stop = this.relativeTo ? path.resolve(this.relativeTo) : undefined;
+        for (let current = dir; ; current = path.dirname(current)) {
+            if (fs.existsSync(path.join(current, lockFile))) {
+                return current;
+            }
+            if (current === stop || path.dirname(current) === current) {
+                return dir;
             }
         }
     }

@@ -34,7 +34,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 /**
- * ssri 5.3.0's and 13.0.1's own tests ({@code upstream/ssri-*.jsonl}), and 13.0.1 run on these values under Node 24.
+ * ssri 5.3.0's, 13.0.0's and 13.0.1's own tests ({@code upstream/ssri-*.jsonl}), and 13.0.0 and 13.0.1 run on these
+ * values under Node 24.
  */
 class SsriTest {
 
@@ -129,6 +130,38 @@ class SsriTest {
         assertThat(fromHex("0303030303030303030303030303030303030303")).isEqualTo(S);
         assertThat(fromHex("03zz")).isEqualTo("sha1-Aw==");
         assertThat(fromHex("")).isNull();
+    }
+
+    // ssri 13.0.0 (npm 11.9.0) and 13.0.1 (npm 11.10.0) on integrity strings that name an algorithm Node cannot hash
+    // with: 13.0.0 keeps it, and trips over one spelled as a member its Integrity inherits; 13.0.1 drops both
+    @Test
+    void algorithmNodeLacksBefore13_0_1() {
+        Ssri.Release v13_0_0 = Ssri.Release.V13_0_0;
+        assertThat(String.valueOf(Ssri.parse("sha999-abc sha512-def", v13_0_0))).isEqualTo("sha999-abc sha512-def");
+        assertThat(String.valueOf(Ssri.parse("sha999-abc sha512-def", V13))).isEqualTo("sha512-def");
+        assertThat(String.valueOf(Ssri.parse("md4-abc", v13_0_0))).isEqualTo("md4-abc");
+        assertThat(Ssri.parse("md4-abc", V13)).isNull();
+        assertThat(Ssri.parse("SHA512-abc", v13_0_0)).isNull();
+        assertThat(String.valueOf(Ssri.fromHex("deadbeef", "sha999", v13_0_0))).isEqualTo("sha999-3q2+7w==");
+        assertThat(Ssri.fromHex("deadbeef", "sha999", V13)).isNull();
+
+        Ssri.Integrity held = Objects.requireNonNull(Ssri.parse("sha999-abc", v13_0_0));
+        assertThat(held.match("sha512-def")).isNull();
+        held.merge("sha512-def");
+        assertThat(held).hasToString("sha999-abc sha512-def");
+        Ssri.Integrity known = Objects.requireNonNull(Ssri.parse("sha512-def", v13_0_0));
+        known.merge("sha999-abc");
+        assertThat(known).hasToString("sha512-def sha999-abc");
+        Ssri.Integrity newer = Objects.requireNonNull(Ssri.parse("sha512-def", V13));
+        newer.merge("sha999-abc");
+        assertThat(newer).hasToString("sha512-def");
+
+        for (String inherited : new String[]{"constructor-abc", "match-abc", "merge-abc", "concat-abc"}) {
+            assertThatThrownBy(() -> Ssri.parse(inherited, v13_0_0)).hasMessage("acc[algo].push is not a function");
+            assertThat(Ssri.parse(inherited, V13)).isNull();
+        }
+        assertThatThrownBy(() -> Objects.requireNonNull(Ssri.parse("sha512-def", v13_0_0)).match("match-abc"))
+          .hasMessage("acc[algo].push is not a function");
     }
 
     static Stream<Arguments> calls() {
@@ -282,12 +315,13 @@ class SsriTest {
             }
         }
         Map<String, Integer> expected = new LinkedHashMap<>();
-        for (String release : new String[]{"13.0.1", "5.3.0"}) {
-            boolean v13 = "13.0.1".equals(release);
+        for (String release : new String[]{"13.0.0", "13.0.1", "5.3.0"}) {
+            boolean v13 = !"5.3.0".equals(release);
+            boolean v13_0_1 = "13.0.1".equals(release);
             String path = ": not on a package manager's lock path";
             expected.put(release + " Hash#hexDigest" + path, 1);
             if (v13) {
-                expected.put(release + " Hash#match" + path, 9);
+                expected.put(release + " Hash#match" + path, v13_0_1 ? 9 : 8);
             }
             expected.put(release + " Integrity#concat" + path, 7);
             expected.put(release + " Integrity#hexDigest" + path, 1);
@@ -298,7 +332,8 @@ class SsriTest {
             expected.put(release + " fromData" + path, v13 ? 13 : 9);
             expected.put(release + " fromStream" + path, 3);
             expected.put(release + " integrityStream" + path, v13 ? 12 : 4);
-            expected.put(release + " options (strict, single, sep): no package manager passes them", v13 ? 40 : 23);
+            expected.put(release + " options (strict, single, sep): no package manager passes them",
+              v13_0_1 ? 40 : v13 ? 39 : 23);
         }
         assertThat(notPorted).isEqualTo(expected);
     }

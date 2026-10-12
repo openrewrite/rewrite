@@ -15,9 +15,11 @@
  */
 package org.openrewrite.javascript.internal.lock.pnpm;
 
+import lombok.AllArgsConstructor;
 import lombok.Value;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.javascript.internal.lock.ValidateNpmPackageName;
+import org.openrewrite.javascript.semver.NodeSemver;
 
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
@@ -58,6 +60,7 @@ final class ParseOverrides {
     }
 
     @Value
+    @AllArgsConstructor
     static class VersionOverride {
         String selector;
 
@@ -67,6 +70,17 @@ final class ParseOverrides {
         PackageSelector targetPkg;
 
         String newBareSpecifier;
+
+        /**
+         * From 11.13.0, a convergence override ({@code pkg@}), whose exact version replaces only a declared range it
+         * satisfies ({@link PnpmRelease#convergesAnEmptyRangeOverride}).
+         */
+        boolean converge;
+
+        VersionOverride(String selector, @Nullable PackageSelector parentPkg, PackageSelector targetPkg,
+                        String newBareSpecifier) {
+            this(selector, parentPkg, targetPkg, newBareSpecifier, false);
+        }
     }
 
     /**
@@ -83,6 +97,16 @@ final class ParseOverrides {
 
     static List<VersionOverride> parseOverrides(Map<String, String> overrides,
                                                 Map<String, @Nullable Map<String, @Nullable Object>> catalogs) {
+        return parseOverrides(overrides, catalogs, PnpmRelease.PORTED);
+    }
+
+    /**
+     * {@link #parseOverrides(Map, Map)} as {@code release} parses them: from 11.13.0 an override of an empty range
+     * converges ({@link PnpmRelease#convergesAnEmptyRangeOverride}); before, it is one as any other.
+     */
+    static List<VersionOverride> parseOverrides(Map<String, String> overrides,
+                                                Map<String, @Nullable Map<String, @Nullable Object>> catalogs,
+                                                PnpmRelease release) {
         List<VersionOverride> parsed = new ArrayList<>();
         for (String selector : Js.keys(overrides)) {
             String newBareSpecifier = overrides.get(selector);
@@ -100,10 +124,36 @@ final class ParseOverrides {
                 default:
                     resolvedCatalog = null;
             }
-            parsed.add(new VersionOverride(selector, result[0], result[1],
-                    resolvedCatalog != null ? resolvedCatalog : newBareSpecifier));
+            parsed.add(markConvergeOverride(new VersionOverride(selector, result[0], result[1],
+                    resolvedCatalog != null ? resolvedCatalog : newBareSpecifier), release));
         }
         return parsed;
+    }
+
+    // markConvergeOverride (11.13.0): an override of an empty range is a convergence override, its value an exact
+    // version and its selector no parent>child one; asked of the release only for an empty range
+    private static VersionOverride markConvergeOverride(VersionOverride override, PnpmRelease release) {
+        PackageSelector parentPkg = override.getParentPkg();
+        boolean emptyTargetRange = "".equals(override.getTargetPkg().getBareSpecifier());
+        if (parentPkg != null && ("".equals(parentPkg.getBareSpecifier()) || emptyTargetRange)) {
+            if (release.convergesAnEmptyRangeOverride()) {
+                throw new PnpmError("INVALID_CONVERGENCE_OVERRIDE", "Cannot use an empty range in the \"" +
+                        override.getSelector() + "\" selector: convergence overrides (\"pkg@\") cannot be combined " +
+                        "with parent>child selectors");
+            }
+            return override;
+        }
+        if (!emptyTargetRange || !release.convergesAnEmptyRangeOverride()) {
+            return override;
+        }
+        if (release.underSemver(semver -> NodeSemver.valid(override.getNewBareSpecifier(),
+                NodeSemver.Options.DEFAULT.release(semver))) == null) {
+            throw new PnpmError("INVALID_CONVERGENCE_OVERRIDE", "The value of the convergence override \"" +
+                    override.getSelector() + "\" must be an exact version, but got \"" +
+                    override.getNewBareSpecifier() + "\"");
+        }
+        return new VersionOverride(override.getSelector(), parentPkg, override.getTargetPkg(),
+                override.getNewBareSpecifier(), true);
     }
 
     /**

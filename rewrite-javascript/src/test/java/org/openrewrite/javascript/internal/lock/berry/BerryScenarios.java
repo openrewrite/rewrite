@@ -67,6 +67,9 @@ final class BerryScenarios {
     private static final Pattern RECORDING_REGISTRY = Pattern.compile("^registry: yarn-berry-registry\\.js on " +
                                                                       "(127\\.0\\.0\\.1:\\d+) ", Pattern.MULTILINE);
     private static final String NPM_REGISTRY = "https://registry.npmjs.org/";
+    private static final Pattern RECORDED_RELEASES = Pattern.compile("^yarn (\\S+) then (\\S+)");
+    private static final Pattern PINNED = Pattern.compile("\"packageManager\"\\s*:\\s*\"yarn@(\\d+\\.\\d+\\.\\d+)\"");
+    private static final Pattern CLOCK = Pattern.compile("^clock (\\S+)$", Pattern.MULTILINE);
 
     /**
      * A registry that has nothing.
@@ -143,6 +146,110 @@ final class BerryScenarios {
     static final class Scenario extends LockScenario {
         Scenario(String name, String label, Path dir, @Nullable Path httpCache) {
             super(name, label, dir, httpCache);
+        }
+
+        /**
+         * The release that recorded the edit: {@code recorded-with}'s, else the one the root manifest pins.
+         */
+        @Nullable
+        String recordedRelease() {
+            String recorded = recordedWith();
+            Matcher m = recorded == null ? null : RECORDED_RELEASES.matcher(recorded.split("\n")[0]);
+            if (m != null && m.find()) {
+                return m.group(2).matches("\\d.*") ? m.group(2) : m.group(1);
+            }
+            String pkg = first("pkg", "pkg-after", "pkg-root");
+            Matcher pinned = pkg == null ? null : PINNED.matcher(pkg);
+            return pinned != null && pinned.find() ? pinned.group(1) : null;
+        }
+
+        /**
+         * This scenario replayed as each release its {@code releases} files name: the first and last of every range of
+         * the scenario's own outcome but the release that recorded it, and of each other outcome under
+         * {@code release/}.
+         */
+        List<Replay> releases() {
+            return releaseReplays(YarnReleases.all(), YarnReleases.PROVEN, recordedRelease());
+        }
+
+        /**
+         * Whether the recorder kept the files Yarn rewrote besides the lock ({@code yarnrc.written}): every one but the
+         * user recorder and the downloaded fixtures.
+         */
+        boolean keepsWrittenFiles() {
+            String recorded = recordedWith();
+            if (recorded == null) {
+                return false;
+            }
+            String[] lines = recorded.split("\n");
+            boolean open = lines.length > 2 && lines[2].startsWith("again exit=");
+            return open || lines.length < 2 || !lines[1].contains("again exit=");
+        }
+
+        /**
+         * The {@code .yarnrc.yml} Yarn started a phase with, as the recorders lay a phase out: the phase's own, else
+         * the tree's; after the edit, what the first phase left ({@code beforeWritten}, what it wrote) under them.
+         */
+        @Nullable
+        String yarnrcGiven(Phase phase, @Nullable String beforeWritten) {
+            String given = phase == Phase.BEFORE ? null : first("yarnrc-after");
+            if (given != null) {
+                return given;
+            }
+            if (phase != Phase.BEFORE && tree("tree").containsKey(Configuration.DEFAULT_RC_FILENAME)) {
+                return tree("tree").get(Configuration.DEFAULT_RC_FILENAME);
+            }
+            if (phase != Phase.BEFORE && beforeWritten != null) {
+                return beforeWritten;
+            }
+            String before = first("yarnrc");
+            if (before != null) {
+                return before;
+            }
+            String tree = tree("tree-before").get(Configuration.DEFAULT_RC_FILENAME);
+            return tree != null ? tree : file("workspace-yarnrc");
+        }
+
+        /**
+         * What Yarn had for an install of a phase, as {@link #inputs} has it, with the {@code .yarnrc.yml} it started
+         * with, the release it runs as and its clock.
+         */
+        YarnBerryLockRegenerator.Inputs installInputs(Phase phase, @Nullable String lock, @Nullable String yarnrc,
+                                                      @Nullable String release, Instant now) {
+            YarnBerryLockRegenerator.Inputs inputs = inputs(phase, lock);
+            Map<String, String> configFiles = new LinkedHashMap<>(inputs.getConfigFiles());
+            configFiles.remove(Configuration.DEFAULT_RC_FILENAME);
+            Map<String, String> ordered = new LinkedHashMap<>();
+            if (yarnrc != null) {
+                ordered.put(Configuration.DEFAULT_RC_FILENAME, yarnrc);
+            }
+            ordered.putAll(configFiles);
+            Set<String> paths = inputs.getPaths();
+            if (paths != null) {
+                paths = new TreeSet<>(paths);
+                if (yarnrc == null) {
+                    paths.remove(Configuration.DEFAULT_RC_FILENAME);
+                } else {
+                    paths.add(Configuration.DEFAULT_RC_FILENAME);
+                }
+            }
+            return inputs.toBuilder()
+                    .clearConfigFiles()
+                    .configFiles(ordered)
+                    .paths(paths)
+                    .release(release)
+                    .now(now)
+                    .build();
+        }
+
+        /**
+         * The clock a release's outcome was swept at ({@code clock <instant>} in its {@code recorded-with}), else the
+         * recording's day.
+         */
+        Instant now(Path outcome) {
+            String recorded = outcome.equals(getDir()) ? null : read(outcome, "recorded-with");
+            Matcher m = recorded == null ? null : CLOCK.matcher(recorded);
+            return m != null && m.find() ? Instant.parse(m.group(1)) : now();
         }
 
         /**
@@ -390,10 +497,15 @@ final class BerryScenarios {
             super(scenario);
         }
 
+        // the full packument Yarn asks for, where a release's replay needed what the recording did not keep
+        // (http/<name>@full, with the publish times), else the recording's
         @Override
         public @Nullable String packument(String registry, String name, boolean full, @Nullable String authorization) {
             String mirror = mirror(registry, "npmjs", "yarnpkg");
-            byte[] body = http(mirror, name);
+            byte[] body = http(mirror, name + "@full");
+            if (body == null) {
+                body = http(mirror, name);
+            }
             if (body == null) {
                 notRecorded(mirror == null ? name : mirror + "/" + name);
                 return null;

@@ -22,6 +22,7 @@ import org.openrewrite.javascript.internal.lock.CannotKnow;
 import org.openrewrite.javascript.internal.lock.HostEnvironment;
 import org.openrewrite.javascript.internal.lock.Ini;
 import org.openrewrite.javascript.internal.lock.V8Date;
+import org.openrewrite.javascript.internal.lock.WhatwgUrl;
 
 import java.time.Instant;
 import java.util.ArrayList;
@@ -61,10 +62,68 @@ public class NpmOptions {
             "scope");
     private static final Pattern SCOPED_REGISTRY = Pattern.compile("(@[^:]+):registry");
 
+    // @npmcli/config definitions.js: every key npm 12.0.0 defines, in its order, which no release to 12.2.0 changes
+    private static final Set<String> DEFINITIONS_12 = new LinkedHashSet<>(Arrays.asList(
+            "_auth", "access", "all", "allow-same-version", "allow-directory", "allow-file", "allow-git",
+            "allow-remote", "allow-scripts", "also", "audit", "audit-level", "auth-type", "before", "bin-links",
+            "browser", "bypass-2fa", "ca", "cache", "cache-max", "cache-min", "cafile", "call", "cert", "cidr",
+            "color", "commit-hooks", "cpu", "dangerously-allow-all-scripts", "depth", "description", "dev", "diff",
+            "diff-ignore-all-space", "diff-name-only", "diff-no-prefix", "diff-dst-prefix", "diff-src-prefix",
+            "diff-text", "diff-unified", "dry-run", "editor", "engine-strict", "expect-result-count",
+            "expect-results", "expires", "extension-file", "fetch-retries", "fetch-retry-factor",
+            "fetch-retry-maxtimeout", "fetch-retry-mintimeout", "fetch-timeout", "force", "foreground-scripts",
+            "format-package-lock", "fund", "git", "git-tag-version", "global", "globalconfig", "global-ignore-file",
+            "global-style", "heading", "https-proxy", "if-present", "ignore-extension", "ignore-scripts", "include",
+            "include-staged", "include-workspace-root", "include-attestations", "init-author-email",
+            "init-author-name", "init-author-url", "init-license", "init-module", "init-type", "init-version",
+            "init-private", "init.author.email", "init.author.name", "init.author.url", "init.license", "init.module",
+            "init.version", "install-links", "install-strategy", "json", "key", "legacy-bundling", "legacy-peer-deps",
+            "libc", "link", "local-address", "location", "lockfile-version", "loglevel", "logs-dir", "logs-max",
+            "long", "name", "maxsockets", "message", "min-release-age", "min-release-age-exclude", "node-gyp",
+            "node-options", "noproxy", "offline", "omit", "omit-lockfile-registry-resolved", "only", "orgs",
+            "optional", "os", "otp", "package", "package-lock", "package-lock-only", "pack-destination", "packages",
+            "patches-dir", "allow-unused-patches", "ignore-patch-failures", "edit-dir", "ignore-existing",
+            "keep-edit-dir", "parseable", "allow-scripts-pending", "allow-scripts-pin", "prefer-dedupe",
+            "prefer-offline", "prefer-online", "prefix", "preid", "production", "progress", "provenance",
+            "provenance-file", "proxy", "read-only", "rebuild-bundle", "registry", "replace-registry-host", "save",
+            "save-bundle", "save-dev", "save-exact", "save-optional", "save-peer", "save-prefix", "save-prod",
+            "sbom-format", "sbom-type", "scope", "scopes", "packages-all", "packages-and-scopes-permission",
+            "orgs-permission", "password", "token-description", "script-shell", "searchexclude", "searchlimit",
+            "searchopts", "searchstaleness", "shell", "sign-git-commit", "sign-git-tag", "strict-peer-deps",
+            "strict-allow-scripts", "strict-npmrc", "strict-ssl", "tag", "tag-version-prefix", "timing", "to",
+            "umask", "unicode", "update-notifier", "usage", "user-agent", "userconfig", "version", "versions",
+            "viewer", "which", "workspace", "workspaces", "workspaces-update", "yes"));
+    // definitions/index.js nerfDarts: what a key scoped to a registry may end in without a definition of its own
+    private static final List<String> NERF_DARTS = Arrays.asList("_auth", "_authToken", "_password", "certfile",
+            "email", "keyfile", "username");
+    // index.js internalEnv: what npm sets for an npm it runs
+    private static final List<String> INTERNAL_ENV = Arrays.asList("npm-version", "global-prefix", "local-prefix");
+    private static final String STRICT_NPMRC = "strict-npmrc";
+    // index.js validate: the auth keys an npmrc file may not hold, those it may only hold scoped to a registry, and
+    // the ones npm 12.0.0 adds to these
+    private static final List<String> AUTH_NOT_ALLOWED = Arrays.asList("_authtoken", "-authtoken");
+    private static final List<String> AUTH_SCOPED = Arrays.asList("_auth", "_authToken", "username", "_password");
+    private static final List<String> AUTH_SCOPED_12 = Arrays.asList("email", "certfile", "keyfile");
+    private static final Object UNSET = new Object();
+
     // the definition's type, which npm's parseField reads from types[key]: Boolean, String, Number, or a
     // list of literal values
     private enum Type {
         BOOLEAN, STRING, NUMBER, LITERAL
+    }
+
+    /**
+     * The npm release that reads the configuration: its defaults, and what its arborist does with each option.
+     */
+    @Builder.Default
+    NpmRelease release = NpmRelease.PORTED;
+
+    /**
+     * {@code npmVersion}, npm's own version: what {@code engines.npm} and {@code devEngines.packageManager} are held
+     * to, and the one place an install reads the release's text.
+     */
+    public String getNpmVersion() {
+        return release.toString();
     }
 
     /**
@@ -79,9 +138,14 @@ public class NpmOptions {
     boolean legacyPeerDeps;
 
     /**
-     * {@code install-links}
+     * {@code install-links}; null for the release's default.
      */
-    boolean installLinks;
+    @Nullable
+    Boolean installLinks;
+
+    public boolean isInstallLinks() {
+        return installLinks != null ? installLinks : release.installLinksDefault();
+    }
 
     /**
      * {@code omit-lockfile-registry-resolved}
@@ -146,10 +210,10 @@ public class NpmOptions {
     List<String> omit = Collections.emptyList();
 
     /**
-     * {@code allow-git}: {@code all}, {@code none} or {@code root}.
+     * {@code allow-git}: {@code all}, {@code none} or {@code root}; null for the release's default.
      */
-    @Builder.Default
-    String allowGit = "all";
+    @Nullable
+    String allowGit;
 
     @Builder.Default
     String allowFile = "all";
@@ -157,8 +221,19 @@ public class NpmOptions {
     @Builder.Default
     String allowDirectory = "all";
 
-    @Builder.Default
-    String allowRemote = "all";
+    /**
+     * {@code allow-remote}; null for the release's default.
+     */
+    @Nullable
+    String allowRemote;
+
+    public String getAllowGit() {
+        return allowGit != null ? allowGit : release.allowGitDefault();
+    }
+
+    public String getAllowRemote() {
+        return allowRemote != null ? allowRemote : release.allowRemoteDefault();
+    }
 
     /**
      * {@code registry}, {@code @scope:registry} and {@code scope}: where npm asks for a package's documents.
@@ -245,6 +320,11 @@ public class NpmOptions {
      * {@code min-release-age} opens, as npm flattens the two.
      */
     public @Nullable Object before(Instant now) {
+        if (!release.yieldsMinReleaseAgeToBefore()) {
+            // min-release-age's flatten sets before whenever it is not null, and a config naming both is refused
+            return minReleaseAge != null ?
+                    (Object) V8Date.timeClip(now.toEpochMilli() - 86400000d * Js.toNumber(minReleaseAge)) : before;
+        }
         if (beforeConfigured) {
             return before;
         }
@@ -259,12 +339,12 @@ public class NpmOptions {
 
     /**
      * The options of the user's .npmrc (the host's registries) and a project's over it, each null without one, as
-     * npm's config loads them; a {@code ${VAR}} in a key read, or one it could expand to, is cannot-know.
+     * {@code release}'s config loads them; a {@code ${VAR}} in a key read, or one it could expand to, is cannot-know.
      */
-    public static NpmOptions fromNpmrc(@Nullable String userNpmrc, @Nullable String npmrc) {
+    public static NpmOptions fromNpmrc(NpmRelease release, @Nullable String userNpmrc, @Nullable String npmrc) {
         // npm reads no file that sets a variable, and the host does not know the environment npm runs in
         HostEnvironment env = HostEnvironment.UNKNOWN;
-        NpmOptionsBuilder options = builder();
+        NpmOptionsBuilder options = builder().release(release);
         Map<String, String> scopedRegistries = new LinkedHashMap<>();
         Object omit = null;
         Object include = null;
@@ -279,9 +359,19 @@ public class NpmOptions {
                 entries.addAll(Ini.decode(file, Ini.Release.V6_0_0).entrySet());
             }
         }
+        if (release.definesMinReleaseAge() && !release.yieldsMinReleaseAgeToBefore()) {
+            checkExclusive(npmrc, userNpmrc);
+        }
+        // what the command checks of its config before it reads any of it
+        validate(release, userNpmrc, npmrc, env);
+        validateCli(release, userNpmrc, npmrc, env);
         // global-style and legacy-bundling flatten by writing install-strategy into the config they come from,
         // which install-strategy's own flatten then reads, wherever it stands in the file
         String installStrategyWritten = null;
+        // before npm 9.0.0 they are arborist's own options, legacyBundling read first
+        boolean globalStyle = false;
+        boolean legacyBundling = false;
+        boolean validated = release.flattensValidatedConfig();
         for (Map.Entry<String, @Nullable Object> entry : entries) {
             String key;
             try {
@@ -298,74 +388,123 @@ public class NpmOptions {
             Object value = entry.getValue();
             switch (key) {
                 case "lockfile-version":
-                    options.lockfileVersion(lockfileVersion(parseField(value, Type.LITERAL, env)));
+                    if (!release.definesLockfileVersion()) {
+                        break;
+                    }
+                    Object lfv = parseField(value, Type.LITERAL, env);
+                    if (validated && !(lfv == null ||
+                                       release.typesLockfileVersionAsStrings() &&
+                                       ("1".equals(lfv) || "2".equals(lfv) || "3".equals(lfv)))) {
+                        // nopt's clean drops a value of none of the definition's types
+                        break;
+                    }
+                    options.lockfileVersion(lockfileVersion(lfv));
                     break;
                 case "legacy-peer-deps":
-                    options.legacyPeerDeps(truthy(parseField(value, Type.BOOLEAN, env)));
+                    options.legacyPeerDeps(booleanField(value, env, validated));
                     break;
                 case "install-links":
-                    options.installLinks(truthy(parseField(value, Type.BOOLEAN, env)));
+                    if (release.definesInstallLinks()) {
+                        options.installLinks(booleanField(value, env, validated));
+                    }
                     break;
                 case "omit-lockfile-registry-resolved":
-                    options.omitLockfileRegistryResolved(truthy(parseField(value, Type.BOOLEAN, env)));
+                    if (release.definesOmitLockfileRegistryResolved()) {
+                        options.omitLockfileRegistryResolved(booleanField(value, env, validated));
+                    }
                     break;
                 case "prefer-dedupe":
-                    options.preferDedupe(truthy(parseField(value, Type.BOOLEAN, env)));
+                    if (release.definesPreferDedupe()) {
+                        options.preferDedupe(booleanField(value, env, validated));
+                    } else if (release.flattensUndeclaredPreferDedupe()) {
+                        // a key no definition declares: parsed as a literal, kept by nopt, and read by arborist as !!
+                        options.preferDedupe(truthy(parseField(value, Type.LITERAL, env)));
+                    }
                     break;
                 case "strict-peer-deps":
-                    options.strictPeerDeps(truthy(parseField(value, Type.BOOLEAN, env)));
+                    options.strictPeerDeps(booleanField(value, env, validated));
                     break;
                 case "force":
-                    options.force(truthy(parseField(value, Type.BOOLEAN, env)));
+                    options.force(booleanField(value, env, validated));
                     break;
                 case "engine-strict":
-                    options.engineStrict(truthy(parseField(value, Type.BOOLEAN, env)));
+                    options.engineStrict(booleanField(value, env, validated));
                     break;
                 case "save":
-                    options.save(truthy(parseField(value, Type.BOOLEAN, env)));
+                    options.save(booleanField(value, env, validated));
                     break;
                 case "format-package-lock":
-                    options.formatPackageLock(truthy(parseField(value, Type.BOOLEAN, env)));
+                    options.formatPackageLock(booleanField(value, env, validated));
                     break;
                 case "dry-run":
-                    options.dryRun(truthy(parseField(value, Type.BOOLEAN, env)));
+                    options.dryRun(booleanField(value, env, validated));
                     break;
                 case "global":
-                    options.global(truthy(parseField(value, Type.BOOLEAN, env)));
+                    options.global(booleanField(value, env, validated));
                     break;
                 case "location":
                     // location's flatten turns global on, in the file's own order with global's
-                    if ("global".equals(parseField(value, Type.LITERAL, env))) {
+                    if (release.setsGlobalFromLocation() && "global".equals(parseField(value, Type.LITERAL, env))) {
                         options.global(true);
                     }
                     break;
                 case "install-strategy":
-                    options.installStrategy(InstallStrategy.of(installStrategyWritten != null ? installStrategyWritten :
-                            parseField(value, Type.LITERAL, env)));
+                    if (!release.definesInstallStrategy()) {
+                        break;
+                    }
+                    Object strategy = installStrategyWritten != null ? installStrategyWritten :
+                            parseField(value, Type.LITERAL, env);
+                    boolean known = "hoisted".equals(strategy) || "nested".equals(strategy) ||
+                                    "shallow".equals(strategy) ||
+                                    "linked".equals(strategy) && release.definesLinkedInstallStrategy();
+                    if (validated && !known) {
+                        break;
+                    }
+                    // arborist before npm 9.4.0 knows no linked strategy, and hoists it
+                    options.installStrategy("linked".equals(strategy) && !release.definesLinkedInstallStrategy() ?
+                            InstallStrategy.HOISTED : InstallStrategy.of(strategy));
                     break;
                 case "global-style":
-                    if (truthy(parseField(value, Type.BOOLEAN, env))) {
+                    if (!release.definesInstallStrategy()) {
+                        globalStyle = booleanField(value, env, validated);
+                    } else if (truthy(parseField(value, Type.BOOLEAN, env))) {
                         installStrategyWritten = "shallow";
                         options.installStrategy(InstallStrategy.SHALLOW);
                     }
                     break;
                 case "legacy-bundling":
-                    if (truthy(parseField(value, Type.BOOLEAN, env))) {
+                    if (!release.definesInstallStrategy()) {
+                        legacyBundling = booleanField(value, env, validated);
+                    } else if (truthy(parseField(value, Type.BOOLEAN, env))) {
                         installStrategyWritten = "nested";
                         options.installStrategy(InstallStrategy.NESTED);
                     }
                     break;
                 case "before":
                     Object before = parseField(value, Type.LITERAL, env);
+                    Object date = before instanceof String ? dateField((String) before) : null;
+                    if (validated && date instanceof Double && Double.isNaN((Double) date)) {
+                        // nopt's validateDate drops what Date.parse cannot read, and makes the rest a Date
+                        break;
+                    }
                     options.beforeConfigured(true);
+                    if (release.keepsNpmrcBeforeAString() && "".equals(before)) {
+                        // an empty string is no before to pacote
+                        options.before(null);
+                        break;
+                    }
                     options.before(before == null || before == Js.UNDEFINED || Boolean.FALSE.equals(before) ? null :
-                            before instanceof String ? dateField((String) before) : Double.NaN);
+                            before instanceof String ? date : Double.NaN);
                     break;
                 case "min-release-age":
-                    options.minReleaseAge(parseField(value, Type.NUMBER, env));
+                    if (release.definesMinReleaseAge()) {
+                        options.minReleaseAge(parseField(value, Type.NUMBER, env));
+                    }
                     break;
                 case "min-release-age-exclude":
-                    options.minReleaseAgeExclude(parseListField(value, Type.STRING, env));
+                    if (release.definesMinReleaseAgeExclude()) {
+                        options.minReleaseAgeExclude(parseListField(value, Type.STRING, env));
+                    }
                     break;
                 case "omit":
                     omit = parseListField(value, Type.LITERAL, env);
@@ -389,16 +528,24 @@ public class NpmOptions {
                     also = parseField(value, Type.LITERAL, env);
                     break;
                 case "allow-git":
-                    options.allowGit(allowField(value, env));
+                    if (release.definesAllowGit()) {
+                        options.allowGit(allowField(value, env));
+                    }
                     break;
                 case "allow-file":
-                    options.allowFile(allowField(value, env));
+                    if (release.definesAllowFile()) {
+                        options.allowFile(allowField(value, env));
+                    }
                     break;
                 case "allow-directory":
-                    options.allowDirectory(allowField(value, env));
+                    if (release.definesAllowDirectory()) {
+                        options.allowDirectory(allowField(value, env));
+                    }
                     break;
                 case "allow-remote":
-                    options.allowRemote(allowField(value, env));
+                    if (release.definesAllowRemote()) {
+                        options.allowRemote(allowField(value, env));
+                    }
                     break;
                 case "os":
                     options.os(platformField(value, env));
@@ -431,9 +578,301 @@ public class NpmOptions {
                     break;
             }
         }
+        if (!release.definesInstallStrategy()) {
+            options.installStrategy(legacyBundling ? InstallStrategy.NESTED :
+                    globalStyle ? InstallStrategy.SHALLOW : InstallStrategy.HOISTED);
+        }
         options.omit(buildOmitList(omit, include, only, production, dev, optional, also));
         options.scopedRegistries(scopedRegistries);
         return options.build();
+    }
+
+    // a Boolean definition's value as arborist reads it: where the flat options are built from the validated config,
+    // nopt's validateBoolean has made a string that is a number the boolean of that number (0 is false)
+    private static boolean booleanField(@Nullable Object f, HostEnvironment env, boolean validated) {
+        Object value = parseField(f, Type.BOOLEAN, env);
+        if (validated && value instanceof String) {
+            double number = Js.toNumber((String) value);
+            return Double.isNaN(number) || number != 0;
+        }
+        return truthy(value);
+    }
+
+    // config index.js #loadObject while before and min-release-age are `exclusive` of each other: a key is refused
+    // once its sibling is loaded, the project's file loading before the user's
+    private static void checkExclusive(@Nullable String npmrc, @Nullable String userNpmrc) {
+        Set<String> loaded = new LinkedHashSet<>();
+        for (String file : Arrays.asList(npmrc, userNpmrc)) {
+            if (file == null) {
+                continue;
+            }
+            for (String key : Ini.decode(file, Ini.Release.V6_0_0).keySet()) {
+                String exclusive = "before".equals(key) ? "min-release-age" :
+                        "min-release-age".equals(key) ? "before" : null;
+                if (exclusive != null && loaded.contains(exclusive)) {
+                    throw new IllegalArgumentException("--" + key + " cannot be provided when using --" + exclusive);
+                }
+                try {
+                    loaded.add(envReplace(key, HostEnvironment.UNKNOWN));
+                } catch (CannotKnow e) {
+                    // the loop over the keys read decides what an unknown variable costs
+                }
+            }
+        }
+    }
+
+    /**
+     * @npmcli/config index.js {@code validate}, which a command's constructor runs over the loaded config from npm
+     * 9.0.0: an auth key outside a registry's scope in the user's or the project's file fails the install ({@code
+     * ERR_INVALID_AUTH}), and so does a {@code registry} that is no URL, as each file's turn names the scope such a
+     * key moves to ({@code ERR_INVALID_URL}). npm 12.0.0 holds {@code email}, {@code certfile} and {@code keyfile} to
+     * it as well.
+     */
+    private static void validate(NpmRelease release, @Nullable String userNpmrc, @Nullable String npmrc,
+                                 HostEnvironment env) {
+        // npm's order: the global file, the user's, the project's
+        Map<String, Map<String, @Nullable Object>> files = new LinkedHashMap<>();
+        files.put("user", userNpmrc == null ? Collections.emptyMap() : Ini.decode(userNpmrc, Ini.Release.V6_0_0));
+        files.put("project", npmrc == null ? Collections.emptyMap() : Ini.decode(npmrc, Ini.Release.V6_0_0));
+        boolean since9 = false;
+        boolean since12 = false;
+        for (Map<String, @Nullable Object> file : files.values()) {
+            since9 |= mentions(file, AUTH_NOT_ALLOWED) || mentions(file, AUTH_SCOPED);
+            since12 |= mentions(file, AUTH_SCOPED_12);
+        }
+        // nerfDart(this.get('registry')): the project's registry over the user's, as the file holds it; nopt, which
+        // drops one without a host from the project's file before that file's turn, is not ported
+        Object registry = setIn(files.get("project"), "registry", env);
+        if (registry == UNSET) {
+            registry = setIn(files.get("user"), "registry", env);
+        }
+        String nerfedReg = "";
+        RuntimeException noUrl = null;
+        try {
+            nerfedReg = nerfDart(registry == UNSET ? DEFAULT.getRegistry() : parseField(registry, Type.LITERAL, env));
+        } catch (RuntimeException e) {
+            noUrl = e;
+        }
+        if (noUrl == null && !since9 && !since12 || !release.refusesUnscopedAuth()) {
+            return;
+        }
+        if (noUrl != null) {
+            throw noUrl;
+        }
+        since12 = since12 && release.refusesUnscopedEmailAndCertificate();
+
+        List<String> problems = new ArrayList<>();
+        for (Map.Entry<String, Map<String, @Nullable Object>> file : files.entrySet()) {
+            String where = file.getKey();
+            Map<String, @Nullable Object> entries = file.getValue();
+            for (String key : AUTH_NOT_ALLOWED) {
+                if (isSet(entries, key, env)) {
+                    problems.add(notAllowed(key, where));
+                }
+            }
+            for (String key : AUTH_SCOPED) {
+                if (isSet(entries, key, env)) {
+                    // username and _password must both exist in the same file to be recognized correctly
+                    if ("username".equals(key) && !isSet(entries, "_password", env) ||
+                        "_password".equals(key) && !isSet(entries, "username", env)) {
+                        problems.add(notAllowed(key, where));
+                    } else {
+                        problems.add(mustBeRenamed(key, nerfedReg, where));
+                    }
+                }
+            }
+            if (since12) {
+                if (isSet(entries, "email", env)) {
+                    problems.add(mustBeRenamed("email", nerfedReg, where));
+                }
+                // certfile and keyfile are a pair: a lone one is dropped
+                for (String key : Arrays.asList("certfile", "keyfile")) {
+                    if (isSet(entries, key, env)) {
+                        problems.add(isSet(entries, "certfile".equals(key) ? "keyfile" : "certfile", env) ?
+                                mustBeRenamed(key, nerfedReg, where) : notAllowed(key, where));
+                    }
+                }
+            }
+        }
+        if (!problems.isEmpty()) {
+            // errors.js ErrInvalidAuth, its closing backtick as npm prints it
+            throw new NpmRejection("ERR_INVALID_AUTH", "Invalid auth configuration found: " +
+                                                       String.join(", ", problems) + "\nPlease run `npm config fix` " +
+                                                       "to repair your configuration.`", null);
+        }
+    }
+
+    private static String notAllowed(String key, String where) {
+        return "`" + key + "` is not allowed in " + where + " config";
+    }
+
+    private static String mustBeRenamed(String key, String nerfedReg, String where) {
+        return "`" + key + "` must be renamed to `" + nerfedReg + ":" + key + "` in " + where + " config";
+    }
+
+    // @npmcli/config nerf-dart.js: the registry's host and directory, as the keys scoped to it start; new URL()'s
+    // TypeError for a registry that is no URL, or that is an ini section, which has no string
+    private static String nerfDart(@Nullable Object registry) {
+        if (registry instanceof Ini.Section) {
+            throw new IllegalArgumentException("Cannot convert object to primitive value");
+        }
+        WhatwgUrl parsed = WhatwgUrl.tryParse(Js.string(registry));
+        WhatwgUrl rel = parsed == null ? null :
+                WhatwgUrl.tryParse(".", parsed.getProtocol() + "//" + parsed.getHost() + parsed.getPathname());
+        if (rel == null) {
+            throw new NpmRejection("ERR_INVALID_URL", "Invalid URL", null);
+        }
+        return "//" + rel.getHost() + rel.getPathname();
+    }
+
+    // this.get(key, where), truthy or not, once parseField has read the file's value and nopt has cleaned it: _auth
+    // is a [null, String], and none of the other keys validate asks for has a definition
+    private static boolean isSet(Map<String, @Nullable Object> file, String key, HostEnvironment env) {
+        Object raw = setIn(file, key, env);
+        boolean defined = "_auth".equals(key);
+        if (raw == UNSET || raw == null || Boolean.FALSE.equals(raw)) {
+            return false;
+        }
+        if (!(raw instanceof String)) {
+            if (defined && raw instanceof Ini.Section) {
+                // nopt reads a String as String(val), and an ini section has none
+                throw new IllegalArgumentException("Cannot convert object to primitive value");
+            }
+            return true;
+        }
+        String f = Js.trim((String) raw);
+        if (!defined && "undefined".equals(f)) {
+            return false;
+        }
+        String cleaned = Js.trim(envReplace(f, env));
+        return !cleaned.isEmpty() && !"null".equals(cleaned) && (defined || !"false".equals(cleaned));
+    }
+
+    // whether a file has an entry under one of the keys, or under a key that may expand to one
+    private static boolean mentions(Map<String, @Nullable Object> file, List<String> names) {
+        for (String name : names) {
+            if (mentions(file, name)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private static boolean mentions(Map<String, @Nullable Object> file, String name) {
+        for (String key : file.keySet()) {
+            Pattern expansions = expansions(key);
+            if (expansions != null ? expansions.matcher(name).matches() :
+                    name.equals(envReplace(key, HostEnvironment.UNKNOWN))) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /**
+     * base-cmd.js {@code validateCli}, which npm 12.0.0 runs once its config is loaded and before the command reads
+     * it: under {@code strict-npmrc}, a key of an npmrc file that @npmcli/config's {@code checkUnknown} finds no
+     * definition for fails the install. Only the project's keys are asked: the user's file is the host's rendering of
+     * its registries, with keys of the host's own.
+     */
+    private static void validateCli(NpmRelease release, @Nullable String userNpmrc, @Nullable String npmrc,
+                                    HostEnvironment env) {
+        if (npmrc == null) {
+            return;
+        }
+        Map<String, @Nullable Object> project = Ini.decode(npmrc, Ini.Release.V6_0_0);
+        List<String> unknown = new ArrayList<>();
+        for (String key : project.keySet()) {
+            String shown = unknownConfig(key);
+            if (shown != null) {
+                unknown.add(shown);
+            }
+        }
+        if (unknown.isEmpty()) {
+            return;
+        }
+        // config.get('strict-npmrc'): the project's file over the user's
+        Object strict = UNSET;
+        CannotKnow unknowable = null;
+        try {
+            strict = setIn(project, STRICT_NPMRC, env);
+            if (strict == UNSET && userNpmrc != null) {
+                strict = setIn(Ini.decode(userNpmrc, Ini.Release.V6_0_0), STRICT_NPMRC, env);
+            }
+        } catch (CannotKnow e) {
+            unknowable = e;
+        }
+        if (strict == UNSET && unknowable == null || !release.strictNpmrcRefusesUnknownKeys()) {
+            return;
+        }
+        if (unknowable != null) {
+            throw unknowable;
+        }
+        if (cleanBoolean(parseField(strict, Type.BOOLEAN, env))) {
+            StringBuilder message = new StringBuilder("Unknown npm configuration key")
+                    .append(unknown.size() > 1 ? "s" : "").append(':');
+            for (String shown : unknown) {
+                // npm names the file by the path it read it from
+                message.append("\n  - project config ").append(shown).append(" from .npmrc");
+            }
+            throw new NpmRejection("EUNKNOWNCONFIG", message.append("\nSee `npm help npmrc` for supported config " +
+                                                                    "options.").toString(), null);
+        }
+    }
+
+    // @npmcli/config index.js checkUnknown: how validateCli shows a key without a definition, null for one that has
+    // one; a key scoped to a registry or a package scope is known by its last part, and `definitions` is a plain
+    // object, so what it inherits counts as defined
+    private static @Nullable String unknownConfig(String key) {
+        if (defines(key) || INTERNAL_ENV.contains(key)) {
+            return null;
+        }
+        String baseKey = key.contains(":") ? key.substring(key.lastIndexOf(':') + 1) : "";
+        if (key.contains(":") && (defines(baseKey) || NERF_DARTS.contains(baseKey))) {
+            return null;
+        }
+        return baseKey.isEmpty() ? '"' + key + '"' : '"' + baseKey + "\" (" + key + ")";
+    }
+
+    private static boolean defines(String key) {
+        return DEFINITIONS_12.contains(key) || Js.objectPrototypeMember(key) != null;
+    }
+
+    // what a file's entries leave under a key (conf.data[k] = v, in the file's order), UNSET without one; an entry
+    // whose key may expand to it is unknown unless a later one sets the key itself
+    private static @Nullable Object setIn(Map<String, @Nullable Object> file, String name, HostEnvironment env) {
+        Object value = UNSET;
+        CannotKnow unknowable = null;
+        for (Map.Entry<String, @Nullable Object> entry : file.entrySet()) {
+            String key;
+            try {
+                key = envReplace(entry.getKey(), env);
+            } catch (CannotKnow e) {
+                if (Objects.requireNonNull(expansions(entry.getKey())).matcher(name).matches()) {
+                    unknowable = e;
+                }
+                continue;
+            }
+            if (name.equals(key)) {
+                value = entry.getValue();
+                unknowable = null;
+            }
+        }
+        if (unknowable != null) {
+            throw unknowable;
+        }
+        return value;
+    }
+
+    // nopt's clean of a Boolean (type-defs.js validateBoolean), which the command's constructor runs over each file's
+    // values before validateCli reads the config: the flattened options arborist reads are from before it
+    private static boolean cleanBoolean(@Nullable Object value) {
+        if (!(value instanceof String)) {
+            return truthy(value);
+        }
+        String s = Js.trim((String) value);
+        double number = Js.toNumber(s);
+        return Double.isNaN(number) ? !"null".equals(s) && !"false".equals(s) : number != 0;
     }
 
     /**
@@ -621,16 +1060,16 @@ public class NpmOptions {
     }
 
     /**
-     * @npmcli/config {@code loadLocalPrefix}: how many directories above the one it runs in npm installs, at the
-     * nearest of {@code parentTrees} whose workspaces map it; 0 when it installs there.
+     * @npmcli/config {@code loadLocalPrefix}: how many directories above the one it runs in npm {@code release}
+     * installs, at the nearest of {@code parentTrees} whose workspaces map it; 0 when it installs there.
      */
-    static int loadLocalPrefix(@Nullable String manifest,
+    static int loadLocalPrefix(NpmRelease release, @Nullable String manifest,
                                Map<String, Map<String, @Nullable String>> parentTrees) {
         if (manifest == null) {
             return 0;
         }
         for (Map.Entry<String, Map<String, @Nullable String>> parent : parentTrees.entrySet()) {
-            VirtualTreeLoader.ProjectFiles files = parentFiles(parent.getKey(), manifest, parent.getValue());
+            VirtualTreeLoader.ProjectFiles files = parentFiles(parent.getKey(), manifest, parent.getValue(), release);
             Map<String, Object> pkg;
             try {
                 PackageJson own = files.manifest("");
@@ -648,7 +1087,7 @@ public class NpmOptions {
             if (!truthy(pkg.get("workspaces"))) {
                 continue;
             }
-            if (MapWorkspaces.mapWorkspaces("/", pkg, files).containsValue("/" + parent.getKey())) {
+            if (MapWorkspaces.mapWorkspaces("/", pkg, files, release).containsValue("/" + parent.getKey())) {
                 return parent.getKey().split("/").length;
             }
         }
@@ -656,8 +1095,9 @@ public class NpmOptions {
     }
 
     private static VirtualTreeLoader.ProjectFiles parentFiles(String runsIn, String manifest,
-                                                              Map<String, @Nullable String> tree) {
+                                                              Map<String, @Nullable String> tree, NpmRelease release) {
         VirtualTreeLoader.ProjectFiles.ProjectFilesBuilder files = VirtualTreeLoader.ProjectFiles.builder()
+                .release(release)
                 .manifest(runsIn, manifest);
         for (Map.Entry<String, @Nullable String> held : tree.entrySet()) {
             if (held.getKey().equals(runsIn)) {

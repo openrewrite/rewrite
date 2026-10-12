@@ -18,8 +18,12 @@ package org.openrewrite.javascript.internal.lock.npm;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.javascript.internal.lock.PosixPath;
 
+import java.util.ArrayDeque;
+import java.util.Deque;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.Objects;
+import java.util.Set;
 
 import static org.openrewrite.javascript.internal.lock.npm.Js.truthy;
 
@@ -34,7 +38,7 @@ public class Link extends Node {
         Node target = options.getTarget();
         if (target != null) {
             setTarget(target);
-        } else if (Objects.equals(getRealpath(), getRoot().getPath())) {
+        } else if (getRelease().targetsRootItLinksTo() && Objects.equals(getRealpath(), getRoot().getPath())) {
             setTarget(getRoot());
         } else {
             setTarget(new Node(options.toBuilder()
@@ -121,7 +125,8 @@ public class Link extends Node {
     public @Nullable String getResolved() {
         String path = getPath();
         String realpath = getRealpath();
-        return path != null && realpath != null ? "file:" + Relpath.relpath(PosixPath.dirname(path), realpath) : null;
+        return path != null && realpath != null ? "file:" + ConsistentResolve.escapeHash(
+                Relpath.relpath(PosixPath.dirname(path), realpath), getRelease()) : null;
     }
 
     @Override
@@ -134,21 +139,65 @@ public class Link extends Node {
 
     @Override
     void recalculateOutEdgesOverrides() {
+        if (!getRelease().forwardsLinkOverridesToTarget()) {
+            // a link has no method of its own yet, and node.js's goes over the edges out a link never has
+            super.recalculateOutEdgesOverrides();
+            return;
+        }
         OverrideSet overrides = getOverrides();
+        if (!getRelease().forwardsLinkOverridesWithMatchingRule()) {
+            if (target != null) {
+                target.updateOverridesEdgeInAdded(overrides);
+            }
+            return;
+        }
         if (target == null || overrides == null) {
             return;
         }
-        boolean hasMatchingRule = false;
-        for (OverrideSet rule : overrides.getRuleset().values()) {
-            if (target.getEdgesOut().has(rule.getName())) {
-                hasMatchingRule = true;
-                break;
+        if (getRelease().linkOverridesMatchSubtree()) {
+            if (!overrideMatchesSubtree(overrides, target)) {
+                return;
+            }
+        } else {
+            boolean hasMatchingRule = false;
+            for (OverrideSet rule : overrides.getRuleset().values()) {
+                if (target.getEdgesOut().has(rule.getName())) {
+                    hasMatchingRule = true;
+                    break;
+                }
+            }
+            if (!hasMatchingRule) {
+                return;
             }
         }
-        if (!hasMatchingRule) {
-            return;
-        }
         target.updateOverridesEdgeInAdded(overrides);
+    }
+
+    // whether an override rule applies to an edge reachable from the target at any depth
+    private static boolean overrideMatchesSubtree(OverrideSet overrides, Node target) {
+        Set<@Nullable Node> seen = new HashSet<>();
+        Deque<Node> stack = new ArrayDeque<>();
+        stack.push(target);
+        while (!stack.isEmpty()) {
+            Node node = stack.pop();
+            Node resolved = node.isLink() ? node.getTarget() : node;
+            if (seen.contains(resolved)) {
+                continue;
+            }
+            seen.add(resolved);
+            if (resolved == null) {
+                throw new IllegalArgumentException("Cannot read properties of null (reading 'edgesOut')");
+            }
+            for (Edge edge : resolved.getEdgesOut().values()) {
+                if (Objects.equals(overrides.getEdgeRule(edge).getName(), edge.getName())) {
+                    return true;
+                }
+                if (edge.getTo() != null) {
+                    stack.push(edge.getTo());
+                }
+            }
+        }
+        return false;
     }
 
     @Override
