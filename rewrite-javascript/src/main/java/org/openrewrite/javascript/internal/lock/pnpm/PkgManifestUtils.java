@@ -115,7 +115,11 @@ final class PkgManifestUtils {
                 if (Js.truthy(deps) && deps instanceof Map) {
                     for (String runtimeName : RUNTIME_NAMES) {
                         Object dep = ((Map<String, @Nullable Object>) deps).get(runtimeName);
-                        if (dep instanceof String && ((String) dep).startsWith("runtime:")) {
+                        // from 11.15.1 only a runtime the engines field names
+                        // (PnpmRelease#dropsOnlyTheRuntimesTheEnginesFieldNames), asked of one it does not
+                        if (dep instanceof String && ((String) dep).startsWith("runtime:") &&
+                            (find(runtimes, runtimeName) != null ||
+                             !release.dropsOnlyTheRuntimesTheEnginesFieldNames())) {
                             ((Map<String, @Nullable Object>) deps).remove(runtimeName);
                         }
                     }

@@ -2364,7 +2364,14 @@ final class ResolveDependencies {
         address.setMissingPeersOfChildren(missingPeersOfChildren);
         address.setChildrenResolutionId(childrenResolution.getId());
         address.setRootDir(rootDir);
-        address.setMissingPeers(getMissingPeers(pkg));
+        // 11.2.2's are the peers of this occurrence's manifest; 11.15.0's those of the package as its first occurrence
+        // resolved it, less its own dependencies and name, with its optional peers named only in peerDependenciesMeta
+        // (PnpmRelease#takesMissingPeersFromTheResolvedPackage)
+        Map<String, MissingPeerInfo> missingPeers = getMissingPeers(pkg);
+        Map<String, MissingPeerInfo> resolvedPeers = missingPeersOf(resolvedPkg.getPeerDependencies());
+        boolean same = new ArrayList<>(missingPeers.entrySet()).equals(new ArrayList<>(resolvedPeers.entrySet()));
+        address.setMissingPeers(same || !ctx.getRelease().takesMissingPeersFromTheResolvedPackage() ? missingPeers :
+                resolvedPeers);
         address.setOptional(resolvedPkg.isOptional());
         address.setVersion(resolvedPkg.getVersion());
         address.setSaveCatalogName(wantedDependency.getSaveCatalogName());
@@ -2415,6 +2422,16 @@ final class ResolveDependencies {
             Object peerMeta = meta.get(peerName);
             boolean optional = peerMeta instanceof Map && Boolean.TRUE.equals(((Map<?, ?>) peerMeta).get("optional"));
             missingPeers.put(peerName, new MissingPeerInfo(Js.string(peerDependencies.get(peerName)), optional));
+        }
+        return missingPeers;
+    }
+
+    // getMissingPeers of 11.15.0, over a resolved package's peers
+    private static Map<String, MissingPeerInfo> missingPeersOf(Map<String, PeerDependency> peerDependencies) {
+        Map<String, MissingPeerInfo> missingPeers = new LinkedHashMap<>();
+        for (Map.Entry<String, PeerDependency> peer : peerDependencies.entrySet()) {
+            missingPeers.put(peer.getKey(), new MissingPeerInfo(peer.getValue().getVersion(),
+                    Boolean.TRUE.equals(peer.getValue().getOptional())));
         }
         return missingPeers;
     }

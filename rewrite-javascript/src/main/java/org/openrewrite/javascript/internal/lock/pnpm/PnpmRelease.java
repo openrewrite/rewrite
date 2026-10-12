@@ -542,6 +542,17 @@ public final class PnpmRelease {
         return atLeast(11, 9, 0);
     }
 
+    // @pnpm/pkg-manifest.utils src/convertEnginesRuntimeToDependencies.ts
+
+    /**
+     * A {@code runtimeOnFail} other than {@code download} removes from an engines field's dependencies field only the
+     * {@code runtime:} dependencies of the runtimes that engines field names, from 11.15.1
+     * (applyRuntimeOnFailOverride); before, those of node, deno and bun alike.
+     */
+    boolean dropsOnlyTheRuntimesTheEnginesFieldNames() {
+        return atLeast(11, 15, 1);
+    }
+
     // @pnpm/config.version-policy src/index.ts
 
     /**
@@ -977,6 +988,17 @@ public final class PnpmRelease {
      */
     boolean keepsAFailingOptionalDependencyTheLockResolves() {
         return atLeast(11, 11, 0);
+    }
+
+    /**
+     * The peers an occurrence of a package reports missing are those of the package as its first occurrence resolved
+     * it (peerDependenciesWithoutOwn): without its own dependencies and name, with its optional peers named only in
+     * peerDependenciesMeta (range {@code *}), so that autoInstallPeers hoists such a peer the install holds and no
+     * longer one that is also an optional dependency, from 11.15.0 (getMissingPeers of resolvedPkg); before, every
+     * peer of this occurrence's manifest.
+     */
+    boolean takesMissingPeersFromTheResolvedPackage() {
+        return atLeast(11, 15, 0);
     }
 
     /**

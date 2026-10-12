@@ -3109,4 +3109,92 @@ class PnpmReleaseTest {
           .isInstanceOf(CannotKnow.class)
           .hasMessageContaining("pnpm 11.13.0, which pnpm 11.13.1 downloads and hands the install over to");
     }
+
+    // x's optional peer o is named only in peerDependenciesMeta; y depends on o; z depends and peers on p
+    private static final RegistryMetadata META_PEERS = versions(
+      new String[]{"x", "1.0.0", "", "", "\"peerDependenciesMeta\":{\"o\":{\"optional\":true}}"},
+      new String[]{"y", "1.0.0", "\"o\":\"1.0.0\"", ""},
+      new String[]{"o", "1.0.0", "", ""},
+      new String[]{"z", "1.0.0", "\"p\":\"1.0.0\"", "\"p\":\"*\""},
+      new String[]{"p", "1.0.0", "", ""});
+
+    // the lock-only install of a root with x and y
+    private static String installMetaPeers(String release) {
+        return new PnpmLockRegenerator(PnpmLockRegenerator.Inputs.builder()
+          .manifest("", "{\"name\":\"root\",\"version\":\"1.0.0\",\"dependencies\":{\"x\":\"1.0.0\",\"y\":\"1.0.0\"}}")
+          .file("pnpm-workspace.yaml", "minimumReleaseAge: 0\n")
+          .env(Collections.emptyMap())
+          .now(NOW)
+          .release(release(release))
+          .build(), META_PEERS).writeLock();
+    }
+
+    // the importers and snapshots the lock-only install writes of a workspace whose a and b depend on z, the one
+    // project of them that gives z its peer p being resolved first or not, peers neither installed nor hoisted
+    private static String installFirstOccurrence(boolean firstGivesP, String release) {
+        String withP = "{\"name\":\"N\",\"version\":\"1.0.0\",\"dependencies\":{\"p\":\"1.0.0\",\"z\":\"1.0.0\"}}";
+        String withoutP = "{\"name\":\"N\",\"version\":\"1.0.0\",\"dependencies\":{\"z\":\"1.0.0\"}}";
+        String lock = new PnpmLockRegenerator(PnpmLockRegenerator.Inputs.builder()
+          .manifest("", "{\"name\":\"root\",\"version\":\"1.0.0\"}")
+          .manifest("a", (firstGivesP ? withP : withoutP).replace("N", "a"))
+          .manifest("b", (firstGivesP ? withoutP : withP).replace("N", "b"))
+          .file("pnpm-workspace.yaml", "packages:\n  - a\n  - b\nminimumReleaseAge: 0\nautoInstallPeers: false\n")
+          .env(Collections.emptyMap())
+          .now(NOW)
+          .release(release(release))
+          .build(), META_PEERS).writeLock();
+        return lock.substring(lock.indexOf("\nimporters:\n")).replaceAll("\n\npackages:\n(.|\n)*\n\nsnapshots:", "");
+    }
+
+    /**
+     * installing/deps-resolver resolveDependencies.ts (11.15.0): x's missing peers are those of its resolved package,
+     * the optional o named only in peerDependenciesMeta among them, which autoInstallPeers hoists as y's o; before,
+     * those of its peerDependencies, which name none. Every occurrence of z takes the peers of the first, which has p
+     * as a peer where its project gives it and as its own dependency where not, so that a later occurrence's peers
+     * differ from its own manifest's; the lock is the same either way. pnpm 11.14.0 and 11.15.0 wrote these locks
+     * when run on them.
+     */
+    @Test
+    void takesMissingPeersFromTheResolvedPackageFrom11150() {
+        assertThat(installMetaPeers("11.15.0"))
+          .contains("      x:\n        specifier: 1.0.0\n        version: 1.0.0(o@1.0.0)\n")
+          .contains("  x@1.0.0(o@1.0.0):\n    optionalDependencies:\n      o: 1.0.0\n");
+        assertThat(installMetaPeers("11.14.0"))
+          .contains("      x:\n        specifier: 1.0.0\n        version: 1.0.0\n")
+          .contains("  x@1.0.0: {}\n");
+        for (String release : Arrays.asList("11.14.0", "11.15.0")) {
+            assertThat(installFirstOccurrence(true, release)).as(release)
+              .isEqualTo("\nimporters:\n\n  .: {}\n\n  a:\n    dependencies:\n      p:\n        specifier: 1.0.0\n" +
+                         "        version: 1.0.0\n      z:\n        specifier: 1.0.0\n" +
+                         "        version: 1.0.0(p@1.0.0)\n\n  b:\n    dependencies:\n      z:\n" +
+                         "        specifier: 1.0.0\n        version: 1.0.0(p@1.0.0)\n\n  p@1.0.0: {}\n\n" +
+                         "  z@1.0.0(p@1.0.0):\n    dependencies:\n      p: 1.0.0\n");
+            assertThat(installFirstOccurrence(false, release)).as(release)
+              .isEqualTo("\nimporters:\n\n  .: {}\n\n  a:\n    dependencies:\n      z:\n        specifier: 1.0.0\n" +
+                         "        version: 1.0.0\n\n  b:\n    dependencies:\n      p:\n        specifier: 1.0.0\n" +
+                         "        version: 1.0.0\n      z:\n        specifier: 1.0.0\n        version: 1.0.0\n\n" +
+                         "  p@1.0.0: {}\n\n  z@1.0.0:\n    dependencies:\n      p: 1.0.0\n");
+        }
+    }
+
+    // the dependencies of a manifest whose engines.runtime is node, depending on node and bun as runtime: specs, once
+    // the runtimeOnFail setting ignore applies
+    private static @Nullable Object ignoringRuntimes(String release) {
+        Map<String, @Nullable Object> manifest = obj("{'engines':{'runtime':{'name':'node','version':'22.0.0'}}," +
+                                                     "'dependencies':{'node':'runtime:22.0.0','bun':'runtime:1.2.0'," +
+                                                     "'foo':'1.0.0'}}");
+        PkgManifestUtils.applyRuntimeOnFailOverride(manifest, "ignore", release(release));
+        return manifest.get("dependencies");
+    }
+
+    /**
+     * pkg-manifest/utils convertEnginesRuntimeToDependencies.ts applyRuntimeOnFailOverride (11.15.1): runtimeOnFail
+     * ignore removes the runtime: dependency of node, which engines.runtime names, and keeps bun's; before, it removes
+     * every runtime's.
+     */
+    @Test
+    void dropsOnlyTheRuntimesTheEnginesFieldNamesFrom11151() {
+        assertThat(json(ignoringRuntimes("11.15.1"))).isEqualTo("{'bun':'runtime:1.2.0','foo':'1.0.0'}");
+        assertThat(json(ignoringRuntimes("11.15.0"))).isEqualTo("{'foo':'1.0.0'}");
+    }
 }
