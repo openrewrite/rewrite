@@ -343,6 +343,22 @@ class BunReleaseTest {
           .hasMessage("Invalid package resolution");
     }
 
+    /**
+     * GlobWalker.zig makeComponent (1.3.4): {@code .x} in a workspaces glob is itself; before, the walker takes it for
+     * {@code ..} and walks what the engine cannot see.
+     */
+    @Test
+    void walksATwoCharacterDotComponentAsWrittenFrom134() {
+        java.util.Map<String, String> manifests = java.util.Collections.singletonMap(".x/a", "{\"name\":\"a\"}");
+        List<Json.Expr> globs = Json.parse("[\".x/*\"]").items();
+        Workspaces later = new Workspaces(BunRelease.of("1.3.4"));
+        later.processNamesArray(new Log(), globs, manifests);
+        assertThat(later.map).containsOnlyKeys(".x/a");
+        assertThatThrownBy(() -> new Workspaces(BunRelease.of("1.3.3")).processNamesArray(new Log(), globs, manifests))
+          .isInstanceOf(CannotKnow.class)
+          .hasMessageContaining("whose .x its glob walker takes for ..");
+    }
+
     private static PackageManifest.PackageVersion version(BunRelease release, String packument) {
         PackageManifest manifest = requireNonNull(PackageManifest.parse(release, new Log(), packument, "debug", false));
         PackageManifest.FindResult pick = requireNonNull(manifest.findBestVersion(

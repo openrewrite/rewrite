@@ -16,6 +16,7 @@
 package org.openrewrite.javascript.internal.lock.bun;
 
 import org.jspecify.annotations.Nullable;
+import org.openrewrite.javascript.internal.lock.CannotKnow;
 import org.openrewrite.javascript.internal.lock.RootRelativePath;
 
 import java.util.ArrayList;
@@ -90,6 +91,14 @@ final class Workspaces {
 
         for (int i = 0; i < workspaceGlobs.size(); i++) {
             String userPattern = workspaceGlobs.get(i);
+            if (!release.walksDotComponentsAsWritten()) {
+                for (String component : userPattern.replace('\\', '/').split("/")) {
+                    if (component.length() == 2 && component.charAt(0) == '.' && !"..".equals(component)) {
+                        throw new CannotKnow("the directories bun " + release + " walks for the workspaces pattern " +
+                                             userPattern + ", whose " + component + " its glob walker takes for ..");
+                    }
+                }
+            }
             String globPattern = userPattern.isEmpty() ? "package.json" : RootRelativePath.join(
                     userPattern.replace('\\', '/'), "package.json");
             for (String location : manifests.keySet()) {

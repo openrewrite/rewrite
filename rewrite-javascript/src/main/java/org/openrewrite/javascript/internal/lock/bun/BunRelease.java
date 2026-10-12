@@ -195,6 +195,15 @@ public final class BunRelease implements Comparable<BunRelease> {
         return atLeast(1, 3, 0);
     }
 
+    /**
+     * The glob walker takes a component of two characters starting with {@code .} ({@code .*}, {@code .x}) for
+     * itself, from 1.3.4 (src/glob/GlobWalker.zig {@code makeComponent}, bun#24939); before, for {@code ..}, so that
+     * the walk climbs where the pattern does not.
+     */
+    boolean walksDotComponentsAsWritten() {
+        return atLeast(1, 3, 4);
+    }
+
     // src/install/patch_install.zig PatchTask.calcHash
 
     /**

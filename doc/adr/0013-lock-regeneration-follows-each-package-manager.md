@@ -289,12 +289,19 @@ The Bun port follows Bun 1.3.10 and reproduces other releases beside it, as the 
   1.3.10. One outside `BunReleases.PROVEN`, or one that writes no bun.lock (before 1.1.39), is cannot-know.
 - **One question per upstream change.** `BunRelease` holds each difference as a question named for what Bun does,
   answered through `atLeast` alone by the release whose tag (`bun-v<release>` of oven-sh/bun) made it; the ported Zig
-  module branches on it beside 1.3.10's code, the release reaching it through `BunOptions`. bun.lock is read and
-  written as the release does it: `configVersion` from 1.3.2, a `""` registry expanded to the package's scope registry
-  from 1.3.7, the integrity of a git, github or tarball package from 1.3.10. A name `peerDependenciesMeta` alone
-  lists is an optional peer of `"*"` from 1.3.14, in a packument and in a workspace's manifest alike; a workspaces
-  glob a later `!` pattern negates is no workspace from 1.3.0; and the patch file errors are worded as each release
-  words them.
+  module branches on it beside 1.3.10's code, the release reaching it through `BunOptions` and the `Lockfile`. bun.lock
+  is read and written as the release does it: `configVersion` from 1.3.2, a `""` registry expanded to the package's
+  scope registry from 1.3.7, the integrity of a git, github or tarball package from 1.3.10, an unnamed root's entry
+  from 1.3.0, catalogs from 1.2.14. A name `peerDependenciesMeta` alone lists is an optional peer of `"*"` from
+  1.3.14; the peer queue is drained before the wait for the peers from 1.3.11, processed once before it from 1.3.1;
+  a workspaces glob a later `!` pattern negates is no workspace from 1.3.0; bunfig's minimum release age is read
+  from 1.3.0, a quoted .npmrc value expanded from 1.3.5, the root's own catalogs from 1.2.19; and before 1.2.19 a
+  package's dependency groups are not told apart (their order, the root's diff, the workspace bit). The patch file
+  errors are worded as each release words them.
+- **A release that never finishes.** From 1.2.21 (`--lockfile-only` no longer prefetches tarballs) to 1.3.9, a pass
+  of the wait for the peers that leaves peers queued and no request pending is never followed by another: nothing
+  wakes bun's event loop. The port fails there, as npm's does where npm never finishes. Installs over a lock that
+  holds the packages never reach that state; an install from a lock whose root lists nothing can.
 - **How a release is proven.** Every release that writes bun.lock (1.1.39 to 1.4.3) was swept over every recorded Bun
   scenario through a frozen registry, as npm's were; the release that recorded a scenario (1.3.10) is its control. The
   export (the fixtures repository's `releases` and `release/<first>/`) holds 1.2.0 on, since 1.1.x writes
@@ -302,5 +309,11 @@ The Bun port follows Bun 1.3.10 and reproduces other releases beside it, as the 
   its own `before`, of the edit over the scenario's `before` (`cross`), and the second install over each; a lock bun
   wrote from scratch is no outcome, since a regeneration installs over a lock, so that a from-scratch install that
   never finishes (1.2.21 to 1.3.9 over two peer graphs) leaves the edits over a lock, which finish, to be replayed.
-  `BunScenarioTest` replays the first and last release of every range, and every release with
-  `REWRITE_LOCK_EVERY_RELEASE`.
+  A `git clone` bun failed is `cannot-know`: what git reaches over the network is not the engine's to know, as npm's
+  export takes the filesystem npm ran on. `BunScenarioTest` replays the first and last release of every range, and
+  every release with `REWRITE_LOCK_EVERY_RELEASE`.
+- **What is reproduced.** `BunReleases.PROVEN` is 1.3.2 to 1.3.14: every scenario replays as each of them, and every
+  upstream change in the files the port names between them and 1.3.10 that reaches a lock is a question. Every
+  scenario replays as 1.2.0 to 1.3.1 too, but those miss questions still (the git and GitHub specs before 1.3.2, and
+  changes before 1.2.13 in bun.lock's writer and reader, the overrides and the globs), so they stay cannot-know.
+  1.4.x, a Rust translation that writes lockfileVersion 2, is not reproduced.
