@@ -70,6 +70,11 @@ final class JsonIndex {
     @Nullable Error indexError;
     int indexErrorPos;
 
+    /**
+     * Where the first comment indexed starts; -1 for none.
+     */
+    int firstComment = -1;
+
     JsonIndex(byte[] contents) {
         this.s = contents;
         this.n = contents.length;
@@ -216,6 +221,9 @@ final class JsonIndex {
                 } else {
                     fail(Error.UNEXPECTED_SLASH, i);
                     return;
+                }
+                if (firstComment < 0) {
+                    firstComment = start;
                 }
             } else {
                 if (isStructural(c)) {

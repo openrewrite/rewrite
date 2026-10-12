@@ -62,6 +62,7 @@ final class JsonLexer {
     private final String source;
     private final int len;
     private final Json.Log log;
+    private final boolean allowComments;
 
     private int current;
     int start;
@@ -77,17 +78,19 @@ final class JsonLexer {
     private boolean stringNeedsDecode;
     private int stringLiteralStart;
 
-    private JsonLexer(String source, Json.Log log) {
+    private JsonLexer(String source, Json.Log log, boolean allowComments) {
         this.source = source;
         this.len = source.length();
         this.log = log;
+        this.allowComments = allowComments;
     }
 
     /**
-     * {@code init}: the lexer at its first token.
+     * {@code init}: the lexer at its first token; without {@code allowComments}, a comment is logged and lexed as
+     * the end of the file.
      */
-    static JsonLexer init(String source, Json.Log log) {
-        JsonLexer lexer = new JsonLexer(source, log);
+    static JsonLexer init(String source, Json.Log log, boolean allowComments) {
+        JsonLexer lexer = new JsonLexer(source, log, allowComments);
         lexer.step();
         lexer.next();
         return lexer;
@@ -293,6 +296,10 @@ final class JsonLexer {
                     }
                     if (codePoint == '/') {
                         scanSingleLineComment();
+                        if (!allowComments) {
+                            addRangeError(start, end - start, "JSON does not support comments");
+                            return;
+                        }
                         continue;
                     }
                     if (codePoint == '*') {
@@ -314,6 +321,10 @@ final class JsonLexer {
                                     step();
                                     break;
                             }
+                        }
+                        if (!allowComments) {
+                            addRangeError(start, end - start, "JSON does not support comments");
+                            return;
                         }
                         continue;
                     }

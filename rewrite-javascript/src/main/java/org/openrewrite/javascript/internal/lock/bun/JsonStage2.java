@@ -36,16 +36,40 @@ final class JsonStage2 {
     private final int len;
     private final Json.Log log;
     private final JsonIndex idx;
+    private final boolean allowTrailingCommas;
     private int cursor;
     private int tokenStart;
     private int prevErrorLoc = -1;
     private int peekPos;
 
-    JsonStage2(byte[] contents, Json.Log log, JsonIndex idx) {
+    JsonStage2(byte[] contents, Json.Log log, JsonIndex idx, boolean allowTrailingCommas) {
         this.contents = contents;
         this.len = contents.length;
         this.log = log;
         this.idx = idx;
+        this.allowTrailingCommas = allowTrailingCommas;
+    }
+
+    /**
+     * {@code at_trailing_end}: nothing but exotic whitespace follows the cursor.
+     */
+    boolean atTrailingEnd() {
+        while (true) {
+            int p = posAt(cursor);
+            if (p >= len) {
+                return true;
+            }
+            int b = byteAt(p);
+            if ((b >= 0x80 || b == 0x0B || b == 0x0C) && restIsWsCold(p, posAt(cursor + 1))) {
+                cursor++;
+                continue;
+            }
+            return false;
+        }
+    }
+
+    Json.Failure unexpectedHere() {
+        return unexpected(cursor);
     }
 
     // LexerLog (src/ast/lexer_log.rs): an error at the location of the previous one is not logged again
@@ -376,6 +400,9 @@ final class JsonStage2 {
                 }
                 cursor++;
                 if (peek() == ']') {
+                    if (!allowTrailingCommas) {
+                        addRangeError(p, 1, "JSON does not support trailing commas");
+                    }
                     cursor++;
                     break;
                 }
@@ -412,9 +439,13 @@ final class JsonStage2 {
                     throw new Json.Failure(Json.PARSER_ERROR);
                 }
                 cursor++;
+                int comma = p;
                 b = peek();
                 p = peekPos;
                 if (b == '}') {
+                    if (!allowTrailingCommas) {
+                        addRangeError(comma, 1, "JSON does not support trailing commas");
+                    }
                     cursor++;
                     break;
                 }

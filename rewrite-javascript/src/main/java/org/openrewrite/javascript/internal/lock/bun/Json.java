@@ -37,9 +37,13 @@ final class Json {
     static final String SYNTAX_ERROR = "SyntaxError";
 
     private final JsonLexer lexer;
+    private final Log log;
+    private final boolean allowTrailingCommas;
 
-    private Json(JsonLexer lexer) {
+    private Json(JsonLexer lexer, Log log, boolean allowTrailingCommas) {
         this.lexer = lexer;
+        this.log = log;
+        this.allowTrailingCommas = allowTrailingCommas;
     }
 
     /**
@@ -121,14 +125,14 @@ final class Json {
         Log log = new Log();
         if (release.indexesJsonBeforeParsingIt()) {
             try {
-                return parseImpl(source.getBytes(UTF_8), log);
+                return parseImpl(source.getBytes(UTF_8), log, true, true, false);
             } catch (Failure f) {
                 throw new SyntaxError(f.error, log.first(f.error));
             }
         }
         Expr root;
         try {
-            root = new Json(JsonLexer.init(source, log)).parseExpr();
+            root = new Json(JsonLexer.init(source, log, true), log, true).parseExpr();
         } catch (Failure f) {
             throw new SyntaxError(f.error, log.first(f.error));
         }
@@ -140,34 +144,82 @@ final class Json {
         return root;
     }
 
-    // json.rs parse_impl with PACKAGE_JSON_OPTS: what stage 1 found wrong is the error unless stage 2 logged an earlier
-    // one, and any error logged fails the parse
-    private static Expr parseImpl(byte[] contents, Log log) {
+    /**
+     * Strict JSON read to its end, as an .npmrc's quoted value is ({@code parseUTF8Impl} with {@code check_len},
+     * 1.3.10; {@code parse_utf8_impl::<true>} from 1.4.0): neither comments nor trailing commas, and before 1.4.0
+     * what the parse returns though it logged an error, its log being dropped.
+     */
+    static Expr parseStrict(String source, BunRelease release) {
+        if (source.isEmpty()) {
+            return new Expr(Kind.OBJECT, new ArrayList<Property>());
+        }
+        Log log = new Log();
+        try {
+            if (release.indexesJsonBeforeParsingIt()) {
+                return parseImpl(source.getBytes(UTF_8), log, false, false, true);
+            }
+            JsonLexer lexer = JsonLexer.init(source, log, false);
+            Expr root = new Json(lexer, log, false).parseExpr();
+            if (lexer.end >= source.length()) {
+                return root;
+            }
+            lexer.unexpected();
+            throw new Failure(PARSER_ERROR);
+        } catch (Failure f) {
+            throw new SyntaxError(f.error, log.first(f.error));
+        }
+    }
+
+    // json.rs parse_impl: what stage 1 found wrong is the error unless stage 2 logged an earlier one, a comment where
+    // none is allowed is, and any error logged fails the parse
+    private static Expr parseImpl(byte[] contents, Log log, boolean allowComments, boolean allowTrailingCommas,
+                                  boolean checkLen) {
         JsonIndex sidx = new JsonIndex(contents);
         Expr result = null;
         Failure failure = null;
         try {
-            result = new JsonStage2(contents, log, sidx).parseValue();
+            JsonStage2 parser = new JsonStage2(contents, log, sidx, allowTrailingCommas);
+            result = parser.parseValue();
+            if (checkLen && !parser.atTrailingEnd()) {
+                throw parser.unexpectedHere();
+            }
         } catch (Failure f) {
             failure = f;
         }
         if (sidx.indexError != null) {
             int pos = sidx.indexErrorPos;
-            boolean earlierStage2Err = false;
+            boolean rejectedComment = !allowComments && sidx.firstComment >= 0 && sidx.firstComment < pos;
+            if (!rejectedComment) {
+                boolean earlierStage2Err = false;
+                for (int i = 0; i < log.size(); i++) {
+                    if (log.offset(i) + Math.max(log.length(i), 1) <= pos) {
+                        earlierStage2Err = true;
+                        break;
+                    }
+                }
+                if (!earlierStage2Err) {
+                    log.truncate(0);
+                    if (sidx.indexError == JsonIndex.Error.UNTERMINATED_BLOCK_COMMENT) {
+                        log.add("Expected \"*/\" to terminate multi-line comment", contents.length, 0);
+                    } else {
+                        log.add("Unsupported syntax: Operators are not allowed in JSON", pos + 1, 0);
+                    }
+                }
+                throw new Failure(SYNTAX_ERROR);
+            }
+        }
+        if (!allowComments && sidx.firstComment >= 0) {
+            int firstError = Integer.MAX_VALUE;
             for (int i = 0; i < log.size(); i++) {
-                if (log.offset(i) + Math.max(log.length(i), 1) <= pos) {
-                    earlierStage2Err = true;
-                    break;
-                }
+                firstError = Math.min(firstError, log.offset(i));
             }
-            if (!earlierStage2Err) {
+            if (firstError >= sidx.firstComment) {
                 log.truncate(0);
-                if (sidx.indexError == JsonIndex.Error.UNTERMINATED_BLOCK_COMMENT) {
-                    log.add("Expected \"*/\" to terminate multi-line comment", contents.length, 0);
-                } else {
-                    log.add("Unsupported syntax: Operators are not allowed in JSON", pos + 1, 0);
-                }
+                log.add("JSON does not support comments", sidx.firstComment, 0);
+                throw new Failure(SYNTAX_ERROR);
             }
+        }
+        if (sidx.indexError != null) {
             throw new Failure(SYNTAX_ERROR);
         }
         if (failure != null) {
@@ -241,8 +293,16 @@ final class Json {
     }
 
     private boolean parseMaybeTrailingComma(JsonLexer.T closer) {
+        int comma = lexer.start;
+        int commaLength = lexer.end - lexer.start;
         lexer.expect(JsonLexer.T.COMMA);
-        return lexer.token != closer;
+        if (lexer.token == closer) {
+            if (!allowTrailingCommas) {
+                log.add("JSON does not support trailing commas", comma, commaLength);
+            }
+            return false;
+        }
+        return true;
     }
 
     enum Kind {

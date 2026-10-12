@@ -2246,6 +2246,38 @@ class BunReleaseTest {
           .containsEntry("Q", "a-b").containsEntry("R", "").containsEntry("S", "a\\$").containsEntry("U", "x-x");
     }
 
+    /**
+     * ini/lib.rs prepare_str over json.rs (1.4.0, bun#33032): a quoted value is strict JSON, and one whose parse
+     * logged an error, a trailing comma or a comment, stays its text; 1.3.x took what the parse returned.
+     */
+    @Test
+    void keepsAQuotedNpmrcValueWithAJsonErrorAsTextFrom140() {
+        HostEnvironment env = HostEnvironment.of(Collections.<String, String>emptyMap());
+        String npmrc = "omit='[\"dev\",]'\nc='[\"a\"] // c'\nn='[1, 0x10]'\n";
+        assertThat(Ini.parse(npmrc, env, BunRelease.of("1.4.0")))
+          .containsEntry("omit", "[\"dev\",]").containsEntry("c", "[\"a\"] // c")
+          .containsEntry("n", java.util.Arrays.asList(1L, 16L));
+        assertThat(Ini.parse(npmrc, env, BunRelease.of("1.3.14")))
+          .containsEntry("omit", Collections.singletonList("dev")).containsEntry("c", Collections.singletonList("a"));
+        assertThat(BunOptions.load(BunRelease.of("1.4.0"), null, null, npmrc, env).isLocalDevDependencies()).isTrue();
+        assertThat(BunOptions.load(BunRelease.of("1.3.14"), null, null, npmrc, env).isLocalDevDependencies()).isFalse();
+    }
+
+    /**
+     * ini/lib.rs prepare_str (1.4.0, bun#32712): {@code ''} is the empty string; before, JSON's empty document, an
+     * empty object, so that it leaves the user's registry in place.
+     */
+    @Test
+    void readsAnEmptyQuotedNpmrcValueAsAStringFrom140() {
+        HostEnvironment env = HostEnvironment.of(Collections.<String, String>emptyMap());
+        assertThat(Ini.parse("registry=''\n", env, BunRelease.of("1.4.0"))).containsEntry("registry", "");
+        assertThat(Ini.parse("registry=''\n", env, BunRelease.of("1.3.14")).get("registry"))
+          .isEqualTo(Collections.emptyMap());
+        String user = "registry=https://u.example/\n";
+        assertThat(BunOptions.load(BunRelease.of("1.3.14"), null, user, "registry=''\n", env).getRegistry())
+          .isEqualTo("https://u.example/");
+    }
+
     private static String repeat(char c, int n) {
         char[] chars = new char[n];
         java.util.Arrays.fill(chars, c);

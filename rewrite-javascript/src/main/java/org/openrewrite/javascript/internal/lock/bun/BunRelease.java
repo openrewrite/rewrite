@@ -384,6 +384,14 @@ public final class BunRelease implements Comparable<BunRelease> {
     }
 
     /**
+     * An .npmrc value that is empty once its single quotes are stripped ({@code ''}) is the empty string, from 1.4.0
+     * (bun#32712); before, it is parsed as JSON's empty document, an empty object, which no string setting takes.
+     */
+    boolean readsAnEmptyQuotedNpmrcValueAsAString() {
+        return atLeast(1, 4, 0);
+    }
+
+    /**
      * A quoted .env value ends at its first unescaped closing quote and the rest of its line is dropped, from 1.4.0
      * (bun#34003); before, a closing quote ends it only where whitespace and then a newline, a {@code #} or the end
      * of the file follow, else the scan goes on to the next one, past the end of the line.
