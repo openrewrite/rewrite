@@ -125,7 +125,10 @@ final class ScenarioReplay {
             String file = mirror == null ? file(url, full) : mirror + "/" + file(url.replaceFirst(
               "^[a-z]+://[^/]+/", ""), full);
             requests.add(file);
-            String body = mirror == null ? scenario.http(file) : scenario.file(file);
+            // an abbreviated packument whose versions an older recording kept as empty objects, as the sweep's
+            // registry filled them for the releases that ask for it
+            String filled = mirror == null && !full ? scenario.http(file + "@abbreviated") : null;
+            String body = filled != null ? filled : mirror == null ? scenario.http(file) : scenario.file(file);
             if (body == null) {
                 notRecorded(file);
             }
