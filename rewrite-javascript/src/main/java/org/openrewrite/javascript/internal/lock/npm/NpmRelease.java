@@ -225,6 +225,16 @@ public final class NpmRelease implements Comparable<NpmRelease> {
     }
 
     /**
+     * {@code [_canPlaceDep]}, where the peer set came from: the set in the way is replaced once the target's own edges
+     * accept the new one, and its members the new set would leave invalid are taken out of the tree to be built deeper
+     * ({@code needNesting}), from npm 7.11.2; before, it is replaced only where no valid edge from the target to one of
+     * its members objects.
+     */
+    boolean nestsReplacedPeerSets() {
+        return atLeast(7, 11, 2);
+    }
+
+    /**
      * {@code #loadPeerSet} resolves an optional peer only against a version in the tree that does not satisfy it, from
      * npm 11.20.0 and, of npm 12, from 12.1.0; before, every optional peer the virtual root lacks.
      */
@@ -256,6 +266,15 @@ public final class NpmRelease implements Comparable<NpmRelease> {
      */
     boolean prefersSatisfyingWorkspace() {
         return atLeast(8, 5, 0);
+    }
+
+    /**
+     * A placement dedupes with {@code [_pruneDedupable]} (node.js {@code canDedupe}): the target's subtree on a KEEP,
+     * the node the edge leaves, and each deeper node of the name, from npm 7.11.2; before, nothing on a KEEP, and a
+     * node the placed one can replace, unless a nearer node of the name masks it.
+     */
+    boolean prunesDedupable() {
+        return atLeast(7, 11, 2);
     }
 
     /**
@@ -296,6 +315,15 @@ public final class NpmRelease implements Comparable<NpmRelease> {
      */
     boolean queuesProblemNodesOfLock() {
         return atLeast(8, 6, 0);
+    }
+
+    /**
+     * {@code [_resolveLinks]} takes a link to point outside the project when its target does not descend from the root,
+     * and {@code [_buildDepStep]} hands it only links that have a target, from npm 7.20.0; before, when the link's
+     * realpath is outside the project directory, any link.
+     */
+    boolean readsExternalLinksByTarget() {
+        return atLeast(7, 20, 0);
     }
 
     /**
@@ -353,6 +381,14 @@ public final class NpmRelease implements Comparable<NpmRelease> {
      */
     boolean skipsPeerConflictOfDetachedNode() {
         return atLeast(12, 0, 2) || atLeast(11, 19, 0) && !atLeast(12, 0, 0);
+    }
+
+    /**
+     * A placement leaves tops out: it prunes none of the name as deduplicable, and a top's edge to what the name
+     * resolves to under the target does not hold the dependency back, from npm 7.20.0.
+     */
+    boolean skipsTopsWhenPlacing() {
+        return atLeast(7, 20, 0);
     }
 
     /**
@@ -609,6 +645,14 @@ public final class NpmRelease implements Comparable<NpmRelease> {
      */
     boolean dedupesFromResolveParents() {
         return atLeast(7, 14, 0);
+    }
+
+    /**
+     * {@code isDescendantOf} walks resolve parents, so a node in a top's folder outside node_modules descends from that
+     * top, from npm 7.20.0; before, parents only.
+     */
+    boolean descendsThroughResolveParents() {
+        return atLeast(7, 20, 0);
     }
 
     /**

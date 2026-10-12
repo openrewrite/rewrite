@@ -173,7 +173,9 @@ final class LegacyPlacement {
                 }
             }
 
-            pruneDedupable(target, true);
+            if (options.getRelease().prunesDedupable()) {
+                pruneDedupable(target, true);
+            }
             return new ArrayList<>();
         }
 
@@ -227,8 +229,18 @@ final class LegacyPlacement {
             warnPeerConflict(edge);
         }
 
-        if (edge.isValid() && edge.getTo() != null && edge.getTo() != newDep) {
+        boolean prunesDedupable = options.getRelease().prunesDedupable();
+        if (prunesDedupable && edge.isValid() && edge.getTo() != null && edge.getTo() != newDep) {
             pruneDedupable(edge.getTo(), false);
+        } else if (!prunesDedupable && edge.isValid()) {
+            // before npm 7.11.2 the node the edge leaves goes where the placed one can replace it
+            Node to = edge.getTo();
+            if (to == null) {
+                throw new IllegalArgumentException("Cannot read properties of null (reading 'parent')");
+            }
+            if (to.getParent() != target && newDep.canReplace(to)) {
+                to.setParent(null);
+            }
         }
 
         for (Edge edgeIn : new ArrayList<>(newDep.getEdgesIn())) {
@@ -244,7 +256,9 @@ final class LegacyPlacement {
             if (!inventory.query("name", newDep.getName()).contains(n)) {
                 continue;
             }
-            if (!n.isTop() && n.isDescendantOf(target)) {
+            if (!prunesDedupable) {
+                pruneReplaceable(n, newDep, target);
+            } else if ((!n.isTop() || !options.getRelease().skipsTopsWhenPlacing()) && n.isDescendantOf(target)) {
                 pruneDedupable(n, false);
             }
         }
@@ -268,6 +282,24 @@ final class LegacyPlacement {
         virtualRoots.remove(virtualRoot.getSourceReference());
 
         return placed;
+    }
+
+    // before npm 7.11.2: a node of the placed name deeper in the target that the placed one can replace goes, unless
+    // a nearer node of the name masks it that it cannot be replaced with
+    private static void pruneReplaceable(Node node, Node newDep, Node target) {
+        if (node != newDep &&
+            node.isDescendantOf(target) &&
+            !node.isInShrinkwrap() &&
+            !node.isInBundle() &&
+            node.canReplaceWith(newDep)) {
+            Node parent = node.getParent();
+            Node mask = parent != target && parent != null && parent.getParent() != null &&
+                        parent.getParent() != target ? parent.getParent().resolve(newDep.getName()) : null;
+
+            if (mask == null || mask == newDep || node.canReplaceWith(mask)) {
+                node.setParent(null);
+            }
+        }
     }
 
     private void pruneDedupable(Node node, boolean descend) {
@@ -371,7 +403,32 @@ final class LegacyPlacement {
 
             if (isSource) {
                 boolean canReplace = true;
-                if (peerEntryEdge != null) {
+                if (peerEntryEdge != null && !options.getRelease().nestsReplacedPeerSets()) {
+                    // before npm 7.11.2: no valid edge from the target to the set in the way may object
+                    Set<Node> peerSet = peerSet(current);
+                    OUTER:
+                    for (Node p : peerSet) {
+                        for (Edge e : p.getEdgesIn()) {
+                            if (peerSet.contains(e.getFrom())) {
+                                continue;
+                            }
+                            if (e.getFrom() == target && e.isValid()) {
+                                Node rep = virtualChildren(dep).get(e.getName());
+                                boolean override = false;
+                                for (Edge in : rep == null ? new LinkedHashSet<Edge>() : rep.getEdgesIn()) {
+                                    if (!in.isValid()) {
+                                        override = true;
+                                        break;
+                                    }
+                                }
+                                if (rep == null || !rep.satisfies(e) || override) {
+                                    canReplace = false;
+                                    break OUTER;
+                                }
+                            }
+                        }
+                    }
+                } else if (peerEntryEdge != null) {
                     Set<Node> currentPeerSet = peerSet(current);
 
                     Set<Edge> targetEdges = new LinkedHashSet<>();
@@ -498,8 +555,10 @@ final class LegacyPlacement {
 
         Node current = target != entryEdge.getFrom() ? target.resolve(dep.getName()) : null;
         if (current != null) {
+            // before npm 7.20.0 a top's edges hold the dependency too
+            boolean skipsTops = options.getRelease().skipsTopsWhenPlacing();
             for (Edge e : current.getEdgesIn()) {
-                if (!e.getFrom().isTop() && e.getFrom().isDescendantOf(target) && e.isValid()) {
+                if ((!skipsTops || !e.getFrom().isTop()) && e.getFrom().isDescendantOf(target) && e.isValid()) {
                     if (!e.satisfiedBy(dep)) {
                         return CONFLICT;
                     }

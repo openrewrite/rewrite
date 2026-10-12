@@ -598,7 +598,9 @@ public class Node {
     }
 
     public boolean isDescendantOf(Node node) {
-        for (Node p = this; p != null; p = p.getResolveParent()) {
+        // before npm 7.20.0, through parents only
+        boolean throughResolveParents = release.descendsThroughResolveParents();
+        for (Node p = this; p != null; p = throughResolveParents ? p.getResolveParent() : p.parent) {
             if (p == node) {
                 return true;
             }

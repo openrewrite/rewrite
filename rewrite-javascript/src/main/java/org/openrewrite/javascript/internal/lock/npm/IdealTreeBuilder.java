@@ -666,7 +666,9 @@ public final class IdealTreeBuilder {
 
             for (Edge edge : node.getEdgesOut().values()) {
                 Node to = edge.getTo();
-                if (to != null && to.isLink() && to.getTarget() != null) {
+                // before npm 7.20.0 a link that lost its target is queued too
+                if (to != null && to.isLink() &&
+                    (to.getTarget() != null || !options.getRelease().readsExternalLinksByTarget())) {
                     linkNodes.add(to);
                 }
             }
@@ -1201,11 +1203,24 @@ public final class IdealTreeBuilder {
                 continue;
             }
 
-            Node target = Objects.requireNonNull(link.getTarget());
-            boolean external = !target.isDescendantOf(Objects.requireNonNull(tree.getTarget()));
+            Node target = link.getTarget();
+            boolean external;
+            if (options.getRelease().readsExternalLinksByTarget()) {
+                if (target == null) {
+                    throw new IllegalArgumentException("Cannot read properties of null (reading 'isDescendantOf')");
+                }
+                external = !target.isDescendantOf(Objects.requireNonNull(tree.getTarget()));
+            } else {
+                // /^\.\.(\/|$)/.test(relpath(this.path, link.realpath))
+                String loc = Relpath.relpath(path, link.getRealpath());
+                external = loc.equals("..") || loc.startsWith("../");
+            }
 
             if (external) {
                 continue;
+            }
+            if (target == null) {
+                throw new IllegalArgumentException("Cannot read properties of null (reading 'parent')");
             }
 
             boolean unseenLink = (target.getParent() != null || target.getFsParent() != null) &&
