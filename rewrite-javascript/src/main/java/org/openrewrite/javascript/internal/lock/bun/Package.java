@@ -384,7 +384,7 @@ final class Package {
                 foundAnyCatalogOrCatalogObject = lockfile.catalogs.parseAppend(log, workspacesExpr);
                 hasWorkspaces = true;
             }
-            if (!foundAnyCatalogOrCatalogObject && hasWorkspaces) {
+            if (!foundAnyCatalogOrCatalogObject && hasWorkspaces && options.getRelease().readsTopLevelCatalogs()) {
                 lockfile.catalogs.parseAppend(log, json);
             }
         }

@@ -106,6 +106,16 @@ public final class BunRelease implements Comparable<BunRelease> {
         return atLeast(1, 2, 19);
     }
 
+    // src/install/lockfile/Package.zig parseWithJSON and lockfile/CatalogMap.zig
+
+    /**
+     * The root's own {@code catalog} and {@code catalogs} are its catalogs when it has workspaces whose object holds
+     * neither, from 1.2.19; before, only the workspaces object's are.
+     */
+    boolean readsTopLevelCatalogs() {
+        return atLeast(1, 2, 19);
+    }
+
     // src/install/PackageManager/install_with_manager.zig installWithManager
 
     /**
