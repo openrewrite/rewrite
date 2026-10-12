@@ -1682,6 +1682,17 @@ public final class NpmRelease implements Comparable<NpmRelease> {
         return atLeast(12, 0, 0);
     }
 
+    // npm explain-dep.js
+
+    /**
+     * {@code explainDependents} names a dependent without a name, the root project, {@code the root project} among
+     * those past the first it explains, from npm 7.0.11 (npm/cli#2134); before, it reads that name's length, a
+     * TypeError that fails an install as npm logs a peer conflict it warns about.
+     */
+    boolean namesRootProjectAmongMoreDependents() {
+        return atLeast(7, 0, 11);
+    }
+
     // npm explain-eresolve.js
 
     /**

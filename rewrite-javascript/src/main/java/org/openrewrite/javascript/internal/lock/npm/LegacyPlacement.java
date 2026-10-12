@@ -665,6 +665,12 @@ final class LegacyPlacement {
     // [_warnPeerConflict]: marks the edge, which is then never built again (this[_edgesOverridden]), and warns
     private void warnPeerConflict(Edge edge) {
         edge.setPeerConflicted(true);
-        warnings.add(explainPeerConflict(edge, null));
+        PlaceDep.PeerConflict conflict = explainPeerConflict(edge, null);
+        if (!options.getRelease().namesRootProjectAmongMoreDependents()) {
+            // npm's log.warn renders an ERESOLVE warning's explanation at depth 2 (setup-log.js), which before npm
+            // 7.0.11 fails on the root project among the dependents past the first
+            ExplainEresolve.explain(conflict.getExplanation(), 2, options.getRelease());
+        }
+        warnings.add(conflict);
     }
 }
