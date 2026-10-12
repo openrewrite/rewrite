@@ -139,7 +139,8 @@ final class TextLockfileReader {
                     throw error("InvalidOverridesObject", "Expected a string");
                 }
                 long nameHash = Wyhash11.stringHash(nameStr);
-                DependencyVersion version = DependencyVersion.parse(nameStr, nameHash, prop.value.asString());
+                DependencyVersion version = DependencyVersion.parse(nameStr, nameHash, prop.value.asString(),
+                        options.getRelease());
                 if (version == null) {
                     throw error("InvalidOverridesObject", "Invalid override version");
                 }
@@ -147,7 +148,9 @@ final class TextLockfileReader {
             }
         }
 
-        Json.Expr catalogExpr = root.get("catalog");
+        // before 1.2.14 bun.lock holds no catalogs
+        boolean catalogs = options.getRelease().parsesCatalogSpecs();
+        Json.Expr catalogExpr = catalogs ? root.get("catalog") : null;
         if (catalogExpr != null) {
             if (!catalogExpr.isObject()) {
                 throw error("InvalidCatalogObject", "Expected an object");
@@ -155,7 +158,7 @@ final class TextLockfileReader {
             readCatalog(catalogExpr, lockfile.catalogs.defaultMap, "InvalidCatalogObject");
         }
 
-        Json.Expr catalogsExpr = root.get("catalogs");
+        Json.Expr catalogsExpr = catalogs ? root.get("catalogs") : null;
         if (catalogsExpr != null) {
             if (!catalogsExpr.isObject()) {
                 throw error("InvalidCatalogsObject", "Expected an object");
@@ -610,7 +613,8 @@ final class TextLockfileReader {
                 throw error(errorName, "Expected a string");
             }
             long depNameHash = Wyhash11.stringHash(depNameStr);
-            DependencyVersion version = DependencyVersion.parse(depNameStr, depNameHash, prop.value.asString());
+            DependencyVersion version = DependencyVersion.parse(depNameStr, depNameHash, prop.value.asString(),
+                    options.getRelease());
             if (version == null) {
                 throw error(errorName, "Invalid catalog version");
             }
@@ -743,7 +747,7 @@ final class TextLockfileReader {
                 }
                 Behavior behavior = groupBehavior.isPeer() && optionalPeers.contains(nameHash) ?
                         groupBehavior.add(Behavior.OPTIONAL) : groupBehavior;
-                DependencyVersion version = DependencyVersion.parse(nameStr, nameHash, versionStr);
+                DependencyVersion version = DependencyVersion.parse(nameStr, nameHash, versionStr, options.getRelease());
                 if (version == null) {
                     throw error("InvalidDependencyVersion", "Invalid dependency version");
                 }

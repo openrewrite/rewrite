@@ -380,7 +380,8 @@ final class Package {
             boolean foundAnyCatalogOrCatalogObject = false;
             boolean hasWorkspaces = false;
             Json.Expr workspacesExpr = json.get("workspaces");
-            if (workspacesExpr != null) {
+            // before 1.2.14 there are no catalogs
+            if (workspacesExpr != null && options.getRelease().parsesCatalogSpecs()) {
                 foundAnyCatalogOrCatalogObject = lockfile.catalogs.parseAppend(log, workspacesExpr);
                 hasWorkspaces = true;
             }
@@ -436,7 +437,7 @@ final class Package {
                 if (packageVersion.allDependenciesBundled() || bundled != null && bundled.contains(keyHash)) {
                     behavior = behavior.add(Behavior.BUNDLED);
                 }
-                DependencyVersion parsed = DependencyVersion.parse(key, keyHash, map.get(2 * i + 1));
+                DependencyVersion parsed = DependencyVersion.parse(key, keyHash, map.get(2 * i + 1), lockfile.release);
                 Dependency dependency = new Dependency(keyHash, key, parsed == null ? DependencyVersion.ZEROED : parsed,
                         behavior);
                 if (duplicateAt != null) {
@@ -530,7 +531,7 @@ final class Package {
         long aliasHash = Wyhash11.stringHash(externalAlias);
         Behavior behavior = inWorkspace ? groupBehavior.add(Behavior.WORKSPACE) : groupBehavior;
         DependencyVersion dependencyVersion = DependencyVersion.parseWithOptionalTag(externalAlias, aliasHash, version,
-                tag);
+                tag, options.getRelease());
         if (dependencyVersion == null) {
             dependencyVersion = DependencyVersion.ZEROED;
         }

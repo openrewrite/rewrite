@@ -175,7 +175,7 @@ final class OverrideMap {
             return null;
         }
         long nameHash = Wyhash11.stringHash(key);
-        DependencyVersion version = DependencyVersion.parse(key, nameHash, value);
+        DependencyVersion version = DependencyVersion.parse(key, nameHash, value, lockfile.release);
         if (version == null) {
             return null;
         }

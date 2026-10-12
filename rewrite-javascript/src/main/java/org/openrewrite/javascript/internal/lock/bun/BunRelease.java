@@ -106,7 +106,15 @@ public final class BunRelease implements Comparable<BunRelease> {
         return atLeast(1, 2, 19);
     }
 
-    // src/install/lockfile/Package.zig parseWithJSON and lockfile/CatalogMap.zig
+    // src/install/dependency.zig Tag.infer, lockfile/Package.zig parseWithJSON, lockfile/CatalogMap.zig, bun.lock.zig
+
+    /**
+     * Catalogs, from 1.2.14: a {@code catalog:} spec names an entry of the root's workspaces {@code catalog} or
+     * {@code catalogs}, which bun.lock holds; before, there are none, and {@code catalog:} reads as a git spec.
+     */
+    boolean parsesCatalogSpecs() {
+        return atLeast(1, 2, 14);
+    }
 
     /**
      * The root's own {@code catalog} and {@code catalogs} are its catalogs when it has workspaces whose object holds
