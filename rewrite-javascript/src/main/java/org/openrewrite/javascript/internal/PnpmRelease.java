@@ -57,15 +57,21 @@ public final class PnpmRelease {
     // the major whose pnpm-workspace.yaml writer the release runs
     private final int writes;
 
+    // the pnpm 11 release or range the engine reproduces, which its writer asks which yaml writes a number; null for
+    // a release before pnpm 11
+    private final org.openrewrite.javascript.internal.lock.pnpm.@Nullable PnpmRelease installs;
+
     private PnpmRelease(String version, int major, @Nullable String declined) {
-        this(version, major, declined, major);
+        this(version, major, declined, major, null);
     }
 
-    private PnpmRelease(String version, int major, @Nullable String declined, int writes) {
+    private PnpmRelease(String version, int major, @Nullable String declined, int writes,
+                        org.openrewrite.javascript.internal.lock.pnpm.@Nullable PnpmRelease installs) {
         this.version = version;
         this.major = major;
         this.declined = declined;
         this.writes = writes;
+        this.installs = installs;
     }
 
     /**
@@ -106,8 +112,10 @@ public final class PnpmRelease {
                 if (major == 11) {
                     // a pnpm 11 release before 11.0.6 writes pnpm-workspace.yaml as pnpm 10 does
                     try {
-                        return new PnpmRelease(version, major, null, PnpmReleases.installs(version)
-                                .keepsTheWorkspaceManifestKeyOrder() ? 11 : 10);
+                        org.openrewrite.javascript.internal.lock.pnpm.PnpmRelease installs =
+                                PnpmReleases.installs(version);
+                        return new PnpmRelease(version, major, null, installs.keepsTheWorkspaceManifestKeyOrder() ?
+                                11 : 10, installs);
                     } catch (CannotKnow e) {
                         return new PnpmRelease(version, major, e.getSubject());
                     }
@@ -155,7 +163,7 @@ public final class PnpmRelease {
      * The release's writer of pnpm-workspace.yaml; null when it is declined, or pnpm 9, which never writes the file.
      */
     public @Nullable WorkspaceManifestWriter writer() {
-        return declined != null || major == 9 ? null : new WorkspaceManifestWriter(writes);
+        return declined != null || major == 9 ? null : new WorkspaceManifestWriter(writes, installs);
     }
 
     /**

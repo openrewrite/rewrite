@@ -868,6 +868,19 @@ public final class PnpmRelease {
         return atLeast(11, 5, 1);
     }
 
+    // yaml, whose document @pnpm/workspace.workspace-manifest-writer writes pnpm-workspace.yaml as
+    // (WorkspaceManifestWriter, internal.lock.YamlDocument)
+
+    /**
+     * updateWorkspaceManifest writes a negative number with the fraction digits it was read with ({@code -1.50}), and
+     * one whose form has an exponent as that form ({@code 0.00000010} as {@code 1e-7}), from 11.0.7 (yaml 2.8.4's
+     * stringifyNumber, 2.9.0's from 11.2.0); before, yaml 2.8.3 pads only a number that starts with a digit, after an
+     * exponent too ({@code -1.5}, {@code 1e-7.00000000}).
+     */
+    boolean padsTheFractionDigitsOfANegativeNumber() {
+        return atLeast(11, 0, 7);
+    }
+
     // semver
 
     /**

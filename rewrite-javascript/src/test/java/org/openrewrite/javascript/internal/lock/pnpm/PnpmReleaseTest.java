@@ -386,6 +386,42 @@ class PnpmReleaseTest {
           .hasMessageContaining("which npm_config_userconfig names");
     }
 
+    // pnpm-workspace.yaml as the writer release runs writes it with a key added
+    private static String withAKeyAdded(String yaml, PnpmRelease release) {
+        org.openrewrite.javascript.internal.lock.YamlDocument document =
+          org.openrewrite.javascript.internal.lock.YamlDocument.parse((org.openrewrite.yaml.tree.Yaml.Documents)
+            org.openrewrite.yaml.YamlParser.builder().build().parse(yaml).findFirst()
+              .orElseThrow(IllegalStateException::new));
+        @SuppressWarnings("unchecked")
+        Map<String, @Nullable Object> manifest = new LinkedHashMap<>((Map<String, @Nullable Object>) document.toJs());
+        Map<String, @Nullable Object> original = new LinkedHashMap<>();
+        for (String key : manifest.keySet()) {
+            original.put(key, null);
+        }
+        manifest.put("d", "hoisted");
+        new WorkspaceManifestWriter(11, release).write(document, original, manifest);
+        return document.toString();
+    }
+
+    /**
+     * yaml 2.8.4's stringifyNumber (11.0.7, 2.9.0's in 11.2.2): a negative float keeps the fraction digits it was
+     * read with, and one written with an exponent keeps that form; before, yaml 2.8.3 drops the first's and pads the
+     * second after its exponent. A range across 11.0.7 is asked only of a number the two write otherwise, which the
+     * recipes then do not write.
+     */
+    @Test
+    void padsTheFractionDigitsOfANegativeNumberFrom1107() {
+        String yaml = "a: -1.50\nb: 0.00000010\nc: 1.50\n";
+        assertThat(withAKeyAdded(yaml, release("11.0.7"))).isEqualTo("a: -1.50\nb: 1e-7\nc: 1.50\nd: hoisted\n");
+        assertThat(withAKeyAdded(yaml, release("11.0.6")))
+          .isEqualTo("a: -1.5\nb: 1e-7.00000000\nc: 1.50\nd: hoisted\n");
+        PnpmRelease straddling = PnpmRelease.oneOf("11.0.6 || 11.0.7", Arrays.asList("11.0.6", "11.0.7"));
+        assertThat(withAKeyAdded("c: 1.50\n", straddling)).isEqualTo("c: 1.50\nd: hoisted\n");
+        assertThatThrownBy(() -> withAKeyAdded(yaml, straddling))
+          .isInstanceOf(IllegalArgumentException.class)
+          .hasMessageContaining("one of 11.0.6 || 11.0.7, where the releases from 11.0.7 install it otherwise");
+    }
+
     /**
      * installing/deps-installer install/index.ts (11.4.0): updateChecksums resolves in full; before, the lock is up
      * to date.
