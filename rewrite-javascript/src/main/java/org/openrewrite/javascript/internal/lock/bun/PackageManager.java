@@ -620,7 +620,8 @@ final class PackageManager {
                     log.addError("GET " + scope + task.name + " - 404");
                 }
             } else {
-                PackageManifest manifest = PackageManifest.parse(log, text, task.name, task.extended);
+                PackageManifest manifest = PackageManifest.parse(options.getRelease(), log, text, task.name,
+                        task.extended);
                 if (manifest == null) {
                     log.addError("parsing package manifest for " + task.name);
                 } else {

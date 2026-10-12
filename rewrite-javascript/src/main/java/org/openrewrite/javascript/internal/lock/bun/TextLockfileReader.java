@@ -87,7 +87,7 @@ final class TextLockfileReader {
         }
         lockfile.textLockfileVersion = lockfileVersion;
 
-        Json.Expr configVersionExpr = root.get("configVersion");
+        Json.Expr configVersionExpr = options.getRelease().writesConfigVersion() ? root.get("configVersion") : null;
         if (configVersionExpr != null) {
             Integer configVersion = configVersionFromExpr(configVersionExpr);
             if (configVersion == null) {
@@ -353,7 +353,8 @@ final class TextLockfileReader {
                     throw error("InvalidPackageInfo", "Expected a string");
                 }
                 if (registryStr.isEmpty()) {
-                    res = res.withUrl(buildURL(options.scopeForPackageName(nameStr), nameStr, res.version));
+                    res = res.withUrl(buildURL(options.getRelease().expandsEmptyRegistryToScope() ?
+                            options.scopeForPackageName(nameStr) : BunOptions.DEFAULT_REGISTRY, nameStr, res.version));
                 } else {
                     res = res.withUrl(registryStr);
                 }
@@ -450,7 +451,7 @@ final class TextLockfileReader {
                 }
                 case LOCAL_TARBALL:
                 case REMOTE_TARBALL:
-                    if (i < pkgInfo.size()) {
+                    if (options.getRelease().carriesTarballIntegrity() && i < pkgInfo.size()) {
                         String integrityStr = pkgInfo.get(i).asString();
                         if (integrityStr != null) {
                             pkg.meta.integrity = Integrity.parse(integrityStr);
@@ -468,7 +469,7 @@ final class TextLockfileReader {
                         throw error("InvalidPackageInfo", "Expected a string");
                     }
                     res = res.withRepository(res.repository.withResolved(bunTagStr));
-                    if (i < pkgInfo.size()) {
+                    if (options.getRelease().carriesTarballIntegrity() && i < pkgInfo.size()) {
                         String integrityStr = pkgInfo.get(i).asString();
                         if (integrityStr != null) {
                             pkg.meta.integrity = Integrity.parse(integrityStr);

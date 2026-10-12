@@ -29,7 +29,10 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
-/** Port of bun's src/install/lockfile/Package.zig with Package/Meta.zig and Package/Scripts.zig (bun 1.3.10). */
+/**
+ * Port of bun's src/install/lockfile/Package.zig with Package/Meta.zig and Package/Scripts.zig (bun 1.3.10), as the
+ * release that installs parses a package ({@link BunRelease}).
+ */
 final class Package {
 
     static final int INVALID_PACKAGE_ID = Integer.MAX_VALUE;
@@ -111,6 +114,47 @@ final class Package {
         return dependenciesOff + dependenciesLen;
     }
 
+    /**
+     * {@code optional_peer_dependencies}: a {@code std.ArrayHashMap} of the names {@code peerDependenciesMeta} marks
+     * optional, which a declared peer looks up; from 1.3.14 it takes its name out ({@code swapRemove}, the last entry
+     * moving into its place), so that what is left are the names the meta lists alone, in the map's order.
+     */
+    private static final class OptionalPeers {
+        private final boolean drains;
+        final List<String> names = new ArrayList<>();
+        private final List<Long> hashes = new ArrayList<>();
+
+        OptionalPeers(boolean drains) {
+            this.drains = drains;
+        }
+
+        void put(String name) {
+            long hash = Wyhash11.stringHash(name);
+            int i = hashes.indexOf(hash);
+            if (i >= 0) {
+                names.set(i, name);
+                return;
+            }
+            hashes.add(hash);
+            names.add(name);
+        }
+
+        boolean take(long hash) {
+            int i = hashes.indexOf(hash);
+            if (i < 0) {
+                return false;
+            }
+            if (drains) {
+                int last = hashes.size() - 1;
+                hashes.set(i, hashes.get(last));
+                names.set(i, names.get(last));
+                hashes.remove(last);
+                names.remove(last);
+            }
+            return true;
+        }
+    }
+
     private static final String[] GROUP_PROPS = {"workspaces", "dependencies", "devDependencies",
             "optionalDependencies", "peerDependencies"};
     private static final int[] GROUP_BEHAVIORS = {Behavior.WORKSPACE, Behavior.PROD, Behavior.DEV, Behavior.OPTIONAL,
@@ -149,16 +193,19 @@ final class Package {
         name = "";
         nameHash = 0;
 
-        Workspaces workspaceNames = new Workspaces();
-        Set<Long> optionalPeerDependencies = new HashSet<>();
-        Json.Expr peerDependenciesMeta = json.get("peerDependenciesMeta");
+        Workspaces workspaceNames = new Workspaces(options.getRelease());
+        // from 1.3.14 the names a declared peer takes are drained, so that the rest are the meta's alone
+        boolean impliesMetaPeers = options.getRelease().impliesOptionalPeersOfPeerDependenciesMeta();
+        OptionalPeers optionalPeerDependencies = new OptionalPeers(impliesMetaPeers);
+        Json.Expr peerDependenciesMeta = !impliesMetaPeers || features.peerDependencies ?
+                json.get("peerDependenciesMeta") : null;
         if (peerDependenciesMeta != null && peerDependenciesMeta.isObject()) {
             for (Json.Property prop : peerDependenciesMeta.properties()) {
                 Json.Expr optional = prop.value.get("optional");
                 if (optional == null || !Boolean.TRUE.equals(optional.asBool())) {
                     continue;
                 }
-                optionalPeerDependencies.add(Wyhash11.stringHash(prop.key.asString()));
+                optionalPeerDependencies.put(prop.key.asString());
             }
         }
 
@@ -275,7 +322,7 @@ final class Package {
                             packageDependencies, duplicateCheckerMap, DependencyVersion.Tag.WORKSPACE, workspaceVersion,
                             entry.name, path);
                     if (dep != null) {
-                        if (groupBehavior.isPeer() && optionalPeerDependencies.contains(dep.nameHash)) {
+                        if (groupBehavior.isPeer() && optionalPeerDependencies.take(dep.nameHash)) {
                             dep.behavior = dep.behavior.add(Behavior.OPTIONAL);
                         }
                         packageDependencies.add(dep);
@@ -296,11 +343,23 @@ final class Package {
                     Dependency dep = parseDependency(lockfile, options, log, sourceDir, groupBehavior, features,
                             packageDependencies, duplicateCheckerMap, null, null, externalName, version);
                     if (dep != null) {
-                        if (groupBehavior.isPeer() && optionalPeerDependencies.contains(dep.nameHash)) {
+                        if (groupBehavior.isPeer() && optionalPeerDependencies.take(dep.nameHash)) {
                             dep.behavior = dep.behavior.add(Behavior.OPTIONAL);
                         }
                         packageDependencies.add(dep);
                     }
+                }
+            }
+        }
+
+        if (impliesMetaPeers) {
+            // what is left was listed in peerDependenciesMeta alone: an optional peer of "*", as pnpm and Yarn take it
+            for (String externalName : optionalPeerDependencies.names) {
+                Dependency dep = parseDependency(lockfile, options, log, sourceDir, Behavior.of(Behavior.PEER), features,
+                        packageDependencies, duplicateCheckerMap, null, null, externalName, "*");
+                if (dep != null) {
+                    dep.behavior = dep.behavior.add(Behavior.OPTIONAL);
+                    packageDependencies.add(dep);
                 }
             }
         }

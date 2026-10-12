@@ -49,7 +49,8 @@ import static org.openrewrite.javascript.internal.lock.bun.Package.INVALID_PACKA
 
 /**
  * Port of bun's src/install/PackageManager/install_with_manager.zig (bun 1.3.10) for {@code bun install
- * --lockfile-only}; the lock written must come back unchanged from a second install, or that install is reported.
+ * --lockfile-only}, as the release that built the LST installs ({@link BunRelease}); the lock written must come back
+ * unchanged from a second install, or that install is reported.
  */
 public final class BunLockRegenerator {
 
@@ -123,6 +124,12 @@ public final class BunLockRegenerator {
          */
         @Singular
         Map<String, String> parentManifests;
+
+        /**
+         * The Bun release that installs: the one that built the LST ({@link BunReleases#installedAs}).
+         */
+        @Builder.Default
+        BunRelease release = BunRelease.PORTED;
     }
 
     private static final LockOnlyInstall INSTALL = LockOnlyInstall.BUN;
@@ -187,7 +194,7 @@ public final class BunLockRegenerator {
             if (cleaned.isEmpty()) {
                 return null;
             }
-            return TextLockfileWriter.saveFromBinary(cleaned, configVersion);
+            return TextLockfileWriter.saveFromBinary(cleaned, configVersion, manager.options.getRelease());
         }
     }
 
@@ -199,11 +206,16 @@ public final class BunLockRegenerator {
         this.registry = registry;
     }
 
+    /**
+     * The lock bun writes as the release that installs ({@link Inputs#getRelease()}), after a second install over it
+     * changed nothing.
+     */
     public Result regenerate() {
         String written;
         try {
-            INSTALL.requireInstallsAt(findWorkspaceRoot(inputs.getManifests().get(inputs.getRunsIn()),
-                    inputs.getParentManifests()), inputs.getRunsIn(), "bun.lock");
+            INSTALL.requireInstallsAt(findWorkspaceRoot(inputs.getRelease(),
+                    inputs.getManifests().get(inputs.getRunsIn()), inputs.getParentManifests()), inputs.getRunsIn(),
+                    "bun.lock");
             written = install(inputs.getLock());
         } catch (RuntimeException e) {
             return Result.failure(failure(e));
@@ -212,13 +224,13 @@ public final class BunLockRegenerator {
     }
 
     /**
-     * Where bun run in the project's directory installs and writes its bun.lock; a walk that fails, which
-     * {@link #regenerate()} reports as it walks first, stops here.
+     * Where bun {@code release} run in the project's directory installs and writes its bun.lock; a walk that fails,
+     * which {@link #regenerate()} reports as it walks first, stops here.
      */
-    public static InstallRoot installRoot(String runsIn, Map<String, String> manifests,
+    public static InstallRoot installRoot(BunRelease release, String runsIn, Map<String, String> manifests,
                                           Map<String, String> parentManifests) {
         try {
-            return InstallRoot.at(findWorkspaceRoot(manifests.get(runsIn), parentManifests));
+            return InstallRoot.at(findWorkspaceRoot(release, manifests.get(runsIn), parentManifests));
         } catch (RuntimeException e) {
             return InstallRoot.STOPS_HERE;
         }
@@ -228,7 +240,8 @@ public final class BunLockRegenerator {
      * PackageManager.init: how many directories above the one it runs in bun installs, at the first package.json
      * above with workspaces when they list it, writing that root's bun.lock; 0 when it installs there.
      */
-    private static int findWorkspaceRoot(@Nullable String manifest, Map<String, String> parentManifests) {
+    private static int findWorkspaceRoot(BunRelease release, @Nullable String manifest,
+                                         Map<String, String> parentManifests) {
         if (manifest == null) {
             return 0;
         }
@@ -241,7 +254,7 @@ public final class BunLockRegenerator {
             if (packages == null || !packages.isArray()) {
                 return 0;
             }
-            Workspaces names = new Workspaces();
+            Workspaces names = new Workspaces(release);
             try {
                 names.processNamesArray(new Log(), packages.items(), singletonMap(parent.getKey(), manifest));
             } catch (IllegalArgumentException ignored) {
@@ -261,7 +274,7 @@ public final class BunLockRegenerator {
         Log log = new Log();
         PendingInstall install;
         try {
-            install = installWithManager(these, registry, log);
+            install = installWithManager(these.getRelease(), these, registry, log);
             if (!install.getManager().options.isLoadLockfile()) {
                 throw Rejected.discardsLock("BUN_CONFIG_SKIP_LOAD_LOCKFILE is set, so bun does not load bun.lock");
             }
@@ -270,7 +283,7 @@ public final class BunLockRegenerator {
                 throw Rejected.discardsLock(error == null ?
                         "the lock is empty" : error.error + ": " + error.getMessage().split("\n", 2)[0]);
             }
-            requirePatchFiles(these, install.getLockfile());
+            requirePatchFiles(these, install.getLockfile(), install.getManager().options.getRelease());
             install.getManager().resolve(install.getPackagesBefore());
         } catch (IllegalArgumentException e) {
             if (e instanceof Json.SyntaxError || e instanceof TextLockfileReader.ParseError || !log.hasErrors()) {
@@ -311,8 +324,9 @@ public final class BunLockRegenerator {
         CannotKnow.requireRead(inputs.getNpmrc(), inputs.getPaths(), ".npmrc");
     }
 
-    // calcHash: bun joins each patch path onto the root (joinZBuf), so ./ and .. spellings name the same file
-    private static void requirePatchFiles(Inputs inputs, Lockfile lockfile) {
+    // patch_install.zig calcHash: bun joins each patch path onto the root (joinZBuf), so ./ and .. spellings name the
+    // same file
+    private static void requirePatchFiles(Inputs inputs, Lockfile lockfile, BunRelease release) {
         Map<String, String> files = new HashMap<>();
         for (Map.Entry<String, String> file : inputs.getFiles().entrySet()) {
             files.put(RootRelativePath.normalize(file.getKey().replace('\\', '/')), file.getValue());
@@ -334,11 +348,12 @@ public final class BunLockRegenerator {
                     throw Rejected.rejects(Reason.RESOLUTION_REQUIRED,
                             "failed to read from patch file: EISDIR: Is a directory (pread()) (" + path + ")");
                 }
-                throw Rejected.rejects(Reason.RESOLUTION_REQUIRED, "Couldn't find patch file: '" + patch + "'");
+                throw Rejected.rejects(Reason.RESOLUTION_REQUIRED, release.quotesAMissingPatchFile() ?
+                        "Couldn't find patch file: '" + patch + "'" : "could not find patch file " + patch);
             }
             if (contents.isEmpty()) {
-                throw Rejected.rejects(Reason.RESOLUTION_REQUIRED,
-                        "patchfile " + path + " is empty, please restore or delete it.");
+                throw Rejected.rejects(Reason.RESOLUTION_REQUIRED, "patchfile " + path + " is empty, " +
+                        (release.spellsPleaseForAnEmptyPatchFile() ? "please" : "plese") + " restore or delete it.");
             }
         }
     }
@@ -397,8 +412,9 @@ public final class BunLockRegenerator {
     /**
      * Up to the resolution of what the diff enqueued. A lock bun would ignore is not installed over.
      */
-    private static PendingInstall installWithManager(Inputs inputs, ManifestSource registry, Log log) {
-        BunOptions options = BunOptions.load(inputs.getBunfig(), inputs.getUserNpmrc(), inputs.getNpmrc(),
+    private static PendingInstall installWithManager(BunRelease release, Inputs inputs, ManifestSource registry,
+                                                     Log log) {
+        BunOptions options = BunOptions.load(release, inputs.getBunfig(), inputs.getUserNpmrc(), inputs.getNpmrc(),
                 DotEnv.load(HostEnvironment.UNKNOWN, inputs.getFiles()));
         LoadResult loadResult = loadFromCwd(options.isLoadLockfile() ? inputs.getLock() : null, options);
         int configVersion = loadResult.chooseConfigVersion();

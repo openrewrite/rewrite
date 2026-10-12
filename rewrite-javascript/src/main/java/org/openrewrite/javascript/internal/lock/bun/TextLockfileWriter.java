@@ -22,7 +22,10 @@ import java.util.Map;
 
 import static org.openrewrite.javascript.internal.lock.bun.Package.INVALID_PACKAGE_ID;
 
-/** Port of bun's src/install/lockfile/bun.lock.zig {@code Stringifier} (bun 1.3.10) for a lockfile loaded from text. */
+/**
+ * Port of bun's src/install/lockfile/bun.lock.zig {@code Stringifier} (bun 1.3.10) for a lockfile loaded from text,
+ * as the release that installs writes it ({@link BunRelease}).
+ */
 final class TextLockfileWriter {
 
     private static final String[] GROUP_NAMES = {"dependencies", "devDependencies", "optionalDependencies",
@@ -34,7 +37,7 @@ final class TextLockfileWriter {
     private TextLockfileWriter() {
     }
 
-    static String saveFromBinary(Lockfile lockfile, int configVersion) {
+    static String saveFromBinary(Lockfile lockfile, int configVersion, BunRelease release) {
         StringBuilder writer = new StringBuilder();
         List<Package> pkgs = lockfile.packages;
         List<Dependency> depsBuf = lockfile.dependencies;
@@ -53,8 +56,10 @@ final class TextLockfileWriter {
         incIndent(writer, indent);
         writer.append("\"lockfileVersion\": ").append(Lockfile.TEXT_LOCKFILE_VERSION_CURRENT).append(",\n");
         writeIndent(writer, indent);
-        writer.append("\"configVersion\": ").append(configVersion).append(",\n");
-        writeIndent(writer, indent);
+        if (release.writesConfigVersion()) {
+            writer.append("\"configVersion\": ").append(configVersion).append(",\n");
+            writeIndent(writer, indent);
+        }
         writer.append("\"workspaces\": {\n");
         incIndent(writer, indent);
         writeWorkspaceDeps(writer, indent, lockfile, 0, "");
@@ -276,7 +281,7 @@ final class TextLockfileWriter {
                         Strings.appendJsonString(writer, res.value, false);
                         writer.append("\", ");
                         writePackageInfoObject(writer, dep.behavior, depsBuf, pkgDepsSortBuf, pkg);
-                        if (pkg.meta.integrity.tag.isSupported()) {
+                        if (release.carriesTarballIntegrity() && pkg.meta.integrity.tag.isSupported()) {
                             writer.append(", \"").append(pkg.meta.integrity).append("\"]");
                         } else {
                             writer.append(']');
@@ -315,7 +320,7 @@ final class TextLockfileWriter {
                         writePackageInfoObject(writer, dep.behavior, depsBuf, pkgDepsSortBuf, pkg);
                         writer.append(", ");
                         Strings.appendJsonString(writer, repo.resolved, true);
-                        if (pkg.meta.integrity.tag.isSupported()) {
+                        if (release.carriesTarballIntegrity() && pkg.meta.integrity.tag.isSupported()) {
                             writer.append(", \"").append(pkg.meta.integrity).append("\"]");
                         } else {
                             writer.append(']');

@@ -9,8 +9,8 @@ regenerates through the port of its own resolver, and the shared engine of ADR 0
 what `internal.lock` holds, and how the recipes write overrides and follow catalogs for each package manager; and
 again: one port per library, the host's registries as the user's config, corepack, the regenerators by module.
 Amended 2026-10-11: later releases of the ported pnpm and Yarn majors; the npm release that built the LST,
-with every npm release from 7.20.3 reproduced beside the one ported; and every Yarn 4.x release reproduced beside
-4.10.3.
+with every npm release from 7.20.3 reproduced beside the one ported; every Yarn 4.x release reproduced beside
+4.10.3; and Bun releases reproduced beside 1.3.10.
 
 ## Context
 
@@ -280,3 +280,27 @@ The Berry port follows Yarn 4.10.3 and reproduces every 4.x release beside it, a
   lock with a builtin compat patch entry its start lock does not hold is `exact-or cannot-know builtin compat patch
   changed`, as the scenarios recorded over such an entry say. `YarnBerryScenarioTest` replays the first and last
   release of every range, and every release with `REWRITE_LOCK_EVERY_RELEASE`.
+
+## Amendment 2026-10-11: Bun releases
+
+The Bun port follows Bun 1.3.10 and reproduces other releases beside it, as the npm port does npm's.
+
+- **The release that installs** is the one the `NodeRuntime` marker names (what `bun --version` answered), else
+  1.3.10. One outside `BunReleases.PROVEN`, or one that writes no bun.lock (before 1.1.39), is cannot-know.
+- **One question per upstream change.** `BunRelease` holds each difference as a question named for what Bun does,
+  answered through `atLeast` alone by the release whose tag (`bun-v<release>` of oven-sh/bun) made it; the ported Zig
+  module branches on it beside 1.3.10's code, the release reaching it through `BunOptions`. bun.lock is read and
+  written as the release does it: `configVersion` from 1.3.2, a `""` registry expanded to the package's scope registry
+  from 1.3.7, the integrity of a git, github or tarball package from 1.3.10. A name `peerDependenciesMeta` alone
+  lists is an optional peer of `"*"` from 1.3.14, in a packument and in a workspace's manifest alike; a workspaces
+  glob a later `!` pattern negates is no workspace from 1.3.0; and the patch file errors are worded as each release
+  words them.
+- **How a release is proven.** Every release that writes bun.lock (1.1.39 to 1.4.3) was swept over every recorded Bun
+  scenario through a frozen registry, as npm's were; the release that recorded a scenario (1.3.10) is its control. The
+  export (the fixtures repository's `releases` and `release/<first>/`) holds 1.2.0 on, since 1.1.x writes
+  lockfileVersion 0 and reads none of the fixtures' version 1 locks. A release's outcome is the lock of the edit over
+  its own `before`, of the edit over the scenario's `before` (`cross`), and the second install over each; a lock bun
+  wrote from scratch is no outcome, since a regeneration installs over a lock, so that a from-scratch install that
+  never finishes (1.2.21 to 1.3.9 over two peer graphs) leaves the edits over a lock, which finish, to be replayed.
+  `BunScenarioTest` replays the first and last release of every range, and every release with
+  `REWRITE_LOCK_EVERY_RELEASE`.

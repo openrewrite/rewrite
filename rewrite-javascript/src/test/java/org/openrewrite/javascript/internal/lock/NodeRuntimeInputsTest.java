@@ -28,6 +28,8 @@ import org.openrewrite.javascript.internal.LockFileRegeneration.InstallRoot;
 import org.openrewrite.javascript.internal.LockFileRegeneration.Kind;
 import org.openrewrite.javascript.internal.LockFileRegeneration.Request;
 import org.openrewrite.javascript.internal.LockFileRegeneration.Result;
+import org.openrewrite.javascript.internal.lock.bun.BunRelease;
+import org.openrewrite.javascript.internal.lock.bun.BunReleases;
 import org.openrewrite.javascript.internal.lock.npm.NpmRelease;
 import org.openrewrite.javascript.internal.lock.npm.NpmReleases;
 import org.openrewrite.javascript.marker.NodeResolutionResult.PackageManager;
@@ -47,7 +49,7 @@ import static org.openrewrite.javascript.Assertions.nodeResolutionResult;
 
 /**
  * What a regeneration takes from the {@link NodeRuntime} the parser recorded: the machine where the host gives none,
- * and the npm release that installs the project.
+ * and the npm or Bun release that installs the project.
  */
 class NodeRuntimeInputsTest {
 
@@ -202,6 +204,58 @@ class NodeRuntimeInputsTest {
         // a release the engine does not reproduce stops the walk, which the regeneration reports
         assertThat(npm12).isEqualTo(NpmReleases.isProven(NpmRelease.of("12.2.0")) ? InstallRoot.HERE :
           InstallRoot.STOPS_HERE);
+    }
+
+    private static final String BUN_LOCK = "{\n  \"lockfileVersion\": 1,\n  \"configVersion\": 1,\n  \"workspaces\": " +
+                                           "{\n    \"\": {\n      \"name\": \"a\",\n    },\n  },\n  \"packages\": {}\n}\n";
+
+    private static Request bunRequest(@Nullable NodeRuntime runtime) {
+        return Request.builder()
+          .packageJson(MANIFEST)
+          .lock(BUN_LOCK)
+          .marker(nodeResolutionResult(PackageManager.Bun))
+          .runtime(runtime)
+          .packageJsonPath(Paths.get("package.json"))
+          .manifest(Paths.get("package.json"), MANIFEST)
+          .build();
+    }
+
+    private static BunRelease bunInstalledAs(Request request) {
+        HostInputs host = HostInputs.of(ctx(), request.getMarker(), request.getRuntime(), Instant.EPOCH);
+        return BunInputs.from(LockDirectory.of(request), host).getRelease();
+    }
+
+    @Test
+    void aBunRequestIsInstalledAsTheProvenReleaseOfItsMarker() {
+        List<String> proven = BunReleases.all().stream().filter(BunReleases::isProven).collect(toList());
+        assertThat(proven).contains("1.3.10");
+        for (String release : proven) {
+            assertThat(bunInstalledAs(bunRequest(runtime(PackageManager.Bun, release))))
+              .isEqualTo(BunRelease.of(release));
+        }
+    }
+
+    @Test
+    void withoutTheMarkerOrAReleaseOfBunItIsInstalledAs1_3_10() {
+        assertThat(bunInstalledAs(bunRequest(null))).isEqualTo(BunRelease.PORTED);
+        assertThat(bunInstalledAs(bunRequest(runtime(PackageManager.Bun, null)))).isEqualTo(BunRelease.PORTED);
+        assertThat(bunInstalledAs(bunRequest(runtime(PackageManager.Npm, "11.17.0")))).isEqualTo(BunRelease.PORTED);
+    }
+
+    // a canary, a release that writes only bun.lockb, one newer than the list, and one the engine does not reproduce
+    @ParameterizedTest
+    @ValueSource(strings = {"1.3.10-canary.1", "1.1.38", "9.0.0", "1.1.39"})
+    void aBunReleaseTheEngineDoesNotReproduceIsCannotKnow(String version) {
+        assumeThat(BunReleases.isProven(version) && BunReleases.all().contains(version)).isFalse();
+        Result result = NativeLockEngine.regenerate(BunInputs.PORT, bunRequest(runtime(PackageManager.Bun, version)),
+          ctx());
+
+        assertThat(result.getFailure()).isNotNull();
+        assertThat(result.getFailure().getKind()).isEqualTo(Kind.CANNOT_KNOW);
+        assertThat(result.getErrorMessage()).startsWith("RESOLUTION_REQUIRED: the engine cannot know what bun " +
+          version + " writes, since the engine reproduces bun ");
+        assertThat(BunInputs.PORT.installRoot(LockDirectory.of(bunRequest(runtime(PackageManager.Bun, version)))))
+          .isEqualTo(InstallRoot.STOPS_HERE);
     }
 
     // a failure the port returns, not an exception out of it
