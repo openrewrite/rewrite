@@ -116,10 +116,12 @@ class YarnClassicScenarioTest extends LockScenarioTest {
     }
 
     // what the engine cannot know of the recording, replayed without the release that built the LST, it may know as
-    // that release (a yarn-path hands the install to it): the lock byte for byte where it writes one
+    // that release (a yarn-path hands the install to it), and what the recording's release discards as malformed
+    // another may read (a Berry lock before 1.19.0): the lock byte for byte where it writes one
     private static @Nullable String asRelease(@Nullable String expect) {
-        return expect != null && "cannot-know".equals(Expect.of(expect).getKind()) ? Expect.EXACT_OR + " " + expect :
-                expect;
+        String kind = Expect.of(expect).getKind();
+        return expect != null && ("cannot-know".equals(kind) || "malformed".equals(kind)) ?
+                Expect.EXACT_OR + " " + expect : expect;
     }
 
     // another release's outcome: the edit over the lock that release wrote first (over the given one where the

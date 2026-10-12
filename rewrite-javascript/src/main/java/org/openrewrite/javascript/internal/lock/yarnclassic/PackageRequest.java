@@ -41,6 +41,8 @@ final class PackageRequest {
     private static final Pattern GIT_PROTOCOL = Pattern.compile("^git(\\+[a-z0-9]+)?://");
 
     private static final List<String> REQUIRED_PACKAGE_KEYS = Arrays.asList("name", "version", "_uid");
+    private static final String FLAT_GLOBAL_ERROR = "The package $0 requires a flat dependency graph. Add `\"flat\": " +
+                                                    "true` to your package.json and try again.";
 
     final @Nullable PackageRequest parentRequest;
     final List<String> parentNames;
@@ -265,9 +267,10 @@ final class PackageRequest {
             }
 
             if (Js.truthy(info.get("flat")) && !resolver.flat) {
-                throw new MessageError(Lang.format("The package $0 requested to be flat, but the project is not " +
-                                                   "flat. Please use the --flat flag.",
-                        Js.templateString(info.getName()) + "@" + Js.templateString(info.getVersion())));
+                throw new MessageError(config.getRelease().namesTheFlatPackage() ?
+                        Lang.format(FLAT_GLOBAL_ERROR,
+                                Js.templateString(info.getName()) + "@" + Js.templateString(info.getVersion())) :
+                        FLAT_GLOBAL_ERROR.replace("$0", "undefined@undefined"));
             }
 
             validateVersionInfo(info);

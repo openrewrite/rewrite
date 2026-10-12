@@ -22,12 +22,16 @@ import org.junit.jupiter.params.provider.CsvSource;
 import org.openrewrite.javascript.internal.lock.CannotKnow;
 import org.openrewrite.javascript.internal.lock.Host;
 import org.openrewrite.javascript.internal.lock.JsError;
+import org.openrewrite.javascript.internal.lock.RegistrySource;
 import org.openrewrite.javascript.internal.lock.Rejected;
 
 import java.io.ByteArrayOutputStream;
 import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Base64;
 import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
@@ -242,12 +246,141 @@ class YarnClassicReleaseTest {
     }
 
     /**
+     * util/rc.js {@code getRcPaths} and rc.js {@code loadRcFile}: a .yarnrc.yml is read from 1.17.1, before its
+     * directory's .yarnrc and keeping its yarnPath unresolved; from 1.17.2 after it, as {@code yarn-path} resolved
+     * against the file's directory.
+     */
+    @ParameterizedTest(name = "{0}")
+    @CsvSource(delimiter = '|', value = {
+            "1.17.0|{yarn-path=../a.js}",
+            "1.17.1|{yarnPath=b.js, yarn-path=../a.js}",
+            "1.17.2|{yarn-path=../b.js}",
+    })
+    void readsAYarnrcYmlBesideTheYarnrcFrom1171(String version, String rc) {
+        Map<String, String> files = new LinkedHashMap<>();
+        files.put("../.yarnrc", "yarn-path \"a.js\"\n");
+        files.put("../.yarnrc.yml", "yarnPath: b.js\n");
+        assertThat(rc(version, files)).isEqualTo(rc);
+    }
+
+    /**
+     * parse.js {@code parse}: what the lockfile parser cannot read is read with js-yaml's failsafe schema from 1.17.0;
+     * lockfile/index.js {@code fromDirectory} sets a Yarn Berry lock aside from 1.19.0.
+     */
+    @Test
+    void readsAJsonOrBerryLockAsItsReleaseDoes() {
+        String json = "{\"a@^1.0.0\": {\"version\": \"1.0.0\"}}";
+        assertThatThrownBy(() -> LockfileParser.parseLockfile(json, "yarn.lock", release("1.16.0")))
+                .isInstanceOf(JsError.class)
+                .hasMessageStartingWith("Unknown token: { line: 1, col: 0, type: 'INVALID', value: undefined } 1:0");
+        assertThat(LockfileParser.parseLockfile(json, "yarn.lock", release("1.17.0")).getObject())
+                .isEqualTo(Collections.singletonMap("a@^1.0.0", Collections.singletonMap("version", "1.0.0")));
+        String berry = "__metadata:\n  version: 6\n\n\"a@npm:^1.0.0\":\n  version: 1.0.0\n";
+        assertThat(Lockfile.fromDirectory(berry, release("1.18.0")).getLockfilev2()).isNull();
+        assertThat(Lockfile.fromDirectory(berry, release("1.19.0")).getLockfilev2()).isNotNull();
+    }
+
+    /**
+     * config.js: {@code unsafe-disable-integrity-migration} disables the migration where it holds a truthy value
+     * before 1.12.0, and is a boolean defaulting to true from 1.12.0.
+     */
+    @ParameterizedTest(name = "{0} {1}")
+    @CsvSource(delimiter = '|', nullValues = "-", value = {
+            "1.11.1|-|true",
+            "1.11.1|true|false",
+            "1.12.0|-|false",
+            "1.12.0|false|true",
+    })
+    void migratesIntegrityAsItsReleaseDoes(String version, @Nullable String disable, boolean migrates) {
+        YarnClassicLockRegenerator.Inputs.InputsBuilder inputs = YarnClassicLockRegenerator.Inputs.builder()
+                .release(release(version)).manifest("", ROOT).env(Collections.emptyMap());
+        if (disable != null) {
+            inputs.configFile(".yarnrc", "unsafe-disable-integrity-migration " + disable + "\n");
+        }
+        YarnClassicLockRegenerator.Inputs built = inputs.build();
+        assertThat(new Config(built, YarnClassicLockRegenerator.start(built)).isAutoAddIntegrity())
+                .isEqualTo(migrates);
+    }
+
+    /**
+     * npm-resolver.js {@code findVersionInRegistryResponse}: a malformed response names the package asked for from
+     * 1.12.0, the one the response names before.
+     */
+    @Test
+    void namesThePackageOfAMalformedResponse() {
+        Map<String, Object> body = Collections.singletonMap("name", "y");
+        assertThatThrownBy(() -> NpmResolver.findVersionInRegistryResponse(config("1.11.1"), "x", "^1.0.0", body))
+                .hasMessage("Received malformed response from registry for \"y\". The registry may be down.");
+        assertThatThrownBy(() -> NpmResolver.findVersionInRegistryResponse(config("1.12.0"), "x", "^1.0.0", body))
+                .hasMessage("Received malformed response from registry for \"x\". The registry may be down.");
+    }
+
+    /**
+     * npm-registry.js {@code getRequestUrl}: registry.npmjs.org and registry.yarnpkg.com over https from 1.17.3.
+     */
+    @Test
+    void asksThePublicRegistriesOverHttpsFrom1173() {
+        assertThat(NpmRegistry.getRequestUrl("http://registry.npmjs.org", "x", release("1.17.2")))
+                .isEqualTo("http://registry.npmjs.org/x");
+        assertThat(NpmRegistry.getRequestUrl("http://registry.npmjs.org", "x", release("1.17.3")))
+                .isEqualTo("https://registry.npmjs.org/x");
+    }
+
+    /**
+     * resolve-relative.js: a {@code file:./} dependency on the lockfile's directory is written {@code file:.} from
+     * 1.18.0, {@code file:./.} before.
+     */
+    @ParameterizedTest(name = "{0}")
+    @CsvSource({"1.17.3,file:./.", "1.18.0,file:."})
+    void writesTheLockfileFolderAsItsReleaseDoes(String version, String written) {
+        Manifest info = new Manifest();
+        Map<String, Object> dependencies = new LinkedHashMap<>();
+        dependencies.put("self", "file:./");
+        info.put("dependencies", dependencies);
+        NormalizeManifest.resolveRelative(info, "", "", release(version));
+        assertThat(dependencies.get("self")).isEqualTo(written);
+    }
+
+    /**
+     * tarball-fetcher.js {@code createExtractor}: the sha1 hash a url names is checked beside the integrity from
+     * 1.19.0; before, the integrity alone.
+     */
+    @Test
+    void checksTheHashBesideTheIntegrityFrom1190() throws NoSuchAlgorithmException {
+        byte[] tar = tar("package/package.json", "{\"name\":\"x\",\"version\":\"1.0.0\"}", null);
+        PackageRemote remote = new PackageRemote();
+        remote.type = "tarball";
+        remote.registry = "npm";
+        remote.reference = "https://registry.npmjs.org/x/-/x-1.0.0.tgz";
+        remote.hash = "0000000000000000000000000000000000000000";
+        remote.integrity = "sha512-" + Base64.getEncoder().encodeToString(
+                MessageDigest.getInstance("SHA-512").digest(tar));
+        RegistrySource tarballs = new RegistrySource() {
+            @Override
+            public @Nullable String packument(String r, String name, boolean full, @Nullable String authorization) {
+                return null;
+            }
+
+            @Override
+            public byte[] tarball(String url, String name, String version, @Nullable String authorization) {
+                return tar;
+            }
+        };
+        assertThat(new TarballFetcher(remote, "x", "1.0.0", "dest", tarballs, config("1.18.0")).download())
+                .isEqualTo(tar);
+        assertThatThrownBy(() -> new TarballFetcher(remote, "x", "1.0.0", "dest", tarballs, config("1.19.0"))
+                .download())
+                .isInstanceOf(CannotKnow.class)
+                .hasMessageContaining("does not match the integrity the registry gives it");
+    }
+
+    /**
      * tarball-fetcher.js {@code createExtractor}'s map (1.22.0) keeps a link of the archive inside the package's
      * directory; before, a link out of it reaches the disk around yarn's cache.
      */
     @Test
     void keepsTheLinksOfAnArchiveInsideFrom1220() {
-        byte[] tar = tar("package/package.json", "../../outside/package.json");
+        byte[] tar = tar("package/package.json", null, "../../outside/package.json");
         Object jailed = TarballFetcher.manifest(TarballFetcher.untar("<url>", tar, release("1.22.0")), "", "npm",
                 "fallback", "9.9.9", true);
         assertThat(((Manifest) jailed).getName()).isEqualTo("fallback");
@@ -257,17 +390,20 @@ class YarnClassicReleaseTest {
                 .hasMessageContaining("a link of the archive leads to");
     }
 
-    // an uncompressed ustar archive of one symbolic link
-    private static byte[] tar(String name, String target) {
+    // an uncompressed ustar archive of one file, or of one symbolic link to a target
+    private static byte[] tar(String name, @Nullable String content, @Nullable String target) {
+        byte[] data = content == null ? new byte[0] : content.getBytes(StandardCharsets.UTF_8);
         byte[] header = new byte[512];
         put(header, 0, name);
-        put(header, 100, "0000777");
+        put(header, 100, target == null ? "0000644" : "0000777");
         put(header, 108, "0000000");
         put(header, 116, "0000000");
-        put(header, 124, "00000000000");
+        put(header, 124, String.format("%011o", data.length));
         put(header, 136, "00000000000");
-        header[156] = '2';
-        put(header, 157, target);
+        header[156] = (byte) (target == null ? '0' : '2');
+        if (target != null) {
+            put(header, 157, target);
+        }
         put(header, 257, "ustar");
         put(header, 263, "00");
         Arrays.fill(header, 148, 156, (byte) ' ');
@@ -279,7 +415,8 @@ class YarnClassicReleaseTest {
         header[154] = 0;
         ByteArrayOutputStream out = new ByteArrayOutputStream();
         out.write(header, 0, header.length);
-        out.write(new byte[1024], 0, 1024);
+        out.write(data, 0, data.length);
+        out.write(new byte[(512 - data.length % 512) % 512 + 1024], 0, (512 - data.length % 512) % 512 + 1024);
         return out.toByteArray();
     }
 

@@ -141,9 +141,12 @@ final class TarballFetcher {
                !mismatches(tarball, other);
     }
 
+    // the sha1 hash and the integrity both; before 1.19.0 the integrity, else the hash (_findIntegrity)
     private boolean mismatches(byte[] tarball, PackageRemote expected) {
         Ssri.Integrity integrity = integrity(expected);
-        return Js.truthy(expected.hash) &&
+        boolean checksHash = Js.truthy(expected.hash) &&
+                             (config.getRelease().checksTheHashBesideTheIntegrity() || !Js.truthy(expected.integrity));
+        return checksHash &&
                !matches(tarball, Objects.requireNonNull(Ssri.fromHex(expected.hash, "sha1", Ssri.Release.V5_3_0))) ||
                integrity != null && !integrity.getHashes().isEmpty() && !matches(tarball, integrity);
     }

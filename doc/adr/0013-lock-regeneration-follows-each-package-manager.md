@@ -9,8 +9,8 @@ regenerates through the port of its own resolver, and the shared engine of ADR 0
 what `internal.lock` holds, and how the recipes write overrides and follow catalogs for each package manager; and
 again: one port per library, the host's registries as the user's config, corepack, the regenerators by module.
 Amended 2026-10-11: later releases of the ported pnpm and Yarn majors; the npm release that built the LST,
-with every npm release from 7.20.3 reproduced beside the one ported; and every Yarn 4.x release reproduced beside
-4.10.3.
+with every npm release from 7.20.3 reproduced beside the one ported; every Yarn 4.x release reproduced beside
+4.10.3; and Yarn 1 releases reproduced beside 1.22.22.
 
 ## Context
 
@@ -278,3 +278,27 @@ The Berry port follows Yarn 4.10.3 and reproduces every 4.x release beside it, a
   lock with a builtin compat patch entry its start lock does not hold is `exact-or cannot-know builtin compat patch
   changed`, as the scenarios recorded over such an entry say. `YarnBerryScenarioTest` replays the first and last
   release of every range, and every release with `REWRITE_LOCK_EVERY_RELEASE`.
+
+## Amendment 2026-10-11: Yarn classic releases
+
+The Yarn classic port follows yarn 1.22.22 and reproduces the 1.x releases beside it, as the npm port does npm's.
+
+- **The release that installs** is the one the `NodeRuntime` marker names; without one, 1.22.22 as before. A
+  yarn-path hands the install to the file it names: a file named as a release (`yarn-<version>.js`, `.cjs`, `.mjs`)
+  is the release the marker names, whose `--version` answered through the same hand-off, and only 1.22.22's own file
+  without a marker; any other file is a script whose install the engine cannot know. A release outside
+  `YarnClassicReleases.PROVEN`, or one the registry does not publish as yarn 1, is cannot-know.
+- **One question per upstream change.** `YarnClassicRelease` holds each difference as a question named for what yarn
+  does, answered through `atLeast` alone by the tag of yarnpkg/yarn that made it. The release names itself where yarn
+  does: the header `yarn-enable-lockfile-versions` writes, `engines.yarn`, the `packageManager` message. An error that
+  is no MessageError is worded as the release reports it: `An unexpected error occurred: "<message>".` before 1.22.20,
+  its stack from 1.22.21; 1.22.20 prints none, and the engine words it as 1.22.21 does. What ends yarn before `main`
+  reports (an rc file it cannot read, a yarn-path that does not load, the manifest 1.22.20 reads first) is printed as
+  its stack by every release.
+- **How a release is proven.** Every stable 1.x release was swept over every Yarn classic scenario as npm's were;
+  1.22.12, which the registry publishes without its bundle, never ran and is not reproduced. The export's failure of a
+  phase is the error that ended it, yarn's last `error` line (the steps go to stdout, which interleaves with stderr
+  from run to run), none where 1.22.20 printed none. A recording's `cannot-know` or `malformed` line is `exact-or`
+  that line for a release that writes a lock, in the export's outcomes and in the replays of the recorded outcome as
+  another release. `YarnClassicScenarioTest` replays the first and last release of every range, and every release
+  with `REWRITE_LOCK_EVERY_RELEASE`.

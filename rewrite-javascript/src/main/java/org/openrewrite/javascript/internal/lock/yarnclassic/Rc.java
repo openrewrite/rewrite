@@ -60,15 +60,17 @@ final class Rc {
     static Map<String, @Nullable Object> getRcConfigForCwd(Map<String, String> configFiles,
                                                            Map<String, String> home, YarnClassicRelease release) {
         Map<String, @Nullable Object> rc = new LinkedHashMap<>();
+        List<String> inEachDirectory = !release.readsYarnrcYml() ? RC_FILES.subList(0, 1) :
+                release.readsYarnrcYmlAfterYarnrc() ? RC_FILES : Arrays.asList(RC_FILES.get(1), RC_FILES.get(0));
         for (int depth = Config.depth(configFiles.keySet()); depth >= 0; depth--) {
-            for (String name : RC_FILES) {
+            for (String name : inEachDirectory) {
                 String text = configFiles.get(Config.up(depth) + name);
                 if (text != null) {
                     Js.assign(rc, parseRcPath(text, Config.up(depth) + name, release));
                 }
             }
         }
-        for (String name : RC_FILES) {
+        for (String name : release.readsYarnrcYml() ? RC_FILES : RC_FILES.subList(0, 1)) {
             String text = home.get(name);
             if (text != null) {
                 Js.assign(rc, parseRcPath(text, HOME + name, release));
@@ -108,7 +110,7 @@ final class Rc {
         if (filePath.endsWith(".yml")) {
             if (!release.keepsYarnrcYmlSettings()) {
                 Map<String, @Nullable Object> path = new LinkedHashMap<>();
-                path.put("yarn-path", yarnPathOf(values));
+                path.put(release.resolvesYarnrcYmlYarnPath() ? "yarn-path" : "yarnPath", yarnPathOf(values));
                 values = path;
             } else if ((Js.truthy(values) || !release.readsYarnPathOfAValue()) &&
                        yarnPathOf(values) instanceof String) {

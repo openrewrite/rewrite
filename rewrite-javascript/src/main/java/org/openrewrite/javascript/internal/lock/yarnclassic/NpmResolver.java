@@ -66,7 +66,9 @@ final class NpmResolver {
         }
         if (!Js.truthy(distTags) || !Js.truthy(versions)) {
             throw new MessageError(Lang.format("Received malformed response from registry for $0. " +
-                                               "The registry may be down.", name));
+                                               "The registry may be down.",
+                    config.getRelease().namesTheRequestedPackageOfAMalformedResponse() ? name :
+                            Js.get(body, "name")));
         }
         Object wanted = range;
         Object tag = distTag(distTags, range);

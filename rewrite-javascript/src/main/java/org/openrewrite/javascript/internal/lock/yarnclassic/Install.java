@@ -251,7 +251,7 @@ final class Install {
             String cwd = up.substring(0, up.length() - 1);
             String text = Objects.requireNonNull(inputs.getConfigFiles().get(up + "package.json"));
             Manifest projectManifestJson = NormalizeManifest.normalizeManifest(Config.manifest(Fs.readJson(up +
-                    "package.json", text), "_registry"), cwd, cwd, true, config.isLooseSemver());
+                    "package.json", text), "_registry"), cwd, cwd, true, config.isLooseSemver(), config.getRelease());
             Map<String, @Nullable Object> resolutions = new LinkedHashMap<>();
             Js.assign(resolutions, projectManifestJson.get("resolutions"));
             new ResolutionMap(config).init(resolutions);
@@ -289,7 +289,7 @@ final class Install {
         }
         String registry = NpmResolver.NPM_REGISTRY_ID;
         Manifest projectManifestJson = NormalizeManifest.normalizeManifest(Config.manifest(Fs.readJson(
-                "package.json", rootText), "_registry"), "", "", true, config.isLooseSemver());
+                "package.json", rootText), "_registry"), "", "", true, config.isLooseSemver(), config.getRelease());
         Manifest manifest = projectManifestJson;
         boolean workspaceRootFolder = Config.isWorkspaceRoot(projectManifestJson);
 
@@ -297,7 +297,8 @@ final class Install {
         Js.assign(resolutions, projectManifestJson.get("resolutions"));
         resolutionMap.init(resolutions);
         for (String packageName : Js.keys(resolutionMap.resolutionsByPackage)) {
-            boolean optional = ObjectPath.has(manifest.get("optionalDependencies"), packageName) &&
+            boolean optional = config.getRelease().resolvesOptionalDependenciesOptionally() &&
+                               ObjectPath.has(manifest.get("optionalDependencies"), packageName) &&
                                flags.isIgnoreOptional();
             for (ResolutionMap.Resolution resolution : resolutionMap.resolutionsByPackage.get(packageName)) {
                 resolutionDeps.add(DependencyRequestPattern.builder().registry(registry)

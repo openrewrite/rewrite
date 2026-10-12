@@ -95,7 +95,8 @@ final class Lockfile {
             lockfile = parseResult.getObject();
         }
         Object lockfilev2 = null;
-        if (lockfile instanceof Map && Js.truthy(((Map<?, ?>) lockfile).get("__metadata"))) {
+        if (release.setsBerryLocksAside() && lockfile instanceof Map &&
+            Js.truthy(((Map<?, ?>) lockfile).get("__metadata"))) {
             lockfilev2 = lockfile;
             lockfile = new PlainObject();
         }

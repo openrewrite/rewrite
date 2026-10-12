@@ -181,14 +181,16 @@ final class Config {
         String manifest = up.isEmpty() ? inputs.getManifests().get("") :
                 inputs.getConfigFiles().get(up + "package.json");
         lockfileFolderManifest = manifest == null ? null :
-                tryManifest(lockfileFolder, manifest, looseSemver, false, lockfileFolder);
+                tryManifest(lockfileFolder, manifest, looseSemver, false, lockfileFolder, release);
 
         workspacesEnabled = !Boolean.FALSE.equals(getOption("workspaces-experimental"));
         workspacesNohoistEnabled = !Boolean.FALSE.equals(getOption("workspaces-nohoist-experimental"));
         enableLockfileVersions = Js.truthy(getOption("yarn-enable-lockfile-versions"));
         linkFileDependencies = Js.truthy(getOption("yarn-link-file-dependencies"));
         packBuiltPackages = Js.truthy(getOption("experimental-pack-script-packages-in-mirror"));
-        autoAddIntegrity = !boolifyWithDefault(Js.string(getOption("unsafe-disable-integrity-migration")), true);
+        Object integrityMigration = getOption("unsafe-disable-integrity-migration");
+        autoAddIntegrity = release.keepsEntriesWithoutIntegrity() ?
+                !boolifyWithDefault(Js.string(integrityMigration), true) : !Js.truthy(integrityMigration);
         Object productionFlag = flags.get("production");
         // an environment the host does not know counts as one without these variables
         boolean productionEnv = env != null && "production".equals(env.get("NODE_ENV")) &&
@@ -225,7 +227,7 @@ final class Config {
             }
             throw CannotKnow.unread(cwd + "/package.json");
         }
-        return tryManifest(cwd, text, looseSemver, true, "");
+        return tryManifest(cwd, text, looseSemver, true, "", release);
     }
 
     // findWorkspaceRoot starts where yarn runs: a manifest with workspaces below this lock's stops it there
@@ -290,11 +292,19 @@ final class Config {
      */
     static Manifest tryManifest(String location, String text, boolean looseSemver, boolean isRoot,
                                 @Nullable String lockfileFolder) {
+        return tryManifest(location, text, looseSemver, isRoot, lockfileFolder, YarnClassicRelease.PORTED);
+    }
+
+    /**
+     * {@code tryManifest} as {@code release} normalizes.
+     */
+    static Manifest tryManifest(String location, String text, boolean looseSemver, boolean isRoot,
+                                @Nullable String lockfileFolder, YarnClassicRelease release) {
         String file = location.isEmpty() ? "package.json" : location + "/package.json";
         Manifest manifest = manifest(Fs.readJson(file, text), "_registry");
         manifest.put("_registry", NpmResolver.NPM_REGISTRY_ID);
         manifest.put("_loc", file);
-        return NormalizeManifest.normalizeManifest(manifest, location, lockfileFolder, isRoot, looseSemver);
+        return NormalizeManifest.normalizeManifest(manifest, location, lockfileFolder, isRoot, looseSemver, release);
     }
 
     /**
@@ -443,7 +453,7 @@ final class Config {
         for (String file : files) {
             String loc = Objects.requireNonNull(ProjectFiles.location(PosixPath.dirname(file)));
             Manifest manifest = tryManifest(loc, Objects.requireNonNull(inputs.getManifests().get(loc)),
-                    looseSemver, false, "");
+                    looseSemver, false, "", release);
             if (!Js.truthy(manifest.getName()) || !Js.truthy(manifest.getVersion())) {
                 continue;
             }

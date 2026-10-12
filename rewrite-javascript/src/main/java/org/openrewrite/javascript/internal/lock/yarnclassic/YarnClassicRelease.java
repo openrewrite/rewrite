@@ -96,6 +96,27 @@ public final class YarnClassicRelease implements Comparable<YarnClassicRelease> 
         return !atLeast(1, 22, 20);
     }
 
+    // yarn src/cli/commands/install.js
+
+    /**
+     * {@code fetchRequestFromCwd} makes the resolution of a package the root's optionalDependencies name optional
+     * under {@code --ignore-optional}, from 1.17.0; before, every resolution is required.
+     */
+    boolean resolvesOptionalDependenciesOptionally() {
+        return atLeast(1, 17, 0);
+    }
+
+    // yarn src/config.js
+
+    /**
+     * {@code unsafe-disable-integrity-migration} is a boolean that defaults to true, so that a lock entry without
+     * integrity stays without it, from 1.12.0; before, the migration adds the integrity unless the option holds a
+     * truthy value.
+     */
+    boolean keepsEntriesWithoutIntegrity() {
+        return atLeast(1, 12, 0);
+    }
+
     // yarn src/rc.js
 
     /**
@@ -104,6 +125,15 @@ public final class YarnClassicRelease implements Comparable<YarnClassicRelease> 
      */
     boolean parsesRcFilesByTheirPath() {
         return atLeast(1, 22, 1);
+    }
+
+    /**
+     * {@code loadRcFile} keeps a .yarnrc.yml's {@code yarnPath} as {@code yarn-path}, resolved against the file's
+     * directory, from 1.17.2; 1.17.1 keeps it as {@code yarnPath}, unresolved, which {@code start} runs from where
+     * yarn runs.
+     */
+    boolean resolvesYarnrcYmlYarnPath() {
+        return atLeast(1, 17, 2);
     }
 
     /**
@@ -132,7 +162,28 @@ public final class YarnClassicRelease implements Comparable<YarnClassicRelease> 
         return atLeast(1, 22, 1);
     }
 
+    /**
+     * {@code getRcPaths} reads a .yarnrc.yml beside every .yarnrc, from 1.17.1.
+     */
+    boolean readsYarnrcYml() {
+        return atLeast(1, 17, 1);
+    }
+
+    /**
+     * {@code getRcPaths} reads each directory's .yarnrc.yml after its .yarnrc, from 1.17.2; 1.17.1 reads it before.
+     */
+    boolean readsYarnrcYmlAfterYarnrc() {
+        return atLeast(1, 17, 2);
+    }
+
     // yarn src/lockfile/parse.js
+
+    /**
+     * {@code parse} reads with js-yaml's failsafe schema what the lockfile parser cannot read, from 1.17.0.
+     */
+    boolean readsWithYamlWhatTheLockfileParserCannot() {
+        return atLeast(1, 17, 0);
+    }
 
     /**
      * {@code parse} reads a {@code .yml} file with js-yaml alone, from 1.22.1; before, as a lock first.
@@ -158,6 +209,14 @@ public final class YarnClassicRelease implements Comparable<YarnClassicRelease> 
         return atLeast(1, 22, 22);
     }
 
+    /**
+     * {@code fromDirectory} sets a Yarn Berry lock ({@code __metadata}) aside and resolves from scratch, from 1.19.0;
+     * before, it reads the lock's entries as its own.
+     */
+    boolean setsBerryLocksAside() {
+        return atLeast(1, 19, 0);
+    }
+
     // yarn src/fetchers/tarball-fetcher.js
 
     /**
@@ -165,6 +224,72 @@ public final class YarnClassicRelease implements Comparable<YarnClassicRelease> 
      */
     boolean jailsTarballLinks() {
         return atLeast(1, 22, 0);
+    }
+
+    /**
+     * {@code createExtractor} checks a tarball against the remote's sha1 hash and its integrity both, from 1.19.0;
+     * before, against its integrity, or its hash where it has none.
+     */
+    boolean checksTheHashBesideTheIntegrity() {
+        return atLeast(1, 19, 0);
+    }
+
+    // yarn src/registries/npm-registry.js
+
+    /**
+     * {@code getRequestUrl} asks registry.yarnpkg.com and registry.npmjs.org over https whatever the url says, from
+     * 1.17.3.
+     */
+    boolean requestsPublicRegistriesOverHttps() {
+        return atLeast(1, 17, 3);
+    }
+
+    // yarn src/package-request.js
+
+    /**
+     * {@code findVersionInfo}'s {@code flatGlobalError} names the package that asks for a flat graph, from 1.12.0;
+     * before, it passes none, and the message's {@code $0@$1} read {@code undefined@undefined}.
+     */
+    boolean namesTheFlatPackage() {
+        return atLeast(1, 12, 0);
+    }
+
+    // yarn src/resolvers/registries/npm-resolver.js
+
+    /**
+     * {@code findVersionInRegistryResponse}'s {@code malformedRegistryResponse} names the package asked for, escaped,
+     * from 1.12.0; before, the name the response gives.
+     */
+    boolean namesTheRequestedPackageOfAMalformedResponse() {
+        return atLeast(1, 12, 0);
+    }
+
+    // yarn src/resolvers/exotics/link-resolver.js
+
+    /**
+     * {@code resolve} makes a link to a directory without a package.json a package of the directory's name at 0.0.0,
+     * from 1.17.0; before, only a link to a path that does not exist, and a directory without one fails.
+     */
+    boolean linksADirectoryWithoutManifest() {
+        return atLeast(1, 17, 0);
+    }
+
+    /**
+     * {@code resolve} makes a link to the lockfile's directory such a package too, from 1.18.0; before, it is the
+     * root's own package.
+     */
+    boolean linksTheLockfileFolderAsADirectory() {
+        return atLeast(1, 18, 0);
+    }
+
+    // yarn src/util/normalize-manifest/resolve-relative.js
+
+    /**
+     * A file: or link: dependency on the lockfile's directory is written {@code .}, from 1.18.0; before, one written
+     * with a {@code ./} prefix becomes {@code ./.}.
+     */
+    boolean writesTheLockfileFolderAsDot() {
+        return atLeast(1, 18, 0);
     }
 
     @Override

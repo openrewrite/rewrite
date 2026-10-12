@@ -75,7 +75,7 @@ final class PackageFetcher {
                 // workspace-fetcher.js reads the workspace's own manifest again after fetching the registry's tarball
                 String loc = String.valueOf(ref.remote.reference);
                 Manifest local = Config.tryManifest(loc, String.valueOf(resolver.files.manifest(loc)),
-                        config.isLooseSemver(), false, "");
+                        config.isLooseSemver(), false, "", config.getRelease());
                 new TarballFetcher(registryRemote, local.getName(), local.getVersion(), dest, registry, config)
                         .fetch();
                 local.put("_uid", local.getVersion());

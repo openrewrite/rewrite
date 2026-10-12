@@ -383,6 +383,9 @@ final class LockfileParser {
         Parser parser = new Parser(str, fileLoc);
         parser.next();
         if (!fileLoc.endsWith(".yml") || !release.parsesYmlAsYaml()) {
+            if (!release.readsWithYamlWhatTheLockfileParserCannot()) {
+                return parser.parse(0);
+            }
             try {
                 return parser.parse(0);
             } catch (RuntimeException error1) {

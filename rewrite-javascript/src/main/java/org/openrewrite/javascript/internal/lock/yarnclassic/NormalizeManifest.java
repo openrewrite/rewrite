@@ -57,6 +57,14 @@ final class NormalizeManifest {
      */
     static Manifest normalizeManifest(Manifest info, @Nullable String moduleLoc, @Nullable String lockfileFolder,
                                       boolean isRoot, boolean looseSemver) {
+        return normalizeManifest(info, moduleLoc, lockfileFolder, isRoot, looseSemver, YarnClassicRelease.PORTED);
+    }
+
+    /**
+     * {@code normalizeManifest} as {@code release} normalizes.
+     */
+    static Manifest normalizeManifest(Manifest info, @Nullable String moduleLoc, @Nullable String lockfileFolder,
+                                      boolean isRoot, boolean looseSemver, YarnClassicRelease release) {
         Object name = info.getName();
         Object version = info.getVersion();
         String human = null;
@@ -72,7 +80,7 @@ final class NormalizeManifest {
         String prefix = Js.truthy(human) ? human + ": " : "";
 
         fix(info, looseSemver);
-        resolveRelative(info, moduleLoc, lockfileFolder);
+        resolveRelative(info, moduleLoc, lockfileFolder, release);
         try {
             validate(info);
         } catch (MessageError err) {
@@ -138,8 +146,16 @@ final class NormalizeManifest {
      * {@code file:} and {@code link:} dependencies made relative to the lock's directory; an absolute target, or any
      * in yarn's cache, becomes an {@link UnknownPath}, as yarn writes it relative to where the project or cache sits.
      */
-    @SuppressWarnings("unchecked")
     static void resolveRelative(Manifest info, @Nullable String moduleLoc, @Nullable String lockfileFolder) {
+        resolveRelative(info, moduleLoc, lockfileFolder, YarnClassicRelease.PORTED);
+    }
+
+    /**
+     * {@code resolveRelative} of {@code release}: a target that is the lockfile's directory is {@code .} from 1.18.0.
+     */
+    @SuppressWarnings("unchecked")
+    static void resolveRelative(Manifest info, @Nullable String moduleLoc, @Nullable String lockfileFolder,
+                                YarnClassicRelease release) {
         if (lockfileFolder == null) {
             return;
         }
@@ -191,7 +207,7 @@ final class NormalizeManifest {
                 if (relativeTarget.isEmpty()) {
                     relativeTarget = ".";
                 }
-                if (absoluteTarget.equals(root)) {
+                if (absoluteTarget.equals(root) && release.writesTheLockfileFolderAsDot()) {
                     relativeTarget = ".";
                 } else if (hasPathPrefix && !RELATIVE_PREFIX.matcher(relativeTarget).find()) {
                     relativeTarget = "./" + relativeTarget;

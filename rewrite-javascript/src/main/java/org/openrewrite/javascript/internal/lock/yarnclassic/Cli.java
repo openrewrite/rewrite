@@ -78,18 +78,16 @@ final class Cli {
             path = PosixPath.normalize(PosixPath.join(inputs.getCwd(), path));
         }
         Set<String> paths = inputs.getPaths();
+        boolean held = paths == null || paths.contains(path);
+        // the host's paths cover the project and the files directly in each directory above it they reach
+        if (yarnPath instanceof String && !held && !PosixPath.isAbsolute(path) && (!path.startsWith("../") ||
+            IN_A_DIRECTORY_ABOVE.matcher(path).matches() && Config.depth(singletonList(path)) <= inputs.reach())) {
+            throw new Crash(new JsError(JsError.ERROR, "Cannot find module '" + path + "'"));
+        }
         String file = PosixPath.basename(path);
-        if (yarnPath instanceof String && (inputs.getRelease() != null ? RELEASE_FILE.matcher(file).matches() :
+        if (yarnPath instanceof String && held && (inputs.getRelease() != null ? RELEASE_FILE.matcher(file).matches() :
                 file.matches("yarn-" + Pattern.quote(release.toString()) + "\\.[cm]?js"))) {
-            if (paths == null || paths.contains(path)) {
-                return;
-            }
-            // the host's paths cover the project and the files directly in each directory above it they reach
-            if (!PosixPath.isAbsolute(path) && (!path.startsWith("../") ||
-                IN_A_DIRECTORY_ABOVE.matcher(path).matches() &&
-                Config.depth(singletonList(path)) <= inputs.reach())) {
-                throw new Crash(new JsError(JsError.ERROR, "Cannot find module '" + path + "'"));
-            }
+            return;
         }
         throw new CannotKnow("what the release yarn-path names (" + path + ") writes: yarn " + release + " hands " +
                              "the install to it");
