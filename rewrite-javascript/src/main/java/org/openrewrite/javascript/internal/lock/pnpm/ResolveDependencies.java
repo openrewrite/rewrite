@@ -42,12 +42,23 @@ import java.util.function.Supplier;
 /**
  * Port of @pnpm/installing.deps-resolver src/resolveDependencies.ts (pnpm 11.2.2) with the small modules it calls:
  * getNonDevWantedDependencies, hoistPeers, replaceVersionInBareSpecifier, unwrapPackageName and their siblings.
+ * hoistPeers.ts' getHoistableOptionalPeers follows the release that installs
+ * ({@link ResolutionContext#getPnpmVersion()}): 11.2.2's up to 11.5.0, 11.5.1's from 11.5.1
+ * ({@link #LOCKED_OPTIONAL_PEER_CANDIDATES}).
  */
 final class ResolveDependencies {
 
     private static final Set<String> NON_EXOTIC_RESOLVED_VIA = new LinkedHashSet<>(Arrays.asList(
             "custom-resolver", "github.com/denoland/deno", "github.com/oven-sh/bun", "jsr-registry",
             "local-filesystem", "named-registry", "nodejs.org", "npm-registry", "workspace"));
+
+    /**
+     * The releases whose getHoistableOptionalPeers reads a selector with a weight by its type, as hoistPeers does
+     * (pnpm/pnpm#12075, released in 11.5.1): a version only the lock holds is then a candidate for a missing
+     * optional peer. An earlier release compares the selector itself with {@code 'version'}, which one with a weight
+     * never is. Recorded with 11.2.2, 11.5.0, 11.5.1, 11.15.1 and 11.28.5.
+     */
+    static final String LOCKED_OPTIONAL_PEER_CANDIDATES = ">=11.5.1";
 
     private ResolveDependencies() {
     }
@@ -530,6 +541,13 @@ final class ResolveDependencies {
         private final Map<NodeId, DependenciesTreeNode> dependenciesTree = new LinkedHashMap<>();
         private boolean preferWorkspacePackages;
         private @Nullable ReadPackageHook readPackageHook;
+
+        /**
+         * {@code pnpmVersion}, the install's {@code packageManager.version}: the release that installs, a range
+         * where the inputs do not say which release of it does.
+         */
+        private String pnpmVersion = Main.PNPM_VERSION;
+
         private Map<String, String> registries = new LinkedHashMap<>();
         private List<String> namedRegistryPrefixes = new ArrayList<>();
         private @Nullable String resolutionMode;
@@ -610,7 +628,7 @@ final class ResolveDependencies {
                         return Promise.resolved(ctx.getLoop(), null);
                     }
                     Map<String, String> optionalDependencies = getHoistableOptionalPeers(allMissingOptionalPeers,
-                            ctx.getAllPreferredVersions());
+                            ctx.getAllPreferredVersions(), ctx.getPnpmVersion());
                     if (optionalDependencies.isEmpty()) {
                         return Promise.resolved(ctx.getLoop(), null);
                     }
@@ -1886,11 +1904,43 @@ final class ResolveDependencies {
     }
 
     /**
-     * hoistPeers.ts {@code getHoistableOptionalPeers}: a missing optional peer at the highest version known that every
-     * range admits.
+     * hoistPeers.ts {@code getHoistableOptionalPeers} as the release that installs runs it. Where {@code pnpmVersion}
+     * is a range with releases on both sides of {@link #LOCKED_OPTIONAL_PEER_CANDIDATES}, the inputs do not say which
+     * of the two runs: they must hoist the same.
      */
     static Map<String, String> getHoistableOptionalPeers(Map<String, List<String>> allMissingOptionalPeers,
-                                                         Map<String, Map<String, PreferredVersions.Selector>> allPref) {
+                                                         Map<String, Map<String, PreferredVersions.Selector>> allPref,
+                                                         String pnpmVersion) {
+        Boolean lockedCandidates = Main.releaseIn(pnpmVersion, LOCKED_OPTIONAL_PEER_CANDIDATES);
+        Map<String, String> optionalDependencies = getHoistableOptionalPeers(allMissingOptionalPeers, allPref,
+                !Boolean.FALSE.equals(lockedCandidates));
+        if (lockedCandidates == null) {
+            Map<String, String> withoutThem = getHoistableOptionalPeers(allMissingOptionalPeers, allPref, false);
+            if (!optionalDependencies.equals(withoutThem)) {
+                throw new CannotKnow("the optional peers pnpm hoists: " + specs(optionalDependencies) + " from " +
+                                     "11.5.1, which counts the versions the lock holds, and " + specs(withoutThem) +
+                                     " before; the release that installs is one of " + pnpmVersion);
+            }
+        }
+        return optionalDependencies;
+    }
+
+    private static String specs(Map<String, String> dependencies) {
+        List<String> specs = new ArrayList<>();
+        for (Map.Entry<String, String> dependency : dependencies.entrySet()) {
+            specs.add(dependency.getKey() + "@" + dependency.getValue());
+        }
+        return specs.isEmpty() ? "none" : String.join(", ", specs);
+    }
+
+    /**
+     * hoistPeers.ts {@code getHoistableOptionalPeers}: a missing optional peer at the highest version known that every
+     * range admits. With {@code lockedCandidates} a selector with a weight is read by its type, as 11.5.1 reads it
+     * ({@link #LOCKED_OPTIONAL_PEER_CANDIDATES}); without, the selector itself is compared with {@code 'version'}.
+     */
+    static Map<String, String> getHoistableOptionalPeers(Map<String, List<String>> allMissingOptionalPeers,
+                                                         Map<String, Map<String, PreferredVersions.Selector>> allPref,
+                                                         boolean lockedCandidates) {
         Map<String, String> optionalDependencies = new LinkedHashMap<>();
         for (Map.Entry<String, List<String>> peer : allMissingOptionalPeers.entrySet()) {
             Map<String, PreferredVersions.Selector> preferred = allPref.get(peer.getKey());
@@ -1899,8 +1949,9 @@ final class ResolveDependencies {
             }
             String maxSatisfyingVersion = null;
             for (Map.Entry<String, PreferredVersions.Selector> entry : preferred.entrySet()) {
-                // a weighted selector is an object, never the string 'version'
-                if (entry.getValue().getWeight() != null || !"version".equals(entry.getValue().getSelectorType())) {
+                // compared itself, a weighted selector is an object, never the string 'version'
+                if (!lockedCandidates && entry.getValue().getWeight() != null ||
+                    !"version".equals(entry.getValue().getSelectorType())) {
                     continue;
                 }
                 String version = entry.getKey();

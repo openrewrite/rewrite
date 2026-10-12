@@ -15,15 +15,36 @@
  */
 package org.openrewrite.javascript.internal.lock.pnpm;
 
+import lombok.Value;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.javascript.internal.lock.CannotKnow;
 import org.openrewrite.javascript.semver.NodeSemver;
 
 /**
  * Port of pnpm/src switchCliVersion.ts and shouldPersistLockfile.ts (pnpm 11.2.2): the release that installs, which
- * the engine follows only when it {@link Main#runsAsPorted runs as the ported one}.
+ * the engine follows only when it {@link Main#runsAsPorted runs as the ported one}, and then with what the ported
+ * modules do from that release on (the release options their classes name).
  */
 final class SwitchCliVersion {
+
+    /**
+     * What the switch leaves for the install that follows.
+     */
+    @Value
+    static class Switched {
+        /**
+         * The release that installs: the one pnpm hands the install to, this one where it does not switch; the range
+         * the project names where the inputs do not say which release of it the root's lock pins.
+         */
+        String release;
+
+        /**
+         * The failure of a store controller pnpm creates unless the root's lock records the release, which pnpm ends
+         * with either way; null when it creates none or the inputs say what that lock holds.
+         */
+        @Nullable
+        PnpmError unlessLocked;
+    }
 
     private final EnvInstaller envInstaller;
     private final CreateNewStoreController stores;
@@ -34,19 +55,17 @@ final class SwitchCliVersion {
     }
 
     /**
-     * The switch over the lock file of rootProjectManifestDir, null when the inputs do not say what it holds: then the
-     * failure of a store controller pnpm creates unless that lock records the release, which pnpm ends with either way.
+     * The switch over the lock file of rootProjectManifestDir, null when the inputs do not say what it holds.
      */
-    @Nullable
-    PnpmError switchCliVersion(PnpmOptions.WantedPackageManager pm, PnpmOptions options,
-                               EnvLockfile.@Nullable OnDisk lockFile) {
+    Switched switchCliVersion(PnpmOptions.WantedPackageManager pm, PnpmOptions options,
+                              EnvLockfile.@Nullable OnDisk lockFile) {
         if (!"pnpm".equals(pm.getName()) || pm.getVersion() == null) {
-            return null;
+            return new Switched(Main.PNPM_VERSION, null);
         }
         String version = Js.string(pm.getVersion());
         boolean persistLockfile = shouldPersistLockfile(pm);
         if (!persistLockfile && Main.runsAsPorted(version)) {
-            return null;
+            return new Switched(version, null);
         }
         if (lockFile == null && persistLockfile &&
             NodeSemver.satisfies(Main.PNPM_VERSION, version, NodeSemver.Options.INCLUDE_PRERELEASE)) {
@@ -55,7 +74,7 @@ final class SwitchCliVersion {
                 throw new CannotKnow("which pnpm release the workspace's " + LockfileReader.WANTED_LOCKFILE +
                                      " pins for " + version + " (pnpm runs that release)");
             }
-            return failure;
+            return new Switched(version, failure);
         }
         EnvLockfile.OnDisk rootLockFile = lockFile == null ? new EnvLockfile.OnDisk(null) : lockFile;
         EnvLockfile envLockfile = persistLockfile ? rootLockFile.readEnvLockfile() : null;
@@ -75,7 +94,7 @@ final class SwitchCliVersion {
             pmVersion = EnvInstaller.lockedVersion(resolved.packageManagerDependencies(), "pnpm");
             if (!Js.truthy(pmVersion)) {
                 // pnpm warns that it cannot resolve the release and goes on
-                return null;
+                return new Switched(Main.PNPM_VERSION, null);
             }
         } else if (!EnvInstaller.isPackageManagerResolved(envLockfile, Js.string(pmVersion))) {
             storeToUse = stores.createStoreController(options);
@@ -86,7 +105,8 @@ final class SwitchCliVersion {
                     rootLockFile, storeToUse, options);
         }
         if (Main.runsAsPorted(Js.string(pmVersion))) {
-            return null;
+            // a root lock the inputs do not hold may pin another release of the range than the one resolved here
+            return new Switched(persistLockfile && lockFile == null ? version : Js.string(pmVersion), null);
         }
         if (storeToUse == null) {
             stores.createStoreController(options);

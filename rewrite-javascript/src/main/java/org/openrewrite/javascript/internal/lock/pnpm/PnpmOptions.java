@@ -82,16 +82,32 @@ public final class PnpmOptions {
      */
     private final @Nullable WantedPackageManager wantedPackageManager;
 
+    /**
+     * {@code packageManager.version}, which the install gives its resolver as {@code pnpmVersion}: the release whose
+     * config this is, the one ported until pnpm hands the install to another ({@link #withPackageManagerVersion}).
+     */
+    private final String packageManagerVersion;
+
     private PnpmOptions(Map<String, @Nullable Object> config, Set<String> explicitlySetKeys,
                         Map<String, @Nullable Map<String, @Nullable Object>> catalogs, Map<String, String> registries,
                         @Nullable List<String> workspacePackagePatterns,
-                        @Nullable WantedPackageManager wantedPackageManager) {
+                        @Nullable WantedPackageManager wantedPackageManager, String packageManagerVersion) {
         this.config = config;
         this.explicitlySetKeys = explicitlySetKeys;
         this.catalogs = catalogs;
         this.registries = registries;
         this.workspacePackagePatterns = workspacePackagePatterns;
         this.wantedPackageManager = wantedPackageManager;
+        this.packageManagerVersion = packageManagerVersion;
+    }
+
+    /**
+     * The config the release that installs reads from the same files, {@code version} its
+     * {@code packageManager.version}: {@link Main#checkWantedPackageManager}'s, a release or a range of them.
+     */
+    PnpmOptions withPackageManagerVersion(String version) {
+        return new PnpmOptions(config, explicitlySetKeys, catalogs, registries, workspacePackagePatterns,
+                wantedPackageManager, version);
     }
 
     @Value
@@ -266,7 +282,8 @@ public final class PnpmOptions {
         config.put("useGitBranchLockfile", gitBranchLockfile instanceof Boolean ? gitBranchLockfile : false);
         WantedPackageManager wantedPackageManager = rootManifest == null ? null :
                 withPmOnFail(getWantedPackageManager(rootManifest), config.get("pmOnFail"));
-        return new PnpmOptions(config, explicitlySetKeys, catalogs, registries, patterns, wantedPackageManager);
+        return new PnpmOptions(config, explicitlySetKeys, catalogs, registries, patterns, wantedPackageManager,
+                Main.PNPM_VERSION);
     }
 
     /**

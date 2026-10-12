@@ -19,6 +19,7 @@ import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.openrewrite.javascript.internal.lock.CannotKnow;
 import org.openrewrite.javascript.internal.lock.SpecUtils;
 
@@ -270,5 +271,64 @@ class MainTest {
         assertThat(Main.release(ported.withName("yarn"), () -> fail("asked corepack"))).isEqualTo(Main.PNPM_VERSION);
         assertThat(Main.release(ported.withVersion("10.34.6"), () -> new SpecUtils.Descriptor("pnpm", "10.34.6")))
           .isEqualTo("10.34.6");
+    }
+
+    // the packageManager.version of the config the install reads, with the environment known or not
+    private static String installedBy(String manifest, @Nullable String settings, boolean environment) {
+        PnpmLockRegenerator.Inputs.InputsBuilder inputs = PnpmLockRegenerator.Inputs.builder()
+          .lock(LOCK)
+          .manifest("", manifest)
+          .file("pnpm-workspace.yaml", "minimumReleaseAge: 0\n" + (settings == null ? "" : settings))
+          .now(Instant.parse("2026-10-08T00:00:00Z"));
+        if (environment) {
+            inputs.env(new LinkedHashMap<>());
+        }
+        Install.Result install = new PnpmLockRegenerator(inputs.build(), NO_REGISTRY).install();
+        assertThat(install.getWritten()).isEqualTo(LOCK);
+        return install.getOpts().getConfig().getPackageManagerVersion();
+    }
+
+    /**
+     * The release that installs is the one pnpm hands the install to, the ported one where it does not switch
+     * (release-11.28.5-bump-past-other-version and its kin are recorded with the release their manifest names).
+     */
+    @ParameterizedTest
+    @ValueSource(booleans = {true, false})
+    void theInstallIsGivenTheReleasePnpmSwitchesTo(boolean environment) {
+        assertThat(installedBy(manifest("\"private\":true"), null, environment)).isEqualTo(Main.PNPM_VERSION);
+        assertThat(installedBy(manifest("\"packageManager\":\"pnpm@11.2.2\""), null, environment))
+          .isEqualTo("11.2.2");
+        assertThat(installedBy(manifest("\"packageManager\":\"pnpm@11.5.0\""), null, environment))
+          .isEqualTo("11.5.0");
+        assertThat(installedBy(manifest("\"packageManager\":\"pnpm@11.15.1\""), null, environment))
+          .isEqualTo("11.15.1");
+    }
+
+    /**
+     * Without a switch the ported release installs when pnpm is run directly, and the release the project names when
+     * corepack starts pnpm: with the environment unknown the install is either's.
+     */
+    @Test
+    void withoutASwitchTheInstallIsThePortedReleasesOrTheOneCorepackStarts() {
+        String named = manifest("\"packageManager\":\"pnpm@11.15.1\"");
+        assertThat(installedBy(named, "pmOnFail: ignore\n", true)).isEqualTo(Main.PNPM_VERSION);
+        assertThat(installedBy(named, "pmOnFail: warn\n", true)).isEqualTo(Main.PNPM_VERSION);
+        assertThat(installedBy(named, "pmOnFail: ignore\n", false)).isEqualTo("11.2.2 || 11.15.1");
+        assertThat(installedBy(named, "pmOnFail: warn\n", false)).isEqualTo("11.2.2 || 11.15.1");
+    }
+
+    /**
+     * A behavior a ported module took on in a later release is that of every release the install can be, of none of
+     * them, or unknown.
+     */
+    @ParameterizedTest
+    @CsvSource(delimiter = ';', nullValues = "unknown", value = {
+      "11.5.1;true", "11.15.1;true", "11.28.5;true", ">=11.5.1 <12;true", "11.5.1 || 11.28.5;true",
+      "11.0.6;false", "11.2.2;false", "11.5.0;false", "11.0.6 - 11.5.0;false", "11.2.2 || 11.5.0;false",
+      "^11.0.6;unknown", "11.0.6 - 11;unknown", "11.2.2 || 11.15.1;unknown", "11.x;unknown",
+    })
+    void aReleaseOptionIsThatOfEveryReleaseTheInstallCanBe(String pnpmVersion, @Nullable Boolean expected) {
+        assertThat(Main.releaseIn(pnpmVersion, ResolveDependencies.LOCKED_OPTIONAL_PEER_CANDIDATES))
+          .isEqualTo(expected);
     }
 }

@@ -222,9 +222,26 @@ arrays and objects that npm, pnpm and yarn 1 print again with `JSON.stringify`.
 
 ## Amendment 2026-10-11: later releases of the ported majors
 
-- pnpm: a release from 11.0.6 to below 12 (`Main.RUNS_AS_PORTED`) runs as 11.2.2, for the port (`SwitchCliVersion`,
-  `Main.release`) and the recipes (`PnpmRelease`) alike. Recordings with 11.13.0 and 11.28.5 write the locks 11.2.2
-  writes; 11.0.5 sorts what 11.0.6 appends. Another major stays cannot-know.
+- pnpm: a release from 11.0.6 to below 12 (`Main.RUNS_AS_PORTED`) runs as the port of 11.2.2, for the port
+  (`SwitchCliVersion`, `Main.release`) and the recipes (`PnpmRelease`) alike; 11.0.5 sorts what 11.0.6 appends, and
+  another major stays cannot-know. What a later 11.x release changed in a ported module is an option of that module's
+  class, a range of releases asked of the release that installs (`Main.releaseIn`): the package manager check names
+  that release (`Main.checkWantedPackageManager`: the one pnpm hands the install to, else 11.2.2), and the install's
+  config carries it as pnpm's own `packageManager.version`, the resolver's `pnpmVersion`. Where the inputs do not say
+  which side of an option it is on (a range of which the root's lock pins one, corepack starting another release than
+  pnpm run directly), both sides are computed and a difference is cannot-know. One option so far: from 11.5.1 a
+  missing optional peer is hoisted at a version only the lock holds
+  (`ResolveDependencies.LOCKED_OPTIONAL_PEER_CANDIDATES`, pnpm/pnpm#12075), recorded with 11.2.2 and 11.5.0 dropping
+  the peer and 11.5.1, 11.15.1 and 11.28.5 keeping it. The other changes of 11.3.0 to 11.28.5 to the ported modules
+  are work items, so a later release is byte-exact per recording, not per release: recordings with 11.13.0 and
+  11.28.5 write the locks 11.2.2 writes for the scenarios taken with them, while seek-oss/playroom's lock after one
+  version bump, recorded with every release from 11.2.2 to 11.28.5, is the port's up to 11.5.1 and another one from
+  each of 11.5.2, 11.7.0, 11.15.0, 11.28.0 and 11.28.1. Their changesets name what those releases changed (read, not
+  recorded apart): the peer contexts the lock records are preferred (pnpm/pnpm#12083) and kept from a node's
+  siblings (pnpm/pnpm#12320), an optional peer only `peerDependenciesMeta` declares is hoisted (pnpm/pnpm#13120), a
+  name a package lists as a dependency and as an optional peer stays a dependency (pnpm/pnpm#15503), and a candidate
+  for an optional peer is skipped when the importer provides one of its own peers at a version it rejects
+  (pnpm/pnpm#15573).
 - Yarn Berry: every 4.x release the release data holds (4.0.0 to 4.18.1) is reproduced beside 4.10.3, as the
   amendment on Yarn Berry releases below has it. Yarn 2 and 3, and a release after the data's, stay cannot-know.
 
