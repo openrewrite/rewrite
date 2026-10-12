@@ -70,7 +70,8 @@ The npm port reproduces each release in `NpmReleases.PROVEN`; the release that i
 `NodeRuntime` marker names, 11.17.0 without one. The Berry port reproduces each release in `YarnReleases.PROVEN`
 (`YarnRelease` holds its questions beside each release's data); the marker's release installs, else the one
 `yarnPath` or corepack starts. The Bun port reproduces each release in `BunReleases.PROVEN` (`BunRelease`, the
-upstream source being the tag `bun-v<release>` of oven-sh/bun); the marker's release installs, 1.3.10 without one.
+upstream source being the tag `bun-v<release>` of oven-sh/bun, Zig to 1.3.14 and Rust from 1.4.0, each Java class
+naming the Rust file beside the Zig one); the marker's release installs, 1.3.10 without one.
 The Yarn classic port reproduces each release in `YarnClassicReleases.PROVEN` (`YarnClassicRelease`); the marker's
 release installs, 1.22.22 without one. To add releases:
 

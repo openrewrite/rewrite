@@ -233,9 +233,10 @@ public final class BunRelease implements Comparable<BunRelease> {
      * the event loop again (usockets' kqueue or epoll wait without a timeout). From 1.2.21, whose
      * {@code --lockfile-only} no longer prefetches the tarball of each package it adds (PackageManagerOptions.zig
      * {@code prefetch_resolved_tarballs}), whose request kept the wait going; until 1.3.10, whose event loop counts
-     * the wakeup a request's end made (bun-usockets {@code pending_wakeups}) and gives such a pass one more. 1.3.10
-     * itself is taken to end the wait there, as the port of it does: on kqueue it waits after a second such pass, and
-     * on epoll as 1.3.9 does, which the port does not reproduce.
+     * the wakeup a request's end made (bun-usockets {@code pending_wakeups}) and gives such a pass one more. 1.3.10 to
+     * 1.4.0 are taken to end the wait there, as the port of 1.3.10 does: on kqueue they wait after a second such pass,
+     * and on epoll as 1.3.9 does, which the port does not reproduce; from 1.4.1 (bun#40470) the wait processes the
+     * peers again until none is queued before it sleeps, and ends everywhere.
      */
     boolean waitsForeverOnPeersQueuedWithNothingPending() {
         return atLeast(1, 2, 21) && !atLeast(1, 3, 10);

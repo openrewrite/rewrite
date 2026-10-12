@@ -312,13 +312,24 @@ The Bun port follows Bun 1.3.10 and reproduces other releases beside it, as the 
   never finishes (1.2.21 to 1.3.9 over two peer graphs) leaves the edits over a lock, which finish, to be replayed.
   A `git clone` bun failed is `cannot-know`: what git reaches over the network is not the engine's to know, as npm's
   export takes the filesystem npm ran on. `BunScenarioTest` replays the first and last release of every range, and
-  every release with `REWRITE_LOCK_EVERY_RELEASE`.
-- **What is reproduced.** `BunReleases.PROVEN` is 1.3.0 to 1.3.14: every scenario replays as each of them, and every
+  every release with `REWRITE_LOCK_EVERY_RELEASE`; a release replay answers only for the registries that release
+  asked (its outcome's `requests.log`), since 1.4.0 asks bunfig's registry where 1.3.x asked .npmrc's.
+- **1.4.x, a Rust translation.** 1.4.0 translated every Zig file the port names to Rust and changed much on the way;
+  each change is a question beside 1.3.10's code like any other, the Java classes still following their modules (the
+  Rust file named beside the Zig one). bun.lock holds versions 0 to 3: a lock keeps the version it was read with, a
+  new one is 2, held at 1 where a package would not read back at 2, and 3 where the overrides hold rules scoped to a
+  parent or a range, which 1.4.0 reads, matches and writes. Among the rest: the JSON and TOML parsers are new (their
+  errors and what they accept), bunfig's registry wins over .npmrc's, registry urls are canonical, catalogs compare and
+  look up by name, a frozen `--lockfile-only` install writes nothing, the resolver dedupes and redirects otherwise
+  (`get_package_id`'s guard, `update_transitive.rs`), the reader binds peers by version, the hoist dedupes a
+  package's second edge to a name, and the clean drops what only optional peers hold. What the engine cannot see is
+  cannot-know: bun's manifest cache (`install.offline`, from 1.4.1), a frozen install over a pruned checkout, and two
+  1.4.0 bugs whose bytes depend on memory or response headers.
+- **What is reproduced.** `BunReleases.PROVEN` is 1.3.0 to 1.4.3: every scenario replays as each of them, and every
   upstream change in the files the port names between them and 1.3.10 that reaches a lock is a question. Every
   scenario replays as 1.2.0 to 1.2.23 too, but those miss questions still (changes before 1.2.13 in bun.lock's writer
   and reader, the overrides and the globs; .npmrc, semver and the workspaces object before 1.2.24), so they stay
   cannot-know.
-  1.4.x, a Rust translation that writes lockfileVersion 2, is not reproduced.
 
 ## Amendment 2026-10-11: Yarn classic releases
 

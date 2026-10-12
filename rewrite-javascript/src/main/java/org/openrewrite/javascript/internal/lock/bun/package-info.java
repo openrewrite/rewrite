@@ -20,7 +20,9 @@
  * {@code default-trusted-dependencies.txt}; and from the Zig standard library at the commit Bun 1.3.10 builds
  * with (oven-sh/zig c031cbebf5b063210473ff5204a24ebfb2492c72): {@code std.hash.Wyhash}, the layout of
  * {@code std.HashMapUnmanaged} and the base64 decoder. What the other releases in {@link BunReleases#PROVEN} do
- * otherwise is ported from their own tags beside it ({@link BunRelease}). Both are distributed under the MIT License:
+ * otherwise is ported from their own tags beside it ({@link BunRelease}): the Zig sources to 1.3.14, the Rust
+ * translation of 1.4.0 to 1.4.3 (src/install, src/parsers, src/dotenv, src/glob, src/semver). Both are distributed
+ * under the MIT License:
  * <pre>
  * Copyright (c) Bun contributors
  * Copyright (c) Zig contributors
