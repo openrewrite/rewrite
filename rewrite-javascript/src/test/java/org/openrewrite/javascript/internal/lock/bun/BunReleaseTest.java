@@ -193,6 +193,47 @@ class BunReleaseTest {
         assertThat(earlier.map).containsOnlyKeys("packages/a", "packages/b");
     }
 
+    private static final String INTEGRITY = "sha512-6FlzubTLZG3J2a/NVCAleEhjzq5oxgHyaCU9yYXvcLsvoVaHJq/s5xXI6/XXP6tz7R9xA" +
+                                            "OtHnSO/tXtF3WRTlA==";
+
+    private static String packument(String name, String peers) {
+        return "{\"name\":\"" + name + "\",\"modified\":\"2026-01-01T00:00:00.000Z\",\"dist-tags\":{\"latest\":" +
+               "\"1.0.0\"},\"versions\":{\"1.0.0\":{\"name\":\"" + name + "\",\"version\":\"1.0.0\"," +
+               "\"peerDependencies\":" + peers + ",\"dist\":{\"tarball\":\"https://registry.npmjs.org/" + name +
+               "/-/" + name + "-1.0.0.tgz\",\"integrity\":\"" + INTEGRITY + "\"}}}}";
+    }
+
+    /**
+     * install_with_manager.zig (1.3.11): the peer queue is processed until it is empty before the wait for the peers,
+     * so that q is resolved: the peer of p, which a's peer adds with nothing to fetch once the failed optional p has
+     * loaded p's packument. a, a dev dependency, is asked for first, so that its peer p waits for the peers.
+     */
+    @Test
+    void resolvesThePeersOfAPeerItAddsWithNothingToFetchFrom1311() {
+        String lock = "{\n  \"lockfileVersion\": 1,\n  \"configVersion\": 1,\n  \"workspaces\": {\n    \"\": {\n" +
+                      "      \"name\": \"root\",\n    },\n  },\n  \"packages\": {}\n}\n";
+        String manifest = "{\"name\":\"root\",\"devDependencies\":{\"a\":\"1.0.0\"},\"optionalDependencies\":" +
+                          "{\"p\":\"^2.0.0\"}}";
+        ManifestSource registry = (url, name, extended) -> "a".equals(name) ? packument("a", "{\"p\":\"^1.0.0\"}") :
+                "p".equals(name) ? packument("p", "{\"q\":\"^1.0.0\"}") : "q".equals(name) ? packument("q", "{}") :
+                        null;
+        BunLockRegenerator.Inputs.InputsBuilder inputs = BunLockRegenerator.Inputs.builder()
+          .lock(lock)
+          .manifest("", manifest)
+          .now(java.time.Instant.parse("2026-10-11T00:00:00Z"));
+        org.openrewrite.javascript.internal.LockFileRegeneration.Result later = new BunLockRegenerator(
+          inputs.release(BunRelease.of("1.3.11")).build(), registry).regenerate();
+        assertThat(later.getLockFileContent()).as(String.valueOf(later.getErrorMessage()))
+          .contains("\"p\": [\"p@1.0.0\"").contains("\"q\": [\"q@1.0.0\"");
+        // 1.3.10 writes p without its peer q, a lock its own reader rejects on the next install
+        org.openrewrite.javascript.internal.LockFileRegeneration.Result earlier = new BunLockRegenerator(
+          inputs.release(BunRelease.PORTED).build(), registry).regenerate();
+        assertThat(requireNonNull(earlier.getFailure()).getKind())
+          .isEqualTo(org.openrewrite.javascript.internal.LockFileRegeneration.Kind.SECOND_INSTALL);
+        assertThat(earlier.getFailure().getDetail()).contains("Failed to resolve peer dependency 'q' for package 'p'");
+        assertThat(earlier.getFailure().getWritten()).contains("\"p\": [\"p@1.0.0\"").doesNotContain("\"q\": [");
+    }
+
     private static PackageManifest.PackageVersion version(BunRelease release, String packument) {
         PackageManifest manifest = requireNonNull(PackageManifest.parse(release, new Log(), packument, "debug", false));
         PackageManifest.FindResult pick = requireNonNull(manifest.findBestVersion(

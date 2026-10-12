@@ -670,7 +670,13 @@ final class PackageManager {
         }
         peersStarted = true;
         namesBeforePeers = new HashSet<>(lockfile.packageIndex.keySet());
-        if (!peerDependencies.isEmpty()) {
+        if (options.getRelease().drainsPeersOfResolvedPeers()) {
+            // a peer resolved here can add a package whose own peers are queued again, with nothing to fetch
+            while (!peerDependencies.isEmpty()) {
+                processPeerDependencyList();
+                drainDependencyList();
+            }
+        } else if (!peerDependencies.isEmpty()) {
             processPeerDependencyList();
             drainDependencyList();
         }

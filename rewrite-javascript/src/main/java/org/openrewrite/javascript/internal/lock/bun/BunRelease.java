@@ -90,6 +90,17 @@ public final class BunRelease implements Comparable<BunRelease> {
         return atLeast(1, 3, 2);
     }
 
+    // src/install/PackageManager/install_with_manager.zig installWithManager
+
+    /**
+     * Before it waits for the peers, the install processes the peer queue until it is empty, so that the peers of a
+     * package a peer added with nothing to fetch are resolved too, from 1.3.11; before, it processes the queue once,
+     * and those peers stay unresolved when no request is pending.
+     */
+    boolean drainsPeersOfResolvedPeers() {
+        return atLeast(1, 3, 11);
+    }
+
     // src/install/lockfile/Package/WorkspaceMap.zig processNamesArray
 
     /**
@@ -122,7 +133,9 @@ public final class BunRelease implements Comparable<BunRelease> {
 
     /**
      * A name {@code peerDependenciesMeta} marks optional that {@code peerDependencies} does not list is an optional
-     * peer of {@code "*"}, as pnpm and Yarn take it, from 1.3.14.
+     * peer of {@code "*"}, as pnpm and Yarn take it, from 1.3.14. With it a packument's dependency group is read only
+     * when it holds a dependency (the peers also for such a name), and the peers no longer reset the bundled names the
+     * other groups found; before, every group that is an object is read, and the last resets them.
      */
     boolean impliesOptionalPeersOfPeerDependenciesMeta() {
         return atLeast(1, 3, 14);
