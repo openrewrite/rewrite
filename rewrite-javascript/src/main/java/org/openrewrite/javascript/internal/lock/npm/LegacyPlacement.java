@@ -117,7 +117,8 @@ final class LegacyPlacement {
             }
 
             Edge checkEdge = check.getEdgesOut().get(edge.getName());
-            if (!check.isTop() && checkEdge != null && checkEdge.isPeer()) {
+            if (options.getRelease().skipsPlacesWithPeerEdgeOfName() && !check.isTop() && checkEdge != null &&
+                checkEdge.isPeer()) {
                 continue;
             }
 
@@ -276,7 +277,19 @@ final class LegacyPlacement {
             }
             Node peer = virtualRoot.getChildren().get(peerEdge.getName());
 
-            if (!peerEdge.isPeer() || peerEdge.isValid() || peer == null) {
+            if (!peerEdge.isPeer() || peerEdge.isValid()) {
+                continue;
+            }
+            if (peer == null) {
+                if (!options.getRelease().skipsPeersVirtualRootLacks()) {
+                    // before npm 7.0.8 the missing peer is placed: [_canPlaceDep] reads it at the first place up
+                    Node peerStart = !newDep.isRoot() && newDep.getResolveParent() != null ?
+                            newDep.getResolveParent() : newDep;
+                    Edge entryEdge = peerEntryEdge != null ? peerEntryEdge : edge;
+                    throw new IllegalArgumentException("Cannot read properties of undefined (reading '" +
+                                                       readOfMissingDep(peerStart, peerEdge.getName(),
+                                                               entryEdge.getFrom()) + "')");
+                }
                 continue;
             }
 
@@ -317,6 +330,12 @@ final class LegacyPlacement {
                 node.setParent(null);
             }
         }
+    }
+
+    // what [_canPlaceDep] (npm 7.0.7) reads first of a dep that is undefined, checking target: dep.matches for the node in
+    // place, dep.name where the target is not the entry edge's dependent, else [_canPlacePeers]'s dep.parent
+    private static String readOfMissingDep(Node target, String name, @Nullable Node entryFrom) {
+        return target.getChildren().has(name) ? "matches" : target != entryFrom ? "name" : "parent";
     }
 
     private void pruneDedupable(Node node, boolean descend) {
@@ -418,7 +437,9 @@ final class LegacyPlacement {
                 return KEEP;
             }
 
-            boolean preferDedupe = options.isPreferDedupe() || edge.isPeer();
+            // before npm 7.0.8 only under prefer-dedupe
+            boolean preferDedupe = options.isPreferDedupe() ||
+                                   edge.isPeer() && options.getRelease().prefersDedupeForPeers();
             if (preferDedupe && !tryReplace && dep.canReplace(current)) {
                 CanPlaceDep.Result res = canPlacePeers(dep, target, edge, REPLACE, peerEntryEdge, peerPath, isSource);
                 if (res != CONFLICT) {

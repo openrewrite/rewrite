@@ -733,6 +733,41 @@ class NpmLockRegeneratorTest {
           Arrays.asList("node_modules/a@2.0.0", "node_modules/x@1.0.0", "node_modules/y@1.0.0"));
     }
 
+    // build-ideal-tree.js [_placeDep] from npm 7.0.8 passes over b, which peer-depends on x, placing c@2's x@2, so it
+    // lands at the root; npm 7.0.7 checks b, whose peer edge rejects x@2, and nests it (skipsPlacesWithPeerEdgeOfName)
+    @ParameterizedTest
+    @ValueSource(strings = {"7.0.7", "7.0.8"})
+    void placeThatPeerDependsOnTheNameIsPassedOverFrom7_0_8(String release) {
+        Result result = install(release,
+          "{\"b\":{\"latest\":\"1.0.0\",\"versions\":{\"1.0.0\":{\"dependencies\":{\"c\":\"2.0.0\"}," +
+          "\"peerDependencies\":{\"x\":\"1\"},\"peerDependenciesMeta\":{\"x\":{\"optional\":true}}}}}," +
+          "\"c\":{\"latest\":\"1.0.0\",\"versions\":{\"1.0.0\":{},\"2.0.0\":{\"dependencies\":{\"x\":\"2.0.0\"}}}}," +
+          "\"x\":{\"latest\":\"2.0.0\",\"versions\":{\"1.0.0\":{},\"2.0.0\":{}}}}",
+          "{\"name\":\"root\",\"version\":\"1.0.0\",\"dependencies\":{\"b\":\"1.0.0\",\"c\":\"1.0.0\"}}");
+        assertThat(installed(result)).containsExactlyElementsOf("7.0.7".equals(release) ?
+          Arrays.asList("node_modules/b@1.0.0", "node_modules/b/node_modules/c@2.0.0",
+            "node_modules/b/node_modules/c/node_modules/x@2.0.0", "node_modules/c@1.0.0") :
+          Arrays.asList("node_modules/b@1.0.0", "node_modules/b/node_modules/c@2.0.0", "node_modules/c@1.0.0",
+            "node_modules/x@2.0.0"));
+    }
+
+    // build-ideal-tree.js [_canPlaceDep] from npm 7.0.8 tries an older peer over the node in place, so a's x@1 replaces
+    // d's x@2 at the root; npm 7.0.7 does only under prefer-dedupe, and nests a and x@1 under e (prefersDedupeForPeers)
+    @ParameterizedTest
+    @ValueSource(strings = {"7.0.7", "7.0.8"})
+    void olderPeerReplacesTheNodeInPlaceFrom7_0_8(String release) {
+        Result result = install(release,
+          "{\"d\":{\"latest\":\"1.0.0\",\"versions\":{\"1.0.0\":{\"dependencies\":{\"x\":\"1 || 2\"}}}}," +
+          "\"e\":{\"latest\":\"1.0.0\",\"versions\":{\"1.0.0\":{\"dependencies\":{\"a\":\"1.0.0\"}}}}," +
+          "\"a\":{\"latest\":\"1.0.0\",\"versions\":{\"1.0.0\":{\"peerDependencies\":{\"x\":\"1\"}}}}," +
+          "\"x\":{\"latest\":\"2.0.0\",\"versions\":{\"1.0.0\":{},\"2.0.0\":{}}}}",
+          "{\"name\":\"root\",\"version\":\"1.0.0\",\"dependencies\":{\"d\":\"1.0.0\",\"e\":\"1.0.0\"}}");
+        assertThat(installed(result)).containsExactlyElementsOf("7.0.7".equals(release) ?
+          Arrays.asList("node_modules/d@1.0.0", "node_modules/e@1.0.0", "node_modules/e/node_modules/a@1.0.0",
+            "node_modules/e/node_modules/x@1.0.0", "node_modules/x@2.0.0") :
+          Arrays.asList("node_modules/a@1.0.0", "node_modules/d@1.0.0", "node_modules/e@1.0.0", "node_modules/x@1.0.0"));
+    }
+
     // node-semver 7.3.2 (npm 7.0.0 to 7.0.15) keeps the `x` group beside the prerelease one, which then satisfies the
     // range and is the latest; 7.3.4 (npm 7.1.0) takes the range for any version, which the prerelease no longer
     // satisfies (NpmRelease.semver())

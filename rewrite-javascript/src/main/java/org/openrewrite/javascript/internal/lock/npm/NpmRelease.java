@@ -338,6 +338,14 @@ public final class NpmRelease implements Comparable<NpmRelease> {
     }
 
     /**
+     * {@code [_canPlaceDep]} tries an older node over the one in place for a peer edge, as prefer-dedupe does for any
+     * edge, since peers try harder to be singletons, from npm 7.0.8; before, only under prefer-dedupe.
+     */
+    boolean prefersDedupeForPeers() {
+        return atLeast(7, 0, 8);
+    }
+
+    /**
      * {@code #nodeFromSpec}: a spec naming a workspace that satisfies the edge takes the workspace instead of a
      * registry manifest, from npm 8.5.0.
      */
@@ -515,6 +523,23 @@ public final class NpmRelease implements Comparable<NpmRelease> {
      */
     boolean skipsPeerConflictOfDetachedNode() {
         return atLeast(12, 0, 2) || atLeast(11, 19, 0) && !atLeast(12, 0, 0);
+    }
+
+    /**
+     * {@code [_placeDep]} passes over an unmet peer of the placed node that its virtual root does not hold, an optional
+     * peer {@code [_loadPeerSet]} never loads, from npm 7.0.8, as 7.0.0 does; npm 7.0.1 to 7.0.7, whose one peer loop
+     * dropped 7.0.0's check, place the missing peer, a TypeError.
+     */
+    boolean skipsPeersVirtualRootLacks() {
+        return atLeast(7, 0, 8) || !atLeast(7, 0, 1);
+    }
+
+    /**
+     * {@code [_placeDep]} passes over a place, other than a top, that has a peer edge of the name it places, from npm
+     * 7.0.8; before, every place from the start up is checked.
+     */
+    boolean skipsPlacesWithPeerEdgeOfName() {
+        return atLeast(7, 0, 8);
     }
 
     /**
