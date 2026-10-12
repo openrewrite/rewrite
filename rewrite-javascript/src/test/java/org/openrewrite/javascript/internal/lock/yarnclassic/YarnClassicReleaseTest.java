@@ -316,6 +316,18 @@ class YarnClassicReleaseTest {
     }
 
     /**
+     * npm-resolver.js {@code cleanRegistry} (1.10.0) rewrites an http registry.npmjs.org url too; before, an https one
+     * only.
+     */
+    @Test
+    void cleansHttpNpmRegistryUrlsFrom1100() {
+        String tarball = "http://registry.npmjs.org/a/-/a-1.0.0.tgz";
+        assertThat(NpmResolver.cleanRegistry(config("1.9.4"), tarball)).isEqualTo(tarball);
+        assertThat(NpmResolver.cleanRegistry(config("1.10.0"), tarball))
+                .isEqualTo("https://registry.yarnpkg.com/a/-/a-1.0.0.tgz");
+    }
+
+    /**
      * npm-registry.js {@code getRequestUrl}: registry.npmjs.org and registry.yarnpkg.com over https from 1.17.3.
      */
     @Test

@@ -120,9 +120,10 @@ final class PackageRequest {
         remote.type = preferredRemoteType;
         remote.reference = url;
         remote.hash = hash;
-        remote.integrity = shrunk.get("integrity");
+        boolean integrity = config.getRelease().recordsIntegrity();
+        remote.integrity = integrity ? shrunk.get("integrity") : null;
         remote.registry = shrunk.get("registry");
-        remote.packageName = shrunk.get("name");
+        remote.packageName = integrity ? shrunk.get("name") : null;
         manifest.remote = remote;
         manifest.put("optionalDependencies", or(shrunk.get("optionalDependencies")));
         manifest.put("dependencies", or(shrunk.get("dependencies")));

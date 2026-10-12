@@ -301,4 +301,5 @@ The Yarn classic port follows yarn 1.22.22 and reproduces the 1.x releases besid
   from run to run), none where 1.22.20 printed none. A recording's `cannot-know` or `malformed` line is `exact-or`
   that line for a release that writes a lock, in the export's outcomes and in the replays of the recorded outcome as
   another release. `YarnClassicScenarioTest` replays the first and last release of every range, and every release
-  with `REWRITE_LOCK_EVERY_RELEASE`.
+  with `REWRITE_LOCK_EVERY_RELEASE`. `PROVEN` is 1.8.0 to 1.22.22 but 1.22.12; 1.7.0 resolves a focused workspace's
+  sibling from the registry, and earlier releases know no `--focus` and word many failures otherwise.

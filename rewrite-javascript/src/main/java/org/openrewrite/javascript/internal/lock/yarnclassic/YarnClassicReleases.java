@@ -39,7 +39,7 @@ public final class YarnClassicReleases {
      * gives what that release wrote ({@code YarnClassicScenarioTest} with {@code REWRITE_LOCK_EVERY_RELEASE}). 1.22.12
      * is none: the registry publishes it without its bundle, so it was never run.
      */
-    public static final String PROVEN = "1.19.1 - 1.22.11 || 1.22.13 - 1.22.22";
+    public static final String PROVEN = "1.8.0 - 1.22.11 || 1.22.13 - 1.22.22";
 
     private static final List<YarnClassicRelease> ALL = load();
 

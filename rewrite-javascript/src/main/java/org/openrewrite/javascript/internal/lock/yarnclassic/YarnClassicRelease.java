@@ -244,6 +244,16 @@ public final class YarnClassicRelease implements Comparable<YarnClassicRelease> 
         return atLeast(1, 17, 3);
     }
 
+    // yarn src/lockfile/index.js, src/package-request.js, src/resolvers/registries/npm-resolver.js (the integrity)
+
+    /**
+     * Yarn records each package's integrity, checks a tarball and a lock's entries against it, adds it to an entry
+     * that has none and writes it to the lock, from 1.10.0; before, a lock holds no integrity and yarn reads none.
+     */
+    boolean recordsIntegrity() {
+        return atLeast(1, 10, 0);
+    }
+
     // yarn src/package-request.js
 
     /**
@@ -262,6 +272,14 @@ public final class YarnClassicRelease implements Comparable<YarnClassicRelease> 
      */
     boolean namesTheRequestedPackageOfAMalformedResponse() {
         return atLeast(1, 12, 0);
+    }
+
+    /**
+     * {@code cleanRegistry} rewrites an http registry.npmjs.org url to registry.yarnpkg.com as an https one, from
+     * 1.10.0 ({@code NPM_REGISTRY_RE}); before, an https one only.
+     */
+    boolean cleansHttpNpmRegistryUrls() {
+        return atLeast(1, 10, 0);
     }
 
     // yarn src/resolvers/exotics/link-resolver.js

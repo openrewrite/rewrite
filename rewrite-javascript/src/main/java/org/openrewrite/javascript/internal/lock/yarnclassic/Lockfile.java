@@ -58,16 +58,22 @@ final class Lockfile {
 
     private final Map<Object, Map<String, @Nullable Object>> arrayEntries = new IdentityHashMap<>();
 
+    /**
+     * The release that read the lock, whose entries hold an integrity from 1.10.0.
+     */
+    private final YarnClassicRelease release;
+
     Lockfile(@Nullable Object cache, @Nullable String source, @Nullable String parseResultType) {
-        this(cache, source, parseResultType, null);
+        this(cache, source, parseResultType, null, YarnClassicRelease.PORTED);
     }
 
     private Lockfile(@Nullable Object cache, @Nullable String source, @Nullable String parseResultType,
-                     @Nullable Object lockfilev2) {
+                     @Nullable Object lockfilev2, YarnClassicRelease release) {
         this.source = source == null ? "" : source;
         this.cache = cache;
         this.parseResultType = parseResultType;
         this.lockfilev2 = lockfilev2;
+        this.release = release;
     }
 
     Lockfile() {
@@ -100,7 +106,7 @@ final class Lockfile {
             lockfilev2 = lockfile;
             lockfile = new PlainObject();
         }
-        return new Lockfile(lockfile, raw, parseResult == null ? null : parseResult.getType(), lockfilev2);
+        return new Lockfile(lockfile, raw, parseResult == null ? null : parseResult.getType(), lockfilev2, release);
     }
 
     static String getName(String pattern) {
@@ -158,6 +164,14 @@ final class Lockfile {
      * Fills a lock entry's defaults in place, as yarn does when it reads one.
      */
     static Map<String, @Nullable Object> explodeEntry(String pattern, Map<String, @Nullable Object> obj) {
+        return explodeEntry(pattern, obj, YarnClassicRelease.PORTED);
+    }
+
+    /**
+     * {@code explodeEntry} of {@code release}, which reads no integrity before 1.10.0.
+     */
+    static Map<String, @Nullable Object> explodeEntry(String pattern, Map<String, @Nullable Object> obj,
+                                                      YarnClassicRelease release) {
         or(obj, "optionalDependencies", new LinkedHashMap<String, Object>());
         or(obj, "dependencies", new LinkedHashMap<String, Object>());
         or(obj, "uid", obj.get("version"));
@@ -165,7 +179,7 @@ final class Lockfile {
         or(obj, "registry", "npm");
         or(obj, "name", getName(pattern));
         Object integrity = obj.get("integrity");
-        if (Js.truthy(integrity) && Js.truthy(Js.get(integrity, "isIntegrity"))) {
+        if (release.recordsIntegrity() && Js.truthy(integrity) && Js.truthy(Js.get(integrity, "isIntegrity"))) {
             obj.put("integrity", Ssri.parse(integrity, Ssri.Release.V5_3_0, Js::templateString));
         }
         return obj;
@@ -192,9 +206,9 @@ final class Lockfile {
                 }
                 pattern = (String) shrunk;
             } else if (shrunk instanceof Map) {
-                return explodeEntry(pattern, (Map<String, @Nullable Object>) shrunk);
+                return explodeEntry(pattern, (Map<String, @Nullable Object>) shrunk, release);
             } else if (shrunk instanceof List) {
-                return explodeEntry(pattern, arrayEntry((List<?>) shrunk));
+                return explodeEntry(pattern, arrayEntry((List<?>) shrunk), release);
             } else if (shrunk instanceof PlainObject.BuiltinFunction) {
                 throw new JsError(JsError.TYPE_ERROR, "Cannot assign to read only property 'name' of function '" +
                                                       shrunk + "'");
@@ -322,7 +336,9 @@ final class Lockfile {
             fields.put("version", pkg.getVersion());
             fields.put("uid", pkg.getUid());
             fields.put("resolved", remote.resolved);
-            fields.put("integrity", remote.integrity);
+            if (release.recordsIntegrity()) {
+                fields.put("integrity", remote.integrity);
+            }
             fields.put("registry", remote.registry);
             fields.put("dependencies", pkg.get("dependencies"));
             fields.put("peerDependencies", pkg.get("peerDependencies"));
