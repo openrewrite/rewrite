@@ -55,6 +55,10 @@ final class InstallDeps {
      */
     Install.Result installDeps(PnpmOptions opts, @Nullable List<Verification.Project> allProjects,
                                ProjectsGraph.@Nullable Result allProjectsGraph) {
+        if (Install.dryRun(opts) && Js.truthy(opts.get("pnprServer"))) {
+            throw new PnpmError("CONFIG_CONFLICT_DRY_RUN_WITH_PNPR_SERVER", "Cannot use --dry-run with a configured " +
+                    "pnpr server because the pnpr install path resolves and links through the server");
+        }
         NpmResolver store = stores.createNewStoreController(opts, opts.getFetchFullMetadata());
         verifyPacquetIdentity(opts, install::readEnvLockfile, inputs.getHost());
         Object runtimeOnFail = opts.get("runtimeOnFail");

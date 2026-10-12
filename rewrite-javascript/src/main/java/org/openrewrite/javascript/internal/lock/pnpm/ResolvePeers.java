@@ -511,7 +511,7 @@ final class ResolvePeers {
         }
         if (dedupeInjectedDeps) {
             DedupeInjectedDeps.dedupeInjectedDeps(dependenciesByProjectId, projects, depGraph, pathsByNodeId,
-                    lockfileDir, resolvedImporters, workspaceProjectIds);
+                    lockfileDir, resolvedImporters, workspaceProjectIds, release);
         }
         if (dedupePeerDependents) {
             List<Set<String>> duplicates = new ArrayList<>();
@@ -893,9 +893,14 @@ final class ResolvePeers {
             parentPkgs = new LinkedHashMap<>(parentParentPkgs);
             List<ParentPkgNode> parentPkgNodes = new ArrayList<>();
             for (Map.Entry<String, NodeId> child : children.entrySet()) {
-                if (ctx.allPeerDepNames.contains(child.getKey())) {
-                    parentPkgNodes.add(new ParentPkgNode(child.getKey(), ctx.dependenciesTree.get(child.getValue()),
-                            child.getValue(), parentNodeIds));
+                DependenciesTreeNode childNode = ctx.dependenciesTree.get(child.getValue());
+                // from 11.8.0 an npm-aliased child provides a peer of its real name too
+                // (PnpmRelease#providesPeersUnderAnAliasedChildsName)
+                String realName = childNode.getResolvedPackage().getName();
+                if (ctx.allPeerDepNames.contains(child.getKey()) ||
+                    !child.getKey().equals(realName) && ctx.allPeerDepNames.contains(realName) &&
+                    ctx.release.providesPeersUnderAnAliasedChildsName()) {
+                    parentPkgNodes.add(new ParentPkgNode(child.getKey(), childNode, child.getValue(), parentNodeIds));
                 }
             }
             Map<String, ParentRef> newParentPkgs = toPkgByName(parentPkgNodes);
@@ -959,9 +964,13 @@ final class ResolvePeers {
 
         PeersCacheItem cache = null;
         boolean isPure = allResolvedPeers.isEmpty() && allMissingPeers.isEmpty();
-        if (isPure) {
+        // from 11.8.0 a package reached again through a cycle, its children cut, is neither pure nor cached
+        // (PnpmRelease#leavesACycleReentryUncached)
+        boolean resolvedThroughCycle = ctx.parentDepPathsChain.contains(pkgIdWithPatchHash) &&
+                                       ctx.release.leavesACycleReentryUncached();
+        if (!resolvedThroughCycle && isPure) {
             ctx.purePkgs.add(pkgIdWithPatchHash);
-        } else {
+        } else if (!resolvedThroughCycle) {
             cache = new PeersCacheItem(new Deferred(ctx.microtasks), allResolvedPeers, allMissingPeers, nodeId);
             ctx.peersCache.computeIfAbsent(pkgIdWithPatchHash, k -> new ArrayList<>()).add(cache);
         }

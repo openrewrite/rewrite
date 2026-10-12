@@ -116,6 +116,12 @@ final class Install {
         return lockDir;
     }
 
+    // the install command's dryRun of 11.8.0, which resolves without writing the lock
+    // (PnpmRelease#stopsTheLockWriteOnADryRun); before, pnpm install does not read it
+    static boolean dryRun(PnpmOptions options) {
+        return options.isTrue("dryRun") && options.getRelease().stopsTheLockWriteOnADryRun();
+    }
+
     /**
      * The env document of the lock file in the lock's directory, as the install finds it; null without one.
      */
@@ -253,6 +259,9 @@ final class Install {
         String reason = null;
         if (read.isHadConflicts()) {
             reason = "merge conflicts";
+        } else if (dryRun(options)) {
+            // a check-only install resolves in full (isCheckOnlyInstall)
+            reason = "a dry run";
         } else if (!options.isTrue("preferFrozenLockfile")) {
             reason = "preferFrozenLockfile off";
         } else if (pruneLockfileImporters && wantedLockfile.getImporters().size() != projects.size()) {
@@ -388,7 +397,17 @@ final class Install {
 
         LockfileObject newLockfile = result.getNewLockfile();
         newLockfile.set("lockfileVersion", LockfileObject.LOCKFILE_VERSION);
-        String written = lockFile.writeWantedLockfile(newLockfile);
+        String written;
+        if (dryRun(options)) {
+            // a dry run writes no lock: the file is as the run found it, its env document as main.ts wrote it
+            written = lockFile.text();
+            if (written == null) {
+                throw new CannotKnow("what the regeneration ends with where a dry run writes no " +
+                                     LockfileReader.WANTED_LOCKFILE);
+            }
+        } else {
+            written = lockFile.writeWantedLockfile(newLockfile);
+        }
         ReportPeerDependencyIssues.reportPeerDependencyIssues(result.getPeerDependencyIssuesByProjects(),
                 options.getPeerDependencyRules(), options.isTrue("strictPeerDependencies"), options.getRelease());
         return written;

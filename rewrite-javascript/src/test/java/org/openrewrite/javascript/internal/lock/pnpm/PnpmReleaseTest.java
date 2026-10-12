@@ -1258,6 +1258,103 @@ class PnpmReleaseTest {
     }
 
     /**
+     * installing/deps-resolver resolveDependencies.ts getDepsToResolve (11.8.0): a child the lock pins to wrappy
+     * 1.0.1, which a direct dependency's 1.0.2 supersedes in the child's range "1", is resolved again to 1.0.2;
+     * before, the pin is kept. The recorded scenario small-bump-direct-ranged-dependent shows both.
+     */
+    @Test
+    void movesAStalePinUpToADirectVersionFrom1180() {
+        String lock = "lockfileVersion: '9.0'\n\nsettings:\n  autoInstallPeers: true\n" +
+                      "  excludeLinksFromLockfile: false\n\nimporters:\n\n  .: {}\n\npackages:\n\n" +
+                      "  wrappy@1.0.1:\n    resolution: {integrity: sha512-x}\n\nsnapshots:\n\n  wrappy@1.0.1: {}\n";
+        Map<String, PreferredVersions.Selector> wrappy = new LinkedHashMap<>();
+        wrappy.put("1.0.2", PreferredVersions.Selector.of("version", PreferredVersions.DIRECT_DEP_SELECTOR_WEIGHT));
+        wrappy.put("1.0.1", PreferredVersions.Selector.of("version", 1_000_000));
+        PreferredVersions.ByName preferred = PreferredVersions.ByName.of(new LinkedHashMap<>(
+          Collections.singletonMap("wrappy", wrappy)));
+        for (String release : Arrays.asList("11.8.0", "11.7.0")) {
+            LockfileObject lockfile = LockfileReader.read(lock, release(release)).getLockfile();
+            ResolveDependencies.ExtendedWantedDependency dep = ResolveDependencies.getDepsToResolve(
+              Collections.singletonList(new ResolveDependencies.WantedDependency("wrappy", "1", false, false)),
+              lockfile, Collections.singletonMap("default", REGISTRY), null, false,
+              Collections.singletonMap("wrappy", "1.0.1"), preferred, release(release)).get(0);
+            if ("11.8.0".equals(release)) {
+                assertThat(dep.getPreferredVersion()).isEqualTo("1.0.2");
+                assertThat(dep.getInfoFromLockfile()).isNull();
+            } else {
+                assertThat(dep.getPreferredVersion()).isNull();
+                assertThat(dep.getInfoFromLockfile()).isNotNull();
+            }
+        }
+    }
+
+    /**
+     * installing/env-installer verifyEnvLockfile.ts (11.8.0): a config dependency's version must be exact; before,
+     * nothing checks it.
+     */
+    @Test
+    void verifiesTheEnvDocumentsConfigDependenciesFrom1180() {
+        String env = "---\nlockfileVersion: '9.0'\n\nimporters:\n\n  .:\n    configDependencies:\n      foo:\n" +
+                     "        specifier: ^1.0.0\n        version: ^1.0.0\n\npackages:\n\n  foo@^1.0.0:\n" +
+                     "    resolution: {integrity: sha512-x}\n\nsnapshots:\n\n  foo@^1.0.0: {}\n\n---\n" + EMPTY_LOCK;
+        EnvLockfile envLockfile = EnvLockfile.readEnvLockfile(env);
+        assertThatThrownBy(() -> EnvInstaller.verifyEnvLockfile(envLockfile, release("11.8.0")))
+          .isInstanceOfSatisfying(PnpmError.class, e -> {
+              assertThat(e.getCode()).isEqualTo("ERR_PNPM_INVALID_CONFIG_DEP_VERSION");
+              assertThat(e.getMessage()).isEqualTo("The config dependency \"foo\" has an invalid version \"^1.0.0\"");
+          });
+        EnvInstaller.verifyEnvLockfile(envLockfile, release("11.7.0"));
+    }
+
+    /**
+     * installing/commands install.ts dryRunInstall (11.8.0): a dryRun setting resolves in full and writes no lock;
+     * before, pnpm install does not read it and finds the lock up to date.
+     */
+    @Test
+    void stopsTheLockWriteOnADryRunFrom1180() {
+        assertThat(install("11.8.0", "", "dryRun: true\n", WRAPPY_ONLY).getResolution()).isEqualTo("a dry run");
+        assertThat(install("11.7.0", "", "dryRun: true\n", WRAPPY_ONLY).getWritten()).isEqualTo(WRAPPY_LOCK);
+    }
+
+    /**
+     * config/reader index.ts parsePackageManager (11.8.0): @pnpm/exe@11.2.2 names @pnpm/exe; before, the split at
+     * each @ names "" and no version.
+     */
+    @Test
+    void splitsThePackageManagerAtItsVersionsAtFrom1180() {
+        Map<String, @Nullable Object> manifest = obj("{'packageManager':'@pnpm/exe@11.2.2'}");
+        PnpmOptions.WantedPackageManager after = PnpmOptions.getWantedPackageManager(manifest, release("11.8.0"));
+        PnpmOptions.WantedPackageManager before = PnpmOptions.getWantedPackageManager(manifest, release("11.7.0"));
+        assertThat(after).isNotNull();
+        assertThat(before).isNotNull();
+        assertThat(after.getName()).isEqualTo("@pnpm/exe");
+        assertThat(after.getVersion()).isEqualTo("11.2.2");
+        assertThat(before.getName()).isEqualTo("");
+    }
+
+    /**
+     * resolving/npm-resolver whichVersionIsPinned.ts (11.8.0): a catalog: specifier pins nothing; before, a catalog
+     * name that reads as a major pins the major.
+     */
+    @Test
+    void takesNoPinFromACatalogSpecifierFrom1180() {
+        assertThat(NpmResolver.whichVersionIsPinned("catalog:react18", release("11.8.0"))).isNull();
+        assertThat(NpmResolver.whichVersionIsPinned("catalog:react18", release("11.7.0"))).isEqualTo("major");
+        assertThat(NpmResolver.whichVersionIsPinned("^1.0.0", release("11.8.0"))).isEqualTo("major");
+    }
+
+    /**
+     * engine/runtime/node-resolver createNodeRuntimeVersionSpec (11.8.0): runtime:~22 is saved as ~22.0.0; before,
+     * as ^22.0.0.
+     */
+    @Test
+    void keepsARuntimeSpecifiersRangeOperatorFrom1180() {
+        assertThat(nodeRuntime("~22", null, "11.8.0").normalizedBareSpecifier).isEqualTo("runtime:~22.0.0");
+        assertThat(nodeRuntime("~22", null, "11.7.0").normalizedBareSpecifier).isEqualTo("runtime:^22.0.0");
+        assertThat(nodeRuntime("22", null, "11.8.0").normalizedBareSpecifier).isEqualTo("runtime:22.0.0");
+    }
+
+    /**
      * lockfile/utils toLockfileResolution.ts (11.5.3): a tarball URL is git-hosted in any case; before, only in
      * lower case, so that a mixed-case codeload URL is kept without the flag.
      */

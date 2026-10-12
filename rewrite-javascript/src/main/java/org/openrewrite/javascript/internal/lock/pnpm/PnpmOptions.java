@@ -500,7 +500,11 @@ public final class PnpmOptions {
             throw new CannotKnow("what pnpm makes of packageManager (" + Js.typeOf(packageManager) +
                                  ", where pnpm reads a string)");
         }
-        String[] pm = parsePackageManager((String) packageManager);
+        // from 11.8.0 split at the first @ after a scope's, everything after it the reference
+        // (PnpmRelease#splitsThePackageManagerAtItsVersionsAt); before, at each @
+        String[] old = parsePackageManager((String) packageManager);
+        String[] split = splitPackageManager((String) packageManager);
+        String[] pm = Arrays.equals(old, split) || !release.splitsThePackageManagerAtItsVersionsAt() ? old : split;
         String version = pm[1];
         if (version != null) {
             String cleanVersion = NodeSemver.valid(version, NodeSemver.Options.DEFAULT);
@@ -509,6 +513,25 @@ public final class PnpmOptions {
             }
         }
         return new WantedPackageManager(pm[0], version, null, false);
+    }
+
+    /**
+     * 11.8.0's {@code parsePackageManager}: the name before the first {@code @} after a scope's, the version after it
+     * up to a {@code +}.
+     */
+    static @Nullable String[] splitPackageManager(String packageManager) {
+        int separatorIndex = packageManager.startsWith("@") ? packageManager.indexOf('@', 1) :
+                packageManager.indexOf('@');
+        if (separatorIndex == -1) {
+            return new String[]{packageManager, null};
+        }
+        String name = packageManager.substring(0, separatorIndex);
+        String pmReference = packageManager.substring(separatorIndex + 1);
+        if (pmReference.contains(":")) {
+            return new String[]{name, null};
+        }
+        int hashIndex = pmReference.indexOf('+');
+        return new String[]{name, hashIndex == -1 ? pmReference : pmReference.substring(0, hashIndex)};
     }
 
     /**

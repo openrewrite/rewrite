@@ -995,7 +995,7 @@ final class ResolveDependencies {
             List<ExtendedWantedDependency> extendedWantedDeps = getDepsToResolve(wantedDependencies,
                     ctx.getWantedLockfile(), ctx.getRegistries(), options.getPreferredDependencies(),
                     options.isProceed() || ctx.isForceFullResolution(), options.getResolvedDependencies(),
-                    ctx.getRelease());
+                    preferredVersions, ctx.getRelease());
             List<Function<PostponedResolutionOpts, Promise<PeersResolutionResult>>> postponedResolutionsQueue =
                     new ArrayList<>();
             List<Function<ParentPkgAliases, Promise<PeersResolutionResult>>> postponedPeersResolutionQueue =
@@ -1362,6 +1362,23 @@ final class ResolveDependencies {
                                                            boolean proceed,
                                                            @Nullable Map<String, @Nullable String> resolvedDeps,
                                                            PnpmRelease release) {
+        return getDepsToResolve(wantedDependencies, wantedLockfile, registries, preferredDeps, proceed, resolvedDeps,
+                null, release);
+    }
+
+    /**
+     * {@code getDepsToResolve} of a package's children, whose {@code preferredVersions} 11.8.0 reads: a locked pin a
+     * direct dependency's higher version in range supersedes is resolved again to that version
+     * ({@link PnpmRelease#movesAStalePinUpToADirectVersion}).
+     */
+    static List<ExtendedWantedDependency> getDepsToResolve(List<WantedDependency> wantedDependencies,
+                                                           LockfileObject wantedLockfile,
+                                                           Map<String, String> registries,
+                                                           @Nullable Map<String, @Nullable String> preferredDeps,
+                                                           boolean proceed,
+                                                           @Nullable Map<String, @Nullable String> resolvedDeps,
+                                                           PreferredVersions.@Nullable ByName preferredVersions,
+                                                           PnpmRelease release) {
         Map<String, @Nullable String> resolvedDependencies = resolvedDeps == null ? Collections.emptyMap() :
                 resolvedDeps;
         Map<String, @Nullable String> preferredDependencies = preferredDeps == null ? Collections.emptyMap() :
@@ -1370,6 +1387,7 @@ final class ResolveDependencies {
         boolean proceedAll = proceed;
         for (WantedDependency wantedDependency : wantedDependencies) {
             String reference = null;
+            String preferredVersion = null;
             boolean proceedThis = proceedAll;
             String alias = wantedDependency.getAlias();
             if (alias != null && !alias.isEmpty()) {
@@ -1378,7 +1396,16 @@ final class ResolveDependencies {
                 if (Js.truthy(resolved) && (referenceSatisfiesWantedSpec(wantedLockfile, wantedDependency, resolved,
                         release) ||
                                             resolved.startsWith("file:"))) {
-                    reference = resolved;
+                    String[] pinned = resolved.startsWith("file:") ? null :
+                            getPinnedNameVer(wantedLockfile, resolved, alias);
+                    String higherDirectVersion = pinned == null ? null : findHigherDirectDepVersion(preferredVersions,
+                            pinned[0], pinned[1], wantedDependency.getBareSpecifier(), release);
+                    if (higherDirectVersion != null && release.movesAStalePinUpToADirectVersion()) {
+                        proceedThis = true;
+                        preferredVersion = higherDirectVersion;
+                    } else {
+                        reference = resolved;
+                    }
                 } else if (validRange(wantedDependency.getBareSpecifier(), release) != null && Js.truthy(preferred) &&
                            referenceSatisfiesWantedSpec(wantedLockfile, wantedDependency, preferred, release)) {
                     proceedThis = true;
@@ -1397,9 +1424,54 @@ final class ResolveDependencies {
                     extended.setProceed(true);
                 }
             }
-            extendedWantedDeps.add(new ExtendedWantedDependency(infoFromLockfile, proceedThis, wantedDependency));
+            ExtendedWantedDependency extended = new ExtendedWantedDependency(infoFromLockfile, proceedThis,
+                    wantedDependency);
+            extended.setPreferredVersion(preferredVersion);
+            extendedWantedDeps.add(extended);
         }
         return extendedWantedDeps;
+    }
+
+    // getPinnedNameVer (11.8.0): the name and version of the package a locked reference pins, null for none
+    private static String @Nullable [] getPinnedNameVer(LockfileObject lockfile, String reference, String alias) {
+        String depPath = DepPath.refToRelative(reference, alias);
+        if (depPath == null || lockfile.getPackages() == null) {
+            return null;
+        }
+        PackageSnapshot pkgSnapshot = lockfile.getPackages().get(depPath);
+        return pkgSnapshot == null ? null : nameVerFromPkgSnapshot(depPath, pkgSnapshot);
+    }
+
+    // findHigherDirectDepVersion (11.8.0): the highest version a direct dependency names that is above the pinned one
+    // and in the wanted range
+    private static @Nullable String findHigherDirectDepVersion(PreferredVersions.@Nullable ByName preferredVersions,
+                                                               @Nullable String pinnedName,
+                                                               @Nullable String pinnedVersion, String bareSpecifier,
+                                                               PnpmRelease release) {
+        if (preferredVersions == null || pinnedName == null || pinnedVersion == null ||
+            NodeSemver.valid(pinnedVersion, NodeSemver.Options.DEFAULT) == null ||
+            validRange(bareSpecifier, release) == null) {
+            return null;
+        }
+        Map<String, PreferredVersions.Selector> selectors = preferredVersions.get(pinnedName);
+        if (selectors == null) {
+            return null;
+        }
+        String best = null;
+        for (Map.Entry<String, PreferredVersions.Selector> selector : selectors.entrySet()) {
+            String candidate = selector.getKey();
+            Long weight = selector.getValue().getWeight();
+            if (weight != null && "version".equals(selector.getValue().getSelectorType()) &&
+                weight == PreferredVersions.DIRECT_DEP_SELECTOR_WEIGHT &&
+                NodeSemver.valid(candidate, NodeSemver.Options.DEFAULT) != null &&
+                NodeSemver.compare(candidate, pinnedVersion, NodeSemver.Options.DEFAULT) > 0 &&
+                release.underSemver(semver -> NodeSemver.satisfies(candidate, bareSpecifier,
+                        NodeSemver.Options.LOOSE.release(semver))) &&
+                (best == null || NodeSemver.compare(candidate, best, NodeSemver.Options.DEFAULT) > 0)) {
+                best = candidate;
+            }
+        }
+        return best;
     }
 
     private static boolean hasTransitivePeers(PackageSnapshot snapshot) {
@@ -2022,13 +2094,31 @@ final class ResolveDependencies {
         for (String alias : Js.ownKeys(deps)) {
             if (!ValidateNpmPackageName.validForOldPackages(alias, ValidateNpmPackageName.Release.V7_0_2) &&
                 release.rejectsAnInvalidDependencyName()) {
-                throw new PnpmError("INVALID_DEPENDENCY_NAME", parentPkgDescription + " contains a dependency with " +
-                        "an invalid name: " + Js.jsonStringify(alias), "A dependency name must be a valid npm " +
-                        "package name — a single `name` or `@scope/name` consisting of URL-friendly " +
-                        "characters, with no leading `.` or `_`, and not equal to reserved names such as " +
-                        "`node_modules`.");
+                throw invalidDependencyName(alias, parentPkgDescription);
             }
         }
+    }
+
+    /**
+     * {@code assertValidDependencyAliases} where a release asks it unconditionally (the env document's, from 11.8.0).
+     */
+    static void assertValidDependencyAliases(@Nullable Object deps, String parentPkgDescription) {
+        if (deps == null || deps == Js.UNDEFINED) {
+            return;
+        }
+        for (String alias : Js.ownKeys(deps)) {
+            if (!ValidateNpmPackageName.validForOldPackages(alias, ValidateNpmPackageName.Release.V7_0_2)) {
+                throw invalidDependencyName(alias, parentPkgDescription);
+            }
+        }
+    }
+
+    private static PnpmError invalidDependencyName(String alias, String parentPkgDescription) {
+        return new PnpmError("INVALID_DEPENDENCY_NAME", parentPkgDescription + " contains a dependency with " +
+                "an invalid name: " + Js.jsonStringify(alias), "A dependency name must be a valid npm " +
+                "package name — a single `name` or `@scope/name` consisting of URL-friendly " +
+                "characters, with no leading `.` or `_`, and not equal to reserved names such as " +
+                "`node_modules`.");
     }
 
     /**

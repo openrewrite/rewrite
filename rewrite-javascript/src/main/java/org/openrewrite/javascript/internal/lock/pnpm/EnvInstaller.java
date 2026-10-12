@@ -103,6 +103,7 @@ final class EnvInstaller {
         }
         if (depsToResolve.isEmpty()) {
             if (lockfileChanged) {
+                verifyEnvLockfile(envLockfile, release);
                 lockFile.writeEnvLockfile(envLockfile);
             }
             normalizeFromLockfile(envLockfile, release);
@@ -143,6 +144,7 @@ final class EnvInstaller {
             envLockfile.snapshots().put(pkgKey, snapshot);
         }
         PruneEnvLockfile.pruneEnvLockfile(envLockfile);
+        verifyEnvLockfile(envLockfile, release);
         lockFile.writeEnvLockfile(envLockfile);
         normalizeFromLockfile(envLockfile, release);
     }
@@ -319,6 +321,7 @@ final class EnvInstaller {
         merged.getPackages().putAll(lockfile.getPackages());
         PruneEnvLockfile.replacePrunedEntries(lockfileToUpdate, merged);
         if (save) {
+            verifyEnvLockfile(lockfileToUpdate, options.getRelease());
             lockFile.writeEnvLockfile(lockfileToUpdate);
         }
         return lockfileToUpdate;
@@ -358,10 +361,67 @@ final class EnvInstaller {
                 resolverOptions).getNewLockfile();
     }
 
+    /**
+     * verifyEnvLockfile.ts of 11.8.0, before each write of the env document and each install of its config
+     * dependencies ({@link PnpmRelease#verifiesTheEnvDocumentsConfigDependencies}): their names and those of their
+     * optional dependencies are package names, and each version exact; asked where the check fails.
+     */
+    static void verifyEnvLockfile(EnvLockfile envLockfile, PnpmRelease release) {
+        try {
+            verifyEnvLockfile(envLockfile);
+        } catch (PnpmError | JsError e) {
+            if (release.verifiesTheEnvDocumentsConfigDependencies()) {
+                throw e;
+            }
+        }
+    }
+
+    @SuppressWarnings("unchecked")
+    private static void verifyEnvLockfile(EnvLockfile envLockfile) {
+        Object configDeps = envLockfile.importer().get("configDependencies");
+        ResolveDependencies.assertValidDependencyAliases(configDeps, "The configDependencies in pnpm-lock.yaml");
+        if (!(configDeps instanceof Map)) {
+            return;
+        }
+        for (String name : Js.keys((Map<String, @Nullable Object>) configDeps)) {
+            Object entry = ((Map<String, @Nullable Object>) configDeps).get(name);
+            if (entry == null || entry == Js.UNDEFINED) {
+                throw new JsError(JsError.TYPE_ERROR, "Cannot read properties of " + Js.string(entry) +
+                                                      " (reading 'version')");
+            }
+            Object version = entry instanceof Map ? ((Map<String, @Nullable Object>) entry).get("version") : null;
+            assertValidConfigDepVersion(name, version);
+            Object snapshot = envLockfile.snapshots().get(name + "@" + Js.string(version == null ? Js.UNDEFINED :
+                    version));
+            Object optionalDeps = snapshot instanceof Map ?
+                    ((Map<String, @Nullable Object>) snapshot).get("optionalDependencies") : null;
+            if (optionalDeps == null || optionalDeps == Js.UNDEFINED) {
+                continue;
+            }
+            ResolveDependencies.assertValidDependencyAliases(optionalDeps, "The optionalDependencies of config " +
+                    "dependency \"" + name + "\" in pnpm-lock.yaml");
+            if (optionalDeps instanceof Map) {
+                for (String subdepName : Js.keys((Map<String, @Nullable Object>) optionalDeps)) {
+                    assertValidConfigDepVersion(subdepName, ((Map<String, @Nullable Object>) optionalDeps)
+                            .get(subdepName));
+                }
+            }
+        }
+    }
+
+    private static void assertValidConfigDepVersion(String name, @Nullable Object version) {
+        if (!(version instanceof String) || NodeSemver.valid((String) version, NodeSemver.Options.DEFAULT) == null) {
+            throw new PnpmError("INVALID_CONFIG_DEP_VERSION", "The config dependency \"" + name + "\" has an " +
+                    "invalid version \"" + Js.string(version == null ? Js.UNDEFINED : version) + "\"",
+                    "A config dependency version must be an exact semver version.");
+        }
+    }
+
     // installConfigDeps' normalizeFromLockfile: every locked config dependency and, from 11.2.0, optional
     // subdependency must have its packages entry and integrity
     @SuppressWarnings("unchecked")
     private static void normalizeFromLockfile(EnvLockfile lockfile, PnpmRelease release) {
+        verifyEnvLockfile(lockfile, release);
         Map<String, @Nullable Object> configDeps = lockfile.configDependencies();
         for (String pkgName : Js.keys(configDeps)) {
             Object entry = configDeps.get(pkgName);

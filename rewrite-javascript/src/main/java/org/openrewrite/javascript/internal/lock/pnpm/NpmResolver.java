@@ -421,9 +421,9 @@ final class NpmResolver {
         return result;
     }
 
-    static String calcPrefixedSpecifier(String prefix, String pkgName,
-                                        ResolveDependencies.WantedDependency wantedDependency, String version,
-                                        @Nullable String defaultPinnedVersion) {
+    String calcPrefixedSpecifier(String prefix, String pkgName,
+                                 ResolveDependencies.WantedDependency wantedDependency, String version,
+                                 @Nullable String defaultPinnedVersion) {
         String range = calcRange(version, wantedDependency, defaultPinnedVersion);
         String alias = wantedDependency.getAlias();
         if (alias == null || alias.isEmpty() || pkgName.equals(alias)) {
@@ -570,7 +570,7 @@ final class NpmResolver {
                     specifier.equals(prefix + "~")) {
                     return specifier;
                 }
-                String pinned = whichVersionIsPinned(specifier);
+                String pinned = whichVersionIsPinned(specifier, release);
                 if ("major".equals(pinned)) {
                     return prefix + "^";
                 } else if ("minor".equals(pinned)) {
@@ -587,7 +587,7 @@ final class NpmResolver {
             return prefix + version;
         }
         String pinnedVersion = wantedDependency.getPrevSpecifier() != null ?
-                whichVersionIsPinned(wantedDependency.getPrevSpecifier()) : null;
+                whichVersionIsPinned(wantedDependency.getPrevSpecifier(), release) : null;
         return prefix + createVersionSpec(version, pinnedVersion != null ? pinnedVersion : defaultPinnedVersion);
     }
 
@@ -607,8 +607,8 @@ final class NpmResolver {
         return "npm:" + spec.getName() + "@" + range;
     }
 
-    private static String calcRange(String version, ResolveDependencies.WantedDependency wantedDependency,
-                                    @Nullable String defaultPinnedVersion) {
+    private String calcRange(String version, ResolveDependencies.WantedDependency wantedDependency,
+                             @Nullable String defaultPinnedVersion) {
         if (NodeSemver.valid(version, NodeSemver.Options.DEFAULT) != null) {
             List<Object> prerelease = NodeSemver.prerelease(version, NodeSemver.Options.DEFAULT);
             if (prerelease != null && !prerelease.isEmpty()) {
@@ -617,11 +617,11 @@ final class NpmResolver {
         }
         String pinnedVersion = null;
         if (wantedDependency.getPrevSpecifier() != null && !wantedDependency.getPrevSpecifier().isEmpty()) {
-            pinnedVersion = whichVersionIsPinned(wantedDependency.getPrevSpecifier());
+            pinnedVersion = whichVersionIsPinned(wantedDependency.getPrevSpecifier(), release);
         }
         if (pinnedVersion == null && wantedDependency.getBareSpecifier() != null &&
             !wantedDependency.getBareSpecifier().isEmpty()) {
-            pinnedVersion = whichVersionIsPinned(wantedDependency.getBareSpecifier());
+            pinnedVersion = whichVersionIsPinned(wantedDependency.getBareSpecifier(), release);
         }
         if (pinnedVersion == null) {
             pinnedVersion = defaultPinnedVersion;
@@ -646,6 +646,16 @@ final class NpmResolver {
     /**
      * whichVersionIsPinned.ts over semver-utils' {@code parseRange}.
      */
+    /**
+     * {@link #whichVersionIsPinned(String)} as {@code release} reads it: from 11.8.0 a {@code catalog:} specifier pins
+     * nothing ({@link PnpmRelease#takesNoPinFromACatalogSpecifier}); before, its catalog's name reads as a version.
+     */
+    static @Nullable String whichVersionIsPinned(String spec, PnpmRelease release) {
+        String pinned = whichVersionIsPinned(spec);
+        return pinned != null && spec.startsWith("catalog:") && release.takesNoPinFromACatalogSpecifier() ? null :
+                pinned;
+    }
+
     static @Nullable String whichVersionIsPinned(String spec) {
         int colonIndex = spec.indexOf(':');
         if (colonIndex != -1) {

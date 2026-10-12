@@ -77,7 +77,11 @@ final class NodeRuntimeResolver {
         }
         List<Object> variants = readNodeAssets(fetch, nodeMirrorBaseUrl, version,
                 "release".equals(parsed[0]) && release.verifiesTheNodeShasumsSignature());
-        String range = version.equals(versionSpec) ? version : "^" + version;
+        // from 11.8.0 the saved range keeps the ^ or ~ of the specifier it replaces, else pins the version
+        // (PnpmRelease#keepsARuntimeSpecifiersRangeOperator); before, ^ unless the specifier was the version
+        String caret = version.equals(versionSpec) ? version : "^" + version;
+        String kept = createNodeRuntimeVersionSpec(versionSpec, version, wantedDependency.getPrevSpecifier());
+        String range = caret.equals(kept) || !release.keepsARuntimeSpecifiersRangeOperator() ? caret : kept;
         result.id = "node@runtime:" + version;
         result.normalizedBareSpecifier = "runtime:" + range;
         Map<String, @Nullable Object> manifest = new LinkedHashMap<>();
@@ -88,6 +92,26 @@ final class NodeRuntimeResolver {
         result.resolution.put("type", "variations");
         result.resolution.put("variants", variants);
         return result;
+    }
+
+    // createNodeRuntimeVersionSpec (11.8.0)
+    private static String createNodeRuntimeVersionSpec(String versionSpec, String resolvedVersion,
+                                                       @Nullable String prevSpecifier) {
+        List<Object> prerelease = NodeSemver.valid(resolvedVersion, NodeSemver.Options.DEFAULT) == null ? null :
+                NodeSemver.prerelease(resolvedVersion, NodeSemver.Options.DEFAULT);
+        if (resolvedVersion.equals(versionSpec) || prerelease != null && !prerelease.isEmpty()) {
+            return resolvedVersion;
+        }
+        String source = prevSpecifier != null && prevSpecifier.startsWith("runtime:") ?
+                prevSpecifier.substring("runtime:".length()) : versionSpec;
+        String spec = source.contains("/") ? source.split("/", -1)[1] : source;
+        if (spec.startsWith("^")) {
+            return "^" + resolvedVersion;
+        }
+        if (spec.startsWith("~")) {
+            return "~" + resolvedVersion;
+        }
+        return resolvedVersion;
     }
 
     private static List<Object> readNodeAssets(RegistryMetadata fetch, String nodeMirrorBaseUrl, String version,

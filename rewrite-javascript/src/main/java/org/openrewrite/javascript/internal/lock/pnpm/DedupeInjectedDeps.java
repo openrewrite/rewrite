@@ -40,7 +40,7 @@ final class DedupeInjectedDeps {
                                    Map<String, DependenciesGraphNode> depGraph, Map<NodeId, String> pathsByNodeId,
                                    String lockfileDir,
                                    Map<String, ResolveDependencyTree.ResolvedImporter> resolvedImporters,
-                                   Set<String> workspaceProjectIds) {
+                                   Set<String> workspaceProjectIds, PnpmRelease release) {
         Map<String, Map<String, String[]>> injectedDepsByProjects = new LinkedHashMap<>();
         for (ResolvePeers.ProjectToResolve project : projects) {
             for (Map.Entry<String, NodeId> direct : project.getDirectNodeIdsByAlias().entrySet()) {
@@ -60,9 +60,18 @@ final class DedupeInjectedDeps {
         for (Map.Entry<String, Map<String, String[]>> injected : injectedDepsByProjects.entrySet()) {
             Map<String, String> deduped = new LinkedHashMap<>();
             for (Map.Entry<String, String[]> dep : injected.getValue().entrySet()) {
-                Map<String, String> children = depGraph.get(dep.getValue()[0]).getChildren();
+                DependenciesGraphNode node = depGraph.get(dep.getValue()[0]);
+                Map<String, String> children = node.getChildren();
                 Map<String, String> targetProjectDeps = dependenciesByProjectId.get(dep.getValue()[1]);
-                if (targetProjectDeps == null && !children.isEmpty()) {
+                if (targetProjectDeps == null) {
+                    // a target the install did not resolve: from 11.8.0 deduped by a dep path without peers,
+                    // children or not (PnpmRelease#dedupesAnUnresolvedInjectedTargetByItsPeers); before, by having
+                    // no children
+                    boolean withoutPeers = node.getResolvedPackage().getPkgIdWithPatchHash().equals(dep.getValue()[0]);
+                    if (withoutPeers == children.isEmpty() ? withoutPeers :
+                            release.dedupesAnUnresolvedInjectedTargetByItsPeers() ? withoutPeers : children.isEmpty()) {
+                        deduped.put(dep.getKey(), dep.getValue()[1]);
+                    }
                     continue;
                 }
                 boolean isSubset = true;

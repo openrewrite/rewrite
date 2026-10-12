@@ -258,6 +258,15 @@ public final class PnpmRelease {
     }
 
     /**
+     * The {@code packageManager} field is split at the first {@code @} after a scope's, everything after it the
+     * reference ({@code @pnpm/exe@11.2.2} names @pnpm/exe), from 11.8.0; before, at each {@code @}, the first two
+     * parts the name and the reference.
+     */
+    boolean splitsThePackageManagerAtItsVersionsAt() {
+        return atLeast(11, 8, 0);
+    }
+
+    /**
      * {@code trustLockfile} skips the verification of the lock's resolutions, from 11.3.0; before, it is no setting.
      */
     boolean readsTrustLockfile() {
@@ -400,6 +409,14 @@ public final class PnpmRelease {
         return atLeast(11, 5, 3);
     }
 
+    /**
+     * A Node.js runtime's saved specifier keeps the {@code ^} or {@code ~} of the one it replaces, a prerelease or
+     * another specifier pinning the version, from 11.8.0; before, {@code ^} unless the specifier was the version.
+     */
+    boolean keepsARuntimeSpecifiersRangeOperator() {
+        return atLeast(11, 8, 0);
+    }
+
     // @pnpm/config.package-is-installable src/index.ts, inferPlatformFromPackageName.ts
 
     /**
@@ -446,6 +463,14 @@ public final class PnpmRelease {
      */
     boolean picksTheLowestMatureVersion() {
         return atLeast(11, 22, 0);
+    }
+
+    /**
+     * A {@code catalog:} specifier pins nothing, its catalog entry's specifier deciding, from 11.8.0
+     * (whichVersionIsPinned); before, a catalog name that reads as a version ({@code catalog:react18}) pins.
+     */
+    boolean takesNoPinFromACatalogSpecifier() {
+        return atLeast(11, 8, 0);
     }
 
     /**
@@ -534,6 +559,16 @@ public final class PnpmRelease {
         return atLeast(11, 7, 0);
     }
 
+    // @pnpm/installing.commands src/install.ts (dryRunInstall)
+
+    /**
+     * A {@code dryRun} setting resolves in full and writes no lock ({@code ERR_PNPM_CONFIG_CONFLICT_DRY_RUN_WITH_PNPR
+     * _SERVER} beside a pnpr server), from 11.8.0; before, pnpm install does not read it.
+     */
+    boolean stopsTheLockWriteOnADryRun() {
+        return atLeast(11, 8, 0);
+    }
+
     // @pnpm/installing.env-installer src/resolveOptionalSubdeps.ts, resolveAndInstallConfigDeps.ts,
     // installConfigDeps.ts
 
@@ -550,6 +585,15 @@ public final class PnpmRelease {
      */
     boolean marksAConfigDependencysOptionalDependenciesOptional() {
         return atLeast(11, 2, 1);
+    }
+
+    /**
+     * The env document's config dependencies, and their optional dependencies, must have package names and exact
+     * versions ({@code ERR_PNPM_INVALID_DEPENDENCY_NAME}, {@code ERR_PNPM_INVALID_CONFIG_DEP_VERSION}) before each
+     * write of the document and each install of them, from 11.8.0 (verifyEnvLockfile); before, nothing checks them.
+     */
+    boolean verifiesTheEnvDocumentsConfigDependencies() {
+        return atLeast(11, 8, 0);
     }
 
     // @pnpm/installing.deps-resolver src/resolveDependencies.ts, getWantedDependencies.ts,
@@ -587,6 +631,14 @@ public final class PnpmRelease {
      */
     boolean readsALockedPackageFromItsSnapshot() {
         return atLeast(11, 5, 2);
+    }
+
+    /**
+     * A child the lock pins below a version a direct dependency names, which the child's range admits, is resolved
+     * again to that version, from 11.8.0 (getDepsToResolve's findHigherDirectDepVersion); before, the pin is kept.
+     */
+    boolean movesAStalePinUpToADirectVersion() {
+        return atLeast(11, 8, 0);
     }
 
     /**
@@ -640,6 +692,32 @@ public final class PnpmRelease {
      */
     boolean keepsALockedPeerInItsOwnScope() {
         return atLeast(11, 7, 0);
+    }
+
+    /**
+     * A package reached again through a cycle, its children cut there, is neither pure nor cached for its later
+     * occurrences, from 11.8.0 (pnpm/pnpm#5108); before, it is, and those occurrences lose their transitive peers.
+     */
+    boolean leavesACycleReentryUncached() {
+        return atLeast(11, 8, 0);
+    }
+
+    /**
+     * An npm-aliased child ({@code ts4: npm:typescript@4}) provides a peer of its real name to its siblings, from
+     * 11.8.0; before, only of its alias.
+     */
+    boolean providesPeersUnderAnAliasedChildsName() {
+        return atLeast(11, 8, 0);
+    }
+
+    // @pnpm/installing.deps-resolver src/dedupeInjectedDeps.ts
+
+    /**
+     * An injected workspace project whose own project the install did not resolve is a link where its dep path has no
+     * peers, children or not, from 11.8.0; before, where it has no children.
+     */
+    boolean dedupesAnUnresolvedInjectedTargetByItsPeers() {
+        return atLeast(11, 8, 0);
     }
 
     // @pnpm/installing.deps-installer src/install/index.ts (installSome's catalogMode)
