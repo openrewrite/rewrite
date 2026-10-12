@@ -9,7 +9,7 @@ regenerates through the port of its own resolver, and the shared engine of ADR 0
 what `internal.lock` holds, and how the recipes write overrides and follow catalogs for each package manager; and
 again: one port per library, the host's registries as the user's config, corepack, the regenerators by module.
 Amended 2026-10-11: later releases of the ported pnpm and Yarn majors; the npm release that built the LST,
-with every npm release from 7.1.1 reproduced beside the one ported; every Yarn 4.x release reproduced beside
+with every npm release from 7.0.4 reproduced beside the one ported; every Yarn 4.x release reproduced beside
 4.10.3; Bun releases reproduced beside 1.3.10; and Yarn 1 releases reproduced beside 1.22.22. Amended 2026-10-12:
 pnpm releases reproduced beside 11.2.2; and the manifests a port is given.
 
@@ -296,6 +296,9 @@ allow write different locks for the plainest edit (every release before 10.8.0 d
   branches on it where upstream changed, 11.17.0's code unchanged beside it. A library npm bundles at several releases
   is ported once with its release as an option (`NodeSemver`, `Ssri`, `PickManifest`, `PackageJson`, `MapWorkspaces`),
   and `NpmRelease` names the one each npm bundles.
+- **An older generation is a class beside the ported one.** Where a release's placement or tree model differs
+  throughout rather than at a few points, the older module is ported whole and chosen through one question:
+  `LegacyPlacement` (7.20.2's placement) before 7.20.3, and `LegacyNode` (arborist 1.0.14's tree model) before 7.1.1.
 - **What is reproduced.** `NpmReleases.PROVEN` is the range of releases for which every recorded scenario replays as
   that release wrote it. A marker naming a release outside it, or one npm never published, is cannot-know.
 - **How a release is proven.** Every npm release from 7.0.0 is run over every recorded scenario against a frozen
