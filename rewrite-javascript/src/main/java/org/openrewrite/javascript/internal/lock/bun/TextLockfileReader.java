@@ -69,8 +69,9 @@ final class TextLockfileReader {
         return new TextLockfileReader(options).parseIntoBinaryLockfile(root);
     }
 
-    private static ParseError error(String error, String message) {
-        return new ParseError(error, message);
+    private ParseError error(String error, String message) {
+        return new ParseError(options.getRelease().reportsEveryLockfileErrorAsInvalidLockfile() ? "InvalidLockfile" :
+                error, message);
     }
 
     private Lockfile parseIntoBinaryLockfile(Json.Expr root) {
@@ -83,8 +84,13 @@ final class TextLockfileReader {
             throw error("InvalidLockfileVersion", "Invalid lockfile version");
         }
         int lockfileVersion = (int) num;
-        if (lockfileVersion != 0 && lockfileVersion != 1) {
-            throw error("UnknownLockfileVersion", "Unknown lockfile version");
+        BunRelease release = options.getRelease();
+        if (num > (release.keepsTheLockfileVersionItRead() ? Lockfile.TEXT_LOCKFILE_VERSION_SCOPED_OVERRIDES :
+                Lockfile.TEXT_LOCKFILE_VERSION_CURRENT)) {
+            throw error("UnknownLockfileVersion", release.explainsAnUnsupportedLockfileVersion() ?
+                    "Unsupported lockfile version " + (long) num + ". This lockfile was likely created by a newer " +
+                    "version of Bun. (This is Bun v" + release + ", which supports lockfile versions up to " +
+                    Lockfile.TEXT_LOCKFILE_VERSION_SCOPED_OVERRIDES + ".)" : "Unknown lockfile version");
         }
         lockfile.textLockfileVersion = lockfileVersion;
 
@@ -350,6 +356,7 @@ final class TextLockfileReader {
                 throw error("UnexpectedResolution", e.getMessage());
             }
 
+            boolean npmUrlNeedsIntegrity = false;
             if (res.tag == Resolution.Tag.NPM) {
                 if (i >= pkgInfo.size()) {
                     throw error("InvalidPackageInfo", "Missing npm registry");
@@ -363,6 +370,8 @@ final class TextLockfileReader {
                     res = res.withUrl(buildURL(options.getRelease().expandsEmptyRegistryToScope() ?
                             options.scopeForPackageName(nameStr) : BunOptions.DEFAULT_REGISTRY, nameStr, res.version));
                 } else {
+                    npmUrlNeedsIntegrity = !urlIsUnderRegistry(registryStr, options.scopeForPackageName(nameStr)) &&
+                                           !urlIsUnderRegistry(registryStr, BunOptions.DEFAULT_REGISTRY);
                     res = res.withUrl(registryStr);
                 }
             }
@@ -454,6 +463,11 @@ final class TextLockfileReader {
                         throw error("InvalidPackageInfo", "Expected a string");
                     }
                     pkg.meta.integrity = Integrity.parse(integrityStr);
+                    if (lockfileVersion >= Lockfile.TEXT_LOCKFILE_VERSION_STRICT && npmUrlNeedsIntegrity &&
+                        !pkg.meta.integrity.tag.isSupported()) {
+                        throw error("InvalidPackageInfo", "Missing integrity hash for npm package resolved to a " +
+                                                          "tarball URL outside the configured registry");
+                    }
                     break;
                 }
                 case LOCAL_TARBALL:
@@ -474,6 +488,12 @@ final class TextLockfileReader {
                     String bunTagStr = pkgInfo.get(i++).asString();
                     if (bunTagStr == null) {
                         throw error("InvalidPackageInfo", "Expected a string");
+                    }
+                    boolean enforceSafeTag = res.tag == Resolution.Tag.GITHUB ?
+                            options.getRelease().rejectsAnUnsafeGitHubTag() :
+                            lockfileVersion >= Lockfile.TEXT_LOCKFILE_VERSION_STRICT;
+                    if (enforceSafeTag && !Repository.isSafeResolvedTag(bunTagStr)) {
+                        throw error("InvalidPackageInfo", "Invalid git dependency tag");
                     }
                     res = res.withRepository(res.repository.withResolved(bunTagStr));
                     if (options.getRelease().carriesTarballIntegrity() && i < pkgInfo.size()) {
@@ -794,6 +814,15 @@ final class TextLockfileReader {
             end = lockfile.dependencies.size();
         }
         return new int[]{off, end - off};
+    }
+
+    /**
+     * {@code url_is_under_registry} (from 1.4.0): the registry, without its trailing slash, is a prefix of the url
+     * that ends it or is followed by a {@code /}.
+     */
+    static boolean urlIsUnderRegistry(String url, String registry) {
+        String prefix = Strings.withoutTrailingSlash(registry);
+        return url.startsWith(prefix) && (url.length() == prefix.length() || url.charAt(prefix.length()) == '/');
     }
 
     /**

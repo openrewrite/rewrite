@@ -54,7 +54,8 @@ final class TextLockfileWriter {
         int[] indent = {0};
         writer.append("{\n");
         incIndent(writer, indent);
-        writer.append("\"lockfileVersion\": ").append(Lockfile.TEXT_LOCKFILE_VERSION_CURRENT).append(",\n");
+        writer.append("\"lockfileVersion\": ").append(release.keepsTheLockfileVersionItRead() ?
+                versionToWrite(lockfile) : Lockfile.TEXT_LOCKFILE_VERSION_CURRENT).append(",\n");
         writeIndent(writer, indent);
         if (release.writesConfigVersion()) {
             writer.append("\"configVersion\": ").append(configVersion).append(",\n");
@@ -300,7 +301,10 @@ final class TextLockfileWriter {
                         writer.append("[\"");
                         Strings.appendJsonString(writer, pkg.name, false);
                         writer.append('@').append(res.version).append("\", ");
-                        writer.append('"').append(res.url.startsWith(DEFAULT_REGISTRY) ? "" : res.url).append("\", ");
+                        boolean underDefault = release.matchesTheDefaultRegistryAtAPathBoundary() ?
+                                TextLockfileReader.urlIsUnderRegistry(res.url, BunOptions.DEFAULT_REGISTRY) :
+                                res.url.startsWith(DEFAULT_REGISTRY);
+                        writer.append('"').append(underDefault ? "" : res.url).append("\", ");
                         writePackageInfoObject(writer, dep.behavior, depsBuf, pkgDepsSortBuf, pkg);
                         writer.append(", \"").append(pkg.meta.integrity).append("\"]");
                         break;
@@ -530,6 +534,41 @@ final class TextLockfileWriter {
             decIndent(writer, indent);
         }
         writer.append("},");
+    }
+
+    /**
+     * {@code Stringifier::version_to_write} (from 1.4.0): a lock read keeps its version, 0 as 1, unless its overrides
+     * hold scoped rules; otherwise, among the packages written, an npm package without a supported integrity whose
+     * tarball is outside the default registry, or a git package whose tag is unsafe, holds it at 1; else it is 3 with
+     * scoped rules and 2 without.
+     */
+    private static int versionToWrite(Lockfile lockfile) {
+        int loaded = lockfile.textLockfileVersion;
+        boolean hasScoped = lockfile.overrides.hasScoped();
+        if (!hasScoped && loaded < Lockfile.TEXT_LOCKFILE_VERSION_SCOPED_OVERRIDES) {
+            return Math.max(loaded, Lockfile.TEXT_LOCKFILE_VERSION_CURRENT);
+        }
+        Tree.Iterator iter = new Tree.Iterator(lockfile);
+        Tree.Next node;
+        while ((node = iter.next()) != null) {
+            for (int depId : node.dependencies) {
+                int pkgId = lockfile.resolutions.get(depId);
+                if (pkgId == INVALID_PACKAGE_ID) {
+                    continue;
+                }
+                Package pkg = lockfile.packages.get(pkgId);
+                Resolution res = pkg.resolution;
+                if (res.tag == Resolution.Tag.NPM) {
+                    if (!pkg.meta.integrity.tag.isSupported() &&
+                        !TextLockfileReader.urlIsUnderRegistry(res.url, BunOptions.DEFAULT_REGISTRY)) {
+                        return Lockfile.TEXT_LOCKFILE_VERSION_CURRENT;
+                    }
+                } else if (res.tag == Resolution.Tag.GIT && !Repository.isSafeResolvedTag(res.repository.resolved)) {
+                    return Lockfile.TEXT_LOCKFILE_VERSION_CURRENT;
+                }
+            }
+        }
+        return hasScoped ? Lockfile.TEXT_LOCKFILE_VERSION_SCOPED_OVERRIDES : Lockfile.TEXT_LOCKFILE_VERSION_STRICT;
     }
 
     static void writeIndent(StringBuilder writer, int[] indent) {

@@ -83,10 +83,11 @@ final class DependencyVersion {
                                 if (url.startsWith("://")) {
                                     url = url.substring("://".length());
                                     if (url.startsWith("github.com/") &&
-                                        HostedGitInfo.isGitHubShorthand(url.substring("github.com/".length()))) {
+                                        isGitHubShorthand(url.substring("github.com/".length()), release)) {
                                         return GITHUB;
                                     }
-                                    return hgiToTag(dependency, GIT);
+                                    return release.readsGitSpecsAsHostedGitInfoDoes() ? hgiToTag(dependency, GIT) :
+                                            GIT;
                                 }
                             } else if (c == '+') {
                                 if (url.startsWith("+ssh:") || url.startsWith("+file:")) {
@@ -106,15 +107,16 @@ final class DependencyVersion {
                                     }
                                     if (isHttp) {
                                         if (url.startsWith("github.com/") &&
-                                            HostedGitInfo.isGitHubShorthand(url.substring("github.com/".length()))) {
+                                            isGitHubShorthand(url.substring("github.com/".length()), release)) {
                                             return GITHUB;
                                         }
-                                        return hgiToTag(dependency, GIT);
+                                        return release.readsGitSpecsAsHostedGitInfoDoes() ?
+                                                hgiToTag(dependency, GIT) : GIT;
                                     }
                                 }
                             } else if (c == 'h') {
                                 if (url.startsWith("hub:") &&
-                                    HostedGitInfo.isGitHubShorthand(url.substring("hub:".length()))) {
+                                    isGitHubShorthand(url.substring("hub:".length()), release)) {
                                     return GITHUB;
                                 }
                             }
@@ -139,9 +141,12 @@ final class DependencyVersion {
                                 if (Dependency.isGitHubTarballPath(path)) {
                                     return TARBALL;
                                 }
-                                if (HostedGitInfo.isGitHubShorthand(path)) {
+                                if (isGitHubShorthand(path, release)) {
                                     return GITHUB;
                                 }
+                            }
+                            if (!release.readsGitSpecsAsHostedGitInfoDoes()) {
+                                return isGitHost(url) ? GIT : TARBALL;
                             }
                             return hgiToTag(dependency, TARBALL);
                         }
@@ -151,6 +156,18 @@ final class DependencyVersion {
                     if (dependency.startsWith("ssh")) {
                         String url = dependency.substring("ssh".length());
                         if (url.length() > 2) {
+                            if (!release.readsGitSpecsAsHostedGitInfoDoes()) {
+                                if (url.charAt(0) == ':' && url.startsWith("://")) {
+                                    url = url.substring("://".length());
+                                }
+                                if (url.length() > 4 && url.startsWith("git@")) {
+                                    url = url.substring("git@".length());
+                                }
+                                if (isGitHost(url)) {
+                                    return GIT;
+                                }
+                                break;
+                            }
                             return hgiToTag(dependency, GIT);
                         }
                     }
@@ -176,7 +193,7 @@ final class DependencyVersion {
                     if (Dependency.isTarball(dependency)) {
                         return TARBALL;
                     }
-                    if (HostedGitInfo.isGitHubShorthand(dependency)) {
+                    if (isGitHubShorthand(dependency, release)) {
                         return GITHUB;
                     }
                     if (Dependency.isSCPLikePath(dependency)) {
@@ -214,16 +231,27 @@ final class DependencyVersion {
             if (Dependency.isTarball(dependency)) {
                 return TARBALL;
             }
-            if (HostedGitInfo.isGitHubShorthand(dependency)) {
+            if (isGitHubShorthand(dependency, release)) {
                 return GITHUB;
             }
             if (Dependency.isSCPLikePath(dependency)) {
-                return hgiToTag(dependency, GIT);
+                return release.readsGitSpecsAsHostedGitInfoDoes() ? hgiToTag(dependency, GIT) : GIT;
             }
             if (dependency.indexOf('|') < 0) {
                 return DIST_TAG;
             }
             return NPM;
+        }
+
+        private static boolean isGitHubShorthand(String dependency, BunRelease release) {
+            return release.readsGitSpecsAsHostedGitInfoDoes() ? HostedGitInfo.isGitHubShorthand(dependency) :
+                    Dependency.isGitHubRepoPath(dependency);
+        }
+
+        // before 1.3.2: the host before the url's first dot is one of Repository.Hosts
+        private static boolean isGitHost(String url) {
+            int dot = url.indexOf('.');
+            return dot >= 0 && Repository.HOSTS.containsKey(url.substring(0, dot));
         }
 
         // only a git host's shortcut representation is .github; when no host is recognized the caller's default stands
@@ -358,13 +386,13 @@ final class DependencyVersion {
     static @Nullable DependencyVersion parse(String alias, @Nullable Long aliasHash, String dependency,
                                              BunRelease release) {
         String dep = Strings.trimLeft(dependency, " \t\n\r");
-        return parseWithTag(alias, aliasHash, dep, Tag.infer(dep, release), dependency);
+        return parseWithTag(alias, aliasHash, dep, Tag.infer(dep, release), dependency, release);
     }
 
     static @Nullable DependencyVersion parseWithOptionalTag(String alias, @Nullable Long aliasHash, String dependency,
                                                             @Nullable Tag tag, BunRelease release) {
         String dep = Strings.trimLeft(dependency, " \t\n\r");
-        return parseWithTag(alias, aliasHash, dep, tag != null ? tag : Tag.infer(dep, release), dependency);
+        return parseWithTag(alias, aliasHash, dep, tag != null ? tag : Tag.infer(dep, release), dependency, release);
     }
 
     /**
@@ -372,7 +400,7 @@ final class DependencyVersion {
      * spec itself.
      */
     static @Nullable DependencyVersion parseWithTag(String alias, @Nullable Long aliasHash, String dependency, Tag tag,
-                                                    String literal) {
+                                                    String literal, BunRelease release) {
         switch (tag) {
             case NPM: {
                 String input = dependency;
@@ -431,6 +459,9 @@ final class DependencyVersion {
                 return new DependencyVersion(Tag.GIT, literal, new Repository("", repo, committish, "", ""));
             }
             case GITHUB: {
+                if (!release.readsGitSpecsAsHostedGitInfoDoes()) {
+                    return parseGitHubRepoPath(dependency, literal);
+                }
                 HostedGitInfo info = HostedGitInfo.fromUrl(dependency);
                 if (info == null) {
                     return null;
@@ -502,6 +533,58 @@ final class DependencyVersion {
                 return new DependencyVersion(Tag.CATALOG, literal, Strings.trim(group, Strings.WHITESPACE_CHARS));
             }
         }
+    }
+
+    /**
+     * A GitHub spec until 1.3.2: without its {@code github:}, {@code git://github.com/} or
+     * {@code [git+]http[s]://github.com/}, the owner is what precedes the last slash before any {@code #}, the repo
+     * what follows it, without a URL's {@code .git}, and the committish what follows the {@code #}.
+     */
+    private static DependencyVersion parseGitHubRepoPath(String dependency, String literal) {
+        boolean fromUrl = false;
+        String input = dependency;
+        if (input.startsWith("github:")) {
+            input = input.substring("github:".length());
+        } else if (input.startsWith("git://github.com/")) {
+            input = input.substring("git://github.com/".length());
+            fromUrl = true;
+        } else {
+            if (input.startsWith("git+")) {
+                input = input.substring("git+".length());
+            }
+            if (input.startsWith("http")) {
+                String url = input.substring("http".length());
+                if (url.length() > 2) {
+                    if (url.charAt(0) == ':' && url.startsWith("://")) {
+                        url = url.substring("://".length());
+                    } else if (url.charAt(0) == 's' && url.startsWith("s://")) {
+                        url = url.substring("s://".length());
+                    }
+                    if (url.startsWith("github.com/")) {
+                        input = url.substring("github.com/".length());
+                        fromUrl = true;
+                    }
+                }
+            }
+        }
+        int hashIndex = 0;
+        int slashIndex = 0;
+        for (int i = 0; i < input.length(); i++) {
+            char c = input.charAt(i);
+            if (c == '/') {
+                slashIndex = i;
+            } else if (c == '#') {
+                hashIndex = i;
+                break;
+            }
+        }
+        String repo = hashIndex == 0 ? input.substring(slashIndex + 1) : input.substring(slashIndex + 1, hashIndex);
+        if (fromUrl && repo.endsWith(".git")) {
+            repo = repo.substring(0, repo.length() - ".git".length());
+        }
+        String committish = hashIndex == 0 ? "" : input.substring(hashIndex + 1);
+        return new DependencyVersion(Tag.GITHUB, literal,
+                new Repository(input.substring(0, slashIndex), repo, committish, "", ""));
     }
 
     @Override

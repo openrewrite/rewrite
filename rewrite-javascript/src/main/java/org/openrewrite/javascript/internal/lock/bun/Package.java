@@ -584,7 +584,7 @@ final class Package {
                     if (options.isLinkWorkspacePackages() && npm.version.satisfies(workspaceVersion)) {
                         String path = workspacePath;
                         DependencyVersion dep = DependencyVersion.parseWithTag(externalAlias, aliasHash, path,
-                                DependencyVersion.Tag.WORKSPACE, path);
+                                DependencyVersion.Tag.WORKSPACE, path, lockfile.release);
                         if (dep != null) {
                             dependencyVersion = new DependencyVersion(dep.tag, dependencyVersion.literal, dep.value);
                         }

@@ -44,8 +44,8 @@ final class Cleaner {
     static Lockfile clean(Lockfile old) {
         Cleaner cloner = new Cleaner(old);
         Lockfile lockfile = cloner.lockfile;
-        lockfile.overrides = old.overrides.cloneMap();
-        lockfile.catalogs = old.catalogs.cloneMap();
+        lockfile.overrides = old.overrides.cloneMap(old.release);
+        lockfile.catalogs = old.catalogs.cloneMap(old.release);
 
         Package root = old.rootPackage();
         if (root == null) {
@@ -68,6 +68,9 @@ final class Cleaner {
         cloner.flush();
 
         lockfile.trustedDependencies = old.trustedDependencies;
+        if (old.release.keepsTheLockfileVersionItRead()) {
+            lockfile.textLockfileVersion = old.textLockfileVersion;
+        }
         lockfile.patchedDependencies = new LinkedHashMap<>(old.patchedDependencies);
         return lockfile;
     }
@@ -112,7 +115,7 @@ final class Cleaner {
         mapping[pkg.meta.id] = newPackage.meta.id;
 
         for (Dependency oldDep : oldDependencies) {
-            lockfile.dependencies.add(oldDep.cloneDependency());
+            lockfile.dependencies.add(oldDep.cloneDependency(old.release));
             lockfile.resolutions.add(INVALID_PACKAGE_ID);
         }
 

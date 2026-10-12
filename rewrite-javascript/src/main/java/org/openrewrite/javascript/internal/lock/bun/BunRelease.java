@@ -99,6 +99,57 @@ public final class BunRelease implements Comparable<BunRelease> {
         return atLeast(1, 3, 2);
     }
 
+    // src/install/lockfile/bun.lock.rs
+
+    /**
+     * bun.lock's versions 2 and 3, from 1.4.0 (bun#31539, bun#31556, bun#31602, bun#38333): a lock keeps the version
+     * it was read with, 0 written as 1; a new one is 2, or 1 where a package it writes would not read back at 2, and
+     * a lock whose overrides hold scoped rules is 3 unless it is held at 1 ({@code Stringifier::version_to_write}). A
+     * lock of version 2 or more rejects an npm package whose tarball is outside the registries without a supported
+     * integrity, and a git package whose tag is no single safe path component. Before, every lock is written at 1,
+     * and a version above 1 is unknown.
+     */
+    boolean keepsTheLockfileVersionItRead() {
+        return atLeast(1, 4, 0);
+    }
+
+    /**
+     * An npm package's tarball is the default registry's, written {@code ""}, where the registry without its trailing
+     * slash ends the url or is followed by {@code /} ({@code url_is_under_registry}), from 1.4.0 (bun#31129); before,
+     * wherever the url starts with it.
+     */
+    boolean matchesTheDefaultRegistryAtAPathBoundary() {
+        return atLeast(1, 4, 0);
+    }
+
+    /**
+     * A GitHub package whose tag is no single safe path component ({@code repository::is_safe_resolved_tag}) is an
+     * invalid package at every lockfile version, from 1.4.0; before, any tag is read.
+     */
+    boolean rejectsAnUnsafeGitHubTag() {
+        return atLeast(1, 4, 0);
+    }
+
+    /**
+     * A lockfile version the release does not read is {@code Unsupported lockfile version <n>. This lockfile was likely
+     * created by a newer version of Bun. (This is Bun v<release>, which supports lockfile versions up to 3.)}, from
+     * 1.4.0 (bun#32465); before, {@code Unknown lockfile version}.
+     */
+    boolean explainsAnUnsupportedLockfileVersion() {
+        return atLeast(1, 4, 0);
+    }
+
+    // src/install/error.rs
+
+    /**
+     * A bun.lock that parses as JSON but not as a lock fails to load as {@code InvalidLockfile}, whatever the parser's
+     * own error, from 1.4.0 ({@code From<bun_lock::ParseError> for Error}); before, as the parser's error, such as
+     * {@code InvalidPackageInfo}.
+     */
+    boolean reportsEveryLockfileErrorAsInvalidLockfile() {
+        return atLeast(1, 4, 0);
+    }
+
     // src/install: dependency.zig, lockfile/Package.zig, bun.lock.zig, Tree.zig, PackageManagerEnqueue.zig
 
     /**
@@ -113,6 +164,20 @@ public final class BunRelease implements Comparable<BunRelease> {
      */
     boolean tellsDependencyGroupsApart() {
         return atLeast(1, 2, 19);
+    }
+
+    // src/install/dependency.zig Tag.infer and parseWithTag
+
+    /**
+     * A git or GitHub spec is told and read as npm's hosted-git-info does ({@code hosted_git_info.isGitHubShorthand},
+     * {@code HostedGitInfo.fromUrl}), from 1.3.2 (bun#24138). Before, a GitHub shorthand is a path of letters, digits
+     * and {@code -} with a slash, {@code .} and {@code _} after it, and at most one {@code #} after it
+     * ({@code isGitHubRepoPath}); a URL is git when its host is github, gitlab or bitbucket ({@code Repository.Hosts}),
+     * else a tarball, and any {@code git://} or {@code git+http} spec is git; and a GitHub spec's owner and repo are
+     * split at its last slash before any {@code #}, a URL's repo without {@code .git}.
+     */
+    boolean readsGitSpecsAsHostedGitInfoDoes() {
+        return atLeast(1, 3, 2);
     }
 
     // src/install: dependency.zig Tag.infer, lockfile/Package.zig parseWithJSON, CatalogMap.zig, bun.lock.zig

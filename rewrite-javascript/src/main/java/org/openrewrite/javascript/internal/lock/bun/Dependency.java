@@ -66,9 +66,9 @@ final class Dependency {
      * The clone parses the spec again with the tag it had: a dependency that was linked to a workspace parses its
      * literal as a workspace spec.
      */
-    Dependency cloneDependency() {
+    Dependency cloneDependency(BunRelease release) {
         DependencyVersion parsed = DependencyVersion.parseWithTag(name, Wyhash11.stringHash(name), version.literal,
-                version.tag, version.literal);
+                version.tag, version.literal, release);
         return new Dependency(nameHash, name, parsed == null ? DependencyVersion.ZEROED : parsed, behavior);
     }
 
@@ -113,6 +113,51 @@ final class Dependency {
             }
         }
         return false;
+    }
+
+    /**
+     * {@code isGitHubRepoPath}, which tells a GitHub shorthand until 1.3.2: {@code user/repo} or
+     * {@code user/repo#ref} of letters, digits and {@code -}, with {@code .} and {@code _} after the first slash and
+     * one {@code #} after it, ending in neither.
+     */
+    static boolean isGitHubRepoPath(String dependency) {
+        if (dependency.length() < 3) {
+            return false;
+        }
+        int hashIndex = 0;
+        int firstSlashIndex = 0;
+        for (int i = 0; i < dependency.length(); i++) {
+            char c = dependency.charAt(i);
+            switch (c) {
+                case '/':
+                    if (i == 0) {
+                        return false;
+                    }
+                    if (firstSlashIndex == 0) {
+                        firstSlashIndex = i;
+                    }
+                    break;
+                case '#':
+                    if (i == 0 || hashIndex > 0 || firstSlashIndex == 0) {
+                        return false;
+                    }
+                    hashIndex = i;
+                    break;
+                case '.':
+                case '_':
+                    if (firstSlashIndex == 0) {
+                        return false;
+                    }
+                    break;
+                default:
+                    if (!(c == '-' || c >= 'a' && c <= 'z' || c >= 'A' && c <= 'Z' || c >= '0' && c <= '9')) {
+                        return false;
+                    }
+                    break;
+            }
+        }
+        return hashIndex != dependency.length() - 1 && firstSlashIndex > 0 &&
+               firstSlashIndex != dependency.length() - 1;
     }
 
     static boolean isGitHubTarballPath(String dependency) {

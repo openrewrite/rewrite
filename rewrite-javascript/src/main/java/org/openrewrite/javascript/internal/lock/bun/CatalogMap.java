@@ -138,15 +138,15 @@ final class CatalogMap {
         return out;
     }
 
-    CatalogMap cloneMap() {
+    CatalogMap cloneMap(BunRelease release) {
         CatalogMap out = new CatalogMap();
         for (Map.Entry<String, Dependency> e : defaultMap.entrySet()) {
-            out.defaultMap.put(e.getKey(), e.getValue().cloneDependency());
+            out.defaultMap.put(e.getKey(), e.getValue().cloneDependency(release));
         }
         for (Map.Entry<String, LinkedHashMap<String, Dependency>> group : groups.entrySet()) {
             LinkedHashMap<String, Dependency> newGroup = new LinkedHashMap<>();
             for (Map.Entry<String, Dependency> e : group.getValue().entrySet()) {
-                newGroup.put(e.getKey(), e.getValue().cloneDependency());
+                newGroup.put(e.getKey(), e.getValue().cloneDependency(release));
             }
             out.groups.put(group.getKey(), newGroup);
         }

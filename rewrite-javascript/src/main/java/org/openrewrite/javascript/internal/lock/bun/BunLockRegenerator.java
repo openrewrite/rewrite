@@ -459,6 +459,9 @@ public final class BunLockRegenerator {
             }
             Json.Expr rootJson = Json.parse(rootManifest);
             manager.lockfile = new Lockfile(release);
+            if (release.keepsTheLockfileVersionItRead() && loaded != null) {
+                manager.lockfile.textLockfileVersion = loaded.textLockfileVersion;
+            }
             Package root = new Package();
             root.parseWithJSON(manager.lockfile, options, log, "", rootJson, Features.MAIN, manifests);
             manager.registerAliases(manager.lockfile, root);
@@ -489,14 +492,14 @@ public final class BunLockRegenerator {
             allNameHashes.addAll(lockfile.overrides.map.keySet());
         }
 
-        managerLockfile.overrides = lockfile.overrides.cloneMap();
-        managerLockfile.catalogs = lockfile.catalogs.cloneMap();
+        managerLockfile.overrides = lockfile.overrides.cloneMap(lockfile.release);
+        managerLockfile.catalogs = lockfile.catalogs.cloneMap(lockfile.release);
         managerLockfile.trustedDependencies = lockfile.trustedDependencies == null ? null :
                 new LinkedHashSet<>(lockfile.trustedDependencies);
 
         List<Integer> oldResolutions = new ArrayList<>(managerLockfile.resolutions.subList(oldOff, oldOff + oldLen));
         for (int i = 0; i < len; i++) {
-            managerLockfile.dependencies.add(newDependencies.get(i).cloneDependency());
+            managerLockfile.dependencies.add(newDependencies.get(i).cloneDependency(lockfile.release));
             managerLockfile.resolutions.add(mapping[i] != INVALID_PACKAGE_ID ? oldResolutions.get(mapping[i]) :
                     INVALID_PACKAGE_ID);
         }

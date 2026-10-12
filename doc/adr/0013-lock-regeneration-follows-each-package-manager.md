@@ -294,7 +294,8 @@ The Bun port follows Bun 1.3.10 and reproduces other releases beside it, as the 
   scope registry from 1.3.7, the integrity of a git, github or tarball package from 1.3.10, an unnamed root's entry
   from 1.3.0, catalogs from 1.2.14. A name `peerDependenciesMeta` alone lists is an optional peer of `"*"` from
   1.3.14; the peer queue is drained before the wait for the peers from 1.3.11, processed once before it from 1.3.1;
-  a workspaces glob a later `!` pattern negates is no workspace from 1.3.0; bunfig's minimum release age is read
+  a workspaces glob a later `!` pattern negates is no workspace from 1.3.0; a git or GitHub spec is told and read as
+  hosted-git-info does from 1.3.2; bunfig's minimum release age is read
   from 1.3.0, a quoted .npmrc value expanded from 1.3.5, the root's own catalogs from 1.2.19; and before 1.2.19 a
   package's dependency groups are not told apart (their order, the root's diff, the workspace bit). The patch file
   errors are worded as each release words them.
@@ -312,10 +313,11 @@ The Bun port follows Bun 1.3.10 and reproduces other releases beside it, as the 
   A `git clone` bun failed is `cannot-know`: what git reaches over the network is not the engine's to know, as npm's
   export takes the filesystem npm ran on. `BunScenarioTest` replays the first and last release of every range, and
   every release with `REWRITE_LOCK_EVERY_RELEASE`.
-- **What is reproduced.** `BunReleases.PROVEN` is 1.3.2 to 1.3.14: every scenario replays as each of them, and every
+- **What is reproduced.** `BunReleases.PROVEN` is 1.3.0 to 1.3.14: every scenario replays as each of them, and every
   upstream change in the files the port names between them and 1.3.10 that reaches a lock is a question. Every
-  scenario replays as 1.2.0 to 1.3.1 too, but those miss questions still (the git and GitHub specs before 1.3.2, and
-  changes before 1.2.13 in bun.lock's writer and reader, the overrides and the globs), so they stay cannot-know.
+  scenario replays as 1.2.0 to 1.2.23 too, but those miss questions still (changes before 1.2.13 in bun.lock's writer
+  and reader, the overrides and the globs; .npmrc, semver and the workspaces object before 1.2.24), so they stay
+  cannot-know.
   1.4.x, a Rust translation that writes lockfileVersion 2, is not reproduced.
 
 ## Amendment 2026-10-11: Yarn classic releases

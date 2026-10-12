@@ -105,6 +105,38 @@ class BunReleaseTest {
     }
 
     /**
+     * dependency.zig (1.3.2): a git or GitHub spec is told and read as hosted-git-info does; before, by
+     * {@code isGitHubRepoPath} and {@code Repository.Hosts}, the GitHub repo split at the last slash.
+     */
+    @Test
+    void tellsGitSpecsAsHostedGitInfoDoesFrom132() {
+        BunRelease later = BunRelease.of("1.3.2");
+        BunRelease earlier = BunRelease.of("1.3.1");
+        assertThat(DependencyVersion.Tag.infer("user/repo#semver:^1.0.0", later)).isEqualTo(DependencyVersion.Tag.GITHUB);
+        assertThat(DependencyVersion.Tag.infer("user/repo#semver:^1.0.0", earlier))
+          .isEqualTo(DependencyVersion.Tag.DIST_TAG);
+        assertThat(DependencyVersion.Tag.infer("user/repo/x", later)).isEqualTo(DependencyVersion.Tag.DIST_TAG);
+        assertThat(DependencyVersion.Tag.infer("user/repo/x", earlier)).isEqualTo(DependencyVersion.Tag.GITHUB);
+        assertThat(DependencyVersion.Tag.infer("https://www.github.com/user/repo", later))
+          .isEqualTo(DependencyVersion.Tag.GIT);
+        assertThat(DependencyVersion.Tag.infer("https://www.github.com/user/repo", earlier))
+          .isEqualTo(DependencyVersion.Tag.TARBALL);
+        assertThat(DependencyVersion.Tag.infer("ssh://git@gitlab.com/user/repo.git", earlier))
+          .isEqualTo(DependencyVersion.Tag.GIT);
+
+        Repository repository = requireNonNull(DependencyVersion.parse("r", null, "github:user/repo.git#v1", earlier))
+          .repository();
+        assertThat(repository.owner).isEqualTo("user");
+        assertThat(repository.repo).isEqualTo("repo.git");
+        assertThat(repository.committish).isEqualTo("v1");
+        Repository fromUrl = requireNonNull(DependencyVersion.parse("r", null, "git://github.com/user/repo.git", earlier))
+          .repository();
+        assertThat(fromUrl.repo).isEqualTo("repo");
+        assertThat(requireNonNull(DependencyVersion.parse("r", null, "github:user/repo.git#v1", later)).repository().repo)
+          .isEqualTo("repo");
+    }
+
+    /**
      * bun.lock.zig (1.3.7): a {@code ""} registry is the package's scope registry; before, npmjs.
      */
     @Test

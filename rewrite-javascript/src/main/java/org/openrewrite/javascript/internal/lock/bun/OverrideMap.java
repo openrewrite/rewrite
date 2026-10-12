@@ -53,6 +53,13 @@ final class OverrideMap {
         return dep == null ? null : dep.version;
     }
 
+    /**
+     * Whether a rule is scoped to a parent or a version range ({@code has_scoped}, from 1.4.0).
+     */
+    boolean hasScoped() {
+        return false;
+    }
+
     void sort() {
         List<Map.Entry<Long, Dependency>> entries = new ArrayList<>(map.entrySet());
         entries.sort((l, r) -> Strings.order(l.getValue().name, r.getValue().name));
@@ -62,10 +69,10 @@ final class OverrideMap {
         }
     }
 
-    OverrideMap cloneMap() {
+    OverrideMap cloneMap(BunRelease release) {
         OverrideMap out = new OverrideMap();
         for (Map.Entry<Long, Dependency> e : map.entrySet()) {
-            out.map.put(e.getKey(), e.getValue().cloneDependency());
+            out.map.put(e.getKey(), e.getValue().cloneDependency(release));
         }
         return out;
     }

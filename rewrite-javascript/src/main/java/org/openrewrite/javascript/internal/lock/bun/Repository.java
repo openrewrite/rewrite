@@ -15,10 +15,27 @@
  */
 package org.openrewrite.javascript.internal.lock.bun;
 
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.Map;
+
 /**
  * Port of bun's src/install/repository.zig {@code Repository} (bun 1.3.10), without the git operations.
  */
 final class Repository {
+
+    /**
+     * {@code Repository.Hosts}: the git hosts with the top-level domain of each.
+     */
+    static final Map<String, String> HOSTS;
+
+    static {
+        Map<String, String> hosts = new HashMap<>();
+        hosts.put("bitbucket", ".org");
+        hosts.put("github", ".com");
+        hosts.put("gitlab", ".com");
+        HOSTS = Collections.unmodifiableMap(hosts);
+    }
 
     final String owner;
     final String repo;
@@ -36,6 +53,26 @@ final class Repository {
 
     Repository withResolved(String resolved) {
         return new Repository(owner, repo, committish, resolved, packageName);
+    }
+
+    /**
+     * {@code is_safe_resolved_tag} (src/install/repository.rs, from 1.4.0): a lock's {@code .bun-tag} is one path
+     * component of at most 256 letters, digits, {@code -}, {@code _} and {@code .}, neither {@code .} nor {@code ..},
+     * that does not start with {@code -}.
+     */
+    static boolean isSafeResolvedTag(String resolved) {
+        if (resolved.isEmpty() || resolved.length() > 256 || resolved.charAt(0) == '-' || ".".equals(resolved) ||
+            "..".equals(resolved)) {
+            return false;
+        }
+        for (int i = 0; i < resolved.length(); i++) {
+            char c = resolved.charAt(i);
+            if (!(c >= 'a' && c <= 'z' || c >= 'A' && c <= 'Z' || c >= '0' && c <= '9' || c == '-' || c == '_' ||
+                  c == '.')) {
+                return false;
+            }
+        }
+        return true;
     }
 
     static Repository parseAppendGit(String input) {

@@ -42,7 +42,22 @@ public final class Lockfile {
 
     static final int TEXT_LOCKFILE_VERSION_CURRENT = 1;
 
-    int textLockfileVersion = TEXT_LOCKFILE_VERSION_CURRENT;
+    /**
+     * From 1.4.0, the bun.lock version whose reading checks what a package's tarball and tag may be
+     * ({@code Version::V2}).
+     */
+    static final int TEXT_LOCKFILE_VERSION_STRICT = 2;
+
+    /**
+     * From 1.4.0, the bun.lock version whose overrides may hold scoped rules, and the newest it reads
+     * ({@code Version::V3}, {@code Version::CURRENT}).
+     */
+    static final int TEXT_LOCKFILE_VERSION_SCOPED_OVERRIDES = 3;
+
+    /**
+     * The version of the bun.lock read; for a new lock, the current one.
+     */
+    int textLockfileVersion;
 
     final List<Package> packages = new ArrayList<>();
     final List<Dependency> dependencies = new ArrayList<>();
@@ -79,6 +94,8 @@ public final class Lockfile {
 
     Lockfile(BunRelease release) {
         this.release = release;
+        this.textLockfileVersion = release.keepsTheLockfileVersionItRead() ? TEXT_LOCKFILE_VERSION_SCOPED_OVERRIDES :
+                TEXT_LOCKFILE_VERSION_CURRENT;
     }
 
     /**
