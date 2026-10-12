@@ -311,9 +311,10 @@ public final class BunRelease implements Comparable<BunRelease> {
      * rule of its name whose parent, the parent's range and its own declared range match best, else the plain one;
      * bun.lock writes the scoped rules grouped by parent at version 3 ({@link #keepsTheLockfileVersionItRead}) and
      * reads such groups at every version; the diff and the edges resolved again count them. Before, every key is a
-     * plain rule as written, but that {@code resolutions} drops a leading {@code **}{@code /} and skips a key with
-     * another slash; an object counts for its {@code "."} alone; a {@code $name} value is the root's dependency itself,
-     * written under that dependency's name; and an {@code overrides} that is no object fails the install.
+     * plain rule as written, but that {@code resolutions} drops a leading {@code **}{@code /} and skips a key holding a
+     * slash past its scope's; an object counts for its {@code "."} alone; a {@code $name} value is the root's
+     * dependency itself, written under that dependency's name; and an {@code overrides} that is no object fails the
+     * install.
      */
     boolean readsScopedOverrides() {
         return atLeast(1, 4, 0);
