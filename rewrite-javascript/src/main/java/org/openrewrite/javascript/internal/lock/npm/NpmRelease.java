@@ -327,6 +327,14 @@ public final class NpmRelease implements Comparable<NpmRelease> {
     }
 
     /**
+     * {@code [_loadPeerSet]}: a peer whose current node does not satisfy it is loaded into the peer set where what the
+     * edge would load can replace that node, from npm 7.11.0; before, the current node stands.
+     */
+    boolean replacesPeerWithReplacement() {
+        return atLeast(7, 11, 0);
+    }
+
+    /**
      * {@code #inflateAncientLockfile}: the dependency flags are reset before they are calculated again, from npm
      * 11.6.3.
      */
@@ -612,6 +620,24 @@ public final class NpmRelease implements Comparable<NpmRelease> {
     }
 
     // @npmcli/arborist load-virtual.js
+
+    /**
+     * {@code [assignBundles]} reads which children a node bundles from the entries' {@code inBundle} only in a lock
+     * older than version 2, and only children the node depends on, from npm 7.11.0; before, in a lock of any version,
+     * every flagged child.
+     */
+    boolean assignsBundlesOfOldLocksOnly() {
+        return atLeast(7, 11, 0);
+    }
+
+    /**
+     * {@code [assignBundles]} takes a child flagged {@code inBundle} to be bundled whether or not its parent depends on
+     * it, from npm 7.1.1 (arborist 2.0.0) until 7.11.0; before, arborist 1's {@code [assignParentage]} only one its
+     * parent depends on.
+     */
+    boolean bundlesChildrenWithoutEdges() {
+        return atLeast(7, 1, 1);
+    }
 
     /**
      * {@code #resolveLinks}: a failure to assign a link target's package.json is swallowed like a failure to read it,

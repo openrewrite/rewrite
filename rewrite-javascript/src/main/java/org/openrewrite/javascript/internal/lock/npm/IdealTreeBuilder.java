@@ -1158,10 +1158,12 @@ public final class IdealTreeBuilder {
             }
 
             Node current = edge.getTo();
-            Node dep = nodeFromEdge(edge, null, null, required);
-            if (dep.canReplace(current)) {
-                nodeFromEdge(edge, nodeParent, null, required);
-                continue;
+            if (options.getRelease().replacesPeerWithReplacement()) {
+                Node dep = nodeFromEdge(edge, null, null, required);
+                if (dep.canReplace(current)) {
+                    nodeFromEdge(edge, nodeParent, null, required);
+                    continue;
+                }
             }
 
             if (conflictOK || !required.contains(edge.getFrom())) {
