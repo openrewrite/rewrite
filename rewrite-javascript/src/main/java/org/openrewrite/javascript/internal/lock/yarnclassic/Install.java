@@ -173,7 +173,8 @@ final class Install {
             if (!errors.isEmpty()) {
                 // each error is the package's name and version, then the message
                 throw Rejected.rejects(errors.get(0).contains(": The engine ") ? SharedError.UNSUPPORTED_ENGINE :
-                        SharedError.UNSUPPORTED_PLATFORM, null, errors.get(0) + " " + e.getMessage());
+                        SharedError.UNSUPPORTED_PLATFORM, null, errors.get(0) + " " +
+                                                              YarnClassicLockRegenerator.report(e, config.getRelease()));
             }
             throw e;
         }
@@ -346,7 +347,7 @@ final class Install {
         Manifest projectManifestJson = NormalizeManifest.normalizeManifest(Config.manifest(Fs.readJson(
                 "package.json", rootText), "_registry"), "", "", true, config.isLooseSemver(), config.getRelease());
         Manifest manifest = projectManifestJson;
-        boolean workspaceRootFolder = Config.isWorkspaceRoot(projectManifestJson);
+        boolean workspaceRootFolder = Config.isWorkspaceRoot(projectManifestJson, config.getRelease());
 
         Map<String, @Nullable Object> resolutions = new LinkedHashMap<>();
         Js.assign(resolutions, projectManifestJson.get("resolutions"));
@@ -501,6 +502,7 @@ final class Install {
             Map<String, @Nullable Object> manifest = lockfile.getLocked(pattern);
             if (resolverPatternsAreSameAsInLockfile && (manifest == null ||
                     !Objects.equals(manifest.get("resolved"), entry.get("resolved")) ||
+                    config.getRelease().keepsPrebuiltVariants() &&
                     !DeepEqual.deepEqual(manifest.get("prebuiltVariants"), entry.get("prebuiltVariants")))) {
                 resolverPatternsAreSameAsInLockfile = false;
             }

@@ -866,6 +866,257 @@ class YarnClassicReleaseTest {
     }
 
     /**
+     * .babelrc: from 1.4.0 to 1.5.1 no error of yarn's own is an {@code instanceof MessageError}, so that cli/index.js
+     * reports it as unexpected (the sweep's small-version-not-found and its kin).
+     */
+    @ParameterizedTest(name = "{0}")
+    @CsvSource(delimiter = '|', value = {
+            "1.3.2|Couldn't find any versions for \"x\" that matches \"^9.0.0\"",
+            "1.4.0|An unexpected error occurred: \"Couldn't find any versions for \\\"x\\\" that matches " +
+            "\\\"^9.0.0\\\"\".",
+            "1.5.1|An unexpected error occurred: \"Couldn't find any versions for \\\"x\\\" that matches " +
+            "\\\"^9.0.0\\\"\".",
+            "1.6.0|Couldn't find any versions for \"x\" that matches \"^9.0.0\"",
+    })
+    void reportsItsOwnErrorsAsItsReleaseDoes(String version, String reported) {
+        assertThat(YarnClassicLockRegenerator.report(new MessageError(
+                "Couldn't find any versions for \"x\" that matches \"^9.0.0\""), release(version))).isEqualTo(reported);
+    }
+
+    /**
+     * npm-resolver.js {@code findVersionInRegistryResponse}, as yarn 1.2.1, 1.3.2 and 1.5.0 answered a packument whose
+     * versions are empty or missing: the highest satisfying version before 1.3.1, the latest tag from 1.3.1 (a version
+     * of empty versions is none: yarn then names the package not found), the response refused from 1.5.0.
+     */
+    @ParameterizedTest(name = "{0} {1}")
+    @CsvSource(delimiter = '|', value = {
+            "1.2.1|{}|Couldn't find any versions for \"x\" that matches \"^1.0.0\"",
+            "1.3.2|{}|none",
+            "1.5.0|{}|No valid versions found for \"x\". The package may be unpublished.",
+            "1.2.1|-|TypeError: Cannot convert undefined or null to object",
+            "1.3.2|-|TypeError: Cannot read properties of undefined (reading '1.0.0')",
+            "1.5.0|-|Received malformed response from registry for \"x\". The registry may be down.",
+    })
+    void readsAResponseWithoutVersionsAsItsReleaseDoes(String version, String versions, String outcome) {
+        Object body = object("{\"name\": \"x\", \"dist-tags\": {\"latest\": \"1.0.0\"}" +
+                             ("-".equals(versions) ? "" : ", \"versions\": " + versions) + "}");
+        String answer;
+        try {
+            Object found = NpmResolver.findVersionInRegistryResponse(config(version), "x", "^1.0.0", body);
+            answer = found == null ? "none" : String.valueOf(found);
+        } catch (MessageError e) {
+            answer = e.getMessage();
+        } catch (JsError e) {
+            answer = e.toString();
+        }
+        assertThat(answer).isEqualTo(outcome);
+    }
+
+    /**
+     * config.js, as yarn 1.3.2, 1.4.0, 1.5.0, 1.5.1 and 1.6.0 installed these roots: workspaces that are a string fail
+     * in {@code patterns.map} before 1.4.0, are refused from 1.4.0, make no workspace root from 1.5.0
+     * ({@code extractWorkspaces}); a nohoist the config disables is thrown in 1.5.x, a warning from 1.6.0.
+     */
+    @ParameterizedTest(name = "{0} {1}")
+    @CsvSource(delimiter = '|', value = {
+            "1.3.2|\"packages/*\"||RESOLUTION_REQUIRED: yarn fails on this edit: An unexpected error occurred: " +
+            "\"patterns.map is not a function\".",
+            "1.4.0|\"packages/*\"||MALFORMED_MANIFEST: yarn rejects this edit: An unexpected error occurred: \"The " +
+            "workspaces field in package.json must be an array.\".",
+            "1.5.0|\"packages/*\"||installs",
+            "1.5.1|{\"packages\": [\"packages/*\"], \"nohoist\": [\"**/x\"]}|workspaces-nohoist-experimental false|" +
+            "MALFORMED_MANIFEST: yarn rejects this edit: An unexpected error occurred: \"\\\"r\\\" defines nohoist but " +
+            "the feature is disabled in your Yarn config. Please check \\\"workspaces-nohoist-experimental\\\" in " +
+            "your .yarnrc file.\".",
+            "1.6.0|{\"packages\": [\"packages/*\"], \"nohoist\": [\"**/x\"]}|workspaces-nohoist-experimental false|" +
+            "installs",
+    })
+    void readsTheWorkspacesAsItsReleaseDoes(String version, String workspaces, @Nullable String yarnrc,
+                                            String outcome) {
+        YarnClassicLockRegenerator.Inputs.InputsBuilder inputs = YarnClassicLockRegenerator.Inputs.builder()
+                .release(release(version))
+                .manifest("", "{\"name\":\"r\",\"version\":\"1.0.0\",\"private\":true,\"workspaces\":" + workspaces +
+                              "}")
+                .manifest("packages/a", "{\"name\":\"a\",\"version\":\"1.0.0\"}")
+                .lock("# yarn lockfile v1\n\n\n")
+                .paths(new LinkedHashSet<>(Arrays.asList("package.json", "yarn.lock", "packages/a/package.json")))
+                .env(Collections.emptyMap());
+        if (yarnrc != null) {
+            inputs.configFile(".yarnrc", yarnrc + "\n");
+        }
+        LockFileRegeneration.Result result = new YarnClassicLockRegenerator(inputs.build(),
+                YarnClassicScenarios.NO_REGISTRY).regenerate();
+        assertThat(result.isSuccess() ? "installs" : result.getErrorMessage()).isEqualTo(outcome);
+    }
+
+    /**
+     * config.js {@code resolveWorkspaces}: a manifest two levels under a member's node_modules is a member before
+     * 1.6.0, which ignores one level down only (as yarn 1.5.1 and 1.6.0 installed a {@code packages/**} root).
+     */
+    @ParameterizedTest(name = "{0}")
+    @CsvSource(delimiter = '|', value = {"1.5.1|[@s/b, a]", "1.6.0|[a]"})
+    void findsTheMembersUnderNodeModulesAsItsReleaseDoes(String version, String members) {
+        YarnClassicLockRegenerator.Inputs inputs = YarnClassicLockRegenerator.Inputs.builder()
+                .release(release(version))
+                .manifest("", "{\"name\":\"r\",\"version\":\"1.0.0\",\"private\":true,\"workspaces\":[\"packages/**\"]}")
+                .manifest("packages/a", "{\"name\":\"a\",\"version\":\"1.0.0\"}")
+                .manifest("packages/a/node_modules/@s/b", "{\"name\":\"@s/b\",\"version\":\"1.0.0\"}")
+                .env(Collections.emptyMap())
+                .build();
+        Config config = new Config(inputs, YarnClassicLockRegenerator.start(inputs));
+        Manifest root = Config.tryManifest("", inputs.getManifests().get(""), true, true, "", release(version));
+        assertThat(config.resolveWorkspaces(root).keySet()).asString().isEqualTo(members);
+    }
+
+    /**
+     * util/conversion.js {@code boolify} from 1.6.0: a .yarnrc's {@code --production 0} is not production; before,
+     * cli/index.js's boolify makes the number 0 true (as yarn 1.5.1 and 1.6.0 installed a member's devDependencies).
+     */
+    @ParameterizedTest(name = "{0}")
+    @CsvSource({"1.5.1,true", "1.6.0,false"})
+    void boolifiesZeroAsItsReleaseDoes(String version, boolean production) {
+        Map<String, @Nullable Object> rc = new LinkedHashMap<>();
+        rc.put("--production", 0.0);
+        assertThat(Rc.getRcArgs(rc, release(version)).get("production")).isEqualTo(production);
+    }
+
+    /**
+     * git-resolver.js {@code isVersion} from 1.6.0 matches git's url patterns; before, url.parse's protocol and a
+     * pathname ending in {@code .git} make a pattern git, which is the first exotic resolver (as yarn 1.5.1 ran git for
+     * {@code file:./x.git} and 1.6.0 copied it).
+     */
+    @ParameterizedTest(name = "{0} {1}")
+    @CsvSource(delimiter = '|', nullValues = "-", value = {
+            "1.5.1|file:./x.git|GIT",
+            "1.6.0|file:./x.git|FILE",
+            "1.5.1|github:a/b.git|GIT",
+            "1.6.0|github:a/b.git|GITHUB",
+            "1.5.1|https://h/x.git?q|GIT",
+            "1.6.0|https://h/x.git?q|TARBALL",
+            "1.5.1|link:x.git|LINK",
+            "1.5.1|^1.0.0|-",
+    })
+    void tellsGitAsItsReleaseDoes(String version, String pattern, @Nullable String kind) {
+        ExoticResolvers.Kind resolver = ExoticResolvers.getExoticResolver(pattern, release(version));
+        assertThat(resolver == null ? null : resolver.name()).isEqualTo(kind);
+    }
+
+    /**
+     * registry-resolver.js from 1.5.0 keeps the {@code @} of a scoped alias's name; before, its name is {@code ""}
+     * (yarn 1.4.0 asked the registry's root for it).
+     */
+    @Test
+    void readsAScopedAliasFrom150() {
+        assertThat(ExoticResolvers.parseRegistryFragment("npm:@s/p@1.0.0", release("1.4.0")))
+                .isEqualTo(new ExoticResolvers.RegistryFragment("npm", "", "s/p@1.0.0"));
+        assertThat(ExoticResolvers.parseRegistryFragment("npm:@s/p@1.0.0", release("1.5.0")))
+                .isEqualTo(new ExoticResolvers.RegistryFragment("npm", "@s/p", "1.0.0"));
+    }
+
+    /**
+     * file-resolver.js from 1.0.2 takes dots only before a file pattern's slash; before, any one or two characters, so
+     * that a package of a one-character scope is a file (yarn 1.0.1 found no {@code @z/zz-probe-sc@1.0.0} directory).
+     */
+    @Test
+    void takesAOneCharacterScopeForAPackageFrom102() {
+        assertThat(ExoticResolvers.getExoticResolver("@z/x@1.0.0", release("1.0.1")))
+                .isEqualTo(ExoticResolvers.Kind.FILE);
+        assertThat(ExoticResolvers.getExoticResolver("@z/x@1.0.0", release("1.0.2"))).isNull();
+    }
+
+    /**
+     * prebuiltVariants: a lock entry's variants are written from 1.5.0; before, every lock yarn writes drops them (as
+     * yarn 1.4.0 and 1.5.0 rewrote such a lock).
+     */
+    @ParameterizedTest(name = "{0}")
+    @CsvSource({"1.4.0,false", "1.5.0,true"})
+    void keepsPrebuiltVariantsFrom150(String version, boolean kept) throws NoSuchAlgorithmException {
+        String entry = "a@1.0.0:\n  version \"1.0.0\"\n  resolved \"https://registry.yarnpkg.com/a/-/a-1.0.0.tgz#a\"\n";
+        String variants = "  prebuiltVariants:\n    a-v1.0.0-x abc\n";
+        byte[] tar = tar("package/package.json", "{\"name\":\"b\",\"version\":\"1.0.0\"}", null);
+        StringBuilder shasum = new StringBuilder();
+        for (byte digit : MessageDigest.getInstance("SHA-1").digest(tar)) {
+            shasum.append(String.format("%02x", digit));
+        }
+        String b = "{\"name\":\"b\",\"dist-tags\":{\"latest\":\"1.0.0\"},\"versions\":{\"1.0.0\":{\"name\":\"b\"," +
+                   "\"version\":\"1.0.0\",\"dist\":{\"tarball\":\"https://registry.yarnpkg.com/b/-/b-1.0.0.tgz\"," +
+                   "\"shasum\":\"" + shasum + "\"}}}}";
+        RegistrySource registry = new RegistrySource() {
+            @Override
+            public @Nullable String packument(String r, String name, boolean full, @Nullable String authorization) {
+                return "b".equals(name) ? b : null;
+            }
+
+            @Override
+            public byte @Nullable [] tarball(String url, String name, String v, @Nullable String authorization) {
+                return "b".equals(name) ? tar : null;
+            }
+        };
+        YarnClassicLockRegenerator.Inputs inputs = YarnClassicLockRegenerator.Inputs.builder()
+                .release(release(version))
+                .manifest("", "{\"name\":\"p\",\"version\":\"1.0.0\",\"dependencies\":{\"a\":\"1.0.0\",\"b\":\"1.0.0\"}}")
+                .lock("# yarn lockfile v1\n\n\n" + entry + variants)
+                .env(Collections.emptyMap())
+                .build();
+        LockFileRegeneration.Result result = new YarnClassicLockRegenerator(inputs, registry).regenerate();
+        assertThat(result.getLockFileContent()).as(String.valueOf(result.getErrorMessage())).contains(entry)
+                .contains("\nb@1.0.0:\n");
+        assertThat(result.getLockFileContent().contains(entry + variants)).isEqualTo(kept);
+    }
+
+    /**
+     * package-request.js {@code find} rejects an invalid version from 1.5.0; before, the missing version reaches
+     * {@code getExactVersionMatch}, whose exotic check throws in url.parse (the sweep's
+     * small-lock-entry-without-version).
+     */
+    @ParameterizedTest(name = "{0}")
+    @CsvSource(delimiter = '|', value = {
+            "1.4.0|RESOLUTION_REQUIRED: yarn fails on this edit: An unexpected error occurred: \"The \\\"url\\\" " +
+            "argument must be of type string. Received undefined\".",
+            "1.5.0|MALFORMED_LOCK: yarn rejects this edit: An unexpected error occurred: \"Can't add \\\"a\\\": " +
+            "invalid package version undefined.\".",
+    })
+    void rejectsAnInvalidVersionFrom150(String version, String outcome) {
+        YarnClassicLockRegenerator.Inputs inputs = YarnClassicLockRegenerator.Inputs.builder()
+                .release(release(version))
+                .manifest("", "{\"name\":\"p\",\"version\":\"1.0.0\",\"dependencies\":{\"a\":\"1.0.0\",\"b\":\"1.0.0\"}}")
+                .lock("# yarn lockfile v1\n\n\n" +
+                      "a@1.0.0:\n  version \"1.0.0\"\n  resolved \"https://registry.yarnpkg.com/a/-/a-1.0.0.tgz#a\"\n\n" +
+                      "a@^1.0.0:\n  resolved \"https://registry.yarnpkg.com/a/-/a-1.0.0.tgz#a\"\n\n" +
+                      "b@1.0.0:\n  version \"1.0.0\"\n  resolved \"https://registry.yarnpkg.com/b/-/b-1.0.0.tgz#b\"\n" +
+                      "  dependencies:\n    a \"^1.0.0\"\n")
+                .env(Collections.emptyMap())
+                .build();
+        LockFileRegeneration.Result result = new YarnClassicLockRegenerator(inputs, YarnClassicScenarios.NO_REGISTRY)
+                .regenerate();
+        assertThat(result.getErrorMessage()).isEqualTo(outcome);
+    }
+
+    /**
+     * package-request.js {@code findVersionOnRegistry} from 1.5.0 names the parent of a package the registry does not
+     * have; before, the registry's own error goes out (the sweep's open-member-cwd-implicit-file-root-dir).
+     */
+    @ParameterizedTest(name = "{0}")
+    @CsvSource(delimiter = '|', value = {
+            "1.4.0|An unexpected error occurred: \"https://registry.yarnpkg.com/b: Not found\".",
+            "1.5.0|An unexpected error occurred: \"Couldn't find package \\\"b@^1.0.0\\\" required by \\\"a@1.0.0\\\" " +
+            "on the \\\"npm\\\" registry.\".",
+            "1.6.0|Couldn't find package \"b@^1.0.0\" required by \"a@1.0.0\" on the \"npm\" registry.",
+    })
+    void namesTheParentOfAPackageNotFoundFrom150(String version, String reported) {
+        YarnClassicLockRegenerator.Inputs inputs = YarnClassicLockRegenerator.Inputs.builder()
+                .release(release(version))
+                .manifest("", "{\"name\":\"p\",\"version\":\"1.0.0\",\"dependencies\":{\"a\":\"1.0.0\"}}")
+                .lock("# yarn lockfile v1\n\n\na@1.0.0:\n  version \"1.0.0\"\n  resolved " +
+                      "\"https://registry.yarnpkg.com/a/-/a-1.0.0.tgz#a\"\n  dependencies:\n    b \"^1.0.0\"\n")
+                .env(Collections.emptyMap())
+                .build();
+        LockFileRegeneration.Result result = new YarnClassicLockRegenerator(inputs, YarnClassicScenarios.NO_REGISTRY)
+                .regenerate();
+        assertThat(result.getErrorMessage()).endsWith(": " + reported);
+    }
+
+    /**
      * tar-stream and readable-stream as each release bundles them, as yarn 1.6.0, 1.7.0 and 1.8.0 installed these
      * tarballs from a registry: an archive cut inside a file after package.json extracts before 1.8.0 (readable-stream
      * 2.2.9 calls no {@code _final}) and is corrupt from 1.8.0; cut inside package.json, what yarn reads of it follows

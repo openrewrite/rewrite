@@ -90,7 +90,7 @@ final class ResolutionMap {
 
         boolean validRange = range instanceof String &&
                              NodeSemver.validRange((String) range, Config.SEMVER) != null;
-        if (!validRange && ExoticResolvers.getExoticResolver(range) == null) {
+        if (!validRange && ExoticResolvers.getExoticResolver(range, config.getRelease()) == null) {
             return null;
         }
         String r = Js.string(range);

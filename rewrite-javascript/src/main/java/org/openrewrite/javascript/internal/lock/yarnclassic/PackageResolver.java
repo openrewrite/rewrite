@@ -118,7 +118,9 @@ final class PackageResolver {
             if (newPkg.reference != null) {
                 for (String pattern : newPkg.reference.patterns) {
                     Manifest oldPkg = patterns.get(pattern);
-                    newPkg.put("prebuiltVariants", oldPkg.get("prebuiltVariants"));
+                    if (config.getRelease().keepsPrebuiltVariants()) {
+                        newPkg.put("prebuiltVariants", oldPkg.get("prebuiltVariants"));
+                    }
                     patterns.put(pattern, newPkg);
                 }
             }
@@ -308,19 +310,23 @@ final class PackageResolver {
         return manifest;
     }
 
+    /**
+     * The manifest already resolved for the name whose version is {@code version}; a version of no string reaches
+     * here only before 1.5.0 checks it ({@code invalidPackageVersion}).
+     */
     @Nullable
-    Manifest getExactVersionMatch(String name, String version, @Nullable Manifest manifest) {
+    Manifest getExactVersionMatch(String name, @Nullable Object version, @Nullable Manifest manifest) {
         List<String> patterns = patternsByPackage.get(name);
         if (patterns == null) {
             return null;
         }
         for (String pattern : patterns) {
             Manifest info = getStrictResolvedPattern(pattern);
-            if (version.equals(info.getVersion())) {
+            if (Js.strictEquals(info.getVersion(), version)) {
                 return info;
             }
         }
-        if (manifest != null && ExoticResolvers.getExoticResolver(version) != null) {
+        if (manifest != null && ExoticResolvers.getExoticResolver(version, config.getRelease()) != null) {
             List<Manifest> resolved = new ArrayList<>();
             for (String pattern : patterns) {
                 resolved.add(getStrictResolvedPattern(pattern));
@@ -335,7 +341,7 @@ final class PackageResolver {
      * 5.5.0's {@code maxSatisfying} over the versions as the manifests hold them.
      */
     @Nullable
-    Manifest getHighestRangeVersionMatch(String name, String range, @Nullable Manifest manifest) {
+    Manifest getHighestRangeVersionMatch(String name, @Nullable Object range, @Nullable Manifest manifest) {
         List<String> patterns = patternsByPackage.get(name);
         if (patterns == null) {
             return null;
@@ -347,9 +353,10 @@ final class PackageResolver {
             versionNumbers.add(info.getVersion());
             resolvedPatterns.add(info);
         }
-        Object maxValidRange = maxSatisfying(versionNumbers, range);
+        // semver's Range of no string takes no version
+        Object maxValidRange = range instanceof String ? maxSatisfying(versionNumbers, (String) range) : null;
         if (maxValidRange == null) {
-            return manifest != null && ExoticResolvers.getExoticResolver(range) != null ?
+            return manifest != null && ExoticResolvers.getExoticResolver(range, config.getRelease()) != null ?
                     exoticRangeMatch(resolvedPatterns, manifest) : null;
         }
         return resolvedPatterns.get(versionNumbers.indexOf(maxValidRange));
@@ -393,7 +400,7 @@ final class PackageResolver {
     boolean isLockfileEntryOutdated(@Nullable Object version, String range, boolean hasVersion) {
         return NodeSemver.validRange(range, Config.SEMVER) != null &&
                version instanceof String && NodeSemver.valid((String) version, Config.SEMVER) != null &&
-               ExoticResolvers.getExoticResolver(range) == null &&
+               ExoticResolvers.getExoticResolver(range, config.getRelease()) == null &&
                hasVersion &&
                !NodeSemver.satisfies((String) version, range, Config.SEMVER);
     }

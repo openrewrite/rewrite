@@ -63,15 +63,15 @@ final class NpmResolver {
                                                           @Nullable Object body) {
         Object versions = Js.get(body, "versions");
         Object distTags = Js.get(body, "dist-tags");
-        if (Js.truthy(versions) && Js.keys(versions).isEmpty()) {
+        YarnClassicRelease release = config.getRelease();
+        if (release.rejectsAResponseWithoutVersions() && Js.truthy(versions) && Js.keys(versions).isEmpty()) {
             throw new MessageError(Lang.format("No valid versions found for $0. The package may be unpublished.",
                     Js.get(body, "name")));
         }
-        if (!Js.truthy(distTags) || !Js.truthy(versions)) {
+        if (!Js.truthy(distTags) || release.rejectsAResponseWithoutVersions() && !Js.truthy(versions)) {
             throw new MessageError(Lang.format("Received malformed response from registry for $0. " +
                                                "The registry may be down.",
-                    config.getRelease().namesTheRequestedPackageOfAMalformedResponse() ? name :
-                            Js.get(body, "name")));
+                    release.namesTheRequestedPackageOfAMalformedResponse() ? name : Js.get(body, "name")));
         }
         Object wanted = range;
         Object tag = distTag(distTags, range);
@@ -80,17 +80,36 @@ final class NpmResolver {
         }
 
         Object latestVersion = Js.get(distTags, "latest");
-        if (Js.truthy(latestVersion) && wanted instanceof String && satisfies(latestVersion, (String) wanted)) {
-            return Js.get(versions, Js.string(latestVersion));
+        if (release.prefersTheLatestTag() && Js.truthy(latestVersion) && wanted instanceof String &&
+            satisfies(latestVersion, (String) wanted)) {
+            return Js.get(readable(body, versions, Js.string(latestVersion)), Js.string(latestVersion));
         }
 
         String satisfied = wanted instanceof String ?
-                config.resolveConstraints(new ArrayList<>(Js.keys(versions)), (String) wanted) : null;
+                config.resolveConstraints(new ArrayList<>(Js.keys(readable(body, versions, null))), (String) wanted) :
+                null;
         if (satisfied != null) {
             return Js.get(versions, satisfied);
         }
         throw new MessageError(Lang.format("Couldn't find any versions for $0 that matches $1",
                 Js.get(body, "name"), wanted));
+    }
+
+    /**
+     * {@code body.versions} as JavaScript reads it where 1.5.0's check has not refused a response without versions:
+     * reading one of its versions ({@code key}), or {@code Object.keys} of it ({@code key} null), throws where it is
+     * undefined or null.
+     */
+    private static @Nullable Object readable(@Nullable Object body, @Nullable Object versions, @Nullable String key) {
+        if (versions != null) {
+            return versions;
+        }
+        if (key == null) {
+            throw new JsError(JsError.TYPE_ERROR, "Cannot convert undefined or null to object");
+        }
+        boolean isNull = body instanceof Map && ((Map<?, ?>) body).containsKey("versions");
+        throw new JsError(JsError.TYPE_ERROR, "Cannot read properties of " + (isNull ? "null" : "undefined") +
+                                              " (reading '" + key + "')");
     }
 
     private static boolean satisfies(Object version, String range) {
@@ -159,6 +178,11 @@ final class NpmResolver {
     Promise<@Nullable Object> resolveRequest(@Nullable Object desiredVersion) {
         if (config.isOffline()) {
             throw config.offlineCache();
+        }
+        if (name.isEmpty()) {
+            // before 1.5.0 a scoped alias reads as the name "": its request is the registry's root
+            throw new CannotKnow("what the registry answers at its root, which yarn asks for the package \"\" of " +
+                                 request.pattern);
         }
         String escapedName = NpmRegistry.escapeName(name);
         String desiredRange = Js.truthy(desiredVersion) ? Js.string(desiredVersion) : range;

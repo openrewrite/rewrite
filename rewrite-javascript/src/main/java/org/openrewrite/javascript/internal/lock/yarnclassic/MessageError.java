@@ -26,6 +26,12 @@ class MessageError extends RuntimeException {
 
     private final @Nullable String code;
 
+    /**
+     * Whether yarn made this error of its own rejection, which it took for another's because {@code instanceof
+     * MessageError} failed it (1.5.x): its words name another cause than the one that ended the install.
+     */
+    private boolean rewrapped;
+
     MessageError(String message) {
         this(message, null);
     }
@@ -33,5 +39,10 @@ class MessageError extends RuntimeException {
     MessageError(String message, @Nullable String code) {
         super(message);
         this.code = code;
+    }
+
+    MessageError rewrapped() {
+        rewrapped = true;
+        return this;
     }
 }

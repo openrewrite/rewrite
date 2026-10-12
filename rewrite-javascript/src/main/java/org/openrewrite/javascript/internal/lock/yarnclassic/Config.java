@@ -256,9 +256,8 @@ final class Config {
                 }
                 continue;
             }
-            Map<String, @Nullable Object> ws = extractWorkspaces(tryManifest(dir, text, looseSemver, true, null,
-                    inputs.installsAs()));
-            if (ws != null && Js.truthy(ws.get("packages"))) {
+            if (workspaceGlobs(tryManifest(dir, text, looseSemver, true, null, inputs.installsAs()),
+                    inputs.installsAs()) != null) {
                 throw new CannotKnow("the lock yarn writes: run in " + inputs.getCwd() + " it stops at the " +
                                      "workspaces of " + file + ", not at this lock");
             }
@@ -273,15 +272,29 @@ final class Config {
         String cwd = inputs.getCwd();
         for (int depth = 0; depth <= inputs.reach(); depth++) {
             Manifest manifest = findManifest(inputs, depth, looseSemver);
-            Map<String, @Nullable Object> ws = manifest == null ? null : extractWorkspaces(manifest);
-            if (ws != null && Js.truthy(ws.get("packages"))) {
+            Object globs = manifest == null ? null : workspaceGlobs(manifest, inputs.installsAs());
+            if (globs != null) {
                 String relativePath = depth == 0 ? cwd : cwd.isEmpty() ? inputs.relativePath(depth) :
                         inputs.relativePath(depth) + "/" + cwd;
                 return relativePath.isEmpty() ||
-                       !Micromatch.micromatch(singletonList(relativePath), ws.get("packages")).isEmpty() ? depth : -1;
+                       !Micromatch.micromatch(singletonList(relativePath), globs).isEmpty() ? depth : -1;
             }
         }
         return -1;
+    }
+
+    /**
+     * What {@code findWorkspaceRoot} matches the path from a manifest's directory against, null where the manifest
+     * makes no workspace root: {@code extractWorkspaces}' packages from 1.5.0; before, its {@code workspaces} as they
+     * are, any truthy value.
+     */
+    static @Nullable Object workspaceGlobs(Manifest manifest, YarnClassicRelease release) {
+        if (!release.readsTheWorkspacesObject()) {
+            Object workspaces = manifest.get("workspaces");
+            return Js.truthy(workspaces) ? workspaces : null;
+        }
+        Map<String, @Nullable Object> ws = extractWorkspaces(manifest);
+        return ws != null && Js.truthy(ws.get("packages")) ? ws.get("packages") : null;
     }
 
     // findManifest: the directory's package.json, else its yarn.json
@@ -390,8 +403,11 @@ final class Config {
      * {@code workspaces} array, even an empty one, or an object with one.
      */
     static boolean isWorkspaceRoot(Manifest manifest) {
-        Map<String, @Nullable Object> ws = extractWorkspaces(manifest);
-        return ws != null && Js.truthy(ws.get("packages"));
+        return isWorkspaceRoot(manifest, YarnClassicRelease.PORTED);
+    }
+
+    static boolean isWorkspaceRoot(Manifest manifest, YarnClassicRelease release) {
+        return workspaceGlobs(manifest, release) != null;
     }
 
     @SuppressWarnings("unchecked")
@@ -438,6 +454,12 @@ final class Config {
         }
         if (wsCopy != null && Js.truthy(wsCopy.get("nohoist")) && Js.length(wsCopy.get("nohoist")) > 0) {
             if (!workspacesNohoistEnabled) {
+                // a warning from 1.6.0; before, every warning is thrown
+                if (!release.throwsOnlyWorkspaceErrors()) {
+                    errors.add(Lang.format("$0 defines nohoist but the feature is disabled in your Yarn config. " +
+                                           "Please check \"workspaces-nohoist-experimental\" in your .yarnrc file.",
+                            manifest.getName()));
+                }
                 wsCopy.put("nohoist", null);
             } else if (!isPrivate) {
                 errors.add(Lang.format("nohoist config is ignored in $0 because it is not a private package. If " +
@@ -485,9 +507,24 @@ final class Config {
      * {@code resolveWorkspaces} up to its glob, which calls replace on every pattern before the first glob starts.
      */
     List<?> workspacePatterns(Manifest root) {
-        Map<String, @Nullable Object> ws = getWorkspaces(root, true);
-        Object patterns = ws != null && Js.truthy(ws.get("packages")) ? ws.get("packages") : new ArrayList<>();
+        Object patterns;
+        if (release.readsTheWorkspacesObject()) {
+            Map<String, @Nullable Object> ws = getWorkspaces(root, true);
+            patterns = ws != null && Js.truthy(ws.get("packages")) ? ws.get("packages") : new ArrayList<>();
+        } else {
+            // before 1.5.0 the root's workspaces as they are, of a private root where they have a length
+            patterns = Js.truthy(root.get("workspaces")) ? root.get("workspaces") : new ArrayList<>();
+            Object length = patterns instanceof Map ? ((Map<?, ?>) patterns).get("length") : (Object) Js.length(patterns);
+            if (!Js.truthy(root.get("private")) && length instanceof Number && ((Number) length).doubleValue() > 0) {
+                throw new MessageError(release.endsTheWorkspacesPrivacyMessageWithAPeriod() ?
+                        "Workspaces can only be enabled in private projects." :
+                        "Workspaces can only be enabled in private projects");
+            }
+        }
         if (!(patterns instanceof List)) {
+            if (!release.requiresAnArrayOfWorkspaces()) {
+                throw new JsError(JsError.TYPE_ERROR, "patterns.map is not a function");
+            }
             throw new MessageError("The workspaces field in package.json must be an array.");
         }
         for (Object pattern : (List<?>) patterns) {
@@ -511,7 +548,9 @@ final class Config {
             prefix += "./";
         }
         String include = base + "/+(package.json|yarn.json)";
-        String ignore = base + "/node_modules/**/+(package.json|yarn.json)";
+        // every manifest under the pattern's node_modules from 1.6.0; before, one level down
+        String ignore = base + (release.ignoresEveryManifestUnderNodeModules() ? "/node_modules/**/" :
+                "/node_modules/*/") + "+(package.json|yarn.json)";
         Set<String> files = new LinkedHashSet<>();
         for (String loc : inputs.getManifests().keySet()) {
             if (!loc.isEmpty()) {
@@ -933,6 +972,17 @@ final class Config {
     // util/conversion.js
     static boolean boolify(@Nullable Object val) {
         return !FALSY_STRINGS.contains(Js.string(val).toLowerCase(Locale.ROOT));
+    }
+
+    /**
+     * {@code boolify} of {@code release}: before 1.6.0 cli/index.js's, false only for a value whose string is
+     * {@code false} or for the string {@code 0}, so that the number 0 is true.
+     */
+    static boolean boolify(@Nullable Object val, YarnClassicRelease release) {
+        if (!release.readsZeroAsFalse()) {
+            return !"false".equals(Js.string(val).toLowerCase(Locale.ROOT)) && !"0".equals(val);
+        }
+        return boolify(val);
     }
 
     static boolean boolifyWithDefault(@Nullable Object val, boolean defaultResult) {

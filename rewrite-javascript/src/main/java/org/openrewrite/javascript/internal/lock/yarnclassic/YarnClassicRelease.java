@@ -68,6 +68,20 @@ public final class YarnClassicRelease implements Comparable<YarnClassicRelease> 
         return compareTo(new YarnClassicRelease(major, minor, patch)) >= 0;
     }
 
+    // yarn .babelrc
+
+    /**
+     * An error yarn throws as one of its own classes ({@code MessageError} and those extending it) is an
+     * {@code instanceof} that class before 1.4.0 (the es2015-node4 and node5 presets keep classes native) and from
+     * 1.6.0 ({@code transform-builtin-extend}). From 1.4.0 to 1.5.1, babel-preset-env (loose, node 4) compiles
+     * {@code class MessageError extends Error} to a constructor that returns the plain Error it calls, so that
+     * cli/index.js reports every such error as unexpected ({@code An unexpected error occurred: "<message>".}) and
+     * package-request.js (1.5.x) rewraps a resolver's own rejection.
+     */
+    boolean tellsItsErrorsByClass() {
+        return !atLeast(1, 4, 0) || atLeast(1, 6, 0);
+    }
+
     // yarn src/cli/index.js
 
     /**
@@ -158,6 +172,41 @@ public final class YarnClassicRelease implements Comparable<YarnClassicRelease> 
      */
     boolean keepsEntriesWithoutIntegrity() {
         return atLeast(1, 12, 0);
+    }
+
+    /**
+     * {@code resolveWorkspaces} refuses a root's workspaces that are no array
+     * ({@code workspacesSettingMustBeArray}), from 1.4.0; before, {@code patterns.map} of a string or an object throws.
+     */
+    boolean requiresAnArrayOfWorkspaces() {
+        return atLeast(1, 4, 0);
+    }
+
+    /**
+     * {@code extractWorkspaces} reads a manifest's workspaces as an array of member globs or an object with a
+     * {@code packages} or {@code nohoist} array, which {@code findWorkspaceRoot}, {@code getWorkspaces} and
+     * {@code resolveWorkspaces} take the packages of, from 1.5.0 (nohoist with it); before, any truthy
+     * {@code workspaces} makes a workspace root, its value the member globs as it is (micromatch's {@code matcher}
+     * throws for an object, {@code resolveWorkspaces} refuses what is no array).
+     */
+    boolean readsTheWorkspacesObject() {
+        return atLeast(1, 5, 0);
+    }
+
+    /**
+     * {@code getWorkspaces} throws its errors only, a nohoist the config disables being a warning, from 1.6.0; 1.5.x
+     * throws every warning, {@code workspacesNohoistDisabled} among them.
+     */
+    boolean throwsOnlyWorkspaceErrors() {
+        return atLeast(1, 6, 0);
+    }
+
+    /**
+     * {@code resolveWorkspaces} ignores every manifest under a member glob's node_modules
+     * ({@code /node_modules/**}{@code /+(package.json|yarn.json)}), from 1.6.0; before, those one level down only.
+     */
+    boolean ignoresEveryManifestUnderNodeModules() {
+        return atLeast(1, 6, 0);
     }
 
     /**
@@ -421,6 +470,44 @@ public final class YarnClassicRelease implements Comparable<YarnClassicRelease> 
     // yarn src/package-request.js
 
     /**
+     * {@code findVersionOnRegistry} rewraps an error of a request that has a parent and is no MessageError as
+     * {@code requiredPackageNotFoundRegistry} ({@code Couldn't find package $0 required by $1 on the $2 registry.}),
+     * from 1.5.0; before, the resolver's error goes out as it is.
+     */
+    boolean namesTheParentOfAPackageNotFound() {
+        return atLeast(1, 5, 0);
+    }
+
+    /**
+     * {@code find} rejects a version semver does not take ({@code invalidPackageVersion}: {@code Can't add $0: invalid
+     * package version $1.}), from 1.5.0; before, the install goes on with it.
+     */
+    boolean rejectsAnInvalidVersion() {
+        return atLeast(1, 5, 0);
+    }
+
+    // yarn src/lockfile/index.js, src/package-request.js, src/package-resolver.js, src/cli/commands/install.js
+
+    /**
+     * Yarn reads a lock entry's {@code prebuiltVariants}, keeps them over a fetch, writes them and rewrites a lock whose
+     * variants differ from the resolver's, from 1.5.0; before, it writes none.
+     */
+    boolean keepsPrebuiltVariants() {
+        return atLeast(1, 5, 0);
+    }
+
+    // yarn src/resolvers/exotics/registry-resolver.js
+
+    /**
+     * The fragment of an {@code npm:} alias is {@code ^(\S+):(@?.*?)(@(.*?)|)$}, so that a scoped name keeps its
+     * {@code @}, from 1.5.0; before, {@code ^(\S+):(.*?)(@(.*?)|)$}, which reads {@code npm:@s/p@1.0.0} as the name
+     * {@code ""} and the range {@code s/p@1.0.0}.
+     */
+    boolean readsScopedAliases() {
+        return atLeast(1, 5, 0);
+    }
+
+    /**
      * {@code findVersionInfo}'s {@code flatGlobalError} names the package that asks for a flat graph, from 1.12.0;
      * before, it passes none, and the message's {@code $0@$1} read {@code undefined@undefined}.
      */
@@ -456,6 +543,23 @@ public final class YarnClassicRelease implements Comparable<YarnClassicRelease> 
     // yarn src/resolvers/registries/npm-resolver.js
 
     /**
+     * {@code findVersionInRegistryResponse} takes {@code dist-tags.latest} where it satisfies the range (#3560), from
+     * 1.3.1; before, the highest version that does.
+     */
+    boolean prefersTheLatestTag() {
+        return atLeast(1, 3, 1);
+    }
+
+    /**
+     * {@code findVersionInRegistryResponse} rejects a response whose {@code versions} are empty
+     * ({@code registryNoVersions}) or missing ({@code malformedRegistryResponse}), from 1.5.0; before, only one without
+     * {@code dist-tags} is malformed, empty versions match nothing, and missing ones throw where they are read.
+     */
+    boolean rejectsAResponseWithoutVersions() {
+        return atLeast(1, 5, 0);
+    }
+
+    /**
      * {@code findVersionInRegistryResponse}'s {@code malformedRegistryResponse} names the package asked for, escaped,
      * from 1.12.0; before, the name the response gives.
      */
@@ -469,6 +573,29 @@ public final class YarnClassicRelease implements Comparable<YarnClassicRelease> 
      */
     boolean cleansHttpNpmRegistryUrls() {
         return atLeast(1, 10, 0);
+    }
+
+    // yarn src/resolvers/exotics/git-resolver.js
+
+    /**
+     * {@code isVersion} takes a pattern for git where it matches {@code GIT_PATTERN_MATCHERS} ({@code ^git:},
+     * {@code ^git\+.+:}, {@code ^ssh:}, {@code ^https?:.+\.git$}, {@code ^https?:.+\.git#.+}) or names a git host, a user
+     * and a repository, from 1.6.0; before, where url.parse finds a protocol and then a pathname ending in {@code .git}
+     * ({@code file:../x.git}, {@code github:a/b.git}, {@code https://h/x.git?q}), a {@code git+} protocol, {@code git:}
+     * or {@code ssh:}, or a git host, a user and a repository. Git is the first exotic resolver yarn tries.
+     */
+    boolean tellsGitByItsUrlPatterns() {
+        return atLeast(1, 6, 0);
+    }
+
+    // yarn src/resolvers/exotics/file-resolver.js
+
+    /**
+     * {@code prefixMatcher} takes one or two dots before a slash ({@code ./}, {@code ../}), from 1.0.2 (#4338); before,
+     * any one or two characters, so that a package of a one-character scope ({@code @a/pkg@^1.0.0}) is a file: path.
+     */
+    boolean takesOnlyDotsBeforeAFileSlash() {
+        return atLeast(1, 0, 2);
     }
 
     // yarn src/resolvers/exotics/link-resolver.js
@@ -513,6 +640,23 @@ public final class YarnClassicRelease implements Comparable<YarnClassicRelease> 
      */
     boolean endsFoundIncompatibleWithAPeriod() {
         return atLeast(1, 16, 0);
+    }
+
+    /**
+     * {@code workspacesRequirePrivateProjects} ends with a period, from 1.4.0.
+     */
+    boolean endsTheWorkspacesPrivacyMessageWithAPeriod() {
+        return atLeast(1, 4, 0);
+    }
+
+    // yarn src/util/conversion.js
+
+    /**
+     * {@code boolify} takes the number 0 as false, from 1.6.0; before, cli/index.js's own boolify is false only for
+     * a value whose string is {@code false} or the string {@code 0} (a .yarnrc's {@code --production 0} is true).
+     */
+    boolean readsZeroAsFalse() {
+        return atLeast(1, 6, 0);
     }
 
     // ini

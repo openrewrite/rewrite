@@ -188,7 +188,7 @@ final class Rc {
                 switch (arg) {
                     case "prod":
                     case "production":
-                        args.put("production", Config.boolify(value));
+                        args.put("production", Config.boolify(value, release));
                         break;
                     case "registry":
                     case "modules-folder":

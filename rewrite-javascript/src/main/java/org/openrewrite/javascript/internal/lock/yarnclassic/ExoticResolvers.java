@@ -52,8 +52,15 @@ final class ExoticResolvers {
             "^[^:@%/" + Js.WHITESPACE_CLASS + ".-][^:@%/" + Js.WHITESPACE_CLASS + "]*[/][^:@" + Js.WHITESPACE_CLASS +
             "/%]+(?:#" + DOT + "*)?\\z");
     private static final Pattern FILE_PREFIX = Pattern.compile("^\\.{1,2}/");
+    // file-resolver.js's prefixMatcher before 1.0.2: any one or two characters before a slash
+    private static final Pattern ANY_FILE_PREFIX = Pattern.compile("^" + DOT + "{1,2}/");
+    // git-resolver.js's GIT_PROTOCOL_PATTERN before 1.6.0, which it tests the protocol against
+    private static final Pattern GIT_PROTOCOL_PATTERN = Pattern.compile("git\\+" + DOT + "+:");
     private static final Pattern REGISTRY_FRAGMENT = Pattern.compile("^([^" + Js.WHITESPACE_CLASS + "]+):(@?" +
                                                                      DOT + "*?)(@(" + DOT + "*?)|)\\z");
+    private static final Pattern UNSCOPED_REGISTRY_FRAGMENT = Pattern.compile("^([^" + Js.WHITESPACE_CLASS +
+                                                                              "]+):(" + DOT + "*?)(@(" + DOT +
+                                                                              "*?)|)\\z");
 
     private ExoticResolvers() {
     }
@@ -62,11 +69,19 @@ final class ExoticResolvers {
      * @throws JsError what the git resolver's {@code isVersion} raises on a pattern that is not a string.
      */
     static @Nullable Kind getExoticResolver(@Nullable Object pattern) {
-        if (isGit(pattern)) {
+        return getExoticResolver(pattern, YarnClassicRelease.PORTED);
+    }
+
+    /**
+     * {@code getExoticResolver} with the {@code isVersion} of {@code release}'s resolvers.
+     * @throws JsError what the git resolver's {@code isVersion} raises on a pattern that is not a string.
+     */
+    static @Nullable Kind getExoticResolver(@Nullable Object pattern, YarnClassicRelease release) {
+        if (isGit(pattern, release)) {
             return Kind.GIT;
         }
         for (Kind kind : Kind.values()) {
-            if (kind != Kind.GIT && isVersion(kind, (String) pattern)) {
+            if (kind != Kind.GIT && isVersion(kind, (String) pattern, release)) {
                 return kind;
             }
         }
@@ -100,11 +115,15 @@ final class ExoticResolvers {
     }
 
     static boolean isVersion(Kind kind, String pattern) {
+        return isVersion(kind, pattern, YarnClassicRelease.PORTED);
+    }
+
+    static boolean isVersion(Kind kind, String pattern, YarnClassicRelease release) {
         switch (kind) {
             case GIT:
-                return isGit(pattern);
+                return isGit(pattern, release);
             case TARBALL:
-                if (isGit(pattern)) {
+                if (isGit(pattern, release)) {
                     return false;
                 }
                 if (pattern.startsWith("http://") || pattern.startsWith("https://")) {
@@ -114,7 +133,8 @@ final class ExoticResolvers {
             case GITHUB:
                 return pattern.startsWith("github:") || GITHUB_SHORTHAND.matcher(pattern).find();
             case FILE:
-                return pattern.startsWith("file:") || FILE_PREFIX.matcher(pattern).find() || pattern.startsWith("/");
+                return pattern.startsWith("file:") || (release.takesOnlyDotsBeforeAFileSlash() ? FILE_PREFIX :
+                        ANY_FILE_PREFIX).matcher(pattern).find() || pattern.startsWith("/");
             case LINK:
                 return pattern.startsWith("link:");
             case GITLAB:
@@ -131,7 +151,10 @@ final class ExoticResolvers {
         }
     }
 
-    private static boolean isGit(@Nullable Object pattern) {
+    private static boolean isGit(@Nullable Object pattern, YarnClassicRelease release) {
+        if (!release.tellsGitByItsUrlPatterns()) {
+            return isGitByItsProtocol(pattern);
+        }
         if (pattern instanceof Map) {
             throw new JsError(JsError.TYPE_ERROR, "Cannot convert object to primitive value");
         }
@@ -145,16 +168,38 @@ final class ExoticResolvers {
             throw Js.invalidArgType("The \"url\" argument must be of type string", pattern);
         }
         LegacyUrl url = LegacyUrl.parse(text);
-        if (url.hostname != null && url.path != null && GIT_HOSTS.contains(url.hostname)) {
-            int segments = 0;
-            for (String p : url.path.split("/", -1)) {
-                if (!p.isEmpty()) {
-                    segments++;
-                }
-            }
-            return segments == 2;
+        return url.hostname != null && url.path != null && GIT_HOSTS.contains(url.hostname) &&
+               segments(url.path) == 2;
+    }
+
+    // git-resolver.js isVersion before 1.6.0: no protocol url.parse finds is no git; then a pathname ending in .git, a
+    // protocol GIT_PROTOCOL_PATTERN finds or git: or ssh:, or a git host and a user and repository
+    private static boolean isGitByItsProtocol(@Nullable Object pattern) {
+        if (!(pattern instanceof String)) {
+            throw Js.invalidArgType("The \"url\" argument must be of type string", pattern);
         }
-        return false;
+        LegacyUrl url = LegacyUrl.parse((String) pattern);
+        if (url.protocol == null) {
+            return false;
+        }
+        String pathname = url.path == null ? null : url.path.replaceFirst("\\?" + DOT + "*", "");
+        if (pathname != null && pathname.endsWith(".git") || GIT_PROTOCOL_PATTERN.matcher(url.protocol).find() ||
+            "git:".equals(url.protocol) || "ssh:".equals(url.protocol)) {
+            return true;
+        }
+        return url.hostname != null && url.path != null && GIT_HOSTS.contains(url.hostname) &&
+               segments(url.path) == 2;
+    }
+
+    // path.split('/').filter(p => !!p).length
+    private static int segments(String path) {
+        int segments = 0;
+        for (String p : path.split("/", -1)) {
+            if (!p.isEmpty()) {
+                segments++;
+            }
+        }
+        return segments;
     }
 
     /**
@@ -168,7 +213,16 @@ final class ExoticResolvers {
     }
 
     static RegistryFragment parseRegistryFragment(String fragment) {
-        Matcher match = REGISTRY_FRAGMENT.matcher(fragment);
+        return parseRegistryFragment(fragment, YarnClassicRelease.PORTED);
+    }
+
+    /**
+     * The fragment as {@code release}'s registry-resolver.js reads it: before 1.5.0 a name keeps no {@code @} of its
+     * own, so that the fragment's first {@code @} after the colon starts the range.
+     */
+    static RegistryFragment parseRegistryFragment(String fragment, YarnClassicRelease release) {
+        Matcher match = (release.readsScopedAliases() ? REGISTRY_FRAGMENT : UNSCOPED_REGISTRY_FRAGMENT)
+                .matcher(fragment);
         if (!match.find()) {
             throw new MessageError(Lang.format("Invalid fragment $0.", fragment));
         }
