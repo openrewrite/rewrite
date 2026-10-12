@@ -2325,6 +2325,109 @@ class BunReleaseTest {
           .isEqualTo("https://u.example/");
     }
 
+    // what the release's TOML parser fails a bunfig.toml with, "reads past" what 1.3.x only logs, else the value at the
+    // dotted path
+    private static String toml(String release, String bunfig, String path) {
+        Json.Expr expr;
+        try {
+            expr = Toml.parse(bunfig, BunRelease.of(release));
+        } catch (Toml.SyntaxError e) {
+            return e.error + ": " + e.getMessage();
+        } catch (CannotKnow e) {
+            return "reads past " + e.getMessage().replaceFirst(".*reads past its own error \\((.*)\\)$", "$1");
+        }
+        for (String key : path.split("\\.")) {
+            expr = expr == null ? null : expr.get(key);
+        }
+        if (expr == null) {
+            return "absent";
+        }
+        return expr.isString() ? "\"" + expr.asString() + "\"" : expr.kind == Json.Kind.NUMBER ?
+          String.valueOf(expr.asNumber()) : String.valueOf(expr.asBool());
+    }
+
+    /**
+     * toml.rs (1.4.0, bun#32953): strict TOML 1.1, every error fatal and redacted, beside 1.3.10's lexer.
+     */
+    @Test
+    void parsesBunfigAsStrictTomlFrom140() {
+        assertThat(toml("1.4.0", "[install]\nlinker = isolated\n", "install.linker"))
+          .isEqualTo("SyntaxError: Strings must be quoted");
+        assertThat(toml("1.3.14", "[install]\nlinker = isolated\n", "install.linker")).isEqualTo("\"isolated\"");
+
+        assertThat(toml("1.4.0", "[install]\nregistry = \"a\"\nregistry = \"b\"\n", "install.registry"))
+          .isEqualTo("SyntaxError: Cannot redefine key");
+        assertThat(toml("1.3.14", "[install]\nregistry = \"a\"\nregistry = \"b\"\n", "install.registry"))
+          .isEqualTo("SyntaxError: Cannot redefine key 'registry'");
+
+        String reopened = "[install]\nfrozenLockfile = true\n[install]\nregistry = \"r\"\n";
+        assertThat(toml("1.4.0", reopened, "install.registry")).isEqualTo("SyntaxError: Cannot redefine table");
+        assertThat(toml("1.3.14", reopened, "install.registry")).isEqualTo("\"r\"");
+
+        String dotted = "install.registry = \"r\"\n[x]\ny = 1\n[install]\ndev = true\n";
+        assertThat(toml("1.4.0", dotted, "install.dev")).isEqualTo("SyntaxError: Cannot redefine table");
+
+        assertThat(toml("1.4.0", "[install.scopes]\n@myorg = \"x\"\n", "install.scopes.@myorg"))
+          .isEqualTo("SyntaxError: Expected a key but found (redacted)");
+        assertThat(toml("1.3.14", "[install.scopes]\n@myorg = \"x\"\n", "install.scopes.@myorg")).isEqualTo("\"x\"");
+
+        assertThat(toml("1.4.0", "[install]\nregistry : \"x\"\n", "install.registry"))
+          .isEqualTo("SyntaxError: Expected '=' after a key but found (redacted)");
+        assertThat(toml("1.3.14", "[install]\nregistry : \"x\"\n", "install.registry")).isEqualTo("\"x\"");
+
+        assertThat(toml("1.4.0", "a = 1 b = 2\n", "a"))
+          .isEqualTo("SyntaxError: Expected a newline or end of file after a key/value pair");
+        assertThat(toml("1.4.0", "[install]\nregistry =\n\"x\"\n", "install.registry"))
+          .isEqualTo("SyntaxError: Missing value after '='; values must be on the same line");
+    }
+
+    @Test
+    void readsBunfigCommentsEscapesNumbersAndDatesAsTomlFrom140() {
+        // a # that ends its line swallowed the next in 1.3.x
+        assertThat(toml("1.4.0", "[install] #\nx = 1\n", "install.x")).isEqualTo("1.0");
+        assertThat(toml("1.3.14", "[install] #\nx = 1\n", "install.x")).isEqualTo("absent");
+        assertThat(toml("1.4.0", "#\nx = 1\n", "x")).isEqualTo("1.0");
+        assertThat(toml("1.3.14", "#\nx = 1\n", "x")).isEqualTo("absent");
+
+        assertThat(toml("1.4.0", "x = \"a\\tb\"\n", "x")).isEqualTo("\"a\tb\"");
+        assertThat(toml("1.3.14", "x = \"a\\tb\"\n", "x")).isEqualTo("\"a\fb\"");
+        assertThat(toml("1.4.0", "x = \"a\\qb\"\n", "x")).isEqualTo("SyntaxError: Invalid escape sequence: (redacted)");
+        assertThat(toml("1.3.14", "x = \"a\\qb\"\n", "x")).isEqualTo("\"aqb\"");
+
+        assertThat(toml("1.4.0", "x = 017\n", "x")).isEqualTo("SyntaxError: Leading zeros are not allowed in numbers");
+        assertThat(toml("1.3.14", "x = 017\n", "x")).isEqualTo("15.0");
+        assertThat(toml("1.4.0", "x = 9007199254740992\n", "x")).isEqualTo("SyntaxError: Integer cannot be losslessly " +
+          "represented as a JavaScript number; it must be within +/-(2^53 - 1)");
+        assertThat(toml("1.4.0", "x = 0x1F\ny = -0\n", "x")).isEqualTo("31.0");
+        assertThat(toml("1.4.0", "x = 1979-05-27T07:32:00Z\n", "x")).isEqualTo("\"1979-05-27T07:32:00Z\"");
+
+        assertThat(toml("1.4.0", "x = '''\nabc'''\n", "x")).isEqualTo("\"abc\"");
+        assertThat(toml("1.3.14", "x = '''\nabc'''\n", "x")).isEqualTo("\"\nabc\"");
+
+        // an unknown character is the end of the file to 1.3.x, which logs "Unexpected " and goes on
+        assertThat(toml("1.3.14", "x = 1\n%\ny = 2\n", "x")).isEqualTo("reads past Unexpected ");
+        assertThat(toml("1.4.0", "x = 1\n%\ny = 2\n", "x"))
+          .isEqualTo("SyntaxError: Expected a key but found (redacted)");
+    }
+
+    /**
+     * Arguments.zig loadConfig and bunfig's arguments.rs: a bunfig.toml that does not parse is the parser's error,
+     * then {@code failed to load bunfig}.
+     */
+    @Test
+    void reportsABunfigThatDoesNotParseAsSuch() {
+        org.openrewrite.javascript.internal.LockFileRegeneration.Result result = new BunLockRegenerator(
+          BunLockRegenerator.Inputs.builder()
+            .lock(EMPTY_ROOT)
+            .manifest("", "{\"name\":\"root\"}")
+            .bunfig("[install]\nlinker = isolated\n")
+            .now(java.time.Instant.parse("2026-10-11T00:00:00Z"))
+            .release(BunRelease.of("1.4.0"))
+            .build(), (url, name, extended) -> null).regenerate();
+        assertThat(requireNonNull(result.getFailure()).getDetail())
+          .contains("SyntaxError: failed to load bunfig: Strings must be quoted");
+    }
+
     private static String repeat(char c, int n) {
         char[] chars = new char[n];
         java.util.Arrays.fill(chars, c);

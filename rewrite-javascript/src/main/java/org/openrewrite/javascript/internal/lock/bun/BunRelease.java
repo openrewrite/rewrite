@@ -357,6 +357,20 @@ public final class BunRelease implements Comparable<BunRelease> {
     }
 
     /**
+     * bunfig.toml is read by a strict TOML 1.1 parser (src/parsers/toml.rs), every error fatal, from 1.4.0
+     * (bun#32953): a bare word value is {@code Strings must be quoted}; a table is defined once, a dotted key extends
+     * only its own block, and a key once; bare keys are letters, digits, {@code -} and {@code _}, and {@code =}
+     * alone separates a key from its value; a line holds one statement; a comment takes no control character and
+     * ends at its line's end; escapes are TOML's, a newline after a multi-line string's opening is trimmed, and
+     * numbers and dates are TOML's. Before, the TOML lexer (src/interchange/toml) reads a bare word as a string, merges
+     * a table reopened, takes {@code :} for {@code =} and a word's {@code @ $ :} as its own, swallows the line after
+     * a {@code #} that ends one, swaps {@code \f} and {@code \t}, and only logs what {@code expect} does not find.
+     */
+    boolean parsesTomlStrictly() {
+        return atLeast(1, 4, 0);
+    }
+
+    /**
      * A quoted string in bun.lock ({@code format_json_string_utf8} with {@code quote}) is escaped by
      * src/bun_core/fmt.rs {@code encode_json_string_chars}, from 1.4.0 (bun#30412) until 1.4.1 (bun#40718): only
      * {@code "}, {@code \}, the short escapes and the other control characters, those as <code>&#92;u00xx</code> in lowercase

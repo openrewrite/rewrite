@@ -90,7 +90,7 @@ public final class BunOptions {
         Install install = new Install();
         Json.Expr installObj = null;
         if (bunfigToml != null) {
-            Json.Expr bunfig = Toml.parse(bunfigToml);
+            Json.Expr bunfig = Toml.parse(bunfigToml, release);
             installObj = bunfig.getObject("install");
             if (installObj != null && !release.letsBunfigOverrideNpmrc()) {
                 install.readBunfig(installObj);
