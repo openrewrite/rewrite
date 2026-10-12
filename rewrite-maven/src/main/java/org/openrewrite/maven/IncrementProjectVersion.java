@@ -37,7 +37,7 @@ import static org.openrewrite.internal.StringUtils.matchesGlob;
 
 @Value
 @EqualsAndHashCode(callSuper = false)
-public class IncrementProjectVersion extends ScanningRecipe<Map<GroupArtifact, String>> {
+public class IncrementProjectVersion extends ScanningRecipe<Map<GroupArtifact, IncrementProjectVersion.VersionChange>> {
 
     @Option(displayName = "Group",
             description = "The group ID of the Maven project to change its version. This can be a glob expression.",
@@ -61,6 +61,12 @@ public class IncrementProjectVersion extends ScanningRecipe<Map<GroupArtifact, S
         PATCH
     }
 
+    @Value
+    public static class VersionChange {
+        String oldVersion;
+        String newVersion;
+    }
+
     String displayName = "Increment Maven project version";
 
     @Override
@@ -72,12 +78,12 @@ public class IncrementProjectVersion extends ScanningRecipe<Map<GroupArtifact, S
                "[semver](https://semver.org/). Other versioning schemes are not supported.";
 
     @Override
-    public Map<GroupArtifact, String> getInitialValue(ExecutionContext ctx) {
+    public Map<GroupArtifact, VersionChange> getInitialValue(ExecutionContext ctx) {
         return new HashMap<>();
     }
 
     @Override
-    public TreeVisitor<?, ExecutionContext> getScanner(Map<GroupArtifact, String> acc) {
+    public TreeVisitor<?, ExecutionContext> getScanner(Map<GroupArtifact, VersionChange> acc) {
         final Pattern SEMVER_PATTERN = Pattern.compile("(\\d+)\\.(\\d+)\\.(\\d+)\\.?(\\d+)?(-.+)?$");
 
         return new MavenIsoVisitor<ExecutionContext>() {
@@ -85,7 +91,7 @@ public class IncrementProjectVersion extends ScanningRecipe<Map<GroupArtifact, S
             public Xml.Tag visitTag(Xml.Tag tag, ExecutionContext ctx) {
                 Xml.Tag t = super.visitTag(tag, ctx);
 
-                if (!isProjectTag()) {
+                if (!isProjectTag() || t.getMarkers().findFirst(AlreadyIncremented.class).isPresent()) {
                     return t;
                 }
                 ResolvedPom resolvedPom = getResolutionResult().getPom();
@@ -106,9 +112,8 @@ public class IncrementProjectVersion extends ScanningRecipe<Map<GroupArtifact, S
                 if (newVersion.equals(oldVersion)) {
                     return t;
                 }
-                acc.put(new GroupArtifact(
-                                t.getChildValue("groupId").orElse(null), t.getChildValue("artifactId").orElse(null)),
-                        newVersion);
+                acc.put(new GroupArtifact(resolvedPom.getGroupId(), resolvedPom.getArtifactId()),
+                        new VersionChange(oldVersion, newVersion));
                 return t;
             }
 
@@ -152,25 +157,48 @@ public class IncrementProjectVersion extends ScanningRecipe<Map<GroupArtifact, S
     }
 
     @Override
-    public TreeVisitor<?, ExecutionContext> getVisitor(Map<GroupArtifact, String> acc) {
+    public TreeVisitor<?, ExecutionContext> getVisitor(Map<GroupArtifact, VersionChange> acc) {
         return new MavenIsoVisitor<ExecutionContext>() {
             @Override
             public Xml.Tag visitTag(Xml.Tag tag, ExecutionContext ctx) {
                 Xml.Tag t = super.visitTag(tag, ctx);
+                if (isProjectTag() || isParentTag()) {
+                    return incrementProjectVersion(t);
+                }
+                if (isDependencyLikeTag()) {
+                    return incrementSiblingVersion(t);
+                }
+                return t;
+            }
 
-                if (!(isProjectTag() || isParentTag()) ||
-                    t.getMarkers().findFirst(AlreadyIncremented.class).isPresent()) {
+            private Xml.Tag incrementProjectVersion(Xml.Tag t) {
+                if (t.getMarkers().findFirst(AlreadyIncremented.class).isPresent()) {
                     return t;
                 }
-                String newVersion = acc.get(new GroupArtifact(
-                        t.getChildValue("groupId").orElse(null),
-                        t.getChildValue("artifactId").orElse(null)));
-                String oldVersion = t.getChildValue("version").orElse(null);
-                if (newVersion == null || newVersion.equals(oldVersion)) {
+                ResolvedPom resolvedPom = getResolutionResult().getPom();
+                VersionChange change = isProjectTag() ?
+                        acc.get(new GroupArtifact(resolvedPom.getGroupId(), resolvedPom.getArtifactId())) :
+                        acc.get(groupArtifact(t));
+                if (change == null || change.getNewVersion().equals(t.getChildValue("version").orElse(null))) {
                     return t;
                 }
-                return t.withChildValue("version", newVersion)
+                return t.withChildValue("version", change.getNewVersion())
                         .withMarkers(t.getMarkers().add(new AlreadyIncremented(randomId())));
+            }
+
+            private Xml.Tag incrementSiblingVersion(Xml.Tag t) {
+                VersionChange change = acc.get(groupArtifact(t));
+                if (change == null || !change.getOldVersion().equals(t.getChildValue("version").orElse(null))) {
+                    return t;
+                }
+                return t.withChildValue("version", change.getNewVersion());
+            }
+
+            private GroupArtifact groupArtifact(Xml.Tag t) {
+                ResolvedPom resolvedPom = getResolutionResult().getPom();
+                return new GroupArtifact(
+                        resolvedPom.getValue(t.getChildValue("groupId").orElse(null)),
+                        resolvedPom.getValue(t.getChildValue("artifactId").orElse(null)));
             }
         };
     }
