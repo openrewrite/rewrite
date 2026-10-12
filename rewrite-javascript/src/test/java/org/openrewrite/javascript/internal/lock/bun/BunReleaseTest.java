@@ -2129,6 +2129,47 @@ class BunReleaseTest {
           .containsOnly("packages/c");
     }
 
+    /**
+     * GlobWalker.zig matchPatternSlow's matcher: src/glob/ascii.zig before 1.2.3, src/glob/match.zig from 1.2.3
+     * (bun#16824), whose skipBranch goes to its own group's close from 1.2.4. Each row is what
+     * {@code new Bun.Glob(pattern).match(path)}, which calls the same matcher, answers in 1.2.2, 1.2.3 and 1.2.4.
+     */
+    @ParameterizedTest
+    @org.junit.jupiter.params.provider.CsvSource(delimiter = '|', value = {
+      "{a,ab}b|ab|false|true|true",
+      "{a,ab}b|abb|true|true|true",
+      "{ab,a}b|ab|false|true|true",
+      "{a,{b,c}x}|a|true|false|true",
+      "{a,{b,c}x}|ax|false|true|false",
+      "{a,{b,c}x}|bx|false|true|true",
+      "{a,{b,c}x}|b|true|false|false",
+      "![ab|a|false|true|true",
+      "[ab|a|false|false|false",
+      "a}|a}|false|true|true",
+      "'a,b'|'a,b'|false|true|true",
+      "pkg-*|pkg-a|true|true|true",
+      "{pkg,lib}-*|lib-x|true|true|true",
+      "*{a,b}|xb|true|true|true",
+      "{*a,b}c|xac|true|true|true",
+      "!{a,b}|c|true|true|true",
+      "!{a,b}|a|false|false|false",
+      "{a,b|a|false|true|true",
+      "{a,b}}|a}|false|true|true",
+    })
+    void triesEveryBraceBranchFrom123AndSkipsToTheBranchsOwnCloseFrom124(String pattern, String path, boolean in122,
+                                                                         boolean in123, boolean in124) {
+        assertThat(Glob.match(pattern, path, BunRelease.of("1.2.2")).matches()).as("1.2.2").isEqualTo(in122);
+        assertThat(Glob.match(pattern, path, BunRelease.of("1.2.3")).matches()).as("1.2.3").isEqualTo(in123);
+        assertThat(Glob.match(pattern, path, BunRelease.of("1.2.4")).matches()).as("1.2.4").isEqualTo(in124);
+    }
+
+    @Test
+    void matchesAWorkspacesGlobsBranchesAsTheReleaseDoes() {
+        String[] locations = {"packages/ab", "packages/abb"};
+        assertThat(workspaces("1.2.3", "[\"packages/{a,ab}b\"]", locations)).containsOnly("packages/ab", "packages/abb");
+        assertThat(workspaces("1.2.2", "[\"packages/{a,ab}b\"]", locations)).containsOnly("packages/abb");
+    }
+
     // the error the release's JSON parser fails a package.json or bun.lock with, as "name: first message"; "reads past"
     // the error 1.3.x only logs where its parse returns what it read
     private static String jsonFailure(String release, String json) {

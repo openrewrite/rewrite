@@ -291,6 +291,29 @@ public final class BunRelease implements Comparable<BunRelease> {
         return atLeast(1, 3, 4);
     }
 
+    // src/glob: GlobWalker.zig matchPatternSlow, match.zig (from 1.2.3), ascii.zig (before 1.2.3)
+
+    /**
+     * A workspaces glob component with syntax beyond {@code *}, {@code **} and {@code *.ext} is matched by
+     * src/glob/match.zig, which tries each brace branch with the rest of the pattern, from 1.2.3 (bun#16824); before,
+     * by Devon Govett's glob-match (src/glob/ascii.zig, over code points in GlobWalker.zig's {@code matchImpl}), which
+     * keeps the longest branch that matched and never tries a shorter one again ({@code {a,ab}b} does not match
+     * {@code ab}), matches no {@code ,} or {@code }} outside a group, and takes a pattern it cannot read for no match
+     * under {@code !} too.
+     */
+    boolean triesEveryBraceBranch() {
+        return atLeast(1, 2, 3);
+    }
+
+    /**
+     * Past the branch that matched, the matcher skips to the {@code }} that closes the branch's own group
+     * ({@code skipBranch}), from 1.2.4; 1.2.3 stops at the first {@code }}, a nested group's too, and goes on
+     * matching after it ({@code {a,{b,c}x}} matches {@code ax}, not {@code a}).
+     */
+    boolean skipsABraceBranchToItsOwnClose() {
+        return atLeast(1, 2, 4);
+    }
+
     // src/install/patch_install.zig PatchTask.calcHash
 
     /**
