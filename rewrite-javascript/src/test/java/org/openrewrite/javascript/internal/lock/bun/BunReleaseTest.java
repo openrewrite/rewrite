@@ -1629,6 +1629,20 @@ class BunReleaseTest {
         assertThat(rootDiff("1.4.0", WORKSPACE_A, manifests, mapping).hasDiffs()).isFalse();
         assertThat(rootDiff("1.4.1", WORKSPACE_A, workspace("{\"name\":\"a\",\"version\":\"1.0.0\"}"), mapping)
           .hasDiffs()).isFalse();
+
+        ManifestSource none = (url, name, extended) -> null;
+        BunLockRegenerator.Inputs.InputsBuilder inputs = BunLockRegenerator.Inputs.builder()
+          .lock(WORKSPACE_A)
+          .manifests(manifests)
+          .now(java.time.Instant.parse("2026-10-11T00:00:00Z"));
+        org.openrewrite.javascript.internal.LockFileRegeneration.Result rewritten =
+          new BunLockRegenerator(inputs.release(BunRelease.of("1.4.1")).build(), none).regenerate();
+        assertThat(rewritten.getLockFileContent()).as(String.valueOf(rewritten.getErrorMessage()))
+          .contains("\"version\": \"1.1.0\"");
+        org.openrewrite.javascript.internal.LockFileRegeneration.Result kept =
+          new BunLockRegenerator(inputs.release(BunRelease.of("1.4.0")).build(), none).regenerate();
+        assertThat(kept.getLockFileContent()).as(String.valueOf(kept.getErrorMessage()))
+          .contains("\"version\": \"1.0.0\"");
     }
 
     /**
@@ -1650,8 +1664,15 @@ class BunReleaseTest {
           .hasMessage("workspace \"a\" depends on workspace \"b\" (packages/b), which is listed in bun.lock but not " +
                       "on disk");
         assertThat(rootDiff("1.3.14", lock, manifests, mapping).remove).isEqualTo(1);
+        org.openrewrite.javascript.internal.LockFileRegeneration.Result result = new BunLockRegenerator(
+          BunLockRegenerator.Inputs.builder().lock(lock).manifests(manifests)
+            .now(java.time.Instant.parse("2026-10-11T00:00:00Z")).release(BunRelease.of("1.4.0")).build(),
+          (url, name, extended) -> null).regenerate();
+        assertThat(requireNonNull(result.getFailure()).getKind())
+          .isEqualTo(org.openrewrite.javascript.internal.LockFileRegeneration.Kind.PM_REJECTS);
+        assertThat(result.getFailure().getDetail()).contains("which is listed in bun.lock but not on disk");
 
-        String alone = lock.replace("\"b\": \"workspace:*\"", "\"c\": \"1.0.0\"").replace("\"packages\": {\n",
+        String alone =lock.replace("\"b\": \"workspace:*\"", "\"c\": \"1.0.0\"").replace("\"packages\": {\n",
           "\"packages\": {\n" + npm("c", "c@1.0.0", "{}"));
         Map<String, String> unrelated = workspace("{\"name\":\"a\",\"dependencies\":{\"c\":\"1.0.0\"}}");
         BunOptions frozen = BunOptions.load(BunRelease.of("1.4.0"), "[install]\nfrozenLockfile = true\n", null, null,
