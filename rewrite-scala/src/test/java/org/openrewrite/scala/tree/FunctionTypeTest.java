@@ -146,6 +146,25 @@ class FunctionTypeTest implements RewriteTest {
         );
     }
 
+    @Test
+    void byNameParameterInFunctionTypeParameter() {
+        rewriteRun(
+          scala(
+            """
+            object Test {
+              def f(g: (=> Int) => Int) = g(1)
+            }
+            """,
+            spec -> spec.afterRecipe(cu -> {
+                S.FunctionType ft = firstFunctionType(cu);
+                assertThat(ft.isParenthesized()).isTrue();
+                assertThat(ft.getParameters()).singleElement().isInstanceOf(S.FunctionType.class);
+                assertThat(((J.Identifier) ft.getReturnType()).getSimpleName()).isEqualTo("Int");
+            })
+          )
+        );
+    }
+
     private static S.FunctionType firstFunctionType(J tree) {
         AtomicReference<S.FunctionType> ref = new AtomicReference<>();
         new ScalaIsoVisitor<Integer>() {

@@ -33,6 +33,7 @@ import org.openrewrite.test.TypeValidation;
 import java.io.ByteArrayInputStream;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -46,6 +47,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.ExecutionContext.REQUIRE_PRINT_EQUALS_INPUT;
 import static org.openrewrite.java.tree.JavaType.GenericTypeVariable.Variance.*;
 import static org.openrewrite.kotlin.Assertions.kotlin;
+import static org.openrewrite.kotlin.Assertions.kotlinScript;
 
 @SuppressWarnings("ConstantConditions")
 class KotlinTypeMappingTest {
@@ -2459,6 +2461,168 @@ class KotlinTypeMappingTest {
                   """
               )
             );
+        }
+
+        @Test
+        void topLevelFunctionsAndPropertiesAreStatic() {
+            rewriteRun(
+              kotlin(
+                """
+                  package p
+
+                  val topProp = 1
+
+                  fun top() = 1
+
+                  fun String.ext() = length
+
+                  fun main() {
+                      top()
+                      "a".ext()
+                      println(topProp)
+                      listOf(1)
+                  }
+                  """,
+                spec -> spec.afterRecipe(cu -> {
+                    // when
+                    Map<String, Boolean> staticByElement = staticFlagByElement(cu);
+
+                    // then
+                    assertThat(staticByElement).containsAllEntriesOf(Map.of(
+                      "decl top", true,
+                      "decl ext", true,
+                      "decl main", true,
+                      "call top", true,
+                      "call ext", true,
+                      "call println", true,
+                      "call listOf", true,
+                      "var topProp", true,
+                      "ref topProp", true
+                    ));
+                })
+              )
+            );
+        }
+
+        @Test
+        void membersAndLocalsAreNotStatic() {
+            rewriteRun(
+              kotlin(
+                """
+                  package p
+
+                  class UtilKt {
+                      fun f(s: String) = s
+                      fun String.memberExt() = length
+                      fun use() {
+                          f("a")
+                          "a".memberExt()
+                      }
+                  }
+
+                  object O {
+                      fun g() = 1
+                  }
+
+                  class C {
+                      companion object {
+                          fun h() = 1
+                      }
+                  }
+
+                  fun main() {
+                      fun local() = 1
+                      val localVar = 2
+                      O.g()
+                      C.h()
+                      local()
+                      println(localVar)
+                  }
+                  """,
+                spec -> spec.afterRecipe(cu -> {
+                    // when
+                    Map<String, Boolean> staticByElement = staticFlagByElement(cu);
+
+                    // then
+                    assertThat(staticByElement).containsAllEntriesOf(Map.of(
+                      "decl f", false,
+                      "decl memberExt", false,
+                      "decl g", false,
+                      "decl h", false,
+                      "decl local", false,
+                      "call f", false,
+                      "call memberExt", false,
+                      "call g", false,
+                      "call h", false,
+                      "call local", false
+                    ));
+                    assertThat(staticByElement).containsAllEntriesOf(Map.of(
+                      "var s", false,
+                      "var localVar", false,
+                      "ref localVar", false
+                    ));
+                })
+              )
+            );
+        }
+
+        @Test
+        void scriptDeclarationsAreNotStatic() {
+            rewriteRun(
+              kotlinScript(
+                """
+                  val scriptProp = 1
+                  fun scriptFun() = scriptProp
+                  scriptFun()
+                  listOf(1)
+                  """,
+                spec -> spec.afterRecipe(cu -> {
+                    // when
+                    Map<String, Boolean> staticByElement = staticFlagByElement(cu);
+
+                    // then
+                    assertThat(staticByElement).containsAllEntriesOf(Map.of(
+                      "decl scriptFun", false,
+                      "call scriptFun", false,
+                      "var scriptProp", false,
+                      "ref scriptProp", false,
+                      "call listOf", true
+                    ));
+                })
+              )
+            );
+        }
+
+        private static Map<String, Boolean> staticFlagByElement(K.CompilationUnit cu) {
+            return new KotlinIsoVisitor<Map<String, Boolean>>() {
+                @Override
+                public J.MethodDeclaration visitMethodDeclaration(J.MethodDeclaration method, Map<String, Boolean> acc) {
+                    acc.put("decl " + method.getSimpleName(), method.getMethodType().hasFlags(Flag.Static));
+                    return super.visitMethodDeclaration(method, acc);
+                }
+
+                @Override
+                public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, Map<String, Boolean> acc) {
+                    acc.put("call " + method.getSimpleName(), method.getMethodType().hasFlags(Flag.Static));
+                    return super.visitMethodInvocation(method, acc);
+                }
+
+                @Override
+                public J.VariableDeclarations.NamedVariable visitVariable(J.VariableDeclarations.NamedVariable variable, Map<String, Boolean> acc) {
+                    if (variable.getVariableType() != null) {
+                        acc.put("var " + variable.getSimpleName(), variable.getVariableType().hasFlags(Flag.Static));
+                    }
+                    return super.visitVariable(variable, acc);
+                }
+
+                @Override
+                public J.Identifier visitIdentifier(J.Identifier identifier, Map<String, Boolean> acc) {
+                    if (identifier.getFieldType() != null && !(getCursor().getParentTreeCursor().getValue() instanceof J.VariableDeclarations.NamedVariable)) {
+                        acc.put("ref " + identifier.getSimpleName(), identifier.getFieldType().hasFlags(Flag.Static));
+                    }
+                    return super.visitIdentifier(identifier, acc);
+                }
+            }.reduce(cu, new HashMap<>());
         }
 
         private static void assertQualifierTypes(K.CompilationUnit cu, Map<String, String> expectedFqnBySimpleName, String supertype) {

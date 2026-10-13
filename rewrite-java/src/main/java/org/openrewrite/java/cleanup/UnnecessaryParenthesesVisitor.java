@@ -26,6 +26,8 @@ import org.openrewrite.java.style.UnnecessaryParenthesesStyle;
 import org.openrewrite.java.tree.*;
 import org.openrewrite.style.Style;
 
+import java.util.List;
+
 @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
 public class UnnecessaryParenthesesVisitor<P> extends JavaVisitor<P> {
     @Override
@@ -231,20 +233,40 @@ public class UnnecessaryParenthesesVisitor<P> extends JavaVisitor<P> {
                 return mi;
             }
             Expression tree = (Expression) parentheses.getTree();
-            mi = mi.withSelect(tree.withPrefix((mergeSpace(mi.getSelect().getPrefix(), tree.getPrefix()))));
+            Space treePrefix = tree.getPrefix().getWhitespace().contains("\n") ?
+                    tree.getPrefix().withWhitespace("") :
+                    tree.getPrefix();
+            mi = mi.withSelect(tree.withPrefix(mergeSpace(mi.getSelect().getPrefix(), treePrefix, true)));
         }
-        return mi.withArguments(ListUtils.map(mi.getArguments(), arg -> {
-            if (arg instanceof J.Parentheses) {
-                J tree = ((J.Parentheses<?>) arg).getTree();
-                return tree.withPrefix(mergeSpace(arg.getPrefix(), tree.getPrefix()));
+        JContainer<Expression> args = mi.getPadding().getArguments();
+        return mi.getPadding().withArguments(args.getPadding().withElements(ListUtils.map(args.getPadding().getElements(), arg -> {
+            if (!(arg.getElement() instanceof J.Parentheses)) {
+                return arg;
             }
-            return arg;
-        }));
+            J.Parentheses<?> parens = (J.Parentheses<?>) arg.getElement();
+            if (!(parens.getTree() instanceof Expression)) {
+                return arg;
+            }
+            Expression tree = (Expression) parens.getTree();
+            return arg
+                    .withElement(tree.withPrefix(mergeSpace(parens.getPrefix(), tree.getPrefix(), true)))
+                    .withAfter(mergeSpace(parens.getPadding().getTree().getAfter(), arg.getAfter(), false));
+        })));
     }
 
-    private static Space mergeSpace(Space outside, Space inside) {
-        return Space.build(
-                outside.getWhitespace() + inside.getWhitespace(),
-                ListUtils.concatAll(outside.getComments(), inside.getComments()));
+    private static Space mergeSpace(Space first, Space second, boolean keepFirstLineBreak) {
+        List<Comment> firstComments = first.getComments();
+        String firstTail = firstComments.isEmpty() ?
+                first.getWhitespace() :
+                firstComments.get(firstComments.size() - 1).getSuffix();
+        String join = firstTail.contains("\n") && second.getWhitespace().contains("\n") ?
+                (keepFirstLineBreak ? firstTail : second.getWhitespace()) :
+                firstTail + second.getWhitespace();
+        if (firstComments.isEmpty()) {
+            return Space.build(join, second.getComments());
+        }
+        return Space.build(first.getWhitespace(), ListUtils.concatAll(
+                ListUtils.mapLast(firstComments, c -> c.withSuffix(join)),
+                second.getComments()));
     }
 }

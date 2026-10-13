@@ -19,26 +19,28 @@ import lombok.EqualsAndHashCode;
 import lombok.Value;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
-import org.openrewrite.javascript.internal.LockFileRegeneration;
-import org.openrewrite.javascript.internal.NodeDependencyScan;
+import org.openrewrite.javascript.internal.NodeCatalogs;
+import org.openrewrite.javascript.internal.NodeDependencyEdits;
 import org.openrewrite.javascript.internal.PackageJsonHelper;
-import org.openrewrite.javascript.marker.NodeResolutionResult;
-import org.openrewrite.javascript.marker.NodeResolutionResult.Dependency;
+import org.openrewrite.javascript.internal.lock.Rejected;
+import org.openrewrite.javascript.internal.lock.Spec;
+import org.openrewrite.javascript.table.NodeDependencyProtocolsSkipped;
+import org.openrewrite.javascript.table.NodeDependencyEditsDeclined;
 import org.openrewrite.javascript.table.NodeLockRegenerationFailures;
 import org.openrewrite.json.tree.Json;
-import org.openrewrite.marker.Markup;
-import org.openrewrite.text.PlainText;
-import org.openrewrite.yaml.tree.Yaml;
 
-import java.nio.file.Path;
-import java.util.List;
-import java.util.function.Function;
+import java.util.Collection;
+import java.util.LinkedHashMap;
+import java.util.Map;
+
 
 @EqualsAndHashCode(callSuper = false)
 @Value
-public class ChangeDependency extends ScanningRecipe<NodeDependencyScan.Accumulator> {
+public class ChangeDependency extends ScanningRecipe<NodeDependencyEdits> {
 
     transient NodeLockRegenerationFailures lockRegenerationFailures = new NodeLockRegenerationFailures(this);
+    transient NodeDependencyEditsDeclined editsDeclined = new NodeDependencyEditsDeclined(this);
+    transient NodeDependencyProtocolsSkipped protocolsSkipped = new NodeDependencyProtocolsSkipped(this);
 
     @Option(displayName = "Old package name",
             description = "The current name of the npm package to rename.",
@@ -66,152 +68,119 @@ public class ChangeDependency extends ScanningRecipe<NodeDependencyScan.Accumula
     @Nullable String scope;
 
     @Override public String getDisplayName() { return "Change npm dependency"; }
-    @Override public String getInstanceNameSuffix() { return String.format("`%s` -> `%s`", oldPackageName, newPackageName); }
+    @Override
+    public String getInstanceNameSuffix() {
+        return String.format("`%s` -> `%s`", oldPackageName, newPackageName);
+    }
 
     @Override public String getDescription() {
-        return "Renames an npm dependency in `package.json` and optionally updates its version constraint. " +
-                "After modifying the package.json, the lock file is regenerated natively, without executing the package manager. " +
-                "Not safe to use as a precondition: consults the package registry over the network and publishes per-project " +
-                "state shared with other dependency recipes.";
+        return "Renames an npm dependency in `package.json` and optionally updates its version constraint. A " +
+                "`catalog:` reference keeps its catalog, which gains the new name's entry. After modifying the " +
+                "package.json, the lock file is regenerated natively, without executing the package manager. Not " +
+                "safe to use as a precondition: consults the package registry over the network and publishes " +
+                "per-project state shared with other dependency recipes.";
     }
 
-    @Override public NodeDependencyScan.Accumulator getInitialValue(ExecutionContext ctx) { return new NodeDependencyScan.Accumulator(); }
+    @Override
+    public NodeDependencyEdits getInitialValue(ExecutionContext ctx) {
+        return new NodeDependencyEdits(NodeDependencyEdits.rows(lockRegenerationFailures, editsDeclined,
+                oldPackageName));
+    }
 
     @Override
-    public TreeVisitor<?, ExecutionContext> getScanner(NodeDependencyScan.Accumulator acc) {
+    public TreeVisitor<?, ExecutionContext> getScanner(NodeDependencyEdits acc) {
         return new TreeVisitor<Tree, ExecutionContext>() {
             @Override public Tree preVisit(Tree tree, ExecutionContext ctx) {
                 stopAfterPreVisit();
-                if (!(tree instanceof SourceFile)) return tree;
-                SourceFile sf = (SourceFile) tree;
-                Path p = sf.getSourcePath();
-                String basename = p.getFileName().toString();
-
-                if (PackageJsonHelper.isLockFile(basename)) {
-                    if (sf instanceof Json.Document || sf instanceof Yaml.Documents || sf instanceof PlainText) {
-                        Path packagePath = PackageJsonHelper.correspondingPackageJsonPath(p);
-                        NodeDependencyScan.ProjectState ps = acc.projects.computeIfAbsent(packagePath, k -> new NodeDependencyScan.ProjectState());
-                        ps.capturedLockContent = sf.printAll();
-                        acc.lockToPackage.put(p, packagePath);
-                    }
-                    return tree;
-                }
-                if (sf instanceof Json.Document && "package.json".equals(basename)) {
-                    NodeResolutionResult marker = sf.getMarkers().findFirst(NodeResolutionResult.class).orElse(null);
-                    if (marker == null) return tree;
-                    NodeDependencyScan.ProjectState ps = acc.projects.computeIfAbsent(p, k -> new NodeDependencyScan.ProjectState());
-                    ps.capturedPackageJson = sf;
+                if (tree instanceof SourceFile) {
+                    acc.scan((SourceFile) tree);
                 }
                 return tree;
             }
         };
     }
 
-    private boolean matchesChange(SourceFile pkg) {
-        NodeResolutionResult marker = pkg.getMarkers().findFirst(NodeResolutionResult.class).orElse(null);
-        if (marker == null) return false;
-        if (scope != null) {
-            return containsIn(getScopeDeps(marker, scope));
-        }
-        return containsIn(marker.getDependencies()) || containsIn(marker.getDevDependencies())
-                || containsIn(marker.getPeerDependencies()) || containsIn(marker.getOptionalDependencies())
-                || containsIn(marker.getBundledDependencies());
+    @Override
+    public Collection<? extends SourceFile> generate(NodeDependencyEdits acc, ExecutionContext ctx) {
+        return acc.decideAll(ctx, this::decide);
     }
 
-    private boolean containsIn(@Nullable List<Dependency> deps) {
-        if (deps == null) return false;
-        for (Dependency d : deps) if (oldPackageName.equals(d.getName())) return true;
-        return false;
+    private void decide(NodeDependencyEdits.Decision decision, ExecutionContext ctx) {
+        Map<String, Boolean> keepValue = new LinkedHashMap<>();
+        for (Map.Entry<String, Map<String, String>> declared :
+                PackageJsonHelper.declaredDependencies(decision.getManifest()).entrySet()) {
+            String value = declared.getValue().get(oldPackageName);
+            if (value == null || scope != null && !scope.equals(declared.getKey())) {
+                continue;
+            }
+            Spec spec = Spec.ofDependencyOrNull(oldPackageName, value);
+            if (spec != null && (spec.isVersionSpec() || spec.isLocation() && newVersion != null)) {
+                keepValue.put(declared.getKey(), false);
+            } else if (spec != null && spec.getType() == Spec.Type.CATALOG) {
+                NodeCatalogs catalogs;
+                try {
+                    catalogs = decision.catalogs();
+                } catch (Rejected e) {
+                    String why = oldPackageName + " was not renamed: " + e.getMessage();
+                    decision.warn(why);
+                    decision.decline(why);
+                    continue;
+                }
+                String catalog = catalogs == null ? null : catalogs.catalogOf(value);
+                String entry = newVersion;
+                if (catalog != null && entry == null) {
+                    // an entry the new name already has stays, since other importers may use it
+                    entry = catalogs.specifier(catalog, newPackageName);
+                    entry = entry == null ? catalogs.specifier(catalog, oldPackageName) : entry;
+                }
+                String newEntry = entry;
+                if (catalogs != null && catalogs.declined() != null) {
+                    String why = oldPackageName + " was not renamed: " + catalogs.declined();
+                    decision.warn(why);
+                    decision.decline(why);
+                } else if (catalogs != null && catalogs.isFlowStyle()) {
+                    decline(decision, ctx, declared.getKey(), value, spec,
+                            "its catalogs are written in flow style, which is not edited in place");
+                } else if (catalog == null || entry == null) {
+                    decline(decision, ctx, declared.getKey(), value, spec, "its catalog holds no entry for it");
+                } else if (!decision.editCatalogs(c -> c.withEntry(catalog, newPackageName, newEntry))) {
+                    decline(decision, ctx, declared.getKey(), value, spec,
+                            "its catalog cannot take the new name's entry in place");
+                } else {
+                    keepValue.put(declared.getKey(), true);
+                }
+            } else {
+                decline(decision, ctx, declared.getKey(), value, spec, spec != null && spec.isLocation() ?
+                        "pass a newVersion to replace it with a registry version" :
+                        "rename it where the value points first");
+            }
+        }
+        if (!keepValue.isEmpty()) {
+            decision.editManifest(doc -> rename(doc, keepValue));
+        }
     }
 
-    private @Nullable List<Dependency> getScopeDeps(NodeResolutionResult marker, String scopeName) {
-        switch (scopeName) {
-            case "dependencies": return marker.getDependencies();
-            case "devDependencies": return marker.getDevDependencies();
-            case "peerDependencies": return marker.getPeerDependencies();
-            case "optionalDependencies": return marker.getOptionalDependencies();
-            case "bundledDependencies": return marker.getBundledDependencies();
-            default: return null;
+    private Json.Document rename(Json.Document doc, Map<String, Boolean> keepValue) {
+        Json.Document out = doc;
+        for (Map.Entry<String, Boolean> declared : keepValue.entrySet()) {
+            out = PackageJsonHelper.changeDependency(out, oldPackageName, newPackageName,
+                    declared.getValue() ? null : newVersion, declared.getKey());
         }
+        return out;
+    }
+
+    private void decline(NodeDependencyEdits.Decision decision, ExecutionContext ctx, String declaredScope,
+                         String value, @Nullable Spec spec, String remedy) {
+        String protocol = spec == null || spec.getProtocol() == null ? "" : spec.getProtocol();
+        String path = decision.getPath().toString();
+        decision.insertRow(protocolsSkipped, ctx, new NodeDependencyProtocolsSkipped.Row(path, path, oldPackageName,
+                declaredScope, protocol, value, newVersion == null ? "" : newVersion));
+        decision.warn(oldPackageName + " is declared as " + value + (protocol.isEmpty() ? "" : " (" + protocol +
+                ")") + " and was left unchanged: " + remedy);
     }
 
     @Override
-    public TreeVisitor<?, ExecutionContext> getVisitor(NodeDependencyScan.Accumulator acc) {
-        NodeDependencyScan.linkWorkspaceMembers(acc);
-        return new TreeVisitor<Tree, ExecutionContext>() {
-            @Override public Tree preVisit(Tree tree, ExecutionContext ctx) {
-                stopAfterPreVisit();
-                if (!(tree instanceof SourceFile)) return tree;
-                SourceFile sf = (SourceFile) tree;
-                Path p = sf.getSourcePath();
-
-                NodeDependencyScan.ProjectState ps = acc.projects.get(p);
-                if (ps != null && ps.capturedPackageJson != null) {
-                    if (matchesChange(sf)) {
-                        ensureComputed(ps, sf, ctx);
-                    }
-                    if (ps.modifiedPackageJson != null) {
-                        SourceFile out = NodeDependencyScan.modifiedFor(ps, sf);
-                        PackageJsonHelper.putLiveTree(ctx, p, out);
-                        if (ps.regenResult != null && !ps.regenResult.isSuccess()) {
-                            recordFailure(ctx, ps, p);
-                            return Markup.warn(out, new RuntimeException(
-                                    "lock regeneration failed: " + ps.regenResult.getErrorMessage()));
-                        }
-                        return out;
-                    }
-                }
-
-                Path packagePath = acc.lockToPackage.get(p);
-                if (packagePath == null) return tree;
-                NodeDependencyScan.ProjectState rootPs = acc.projects.get(packagePath);
-                if (rootPs == null) return tree;
-
-                for (Path importer : NodeDependencyScan.lockImporters(acc, packagePath, rootPs)) {
-                    NodeDependencyScan.ProjectState ips = acc.projects.get(importer);
-                    if (ips == null) continue;
-                    if (ips.modifiedPackageJson == null) {
-                        SourceFile pkg = PackageJsonHelper.getLiveTree(ctx, importer);
-                        if (pkg == null) pkg = ips.capturedPackageJson;
-                        if (pkg != null && matchesChange(pkg)) {
-                            ensureComputed(ips, pkg, ctx);
-                            if (ips.modifiedPackageJson != null) {
-                                PackageJsonHelper.putLiveTree(ctx, importer, ips.modifiedPackageJson);
-                            }
-                        }
-                    }
-                    if (ips.regenResult != null) {
-                        if (ips.regenResult.isSuccess()) {
-                            return PackageJsonHelper.reparseLock(sf, ips.regenResult.getLockFileContent());
-                        }
-                        recordFailure(ctx, ips, importer);
-                        return Markup.warn(sf, new RuntimeException(
-                                "lock regeneration failed: " + ips.regenResult.getErrorMessage()));
-                    }
-                }
-                return tree;
-            }
-
-            private void ensureComputed(NodeDependencyScan.ProjectState ps, SourceFile pkg, ExecutionContext ctx) {
-                if (ps.modifiedPackageJson != null) return;
-                Function<Json.Document, Json.Document> edit = doc -> PackageJsonHelper.changeDependency(doc, oldPackageName, newPackageName, newVersion, scope);
-                PackageJsonHelper.EditAndRegenerateResult r = PackageJsonHelper.editAndRegenerate(
-                        pkg, edit, ps.capturedLockContent, ctx);
-                if (r.isChanged()) {
-                    ps.modifiedPackageJson = r.getModifiedPackageJson();
-                    ps.regenResult = r.getRegenResult();
-                    ps.editedFrom = pkg;
-                    ps.edit = edit;
-                }
-            }
-        };
-    }
-
-    private void recordFailure(ExecutionContext ctx, NodeDependencyScan.ProjectState ps, Path packageJsonPath) {
-        if (ps.failureRecorded || ps.regenResult == null) {
-            return;
-        }
-        ps.failureRecorded = true;
-        LockFileRegeneration.insertFailureRow(ctx, lockRegenerationFailures, packageJsonPath, ps.regenResult, oldPackageName);
+    public TreeVisitor<?, ExecutionContext> getVisitor(NodeDependencyEdits acc) {
+        return acc.visitor(this::decide);
     }
 }
