@@ -146,7 +146,8 @@ public class SemanticallyEqual {
         @Override
         public Expression visitExpression(Expression expression, J j) {
             if (isEqual.get()) {
-                if (!isOfType(expression.getType(), ((Expression) j).getType())) {
+                if (expression.getClass() != j.getClass() ||
+                    !isOfType(expression.getType(), ((Expression) j).getType())) {
                     isEqual.set(false);
                 }
             }
