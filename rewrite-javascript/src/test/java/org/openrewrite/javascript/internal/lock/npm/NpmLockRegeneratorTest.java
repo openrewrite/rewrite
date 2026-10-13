@@ -15,18 +15,26 @@
  */
 package org.openrewrite.javascript.internal.lock.npm;
 
+import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.openrewrite.javascript.internal.LockFileRegeneration.Kind;
 import org.openrewrite.javascript.internal.LockFileRegeneration.Reason;
 import org.openrewrite.javascript.internal.LockFileRegeneration.Result;
 import org.openrewrite.javascript.internal.lock.Host;
 
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Base64;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
+import java.util.List;
 import java.util.Map;
 
 import static java.util.Collections.singletonMap;
@@ -580,5 +588,196 @@ class NpmLockRegeneratorTest {
 
         assertThat(regenerate(inputs.release(NpmRelease.of("12.0.0"))).getLockFileContent())
           .isEqualTo(lock("1.0.1", 3));
+    }
+
+    /**
+     * A registry of {@code {name: {latest, versions: {version: manifest fields}}}}, each version given its name,
+     * version and a dist, as the cases of the review of npm 7.0.9 to 7.1.0 ran the real releases over a local registry
+     * ({@code build/mini/run-case.js}); the locks expected below are what those releases wrote.
+     */
+    @SuppressWarnings("unchecked")
+    private static PackumentSource localRegistry(String json) {
+        Map<String, Object> packages = NpmTreeSupport.json(json);
+        return new PackumentSource() {
+            @Override
+            public Map<String, Object> packument(String registry, String name, boolean fullMetadata) {
+                Map<String, Object> p = (Map<String, Object>) packages.get(name);
+                if (p == null) {
+                    throw new AssertionError("no such package: " + name);
+                }
+                Map<String, Object> versions = new LinkedHashMap<>();
+                for (String version : ((Map<String, Object>) p.get("versions")).keySet()) {
+                    versions.put(version, manifest(registry, name, version));
+                }
+                Map<String, Object> doc = new LinkedHashMap<>();
+                doc.put("name", name);
+                doc.put("dist-tags", singletonMap("latest", p.get("latest")));
+                doc.put("versions", versions);
+                return doc;
+            }
+
+            @Override
+            public Map<String, Object> manifest(String registry, String name, String version) {
+                Map<String, Object> m = new LinkedHashMap<>();
+                m.put("name", name);
+                m.put("version", version);
+                m.putAll((Map<String, Object>) ((Map<String, Object>) ((Map<String, Object>) packages.get(name))
+                  .get("versions")).get(version));
+                Map<String, Object> dist = new LinkedHashMap<>();
+                dist.put("tarball", registry + name + "/-/" + name + "-" + version + ".tgz");
+                dist.put("integrity", "sha512-" + Base64.getEncoder().encodeToString(sha512(name + "@" + version)));
+                m.put("dist", dist);
+                return m;
+            }
+        };
+    }
+
+    private static byte[] sha512(String text) {
+        try {
+            return MessageDigest.getInstance("SHA-512").digest(text.getBytes(StandardCharsets.UTF_8));
+        } catch (NoSuchAlgorithmException e) {
+            throw new IllegalStateException(e);
+        }
+    }
+
+    // the lock of a project named root that has no dependency yet, which the releases were run over too
+    private static final String ROOT_ONLY_LOCK = "{\n  \"name\": \"root\",\n  \"version\": \"1.0.0\",\n" +
+                                                 "  \"lockfileVersion\": 2,\n  \"requires\": true,\n" +
+                                                 "  \"packages\": {\n    \"\": {\n      \"name\": \"root\",\n" +
+                                                 "      \"version\": \"1.0.0\"\n    }\n  }\n}\n";
+
+    // the root manifest installed as release over ROOT_ONLY_LOCK, in a directory named project as the releases were run
+    private static Result install(String release, String registry, String manifest) {
+        return new NpmLockRegenerator(NpmLockRegenerator.Inputs.builder()
+          .release(NpmRelease.of(release))
+          .directoryName("project")
+          .lock(ROOT_ONLY_LOCK)
+          .manifest("", manifest)
+          .now(Instant.EPOCH)
+          .build(), localRegistry(registry)).regenerate();
+    }
+
+    // the lock's entries as location@version
+    @SuppressWarnings("unchecked")
+    private static List<String> installed(Result result) {
+        assertThat(result.getErrorMessage()).isNull();
+        Map<String, Object> packages = (Map<String, Object>) NpmTreeSupport.<Map<String, Object>>json(
+          String.valueOf(result.getLockFileContent())).get("packages");
+        List<String> out = new ArrayList<>();
+        for (Map.Entry<String, Object> e : packages.entrySet()) {
+            if (!e.getKey().isEmpty()) {
+                out.add(e.getKey() + "@" + ((Map<String, Object>) e.getValue()).get("version"));
+            }
+        }
+        return out;
+    }
+
+    // build-ideal-tree.js [_placeDep] from npm 7.0.11 checks the place past a source that peer-depends on the name as
+    // the source, which keeps t's p and warns, where npm 7.0.10 has no place for s's peer set
+    // (treatsFirstPlaceAsPeerSetSource)
+    @ParameterizedTest
+    @ValueSource(strings = {"7.0.10", "7.0.11"})
+    void placeAboveASkippedSourceIsTheSourceFrom7_0_11(String release) {
+        Result result = install(release,
+          "{\"t\":{\"latest\":\"1.0.0\",\"versions\":{\"1.0.0\":{\"dependencies\":{\"s\":\"1.0.0\",\"p\":\"1.0.0\"}}}}," +
+          "\"s\":{\"latest\":\"2.0.0\",\"versions\":{\"1.0.0\":{\"dependencies\":{\"d\":\"1.0.0\"}," +
+          "\"peerDependencies\":{\"p\":\"^1.0.0\"}},\"2.0.0\":{}}}," +
+          "\"d\":{\"latest\":\"1.0.0\",\"versions\":{\"1.0.0\":{\"peerDependencies\":{\"p\":\"^1.1.0\"}}}}," +
+          "\"p\":{\"latest\":\"3.0.0\",\"versions\":{\"1.0.0\":{},\"1.2.0\":{},\"3.0.0\":{}}}}",
+          "{\"name\":\"root\",\"version\":\"1.0.0\",\"dependencies\":{\"t\":\"1.0.0\",\"s\":\"2.0.0\",\"p\":\"3.0.0\"}}");
+        if ("7.0.10".equals(release)) {
+            assertThat(result.getErrorMessage()).contains("(ERESOLVE)").contains("Found: p@1.0.0");
+        } else {
+            assertThat(installed(result)).containsExactly("node_modules/p@3.0.0", "node_modules/s@2.0.0",
+              "node_modules/t@1.0.0", "node_modules/t/node_modules/p@1.0.0", "node_modules/t/node_modules/s@1.0.0",
+              "node_modules/t/node_modules/s/node_modules/d@1.0.0");
+        }
+    }
+
+    // build-ideal-tree.js [_pruneForReplacement] from npm 7.0.11 prunes what the replaced a@1 alone held unless a valid
+    // edge holds it, so b@1 goes and z1's b@2 takes the root; npm 7.0.10 keeps b@1 for z1's and z2's invalid edges
+    // (prunesReplacedDepsByValidEdges)
+    @ParameterizedTest
+    @ValueSource(strings = {"7.0.10", "7.0.11"})
+    void invalidEdgesHoldNoReplacedDependencyFrom7_0_11(String release) {
+        Result result = install(release,
+          "{\"x\":{\"latest\":\"1.0.0\",\"versions\":{\"1.0.0\":{\"dependencies\":{\"a\":\"1 || 2\"}}}}," +
+          "\"y\":{\"latest\":\"1.0.0\",\"versions\":{\"1.0.0\":{\"dependencies\":{\"a\":\"2\"}}}}," +
+          "\"z1\":{\"latest\":\"1.0.0\",\"versions\":{\"1.0.0\":{\"dependencies\":{\"b\":\"2\"}}}}," +
+          "\"z2\":{\"latest\":\"1.0.0\",\"versions\":{\"1.0.0\":{\"dependencies\":{\"b\":\"3\"}}}}," +
+          "\"a\":{\"latest\":\"1.0.0\",\"versions\":{\"1.0.0\":{\"dependencies\":{\"b\":\"1.0.0\"}},\"2.0.0\":{}}}," +
+          "\"b\":{\"latest\":\"1.0.0\",\"versions\":{\"1.0.0\":{},\"2.0.0\":{},\"3.0.0\":{}}}}",
+          "{\"name\":\"root\",\"version\":\"1.0.0\",\"dependencies\":{\"x\":\"1.0.0\",\"y\":\"1.0.0\",\"z1\":\"1.0.0\"," +
+          "\"z2\":\"1.0.0\"}}");
+        assertThat(installed(result)).containsExactlyElementsOf("7.0.10".equals(release) ?
+          Arrays.asList("node_modules/a@2.0.0", "node_modules/b@3.0.0", "node_modules/x@1.0.0", "node_modules/y@1.0.0",
+            "node_modules/z1@1.0.0", "node_modules/z1/node_modules/b@2.0.0", "node_modules/z2@1.0.0") :
+          Arrays.asList("node_modules/a@2.0.0", "node_modules/b@2.0.0", "node_modules/x@1.0.0", "node_modules/y@1.0.0",
+            "node_modules/z1@1.0.0", "node_modules/z2@1.0.0", "node_modules/z2/node_modules/b@3.0.0"));
+    }
+
+    // node.js canReplaceWith from npm 7.0.11 leaves out b's edge back to a, which a's replacement takes away with it,
+    // so a@2 replaces a@1; npm 7.0.10 keeps a@1 for b and nests y's a@2 (ignoresOwnDepSetToReplace)
+    @ParameterizedTest
+    @ValueSource(strings = {"7.0.10", "7.0.11"})
+    void ownDependencyCycleHoldsNoNodeFrom7_0_11(String release) {
+        Result result = install(release,
+          "{\"x\":{\"latest\":\"1.0.0\",\"versions\":{\"1.0.0\":{\"dependencies\":{\"a\":\"1 || 2\"}}}}," +
+          "\"y\":{\"latest\":\"1.0.0\",\"versions\":{\"1.0.0\":{\"dependencies\":{\"a\":\"2\"}}}}," +
+          "\"a\":{\"latest\":\"1.0.0\",\"versions\":{\"1.0.0\":{\"dependencies\":{\"b\":\"1.0.0\"}},\"2.0.0\":{}}}," +
+          "\"b\":{\"latest\":\"1.0.0\",\"versions\":{\"1.0.0\":{\"dependencies\":{\"a\":\"1\"}}}}}",
+          "{\"name\":\"root\",\"version\":\"1.0.0\",\"dependencies\":{\"x\":\"1.0.0\",\"y\":\"1.0.0\"}}");
+        assertThat(installed(result)).containsExactlyElementsOf("7.0.10".equals(release) ?
+          Arrays.asList("node_modules/a@1.0.0", "node_modules/b@1.0.0", "node_modules/x@1.0.0", "node_modules/y@1.0.0",
+            "node_modules/y/node_modules/a@2.0.0") :
+          Arrays.asList("node_modules/a@2.0.0", "node_modules/x@1.0.0", "node_modules/y@1.0.0"));
+    }
+
+    // build-ideal-tree.js [_placeDep] from npm 7.0.8 passes over b, which peer-depends on x, placing c@2's x@2, so it
+    // lands at the root; npm 7.0.7 checks b, whose peer edge rejects x@2, and nests it (skipsPlacesWithPeerEdgeOfName)
+    @ParameterizedTest
+    @ValueSource(strings = {"7.0.7", "7.0.8"})
+    void placeThatPeerDependsOnTheNameIsPassedOverFrom7_0_8(String release) {
+        Result result = install(release,
+          "{\"b\":{\"latest\":\"1.0.0\",\"versions\":{\"1.0.0\":{\"dependencies\":{\"c\":\"2.0.0\"}," +
+          "\"peerDependencies\":{\"x\":\"1\"},\"peerDependenciesMeta\":{\"x\":{\"optional\":true}}}}}," +
+          "\"c\":{\"latest\":\"1.0.0\",\"versions\":{\"1.0.0\":{},\"2.0.0\":{\"dependencies\":{\"x\":\"2.0.0\"}}}}," +
+          "\"x\":{\"latest\":\"2.0.0\",\"versions\":{\"1.0.0\":{},\"2.0.0\":{}}}}",
+          "{\"name\":\"root\",\"version\":\"1.0.0\",\"dependencies\":{\"b\":\"1.0.0\",\"c\":\"1.0.0\"}}");
+        assertThat(installed(result)).containsExactlyElementsOf("7.0.7".equals(release) ?
+          Arrays.asList("node_modules/b@1.0.0", "node_modules/b/node_modules/c@2.0.0",
+            "node_modules/b/node_modules/c/node_modules/x@2.0.0", "node_modules/c@1.0.0") :
+          Arrays.asList("node_modules/b@1.0.0", "node_modules/b/node_modules/c@2.0.0", "node_modules/c@1.0.0",
+            "node_modules/x@2.0.0"));
+    }
+
+    // build-ideal-tree.js [_canPlaceDep] from npm 7.0.8 tries an older peer over the node in place, so a's x@1 replaces
+    // d's x@2 at the root; npm 7.0.7 does only under prefer-dedupe, and nests a and x@1 under e (prefersDedupeForPeers)
+    @ParameterizedTest
+    @ValueSource(strings = {"7.0.7", "7.0.8"})
+    void olderPeerReplacesTheNodeInPlaceFrom7_0_8(String release) {
+        Result result = install(release,
+          "{\"d\":{\"latest\":\"1.0.0\",\"versions\":{\"1.0.0\":{\"dependencies\":{\"x\":\"1 || 2\"}}}}," +
+          "\"e\":{\"latest\":\"1.0.0\",\"versions\":{\"1.0.0\":{\"dependencies\":{\"a\":\"1.0.0\"}}}}," +
+          "\"a\":{\"latest\":\"1.0.0\",\"versions\":{\"1.0.0\":{\"peerDependencies\":{\"x\":\"1\"}}}}," +
+          "\"x\":{\"latest\":\"2.0.0\",\"versions\":{\"1.0.0\":{},\"2.0.0\":{}}}}",
+          "{\"name\":\"root\",\"version\":\"1.0.0\",\"dependencies\":{\"d\":\"1.0.0\",\"e\":\"1.0.0\"}}");
+        assertThat(installed(result)).containsExactlyElementsOf("7.0.7".equals(release) ?
+          Arrays.asList("node_modules/d@1.0.0", "node_modules/e@1.0.0", "node_modules/e/node_modules/a@1.0.0",
+            "node_modules/e/node_modules/x@1.0.0", "node_modules/x@2.0.0") :
+          Arrays.asList("node_modules/a@1.0.0", "node_modules/d@1.0.0", "node_modules/e@1.0.0", "node_modules/x@1.0.0"));
+    }
+
+    // node-semver 7.3.2 (npm 7.0.0 to 7.0.15) keeps the `x` group beside the prerelease one, which then satisfies the
+    // range and is the latest; 7.3.4 (npm 7.1.0) takes the range for any version, which the prerelease no longer
+    // satisfies (NpmRelease.semver())
+    @ParameterizedTest
+    @ValueSource(strings = {"7.0.15", "7.1.0"})
+    void groupOfAnyKeepsAPrereleaseBefore7_1_0(String release) {
+        Result result = install(release,
+          "{\"a\":{\"latest\":\"2.0.0-beta.1\",\"versions\":{\"1.0.0\":{},\"2.0.0-beta.1\":{}}}}",
+          "{\"name\":\"root\",\"version\":\"1.0.0\",\"dependencies\":{\"a\":\"x || 2.0.0-beta.1\"}}");
+        assertThat(installed(result)).containsExactly("7.0.15".equals(release) ? "node_modules/a@2.0.0-beta.1" :
+          "node_modules/a@1.0.0");
     }
 }

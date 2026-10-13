@@ -301,6 +301,9 @@ public final class VirtualTreeLoader {
             }
         }
         resolveLinks(links, nodes);
+        if (!options.getRelease().placesLockNodesByRoot()) {
+            assignParentage(nodes);
+        }
         if (!options.getRelease().assignsBundlesOfOldLocksOnly()) {
             assignEveryBundle(nodes);
         } else if (!(Js.toNumber(s.getOriginalLockfileVersion()) >= 2)) {
@@ -474,6 +477,35 @@ public final class VirtualTreeLoader {
                 } else {
                     ((List<Object>) bundleDependencies).add(node.getName());
                 }
+            }
+        }
+    }
+
+    // [assignParentage] of arborist 1 (npm 7.1.0), whose nodes and links are made with no parent: each takes as
+    // parent, or else fsParent, the first node the lock holds walking up its path. The bundles it also assigns, for a
+    // child its parent depends on, are assignEveryBundle's, which reads each node's parent once all are placed.
+    private void assignParentage(Map<String, Node> nodes) {
+        boolean skipsRoot = options.getRelease().skipsRootParentage();
+        for (Map.Entry<String, Node> entry : new ArrayList<>(nodes.entrySet())) {
+            String location = entry.getKey();
+            Node node = entry.getValue();
+            if (location.isEmpty() && skipsRoot) {
+                continue;
+            }
+            String name = Js.string(node.getName());
+            for (String p : PosixPath.walkUp(PosixPath.dirname(Js.string(node.getPath())))) {
+                String ploc = Relpath.relpath(path, p);
+                Node parent = nodes.get(ploc);
+                if (parent == null || parent == node && skipsRoot) {
+                    continue;
+                }
+                String locTest = (ploc + "/node_modules/" + name).replaceFirst("^/", "");
+                if (location.equals(locTest)) {
+                    node.setParent(parent);
+                } else {
+                    node.setFsParent(parent);
+                }
+                break;
             }
         }
     }

@@ -192,6 +192,10 @@ final class DepValid {
             return false;
         }
         if (truthy(child.getResolved())) {
+            if (!child.getRelease().comparesTarballPathsWithSlashes()) {
+                // before npm 7.0.13, as written
+                return Js.strictEquals(child.getResolved(), "file:" + requested.getFetchSpec());
+            }
             if (!(child.getResolved() instanceof String)) {
                 throw new IllegalArgumentException("child.resolved.replace is not a function");
             }

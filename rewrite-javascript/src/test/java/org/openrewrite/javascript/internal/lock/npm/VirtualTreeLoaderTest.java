@@ -98,6 +98,54 @@ class VirtualTreeLoaderTest {
         }
     }
 
+    private static final String WORKSPACE_LOCK = "{\"name\":\"root\",\"lockfileVersion\":2,\"requires\":true," +
+      "\"packages\":{\"\":{\"name\":\"root\",\"workspaces\":[\"packages/a\"]}," +
+      "\"node_modules/a\":{\"resolved\":\"packages/a\",\"link\":true}," +
+      "\"packages/a\":{\"name\":\"a\",\"version\":\"1.0.0\"}}}";
+
+    // load-virtual.js before npm 7.1.1 (arborist 1): [assignParentage] places the lock's nodes and links, which are
+    // made with no parent, by walking up their paths; the root is not in its own inventory
+    @Test
+    void arboristOneAssignsParentageByPath() {
+        for (String version : new String[]{"7.1.0", "7.1.1"}) {
+            NpmRelease release = NpmRelease.of(version);
+            VirtualTreeLoader loader = new VirtualTreeLoader("/project", NpmOptions.fromNpmrc(release, null, null));
+            Node tree = loader.loadVirtual(VirtualTreeLoader.ProjectFiles.builder()
+              .lock(new LockFile(WORKSPACE_LOCK))
+              .manifest("", "{\"name\":\"root\",\"workspaces\":[\"packages/a\"]}")
+              .manifest("packages/a", "{\"name\":\"a\",\"version\":\"1.0.0\"}")
+              .build());
+            Node link = tree.getInventory().get("node_modules/a");
+            Node target = tree.getInventory().get("packages/a");
+            assertThat(link).isNotNull();
+            assertThat(link.getParent()).as("npm %s", version).isSameAs(tree);
+            assertThat(link.getTarget()).isSameAs(target);
+            assertThat(target.getFsParent()).as("npm %s", version).isSameAs(tree);
+            assertThat(tree.getEdgesOut().get("a").getTo()).isSameAs(link);
+            assertThat(tree.getInventory().get("")).as("npm %s", version)
+              .isSameAs("7.1.0".equals(version) ? null : tree);
+        }
+    }
+
+    // [assignParentage] passes over the root from npm 7.0.10; before, the root takes as fsParent a node the lock holds
+    // above the project
+    @Test
+    void arboristOneSkipsRootParentageFrom7010() {
+        String lock = "{\"name\":\"project\",\"lockfileVersion\":2,\"requires\":true," +
+                      "\"packages\":{\"\":{\"name\":\"project\"},\"..\":{\"name\":\"above\",\"version\":\"1.0.0\"}}}";
+        for (String version : new String[]{"7.0.9", "7.0.10"}) {
+            NpmRelease release = NpmRelease.of(version);
+            VirtualTreeLoader loader = new VirtualTreeLoader("/a/project", NpmOptions.fromNpmrc(release, null, null));
+            Node tree = loader.loadVirtual(VirtualTreeLoader.ProjectFiles.builder()
+              .lock(new LockFile(lock))
+              .manifest("", "{\"name\":\"project\"}")
+              .build());
+            Node above = tree.getInventory().get("..");
+            assertThat(above).isNotNull();
+            assertThat(tree.getFsParent()).as("npm %s", version).isSameAs("7.0.9".equals(version) ? above : null);
+        }
+    }
+
     @Test
     void sameTreeReused() {
         VirtualTreeLoader loader = new VirtualTreeLoader(path("install-types"), NpmOptions.DEFAULT);

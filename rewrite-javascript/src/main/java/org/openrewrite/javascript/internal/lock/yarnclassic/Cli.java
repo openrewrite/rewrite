@@ -46,6 +46,16 @@ final class Cli {
         }
     }
 
+    /**
+     * The end of a yarn that handed the install to a yarn-path whose failure it does not pass on (before 1.2.0): the
+     * project is as the yarn-path left it, which node could not load.
+     */
+    static final class HandedOver extends RuntimeException {
+        HandedOver() {
+            super("yarn ends with 0 after the yarn-path it hands the install to fails to load", null, false, false);
+        }
+    }
+
     private static final Pattern RELEASE_FILE = Pattern.compile("yarn-\\d+\\.\\d+\\.\\d+\\.[cm]?js");
     private static final Pattern IN_A_DIRECTORY_ABOVE = Pattern.compile("(\\.\\./)+[^/]+");
     private static final Pattern YARN_0_OR_1 = Pattern.compile("^yarn@[01]\\.");
@@ -70,8 +80,9 @@ final class Cli {
         Object yarnPath = Js.truthy(rc.get("yarn-path")) || !release.followsAYarnrcsYarnPath() ? rc.get("yarn-path") :
                 rc.get("yarnPath");
         Map<String, String> env = inputs.getEnv();
-        if (!Js.truthy(yarnPath) ||
-            Config.boolifyWithDefault(env == null ? null : env.get("YARN_IGNORE_PATH"), false)) {
+        String ignorePath = env == null ? null : env.get("YARN_IGNORE_PATH");
+        if (!Js.truthy(yarnPath) || (release.boolifiesYarnIgnorePath() ?
+                Config.boolifyWithDefault(ignorePath, false) : "1".equals(ignorePath))) {
             return;
         }
         String path = PosixPath.normalize(Js.string(yarnPath));
@@ -83,6 +94,9 @@ final class Cli {
         // the host's paths cover the project and the files directly in each directory above it they reach
         if (yarnPath instanceof String && !held && !PosixPath.isAbsolute(path) && (!path.startsWith("../") ||
             IN_A_DIRECTORY_ABOVE.matcher(path).matches() && Config.depth(singletonList(path)) <= inputs.reach())) {
+            if (!release.exitsWithTheYarnPathsCode()) {
+                throw new HandedOver();
+            }
             throw new Crash(new JsError(JsError.ERROR, "Cannot find module '" + path + "'"));
         }
         String file = PosixPath.basename(path);

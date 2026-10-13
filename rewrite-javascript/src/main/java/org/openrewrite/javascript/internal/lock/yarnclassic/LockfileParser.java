@@ -131,9 +131,10 @@ final class LockfileParser {
             }
             int chop = 0;
             char c0 = input.charAt(0);
-            if (c0 == '\n' || c0 == '\r') {
+            boolean carriageReturns = release.readsCarriageReturnsAsLineEnds();
+            if (c0 == '\n' || c0 == '\r' && carriageReturns) {
                 chop++;
-                if (input.length() > 1 && input.charAt(1) == '\n') {
+                if (carriageReturns && input.length() > 1 && input.charAt(1) == '\n') {
                     chop++;
                 }
                 line++;
@@ -211,7 +212,7 @@ final class LockfileParser {
                 int i = 0;
                 for (; i < input.length(); i++) {
                     char c = input.charAt(i);
-                    if (c == ':' || c == ' ' || c == '\n' || c == '\r' || c == ',') {
+                    if (c == ':' || c == ' ' || c == '\n' || c == '\r' && carriageReturns || c == ',') {
                         break;
                     }
                 }
@@ -227,7 +228,7 @@ final class LockfileParser {
             }
 
             col += chop;
-            lastNewline = c0 == '\n' || (c0 == '\r' && input.length() > 1 && input.charAt(1) == '\n');
+            lastNewline = c0 == '\n' || (carriageReturns && c0 == '\r' && input.length() > 1 && input.charAt(1) == '\n');
             input = input.substring(chop);
         }
 
@@ -345,7 +346,8 @@ final class LockfileParser {
                         throw unexpected("Invalid value type");
                     }
                 } else {
-                    throw unexpected("Unknown token: " + propToken.inspect());
+                    throw unexpected(release.inspectsTheUnknownToken() ? "Unknown token: " + propToken.inspect() :
+                            "Unknown token");
                 }
             }
             return obj;

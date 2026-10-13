@@ -284,7 +284,7 @@ class NodeRuntimeInputsTest {
         assertThat(YarnClassicInputs.from(LockDirectory.of(unmarked), HostInputs.of(ctx(), unmarked.getMarker(), null,
           Instant.EPOCH)).getRelease()).isNull();
 
-        for (String version : Arrays.asList("0.28.4", "1.22.12", "1.6.0")) {
+        for (String version : Arrays.asList("0.28.4", "1.22.12", "0.27.5")) {
             Result result = NativeLockEngine.regenerate(YarnClassicInputs.PORT,
               yarnClassicRequest(runtime(PackageManager.YarnClassic, version)), ctx());
             assertThat(result.getFailure()).isNotNull();
