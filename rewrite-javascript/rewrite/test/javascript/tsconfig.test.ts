@@ -373,6 +373,9 @@ describe('tsconfig.json compiler options', () => {
 });
 
 function forceGc(): void {
+    // A function still being optimized on a compiler thread is held strongly by its job, and with it
+    // the TypeScript checker whose closure it is, so those jobs have to finish before a collection.
+    finalizeOptimization();
     if (typeof global.gc === "function") {
         global.gc();
         return;
@@ -382,6 +385,15 @@ function forceGc(): void {
         vm.runInNewContext("gc")();
     } finally {
         v8.setFlagsFromString("--no-expose_gc");
+    }
+}
+
+function finalizeOptimization(): void {
+    v8.setFlagsFromString("--allow-natives-syntax");
+    try {
+        vm.runInNewContext("%FinalizeOptimization()");
+    } finally {
+        v8.setFlagsFromString("--no-allow-natives-syntax");
     }
 }
 
