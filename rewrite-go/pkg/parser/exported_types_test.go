@@ -17,7 +17,10 @@
 package parser
 
 import (
+	"go/ast"
 	"go/constant"
+	"go/importer"
+	goparser "go/parser"
 	"go/token"
 	"go/types"
 	"strings"
@@ -61,9 +64,7 @@ func TestEnumeratePackageFlagsPackageLevelVariablesPublic(t *testing.T) {
 	assert.Equal(t, map[string]int64{"V": 1, "C": 1}, flags)
 }
 
-// No function body changes a package's declared API, so checking the declarations alone
-// enumerates what checking everything does.
-func TestDeclarationsOnlyEnumeratesTheSameAPI(t *testing.T) {
+func TestImporterEnumeratesTheAPIOfAFullCheck(t *testing.T) {
 	api := `package api
 
 import (
@@ -109,19 +110,22 @@ func Map[T, U any](in []T, f func(T) U) []U {
 	return out
 }
 `
-	full := enumeratedAPI(t, false, api)
+	fset := token.NewFileSet()
+	file, err := goparser.ParseFile(fset, "api.go", api, 0)
+	require.NoError(t, err)
+	checked, err := (&types.Config{Importer: importer.Default()}).Check("example.com/api", fset, []*ast.File{file}, nil)
+	require.NoError(t, err)
+	full := enumeratedAPI(checked)
 	require.NotEmpty(t, full)
-	assert.Equal(t, full, enumeratedAPI(t, true, api))
+
+	pi := NewProjectImporter("example.com/api", nil)
+	pi.AddSource("api.go", api)
+	imported, err := pi.Import("example.com/api")
+	require.NoError(t, err)
+	assert.Equal(t, full, enumeratedAPI(imported))
 }
 
-func enumeratedAPI(t *testing.T, declarationsOnly bool, source string) []string {
-	t.Helper()
-	pi := NewProjectImporter("example.com/api", nil)
-	pi.SetDeclarationsOnly(declarationsOnly)
-	pi.AddSource("api.go", source)
-	pkg, err := pi.Import("example.com/api")
-	require.NoError(t, err)
-
+func enumeratedAPI(pkg *types.Package) []string {
 	var described []string
 	enumeratePackage(pkg, "example.com/api", newTypeMapper(), func(c *java.JavaTypeClass) {
 		if c == nil {
