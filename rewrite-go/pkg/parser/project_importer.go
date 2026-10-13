@@ -89,6 +89,9 @@ type ProjectImporter struct {
 	checking []string
 	fset     *token.FileSet
 	fallback types.Importer
+	// declarationsOnly skips function bodies and the ast's object resolution,
+	// for a caller that reads no more than the packages' declared API.
+	declarationsOnly bool
 }
 
 // DegradedImport is a package carrying less than its source would, and why.
@@ -161,6 +164,14 @@ func NewProjectImporter(modulePath string, fallback types.Importer) *ProjectImpo
 		fset:       token.NewFileSet(),
 		fallback:   fallback,
 	}
+}
+
+// SetDeclarationsOnly type-checks packages without their function bodies. A
+// package's declared types and signatures come out the same; what is lost is
+// the checking of statements, which only a parse that maps those statements
+// needs.
+func (p *ProjectImporter) SetDeclarationsOnly(declarationsOnly bool) {
+	p.declarationsOnly = declarationsOnly
 }
 
 // SetProjectRoot configures the directory the vendor walker scans
@@ -466,9 +477,13 @@ func readGoFilesIn(dir string) ([]projectFile, error) {
 }
 
 func (p *ProjectImporter) parsePackage(importPath string, files []projectFile) (*types.Package, error) {
+	mode := parser.ParseComments
+	if p.declarationsOnly {
+		mode = parser.SkipObjectResolution
+	}
 	asts := make([]*ast.File, 0, len(files))
 	for _, f := range files {
-		a, err := parser.ParseFile(p.fset, f.path, f.content, parser.ParseComments)
+		a, err := parser.ParseFile(p.fset, f.path, f.content, mode)
 		if err != nil {
 			return nil, fmt.Errorf("parse %s: %w", f.path, err)
 		}
@@ -479,11 +494,13 @@ func (p *ProjectImporter) parsePackage(importPath string, files []projectFile) (
 		Importer: p,
 		// Type errors in sibling code shouldn't break the caller's parse —
 		// we still want partial type info.
-		Error: func(error) {},
+		Error:            func(error) {},
+		IgnoreFuncBodies: p.declarationsOnly,
 	}
-	info := &types.Info{
-		Defs: make(map[*ast.Ident]types.Object),
-		Uses: make(map[*ast.Ident]types.Object),
+	info := &types.Info{}
+	if !p.declarationsOnly {
+		info.Defs = make(map[*ast.Ident]types.Object)
+		info.Uses = make(map[*ast.Ident]types.Object)
 	}
 	// The package's Path() — here the full import path, e.g. "github.com/x/y"
 	// — MUST be the full import path, not just the package name, because

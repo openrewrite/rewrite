@@ -33,7 +33,7 @@ from typing import Dict, Optional, Tuple
 from rewrite.java import JavaType
 
 # Import type mapping modules
-from rewrite.python.type_mapping import PythonTypeMapping, compute_source_line_data
+from rewrite.python.type_mapping import PythonTypeMapping, _WithFallback, compute_source_line_data
 from rewrite.python.ty_client import TyTypesClient
 from rewrite.python._parser_visitor import ParserVisitor
 from rewrite.python.visitor import PythonVisitor
@@ -4887,3 +4887,21 @@ class TestDecoratorAttribution:
         # A star import spells no name at all, so only the binding can name what it binds.
         self._assert_named_in_package(
             'from pkg.api import *\n\n@require\ndef f():\n    pass\n', 'pkg._impl.require')
+
+
+class TestSessionTypeFallback:
+    """A file's registry reads the ty session's descriptors without copying them in."""
+
+    def test_a_files_own_descriptor_comes_first_then_the_sessions(self):
+        session = {1: {'kind': 'instance', 'className': 'int'},
+                   2: {'kind': 'instance', 'className': 'str'}}
+        registry = _WithFallback(session)
+        registry[2] = {'kind': 'instance', 'className': 'bytes'}
+
+        assert registry.get(1) is session[1]
+        assert registry.get(2) == {'kind': 'instance', 'className': 'bytes'}
+        assert registry.get(3) is None
+        assert registry.get(3, {}) == {}
+        # Iterating and membership see only the file's own descriptors.
+        assert list(registry) == [2]
+        assert 1 not in registry
