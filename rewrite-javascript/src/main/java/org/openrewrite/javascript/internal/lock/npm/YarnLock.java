@@ -48,6 +48,8 @@ public final class YarnLock {
     private static final String NOT_SPACE = "[^" + Js.WHITESPACE_CLASS + "]";
 
     private static final Pattern LINE = Pattern.compile("([^\\r\\n]*)\\r?\\n");
+    // before npm 7.0.13 a line keeps the \r of a \r\n
+    private static final Pattern LINE_TO_LF = Pattern.compile("([^\\n]*)\\n");
     private static final Pattern ENTRY_START = Pattern.compile(NOT_SPACE + DOT + "*:");
     private static final Pattern SUBKEY = Pattern.compile(" {2}" + NOT_SPACE + "+:");
     private static final Pattern SUBVAL = Pattern.compile(" {4}" + NOT_SPACE + "+ " + DOT + "+");
@@ -119,7 +121,7 @@ public final class YarnLock {
         if (!data.endsWith("\n")) {
             data += "\n";
         }
-        Matcher match = LINE.matcher(data);
+        Matcher match = (release.readsCrlfYarnLock() ? LINE : LINE_TO_LF).matcher(data);
         while (match.find()) {
             String line = match.group(1);
             lineNum++;

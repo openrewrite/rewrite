@@ -223,7 +223,12 @@ public final class YarnClassicLockRegenerator {
     String install(String lock) {
         Inputs these = lock.equals(inputs.getLock()) ? inputs : inputs.toBuilder().lock(lock).build();
         requireConfigFiles(these);
-        Map<String, @Nullable Object> flags = start(these);
+        Map<String, @Nullable Object> flags;
+        try {
+            flags = start(these);
+        } catch (Cli.HandedOver e) {
+            return lock;
+        }
         Config config = new Config(these, flags);
         String saved = new Install(these, config, flags, registry).run();
         return saved == null ? lock : saved;
@@ -246,7 +251,7 @@ public final class YarnClassicLockRegenerator {
         Cli cli = new Cli(inputs);
         cli.start(rc);
         cli.main();
-        return Rc.getRcArgs(rc);
+        return Rc.getRcArgs(rc, inputs.installsAs());
     }
 
     // every install reads the config files of the directory it runs in and of each directory above it
@@ -287,8 +292,10 @@ public final class YarnClassicLockRegenerator {
             return new CannotKnow("the order yarn finds the workspaces in: " + e.getMessage());
         }
         if (e instanceof MessageError) {
-            String message = String.valueOf(e.getMessage());
-            return Rejected.rejects(reasonFor(message), message);
+            MessageError error = (MessageError) e;
+            String message = String.valueOf(error.getMessage());
+            return error.isRewrapped() ? Rejected.crashes(reasonFor(message), null, report(error, release)) :
+                    Rejected.rejects(reasonFor(message), report(error, release));
         }
         // the registry's 404 is its verdict, as in every port; yarn's own plain Errors (a TTY question) have no code
         if (e instanceof NpmRegistry.NotFound) {
@@ -315,8 +322,17 @@ public final class YarnClassicLockRegenerator {
      * 1.22.20. Yarn 1.22.20 reports none; its words are the error's.
      */
     static String unexpectedError(JsError error, YarnClassicRelease release) {
-        return release.reportsUnexpectedErrors() ? Lang.format("An unexpected error occurred: $0.",
+        return release.reportsUnexpectedErrors() ? Lang.format(release, "An unexpected error occurred: $0.",
                 String.valueOf(error.getMessage())) : error.toString();
+    }
+
+    /**
+     * cli/index.js {@code main}'s report of one of yarn's own errors: its message, or, where {@code instanceof
+     * MessageError} fails it (1.4.0 to 1.5.1), {@code onUnexpectedError}'s words.
+     */
+    static String report(MessageError error, YarnClassicRelease release) {
+        String message = String.valueOf(error.getMessage());
+        return release.tellsItsErrorsByClass() ? message : Lang.format(release, "An unexpected error occurred: $0.", message);
     }
 
     private static Reason reasonFor(String message) {

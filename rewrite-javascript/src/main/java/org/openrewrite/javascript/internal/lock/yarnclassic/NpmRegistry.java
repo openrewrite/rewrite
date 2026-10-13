@@ -62,12 +62,27 @@ final class NpmRegistry {
     static String getRequestUrl(String registry, String pathname, YarnClassicRelease release) {
         String resolved = pathname;
         if (!REGISTRY_PREFIX.matcher(pathname).find()) {
-            resolved = (registry.endsWith("/") ? registry : registry + "/") + pathname;
+            resolved = registryAsked(registry, release) + pathname;
         }
         if (release.requestsPublicRegistriesOverHttps() && ENFORCED_HTTPS.matcher(resolved).find()) {
             resolved = resolved.replaceFirst("^http://", "https://");
         }
         return resolved;
+    }
+
+    /**
+     * The registry whose path a package's name follows in the request: the registry with a slash added from 1.0.2;
+     * before, {@code url.resolve}'s, the registry up to the last slash of its path.
+     */
+    static String registryAsked(String registry, YarnClassicRelease release) {
+        if (registry.endsWith("/")) {
+            return registry;
+        }
+        if (release.addsASlashToTheRegistry()) {
+            return registry + "/";
+        }
+        int pathStart = registry.indexOf('/', registry.indexOf("//") + 2);
+        return pathStart < 0 ? registry + "/" : registry.substring(0, registry.lastIndexOf('/') + 1);
     }
 
     /**
@@ -97,7 +112,7 @@ final class NpmRegistry {
         String name = pathname.replaceFirst("%2f", "/");
         String authorization = config.getAuthorization(pathname, url);
         Io<Object> io = Io.issue(loop, causal, () -> {
-            String body = source.packument(registry, name, false, authorization);
+            String body = source.packument(registryAsked(registry, config.getRelease()), name, false, authorization);
             if (body == null) {
                 throw new NotFound(url, name);
             }

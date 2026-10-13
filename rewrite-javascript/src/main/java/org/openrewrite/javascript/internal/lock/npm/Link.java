@@ -36,6 +36,20 @@ public class Link extends Node {
     public Link(Options options) {
         super(linkOptions(options));
         Node target = options.getTarget();
+        if (!getRelease().rootsTargetWithLink()) {
+            // arborist 1: a target made here is rooted in the link's tree and lists the link among its links in
+            setTarget(target != null ? target : new Node(options.toBuilder()
+                    .path(options.getRealpath())
+                    .parent(null)
+                    .root(getRoot())
+                    .linkIn(this)
+                    .build()));
+            Shrinkwrap meta = getRoot().getMeta();
+            if (meta != null) {
+                meta.add(this);
+            }
+            return;
+        }
         if (target != null) {
             setTarget(target);
         } else if (getRelease().targetsRootItLinksTo() && Objects.equals(getRealpath(), getRoot().getPath())) {
@@ -56,6 +70,12 @@ public class Link extends Node {
         if (!truthy(realpath) && (target == null || target.getPath() == null)) {
             throw new IllegalArgumentException("must provide realpath for Link node");
         }
+        if (!options.getRelease().rootsTargetWithLink()) {
+            // arborist 1 roots a link made without a parent nowhere: it is its own root
+            return options.toBuilder()
+                    .realpath(truthy(realpath) ? realpath : target.getPath())
+                    .build();
+        }
         Node root = options.getRoot() != null ? options.getRoot() :
                 options.getParent() != null ? options.getParent().getRoot() :
                         options.getFsParent() != null ? options.getFsParent().getRoot() :
@@ -68,6 +88,10 @@ public class Link extends Node {
 
     @Override
     public Object getVersion() {
+        if (!getRelease().readsLinkVersionFromTarget()) {
+            // arborist 1 has no getter of its own: node.js's reads the package the link took from its target
+            return super.getVersion();
+        }
         if (target != null) {
             return target.getVersion();
         }
@@ -82,6 +106,24 @@ public class Link extends Node {
 
     public void setTarget(@Nullable Node target) {
         Node current = this.target;
+        if (!getRelease().rootsTargetWithLink()) {
+            // arborist 1's setter: the link takes the target's package and path, and roots a target that is its own root
+            if (current != null) {
+                current.getLinksIn().remove(this);
+            }
+            this.target = target;
+            if (target == null) {
+                setPackage(new LinkedHashMap<>());
+                return;
+            }
+            setPackage(target.getPackage());
+            setRealpath(target.getPath());
+            if (target.getRoot() == target) {
+                target.setRoot(getRoot());
+            }
+            target.getLinksIn().add(this);
+            return;
+        }
         if (target == current) {
             return;
         }

@@ -528,8 +528,18 @@ public final class NpmLockRegenerator {
         String message = e.getMessage() == null ? e.getClass().getSimpleName() : e.getMessage();
         if (e instanceof PlaceDep.CouldNotResolve) {
             PlaceDep.PeerConflict conflict = ((PlaceDep.CouldNotResolve) e).getConflict();
-            return Rejected.coded(Reason.PEER_CONFLICT, conflict.getEdge().getName(), "ERESOLVE",
-                    ExplainEresolve.explain(conflict.getExplanation(), 4, conflict.getEdge().getRelease()));
+            NpmRelease release = conflict.getEdge().getRelease();
+            String report;
+            try {
+                report = ExplainEresolve.explain(conflict.getExplanation(), 4, release);
+            } catch (JsError er) {
+                // before npm 7.0.11 the report can fail on the root project's name, after npm logged the code
+                if (release.namesRootProjectAmongMoreDependents()) {
+                    throw er;
+                }
+                report = String.valueOf(er.getMessage());
+            }
+            return Rejected.coded(Reason.PEER_CONFLICT, conflict.getEdge().getName(), "ERESOLVE", report);
         }
         if (e instanceof CannotKnow || e instanceof Rejected) {
             return e;
