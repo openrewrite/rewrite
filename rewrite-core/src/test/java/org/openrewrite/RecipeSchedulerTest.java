@@ -86,6 +86,30 @@ class RecipeSchedulerTest implements RewriteTest {
     }
 
     @Test
+    void exceptionWhileVisitingSynthesizedTreeMarksSourceFile() {
+        rewriteRun(
+          spec -> spec
+            .executionContext(new InMemoryExecutionContext())
+            .recipe(toRecipe(() -> new PlainTextVisitor<>() {
+                @Override
+                public PlainText visitText(PlainText text, ExecutionContext ctx) {
+                    // given a nested visit over a tree which is not part of the source file
+                    return (PlainText) new BoomRecipe().getVisitor().visitNonNull(text.withText("synthesized"), ctx);
+                }
+            }))
+            .cycles(1)
+            .expectedCyclesThatMakeChanges(1)
+            .dataTable(SourcesFileErrors.Row.class, rows -> assertThat(rows).hasSize(1)),
+          // when the nested visit throws
+          // then the error is still visible on the source file
+          text(
+            "hello",
+            "~~(boom)~~>hello"
+          )
+        );
+    }
+
+    @Test
     void exceptionDuringGenerate() {
         rewriteRun(
           spec -> spec.recipe(new BoomGenerateRecipe(false))

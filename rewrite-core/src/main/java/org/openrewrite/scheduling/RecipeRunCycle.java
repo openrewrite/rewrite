@@ -902,7 +902,7 @@ public class RecipeRunCycle<LSS extends LargeSourceSet> {
         if (t instanceof RecipeRunException && after != null) {
             try {
                 RecipeRunException vt = (RecipeRunException) t;
-                after = (SourceFile) new FindRecipeRunException(vt).visitNonNull(after, 0);
+                after = FindRecipeRunException.markNearest(after, vt);
             } catch (Throwable ignored) {
                 // Tree is too broken for node-level marker — fall back to marking the whole file
                 after = Markup.error(after, t);
