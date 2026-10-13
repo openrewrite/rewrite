@@ -89,9 +89,6 @@ type ProjectImporter struct {
 	checking []string
 	fset     *token.FileSet
 	fallback types.Importer
-	// declarationsOnly skips function bodies and the ast's object resolution,
-	// for a caller that reads no more than the packages' declared API.
-	declarationsOnly bool
 }
 
 // DegradedImport is a package carrying less than its source would, and why.
@@ -164,14 +161,6 @@ func NewProjectImporter(modulePath string, fallback types.Importer) *ProjectImpo
 		fset:       token.NewFileSet(),
 		fallback:   fallback,
 	}
-}
-
-// SetDeclarationsOnly type-checks packages without their function bodies. A
-// package's declared types and signatures come out the same; what is lost is
-// the checking of statements, which only a parse that maps those statements
-// needs.
-func (p *ProjectImporter) SetDeclarationsOnly(declarationsOnly bool) {
-	p.declarationsOnly = declarationsOnly
 }
 
 // SetProjectRoot configures the directory the vendor walker scans
@@ -476,14 +465,13 @@ func readGoFilesIn(dir string) ([]projectFile, error) {
 	return out, nil
 }
 
+// parsePackage checks declarations only. Its callers read a package's declared API
+// alone, and no function body changes that API. GoParser checks the files under
+// parse in full.
 func (p *ProjectImporter) parsePackage(importPath string, files []projectFile) (*types.Package, error) {
-	mode := parser.ParseComments
-	if p.declarationsOnly {
-		mode = parser.SkipObjectResolution
-	}
 	asts := make([]*ast.File, 0, len(files))
 	for _, f := range files {
-		a, err := parser.ParseFile(p.fset, f.path, f.content, mode)
+		a, err := parser.ParseFile(p.fset, f.path, f.content, parser.SkipObjectResolution)
 		if err != nil {
 			return nil, fmt.Errorf("parse %s: %w", f.path, err)
 		}
@@ -495,12 +483,7 @@ func (p *ProjectImporter) parsePackage(importPath string, files []projectFile) (
 		// Type errors in sibling code shouldn't break the caller's parse —
 		// we still want partial type info.
 		Error:            func(error) {},
-		IgnoreFuncBodies: p.declarationsOnly,
-	}
-	info := &types.Info{}
-	if !p.declarationsOnly {
-		info.Defs = make(map[*ast.Ident]types.Object)
-		info.Uses = make(map[*ast.Ident]types.Object)
+		IgnoreFuncBodies: true,
 	}
 	// The package's Path() — here the full import path, e.g. "github.com/x/y"
 	// — MUST be the full import path, not just the package name, because
@@ -526,6 +509,6 @@ func (p *ProjectImporter) parsePackage(importPath string, files []projectFile) (
 	p.cache[importPath] = pkg
 	p.checking = append(p.checking, importPath)
 	defer func() { p.checking = p.checking[:len(p.checking)-1] }()
-	_ = types.NewChecker(&conf, p.fset, pkg, info).Files(asts)
+	_ = types.NewChecker(&conf, p.fset, pkg, &types.Info{}).Files(asts)
 	return pkg, nil
 }
