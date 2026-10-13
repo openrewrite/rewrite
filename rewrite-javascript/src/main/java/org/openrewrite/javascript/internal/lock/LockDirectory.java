@@ -21,6 +21,8 @@ import lombok.RequiredArgsConstructor;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.javascript.internal.LockFileRegeneration.Request;
 import org.openrewrite.javascript.marker.NodeResolutionResult;
+import org.openrewrite.javascript.marker.NodeResolutionResult.PackageManager;
+import org.openrewrite.javascript.marker.NodeRuntime;
 
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -71,6 +73,12 @@ public final class LockDirectory {
     private final String runsIn;
 
     /**
+     * The marker of the machine and package manager release that built the LST; null without one.
+     */
+    @Nullable
+    private final NodeRuntime runtime;
+
+    /**
      * The marker's project npmrc, which it read from the repository's root ({@code readNpmrcConfigs(relativeTo ||
      * dir)}), stands in for the root's .npmrc when the host did not read that file itself.
      */
@@ -107,7 +115,16 @@ public final class LockDirectory {
                 paths.add(relative(path, normalize(held)));
             }
         }
-        return new LockDirectory(path, request.getLock(), manifests, files, paths, relative(path, editedDir));
+        return new LockDirectory(path, request.getLock(), manifests, files, paths, relative(path, editedDir),
+                request.getRuntime());
+    }
+
+    /**
+     * The release of {@code pm} that built the LST, as {@link HostInputs#packageManagerVersion} gives it: what the
+     * marker's package manager answered to {@code --version}, when that is {@code pm}, the one the request is for.
+     */
+    public @Nullable String packageManagerVersion(PackageManager pm) {
+        return runtime != null && runtime.getPackageManager() == pm ? runtime.getPackageManagerVersion() : null;
     }
 
     /**

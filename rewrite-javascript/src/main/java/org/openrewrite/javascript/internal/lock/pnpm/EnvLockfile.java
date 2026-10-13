@@ -20,6 +20,7 @@ import org.jspecify.annotations.Nullable;
 import org.openrewrite.javascript.internal.lock.CannotKnow;
 import org.openrewrite.javascript.internal.lock.JsError;
 import org.openrewrite.javascript.internal.lock.JsYaml;
+import org.openrewrite.javascript.internal.lock.StripBom;
 
 import java.util.LinkedHashMap;
 import java.util.Map;
@@ -46,14 +47,23 @@ final class EnvLockfile {
      */
     static final class OnDisk {
         private final @Nullable String text;
+        private final PnpmRelease release;
         private @Nullable String envDocument;
         private boolean envWritten;
         private boolean read;
         private @Nullable EnvLockfile envLockfile;
 
         OnDisk(@Nullable String text) {
+            this(text, PnpmRelease.PORTED);
+        }
+
+        /**
+         * The lock file as {@code release}, the one that runs, reads and writes it.
+         */
+        OnDisk(@Nullable String text, PnpmRelease release) {
             this.text = text;
-            this.envDocument = LockfileReader.readFirstYamlDocument(text);
+            this.release = release;
+            this.envDocument = LockfileReader.readFirstYamlDocument(text, release);
         }
 
         @Nullable
@@ -81,14 +91,23 @@ final class EnvLockfile {
                 return text;
             }
             return LockfileReader.YAML_DOCUMENT_START + envDocument + LockfileReader.YAML_DOCUMENT_SEPARATOR +
-                   (text == null ? "" : LockfileReader.extractMainDocument(text));
+                   (text == null ? "" : LockfileReader.extractMainDocument(text, release));
         }
 
         /**
-         * {@code writeWantedLockfile}: the file with {@code wantedLockfile} as its main document.
+         * {@code writeWantedLockfile} as {@code release}, the one that installs, writes it: the file with
+         * {@code wantedLockfile} as its main document; from 11.14.0 the file as it is where it reads as that already,
+         * its BOM stripped and its CRLF read as LF ({@link PnpmRelease#leavesAnUnchangedLockAsItIs}), asked only there.
          */
-        String writeWantedLockfile(LockfileObject wantedLockfile) {
-            return LockfileWriter.writeWantedLockfile(wantedLockfile, text());
+        String writeWantedLockfile(LockfileObject wantedLockfile, PnpmRelease release) {
+            String existing = text();
+            String content = LockfileWriter.writeWantedLockfile(wantedLockfile, existing);
+            if (existing != null && !existing.equals(content) &&
+                StripBom.stripBom(existing).replace("\r\n", "\n").equals(content) &&
+                release.leavesAnUnchangedLockAsItIs()) {
+                return existing;
+            }
+            return content;
         }
     }
 

@@ -13,11 +13,13 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-// yarn-releases.json.gz: the data each Yarn 4.x release ships that reaches a lock, read at its berry tag.
+// yarn-releases.json.gz: the data each Yarn 4.x release ships that reaches a lock, read at its berry tag. What a release
+// does otherwise than another is a question of YarnRelease, answered by the release that changed it.
 // Usage: node releases.js <rewrite-javascript/src/main/resources/org/openrewrite/javascript/internal/lock/berry>
 'use strict';
 
 const {execFileSync} = require('child_process');
+const {compatPatchHashes} = require('./compat-patch-hashes');
 const crypto = require('crypto');
 const fs = require('fs');
 const {stripTypeScriptTypes} = require('module');
@@ -102,29 +104,6 @@ async function pluginsAt(sha) {
   return manifest[`@yarnpkg/builder`].bundles.standard;
 }
 
-async function jsrScopeAt(sha) {
-  const source = await fetchText(`${RAW}/${sha}/packages/plugin-npm/sources/npmConfigUtils.ts`);
-  return /if \(scope === `jsr`\)/.test(source);
-}
-
-// generateLockfile writes a checksum without its cache key when the key is the lockfile's
-async function checksumWithoutCacheKeyAt(sha) {
-  const source = await fetchText(`${RAW}/${sha}/packages/yarnpkg-core/sources/Project.ts`);
-  return /if \(entryCacheKey === cacheKey\) \{\s*entryChecksum = hash;/.test(source);
-}
-
-// the command the usage errors for an unknown setting and an unknown key of a shape tell the user to run
-async function unknownSettingHintAt(sha) {
-  const source = await fetchText(`${RAW}/${sha}/packages/yarnpkg-core/sources/Configuration.ts`);
-  const hint = source.match(/Unrecognized or legacy configuration settings found: \$\{key\} - run "([^"]+)"/);
-  const shape = source.match(/Unrecognized configuration settings found: \$\{path\}\.\$\{propKey\} - run "([^"]+)"/);
-  if (!hint || !shape)
-    throw new Error(`no unknown-setting message at ${sha}`);
-  if (hint[1] !== shape[1])
-    throw new Error(`the unknown-setting messages at ${sha} name different commands`);
-  return hint[1];
-}
-
 function untar(tgz, wanted) {
   const tar = zlib.gunzipSync(tgz);
   for (let offset = 0; offset + 512 <= tar.length;) {
@@ -183,11 +162,10 @@ async function main() {
       patches: await patchesAt(sha),
       nodeGyp: await nodeGypAt(sha),
       plugins: store(tables, await pluginsAt(sha)),
-      jsrScope: await jsrScopeAt(sha),
-      checksumWithoutCacheKey: await checksumWithoutCacheKeyAt(sha),
       settings: store(tables, await settingsOf(version)),
-      unknownSettingHint: await unknownSettingHintAt(sha),
     };
+    out[version].compatPatchHashes = store(tables, await compatPatchHashes(fetchText, `${RAW}/${sha}`,
+      out[version].patches));
   }
   const json = JSON.stringify({releases: out, tables}, null, 1) + '\n';
   fs.writeFileSync(path.join(outDir, 'yarn-releases.json.gz'), zlib.gzipSync(json, {level: 9}));

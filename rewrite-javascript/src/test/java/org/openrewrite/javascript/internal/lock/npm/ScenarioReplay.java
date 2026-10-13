@@ -15,6 +15,8 @@
  */
 package org.openrewrite.javascript.internal.lock.npm;
 
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.params.provider.Arguments;
 import org.openrewrite.ipc.http.HttpSender;
@@ -27,7 +29,10 @@ import org.openrewrite.javascript.internal.registry.NodeRegistries;
 import org.openrewrite.javascript.internal.registry.NpmRegistryClient;
 
 import java.io.ByteArrayInputStream;
+import java.io.IOException;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.time.Instant;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
@@ -52,12 +57,25 @@ final class ScenarioReplay {
      */
     static final Host RECORDED_ON = Host.builder().os("darwin").cpu("arm64").build();
 
+    private static final ObjectMapper JSON = new ObjectMapper();
+
     private ScenarioReplay() {
     }
 
     static Stream<Arguments> edits() {
+        return edits(NpmScenarios.discover());
+    }
+
+    /**
+     * The edits of every scenario replayed as another release than the one that recorded it.
+     */
+    static Stream<Arguments> releaseEdits() {
+        return edits(NpmScenarios.discoverReleases());
+    }
+
+    private static Stream<Arguments> edits(List<NpmScenarios.Scenario> scenarios) {
         List<Arguments> out = new ArrayList<>();
-        for (NpmScenarios.Scenario scenario : NpmScenarios.discover()) {
+        for (NpmScenarios.Scenario scenario : scenarios) {
             for (NpmScenarios.Edit edit : scenario.edits()) {
                 out.add(Arguments.of(edit.toString(), edit));
             }
@@ -107,7 +125,10 @@ final class ScenarioReplay {
             String file = mirror == null ? file(url, full) : mirror + "/" + file(url.replaceFirst(
               "^[a-z]+://[^/]+/", ""), full);
             requests.add(file);
-            String body = mirror == null ? scenario.http(file) : scenario.file(file);
+            // an abbreviated packument whose versions an older recording kept as empty objects, as the sweep's
+            // registry filled them for the releases that ask for it
+            String filled = mirror == null && !full ? scenario.http(file + "@abbreviated") : null;
+            String body = filled != null ? filled : mirror == null ? scenario.http(file) : scenario.file(file);
             if (body == null) {
                 notRecorded(file);
             }
@@ -174,18 +195,26 @@ final class ScenarioReplay {
 
     static NpmOptions options(NpmScenarios.Scenario scenario) {
         String npmrc = scenario.npmrc() == null ? "" : scenario.npmrc() + "\n";
-        return NpmOptions.fromNpmrc(scenario.host().userNpmrc(HostInputs.GLOBAL_AND_USER),
+        return NpmOptions.fromNpmrc(scenario.release(), scenario.host().userNpmrc(HostInputs.GLOBAL_AND_USER),
                 npmrc + scenario.argsAfter());
     }
 
     static NpmOptions options(@Nullable String npmrc) {
-        return NpmOptions.fromNpmrc(null, npmrc);
+        return options(NpmRelease.PORTED, npmrc);
+    }
+
+    /**
+     * An .npmrc as the config of npm {@code release} reads it, as the release that recorded a scenario loads its locks.
+     */
+    static NpmOptions options(NpmRelease release, @Nullable String npmrc) {
+        return NpmOptions.fromNpmrc(release, null, npmrc);
     }
 
     static NpmLockRegenerator.Inputs inputs(NpmScenarios.Edit edit) {
         NpmScenarios.Scenario scenario = edit.getScenario();
         String npmrc = scenario.npmrc() == null ? "" : scenario.npmrc() + "\n";
         return NpmLockRegenerator.Inputs.builder()
+          .release(scenario.release())
           .lock(edit.getStart().getText())
           .yarnLock(edit.getInputs().getYarnLock())
           .manifests(edit.manifests())
@@ -193,7 +222,70 @@ final class ScenarioReplay {
           .userNpmrc(scenario.host().userNpmrc(HostInputs.GLOBAL_AND_USER))
           .host(host(scenario))
           .now(now(scenario))
+          .directoryName(directoryName(scenario))
+          .paths(paths(edit))
           .build();
+    }
+
+    /**
+     * The name of the directory each release installed the scenario in ({@code sweep-npm.js}): {@code project}, or,
+     * where a root manifest has no name, the name npm gave the lock it recorded there. npm before 7.20.6 writes the
+     * root's name in the lock only when the directory is named otherwise.
+     */
+    static String directoryName(NpmScenarios.Scenario scenario) {
+        Path dir = scenario.getDir();
+        String name = "project";
+        String[][] written = {{"before", "pkg-before"},
+                {"after", Files.isRegularFile(dir.resolve("pkg")) ? "pkg" : "pkg-after"}};
+        for (String[] lockAndManifest : written) {
+            Path lock = dir.resolve(lockAndManifest[0]);
+            Path manifest = dir.resolve(lockAndManifest[1]);
+            if (!Files.isRegularFile(lock) || !Files.isRegularFile(manifest)) {
+                continue;
+            }
+            try {
+                JsonNode pkg = JSON.readTree(manifest.toFile());
+                if (pkg == null || pkg.isNull() || pkg.isObject() && pkg.has("name")) {
+                    continue;
+                }
+                JsonNode named = JSON.readTree(lock.toFile()).get("name");
+                if (named != null && named.isTextual() && named.asText().matches("[A-Za-z0-9._-]+")) {
+                    name = named.asText();
+                }
+            } catch (IOException | RuntimeException e) {
+                // a manifest or lock that does not parse names nothing
+            }
+        }
+        return name;
+    }
+
+    /**
+     * The files of the directory npm installed in, as the recorder laid it out for the edit: package.json, the lock,
+     * the .npmrc, the yarn.lock and the tree's files.
+     */
+    static Set<String> paths(NpmScenarios.Edit edit) {
+        Set<String> paths = new LinkedHashSet<>();
+        // the oldest layout records a member's manifest alone, and a root package.json held unread is cannot-know
+        if (edit.manifests().containsKey("")) {
+            paths.add("package.json");
+        }
+        paths.add("package-lock.json");
+        if (edit.getScenario().npmrc() != null) {
+            paths.add(".npmrc");
+        }
+        if (edit.getInputs().getYarnLock() != null) {
+            paths.add("yarn.lock");
+        }
+        paths.addAll(edit.getInputs().getTree().keySet());
+        return paths;
+    }
+
+    /**
+     * npm's own devEngines check, which it runs before the arborist builds anything.
+     */
+    static void checkDevEngines(NpmScenarios.Edit edit) {
+        NpmScenarios.Scenario scenario = edit.getScenario();
+        NpmLockRegenerator.checkDevEngines(edit.manifests().get(""), options(scenario), host(scenario));
     }
 
     static IdealTreeBuilder builder(NpmScenarios.Edit edit, ScenarioRegistry http, String path) {
@@ -203,7 +295,7 @@ final class ScenarioReplay {
     static IdealTreeBuilder builder(NpmScenarios.Edit edit, ScenarioRegistry http, String path, NpmOptions options) {
         NpmScenarios.Scenario scenario = edit.getScenario();
         VirtualTreeLoader.ProjectFiles files = NpmLockRegenerator.projectFiles(new LockFile(edit.getStart().getText()),
-          edit.getInputs().getYarnLock(), edit.manifests());
+          edit.getInputs().getYarnLock(), edit.manifests()).readBy(options.getRelease(), paths(edit));
         return new IdealTreeBuilder(path, files, options, registry(http), host(scenario), now(scenario));
     }
 
@@ -234,11 +326,12 @@ final class ScenarioReplay {
     }
 
     /**
-     * Arborist's {@code #initTree} and {@code #fixDepFlags} for an install that adds and removes nothing.
+     * Arborist's {@code #initTree} and {@code #fixDepFlags} for an install that adds and removes nothing, as the
+     * release the options are read by runs them.
      */
     static Node load(NpmScenarios.Lock lock, NpmOptions options, String path) {
         VirtualTreeLoader.ProjectFiles files = NpmLockRegenerator.projectFiles(new LockFile(lock.getText()),
-          lock.getYarnLock(), lock.manifests());
+          lock.getYarnLock(), lock.manifests()).readBy(options.getRelease(), null);
         PackageJson manifest;
         try {
             manifest = files.manifest("");
@@ -248,6 +341,7 @@ final class ScenarioReplay {
             manifest = null;
         }
         Node root = new Node(Node.options()
+          .release(options.getRelease())
           .path(path).realpath(path)
           .pkg(manifest != null ? manifest.getContent() : new LinkedHashMap<>())
           .extraneous(false).dev(false).devOptional(false).peer(false).optional(false)

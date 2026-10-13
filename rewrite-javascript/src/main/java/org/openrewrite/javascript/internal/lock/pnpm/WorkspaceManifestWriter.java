@@ -43,10 +43,24 @@ public final class WorkspaceManifestWriter {
     private final int release;
 
     /**
+     * The pnpm 11 release, or range of them, that writes, whose yaml writes the numbers; null for pnpm 10's writer.
+     */
+    private final @Nullable PnpmRelease installs;
+
+    /**
      * The writer of pnpm {@code release} (a major): 11 keeps an unsorted level's order, 10 sorts every level.
      */
     public WorkspaceManifestWriter(int release) {
+        this(release, null);
+    }
+
+    /**
+     * The writer of pnpm {@code release} (a major) as {@code installs}, a pnpm 11 release or range, runs it, its
+     * numbers as that release's yaml writes them ({@link PnpmRelease#padsTheFractionDigitsOfANegativeNumber}).
+     */
+    public WorkspaceManifestWriter(int release, @Nullable PnpmRelease installs) {
         this.release = release;
+        this.installs = installs;
     }
 
     /**
@@ -69,9 +83,11 @@ public final class WorkspaceManifestWriter {
 
     /**
      * The rest of updateWorkspaceManifest ({@code original} is captureKeyOrder's): pnpm 10's sortKeysByPriority or 11's
-     * reorderRecursive, patchDocument, then for 11 propagateBlankLinesToNewPairs.
+     * reorderRecursive, patchDocument, then for 11 propagateBlankLinesToNewPairs; the document then written by the
+     * release's yaml.
      */
     public void write(YamlDocument document, @Nullable Object original, Map<String, @Nullable Object> manifest) {
+        document.writtenBy(this::yaml);
         if (release < 11) {
             document.patch(sorted(manifest));
             return;
@@ -79,6 +95,21 @@ public final class WorkspaceManifestWriter {
         document.patch(reordered(original, manifest));
         propagateBlankLinesToNewPairs(document, original instanceof Map ? EcmaScript.keys(asMap(original)) :
                 Collections.emptyList());
+    }
+
+    // the yaml that writes the numbers, asked of a release only for a number the releases write otherwise, which
+    // where its releases differ is no number written as pnpm writes it; without a release, pnpm 11.2.2's 2.9.0, and
+    // for pnpm 10's writer 2.8.3 (10.33.4 and later bundle 2.8.4, not told apart here)
+    private YamlDocument.Release yaml() {
+        if (installs == null) {
+            return release < 11 ? YamlDocument.Release.V2_8_3 : YamlDocument.Release.V2_9_0;
+        }
+        try {
+            return installs.padsTheFractionDigitsOfANegativeNumber() ? YamlDocument.Release.V2_9_0 :
+                    YamlDocument.Release.V2_8_3;
+        } catch (CannotKnow e) {
+            throw new IllegalArgumentException(e.getMessage(), e);
+        }
     }
 
     private @Nullable Object sorted(@Nullable Object value) {

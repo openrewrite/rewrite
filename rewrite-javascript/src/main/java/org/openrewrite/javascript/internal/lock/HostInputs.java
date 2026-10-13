@@ -15,7 +15,9 @@
  */
 package org.openrewrite.javascript.internal.lock;
 
+import lombok.AccessLevel;
 import lombok.Builder;
+import lombok.Getter;
 import lombok.Singular;
 import lombok.Value;
 import org.jspecify.annotations.Nullable;
@@ -29,6 +31,8 @@ import org.openrewrite.javascript.internal.registry.RegistryDiscovery;
 import org.openrewrite.javascript.marker.NodeResolutionResult;
 import org.openrewrite.javascript.marker.NodeResolutionResult.Npmrc;
 import org.openrewrite.javascript.marker.NodeResolutionResult.NpmrcScope;
+import org.openrewrite.javascript.marker.NodeResolutionResult.PackageManager;
+import org.openrewrite.javascript.marker.NodeRuntime;
 
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
@@ -47,8 +51,9 @@ import static java.util.stream.Collectors.toList;
 import static org.openrewrite.javascript.internal.registry.NodeRegistries.hasCredentials;
 
 /**
- * The host's side of a regeneration, the same for every port: its machine, the time, the environment, and its
- * registry configuration, which each port reads as its package manager's user-level config.
+ * The host's side of a regeneration, the same for every port: its machine, the time, the environment, its registry
+ * configuration, which each port reads as its package manager's user-level config, and the package manager release
+ * that built the LST.
  */
 @Value
 @Builder(toBuilder = true)
@@ -65,8 +70,26 @@ public class HostInputs {
 
     private static final Pattern USERINFO = Pattern.compile("^([A-Za-z][A-Za-z0-9+.-]*://)[^/?#@]*@");
 
+    /**
+     * The machine the package manager runs on: the execution context's where the host set it, else the one the
+     * parser ran on ({@link NodeRuntime}), else unknown.
+     */
     @Builder.Default
     Host host = Host.UNKNOWN;
+
+    /**
+     * The package manager the parser found ({@link NodeRuntime#getPackageManager()}); null without a marker or one.
+     */
+    @Getter(AccessLevel.NONE)
+    @Nullable
+    PackageManager packageManager;
+
+    /**
+     * What its {@code --version} answered in the project's root ({@link NodeRuntime#getPackageManagerVersion()}).
+     */
+    @Getter(AccessLevel.NONE)
+    @Nullable
+    String packageManagerVersion;
 
     Instant now;
 
@@ -95,21 +118,46 @@ public class HostInputs {
     @Builder.Default
     Environment system = Environment.SYSTEM;
 
-    public static HostInputs of(ExecutionContext ctx, @Nullable NodeResolutionResult marker, Instant now) {
+    /**
+     * @param runtime the marker of the machine and package manager release that built the LST, if the parser
+     *                recorded one: its Node version stands where the view sets none, and its os, cpu and libc
+     *                together where the view sets no platform, so that no platform is one field from each machine
+     */
+    public static HostInputs of(ExecutionContext ctx, @Nullable NodeResolutionResult marker,
+                                @Nullable NodeRuntime runtime, Instant now) {
         NodeExecutionContextView view = NodeExecutionContextView.view(ctx);
+        Host.HostBuilder machine = Host.builder()
+                .nodeVersion(view.getNodeVersion())
+                .os(view.getOs())
+                .cpu(view.getCpu())
+                .libc(view.getLibc());
+        if (runtime != null) {
+            if (view.getNodeVersion() == null) {
+                machine.nodeVersion(runtime.getNodeVersion());
+            }
+            if (view.getOs() == null) {
+                machine.os(runtime.getOs()).cpu(runtime.getCpu()).libc(runtime.getLibc());
+            }
+        }
         return HostInputs.builder()
-                .host(Host.builder()
-                        .nodeVersion(view.getNodeVersion())
-                        .os(view.getOs())
-                        .cpu(view.getCpu())
-                        .libc(view.getLibc())
-                        .build())
+                .host(machine.build())
+                .packageManager(runtime == null ? null : runtime.getPackageManager())
+                .packageManagerVersion(runtime == null ? null : runtime.getPackageManagerVersion())
                 .now(now)
                 .registries(view.getRegistries())
                 .credentials(view.getRegistryCredentials())
                 .npmrc(marker == null || marker.getNpmrcConfigs() == null ? new ArrayList<>() :
                         marker.getNpmrcConfigs())
                 .build();
+    }
+
+    /**
+     * The release of {@code pm} that built the LST, which the port of {@code pm} installs the project as: what the
+     * marker's package manager answered to {@code --version}, when that package manager is {@code pm}, the one the
+     * request is for; null otherwise, as without a marker or an answer.
+     */
+    public @Nullable String packageManagerVersion(PackageManager pm) {
+        return pm == packageManager ? packageManagerVersion : null;
     }
 
     /**

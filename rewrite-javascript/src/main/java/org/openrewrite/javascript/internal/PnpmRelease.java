@@ -18,10 +18,11 @@ package org.openrewrite.javascript.internal;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.javascript.internal.lock.CannotKnow;
 import org.openrewrite.javascript.internal.lock.ManifestRules;
-import org.openrewrite.javascript.internal.lock.pnpm.Main;
+import org.openrewrite.javascript.internal.lock.pnpm.PnpmReleases;
 import org.openrewrite.javascript.internal.lock.pnpm.WorkspaceManifestWriter;
 import org.openrewrite.javascript.semver.NodeSemver;
 
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
@@ -34,18 +35,43 @@ import static java.util.Objects.requireNonNull;
  */
 public final class PnpmRelease {
 
-    // each range's first and last release recorded with the same writes, and the pnpm 11 releases that run as 11.2.2
+    // each range's first and last release recorded with the same writes, and the pnpm 11 releases the engine
+    // reproduces, whose writes are the port's
     private static final List<String> RECORDED = Arrays.asList("9.5.0 - 9.15.9", "10.32.1 - 10.34.6",
-            Main.RUNS_AS_PORTED);
+            pnpm11Proven());
+
+    private static String pnpm11Proven() {
+        List<String> releases = new ArrayList<>();
+        for (String release : PnpmReleases.all()) {
+            if (release.startsWith("11.") && PnpmReleases.isProven(release)) {
+                releases.add(release);
+            }
+        }
+        return PnpmReleases.ranges(releases).replace(", ", " || ");
+    }
 
     private final String version;
     private final int major;
     private final @Nullable String declined;
 
+    // the major whose pnpm-workspace.yaml writer the release runs
+    private final int writes;
+
+    // the pnpm 11 release or range the engine reproduces, which its writer asks which yaml writes a number; null for
+    // a release before pnpm 11
+    private final org.openrewrite.javascript.internal.lock.pnpm.@Nullable PnpmRelease installs;
+
     private PnpmRelease(String version, int major, @Nullable String declined) {
+        this(version, major, declined, major, null);
+    }
+
+    private PnpmRelease(String version, int major, @Nullable String declined, int writes,
+                        org.openrewrite.javascript.internal.lock.pnpm.@Nullable PnpmRelease installs) {
         this.version = version;
         this.major = major;
         this.declined = declined;
+        this.writes = writes;
+        this.installs = installs;
     }
 
     /**
@@ -82,10 +108,22 @@ public final class PnpmRelease {
             if (exact != null ? NodeSemver.satisfies(exact, recorded, NodeSemver.Options.DEFAULT) :
                     NodeSemver.validRange(version, NodeSemver.Options.DEFAULT) != null &&
                     NodeSemver.subset(version, recorded, NodeSemver.Options.DEFAULT)) {
-                return new PnpmRelease(version, Integer.parseInt(recorded.substring(0, recorded.indexOf('.'))), null);
+                int major = Integer.parseInt(recorded.substring(0, recorded.indexOf('.')));
+                if (major == 11) {
+                    // a pnpm 11 release before 11.0.6 writes pnpm-workspace.yaml as pnpm 10 does
+                    try {
+                        org.openrewrite.javascript.internal.lock.pnpm.PnpmRelease installs =
+                                PnpmReleases.installs(version);
+                        return new PnpmRelease(version, major, null, installs.keepsTheWorkspaceManifestKeyOrder() ?
+                                11 : 10, installs);
+                    } catch (CannotKnow e) {
+                        return new PnpmRelease(version, major, e.getSubject());
+                    }
+                }
+                return new PnpmRelease(version, major, null);
             }
         }
-        String ranges = String.join(", ", RECORDED);
+        String ranges = recorded();
         return new PnpmRelease(version, exact == null ? -1 : Integer.parseInt(exact.substring(0, exact.indexOf('.'))),
                 exact != null ? "pnpm " + exact + " is not a release whose writes are recorded (" + ranges + ")" :
                         "the pnpm release the project names, " + version + ", is one the registry picks, not " +
@@ -93,10 +131,25 @@ public final class PnpmRelease {
     }
 
     /**
+     * The releases whose writes are recorded, as a declined edit names them: each range, the pnpm 11 ones those the
+     * engine reproduces ({@code PnpmReleases.PROVEN}).
+     */
+    public static String recorded() {
+        return String.join(", ", RECORDED);
+    }
+
+    /**
      * The major of a release whose writes are recorded; for another, its major, or -1 for a range.
      */
     public int getMajor() {
         return major;
+    }
+
+    /**
+     * The release, a version or a range the registry picks from; empty where pnpm cannot read the one it names.
+     */
+    public String getVersion() {
+        return version;
     }
 
     /**
@@ -110,7 +163,7 @@ public final class PnpmRelease {
      * The release's writer of pnpm-workspace.yaml; null when it is declined, or pnpm 9, which never writes the file.
      */
     public @Nullable WorkspaceManifestWriter writer() {
-        return declined != null || major == 9 ? null : new WorkspaceManifestWriter(major);
+        return declined != null || major == 9 ? null : new WorkspaceManifestWriter(writes, installs);
     }
 
     /**

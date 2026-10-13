@@ -32,7 +32,8 @@ import static java.nio.charset.StandardCharsets.UTF_8;
 
 /**
  * Port of bun's src/env_loader.zig (bun 1.3.10): the .env files an install loads from the root over the process
- * environment, in its order, and their parser.
+ * environment, in its order, and their parser, with 1.4.0's src/dotenv/env_loader.rs beside it (the first closing
+ * quote, ASCII whitespace, the byte order mark and left-to-right expansion).
  */
 public final class DotEnv {
 
@@ -45,14 +46,24 @@ public final class DotEnv {
 
     private static final String WHITESPACE = "\t\u000B\f \u00A0\n\r";
 
+    // src/dotenv/env_loader.rs WHITESPACE_CHARS: ASCII only, as the input is UTF-8
+    private static final String ASCII_WHITESPACE = "\t\u000B\f \n\r";
+
+    // the UTF-8 byte order mark, as the loader's bytes
+    private static final String BOM = "\u00EF\u00BB\u00BF";
+
     private DotEnv() {
     }
 
-    /**
-     * The process environment with the files' variables; one whose value expands a variable the host does not know
-     * is unknown.
-     */
     static HostEnvironment load(HostEnvironment process, Map<String, String> files) {
+        return load(BunRelease.PORTED, process, files);
+    }
+
+    /**
+     * The process environment with the files' variables as {@code release} loads them; one whose value expands a
+     * variable the host does not know is unknown.
+     */
+    static HostEnvironment load(BunRelease release, HostEnvironment process, Map<String, String> files) {
         Map<String, String> map = new LinkedHashMap<>();
         for (Map.Entry<String, String> variable : process.known().entrySet()) {
             map.put(variable.getKey(), bytes(variable.getValue()));
@@ -61,7 +72,7 @@ public final class DotEnv {
         for (String file : FILES) {
             String contents = files.get(file);
             if (contents != null) {
-                new Parser(bytes(contents), process, unknown).parse(map);
+                new Parser(bytes(contents), process, unknown, release).parse(map);
             }
         }
         Map<String, String> decoded = new LinkedHashMap<>();
@@ -82,12 +93,19 @@ public final class DotEnv {
         private final StringBuilder valueBuffer = new StringBuilder();
         private final HostEnvironment process;
         private final Set<String> unknown;
+        private final BunRelease release;
+        private final String whitespace;
         private boolean expandsUnknown;
 
-        Parser(String src, HostEnvironment process, Set<String> unknown) {
+        Parser(String src, HostEnvironment process, Set<String> unknown, BunRelease release) {
             this.src = src;
             this.process = process;
             this.unknown = unknown;
+            this.release = release;
+            this.whitespace = release.keepsNoBreakSpacesInEnvValues() ? ASCII_WHITESPACE : WHITESPACE;
+            if (release.stripsTheByteOrderMarkOfEnvFiles() && src.startsWith(BOM)) {
+                pos = BOM.length();
+            }
         }
 
         void parse(Map<String, String> map) {
@@ -111,7 +129,8 @@ public final class DotEnv {
                     continue;
                 }
                 expandsUnknown = false;
-                String expanded = expandValue(map, entry.getValue());
+                String expanded = release.expandsEnvValuesLeftToRight() ?
+                        expandLeftToRight(map, entry.getValue()) : expandValue(map, entry.getValue());
                 if (expanded != null) {
                     entry.setValue(expanded);
                 }
@@ -131,7 +150,7 @@ public final class DotEnv {
 
         private void skipWhitespaces() {
             int i = pos;
-            while (i < src.length() && WHITESPACE.indexOf(src.charAt(i)) >= 0) {
+            while (i < src.length() && whitespace.indexOf(src.charAt(i)) >= 0) {
                 i++;
             }
             pos = i;
@@ -162,7 +181,7 @@ public final class DotEnv {
                             return src.substring(start, end);
                         case ':':
                             int next = pos + 1;
-                            if (next < src.length() && WHITESPACE.indexOf(src.charAt(next)) >= 0) {
+                            if (next < src.length() && whitespace.indexOf(src.charAt(next)) >= 0) {
                                 pos += 2;
                                 return src.substring(start, end);
                             }
@@ -186,10 +205,18 @@ public final class DotEnv {
                 } else if (c == quote) {
                     end++;
                     pos = end;
-                    skipWhitespaces();
-                    String after = src.substring(end, pos);
-                    if (pos >= src.length() || src.charAt(pos) == '#' ||
-                        after.indexOf('\n') >= 0 || after.indexOf('\r') >= 0) {
+                    boolean ends;
+                    if (release.endsAQuotedEnvValueAtItsFirstClosingQuote()) {
+                        // the rest of the line is dropped
+                        skipLine();
+                        ends = true;
+                    } else {
+                        skipWhitespaces();
+                        String after = src.substring(end, pos);
+                        ends = pos >= src.length() || src.charAt(pos) == '#' ||
+                               after.indexOf('\n') >= 0 || after.indexOf('\r') >= 0;
+                    }
+                    if (ends) {
                         int i = start;
                         while (i < end) {
                             char ch = src.charAt(i);
@@ -243,7 +270,119 @@ public final class DotEnv {
                 end++;
             }
             pos = end;
-            return Strings.trim(src.substring(start, end), WHITESPACE);
+            return Strings.trim(src.substring(start, end), whitespace);
+        }
+
+        // env_loader.rs expand_value over expand_into (1.4.0): $NAME, ${NAME} and ${NAME:-default} left to right, the
+        // default expanded in turn; \$ is $, and a $ starting neither is itself
+        private @Nullable String expandLeftToRight(Map<String, String> map, String value) {
+            if (value.length() < 2) {
+                return null;
+            }
+            valueBuffer.setLength(0);
+            return expandInto(map, value, valueBuffer, 0) ? valueBuffer.toString() : null;
+        }
+
+        private boolean expandInto(Map<String, String> map, String value, StringBuilder out, int depth) {
+            int pos = 0;
+            boolean changed = false;
+            while (pos < value.length()) {
+                char b = value.charAt(pos);
+                if (b == '\\' && pos + 1 < value.length() && value.charAt(pos + 1) == '$') {
+                    out.append('$');
+                    pos += 2;
+                    changed = true;
+                    continue;
+                }
+                if (b != '$' || pos + 1 >= value.length()) {
+                    out.append(b);
+                    pos++;
+                    continue;
+                }
+                char next = value.charAt(pos + 1);
+                if (next == '{') {
+                    int innerStart = pos + 2;
+                    int close = -1;
+                    int nest = 1;
+                    int i = innerStart;
+                    while (i < value.length()) {
+                        char c = value.charAt(i);
+                        if (c == '\\' && i + 1 < value.length()) {
+                            i += 2;
+                        } else if (c == '$' && i + 1 < value.length() && value.charAt(i + 1) == '{') {
+                            nest++;
+                            i += 2;
+                        } else if (c == '}') {
+                            nest--;
+                            if (nest == 0) {
+                                close = i;
+                                break;
+                            }
+                            i++;
+                        } else {
+                            i++;
+                        }
+                    }
+                    if (close < 0) {
+                        out.append(value, pos, value.length());
+                        pos = value.length();
+                        continue;
+                    }
+                    changed = true;
+                    String inner = value.substring(innerStart, close);
+                    int keyEnd = 0;
+                    while (keyEnd < inner.length() && isExpansionKeyChar(inner.charAt(keyEnd))) {
+                        keyEnd++;
+                    }
+                    String key = inner.substring(0, keyEnd);
+                    String rest = inner.substring(keyEnd);
+                    if (rest.isEmpty()) {
+                        String lookup = lookup(map, key);
+                        if (lookup != null) {
+                            out.append(lookup);
+                        }
+                    } else if (rest.startsWith(":-")) {
+                        String lookup = lookup(map, key);
+                        String defaultValue = rest.substring(2);
+                        if (lookup != null) {
+                            out.append(lookup);
+                        } else if (depth < 200) {
+                            expandInto(map, defaultValue, out, depth + 1);
+                        } else {
+                            out.append(defaultValue);
+                        }
+                    } else {
+                        out.append(value, pos, close + 1);
+                    }
+                    pos = close + 1;
+                    continue;
+                }
+                if (isExpansionKeyChar(next)) {
+                    changed = true;
+                    int k = pos + 1;
+                    while (k < value.length() && isExpansionKeyChar(value.charAt(k))) {
+                        k++;
+                    }
+                    String lookup = lookup(map, value.substring(pos + 1, k));
+                    if (lookup != null) {
+                        out.append(lookup);
+                    }
+                    pos = k;
+                    continue;
+                }
+                out.append('$');
+                pos++;
+            }
+            return changed;
+        }
+
+        // map.get, noting a variable whose value the host does not know
+        private @Nullable String lookup(Map<String, String> map, String name) {
+            String lookup = map.get(name);
+            if (lookup == null ? !process.settles(name) : unknown.contains(name)) {
+                expandsUnknown = true;
+            }
+            return lookup;
         }
 
         private @Nullable String expandValue(Map<String, String> map, String value) {

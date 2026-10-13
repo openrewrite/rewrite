@@ -30,6 +30,7 @@ import org.openrewrite.SourceFile;
 import org.openrewrite.javascript.internal.lock.DependencyPathSegment;
 import org.openrewrite.javascript.internal.lock.ManifestRules.OverridePlace;
 import org.openrewrite.javascript.marker.NodeResolutionResult.PackageManager;
+import org.openrewrite.javascript.marker.NodeRuntime;
 import org.openrewrite.json.JsonParser;
 import org.openrewrite.json.tree.Json;
 import org.openrewrite.marker.Markup;
@@ -239,6 +240,34 @@ class PackageJsonOverridesTest {
         assertThat(declined(YarnClassic, plain, PackageJsonOverrides.parsePath("is-odd@3.0.1")))
           .contains("is-odd@3.0.1");
         assertThat(declined(Npm, manifest("{\"overrides\":\"x\"}"), null)).contains("not an object");
+    }
+
+    // the Bun release the root's NodeRuntime marker names reads the override, as it installs the lock
+    @Test
+    void bunReadsAnOverrideAsTheReleaseTheMarkerNames() {
+        Json.Document root = manifest("{\"name\":\"p\"}");
+        List<DependencyPathSegment> oneParent = PackageJsonOverrides.parsePath("is-odd");
+        List<DependencyPathSegment> twoParents = PackageJsonOverrides.parsePath("is-even>is-odd");
+        assertThat(declined(Bun, ranBy(root, Bun, "1.3.10"), oneParent))
+          .isEqualTo("bun does not support nested overrides");
+        // from 1.4.0 bun reads an override one parent deep, and warns of a deeper one
+        assertThat(declined(Bun, ranBy(root, Bun, "1.4.0"), oneParent)).isNull();
+        assertThat(declined(Bun, ranBy(root, Bun, "1.4.0"), twoParents))
+          .isEqualTo("Bun currently only supports one level of nested \"overrides\"");
+        assertThat(declined(Bun, ranBy(root, Bun, "1.4.0"), null)).isNull();
+        // 1.2.x reads overrides flat, as 1.3.10 does
+        assertThat(declined(Bun, ranBy(root, Bun, "1.2.0"), oneParent))
+          .isEqualTo("bun does not support nested overrides");
+        // a release the engine does not reproduce
+        assertThat(declined(Bun, ranBy(root, Bun, "1.1.45"), oneParent)).contains("cannot know what bun 1.1.45 writes");
+        // a marker of another package manager names no Bun release: 1.3.10 installs
+        assertThat(declined(Bun, ranBy(root, Npm, "1.4.0"), oneParent))
+          .isEqualTo("bun does not support nested overrides");
+    }
+
+    private static Json.Document ranBy(Json.Document root, PackageManager pm, String version) {
+        return root.withMarkers(root.getMarkers().add(new NodeRuntime(org.openrewrite.Tree.randomId(), "v24.19.0",
+          "darwin", "arm64", null, pm, version)));
     }
 
     @Test

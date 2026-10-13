@@ -26,7 +26,8 @@ import java.util.zip.GZIPInputStream;
 import java.util.zip.InflaterInputStream;
 
 /**
- * Port of gunzip-maybe 1.4.1 with is-gzip 1.0.0 and is-deflate 1.0.0, as yarn 1.22.22 bundles them.
+ * Port of gunzip-maybe 1.4.1 with is-gzip 1.0.0 and is-deflate 1.0.0, as yarn 1.22.22 bundles them; yarn before 1.10.0
+ * bundles 1.4.0, which knows no recursion limit, and so takes off every layer as 1.4.1 does.
  */
 final class GunzipMaybe {
 

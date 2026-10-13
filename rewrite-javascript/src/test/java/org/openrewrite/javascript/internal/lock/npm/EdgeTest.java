@@ -18,6 +18,8 @@ package org.openrewrite.javascript.internal.lock.npm;
 import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 
 import java.util.AbstractMap.SimpleEntry;
 import java.util.Collections;
@@ -345,6 +347,65 @@ class EdgeTest {
         assertThat(edge.getSpec()).isEqualTo("^2.0.0");
         assertThat(child(foo, "bar").isInShrinkwrap()).isTrue();
         assertThat(edge.isValid()).as("edge is valid").isTrue();
+    }
+
+    // npm 12.0.0's satisfiedBy asks inDepBundle where 11.21.0's asks hasShrinkwrap, inShrinkwrap and inBundle: no
+    // node has a shrinkwrap any more, and what the root itself bundles is held to the root's overrides. npm 12.2.0
+    // moves the is-number that a root-bundled is-odd depends on from 6.0.0 to the overriding 7.0.0, where 11.21.0
+    // keeps the 6.0.0.
+    @ParameterizedTest
+    @CsvSource({"11.21.0, true", "12.0.0, false", "12.2.0, false"})
+    void shrinkwrappedAndRootBundledDepsAreOverriddenFrom12(String release, boolean keptAsItIs) {
+        NpmRelease npm = NpmRelease.of(release);
+        Node shrinkwrapped = node(opts().path("/root").loadOverrides(true).release(npm)
+          .pkg(obj("name", "root", "version", "1.2.3", "dependencies", obj("foo", "^1.0.0"), "overrides",
+          obj("bar", "^2.0.0")))
+          .child(opts().hasShrinkwrap(true)
+          .pkg(obj("name", "foo", "version", "1.2.3", "dependencies", obj("bar", "^1.0.0")))
+            .child(opts().pkg(obj("name", "bar", "version", "1.2.3", "dependencies", obj())).build()).build()));
+        Node foo = child(shrinkwrapped, "foo");
+        assertThat(child(foo, "bar").isInShrinkwrap()).isEqualTo(keptAsItIs);
+        assertThat(foo.getEdgesOut().get("bar").isValid()).isEqualTo(keptAsItIs);
+
+        Node bundling = node(opts().path("/root").loadOverrides(true).release(npm)
+          .pkg(obj("name", "root", "version", "1.2.3", "dependencies", obj("foo", "^1.0.0"), "bundleDependencies",
+          arr("foo"), "overrides", obj("bar", "^2.0.0")))
+          .child(opts().pkg(obj("name", "foo", "version", "1.2.3", "dependencies", obj("bar", "^1.0.0")))
+            .child(opts().pkg(obj("name", "bar", "version", "1.2.3", "dependencies", obj())).build()).build()));
+        foo = child(bundling, "foo");
+        assertThat(child(foo, "bar").isInBundle()).isTrue();
+        assertThat(child(foo, "bar").isInDepBundle()).isFalse();
+        assertThat(foo.getEdgesOut().get("bar").isValid()).isEqualTo(keptAsItIs);
+
+        // what a dependency bundles stays as the dependency packed it, under every release
+        Node depBundling = node(opts().path("/root").loadOverrides(true).release(npm)
+          .pkg(obj("name", "root", "version", "1.2.3", "dependencies", obj("foo", "^1.0.0"), "overrides",
+          obj("bar", "^2.0.0")))
+          .child(opts().pkg(obj("name", "foo", "version", "1.2.3", "dependencies", obj("bar", "^1.0.0"),
+            "bundleDependencies", arr("bar")))
+            .child(opts().pkg(obj("name", "bar", "version", "1.2.3", "dependencies", obj())).build()).build()));
+        foo = child(depBundling, "foo");
+        assertThat(child(foo, "bar").isInDepBundle()).isTrue();
+        assertThat(foo.getEdgesOut().get("bar").isValid()).isTrue();
+    }
+
+    // npm 12.2.0's ERESOLVE over a peer that the root's packageExtensions give once names the rule: `peer
+    // isarray@"^2.0.0" from once@1.4.0 ... (added by packageExtensions["once"].peerDependencies.isarray)`. The
+    // edge's explanation carries the selector and the field of the record once holds; an edge of once's own does not.
+    @Test
+    void theExplanationNamesTheRuleThatAddedTheEdge() {
+        Node root = node(opts().path("/root").release(NpmRelease.of("12.2.0"))
+          .pkg(obj("name", "root", "version", "1.0.0", "dependencies", obj("once", "1.4.0")))
+          .child(opts().pkg(obj("name", "once", "version", "1.4.0", "dependencies", obj("wrappy", "1"),
+            "peerDependencies", obj("isarray", "^2.0.0")))
+            .packageExtensionsApplied(obj("selector", "once", "peerDependencies", arr("isarray"))).build()));
+        Node once = child(root, "once");
+
+        assertThat(once.getEdgesOut().get("isarray").explain())
+          .containsEntry("packageExtensions", obj("selector", "once", "field", "peerDependencies"))
+          .doesNotContainKey("npmExtension");
+        assertThat(once.getEdgesOut().get("wrappy").explain()).doesNotContainKey("packageExtensions");
+        assertThat(root.getEdgesOut().get("once").explain()).doesNotContainKey("packageExtensions");
     }
 
     @Test

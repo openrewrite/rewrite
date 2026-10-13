@@ -36,63 +36,85 @@ import static org.openrewrite.javascript.internal.lock.V8RegExp.DOT;
  */
 final class Cli {
 
-    private static final Pattern RELEASE = Pattern.compile("yarn-1\\.22\\.22\\.[cm]?js");
+    /**
+     * An error that ends yarn before {@code main} reports what failed: {@code start}'s catch prints its stack. The
+     * hand-off to a yarn-path that does not load, a .yarnrc yarn cannot read, the manifest 1.22.20 reads first.
+     */
+    static final class Crash extends JsError {
+        Crash(JsError error) {
+            super(error.getName(), String.valueOf(error.getMessage()));
+        }
+    }
+
+    private static final Pattern RELEASE_FILE = Pattern.compile("yarn-\\d+\\.\\d+\\.\\d+\\.[cm]?js");
     private static final Pattern IN_A_DIRECTORY_ABOVE = Pattern.compile("(\\.\\./)+[^/]+");
     private static final Pattern YARN_0_OR_1 = Pattern.compile("^yarn@[01]\\.");
     private static final Pattern BUILD_METADATA = Pattern.compile("\\+" + DOT + "*");
 
     private final Inputs inputs;
+    private final YarnClassicRelease release;
 
     Cli(Inputs inputs) {
         this.inputs = inputs;
+        this.release = inputs.installsAs();
     }
 
     /**
-     * {@code start}: a yarn-path in the rc chain hands the install to the release it names, which is this port only
-     * when it is a yarn 1.22.22 release the project holds.
+     * {@code start}: a yarn-path in the rc chain hands the install to the file it names, which the project must hold.
+     * A file named as a release ({@code yarn-1.22.19.js}, {@code .cjs}, {@code .mjs}, as {@code yarn policies
+     * set-version} saves one) is the release that built the LST, whose {@code --version} answered through the same
+     * hand-off; without that release, it is this port only when it is 1.22.22's. Any other file is a script whose
+     * install the engine cannot know.
      */
     void start(Map<String, @Nullable Object> rc) {
-        Object yarnPath = Js.truthy(rc.get("yarn-path")) ? rc.get("yarn-path") : rc.get("yarnPath");
+        Object yarnPath = Js.truthy(rc.get("yarn-path")) || !release.followsAYarnrcsYarnPath() ? rc.get("yarn-path") :
+                rc.get("yarnPath");
         Map<String, String> env = inputs.getEnv();
         if (!Js.truthy(yarnPath) ||
             Config.boolifyWithDefault(env == null ? null : env.get("YARN_IGNORE_PATH"), false)) {
             return;
         }
-        String release = PosixPath.normalize(Js.string(yarnPath));
-        if (!PosixPath.isAbsolute(release)) {
-            release = PosixPath.normalize(PosixPath.join(inputs.getCwd(), release));
+        String path = PosixPath.normalize(Js.string(yarnPath));
+        if (!PosixPath.isAbsolute(path)) {
+            path = PosixPath.normalize(PosixPath.join(inputs.getCwd(), path));
         }
         Set<String> paths = inputs.getPaths();
-        if (yarnPath instanceof String && RELEASE.matcher(PosixPath.basename(release)).matches()) {
-            if (paths == null || paths.contains(release)) {
-                return;
-            }
-            // the host's paths cover the project and the files directly in each directory above it they reach
-            if (!PosixPath.isAbsolute(release) && (!release.startsWith("../") ||
-                IN_A_DIRECTORY_ABOVE.matcher(release).matches() &&
-                Config.depth(singletonList(release)) <= inputs.reach())) {
-                throw new JsError(JsError.ERROR, "Cannot find module '" + release + "'");
-            }
+        boolean held = paths == null || paths.contains(path);
+        // the host's paths cover the project and the files directly in each directory above it they reach
+        if (yarnPath instanceof String && !held && !PosixPath.isAbsolute(path) && (!path.startsWith("../") ||
+            IN_A_DIRECTORY_ABOVE.matcher(path).matches() && Config.depth(singletonList(path)) <= inputs.reach())) {
+            throw new Crash(new JsError(JsError.ERROR, "Cannot find module '" + path + "'"));
         }
-        throw new CannotKnow("what the release yarn-path names (" + release + ") writes: yarn 1.22.22 hands the " +
-                             "install to it");
+        String file = PosixPath.basename(path);
+        if (yarnPath instanceof String && held && (inputs.getRelease() != null ? RELEASE_FILE.matcher(file).matches() :
+                file.matches("yarn-" + Pattern.quote(release.toString()) + "\\.[cm]?js"))) {
+            return;
+        }
+        throw new CannotKnow("what the release yarn-path names (" + path + ") writes: yarn " + release + " hands " +
+                             "the install to it");
     }
 
     /**
      * {@code main}: the nearest package.json from where yarn runs up with a packageManager field stops yarn when that
-     * field names another package manager than yarn 0 or 1.
+     * field names another package manager than yarn 0 or 1; 1.22.20 asks the manifest where yarn runs, before 1.22.20
+     * no manifest.
      */
     void main() {
-        Map<String, String> env = inputs.getEnv();
-        if (env != null && (Js.truthy(env.get("COREPACK_ROOT")) || Js.truthy(env.get("SKIP_YARN_COREPACK_CHECK")))) {
+        if (!release.checksPackageManager()) {
             return;
         }
-        String packageManager = findPackageManager();
+        Map<String, String> env = inputs.getEnv();
+        if (env != null && (Js.truthy(env.get("COREPACK_ROOT")) ||
+                            release.findsPackageManagerAbove() && Js.truthy(env.get("SKIP_YARN_COREPACK_CHECK")))) {
+            return;
+        }
+        String packageManager = release.findsPackageManagerAbove() ? findPackageManager() :
+                rootManifestPackageManager();
         if (packageManager != null && !YARN_0_OR_1.matcher(packageManager).find()) {
             String version = BUILD_METADATA.matcher(packageManager.replaceFirst("^yarn@", "")).replaceFirst("");
             throw Rejected.rejects(Reason.RESOLUTION_REQUIRED, "This project's package.json defines " +
                                                            "\"packageManager\": \"yarn@" + version + "\". However " +
-                                                           "the current global version of Yarn is 1.22.22.");
+                                                           "the current global version of Yarn is " + release + ".");
         }
     }
 
@@ -134,6 +156,33 @@ final class Cli {
             return null;
         }
         Object packageManager = Js.truthy(data) ? Js.get(data, "packageManager") : null;
+        return packageManager instanceof String ? (String) packageManager : null;
+    }
+
+    // 1.22.20's config.readRootManifest(): the manifest of the directory yarn runs in, read and normalized before
+    // Config.init, whose error ends yarn
+    private @Nullable String rootManifestPackageManager() {
+        String cwd = inputs.getCwd();
+        String text = inputs.getManifests().get(cwd);
+        if (text == null) {
+            String file = cwd.isEmpty() ? "package.json" : cwd + "/package.json";
+            if (inputs.getPaths() == null || inputs.getPaths().contains(file)) {
+                throw CannotKnow.unread(file);
+            }
+            throw new Crash(new JsError(JsError.ERROR, "Couldn't find a package.json file in " +
+                                                       Js.jsonStringify(cwd.isEmpty() ? "." : cwd)));
+        }
+        Manifest manifest;
+        try {
+            manifest = Config.tryManifest(cwd, text, true, true, null);
+        } catch (MessageError e) {
+            throw new Crash(new JsError(JsError.ERROR, String.valueOf(e.getMessage())));
+        } catch (Crash e) {
+            throw e;
+        } catch (JsError e) {
+            throw new Crash(e);
+        }
+        Object packageManager = manifest.get("packageManager");
         return packageManager instanceof String ? (String) packageManager : null;
     }
 }

@@ -53,11 +53,18 @@ final class NpmRegistry {
     }
 
     static String getRequestUrl(String registry, String pathname) {
+        return getRequestUrl(registry, pathname, YarnClassicRelease.PORTED);
+    }
+
+    /**
+     * {@code getRequestUrl} of {@code release}: a public registry over https from 1.17.3.
+     */
+    static String getRequestUrl(String registry, String pathname, YarnClassicRelease release) {
         String resolved = pathname;
         if (!REGISTRY_PREFIX.matcher(pathname).find()) {
             resolved = (registry.endsWith("/") ? registry : registry + "/") + pathname;
         }
-        if (ENFORCED_HTTPS.matcher(resolved).find()) {
+        if (release.requestsPublicRegistriesOverHttps() && ENFORCED_HTTPS.matcher(resolved).find()) {
             resolved = resolved.replaceFirst("^http://", "https://");
         }
         return resolved;
@@ -82,7 +89,7 @@ final class NpmRegistry {
      */
     Io<Object> request(String pathname, Set<Integer> causal) {
         String registry = config.getRegistry(pathname);
-        String url = getRequestUrl(registry, pathname);
+        String url = getRequestUrl(registry, pathname, config.getRelease());
         Io<Object> cached = cache.get(url);
         if (cached != null) {
             return cached;

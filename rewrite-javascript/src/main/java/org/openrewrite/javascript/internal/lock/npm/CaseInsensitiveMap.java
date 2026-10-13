@@ -26,15 +26,28 @@ import java.util.Locale;
 import java.util.Map;
 
 /**
- * Port of @npmcli/arborist lib/case-insensitive-map.js (npm 11.17.0).
+ * Port of @npmcli/arborist lib/case-insensitive-map.js (npm 11.17.0), and of the plain {@code Map} a node's children
+ * and edges are before npm 7.21.0, where a key is only itself.
  */
 public final class CaseInsensitiveMap<V> {
 
     private final Map<String, V> entries = new LinkedHashMap<>();
     private final Map<String, String> keys = new HashMap<>();
+    private final boolean caseInsensitive;
 
-    private static String normKey(String key) {
-        return Normalizer.normalize(key, Normalizer.Form.NFKD).toLowerCase(Locale.ROOT);
+    public CaseInsensitiveMap() {
+        this(true);
+    }
+
+    /**
+     * @param caseInsensitive false for a plain JavaScript {@code Map}, which keeps a key it sets again in its place
+     */
+    public CaseInsensitiveMap(boolean caseInsensitive) {
+        this.caseInsensitive = caseInsensitive;
+    }
+
+    private String normKey(String key) {
+        return caseInsensitive ? Normalizer.normalize(key, Normalizer.Form.NFKD).toLowerCase(Locale.ROOT) : key;
     }
 
     public @Nullable V get(@Nullable Object key) {
@@ -47,7 +60,7 @@ public final class CaseInsensitiveMap<V> {
 
     public void set(String key, V val) {
         String normKey = normKey(key);
-        if (keys.containsKey(normKey)) {
+        if (keys.containsKey(normKey) && caseInsensitive) {
             entries.remove(keys.get(normKey));
         }
         keys.put(normKey, key);

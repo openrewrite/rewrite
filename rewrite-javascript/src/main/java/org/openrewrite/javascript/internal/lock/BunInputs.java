@@ -20,9 +20,12 @@ import org.openrewrite.javascript.internal.LockFileRegeneration.Result;
 import org.openrewrite.javascript.internal.lock.bun.BunLockRegenerator;
 import org.openrewrite.javascript.internal.lock.bun.BunLockRegenerator.Inputs;
 import org.openrewrite.javascript.internal.lock.bun.BunManifestRules;
+import org.openrewrite.javascript.internal.lock.bun.BunRelease;
+import org.openrewrite.javascript.internal.lock.bun.BunReleases;
 import org.openrewrite.javascript.internal.lock.bun.DotEnv;
 import org.openrewrite.javascript.internal.lock.bun.Lockfile;
 import org.openrewrite.javascript.internal.registry.NpmRegistryClient;
+import org.openrewrite.javascript.marker.NodeResolutionResult.PackageManager;
 
 import java.util.LinkedHashMap;
 import java.util.Map;
@@ -56,13 +59,21 @@ final class BunInputs implements Port {
 
     @Override
     public Result regenerate(LockDirectory dir, HostInputs host, NpmRegistryClient client) {
-        return new BunLockRegenerator(from(dir, host), new BunRegistryManifests(host.transport(), client))
-                .regenerate();
+        Inputs inputs;
+        try {
+            inputs = from(dir, host);
+        } catch (CannotKnow e) {
+            return Result.failure(LockOnlyInstall.cannotKnow(e));
+        }
+        return new BunLockRegenerator(inputs, new BunRegistryManifests(host.transport(), client)).regenerate();
     }
 
     /**
-     * With the host's registries as bun's user .npmrc, its user npmrc only: bun reads no global npmrc, and the
-     * marker's project npmrc (the repository root's) only as the .npmrc beside the lock.
+     * As the Bun release that built the LST ({@code NodeRuntime}), 1.3.10 where the host recorded none. With the host's
+     * registries as bun's user .npmrc, its user npmrc only: bun reads no global npmrc, and the marker's project npmrc
+     * (the repository root's) only as the .npmrc beside the lock.
+     *
+     * @throws CannotKnow where the bun that built the LST is a release the engine does not reproduce
      */
     static Inputs from(LockDirectory dir, HostInputs host) {
         Map<String, String> files = new LinkedHashMap<>();
@@ -78,6 +89,7 @@ final class BunInputs implements Port {
             }
         }
         return Inputs.builder()
+                .release(BunReleases.installedAs(host.packageManagerVersion(PackageManager.Bun)))
                 .lock(dir.getLock())
                 .manifests(dir.getManifests())
                 .npmrc(dir.file(".npmrc"))
@@ -103,14 +115,21 @@ final class BunInputs implements Port {
 
     @Override
     public InstallRoot installRoot(LockDirectory dir) {
-        InstallRoot walked = BunLockRegenerator.installRoot(dir.getRunsIn(), dir.getManifests(),
+        // the release from(...) installs as; the regeneration reports one the engine does not reproduce
+        BunRelease release;
+        try {
+            release = BunReleases.installedAs(dir.packageManagerVersion(PackageManager.Bun));
+        } catch (CannotKnow e) {
+            return InstallRoot.STOPS_HERE;
+        }
+        InstallRoot walked = BunLockRegenerator.installRoot(release, dir.getRunsIn(), dir.getManifests(),
                 dir.manifestsAbove(dir.getRunsIn()));
         String root = dir.aboveRunsIn(walked.getDepth());
         Predicate<String> holds = name -> dir.holds(RootRelativePath.join(root, name));
         if (walked.isStopped() || root.isEmpty() && dir.getLock() != null || holds.test("bun.lock")) {
             return walked;
         }
-        return Lockfile.rewritesAnotherFile(holds) ?
+        return Lockfile.rewritesAnotherFile(holds, release) ?
                 InstallRoot.stops(walked.getDepth(), InstallRoot.Stop.WRITES_ANOTHER_FILE) : walked;
     }
 }

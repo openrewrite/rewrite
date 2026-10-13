@@ -25,7 +25,7 @@ final class TarballHttpFetcher implements Fetcher {
 
     @Override
     public boolean supports(Locator locator, FetchOptions opts) {
-        return TarballHttpResolver.isTgzUrl(locator.reference);
+        return TarballHttpResolver.isTgzUrl(locator.reference, opts.getProject().configuration.getRelease());
     }
 
     @Override

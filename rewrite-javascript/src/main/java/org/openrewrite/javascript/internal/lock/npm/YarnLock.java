@@ -40,7 +40,8 @@ import static org.openrewrite.javascript.internal.lock.V8RegExp.DOT;
 import static org.openrewrite.javascript.internal.lock.npm.Js.truthy;
 
 /**
- * Port of @npmcli/arborist lib/yarn-lock.js (npm 11.17.0): the yarn.lock npm reads beside its own lock.
+ * Port of @npmcli/arborist lib/yarn-lock.js (npm 11.17.0): the yarn.lock npm reads beside its own lock, written as
+ * the release given writes it.
  */
 public final class YarnLock {
 
@@ -94,6 +95,16 @@ public final class YarnLock {
     private @Nullable Entry current;
     private @Nullable String subkey;
 
+    private final NpmRelease release;
+
+    public YarnLock() {
+        this(NpmRelease.PORTED);
+    }
+
+    public YarnLock(NpmRelease release) {
+        this.release = release;
+    }
+
     private void endCurrent() {
         current = null;
         subkey = null;
@@ -122,7 +133,7 @@ public final class YarnLock {
             if (ENTRY_START.matcher(line).matches()) {
                 endCurrent();
                 List<String> specs = splitQuoted(line.substring(0, line.length() - 1), SPEC_DELIMITER);
-                Entry entry = new Entry(specs);
+                Entry entry = new Entry(specs, release);
                 current = entry;
                 for (String spec : specs) {
                     entries.put(spec, entry);
@@ -201,7 +212,11 @@ public final class YarnLock {
         for (Entry entry : new LinkedHashSet<>(Objects.requireNonNull(entries).values())) {
             printed.add(entry.toString());
         }
-        printed.sort((a, b) -> LocaleCompare.en(a.replace("\"", ""), b.replace("\"", "")));
+        if (release.quotesYarnLockAsYarnDoes()) {
+            printed.sort((a, b) -> LocaleCompare.en(a.replace("\"", ""), b.replace("\"", "")));
+        } else {
+            printed.sort(LocaleCompare::en);
+        }
         return PREFIX + String.join("\n\n", printed) + "\n";
     }
 
@@ -266,7 +281,7 @@ public final class YarnLock {
         }
 
         if (priorEntry == null) {
-            Entry entry = new Entry(newSpecs);
+            Entry entry = new Entry(newSpecs, release);
             entry.fields.putAll(n);
             for (String s : newSpecs) {
                 entries.put(s, entry);
@@ -301,7 +316,8 @@ public final class YarnLock {
         if (truthy(node.getResolved())) {
             String from = node.isLink() ? PosixPath.dirname(node.getPath()) : node.getPath();
             n.put("resolved",
-                    ConsistentResolve.consistentResolve(node.getResolved(), from, node.getRoot().getPath(), true));
+                    ConsistentResolve.consistentResolve(node.getResolved(), from, node.getRoot().getPath(), true,
+                            node.getRelease()));
         }
         if (truthy(node.getIntegrity())) {
             n.put("integrity", node.getIntegrity());
@@ -326,12 +342,13 @@ public final class YarnLock {
         return s;
     }
 
-    private static String sortKV(Map<String, Object> obj) {
+    private static String sortKV(Map<String, Object> obj, NpmRelease release) {
         List<String> keys = new ArrayList<>(obj.keySet());
         keys.sort(LocaleCompare::en);
         List<String> lines = new ArrayList<>();
         for (String k : keys) {
-            lines.add("    " + quoteIfNeeded(k) + " " + quoteIfNeeded(obj.get(k)));
+            lines.add("    " + (release.quotesYarnLockAsYarnDoes() ? quoteIfNeeded(k) + " " + quoteIfNeeded(obj.get(k)) :
+                    Js.quote(k) + " " + Js.jsonStringify(obj.get(k))));
         }
         return String.join("\n", lines);
     }
@@ -351,9 +368,11 @@ public final class YarnLock {
     public static final class Entry {
         private final Set<String> specs;
         private final Map<String, @Nullable Object> fields = new LinkedHashMap<>();
+        private final NpmRelease release;
 
-        Entry(Collection<String> specs) {
+        Entry(Collection<String> specs, NpmRelease release) {
             this.specs = new LinkedHashSet<>(specs);
+            this.release = release;
             String[] written = {"resolved", "version", "integrity", "dependencies", "optionalDependencies"};
             for (String field : written) {
                 fields.put(field, null);
@@ -374,11 +393,12 @@ public final class YarnLock {
 
         @Override
         public String toString() {
+            boolean yarnQuoting = release.quotesYarnLockAsYarnDoes();
             List<String> sortedSpecs = new ArrayList<>(specs);
             sortedSpecs.sort(LocaleCompare::en);
             List<String> quotedSpecs = new ArrayList<>();
             for (String spec : sortedSpecs) {
-                quotedSpecs.add(quoteIfNeeded(spec));
+                quotedSpecs.add(yarnQuoting ? quoteIfNeeded(spec) : Js.quote(spec));
             }
             StringBuilder sb = new StringBuilder(String.join(", ", quotedSpecs)).append(":\n");
 
@@ -388,16 +408,24 @@ public final class YarnLock {
                     props.add(field.getKey());
                 }
             }
-            props.sort(YarnLock::priorityThenLocaleCompare);
+            if (yarnQuoting) {
+                props.sort(YarnLock::priorityThenLocaleCompare);
+            } else {
+                // sort objects to the bottom, then alphabetical
+                props.sort((a, b) -> (asObject(fields.get(a)) != null) == (asObject(fields.get(b)) != null) ?
+                        LocaleCompare.en(a, b) : asObject(fields.get(a)) != null ? 1 : -1);
+            }
             for (String prop : props) {
                 Object val = fields.get(prop);
                 Map<String, Object> object = asObject(val);
-                if (object == null) {
+                if (object == null && !yarnQuoting) {
+                    sb.append("  ").append(Js.quote(prop)).append(' ').append(Js.jsonStringify(val)).append('\n');
+                } else if (object == null) {
                     boolean quoted = !"integrity".equals(prop) && val instanceof String;
                     sb.append("  ").append(prop).append(' ')
                             .append(quoted ? Js.quote((String) val) : String.valueOf(val)).append('\n');
                 } else if (!object.isEmpty()) {
-                    sb.append("  ").append(prop).append(":\n").append(sortKV(object)).append('\n');
+                    sb.append("  ").append(prop).append(":\n").append(sortKV(object, release)).append('\n');
                 }
             }
             return Js.trim(sb.toString());

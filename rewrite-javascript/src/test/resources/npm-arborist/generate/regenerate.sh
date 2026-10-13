@@ -20,6 +20,7 @@
 # the tags that npm bundles: npm/cli, npm/npm-package-arg and npm/hosted-git-info.
 # The fixtures are JSON with no file extension, so the license plugin does not prepend a header to them.
 # root-collation.js, which writes the collation data in the main resources, runs apart: see its header.
+# So does npm-releases.js, which writes the list of npm's releases there from the registry.
 # Usage: bash regenerate.sh <npm/cli checkout> <npm-package-arg checkout> <hosted-git-info checkout>
 set -e
 G=$(cd "$(dirname "$0")" && pwd)

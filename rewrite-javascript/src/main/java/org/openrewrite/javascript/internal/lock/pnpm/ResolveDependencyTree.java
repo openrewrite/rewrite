@@ -26,6 +26,7 @@ import org.openrewrite.javascript.internal.lock.pnpm.ResolveDependencies.WantedD
 
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -100,6 +101,11 @@ final class ResolveDependencyTree {
         List<ResolvedDirectDependency> directDependencies;
         Map<String, NodeId> directNodeIdsByAlias;
         List<ResolvedDirectDependency> linkedDependencies;
+
+        /**
+         * From 11.11.0: the nodes of the direct dependencies that are peer providers attached for reuse.
+         */
+        Set<NodeId> hoistedPeerProviderNodeIds;
     }
 
     @Value
@@ -119,6 +125,19 @@ final class ResolveDependencyTree {
      * group.
      */
     static List<WantedDependency> getWantedDependencies(Map<String, @Nullable Object> pkg, boolean autoInstallPeers) {
+        return getWantedDependencies(pkg, autoInstallPeers, PnpmRelease.PORTED);
+    }
+
+    /**
+     * {@link #getWantedDependencies(Map, boolean)} as {@code release} reads the project: from 11.4.0 a dependency
+     * name no npm package can have is an error ({@link PnpmRelease#rejectsAnInvalidDependencyName}).
+     */
+    static List<WantedDependency> getWantedDependencies(Map<String, @Nullable Object> pkg, boolean autoInstallPeers,
+                                                        PnpmRelease release) {
+        for (String field : new String[]{"dependencies", "devDependencies", "optionalDependencies",
+                "peerDependencies"}) {
+            ResolveDependencies.assertValidDependencyAliases(pkg.get(field), "The current package", release);
+        }
         Map<String, @Nullable Object> dependencies = ResolveDependencies.asMap(pkg.get("dependencies"));
         Map<String, @Nullable Object> devDependencies = ResolveDependencies.asMap(pkg.get("devDependencies"));
         Map<String, @Nullable Object> optionalDependencies =
@@ -166,25 +185,48 @@ final class ResolveDependencyTree {
      * validatePeerDependencies.ts: each of a project's peer ranges is a semver range, a workspace: or a catalog: spec.
      */
     static void validatePeerDependencies(String rootDir, Map<String, @Nullable Object> manifest) {
+        validatePeerDependencies(rootDir, manifest, PnpmRelease.PORTED);
+    }
+
+    /**
+     * {@link #validatePeerDependencies(String, Map)} as {@code release} validates them: from 11.14.0 a dependency
+     * specifier passes too, and the hint names it ({@link PnpmRelease#readsAPeerRangeOutOfItsSpecifier}).
+     */
+    static void validatePeerDependencies(String rootDir, Map<String, @Nullable Object> manifest,
+                                         PnpmRelease release) {
         Map<String, @Nullable Object> peerDependencies = ResolveDependencies.asMap(manifest.get("peerDependencies"));
         Object name = manifest.get("name");
         String projectId = name != null ? Js.string(name) : rootDir;
         for (String depName : Js.keys(peerDependencies)) {
             String version = Js.string(peerDependencies.get(depName));
-            if (!ReadPackageHook.isValidPeerRange(version)) {
-                throw new PnpmError("INVALID_PEER_DEPENDENCY_SPECIFICATION", "The peerDependencies field named '" +
-                        depName + "' of package '" + projectId + "' has an invalid value: '" + version + "'",
-                        "The values in peerDependencies should be either a valid semver range, a `workspace:` spec, " +
-                        "or a `catalog:` spec");
+            if (ReadPackageHook.isValidPeerRange(version, release)) {
+                continue;
             }
+            boolean acceptable = ReadPackageHook.isAcceptablePeerSpec(version, release);
+            boolean readsSpecifiers = release.readsAPeerRangeOutOfItsSpecifier();
+            if (acceptable && readsSpecifiers) {
+                continue;
+            }
+            throw new PnpmError("INVALID_PEER_DEPENDENCY_SPECIFICATION", "The peerDependencies field named '" +
+                    depName + "' of package '" + projectId + "' has an invalid value: '" + version + "'",
+                    readsSpecifiers ? "The values in peerDependencies should be a valid semver range, a " +
+                                      "`workspace:`/`catalog:` spec, or a dependency specifier such as a " +
+                                      "named-registry (`<registry>:<version>`), `npm:`, `file:`, or git/URL spec" :
+                            "The values in peerDependencies should be either a valid semver range, a `workspace:` " +
+                            "spec, or a `catalog:` spec");
         }
     }
 
     static Result resolveDependencyTree(List<Importer> importers, ResolutionContext ctx,
                                         PreferredVersions.ByName preferredVersions) {
+        // 11.7.0's context: each importer's place in the install, by which the claims on a package's children are
+        // ordered (PnpmRelease#resolvesSharedChildrenInADeterministicContext)
+        for (int index = 0; index < importers.size(); index++) {
+            ctx.getImporterResolutionOrder().put(importers.get(index).getId(), index);
+        }
         List<ResolveDependencies.ImporterToResolve> resolveArgs = new ArrayList<>();
         for (Importer importer : importers) {
-            validatePeerDependencies(importer.getRootDir(), importer.getManifest());
+            validatePeerDependencies(importer.getRootDir(), importer.getManifest(), ctx.getRelease());
             List<WantedDependency> wantedDependencies = new ArrayList<>();
             for (WantedDependency dep : importer.getWantedDependencies()) {
                 String spec = dep.getBareSpecifier();
@@ -236,8 +278,10 @@ final class ResolveDependencyTree {
             DependenciesTreeNode node = new DependenciesTreeNode(pendingNode.getResolvedPackage(),
                     pendingNode.getDepth());
             node.setInstallable(pendingNode.isInstallable());
+            node.setLockedPeerContext(pendingNode.getLockedPeerContext());
+            node.setPreviousDepPath(pendingNode.getPreviousDepPath());
             String id = pendingNode.getResolvedPackage().getId();
-            node.setLazyChildren(() -> buildTree(ctx, id, pendingNode.getParentIds(),
+            node.setLazyChildren(() -> ResolveDependencies.buildTree(ctx, id, pendingNode.getParentIds(),
                     ctx.getChildrenByParentId().get(id), pendingNode.getDepth() + 1, pendingNode.isInstallable()));
             ctx.getDependenciesTree().put(pendingNode.getNodeId(), node);
         }
@@ -250,6 +294,7 @@ final class ResolveDependencyTree {
             List<ResolvedDirectDependency> directDependencies = new ArrayList<>();
             List<ResolvedDirectDependency> linkedDependencies = new ArrayList<>();
             Map<String, NodeId> directNodeIdsByAlias = new LinkedHashMap<>();
+            Set<NodeId> hoistedPeerProviderNodeIds = new LinkedHashSet<>();
             for (PkgAddress dep : directDeps) {
                 if (dep.isLinkedDependency()) {
                     ResolvedDirectDependency linked = new ResolvedDirectDependency(dep.getAlias(), dep.isOptional(),
@@ -267,50 +312,15 @@ final class ResolveDependencyTree {
                         resolvedPackage.getVersion(), resolvedPackage.getName(), dep.getCatalogLookup(),
                         dep.getNormalizedBareSpecifier(), false));
                 directNodeIdsByAlias.put(dep.getAlias(), dep.getNodeId());
+                if (dep.isHoistedPeerProvider()) {
+                    hoistedPeerProviderNodeIds.add(dep.getNodeId());
+                }
             }
             resolvedImporters.put(importer.getId(), new ResolvedImporter(directDependencies, directNodeIdsByAlias,
-                    linkedDependencies));
+                    linkedDependencies, hoistedPeerProviderNodeIds));
         }
         return new Result(ctx.getDependenciesTree(), resolvedImporters, root.getTime(), ctx.getAllPeerDepNames(),
                 ctx.getResolutionPolicyViolations());
-    }
-
-    private static Map<String, NodeId> buildTree(ResolutionContext ctx, String parentId, List<String> parentIds,
-                                                 @Nullable List<ResolveDependencies.ChildId> children, int depth,
-                                                 boolean installable) {
-        Map<String, NodeId> childrenNodeIds = new LinkedHashMap<>();
-        if (children == null) {
-            return childrenNodeIds;
-        }
-        boolean installableSoFar = installable;
-        for (ResolveDependencies.ChildId child : children) {
-            String alias = child.getAlias();
-            String id = child.getId();
-            if (id.startsWith("link:")) {
-                childrenNodeIds.put(alias, NodeId.of(id));
-                continue;
-            }
-            if (ResolveDependencies.parentIdsContainSequence(parentIds, parentId, id) || parentId.equals(id)) {
-                continue;
-            }
-            ResolveDependencies.ResolvedPackage resolved = ctx.getResolvedPkgsById().get(id);
-            if (resolved.isLeaf()) {
-                childrenNodeIds.put(alias, NodeId.of(id));
-                continue;
-            }
-            NodeId childNodeId = ctx.nextNodeId();
-            childrenNodeIds.put(alias, childNodeId);
-            installableSoFar = installableSoFar || !ctx.getSkipped().contains(id);
-            boolean childInstallable = installableSoFar;
-            List<String> childParentIds = new ArrayList<>(parentIds);
-            childParentIds.add(id);
-            DependenciesTreeNode node = new DependenciesTreeNode(resolved, depth);
-            node.setInstallable(childInstallable);
-            node.setLazyChildren(() -> buildTree(ctx, id, childParentIds, ctx.getChildrenByParentId().get(id),
-                    depth + 1, childInstallable));
-            ctx.getDependenciesTree().put(childNodeId, node);
-        }
-        return childrenNodeIds;
     }
 
     private static List<PkgAddress> dedupeSameAliasDirectDeps(List<PkgAddress> directDeps,

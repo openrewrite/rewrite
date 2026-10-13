@@ -1130,15 +1130,18 @@ def handle_dependency_types(params: dict) -> List[dict]:
     its pip coordinate (a null version names a standard-library module), streamed back terminated
     by END_OF_OBJECT. Built once, returned in ``_DEPENDENCY_TYPES_BATCH_SIZE`` slices across the
     client's repeated pulls. An optional ``pythonVersion`` ("3.12") picks the stdlib stub surface.
+    An optional ``path`` is a site-packages-shaped directory holding the distribution, used in
+    place of the last parse's dependency environment.
     """
     name = params.get('name')
     version = params.get('version')
+    path = params.get('path')
     # Stdlib stubs are version-conditioned; a malformed value falls back to the interpreter minor.
     python_version = requested_python_version(params.get('pythonVersion'))
     if not name:
         raise ValueError("DependencyTypes requires a dependency name")
 
-    key = (name, version, python_version)
+    key = (name, version, python_version, path)
     data = _dependency_types_pending.get(key)
     if data is None:
         if version is None:
@@ -1150,6 +1153,9 @@ def handle_dependency_types(params: dict) -> List[dict]:
                     raise ValueError(f"standard-library module {name!r} not found in typeshed at {stdlib}")
             data = _build_exported_types_data([str(artifact)], str(stdlib), None, stdlib,
                                               python_version=python_version)
+        elif path:
+            own_artifacts = _resolve_dist_artifacts(name, version, Path(path))
+            data = _build_exported_types_data(own_artifacts, path, None, None)
         else:
             dependency_path = _last_dependency_path or os.environ.get('VIRTUAL_ENV')
             if not dependency_path:
@@ -2887,11 +2893,9 @@ class _StdinBuffer:
     instance is shared by read_message() and read_message_with_timeout().
     """
 
-    # A response body is read whole, and a page of tree data runs to hundreds of
-    # kilobytes, so each read should take as much as the pipe will give. A pipe
-    # returns at most its own capacity per read, and os.read allocates what it is
-    # asked for before shrinking to what arrived, so an over-large request costs
-    # only the unused difference.
+    # For the reads that cannot say how much is wanted: the header scan, and a body read that
+    # fell through to the loop below. A sized body read instead asks for the whole frame, since
+    # a read returns what it asks for, not what the pipe holds.
     _CHUNK_SIZE = 65536
 
     def __init__(self):
@@ -2921,7 +2925,24 @@ class _StdinBuffer:
                 return None
 
     def read_bytes(self, n: int, deadline: Optional[float] = None) -> Optional[bytes]:
-        """Read exactly *n* bytes.  Returns ``None`` on EOF/timeout."""
+        """Read exactly *n* bytes.  Returns ``None`` on EOF/timeout.
+
+        The bytes object ``os.read`` allocates for a frame-sized read is already what this
+        returns, so with nothing buffered there is no append, slice or second copy — the general
+        path below costs three. Skipped when a deadline applies, because :meth:`_fill` then reads
+        through ``select`` or a thread.
+        """
+        # Positive n only: os.read(fd, 0) returns b'' and cannot be told from end of stream, and
+        # a negative n raises where the general path below slices silently.
+        if n > 0 and not self._buf and deadline is None:
+            chunk = os.read(self._get_fd(), n)
+            if not chunk:
+                self.at_eof = True
+                return None
+            if len(chunk) == n:
+                return chunk
+            self._buf += chunk
+
         while len(self._buf) < n:
             if not self._fill(deadline):
                 return None
@@ -3052,10 +3073,16 @@ def write_message(response: dict):
     Uses unbuffered binary I/O to avoid line-ending translation on Windows
     that would corrupt the JSON-RPC protocol headers. Mirrors the pattern
     used by read_message() which uses os.read() on the read side.
+
+    Header and body go out as separate writes: concatenating copies the whole body to prepend a
+    short header, a cost that scales with the message where the extra syscall does not.
+    ``os.writev`` avoids both but is absent on Windows, and measured no better where it exists.
     """
     content_bytes = json.dumps(response).encode('utf-8')
     header = f"Content-Length: {len(content_bytes)}\r\n\r\n".encode('utf-8')
-    os.write(sys.stdout.fileno(), header + content_bytes)
+    fd = sys.stdout.fileno()
+    os.write(fd, header)
+    os.write(fd, content_bytes)
 
 
 def _error_response(request_id: Any, e: Exception) -> dict:
