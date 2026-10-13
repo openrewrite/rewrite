@@ -388,4 +388,17 @@ class LambdaTest implements RewriteTest {
             )
         );
     }
+
+    @Test
+    void lambdaWithFunctionTypedParam() {
+        rewriteRun(
+            scala(
+                """
+                object Test {
+                  val f = (g: Int => Int) => g(1)
+                }
+                """
+            )
+        );
+    }
 }
