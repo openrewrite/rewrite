@@ -105,9 +105,12 @@ class ScalaTreeVisitor(
 
   /** Extract JavaType from a tree node: try span-based, then direct .tpe, then name-based. */
   private def typeOfTree(tree: Trees.Tree[?]): JavaType = {
-    // 1. Span-based lookup (matches untpd spans to tpd tree via start position)
+    // 1. Span-based lookup (matches untpd spans to tpd tree via source range)
     if (tree.span.exists) {
-      val result = typeFor(tree.span)
+      val result = tree match {
+        case _: untpd.Function => typeMapping.map(_.closureTypeFor(tree.span)).orNull
+        case _ => typeFor(tree.span)
+      }
       if (result != null) return result
     }
     // 2. Direct .tpe (works if tree is already typed)
@@ -510,7 +513,7 @@ class ScalaTreeVisitor(
         }
 
         updateCursor(app.span.end)
-        val mt = typeFor(app.span) match { case m: JavaType.Method => m; case _ => null }
+        val mt = methodTypeFor(app.span)
         val nameId = new J.Identifier(Tree.randomId(), Space.EMPTY, Markers.EMPTY,
           Collections.emptyList(), "apply", null, null)
         new J.MethodInvocation(Tree.randomId(), prefix,
@@ -561,7 +564,7 @@ class ScalaTreeVisitor(
     val closeParen = positionOfNext(")", cursor)
     if (closeParen >= 0) cursor = closeParen + 1
     updateCursor(app.span.end)
-    val mt = typeFor(app.span) match { case m: JavaType.Method => m; case _ => null }
+    val mt = methodTypeFor(app.span)
     new J.MethodInvocation(Tree.randomId(), prefix, Markers.EMPTY,
       null, null, nameId,
       JContainer.build(argsBefore, args, Markers.EMPTY), mt)
@@ -1045,7 +1048,7 @@ class ScalaTreeVisitor(
           val adjustedEnd = Math.max(0, app.span.end - offsetAdjustment)
           if (adjustedEnd > cursor && adjustedEnd <= source.length) cursor = adjustedEnd
         }
-        val methodType = typeFor(app.span) match { case m: JavaType.Method => m; case _ => null }
+        val methodType = methodTypeFor(app.span)
 
         val fn = asExpression(visitApply(innerApp))
         val innerEnd = Math.max(0, innerApp.span.end - offsetAdjustment)
@@ -1138,7 +1141,7 @@ class ScalaTreeVisitor(
           val end = Math.max(0, app.span.end - offsetAdjustment)
           if (end > cursor && end <= source.length) cursor = end
         }
-        val mt = typeFor(app.span) match { case m: JavaType.Method => m; case _ => null }
+        val mt = methodTypeFor(app.span)
         val nameId = new J.Identifier(Tree.randomId(), Space.EMPTY, Markers.EMPTY,
           Collections.emptyList(), "apply", null, null)
         return new J.MethodInvocation(Tree.randomId(), prefix,
@@ -1529,7 +1532,7 @@ class ScalaTreeVisitor(
         faMarkers,
         target,
         new JLeftPadded(beforeDotSpace, name, Markers.EMPTY),
-        null
+        name.getType
       )
     }
   }
@@ -3439,7 +3442,10 @@ class ScalaTreeVisitor(
       varName, // VariableDeclarator - J.Identifier implements this
       Collections.emptyList(), // dimensionsAfterName - not used in Scala
       if (initializer != null) JLeftPadded.build(initializer).withBefore(beforeEquals) else null,
-      null // variableType - will be set later by type attribution
+      varName match {
+        case id: J.Identifier => id.getFieldType
+        case _ => null
+      }
     )
     
     val declarator = JRightPadded.build(namedVariable)
@@ -6780,7 +6786,9 @@ class ScalaTreeVisitor(
       } else {
         (Space.EMPTY, rawParamName, cursor, false)
       }
-    val paramName = ident(displayName, namePrefix, variableTypeOfTree(vd), quoted = nameQuoted)
+    val paramVariableType = variableTypeOfTree(vd)
+    val paramName = ident(displayName, namePrefix, if (paramVariableType != null) paramVariableType.getType else null,
+      paramVariableType, quoted = nameQuoted)
     if (vd.nameSpan.exists && !anonymousParam) {
       cursor = Math.max(cursor, nameEndCursor)
     }
@@ -6846,7 +6854,7 @@ class ScalaTreeVisitor(
       paramName,
       Collections.emptyList(),
       if (initializer != null) new JLeftPadded(initBefore, initializer, Markers.EMPTY) else null,
-      variableTypeOfTree(vd)
+      paramVariableType
     )
 
     cursor = Math.max(cursor, paramEnd)
@@ -6939,7 +6947,9 @@ class ScalaTreeVisitor(
         backtickAwareName(cursor, rawNameStart, rawNameLen, rawParamName)
       } else (Space.EMPTY, rawParamName, cursor, false)
 
-    val paramName = ident(displayParamName, namePrefix, variableTypeOfTree(vd), quoted = paramNameQuoted)
+    val paramVariableType = variableTypeOfTree(vd)
+    val paramName = ident(displayParamName, namePrefix,
+      if (paramVariableType != null) paramVariableType.getType else null, paramVariableType, quoted = paramNameQuoted)
 
     if (vd.nameSpan.exists && !anonymousParam) {
       cursor = Math.max(cursor, paramNameEnd)
@@ -7004,7 +7014,7 @@ class ScalaTreeVisitor(
       paramName,
       Collections.emptyList(),
       if (initializer != null) new JLeftPadded(initBefore, initializer, Markers.EMPTY) else null,
-      variableTypeOfTree(vd)
+      paramVariableType
     )
 
     updateCursor(vd.span.end)

@@ -15,12 +15,17 @@
  */
 package org.openrewrite.scala;
 
+import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaType;
+import org.openrewrite.java.tree.TypeUtils;
 import org.openrewrite.test.RewriteTest;
 
+import java.util.ArrayList;
+import java.util.List;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.function.Predicate;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.scala.Assertions.scala;
@@ -197,5 +202,222 @@ class ScalaTypeAttributionTest implements RewriteTest {
             })
           )
         );
+    }
+
+    @Test
+    void callsInChainHaveTheirOwnMethodType() {
+        rewriteRun(
+          scala(
+            """
+            class Foo {
+              def f(m: Map[Int, Int], p: Int => Boolean, g: Int => Int) = m.view.filterKeys(p).mapValues(g)
+              def h = Map(1 -> 2).mapValues(_ * 2)
+            }
+            """,
+            spec -> spec.afterRecipe(cu -> {
+                assertThat(method(cu, "filterKeys").getMethodType().getName()).isEqualTo("filterKeys");
+                assertThat(method(cu, "mapValues").getMethodType().getName()).isEqualTo("mapValues");
+                J.MethodInvocation mapApply = find(cu, J.MethodInvocation.class,
+                  m -> m.getSimpleName().equals("apply") && m.getSelect() instanceof J.Identifier i && i.getSimpleName().equals("Map"));
+                assertThat(mapApply.getMethodType().getName()).isEqualTo("apply");
+            })
+          )
+        );
+    }
+
+    @Test
+    void companionApplyAndInfixCallsHaveMethodType() {
+        rewriteRun(
+          scala(
+            """
+            class Foo {
+              val xs = List(1)
+              val pair = 1 -> 2
+            }
+            """,
+            spec -> spec.afterRecipe(cu -> {
+                J.MethodInvocation listApply = method(cu, "apply");
+                assertThat(listApply.getMethodType()).isNotNull();
+                assertThat(listApply.getMethodType().getName()).isEqualTo("apply");
+                assertThat(method(cu, "->").getMethodType()).isNotNull();
+                assertThat(method(cu, "->").getMethodType().getDeclaringType().getFullyQualifiedName())
+                  .isEqualTo("scala.Predef");
+            })
+          )
+        );
+    }
+
+    @Test
+    void namedVariableHasType() {
+        rewriteRun(
+          scala(
+            """
+            class Foo {
+              val xs = List(1)
+              def f = {
+                val n: Int = 1
+                n
+              }
+            }
+            """,
+            spec -> spec.afterRecipe(cu -> {
+                J.VariableDeclarations.NamedVariable xs = find(cu, J.VariableDeclarations.NamedVariable.class, v -> v.getSimpleName().equals("xs"));
+                assertThat(TypeUtils.asFullyQualified(xs.getType()).getFullyQualifiedName())
+                  .isEqualTo("scala.collection.immutable.List");
+                assertThat(xs.getVariableType()).isNotNull();
+                J.VariableDeclarations.NamedVariable n = find(cu, J.VariableDeclarations.NamedVariable.class, v -> v.getSimpleName().equals("n"));
+                assertThat(n.getType()).isEqualTo(JavaType.Primitive.Int);
+            })
+          )
+        );
+    }
+
+    @Test
+    void memberSelectionHasType() {
+        rewriteRun(
+          scala(
+            """
+            class Foo {
+              val xs = List(1)
+              val it = xs.toIterator
+            }
+            """,
+            spec -> spec.afterRecipe(cu -> {
+                J.FieldAccess toIterator = find(cu, J.FieldAccess.class, f -> f.getSimpleName().equals("toIterator"));
+                assertThat(TypeUtils.asFullyQualified(toIterator.getType()).getFullyQualifiedName())
+                  .isEqualTo("scala.collection.Iterator");
+                assertThat(toIterator.getName().getType()).isEqualTo(toIterator.getType());
+                assertThat(toIterator.getName().getFieldType()).isNull();
+            })
+          )
+        );
+    }
+
+    @Test
+    void thisHasEnclosingClassType() {
+        rewriteRun(
+          scala(
+            """
+            class Foo {
+              val field = 1
+              def g = this.field
+            }
+            """,
+            spec -> spec.afterRecipe(cu -> {
+                J.FieldAccess thisField = find(cu, J.FieldAccess.class, f -> f.getSimpleName().equals("field"));
+                assertThat(thisField.getType()).isEqualTo(JavaType.Primitive.Int);
+                assertThat(TypeUtils.asFullyQualified(thisField.getTarget().getType()).getFullyQualifiedName())
+                  .isEqualTo("Foo");
+            })
+          )
+        );
+    }
+
+    @Test
+    void binaryHasResultType() {
+        rewriteRun(
+          scala(
+            """
+            class Foo {
+              val m = Map(1 -> 2)
+              def f(k: Int) = k > 0
+              val m2 = m + (3 -> 4, 5 -> 6)
+            }
+            """,
+            spec -> spec.afterRecipe(cu -> {
+                assertThat(find(cu, J.Binary.class, b -> b.getOperator() == J.Binary.Type.GreaterThan).getType())
+                  .isEqualTo(JavaType.Primitive.Boolean);
+                assertThat(TypeUtils.asFullyQualified(find(cu, J.Binary.class, b -> b.getOperator() == J.Binary.Type.Addition).getType())
+                  .getFullyQualifiedName())
+                  .isEqualTo("scala.collection.immutable.Map");
+            })
+          )
+        );
+    }
+
+    @Test
+    void lambdaHasFunctionTypeAndParameterIsOwnedByMethod() {
+        rewriteRun(
+          scala(
+            """
+            class Foo {
+              def f(xs: List[Int], p: Int => Boolean) = xs.map(x => x + 1)
+            }
+            """,
+            spec -> spec.afterRecipe(cu -> {
+                J.Lambda lambda = find(cu, J.Lambda.class, l -> true);
+                assertThat(TypeUtils.asFullyQualified(lambda.getType()).getFullyQualifiedName()).isEqualTo("scala.Function1");
+                J.VariableDeclarations.NamedVariable p = find(cu, J.VariableDeclarations.NamedVariable.class, v -> v.getSimpleName().equals("p"));
+                assertThat(p.getName().getType()).isNotInstanceOf(JavaType.Variable.class);
+                assertThat(TypeUtils.asFullyQualified(p.getName().getType()).getFullyQualifiedName()).isEqualTo("scala.Function1");
+                assertThat(p.getVariableType().getOwner()).isInstanceOf(JavaType.Method.class);
+                assertThat(((JavaType.Method) p.getVariableType().getOwner()).getName()).isEqualTo("f");
+            })
+          )
+        );
+    }
+
+    @Test
+    void unresolvedReceiverHasNoMethodType() {
+        rewriteRun(
+          spec -> spec.typeValidationOptions(org.openrewrite.test.TypeValidation.none()),
+          scala(
+            """
+            class Foo {
+              def r = m.retain((k, v) => true)
+            }
+            """,
+            spec -> spec.afterRecipe(cu -> {
+                J.MethodInvocation retain = method(cu, "retain");
+                assertThat(retain.getMethodType()).isNull();
+                J.Identifier m = (J.Identifier) retain.getSelect();
+                assertThat(m.getFieldType()).isNull();
+            })
+          )
+        );
+    }
+
+    @Test
+    void unresolvableWildcardImportDoesNotShadowOtherNames() {
+        rewriteRun(
+          spec -> spec.typeValidationOptions(org.openrewrite.test.TypeValidation.none()),
+          scala(
+            """
+            import doobie.implicits._
+
+            class Foo {
+              val x = List(1, 2).to(Vector)
+            }
+            """,
+            spec -> spec.afterRecipe(cu -> {
+                J.MethodInvocation to = method(cu, "to");
+                assertThat(to.getMethodType()).isNotNull();
+                assertThat(to.getMethodType().getDeclaringType().getFullyQualifiedName())
+                  .isEqualTo("scala.collection.IterableOnceOps");
+                J.VariableDeclarations.NamedVariable x = find(cu, J.VariableDeclarations.NamedVariable.class, v -> v.getSimpleName().equals("x"));
+                assertThat(TypeUtils.asFullyQualified(x.getName().getType()).getFullyQualifiedName())
+                  .isEqualTo("scala.collection.immutable.Vector");
+            })
+          )
+        );
+    }
+
+    private static J.MethodInvocation method(J cu, String name) {
+        return find(cu, J.MethodInvocation.class, m -> m.getSimpleName().equals(name));
+    }
+
+    private static <T extends J> T find(J cu, Class<T> type, Predicate<T> matching) {
+        List<T> found = new ArrayList<>();
+        new ScalaIsoVisitor<List<T>>() {
+            @Override
+            public @Nullable J preVisit(J tree, List<T> acc) {
+                if (type.isInstance(tree) && matching.test(type.cast(tree))) {
+                    acc.add(type.cast(tree));
+                }
+                return tree;
+            }
+        }.visit(cu, found);
+        assertThat(found).as("%s matching in %s", type.getSimpleName(), cu.printTrimmed()).isNotEmpty();
+        return found.getFirst();
     }
 }

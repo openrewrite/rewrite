@@ -15,6 +15,7 @@
  */
 package org.openrewrite.scala;
 
+import org.jspecify.annotations.Nullable;
 import org.openrewrite.Cursor;
 import org.openrewrite.java.JavaTemplate;
 import org.openrewrite.java.internal.template.Substitutions;
@@ -23,12 +24,16 @@ import org.openrewrite.java.tree.JavaCoordinates;
 import org.openrewrite.scala.internal.template.ScalaSubstitutions;
 import org.openrewrite.scala.internal.template.ScalaTemplateParser;
 
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.Set;
 import java.util.function.Consumer;
 
 import static java.util.Collections.emptySet;
 
 public class ScalaTemplate extends JavaTemplate {
+    private static final @Nullable Path SCALA_LIBRARY = scalaLibrary();
+
     private ScalaTemplate(boolean contextSensitive,
                           ScalaParser.Builder parser,
                           String code,
@@ -50,7 +55,16 @@ public class ScalaTemplate extends JavaTemplate {
     }
 
     private static ScalaParser.Builder augmentClasspath(ScalaParser.Builder parserBuilder) {
-        return parserBuilder.addClasspathEntry(getTemplateClasspathDir());
+        parserBuilder.addClasspathEntry(getTemplateClasspathDir());
+        return SCALA_LIBRARY == null ? parserBuilder : parserBuilder.addClasspathEntry(SCALA_LIBRARY);
+    }
+
+    private static @Nullable Path scalaLibrary() {
+        try {
+            return Paths.get(scala.Option.class.getProtectionDomain().getCodeSource().getLocation().toURI());
+        } catch (Exception e) {
+            return null;
+        }
     }
 
     @Override
