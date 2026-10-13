@@ -526,6 +526,13 @@ object ScalaCompilerBridge {
     if (p == null) path else p.toString
   }
 
+  /** The Scala standard library jar the bridge itself was loaded from, if it can be located. */
+  def scalaLibraryJar(): java.util.Optional[java.nio.file.Path] =
+    locateJar(classOf[scala.Option[?]]) match {
+      case Some(jar) => java.util.Optional.of(Paths.get(jar))
+      case None => java.util.Optional.empty()
+    }
+
   private def locateJar(cls: Class[?]): Option[String] = {
     val pd = cls.getProtectionDomain
     if (pd == null) return None
