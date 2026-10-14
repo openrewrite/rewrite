@@ -251,7 +251,18 @@ public class GroovyParser implements Parser {
     @Override
     public boolean accept(Path path) {
         return path.toString().endsWith(".groovy") ||
-               path.toFile().getName().startsWith("Jenkinsfile");
+               isJenkinsfile(path.toFile().getName());
+    }
+
+    /**
+     * Matches `Jenkinsfile` and variants like `Jenkinsfile.release` or `Jenkinsfile-nightly`, but not
+     * sources such as `JenkinsfileAsGroovy.java` that merely start with the same word.
+     */
+    private static boolean isJenkinsfile(String fileName) {
+        String jenkinsfile = "Jenkinsfile";
+        return fileName.startsWith(jenkinsfile) &&
+               (fileName.length() == jenkinsfile.length() ||
+                !Character.isLetterOrDigit(fileName.charAt(jenkinsfile.length())));
     }
 
     @Override
