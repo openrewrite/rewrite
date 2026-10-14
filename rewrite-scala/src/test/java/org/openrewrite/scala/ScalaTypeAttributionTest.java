@@ -24,6 +24,7 @@ import org.openrewrite.java.tree.TypeUtils;
 import org.openrewrite.scala.marker.EtaExpansion;
 import org.openrewrite.scala.marker.FunctionApplication;
 import org.openrewrite.scala.marker.ImplicitConversion;
+import org.openrewrite.scala.tree.S;
 import org.openrewrite.test.RewriteTest;
 
 import java.util.ArrayList;
@@ -769,6 +770,169 @@ class ScalaTypeAttributionTest implements RewriteTest {
             })
           )
         );
+    }
+
+    @Test
+    void lambdaParametersWithoutTypeHaveTheirInferredType() {
+        rewriteRun(
+          scala(
+            """
+            class Foo {
+              val xs = List(1, 2).map(u => u + 1)
+              val f: (Int, String) => Int = (a, b) => a + b.length
+              val ys = List("a").map { s => s.length }
+            }
+            """,
+            spec -> spec.afterRecipe(cu -> {
+                assertThat(lambdaParameter(cu, "u").getType()).isEqualTo(JavaType.Primitive.Int);
+                assertThat(lambdaParameter(cu, "a").getType()).isEqualTo(JavaType.Primitive.Int);
+                assertThat(TypeUtils.isString(lambdaParameter(cu, "b").getType())).isTrue();
+                assertThat(TypeUtils.isString(lambdaParameter(cu, "s").getType())).isTrue();
+                for (String name : List.of("u", "a", "b", "s")) {
+                    J.Identifier param = lambdaParameter(cu, name);
+                    assertThat(param.getFieldType()).isNotNull();
+                    assertThat(param.getFieldType().getName()).isEqualTo(name);
+                    assertThat(param.getFieldType().getType()).isEqualTo(param.getType());
+                }
+            })
+          )
+        );
+    }
+
+    @Test
+    void wildcardLambdaParameterHasTypeButNoVariable() {
+        rewriteRun(
+          scala(
+            """
+            class Foo {
+              val f: (Int, String) => Int = (a, _) => a
+            }
+            """,
+            spec -> spec.afterRecipe(cu -> {
+                J.Identifier wildcard = lambdaParameter(cu, "_");
+                assertThat(TypeUtils.isString(wildcard.getType())).isTrue();
+                assertThat(wildcard.getFieldType()).isNull();
+            })
+          )
+        );
+    }
+
+    @Test
+    void typedLambdaParameterHasVariableType() {
+        rewriteRun(
+          scala(
+            """
+            class Foo {
+              val xs = List(1, 2).map((u: Int) => u + 1)
+            }
+            """,
+            spec -> spec.afterRecipe(cu -> {
+                J.VariableDeclarations.NamedVariable u = find(cu, J.VariableDeclarations.NamedVariable.class, v -> v.getSimpleName().equals("u"));
+                assertThat(u.getVariableType()).isNotNull();
+                assertThat(u.getVariableType().getType()).isEqualTo(JavaType.Primitive.Int);
+                assertThat(u.getName().getType()).isEqualTo(JavaType.Primitive.Int);
+                assertThat(u.getName().getFieldType()).isSameAs(u.getVariableType());
+            })
+          )
+        );
+    }
+
+    @Test
+    void boundNameHasTypeOfBoundValue() {
+        rewriteRun(
+          scala(
+            """
+            case class Store(key: String)
+            class Foo {
+              def f(x: Any) = x match {
+                case s @ Store(k) => s.key
+                case _ => ""
+              }
+            }
+            """,
+            spec -> spec.afterRecipe(cu -> {
+                J.Identifier s = find(cu, S.Binding.class, b -> b.getName().getSimpleName().equals("s")).getName();
+                assertThat(TypeUtils.asFullyQualified(s.getType()).getFullyQualifiedName()).isEqualTo("Store");
+                assertThat(s.getFieldType()).isNotNull();
+                assertThat(s.getFieldType().getName()).isEqualTo("s");
+                assertThat(s.getFieldType().getType()).isEqualTo(s.getType());
+            })
+          )
+        );
+    }
+
+    @Test
+    void namedArgumentNameHasTypeOfParameter() {
+        rewriteRun(
+          scala(
+            """
+            case class R(a: Int, b: String)
+            class Foo {
+              def m(x: Int, y: Int = 2): Int = x + y
+              val r = R(b = "x", a = 1)
+              val v = m(1, y = 3)
+              def send(path: String, method: String = "GET")(body: Int => Unit): Unit = ()
+              send("/", method = "HEAD") { x => () }
+            }
+            """,
+            spec -> spec.afterRecipe(cu -> {
+                J.Identifier b = namedArgument(cu, "b");
+                assertThat(TypeUtils.isString(b.getType())).isTrue();
+                assertThat(b.getFieldType().getName()).isEqualTo("b");
+                J.Identifier a = namedArgument(cu, "a");
+                assertThat(a.getType()).isEqualTo(JavaType.Primitive.Int);
+                assertThat(a.getFieldType().getName()).isEqualTo("a");
+                J.Identifier y = namedArgument(cu, "y");
+                assertThat(y.getType()).isEqualTo(JavaType.Primitive.Int);
+                assertThat(y.getFieldType().getName()).isEqualTo("y");
+                assertThat(y.getFieldType().getOwner()).isInstanceOf(JavaType.Method.class);
+                assertThat(((JavaType.Method) y.getFieldType().getOwner()).getName()).isEqualTo("m");
+                J.Identifier method = namedArgument(cu, "method");
+                assertThat(TypeUtils.isString(method.getType())).isTrue();
+                assertThat(method.getFieldType().getName()).isEqualTo("method");
+            })
+          )
+        );
+    }
+
+    @Test
+    void interpolatorHasMethodType() {
+        rewriteRun(
+          scala(
+            """
+            class Foo {
+              val name = "x"
+              val n = 1
+              val a = s"hi $name"
+              val b = raw"a\\n$name"
+              val c = f"$n%d"
+            }
+            """,
+            spec -> spec.afterRecipe(cu -> {
+                for (String interpolator : List.of("s", "raw", "f")) {
+                    J.Identifier id = find(cu, S.InterpolatedString.class, i -> i.getInterpolator().getSimpleName().equals(interpolator)).getInterpolator();
+                    assertThat(id.getType()).as(interpolator).isInstanceOf(JavaType.Method.class);
+                    JavaType.Method method = (JavaType.Method) id.getType();
+                    assertThat(method.getName()).isEqualTo(interpolator);
+                    assertThat(method.getDeclaringType().getFullyQualifiedName()).isEqualTo("scala.StringContext");
+                }
+            })
+          )
+        );
+    }
+
+    private static J.Identifier lambdaParameter(J cu, String name) {
+        return findAll(cu, J.Lambda.class, l -> true).stream()
+          .flatMap(l -> l.getParameters().getParameters().stream())
+          .filter(p -> p instanceof J.Identifier i && i.getSimpleName().equals(name))
+          .map(J.Identifier.class::cast)
+          .findFirst()
+          .orElseThrow();
+    }
+
+    private static J.Identifier namedArgument(J cu, String name) {
+        return (J.Identifier) find(cu, J.Assignment.class,
+          a -> a.getVariable() instanceof J.Identifier i && i.getSimpleName().equals(name)).getVariable();
     }
 
     private static J.MethodInvocation application(J cu, String function) {
