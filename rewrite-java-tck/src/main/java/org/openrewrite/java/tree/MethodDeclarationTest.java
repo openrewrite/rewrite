@@ -25,7 +25,7 @@ import org.openrewrite.test.RewriteTest;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.java.Assertions.java;
 
-@SuppressWarnings("NullableProblems")
+@SuppressWarnings({"NullableProblems", "SequencedCollectionMethodCanBeUsed"})
 class MethodDeclarationTest implements RewriteTest {
 
     @Test
@@ -65,8 +65,8 @@ class MethodDeclarationTest implements RewriteTest {
             spec -> spec.afterRecipe(cu -> new JavaIsoVisitor<Integer>() {
                 @Override
                 public J.MethodDeclaration visitMethodDeclaration(J.MethodDeclaration method, Integer p) {
-                    assertThat(method.getParameters().getFirst()).isInstanceOf(J.VariableDeclarations.class);
-                    assertThat(((J.VariableDeclarations) method.getParameters().getFirst()).getVariables().getFirst().getSimpleName())
+                    assertThat(method.getParameters().get(0)).isInstanceOf(J.VariableDeclarations.class);
+                    assertThat(((J.VariableDeclarations) method.getParameters().get(0)).getVariables().get(0).getSimpleName())
                       .endsWith("this");
                     return method;
                 }
@@ -136,6 +136,7 @@ class MethodDeclarationTest implements RewriteTest {
         );
     }
 
+    @SuppressWarnings("SameParameterValue")
     private static void assertModifiers(J.CompilationUnit cu, J.Modifier.Type... expected) {
         J.MethodDeclaration method = (J.MethodDeclaration) cu.getClasses().get(0).getBody().getStatements().get(0);
         assertThat(method.getModifiers()).map(J.Modifier::getType).containsExactly(expected);
@@ -194,6 +195,7 @@ class MethodDeclarationTest implements RewriteTest {
         );
     }
 
+    @SuppressWarnings("ConfusingMainMethod")
     @Issue("https://openjdk.org/jeps/512")
     @MinimumJava25
     @Nested
