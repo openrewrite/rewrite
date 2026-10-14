@@ -22,6 +22,7 @@ import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.java.tree.TypeUtils;
 import org.openrewrite.scala.marker.EtaExpansion;
+import org.openrewrite.scala.marker.FunctionApplication;
 import org.openrewrite.scala.marker.ImplicitConversion;
 import org.openrewrite.test.RewriteTest;
 
@@ -658,6 +659,47 @@ class ScalaTypeAttributionTest implements RewriteTest {
                 assertThat(wrongArity.getMethodType()).isNull();
                 J.NewClass newPerson = find(cu, J.NewClass.class, n -> true);
                 assertThat(newPerson.getConstructorType()).isNull();
+            })
+          )
+        );
+    }
+
+    @Test
+    void illTypedCallHasSameShapeAsWellTypedCall() {
+        rewriteRun(
+          spec -> spec.typeValidationOptions(org.openrewrite.test.TypeValidation.none()),
+          scala(
+            """
+            class Foo {
+              def g(s: String): Int = 1
+              def k: Int => Int = i => i
+              val h: Int => Int = i => i
+              val wellTyped = g("a")
+              val wrongArgument = g(true)
+              val wrongArity = g("a", "b")
+              val functionValue = h(true)
+              val parameterlessMethod = k(true)
+            }
+            """,
+            spec -> spec.afterRecipe(cu -> {
+                List<J.MethodInvocation> calls = new ArrayList<>();
+                new org.openrewrite.java.JavaIsoVisitor<List<J.MethodInvocation>>() {
+                    @Override
+                    public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, List<J.MethodInvocation> found) {
+                        found.add(method);
+                        return super.visitMethodInvocation(method, found);
+                    }
+                }.visit(cu, calls);
+
+                List<J.MethodInvocation> ofG = calls.stream().filter(m -> m.getSimpleName().equals("g")).toList();
+
+                assertThat(ofG).hasSize(3).allSatisfy(m -> {
+                    assertThat(m.getSelect()).isNull();
+                    assertThat(m.getMarkers().findFirst(FunctionApplication.class)).isEmpty();
+                });
+                assertThat(calls).filteredOn(m -> m.getSimpleName().equals("apply"))
+                  .extracting(m -> ((J.Identifier) m.getSelect()).getSimpleName())
+                  .containsExactlyInAnyOrder("h", "k");
             })
           )
         );

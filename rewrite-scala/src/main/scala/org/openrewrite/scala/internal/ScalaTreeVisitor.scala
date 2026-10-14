@@ -874,8 +874,9 @@ class ScalaTreeVisitor(
     val methodType = methodTypeOfTree(app)
     val callee = visitIdent(id).asInstanceOf[Expression]
     val directCallName: Option[J.Identifier] = callee match {
-      case name: J.Identifier if methodType != null && name.getSimpleName != "apply" &&
-        methodType.getName == name.getSimpleName =>
+      case name: J.Identifier if name.getSimpleName != "apply" && (
+        if (methodType != null) methodType.getName == name.getSimpleName
+        else typeMapping.exists(_.refersToMethodWithParameters(id.asInstanceOf[untpd.Tree]))) =>
         Some(name.withType(methodType).withFieldType(null))
       case _ => None
     }

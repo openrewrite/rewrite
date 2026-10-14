@@ -169,6 +169,22 @@ class ScalaTypeMapping(typeFactory: JavaTypeFactory, typedTree: tpd.Tree,
       else calledSymbol(resolved(node)).filterNot(isErrorSymbol).map(sym => try mapMethodType(sym) catch { case _: Throwable => null })
     }
 
+  /**
+   * Whether the node refers to a method taking parameters, so that applying it calls the method
+   * rather than the `apply` of its result. This holds even when the application doesn't type-check.
+   */
+  def refersToMethodWithParameters(tree: untpd.Tree): Boolean =
+    typedNodes.get(tree).exists { node =>
+      try node.own.tpe match {
+        case ref: TermRef =>
+          val alternatives = ref.denot.alternatives
+          alternatives.nonEmpty && alternatives.forall(d => d.symbol.is(Flags.Method) && d.info.stripPoly.isInstanceOf[MethodType])
+        case _ => false
+      } catch {
+        case _: Throwable => false
+      }
+    }
+
   /** The variable a definition or reference refers to, if it refers to a variable. */
   def variableTypeOf(tree: untpd.Tree): Option[JavaType.Variable] =
     typedNodes.get(tree).flatMap { node =>
