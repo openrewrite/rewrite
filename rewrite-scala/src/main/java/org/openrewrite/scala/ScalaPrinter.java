@@ -1583,7 +1583,7 @@ public class ScalaPrinter<P> extends JavaPrinter<P> {
         if (method.getMarkers().findFirst(org.openrewrite.scala.marker.FunctionApplication.class).isPresent()) {
             beforeSyntax(method, Space.Location.METHOD_INVOCATION_PREFIX, p);
 
-            // Print the select (e.g., "arr" or "println")
+            // Print the select (e.g., "arr" or "f")
             visitRightPadded(method.getPadding().getSelect(), JRightPadded.Location.METHOD_SELECT, "", p);
 
             // Print arguments directly with parentheses (no ".apply")

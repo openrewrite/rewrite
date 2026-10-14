@@ -384,6 +384,12 @@ public class RewriteRpcServer
             if (!seenProjects.Add(project.FilePath!))
                 continue;
 
+            if (solutionParser.ProjectsNotParsed.Contains(Path.GetFullPath(project.FilePath!)))
+            {
+                EmitProjectFile(project.FilePath!);
+                continue;
+            }
+
             projectIndex++;
             Log.Debug("RPC ParseSolution: parsing project [{ProjectIndex}/{ProjectCount}] {ProjectName}",
                 projectIndex, projectList.Count, Path.GetFileNameWithoutExtension(project.FilePath));
@@ -416,7 +422,8 @@ public class RewriteRpcServer
             // A diagnostic can name a project that nonetheless evaluated far enough to yield its
             // documents (an unresolvable ProjectReference, say). Recovering from disk there would
             // resurrect files the project deliberately excludes, so leave those projects alone.
-            if (projectsWithSources.Contains(Path.GetFullPath(projectPath)))
+            if (projectsWithSources.Contains(Path.GetFullPath(projectPath)) ||
+                solutionParser.ProjectsNotParsed.Contains(Path.GetFullPath(projectPath)))
                 continue;
 
             var recovered = solutionParser.ParseProjectWithoutMSBuild(projectPath, rootDir,
@@ -549,10 +556,10 @@ public class RewriteRpcServer
 
     /// <summary>
     /// Resolves a coordinate to assembly paths: a null version names a framework (BCL) assembly
-    /// among the target framework's reference assemblies; otherwise the NuGet package's lib/ (or
-    /// ref/) assets nearest the target framework. References are the target framework's reference
-    /// assemblies, or this runtime's shared framework when the package targets a framework whose
-    /// reference assemblies are unavailable.
+    /// among the target framework's reference assemblies; otherwise the NuGet package's compile
+    /// assemblies for the target framework (<see cref="PackageCompileAssets"/>). References are the
+    /// target framework's reference assemblies, or this runtime's shared framework when the package
+    /// targets a framework whose reference assemblies are unavailable.
     /// </summary>
     private static async Task<(List<string> Own, List<string> References)> ResolveDependencyAsync(
         DependencyRequest request)
@@ -572,39 +579,19 @@ public class RewriteRpcServer
             return ([dll], framework.All.ToList());
         }
 
-        var root = Environment.GetEnvironmentVariable("NUGET_PACKAGES")
-            ?? Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), ".nuget", "packages");
-        var package = Path.Combine(root, request.Id.ToLowerInvariant(), request.Version);
-        var target = NuGetFramework.Parse(request.TargetFramework);
-        var own = NearestAssets(Path.Combine(package, "lib"), target)
-            ?? NearestAssets(Path.Combine(package, "ref"), target)
-            ?? throw new InvalidOperationException(
-                $"No assemblies compatible with {request.TargetFramework} in {package}");
+        var folders = PackageCompileAssets.PackageFolders();
+        var package = PackageCompileAssets.FindPackageDirectory(request.Id, request.Version, folders)
+            ?? throw new DirectoryNotFoundException(
+                $"Package {request.Id} {request.Version} not found in {string.Join(", ", folders)}");
+        var own = PackageCompileAssets.CompileAssemblies(package, NuGetFramework.Parse(request.TargetFramework));
+        if (own.Count == 0)
+        {
+            throw new InvalidOperationException(
+                $"No compile assemblies compatible with {request.TargetFramework} in {package}");
+        }
         var references = framework?.All.ToList()
             ?? Directory.GetFiles(Path.GetDirectoryName(typeof(object).Assembly.Location)!, "*.dll").ToList();
         return (own, references);
-    }
-
-    /// <summary>
-    /// The *.dll files of the asset folder nearest <paramref name="target"/>, or null when no
-    /// folder is compatible or the nearest holds no assemblies (a _._ placeholder).
-    /// </summary>
-    private static List<string>? NearestAssets(string assetsDir, NuGetFramework target)
-    {
-        if (!Directory.Exists(assetsDir))
-        {
-            return null;
-        }
-        var candidates = Directory.GetDirectories(assetsDir)
-            .Select(dir => (Framework: NuGetFramework.Parse(Path.GetFileName(dir)), Dir: dir))
-            .ToList();
-        var nearest = new FrameworkReducer().GetNearest(target, candidates.Select(c => c.Framework).ToList());
-        if (nearest == null)
-        {
-            return null;
-        }
-        var dlls = Directory.GetFiles(candidates.First(c => nearest.Equals(c.Framework)).Dir, "*.dll").ToList();
-        return dlls.Count == 0 ? null : dlls;
     }
 
     [JsonRpcMethod("GetObject", UseSingleObjectParameterDeserialization = true)]
@@ -2445,7 +2432,7 @@ public class DependencyRequest
     /// <summary>Package version; null names a BCL assembly among the target framework's reference assemblies.</summary>
     public string? Version { get; set; }
 
-    /// <summary>Framework whose reference assemblies and nearest lib/ assets to enumerate, e.g. "net10.0".</summary>
+    /// <summary>Framework whose reference assemblies and compile assets to enumerate, e.g. "net10.0".</summary>
     public string TargetFramework { get; set; } = "";
 }
 

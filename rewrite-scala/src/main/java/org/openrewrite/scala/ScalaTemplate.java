@@ -20,7 +20,6 @@ import org.openrewrite.java.JavaTemplate;
 import org.openrewrite.java.internal.template.Substitutions;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaCoordinates;
-import org.openrewrite.scala.internal.ScalaCompilerBridge;
 import org.openrewrite.scala.internal.template.ScalaSubstitutions;
 import org.openrewrite.scala.internal.template.ScalaTemplateParser;
 
@@ -51,9 +50,7 @@ public class ScalaTemplate extends JavaTemplate {
     }
 
     private static ScalaParser.Builder augmentClasspath(ScalaParser.Builder parserBuilder) {
-        parserBuilder.addClasspathEntry(getTemplateClasspathDir());
-        ScalaCompilerBridge.scalaLibraryJar().ifPresent(parserBuilder::addClasspathEntry);
-        return parserBuilder;
+        return parserBuilder.addClasspathEntry(getTemplateClasspathDir());
     }
 
     @Override

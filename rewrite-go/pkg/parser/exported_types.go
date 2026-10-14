@@ -104,8 +104,6 @@ func ExportedTypes(ownArtifacts, references []string) []java.FullyQualified {
 		}
 		pi := NewProjectImporter(modPath, refImporter)
 		pi.SetProjectRoot(dir)
-		// Only the module's exported API is read, which no function body changes.
-		pi.SetDeclarationsOnly(true)
 		pkgImports := registerModuleSources(pi, dir, modPath)
 
 		for _, importPath := range pkgImports {
