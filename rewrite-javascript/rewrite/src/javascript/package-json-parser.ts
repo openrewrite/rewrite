@@ -771,6 +771,19 @@ export class PackageJsonParser extends Parser {
     }
 
     /**
+     * The packages a bun.lock key nests, outermost first. A scope and the name after it are one
+     * package: "@babel/core" names one, "is-even/is-odd" and "@babel/core/@babel/types" two.
+     */
+    private static bunKeyPackages(key: string): string[] {
+        const parts = key.split('/');
+        const packages: string[] = [];
+        for (let i = 0; i < parts.length; i++) {
+            packages.push(parts[i].startsWith('@') && i + 1 < parts.length ? `${parts[i]}/${parts[++i]}` : parts[i]);
+        }
+        return packages;
+    }
+
+    /**
      * Converts bun.lock format to npm package-lock.json format for unified processing.
      *
      * bun.lock format (v1):
@@ -814,14 +827,11 @@ export class PackageJsonParser extends Parser {
 
             // Convert bun's path format to npm's node_modules format
             // bun uses "parent/child" for nested deps, npm uses "node_modules/parent/node_modules/child"
-            let pkgPath: string;
-            if (key.includes('/')) {
+            const nesting = PackageJsonParser.bunKeyPackages(key);
+            const pkgPath = nesting.length > 1
                 // Nested dependency - convert "is-even/is-odd" to "node_modules/is-even/node_modules/is-odd"
-                const parts = key.split('/');
-                pkgPath = parts.map(p => `node_modules/${p}`).join('/');
-            } else {
-                pkgPath = `node_modules/${name}`;
-            }
+                ? nesting.map(p => `node_modules/${p}`).join('/')
+                : `node_modules/${name}`;
 
             packages[pkgPath] = pkgEntry;
         }
