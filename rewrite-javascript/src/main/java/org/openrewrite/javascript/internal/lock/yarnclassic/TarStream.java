@@ -26,13 +26,23 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * Port of tar-stream 1.6.1 lib/extract.js and lib/headers.js {@code decode}, as yarn 1.22.22 bundles them.
+ * Port of tar-stream 1.6.1 lib/extract.js and lib/headers.js {@code decode}, as yarn 1.22.22 bundles them, and of
+ * 1.5.4, which yarn bundles before 1.7.0.
  */
 final class TarStream {
 
     private static final String UNEXPECTED_END = "Unexpected end of data";
     private static final String INVALID_HEADER = "Invalid tar header. Maybe the tar is corrupted or it needs to be " +
                                                  "gunzipped?";
+
+    /**
+     * The tar-stream yarn bundles: 1.6.1 from yarn 1.8.0 (1.7.0's 1.6.0 extracts as it does), 1.5.4 before 1.7.0, whose
+     * {@code mixinPax} takes no {@code size} from a pax header.
+     */
+    enum Release {
+        V1_5_4,
+        V1_6_1
+    }
 
     private TarStream() {
     }
@@ -44,6 +54,12 @@ final class TarStream {
         @Nullable
         String linkname;
         double size;
+
+        /**
+         * Whether the archive ends inside the entry's content: an extract that finishes where its data ends hands over
+         * the bytes there are, which the entry's write had reached, or not, when yarn reads it.
+         */
+        boolean cut;
 
         Header(String name, @Nullable String type, @Nullable String linkname, double size) {
             this.name = name;
@@ -65,6 +81,17 @@ final class TarStream {
      * @throws JsError the error the extract stream emits: a header whose checksum is wrong, data that ends early.
      */
     static void extract(byte[] data, OnEntry onEntry) {
+        extract(data, onEntry, Release.V1_6_1, true);
+    }
+
+    /**
+     * {@code extract} of tar-stream {@code release} on a Writable that calls {@code _final}
+     * ({@code failsWhereTheDataEnds}, readable-stream 2.3), which fails an archive that ends inside an entry, its padding
+     * or a header; without it the extract finishes where the data ends, an entry it cuts short handed over
+     * {@link Header#cut}.
+     * @throws JsError the error the extract stream emits: a header whose checksum is wrong, data that ends early.
+     */
+    static void extract(byte[] data, OnEntry onEntry, Release release, boolean failsWhereTheDataEnds) {
         Map<String, String> pax = null;
         Map<String, String> paxGlobal = null;
         String gnuLongPath = null;
@@ -72,6 +99,9 @@ final class TarStream {
         int offset = 0;
         while (offset < data.length) {
             if (data.length - offset < 512) {
+                if (!failsWhereTheDataEnds) {
+                    return;
+                }
                 throw new JsError(JsError.ERROR, UNEXPECTED_END);
             }
             Header header = decode(Arrays.copyOfRange(data, offset, offset + 512));
@@ -82,6 +112,10 @@ final class TarStream {
             int size = (int) (Double.isNaN(header.size) ? 0 : header.size);
             if ("gnu-long-path".equals(header.type) || "gnu-long-link-path".equals(header.type) ||
                 "pax-global-header".equals(header.type) || "pax-header".equals(header.type)) {
+                // a body or its padding the data cuts short: the next header never comes
+                if (!failsWhereTheDataEnds && size >= 0 && data.length - offset < size + padding(size)) {
+                    return;
+                }
                 byte[] body = take(data, offset, size);
                 offset = drain(data, offset + size, size);
                 if ("gnu-long-path".equals(header.type)) {
@@ -109,7 +143,7 @@ final class TarStream {
                 gnuLongLinkPath = null;
             }
             if (pax != null) {
-                mixinPax(header, pax);
+                mixinPax(header, pax, release);
                 pax = null;
             }
             size = (int) (Double.isNaN(header.size) ? 0 : header.size);
@@ -117,10 +151,21 @@ final class TarStream {
                 onEntry.entry(header, data, offset, 0);
                 continue;
             }
+            if (!failsWhereTheDataEnds && size > 0 && data.length - offset < size + padding(size)) {
+                // the entry's stream never ends: what the data holds of it is written, and the extract finishes
+                header.cut = data.length - offset < size;
+                onEntry.entry(header, data, offset, Math.min(size, data.length - offset));
+                return;
+            }
             require(data, offset, size);
             onEntry.entry(header, data, offset, size);
             offset = drain(data, offset + size, size);
         }
+    }
+
+    private static int padding(int size) {
+        int overflow = size & 511;
+        return overflow == 0 ? 0 : 512 - overflow;
     }
 
     private static byte[] take(byte[] data, int offset, int size) {
@@ -143,14 +188,15 @@ final class TarStream {
         return offset + drain;
     }
 
-    private static void mixinPax(Header header, Map<String, String> pax) {
+    // a pax header's size from 1.6.0
+    private static void mixinPax(Header header, Map<String, String> pax, Release release) {
         if (Js.truthy(pax.get("path"))) {
             header.name = pax.get("path");
         }
         if (Js.truthy(pax.get("linkpath"))) {
             header.linkname = pax.get("linkpath");
         }
-        if (Js.truthy(pax.get("size"))) {
+        if (release == Release.V1_6_1 && Js.truthy(pax.get("size"))) {
             header.size = Js.parseInt(pax.get("size"), 10);
         }
     }

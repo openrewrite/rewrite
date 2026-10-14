@@ -909,6 +909,19 @@ def _module_name(fp: str, root: str) -> str:
     return '.'.join(parts)
 
 
+def _module_class_literals(mapping, client, module: str):
+    """The classLiterals of ``module`` a file's mapping sees: those its own response
+    carried, then those earlier files' responses did, in the order ty sent them.
+    Looked up by module rather than scanning the session's whole table per file."""
+    own = mapping._type_registry
+    for tid, descriptor in own.items():
+        if descriptor.get('kind') == 'classLiteral' and (descriptor.get('moduleName') or '') == module:
+            yield tid, descriptor
+    for tid in getattr(client, 'session_classes_by_module', {}).get(module, ()):
+        if tid not in own:
+            yield tid, client.session_types[tid]
+
+
 def _enumerate_artifact(artifact: str, root: str, client, by_fqn: Dict[str, Any],
                         processed_ids: Set[int]) -> None:
     """Collect the complete JavaType.Class for every class one package defines,
@@ -959,16 +972,11 @@ def _enumerate_artifact(artifact: str, root: str, client, by_fqn: Dict[str, Any]
         if source.strip() and not mapping._node_index:
             logger.warning("ExportedTypes: ty returned no types for %s", fp)
             continue
-        for tid, descriptor in mapping._type_registry.items():
+        # Keep only classes defined in this file's own module — precise per-file scoping so ty's
+        # cross-file back-fill (which surfaces referenced types too) can't leak a sibling class,
+        # and a dist sharing a namespace-package dir contributes only its own types.
+        for tid, descriptor in _module_class_literals(mapping, client, own_module):
             if tid in processed_ids:
-                continue
-            if descriptor.get('kind') != 'classLiteral':
-                continue
-            module_name = descriptor.get('moduleName') or ''
-            # Keep only classes defined in this file's own module — precise per-file scoping so ty's
-            # cross-file back-fill (which surfaces referenced types too) can't leak a sibling class,
-            # and a dist sharing a namespace-package dir contributes only its own types.
-            if module_name != own_module:
                 continue
             processed_ids.add(tid)
             try:

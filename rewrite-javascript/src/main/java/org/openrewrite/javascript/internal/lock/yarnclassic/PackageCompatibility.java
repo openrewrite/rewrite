@@ -118,11 +118,11 @@ final class PackageCompatibility {
         Object engines = info.get("engines");
         if (shouldCheckPlatform(os, config.isIgnorePlatform()) && host.getOs() != null &&
             !isValid((List<?>) os, host.getOs())) {
-            pushed.add(Lang.format("The platform $0 is incompatible with this module.", host.getOs()));
+            pushed.add(Lang.format(config.getRelease(), "The platform $0 is incompatible with this module.", host.getOs()));
         }
         if (shouldCheckCpu(cpu, config.isIgnorePlatform()) && host.getCpu() != null &&
             !isValid((List<?>) cpu, host.getCpu())) {
-            pushed.add(Lang.format("The CPU architecture $0 is incompatible with this module.", host.getCpu()));
+            pushed.add(Lang.format(config.getRelease(), "The CPU architecture $0 is incompatible with this module.", host.getCpu()));
         }
         if (shouldCheckEngines(engines, ignoreEngines)) {
             for (String key : Js.keys(engines)) {
@@ -134,9 +134,9 @@ final class PackageCompatibility {
                 }
                 if (!actual.isEmpty() && !testEngine(name, range, actual, config.isLooseSemver())) {
                     pushed.add(config.getRelease().namesTheEngineVersion() ?
-                            Lang.format("The engine $0 is incompatible with this module. Expected version $1. Got $2",
+                            Lang.format(config.getRelease(), "The engine $0 is incompatible with this module. Expected version $1. Got $2",
                                     name, range, actual) :
-                            Lang.format("The engine $0 is incompatible with this module. Expected version $1.", name,
+                            Lang.format(config.getRelease(), "The engine $0 is incompatible with this module. Expected version $1.", name,
                                     range));
                 }
             }

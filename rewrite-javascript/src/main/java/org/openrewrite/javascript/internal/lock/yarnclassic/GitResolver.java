@@ -51,7 +51,7 @@ final class GitResolver {
      * hosted-git-resolver.js: the fragment exploded into user, repo and hash, and a lock entry reused as a tarball.
      */
     static GitResolver hosted(PackageRequest request, String fragment) {
-        explodeHostedGitFragment(fragment);
+        explodeHostedGitFragment(fragment, request.config.getRelease());
         return new GitResolver(request, fragment, "tarball");
     }
 
@@ -59,7 +59,7 @@ final class GitResolver {
         String unprefixed = fragment.startsWith("gist:") ? fragment.substring("gist:".length()) : fragment;
         String[] parts = unprefixed.split("#", -1);
         if (parts.length > 2) {
-            throw new MessageError(Lang.format("Invalid gist fragment $0.", unprefixed));
+            throw new MessageError(Lang.format(request.config.getRelease(), "Invalid gist fragment $0.", unprefixed));
         }
         return git(request, "https://gist.github.com/" + parts[0] + ".git#" + (parts.length > 1 ? parts[1] : ""));
     }
@@ -71,7 +71,7 @@ final class GitResolver {
         String hash;
     }
 
-    static ExplodedFragment explodeHostedGitFragment(String fragment) {
+    static ExplodedFragment explodeHostedGitFragment(String fragment, YarnClassicRelease release) {
         int hashPosition = fragment.indexOf('#');
         String hash = hashPosition == -1 ? "" : fragment.substring(hashPosition + 1);
         String[] preParts = fragment.split("@", -1);
@@ -83,7 +83,7 @@ final class GitResolver {
         stripped = GIT_SUFFIX.matcher(stripped).replaceFirst("");
         String[] parts = stripped.split("/", -1);
         if (parts.length < 2) {
-            throw new MessageError(Lang.format("Invalid hosted git fragment $0.", fragment));
+            throw new MessageError(Lang.format(release, "Invalid hosted git fragment $0.", fragment));
         }
         return new ExplodedFragment(parts[parts.length - 2], parts[parts.length - 1], hash);
     }

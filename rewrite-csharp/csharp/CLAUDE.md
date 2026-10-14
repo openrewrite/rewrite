@@ -86,8 +86,47 @@ rewrite-csharp/csharp/
 │       └── CSharp/                   # C#-specific recipe tests
 ├── OpenRewrite.Tool/                 # RPC server CLI executable
 │   └── Program.cs                    # Entry point (warmup parse, start RPC server)
+├── OpenRewrite.LstViewer/            # Dev utility: prints how a C# snippet maps to the LST
 └── OpenRewrite.sln                   # Visual Studio solution
 ```
+
+## Seeing How Syntax Maps to the LST
+
+`OpenRewrite.LstViewer` parses a C# snippet and tables every node against the source text it
+owns. Use it when modelling a new construct, or when a printer change loses whitespace and it is
+not obvious which node the whitespace belonged to. From `rewrite-csharp/csharp/`:
+
+```bash
+# A snippet inline; auto-wraps fragments into a compilation unit when needed
+dotnet run --project OpenRewrite.LstViewer -- --code 'if (o is string s) { }'
+
+# A whole file, with attested JavaType per node
+dotnet run --project OpenRewrite.LstViewer -- MyFile.cs --types
+
+# Start the table at one construct instead of the compilation unit
+dotnet run --project OpenRewrite.LstViewer -- --code 'x?.Y ?? 0' --wrap expression --focus FieldAccess
+
+# Snippet on stdin; --help lists every option
+echo 'record Point(int X, int Y);' | dotnet run --project OpenRewrite.LstViewer
+```
+
+Each row shows the node type, the parent property holding it, the padding wrapper it sits in
+(`(RP)` `JRightPadded`, `(LP)` `JLeftPadded`, `(JC)` `JContainer`) and the source with that node's
+span inverted — the span opens *before* the node's `Prefix`, so you can see which node owns which
+whitespace. Markers appear as rows under the node they decorate. Three things are worth reading:
+
+- an **underlined** span (`‹ ›` without colour) is derived, not measured: `CSharpPrinter` writes
+  that node inline rather than through `Visit`/`BeforeSyntax` (`Lambda.Parameters`, and the
+  implicit `MethodDeclaration` a record's primary constructor becomes), so its extent comes from
+  the hull of its measured descendants or from the gap its measured siblings leave. It locates the
+  node but can be wider than the text it owns. These are also the nodes where a marker never
+  prints.
+- `not printed` — the node contributes no text to this source at all, so it has nowhere to point.
+- a red warning that the LST does not print back to its source — a parser fidelity bug in the
+  snippet you just fed in.
+
+The table building blocks live in `OpenRewrite/CSharp/LstOutline.cs`, so a test can call
+`LstOutline.Of(tree)` to inspect node spans, parent properties and `IsApproximate` directly.
 
 ## Development Patterns
 

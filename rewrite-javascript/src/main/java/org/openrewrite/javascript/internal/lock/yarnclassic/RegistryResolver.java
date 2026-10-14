@@ -28,7 +28,7 @@ final class RegistryResolver {
 
     RegistryResolver(PackageRequest request, String fragment) {
         this.request = request;
-        this.fragment = ExoticResolvers.parseRegistryFragment(fragment);
+        this.fragment = ExoticResolvers.parseRegistryFragment(fragment, request.config.getRelease());
     }
 
     Promise<Manifest> resolve() {

@@ -15,17 +15,41 @@
  */
 package org.openrewrite.groovy;
 
+import java.nio.file.Path;
 import java.util.stream.Stream;
 import org.intellij.lang.annotations.Language;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.MethodSource;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.openrewrite.Issue;
 import org.openrewrite.test.RewriteTest;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.groovy.Assertions.groovy;
 
 class GroovyParserTest implements RewriteTest {
+
+    @ParameterizedTest
+    @ValueSource(strings = {
+      "Jenkinsfile",
+      "ci/Jenkinsfile.release",
+      "Jenkinsfile-nightly",
+      "Jenkinsfile_deploy",
+      "src/main/groovy/Script.groovy"
+    })
+    void acceptsGroovySourcesAndJenkinsfiles(String path) {
+        assertThat(GroovyParser.builder().build().accept(Path.of(path))).isTrue();
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {
+      "src/main/java/org/openrewrite/jenkins/JenkinsfileAsGroovy.java",
+      "src/test/kotlin/JenkinsfileTest.kt"
+    })
+    void doesNotAcceptFilesMerelyNamedAfterJenkinsfile(String path) {
+        assertThat(GroovyParser.builder().build().accept(Path.of(path))).isFalse();
+    }
 
     @Test
     void groovyPackageDefinition() {

@@ -48,8 +48,11 @@ FAKE_SERVER = textwrap.dedent('''\
             if slow:
                 time.sleep(float(slow.group(1)))
             padding = "x" * 65536 if "big" in name else ""
-            result = {"types": {"1": {"kind": "class", "name": "str"}}, "pad": padding,
-                      "virtualEnv": os.environ.get("VIRTUAL_ENV")}
+            types = {"1": {"kind": "class", "name": "str"}}
+            if "classes" in name:
+                types = {"7": {"kind": "classLiteral", "className": "Widget", "moduleName": "pkg.widgets"},
+                         "8": {"kind": "classLiteral", "className": "Widget", "moduleName": "pkg.other"}}
+            result = {"types": types, "pad": padding, "virtualEnv": os.environ.get("VIRTUAL_ENV")}
         sys.stdout.write(json.dumps({"jsonrpc": "2.0", "id": req["id"], "result": result}) + "\\n")
         sys.stdout.flush()
 ''')
@@ -113,11 +116,22 @@ def test_failed_initialize_restarts_for_another_roots_venv(client, tmp_path, mon
 
 def test_restarted_session_drops_the_previous_sessions_types(client):
     assert client.initialize("/some/project")
-    assert client.get_types("/some/project/app.py") is not None
+    assert client.get_types("/some/project/classes.py") is not None
     client._kill()
 
     assert client.initialize("/some/project")
     assert client.session_types == {}
+    assert client.session_class_literals == {}
+    assert client.session_classes_by_module == {}
+
+
+def test_session_indexes_class_literals_as_they_arrive(client):
+    assert client.initialize("/some/project")
+    assert client.get_types("/some/project/classes.py") is not None
+
+    # A class name resolves to the first id the session saw under it.
+    assert client.session_class_literals == {"Widget": 7}
+    assert client.session_classes_by_module == {"pkg.widgets": [7], "pkg.other": [8]}
 
 
 def test_timeout_returns_none_then_recovers(client):

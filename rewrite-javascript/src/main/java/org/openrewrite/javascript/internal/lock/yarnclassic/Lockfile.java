@@ -344,7 +344,9 @@ final class Lockfile {
             fields.put("peerDependencies", pkg.get("peerDependencies"));
             fields.put("optionalDependencies", pkg.get("optionalDependencies"));
             fields.put("permissions", ref.permissions);
-            fields.put("prebuiltVariants", pkg.get("prebuiltVariants"));
+            if (release.keepsPrebuiltVariants()) {
+                fields.put("prebuiltVariants", pkg.get("prebuiltVariants"));
+            }
             Map<String, @Nullable Object> obj = implodeEntry(pattern, fields);
 
             lockfile.put(pattern, obj);

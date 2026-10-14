@@ -85,4 +85,30 @@ class ScalaTemplateMatchTest implements RewriteTest {
               """
           ));
     }
+
+    @Test
+    void matchUnqualifiedMethodInvocation() {
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new ScalaVisitor<>() {
+              @Override
+              public J visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
+                  return ScalaTemplate.matches("println(#{any(String)})", getCursor()) ?
+                    SearchResult.found(method) : super.visitMethodInvocation(method, ctx);
+              }
+          })),
+          scala(
+            """
+              class Test {
+                  def a = println("hi")
+                  def b = print("hi")
+              }
+              """,
+            """
+              class Test {
+                  def a = /*~~>*/println("hi")
+                  def b = print("hi")
+              }
+              """
+          ));
+    }
 }

@@ -9,7 +9,7 @@ regenerates through the port of its own resolver, and the shared engine of ADR 0
 what `internal.lock` holds, and how the recipes write overrides and follow catalogs for each package manager; and
 again: one port per library, the host's registries as the user's config, corepack, the regenerators by module.
 Amended 2026-10-11: later releases of the ported pnpm and Yarn majors; the npm release that built the LST,
-with every npm release from 7.1.1 reproduced beside the one ported; every Yarn 4.x release reproduced beside
+with every npm release from 7.0.4 reproduced beside the one ported; every Yarn 4.x release reproduced beside
 4.10.3; Bun releases reproduced beside 1.3.10; and Yarn 1 releases reproduced beside 1.22.22. Amended 2026-10-12:
 pnpm releases reproduced beside 11.2.2; and the manifests a port is given.
 
@@ -296,6 +296,9 @@ allow write different locks for the plainest edit (every release before 10.8.0 d
   branches on it where upstream changed, 11.17.0's code unchanged beside it. A library npm bundles at several releases
   is ported once with its release as an option (`NodeSemver`, `Ssri`, `PickManifest`, `PackageJson`, `MapWorkspaces`),
   and `NpmRelease` names the one each npm bundles.
+- **An older generation is a class beside the ported one.** Where a release's placement or tree model differs
+  throughout rather than at a few points, the older module is ported whole and chosen through one question:
+  `LegacyPlacement` (7.20.2's placement) before 7.20.3, and `LegacyNode` (arborist 1.0.14's tree model) before 7.1.1.
 - **What is reproduced.** `NpmReleases.PROVEN` is the range of releases for which every recorded scenario replays as
   that release wrote it. A marker naming a release outside it, or one npm never published, is cannot-know.
 - **How a release is proven.** Every npm release from 7.0.0 is run over every recorded scenario against a frozen
@@ -404,19 +407,23 @@ The Yarn classic port follows yarn 1.22.22 and reproduces the 1.x releases besid
   does, answered through `atLeast` alone by the tag of yarnpkg/yarn that made it. The release names itself where yarn
   does: the header `yarn-enable-lockfile-versions` writes, `engines.yarn`, the `packageManager` message. An error that
   is no MessageError is worded as the release reports it: `An unexpected error occurred: "<message>".` before 1.22.20,
-  its stack from 1.22.21; 1.22.20 prints none, and the engine words it as 1.22.21 does. What ends yarn before `main`
-  reports (an rc file it cannot read, a yarn-path that does not load, the manifest 1.22.20 reads first) is printed as
-  its stack by every release. The questions cover every change between two releases of `PROVEN` in the modules the
-  port names, those no scenario reaches among them (each tested as the release did it when run), and the libraries
-  yarn bundles: ini 1.3.4 and tar-fs 1.16.0 before 1.10.0 are options of their one port.
+  its stack from 1.22.21; 1.22.20 prints none, and the engine words it as 1.22.21 does. From 1.4.0 to 1.5.1 yarn's
+  bundle makes none of its own errors a MessageError, so those releases word every error as unexpected. What ends
+  yarn before `main` reports (an rc file it cannot read, a yarn-path that does not load, the manifest 1.22.20 reads
+  first) is printed as its stack by every release. The questions cover every change between two releases of `PROVEN`
+  in the modules the port names, those no scenario reaches among them (each tested as the release did it when run),
+  and the libraries yarn bundles: ini 1.3.4 and tar-fs 1.16.0 before 1.10.0, and tar-stream 1.5.4 before 1.7.0 (with
+  readable-stream's `_final`, from 1.8.0), are options of their one port.
 - **How a release is proven.** Every stable 1.x release was swept over every Yarn classic scenario as npm's were;
   1.22.12, which the registry publishes without its bundle, never ran and is not reproduced. The export's failure of a
   phase is the error that ended it, yarn's last `error` line (the steps go to stdout, which interleaves with stderr
   from run to run), none where 1.22.20 printed none. A recording's `cannot-know` or `malformed` line is `exact-or`
   that line for a release that writes a lock, in the export's outcomes and in the replays of the recorded outcome as
-  another release. `YarnClassicScenarioTest` replays the first and last release of every range, and every release
-  with `REWRITE_LOCK_EVERY_RELEASE`. `PROVEN` is 1.7.0 to 1.22.22 but 1.22.12; 1.6.0 knows no `--focus`, and the
-  releases before it word many failures otherwise.
+  another release; where a release writes what the recorders say the engine cannot know and the recording release
+  does not (a member directory's own lock, a lock that names yarn's cache folder), the export's line is the
+  recorders' `cannot-know` for it. A registry's `Not found` is yarn rejecting the edit however a release words it.
+  `YarnClassicScenarioTest` replays the first and last release of every range, and every release with
+  `REWRITE_LOCK_EVERY_RELEASE`. `PROVEN` is every 1.x release but 1.22.12.
 
 ## Amendment 2026-10-12: pnpm releases
 

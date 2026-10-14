@@ -87,7 +87,7 @@ final class NormalizeManifest {
         fix(info, looseSemver, release);
         resolveRelative(info, moduleLoc, lockfileFolder, release);
         try {
-            validate(info);
+            validate(info, release);
         } catch (MessageError err) {
             throw new MessageError(prefix + err.getMessage(), err.getCode());
         }
@@ -130,10 +130,13 @@ final class NormalizeManifest {
             info.data.remove("bundledDependencies");
         }
 
-        for (String dependencyType : MANIFEST_FIELDS) {
+        for (String dependencyType : release.cleansTheResolutions() ? MANIFEST_FIELDS : DEPENDENCY_TYPES) {
             Map<String, @Nullable Object> deps = asObject(info, dependencyType);
             if (deps != null) {
                 deps.remove("//");
+                if (!release.emptiesFalsyDependencies()) {
+                    continue;
+                }
                 for (String name : new ArrayList<>(deps.keySet())) {
                     Object value = deps.get(name);
                     deps.put(name, Js.truthy(value) ? value : "");
@@ -223,7 +226,10 @@ final class NormalizeManifest {
             for (String name : Js.keys(dependencies)) {
                 Object raw = Js.get(dependencies, name);
                 if (!(raw instanceof String)) {
-                    throw Js.invalidArgType("The \"path\" argument must be of type string", raw);
+                    // a key's null is JSON's, which reaches here where fix.js keeps it (before 1.1.0)
+                    throw raw == null ? new JsError(Js.INVALID_ARG_TYPE,
+                            "The \"path\" argument must be of type string. Received null") :
+                            Js.invalidArgType("The \"path\" argument must be of type string", raw);
                 }
                 String value = (String) raw;
                 if (value.startsWith("/")) {
@@ -286,7 +292,7 @@ final class NormalizeManifest {
         return project.append("/\0").toString();
     }
 
-    static void validate(Manifest info) {
+    static void validate(Manifest info, YarnClassicRelease release) {
         Object name = info.getName();
         if (name instanceof String) {
             String n = (String) name;
@@ -304,7 +310,7 @@ final class NormalizeManifest {
         for (String key : STRINGS) {
             Object val = info.get(key);
             if (Js.truthy(val) && !(val instanceof String)) {
-                throw new MessageError(Lang.format("$0 is not a string", key));
+                throw new MessageError(Lang.format(release, "$0 is not a string", key));
             }
         }
         cleanDependencies(info);

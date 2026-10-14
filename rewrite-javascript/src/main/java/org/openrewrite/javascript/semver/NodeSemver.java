@@ -43,10 +43,13 @@ public class NodeSemver {
      * 11.17.0 bundles; 7.8.1 (npm 11.16.0); 7.8.0, whose answers 7.7.3 and 7.7.4 give too (npm 11.6.2 to 11.15.0);
      * 7.7.2, whose answers 7.6.3 and 7.7.1 give too (npm 11.0.0 to 11.6.1); 7.5.2 (npm 9.7.2 to 9.8.0), which reads a
      * range's {@code ||} groups untrimmed, so that under {@code loose} a group of none but invalid comparators keeps
-     * the empty one a space leaves and takes any version; or 5.5.0, which yarn 1.22.22 bundles.
+     * the empty one a space leaves and takes any version; 7.3.2 (npm 7.0.0 to 7.0.15), which keeps every group and
+     * comparator as parsed (7.3.3 drops null sets, takes a range with any for any and drops duplicate comparators),
+     * reads {@code >=} and a 0, any character, 0, any character, 0 as any ({@code GTE0}, its dots unescaped), and
+     * takes the least lower bound of each set for {@code minVersion}; or 5.5.0, which yarn 1.22.22 bundles.
      */
     public enum Release {
-        V5_5_0, V7_5_2, V7_7_2, V7_8_0, V7_8_1, V7_8_4, V7_8_5
+        V5_5_0, V7_3_2, V7_5_2, V7_7_2, V7_8_0, V7_8_1, V7_8_4, V7_8_5
     }
 
     @RequiredArgsConstructor(access = AccessLevel.PRIVATE)
@@ -262,6 +265,21 @@ public class NodeSemver {
             }
         }
         NodeSemverVersion minver = null;
+        if (options.release == Release.V7_3_2) {
+            // 7.3.2 takes the least lower bound of any set, and reads the version of an any comparator
+            for (List<NodeSemverComparator> comparators : r.sets()) {
+                for (NodeSemverComparator comparator : comparators) {
+                    if (comparator.isAny()) {
+                        throw new IllegalArgumentException("Invalid Version: undefined");
+                    }
+                    NodeSemverVersion compver = lowerBound(comparator);
+                    if (compver != null && (minver == null || minver.comparePrecedence(compver) > 0)) {
+                        minver = compver;
+                    }
+                }
+            }
+            return minver != null && r.test(minver) ? minver.nodeVersion() : null;
+        }
         for (List<NodeSemverComparator> comparators : r.sets()) {
             NodeSemverVersion setMin = null;
             for (NodeSemverComparator comparator : comparators) {
@@ -287,6 +305,19 @@ public class NodeSemver {
             }
         }
         return minver != null && r.test(minver) ? minver.nodeVersion() : null;
+    }
+
+    // the least version a comparator admits from below: past a > bound, a >= or = bound itself; none for < and <=
+    private static @Nullable NodeSemverVersion lowerBound(NodeSemverComparator comparator) {
+        NodeSemverVersion compver = comparator.getVersion();
+        String operator = comparator.operator();
+        if (">".equals(operator)) {
+            String base = compver.strictMajor() + "." + compver.strictMinor() + ".";
+            return NodeSemverVersion.parse(compver.hasPrerelease() ?
+                    base + compver.strictPatch() + "-" + join(compver.strictPrerelease()) + ".0" :
+                    base + (compver.strictPatch() + 1), Options.DEFAULT);
+        }
+        return operator.isEmpty() || ">=".equals(operator) ? compver : null;
     }
 
     private static String join(List<Object> identifiers) {

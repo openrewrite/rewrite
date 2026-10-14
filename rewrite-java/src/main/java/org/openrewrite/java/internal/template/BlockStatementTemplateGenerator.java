@@ -348,7 +348,7 @@ public class BlockStatementTemplateGenerator {
                 J parent = next(cursor).getValue();
                 if (parent instanceof J.ClassDeclaration) {
                     J.ClassDeclaration cd = (J.ClassDeclaration) parent;
-                    after.append(cd.withBody(null).withLeadingAnnotations(null).withPrefix(Space.EMPTY).printTrimmed(cursor).trim()).append("{}");
+                    after.append(cd.withBody(null).withLeadingAnnotations(emptyList()).withPrefix(Space.EMPTY).printTrimmed(cursor).trim()).append("{}");
                 } else if (parent instanceof J.MethodDeclaration) {
                     J.MethodDeclaration md = (J.MethodDeclaration) parent;
                     after.append(md.withBody(null)
@@ -702,7 +702,7 @@ public class BlockStatementTemplateGenerator {
         StringBuilder beforeBuffer = prior == null ? null : new StringBuilder();
         StringBuilder appendBuffer = prior == null ? after : beforeBuffer;
 
-        appendBuffer.append(cd.withBody(null).withLeadingAnnotations(null).withPrefix(Space.EMPTY).printTrimmed(cursor).trim()).append('{');
+        appendBuffer.append(cd.withBody(null).withLeadingAnnotations(emptyList()).withPrefix(Space.EMPTY).printTrimmed(cursor).trim()).append('{');
 
         List<Statement> statements = cd.getBody().getStatements();
         for (Statement statement : statements) {
