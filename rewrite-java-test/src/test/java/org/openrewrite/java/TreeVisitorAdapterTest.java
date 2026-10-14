@@ -18,6 +18,7 @@ package org.openrewrite.java;
 import lombok.EqualsAndHashCode;
 import lombok.Value;
 import org.junit.jupiter.api.Test;
+import org.openrewrite.Cursor;
 import org.openrewrite.Tree;
 import org.openrewrite.TreeVisitor;
 import org.openrewrite.internal.FindRecipeRunException;
@@ -25,6 +26,13 @@ import org.openrewrite.internal.RecipeRunException;
 import org.openrewrite.internal.TreeVisitorAdapter;
 import org.openrewrite.java.tree.J;
 
+import java.net.URL;
+import java.net.URLClassLoader;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 
@@ -141,6 +149,161 @@ class TreeVisitorAdapterTest {
           .orElseThrow(() -> new IllegalArgumentException("Could not parse as Java"));
         jv.visit(cu, 0);
         assertThat(n.get()).isEqualTo(1);
+    }
+
+    @Test
+    void cachedAdapterStillCreatesAProxyPerDelegate() {
+        J.CompilationUnit cu = JavaParser.fromJavaVersion().build().parse("class Test {}")
+          .findFirst()
+          .map(J.CompilationUnit.class::cast)
+          .orElseThrow(() -> new IllegalArgumentException("Could not parse as Java"));
+
+        AtomicInteger first = new AtomicInteger();
+        AtomicInteger second = new AtomicInteger();
+        Adaptable firstDelegate = new Adaptable(first);
+        //noinspection unchecked
+        JavaVisitor<Integer> a1 = TreeVisitorAdapter.adapt(firstDelegate, JavaVisitor.class);
+        //noinspection unchecked
+        JavaVisitor<Integer> a2 = TreeVisitorAdapter.adapt(firstDelegate, JavaVisitor.class);
+        //noinspection unchecked
+        JavaVisitor<Integer> b = TreeVisitorAdapter.adapt(new Adaptable(second), JavaVisitor.class);
+
+        assertThat(a1).isNotSameAs(a2).isNotSameAs(b);
+        assertThat(a1.getClass()).isSameAs(a2.getClass()).isSameAs(b.getClass());
+
+        a1.visit(cu, 0);
+        b.visit(cu, 0);
+        assertThat(first.get()).isEqualTo(4);
+        assertThat(second.get()).isEqualTo(4);
+    }
+
+    @Test
+    void adaptedVisitorSharesCursorWithDelegate() {
+        Adaptable delegate = new Adaptable(new AtomicInteger());
+        Cursor cursor = new Cursor(new Cursor(null, Cursor.ROOT_VALUE), "parent");
+        delegate.setCursor(cursor);
+
+        //noinspection unchecked
+        JavaVisitor<Integer> adapted = TreeVisitorAdapter.adapt(delegate, JavaVisitor.class);
+        assertThat(adapted.getCursor()).isSameAs(cursor);
+
+        Cursor moved = new Cursor(cursor, "child");
+        adapted.setCursor(moved);
+        assertThat(delegate.getCursor()).isSameAs(moved);
+    }
+
+    @Test
+    void mixinStateIsCopiedPerAdaptation() {
+        J.CompilationUnit cu = JavaParser.fromJavaVersion().build().parse("class Test {}")
+          .findFirst()
+          .map(J.CompilationUnit.class::cast)
+          .orElseThrow(() -> new IllegalArgumentException("Could not parse as Java"));
+
+        AtomicInteger first = new AtomicInteger();
+        AtomicInteger second = new AtomicInteger();
+        CountingMixin firstMixin = new CountingMixin();
+        firstMixin.n = first;
+        CountingMixin secondMixin = new CountingMixin();
+        secondMixin.n = second;
+
+        //noinspection unchecked
+        JavaVisitor<Integer> jv1 = TreeVisitorAdapter.adapt(new Adaptable(new AtomicInteger()), JavaVisitor.class, firstMixin);
+        //noinspection unchecked
+        JavaVisitor<Integer> jv2 = TreeVisitorAdapter.adapt(new Adaptable(new AtomicInteger()), JavaVisitor.class, secondMixin);
+        jv1.visit(cu, 0);
+        assertThat(first.get()).isEqualTo(/* mixin preVisit */ 4 + /* mixin visitIdentifier */ 1);
+        assertThat(second.get()).isZero();
+
+        jv2.visit(cu, 0);
+        assertThat(second.get()).isEqualTo(5);
+    }
+
+    @Test
+    void concurrentAdaptation() throws Exception {
+        J.CompilationUnit cu = JavaParser.fromJavaVersion().build().parse("class Test {}")
+          .findFirst()
+          .map(J.CompilationUnit.class::cast)
+          .orElseThrow(() -> new IllegalArgumentException("Could not parse as Java"));
+
+        ExecutorService executor = Executors.newFixedThreadPool(8);
+        try {
+            List<Future<Integer>> counts = new ArrayList<>();
+            for (int i = 0; i < 64; i++) {
+                counts.add(executor.submit(() -> {
+                    AtomicInteger n = new AtomicInteger();
+                    //noinspection unchecked
+                    JavaVisitor<Integer> jv = TreeVisitorAdapter.adapt(new ConcurrentlyAdapted(n), JavaVisitor.class);
+                    jv.visit(cu, 0);
+                    return n.get();
+                }));
+            }
+            for (Future<Integer> count : counts) {
+                assertThat(count.get()).isEqualTo(4);
+            }
+        } finally {
+            executor.shutdownNow();
+        }
+    }
+
+    /**
+     * Recipe class loaders (e.g. the Moderne CLI's) give a recipe its own copy of rewrite-java, while the
+     * visitor type a tree adapts to (e.g. {@code GroovyVisitor} from the LST's G.accept) comes from the parent.
+     */
+    @Test
+    void adaptVisitorFromChildFirstClassLoader() throws Exception {
+        URL rewriteJava = JavaIsoVisitor.class.getProtectionDomain().getCodeSource().getLocation();
+        URL testClasses = TreeVisitorAdapterTest.class.getProtectionDomain().getCodeSource().getLocation();
+        try (URLClassLoader recipeLoader = new ChildFirstClassLoader(new URL[]{rewriteJava, testClasses},
+          TreeVisitorAdapterTest.class.getClassLoader())) {
+            Class<?> childVisitor = recipeLoader.loadClass(ChildLoadedVisitor.class.getName());
+            assertThat(childVisitor.getSuperclass()).isNotSameAs(JavaIsoVisitor.class);
+
+            TreeVisitor<?, ?> delegate = (TreeVisitor<?, ?>) childVisitor.getDeclaredConstructor().newInstance();
+            //noinspection unchecked
+            JavaVisitor<Integer> adapted = TreeVisitorAdapter.adapt((TreeVisitor<J, ?>) delegate, JavaVisitor.class);
+            J.CompilationUnit cu = JavaParser.fromJavaVersion().build().parse("class Test {}")
+              .findFirst()
+              .map(J.CompilationUnit.class::cast)
+              .orElseThrow(() -> new IllegalArgumentException("Could not parse as Java"));
+            assertThat(adapted.visit(cu, 0)).isSameAs(cu);
+        }
+    }
+
+    public static class ChildLoadedVisitor extends JavaIsoVisitor<Integer> {
+        @Override
+        public J.Identifier visitIdentifier(J.Identifier identifier, Integer p) {
+            return identifier;
+        }
+    }
+
+    static class ChildFirstClassLoader extends URLClassLoader {
+        ChildFirstClassLoader(URL[] urls, ClassLoader parent) {
+            super(urls, parent);
+        }
+
+        @Override
+        protected Class<?> loadClass(String name, boolean resolve) throws ClassNotFoundException {
+            if (!name.equals(JavaIsoVisitor.class.getName()) && !name.startsWith(TreeVisitorAdapterTest.class.getName() + "$")) {
+                return super.loadClass(name, resolve);
+            }
+            synchronized (getClassLoadingLock(name)) {
+                Class<?> c = findLoadedClass(name);
+                if (c == null) {
+                    try {
+                        c = findClass(name);
+                    } catch (ClassNotFoundException e) {
+                        c = super.loadClass(name, resolve);
+                    }
+                }
+                return c;
+            }
+        }
+    }
+
+    static class ConcurrentlyAdapted extends PreVisitBase {
+        ConcurrentlyAdapted(AtomicInteger visitCount) {
+            super(visitCount);
+        }
     }
 
     static class IdentifierCountingBase extends JavaIsoVisitor<Integer> {

@@ -244,6 +244,29 @@ public class SolutionParserTests : IDisposable
     }
 
     [Fact]
+    public void AndroidDesignTimeBuildsUseTheManagedResourceGenerator()
+    {
+        var properties = new Dictionary<string, string>();
+
+        NuGetResolver.ApplyAndroidDesignTimeDefault(properties);
+
+        if (OperatingSystem.IsWindows())
+            Assert.DoesNotContain("AndroidUseManagedDesignTimeResourceGenerator", properties.Keys);
+        else
+            Assert.Equal("true", properties["AndroidUseManagedDesignTimeResourceGenerator"]);
+    }
+
+    [Fact]
+    public void OutOfSupportWorkloadsDoNotFailEvaluation()
+    {
+        var properties = new Dictionary<string, string>();
+
+        NuGetResolver.ApplyOutOfSupportWorkloadsDefault(properties);
+
+        Assert.Equal("false", properties["CheckEolWorkloads"]);
+    }
+
+    [Fact]
     public async Task ProjectsThatResolveNoReferencesAreWarnedAboutOnce()
     {
         WriteFile("Unsupported.csproj", """

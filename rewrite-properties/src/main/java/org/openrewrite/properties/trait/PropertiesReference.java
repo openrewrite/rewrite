@@ -58,7 +58,7 @@ public class PropertiesReference implements Reference {
     }
 
     public static class Provider extends AbstractProvider<PropertiesReference> {
-        private static final Predicate<String> applicationPropertiesMatcher = Pattern.compile("^application(-\\w+)?\\.properties$").asPredicate();
+        private static final Predicate<String> applicationPropertiesMatcher = Pattern.compile("^application(-[\\p{L}\\p{Nd}_.+@-]+)?\\.properties$").asPredicate();
         private static final SimpleTraitMatcher<PropertiesReference> matcher = new SimpleTraitMatcher<PropertiesReference>() {
             private final Predicate<String> javaFullyQualifiedTypeMatcher = Pattern.compile(
                     "^\\p{javaJavaIdentifierStart}\\p{javaJavaIdentifierPart}*" +

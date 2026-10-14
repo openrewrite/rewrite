@@ -35,13 +35,27 @@ export namespace MarkerPrinter {
                 let searchResult = marker as SearchResult;
                 return commentWrapper(searchResult.description == null ? "" : "(" + searchResult.description + ")");
             } else if (marker.kind.startsWith("org.openrewrite.marker.Markup$")) {
-                const markup = marker as Markup;
-                const content = markup.detail
-                    ? `(${markup.message}: ${markup.detail})`
-                    : `(${markup.message})`;
-                return commentWrapper(content);
+                return commentWrapper(`(${(marker as Markup).message})`);
             }
             return "";
+        },
+        beforePrefix(): string {
+            return "";
+        },
+        afterSyntax(): string {
+            return "";
+        },
+    }
+
+    /**
+     * As {@link DEFAULT}, but a {@link Markup} that has a detail prints it rather than its message.
+     */
+    export const VERBOSE: MarkerPrinter = {
+        beforeSyntax(marker: Marker, cursor: Cursor, commentWrapper: CommentWrapper): string {
+            if (marker.kind.startsWith("org.openrewrite.marker.Markup$")) {
+                return commentWrapper(`(${(marker as Markup).detail ?? (marker as Markup).message})`);
+            }
+            return DEFAULT.beforeSyntax(marker, cursor, commentWrapper);
         },
         beforePrefix(): string {
             return "";
@@ -124,8 +138,9 @@ interface TreePrinter {
      * @param tree Helps to determine what kind of language we are dealing with when
      * printing a subtree whose LST type is shared between multiple languages in a language family.
      * @param out Accumulates printing output.
+     * @param cursor What encloses `tree`, when it is not a source file.
      */
-    print(tree: Tree, out?: PrintOutputCapture): Promise<string>;
+    print(tree: Tree, out?: PrintOutputCapture, cursor?: Cursor): Promise<string>;
 }
 
 export class TreePrinters {
@@ -134,9 +149,9 @@ export class TreePrinters {
 
     static register(kind: string, printer: () => TreeVisitor<any, PrintOutputCapture>): void {
         this._registry.set(kind, {
-            async print(tree: Tree, out?: PrintOutputCapture): Promise<string> {
+            async print(tree: Tree, out?: PrintOutputCapture, cursor?: Cursor): Promise<string> {
                 const p = out || new PrintOutputCapture();
-                await printer().visit(tree, p);
+                await printer().visit(tree, p, cursor);
                 return p.out;
             }
         })

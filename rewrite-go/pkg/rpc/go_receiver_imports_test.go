@@ -46,10 +46,10 @@ import (
 func makeImport(path string) *java.Import {
 	return &java.Import{
 		ID: uuid.New(),
-		Qualid: &java.Literal{
+		Qualid: &java.FieldAccess{
 			ID:     uuid.New(),
-			Source: `"` + path + `"`,
-			Value:  path,
+			Target: &java.Empty{ID: uuid.New()},
+			Name:   java.LeftPadded[*java.Identifier]{Element: makeIdent(path)},
 		},
 	}
 }
@@ -140,9 +140,7 @@ func TestCompilationUnitRoundTrip_WithImports(t *testing.T) {
 	require.Len(t, got.Imports.Elements, 2, "Imports.Elements")
 	gotImp0 := got.Imports.Elements[0].Element
 	require.NotNil(t, gotImp0, "Imports[0]: got nil *Import")
-	if lit, ok := gotImp0.Qualid.(*java.Literal); !ok || lit.Value != "fmt" {
-		t.Errorf("Imports[0].Qualid: got %+v, want literal \"fmt\"", gotImp0.Qualid)
-	}
+	assert.Equal(t, "fmt", gotImp0.Path())
 }
 
 func TestCompilationUnitRoundTrip_NilImports(t *testing.T) {

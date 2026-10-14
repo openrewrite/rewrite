@@ -20,11 +20,13 @@ import lombok.Value;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Recipe;
 import org.openrewrite.TreeVisitor;
+import org.openrewrite.maven.tree.ResolvedPom;
 import org.openrewrite.xml.tree.Content;
 import org.openrewrite.xml.tree.Xml;
 
 import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.Iterator;
 import java.util.List;
 
 @Value
@@ -40,7 +42,8 @@ public class SortDependencies extends Recipe {
     public String getDescription() {
         return "Sort dependencies alphabetically by groupId then artifactId. " +
                "Test-scoped dependencies are sorted after non-test dependencies. " +
-               "Applies to both `<dependencies>` and `<dependencyManagement>` sections.";
+               "Imported BOMs retain their original positions. Applies to both `<dependencies>` and " +
+               "`<dependencyManagement>` sections.";
     }
 
     @Override
@@ -59,7 +62,8 @@ public class SortDependencies extends Recipe {
 
                 for (Content content : t.getContent()) {
                     if (content instanceof Xml.Tag) {
-                        groups.add(new DependencyGroup((Xml.Tag) content, currentComments));
+                        Xml.Tag dependency = (Xml.Tag) content;
+                        groups.add(new DependencyGroup(dependency, currentComments, isImportedBom(dependency)));
                         currentComments = new ArrayList<>();
                     } else {
                         currentComments.add(content);
@@ -71,32 +75,26 @@ public class SortDependencies extends Recipe {
                     return t;
                 }
 
-                List<DependencyGroup> sorted = new ArrayList<>(groups);
-                sorted.sort(Comparator.<DependencyGroup, Boolean>comparing(
-                    g -> "test".equals(g.tag.getChildValue("scope").orElse(null))
-                ).thenComparing(
-                    g -> g.tag.getChildValue("groupId").orElse("") + ":" +
-                         g.tag.getChildValue("artifactId").orElse("")
-                ));
+                Iterator<DependencyGroup> sortedReplacements = groups.stream()
+                        .filter(group -> !group.importedBom)
+                        .sorted(Comparator.<DependencyGroup, Boolean>comparing(group -> group.testScoped)
+                                .thenComparing(group -> group.sortKey))
+                        .iterator();
 
-                // Check if order actually changed
-                boolean changed = false;
-                for (int i = 0; i < groups.size(); i++) {
-                    if (groups.get(i).tag != sorted.get(i).tag) {
-                        changed = true;
-                        break;
-                    }
+                List<DependencyGroup> reorderedGroups = new ArrayList<>(groups.size());
+                for (DependencyGroup group : groups) {
+                    reorderedGroups.add(group.importedBom ? group : sortedReplacements.next());
                 }
 
-                if (!changed) {
+                if (groups.equals(reorderedGroups)) {
                     return t;
                 }
 
                 // Rebuild content preserving original whitespace prefixes
                 List<Content> newContent = new ArrayList<>();
-                for (int i = 0; i < sorted.size(); i++) {
+                for (int i = 0; i < reorderedGroups.size(); i++) {
                     DependencyGroup original = groups.get(i);
-                    DependencyGroup reordered = sorted.get(i);
+                    DependencyGroup reordered = reorderedGroups.get(i);
 
                     // Apply the prefix from the original position to the reordered content
                     for (int j = 0; j < reordered.precedingContent.size(); j++) {
@@ -126,16 +124,40 @@ public class SortDependencies extends Recipe {
 
                 return t.withContent(newContent);
             }
+
+            private boolean isImportedBom(Xml.Tag tag) {
+                return matches(tag, "type", "pom") && matches(tag, "scope", "import");
+            }
+
+            private boolean matches(Xml.Tag tag, String childName, String expected) {
+                String value = tag.getChildValue(childName).orElse(null);
+                if (value == null) {
+                    return false;
+                }
+                String resolved = getResolutionResult().getPom().getValue(value);
+                // A placeholder that the effective model can't resolve, such as one defined only in an
+                // inactive profile, might still be an import; leave those dependencies where they are.
+                return resolved == null || ResolvedPom.placeholderHelper.hasPlaceholders(resolved) ||
+                       expected.equalsIgnoreCase(resolved);
+            }
         };
     }
 
     private static class DependencyGroup {
         final Xml.Tag tag;
         final List<Content> precedingContent;
+        final boolean importedBom;
+        final boolean testScoped;
+        // Compared only as a whole key; `:` cannot occur in a groupId or artifactId
+        final String sortKey;
 
-        DependencyGroup(Xml.Tag tag, List<Content> precedingContent) {
+        DependencyGroup(Xml.Tag tag, List<Content> precedingContent, boolean importedBom) {
             this.tag = tag;
             this.precedingContent = precedingContent;
+            this.importedBom = importedBom;
+            this.testScoped = "test".equals(tag.getChildValue("scope").orElse(null));
+            this.sortKey = tag.getChildValue("groupId").orElse("") + ":" +
+                           tag.getChildValue("artifactId").orElse("");
         }
     }
 }

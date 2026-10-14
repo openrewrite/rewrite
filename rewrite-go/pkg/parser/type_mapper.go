@@ -427,6 +427,7 @@ func (m *typeMapper) structMembers(s *types.Struct, owner java.JavaType) []*java
 			m.fieldOwner[f] = owner
 		}
 		members = append(members, &java.JavaTypeVariable{
+			FlagsBitMap: flagsForExported(f.Name()),
 			Name:        f.Name(),
 			Owner:       owner,
 			Type:        m.mapType(f.Type()),
@@ -463,6 +464,14 @@ func fullyQualifiedName(obj *types.TypeName) string {
 // Bit 0 (value 1) = Public (exported in Go)
 func flagsForObject(obj *types.TypeName) int64 {
 	return flagsForExported(obj.Name())
+}
+
+// flagsForVar gives fields and package-level vars their visibility. Locals and parameters have none.
+func flagsForVar(v *types.Var) int64 {
+	if v.IsField() || (v.Pkg() != nil && v.Parent() == v.Pkg().Scope()) {
+		return flagsForExported(v.Name())
+	}
+	return 0
 }
 
 func flagsForExported(name string) int64 {
@@ -512,9 +521,10 @@ func (m *typeMapper) mapObjectToVariable(obj types.Object, enclosing java.JavaTy
 			return v
 		}
 		v := &java.JavaTypeVariable{
-			Name:  o.Name(),
-			Owner: m.ownerType(o, enclosing),
-			Type:  m.mapType(o.Type()),
+			FlagsBitMap: flagsForVar(o),
+			Name:        o.Name(),
+			Owner:       m.ownerType(o, enclosing),
+			Type:        m.mapType(o.Type()),
 		}
 		m.variables[key] = v
 		return v

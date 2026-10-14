@@ -35,6 +35,7 @@ public class RpcReceiveQueue {
     private final Supplier<List<RpcObjectData>> pull;
     private final @Nullable String sourceFileType;
     private final @Nullable PrintStream log;
+    private final List<Integer> receivedRefs = new ArrayList<>();
 
     public RpcReceiveQueue(Map<Integer, Object> refs, Supplier<List<RpcObjectData>> pull,
                            @Nullable String sourceFileType, @Nullable PrintStream log) {
@@ -58,6 +59,15 @@ public class RpcReceiveQueue {
             batch.addAll(pull.get());
         }
         return batch.element();
+    }
+
+    /**
+     * Drop the refs received through this queue, for when what it was receiving failed to arrive
+     * whole. The sender of a failed transfer forgets the refs it assigned in it as well.
+     */
+    public void rollBackRefs() {
+        refs.keySet().removeAll(receivedRefs);
+        receivedRefs.clear();
     }
 
     /**
@@ -131,6 +141,7 @@ public class RpcReceiveQueue {
                         // immutable updates because of its cyclic nature, the before instance will ultimately
                         // be the same as the after instance below.
                         refs.put(ref, before);
+                        receivedRefs.add(ref);
                     }
                 }
                 // Intentional fall-through...
@@ -155,6 +166,10 @@ public class RpcReceiveQueue {
                             "No RPC codec registered on the Java side for '" + message.getValueType() + "'. " +
                                     "The remote side has a codec and sent property messages that will not be consumed, " +
                                     "causing RPC queue desynchronization.");
+                } else if (message.getState() == RpcObjectData.State.ADD) {
+                    // Reading this as null would hide that the remote had something it could not send.
+                    throw new IllegalStateException(
+                            "Received an ADD with no value type, value or ref, so there is nothing to decode: " + message);
                 } else {
                     after = before;
                 }

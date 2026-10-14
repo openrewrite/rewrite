@@ -123,6 +123,96 @@ class GroovyParserTest implements RewriteTest {
     }
 
     @Test
+    void closuresBlocksAndMethodPointers() {
+        rewriteRun(
+          groovy(
+            """
+              [1, 2].each { println it }
+              if (true) {
+                  def f = this.&println
+              }
+              """
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/8978")
+    @Test
+    void baseScriptDeclaration() {
+        rewriteRun(
+          groovy(
+            """
+              @groovy.transform.BaseScript groovy.lang.Script base
+              println 1
+              """
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/8979")
+    @Test
+    void fieldDeclarationInsideBlock() {
+        rewriteRun(
+          groovy(
+            """
+              import groovy.transform.Field
+              @Field def top = 0
+              @Deprecated @Field def second = 1
+              if (true) {
+                  @Field def list = []
+                  @Deprecated
+                  @Field @SuppressWarnings("unused") String s = "s"
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void annotationsAfterModifiers() {
+        rewriteRun(
+          groovy(
+            """
+              import groovy.transform.Field
+              final @Field x = 1
+              final @Deprecated String y = "y"
+              public @SuppressWarnings("unused") final class A {
+                  private @Deprecated t
+                  public @Deprecated A() {}
+                  public @Deprecated <T> T n(final @Deprecated q) { null }
+              }
+              """
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/8980")
+    @Test
+    void gStringInParentheses() {
+        rewriteRun(
+          groovy(
+            """
+              def t = 1
+              def label = ("build.${t}")
+              """
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/8981")
+    @Test
+    void statementsInsideGStringInterpolation() {
+        rewriteRun(
+          groovy(
+            """
+              def x = true
+              def s = "${if (x) { return 'a' }; return ''}"
+              """
+          )
+        );
+    }
+
+    @Test
     void shouldBeAbleToParseClassDeclaration() {
         rewriteRun(
                 groovy(

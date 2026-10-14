@@ -23,6 +23,7 @@ import org.openrewrite.rpc.RpcSendQueue;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.UUID;
+import static org.openrewrite.rpc.Reference.asRef;
 
 public class PlainTextRpcCodec extends DynamicDispatchRpcCodec<PlainText> {
     @Override
@@ -38,7 +39,7 @@ public class PlainTextRpcCodec extends DynamicDispatchRpcCodec<PlainText> {
     @Override
     public void rpcSend(PlainText after, RpcSendQueue q) {
         q.getAndSend(after, Tree::getId);
-        q.getAndSend(after, Tree::getMarkers);
+        q.getAndSend(after, mk -> asRef(mk.getMarkers()));
         q.getAndSend(after, (PlainText d) -> d.getSourcePath().toString());
         q.getAndSend(after, (PlainText d) -> d.getCharset().name());
         q.getAndSend(after, PlainText::isCharsetBomMarked);
@@ -47,7 +48,7 @@ public class PlainTextRpcCodec extends DynamicDispatchRpcCodec<PlainText> {
         q.getAndSend(after, PlainText::getText);
         q.getAndSendList(after, PlainText::getSnippets, Tree::getId, snippet -> {
             q.getAndSend(snippet, Tree::getId);
-            q.getAndSend(snippet, Tree::getMarkers);
+            q.getAndSend(snippet, mk -> asRef(mk.getMarkers()));
             q.getAndSend(snippet, PlainText.Snippet::getText);
         });
     }

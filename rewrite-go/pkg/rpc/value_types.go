@@ -124,6 +124,7 @@ func init() {
 	RegisterValueType(reflect.TypeOf(golang.StructTag{}), "org.openrewrite.golang.marker.StructTag")
 	RegisterValueType(reflect.TypeOf(golang.StructTagQuote{}), "org.openrewrite.golang.marker.StructTagQuote")
 	RegisterValueType(reflect.TypeOf(golang.TrailingComma{}), "org.openrewrite.golang.marker.TrailingComma")
+	RegisterValueType(reflect.TypeOf(golang.ChanDirMarker{}), "org.openrewrite.golang.tree.ChanDirMarker")
 	RegisterValueType(reflect.TypeOf(java.SearchResult{}), "org.openrewrite.marker.SearchResult")
 	RegisterValueType(reflect.TypeOf(java.ParseExceptionResult{}), "org.openrewrite.ParseExceptionResult")
 	RegisterValueType(reflect.TypeOf(golang.Semicolon{}), "org.openrewrite.java.marker.Semicolon")
@@ -248,6 +249,9 @@ func init() {
 	RegisterFactory("org.openrewrite.marker.BuildToolFailure", func() any { return java.GenericMarker{JavaType: "org.openrewrite.marker.BuildToolFailure"} })
 	RegisterFactory("org.openrewrite.marker.Generated", func() any { return java.GenericMarker{JavaType: "org.openrewrite.marker.Generated"} })
 	RegisterFactory("org.openrewrite.marker.DeserializationError", func() any { return java.GenericMarker{JavaType: "org.openrewrite.marker.DeserializationError"} })
+	for level, javaType := range markupJavaTypes {
+		RegisterFactory(javaType, func() any { return java.Markup{Level: level} })
+	}
 	// SearchResult: IS an RpcCodec, sends 2 sub-fields (id, description)
 	RegisterFactory("org.openrewrite.marker.SearchResult", func() any { return java.SearchResult{} })
 	// GroupedImport: IS an RpcCodec, sends 2 sub-fields (id, before Space)
@@ -268,6 +272,7 @@ func init() {
 	RegisterFactory("org.openrewrite.golang.marker.StructTag", func() any { return golang.StructTag{} })
 	RegisterFactory("org.openrewrite.golang.marker.StructTagQuote", func() any { return golang.StructTagQuote{} })
 	RegisterFactory("org.openrewrite.golang.marker.TrailingComma", func() any { return golang.TrailingComma{} })
+	RegisterFactory("org.openrewrite.golang.tree.ChanDirMarker", func() any { return golang.ChanDirMarker{} })
 	// Semicolon: RpcCodec on the Java side; sends only `id`. Replaces the
 	// previous GenericMarker fallback for the same Java FQN.
 	RegisterFactory("org.openrewrite.java.marker.Semicolon", func() any { return golang.Semicolon{} })

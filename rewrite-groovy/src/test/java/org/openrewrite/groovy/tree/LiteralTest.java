@@ -17,6 +17,7 @@ package org.openrewrite.groovy.tree;
 
 import org.junit.jupiter.api.Test;
 import org.openrewrite.Issue;
+import org.openrewrite.java.marker.OmitBraces;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.java.tree.TypeUtils;
@@ -453,6 +454,55 @@ class LiteralTest implements RewriteTest {
         );
     }
 
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/8980")
+    @Test
+    void gStringInParentheses() {
+        rewriteRun(
+          groovy(
+            """
+              def t = 1
+              def label = ("build.${t}")
+              def cast = ( "build.${t}" ) as String
+              """,
+            spec -> spec.beforeRecipe(cu -> {
+                J.Parentheses<?> parens = (J.Parentheses<?>) ((J.VariableDeclarations) cu.getStatements().get(1))
+                  .getVariables().getFirst().getInitializer();
+                assertThat(requireNonNull(parens).getTree()).isInstanceOf(G.GString.class);
+            })
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/8981")
+    @Test
+    void statementsInsideGStringInterpolation() {
+        rewriteRun(
+          groovy(
+            """
+              def x = true
+              def s = "${if (x) { return 'a' }; return ''}"
+              def t = \"""#!/bin/bash
+              ${if (x) {
+                  return 'b'
+              }
+              return ''
+              }
+              \"""
+              """,
+            spec -> spec.beforeRecipe(cu -> {
+                G.GString gString = (G.GString) requireNonNull(((J.VariableDeclarations) cu.getStatements().get(1))
+                  .getVariables().getFirst().getInitializer());
+                J.Block block = (J.Block) ((G.GString.Value) gString.getStrings().getFirst()).getTree();
+                assertThat(block.getMarkers().findFirst(OmitBraces.class)).isPresent();
+                assertThat(block.getStatements()).satisfiesExactly(
+                  s -> assertThat(s).isInstanceOf(J.If.class),
+                  s -> assertThat(s).isInstanceOf(J.Return.class)
+                );
+            })
+          )
+        );
+    }
 
     @Issue("https://github.com/openrewrite/rewrite/issues/5232")
     @Test

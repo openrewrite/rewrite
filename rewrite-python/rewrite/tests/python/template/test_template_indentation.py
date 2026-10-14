@@ -23,7 +23,7 @@ which must receive the correct cursor context to compute indentation.
 from typing import Any, Optional
 
 from rewrite import ExecutionContext, Recipe, TreeVisitor
-from rewrite.java import tree as j
+from rewrite.java import J, tree as j
 from rewrite.python import tree as py_tree
 from rewrite.python.template import template, capture
 from rewrite.python.visitor import PythonVisitor
@@ -149,5 +149,46 @@ def test_template_replace_try_inside_class_method():
             "    def bar(self):\n"
             "        with suppress(KeyError):\n"
             "            do_stuff()",
+        )
+    )
+
+
+_stmt = capture('stmt')
+_wrap_template = template('with lock:\n    {stmt}', stmt=_stmt)
+
+
+class _WrapIfInWith(Recipe):
+    @property
+    def name(self) -> str:
+        return "test.WrapIfInWith"
+
+    @property
+    def display_name(self) -> str:
+        return "Test wrap if in with-statement"
+
+    @property
+    def description(self) -> str:
+        return "Wraps each if-statement in a with-statement."
+
+    def editor(self) -> TreeVisitor[Any, ExecutionContext]:
+        class Visitor(PythonVisitor[ExecutionContext]):
+            def visit_if(self, if_stmt: j.If, p: ExecutionContext) -> Optional[J]:
+                return _wrap_template.apply(self.cursor, values={'stmt': if_stmt})
+
+        return Visitor()
+
+
+def test_template_reindents_a_substituted_block_moved_deeper():
+    spec = RecipeSpec(recipe=_WrapIfInWith())
+    spec.rewrite_run(
+        python(
+            "def f():\n"
+            "    if a :\n"
+            "        b( 1 )\n",
+            #
+            "def f():\n"
+            "    with lock:\n"
+            "        if a :\n"
+            "            b( 1 )\n",
         )
     )

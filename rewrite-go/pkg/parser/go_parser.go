@@ -156,6 +156,8 @@ func (gp *GoParser) ParsePackage(files []FileInput) ([]*golang.CompilationUnit, 
 		// instantiated with explicit type arguments, e.g. the `Map` in `Map[int]`.
 		// Used to distinguish generic instantiation from ordinary indexing.
 		Instances: make(map[*ast.Ident]types.Instance),
+		// the package an import without an alias names
+		Implicits: make(map[ast.Node]types.Object),
 	}
 	// Reasons the package lost part of its type attribution.
 	var partial []string
@@ -532,7 +534,7 @@ func (ctx *parseContext) mapImports(file *ast.File) *java.Container[*java.Import
 			closeParen := ctx.prefix(importDecl.Rparen)
 			ctx.skip(1) // skip ")"
 			if len(importDecl.Specs) == 0 {
-				imp := &java.Import{ID: uuid.New(), Qualid: &java.Empty{ID: uuid.New()}}
+				imp := &java.Import{ID: uuid.New(), Qualid: importQualid(java.EmptySpace, "", nil)}
 				imp.Markers = java.MakeMarkers(uuid.New(), []java.Marker{importBlockMarker})
 				elements = append(elements, java.RightPadded[*java.Import]{Element: imp, After: closeParen})
 			} else {
@@ -585,7 +587,7 @@ func closeImportGroup(elements []java.RightPadded[*java.Import], closeParen java
 		return elements
 	}
 	return append(elements, java.RightPadded[*java.Import]{
-		Element: &java.Import{ID: uuid.New(), Qualid: &java.Empty{ID: uuid.New()}},
+		Element: &java.Import{ID: uuid.New(), Qualid: importQualid(java.EmptySpace, "", nil)},
 		After:   closeParen,
 	})
 }
@@ -601,9 +603,38 @@ func (ctx *parseContext) mapImportSpec(spec *ast.ImportSpec) *java.Import {
 		alias = &lp
 	}
 
-	path := ctx.mapBasicLit(spec.Path)
+	pathPrefix := ctx.prefix(spec.Path.Pos())
+	// as mapStructTag does, since a raw string's carriage returns are absent from Path.Value
+	src := ctx.literalSource(spec.Path.Pos())
+	ctx.skip(len(src))
 
-	return &java.Import{ID: uuid.New(), Prefix: prefix, Qualid: path, Alias: alias}
+	// The imported package, as the alias and every qualifier naming it carry.
+	var pkg java.JavaType
+	if obj := ctx.typeInfo.Implicits[spec]; obj != nil {
+		pkg = ctx.mapper.mapObject(obj)
+	} else if spec.Name != nil {
+		if obj := ctx.typeInfo.Defs[spec.Name]; obj != nil {
+			pkg = ctx.mapper.mapObject(obj)
+		}
+	}
+
+	// an interpreted string is held without its quotes, a raw one as written
+	if len(src) >= 2 && src[0] == '"' {
+		src = src[1 : len(src)-1]
+	}
+	return &java.Import{ID: uuid.New(), Prefix: prefix, Qualid: importQualid(pathPrefix, src, pkg), Alias: alias}
+}
+
+// importQualid builds the field access J.Import holds its path as. An import
+// that only carries the space of an empty group has an empty name.
+func importQualid(prefix java.Space, name string, pkg java.JavaType) *java.FieldAccess {
+	return &java.FieldAccess{
+		ID:     uuid.New(),
+		Prefix: prefix,
+		Target: &java.Empty{ID: uuid.New()},
+		Name:   java.LeftPadded[*java.Identifier]{Element: &java.Identifier{ID: uuid.New(), Name: name, Type: pkg}},
+		Type:   pkg,
+	}
 }
 
 // mapDecl maps a top-level declaration.
@@ -1775,9 +1806,6 @@ func (ctx *parseContext) mapCaseClause(clause *ast.CaseClause) *java.Case {
 		ctx.skip(1) // ":"
 	}
 
-	// The last label's After gets the space before the colon.
-	exprs.Elements[len(exprs.Elements)-1].After = colonPrefix
-
 	// Body statements
 	var body []java.RightPadded[java.Statement]
 	for i, stmt := range clause.Body {
@@ -1798,7 +1826,7 @@ func (ctx *parseContext) mapCaseClause(clause *ast.CaseClause) *java.Case {
 		ID:          uuid.New(),
 		Prefix:      prefix,
 		Expressions: exprs,
-		Body:        body,
+		Body:        java.Container[java.Statement]{Before: colonPrefix, Elements: body},
 	}
 }
 
@@ -2022,7 +2050,7 @@ func (ctx *parseContext) mapForStmt(stmt *ast.ForStmt) *java.ForLoop {
 		ID:      uuid.New(),
 		Prefix:  prefix,
 		Control: control,
-		Body:    body,
+		Body:    java.RightPadded[java.Statement]{Element: body},
 	}
 }
 
@@ -2095,7 +2123,7 @@ func (ctx *parseContext) mapRangeStmt(stmt *ast.RangeStmt) *java.ForEachLoop {
 		ID:      uuid.New(),
 		Prefix:  prefix,
 		Control: control,
-		Body:    body,
+		Body:    java.RightPadded[java.Statement]{Element: body},
 	}
 }
 
@@ -2744,6 +2772,12 @@ func (ctx *parseContext) mapUnaryExpr(expr *ast.UnaryExpr) java.Expression {
 	ctx.skip(len(expr.Op.String()))
 	operand := ctx.mapExpr(expr.X)
 
+	// `~x` is only meaningful in a constraint, but go/parser accepts it anywhere,
+	// and J.Unary.Type cannot tell it from `^x`.
+	if expr.Op == token.TILDE {
+		return &golang.UnderlyingType{ID: uuid.New(), Prefix: prefix, Element: operand}
+	}
+
 	// Go-specific operators (&, *, <-) have no J.Unary.Type equivalent, so they
 	// map to golang.Unary; the rest stay as java.Unary so recipes can treat them
 	// uniformly with other languages.
@@ -2784,8 +2818,6 @@ func (ctx *parseContext) mapUnaryExpr(expr *ast.UnaryExpr) java.Expression {
 		op = java.BitwiseNot
 	case token.ADD:
 		op = java.Positive
-	case token.TILDE:
-		op = java.Tilde
 	}
 
 	return &java.Unary{
@@ -3252,8 +3284,11 @@ func (ctx *parseContext) mapTypeAssertExpr(expr *ast.TypeAssertExpr) java.Expres
 	if expr.Type != nil {
 		typeExpr = ctx.mapTypeExpr(expr.Type)
 	} else {
-		// type switch: x.(type)
-		typePrefix := ctx.prefix(expr.Lparen + 1)
+		// type switch: x.(type). The AST has no position for the keyword.
+		var typePrefix java.Space
+		if typeOff := ctx.nextTokenOffset(); typeOff >= 0 {
+			typePrefix = ctx.prefix(ctx.file.Pos(typeOff))
+		}
 		ctx.skip(len("type"))
 		typeExpr = &java.Identifier{ID: uuid.New(), Prefix: typePrefix, Name: "type"}
 	}
@@ -3622,7 +3657,9 @@ func (ctx *parseContext) mapStructTag(vd *java.VariableDeclarations, tag *ast.Ba
 			unquoted = strings.Trim(raw, `"`)
 		}
 		raw = unquoted
-		vd.Markers = java.AddMarker(vd.Markers, golang.StructTagQuote{Ident: uuid.New(), Quote: `"`})
+		vd.Markers = java.AddMarker(vd.Markers, golang.StructTagQuote{
+			Ident: uuid.New(), Quote: `"`, Value: unquoted, ValueSource: src,
+		})
 	}
 
 	// Anything the scan could not read as a pair is source all the same;

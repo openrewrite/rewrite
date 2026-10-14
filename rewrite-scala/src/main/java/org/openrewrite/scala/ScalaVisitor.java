@@ -60,7 +60,7 @@ public class ScalaVisitor<P> extends JavaVisitor<P> {
 
         c = c.withStatements(ListUtils.map(c.getStatements(), s -> {
             try {
-                return visitAndCast(s, p);
+                return toStatement(visit(s, p));
             } catch (Exception e) {
                 // Some Java recipes may fail on Scala-specific class structures
                 // (e.g., missing primaryConstructor). Return unchanged rather than crashing.
@@ -107,6 +107,37 @@ public class ScalaVisitor<P> extends JavaVisitor<P> {
         }
 
         return c;
+    }
+
+    @Override
+    public <T> @Nullable JRightPadded<T> visitRightPadded(@Nullable JRightPadded<T> right, JRightPadded.Location loc, P p) {
+        JRightPadded<T> r = super.visitRightPadded(right, loc, p);
+        if (r != null && isStatementLocation(loc) &&
+            r.getElement() instanceof Expression && !(r.getElement() instanceof Statement)) {
+            //noinspection unchecked
+            return r.withElement((T) new S.ExpressionStatement(Tree.randomId(), (Expression) r.getElement()));
+        }
+        return r;
+    }
+
+    private static boolean isStatementLocation(JRightPadded.Location loc) {
+        switch (loc) {
+            case BLOCK_STATEMENT:
+            case IF_THEN:
+            case IF_ELSE:
+            case FOR_BODY:
+            case WHILE_BODY:
+                return true;
+            default:
+                return false;
+        }
+    }
+
+    private static @Nullable Statement toStatement(@Nullable J j) {
+        if (j instanceof Expression && !(j instanceof Statement)) {
+            return new S.ExpressionStatement(Tree.randomId(), (Expression) j);
+        }
+        return (Statement) j;
     }
 
     // Additional visit methods for Scala-specific constructs will be added here

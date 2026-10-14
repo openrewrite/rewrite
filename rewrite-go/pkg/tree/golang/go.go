@@ -1412,6 +1412,10 @@ func (s StructTag) ID() uuid.UUID { return s.Ident }
 type StructTagQuote struct {
 	Ident uuid.UUID
 	Quote string // "`" or `"`
+	// Value is what an interpreted string spells and ValueSource the literal
+	// as written, printed for as long as the annotations still spell Value.
+	Value       string
+	ValueSource string
 }
 
 func (s StructTagQuote) ID() uuid.UUID { return s.Ident }

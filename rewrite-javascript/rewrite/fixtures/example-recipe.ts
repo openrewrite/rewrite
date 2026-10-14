@@ -24,6 +24,7 @@ import {RecipeWithSameTypeChildren} from "./recipe-with-same-type-children";
 import {ReplaceId} from "./replace-id";
 import {FindIdentifierWithRemotePathPrecondition} from "./remote-path-precondition";
 import {FindIdentifierWithPathPrecondition} from "./path-precondition";
+import {FindIdentifierOutsideVendoredOrBundled} from "./vendored-precondition";
 import {MarkTypes} from "./mark-types";
 import {MarkPrimitiveTypes} from "./mark-primitive-types";
 import {MarkClassTypes} from "./mark-class-types";
@@ -44,6 +45,7 @@ export async function activate(marketplace: RecipeMarketplace): Promise<void> {
     await marketplace.install(FindIdentifier, JavaScript);
     await marketplace.install(FindIdentifierWithRemotePathPrecondition, JavaScript);
     await marketplace.install(FindIdentifierWithPathPrecondition, JavaScript);
+    await marketplace.install(FindIdentifierOutsideVendoredOrBundled, JavaScript);
     await marketplace.install(MarkTypes, JavaScript);
     await marketplace.install(MarkPrimitiveTypes, JavaScript);
     await marketplace.install(MarkClassTypes, JavaScript);

@@ -105,6 +105,11 @@ public class AddImport<P> extends JavaIsoVisitor<P> {
         J j = tree;
         if (tree instanceof JavaSourceFile) {
             JavaSourceFile cu = (JavaSourceFile) tree;
+            // Languages that don't model imports as J.Import (e.g. JavaScript, Python) leave these null
+            //noinspection ConstantValue
+            if (cu.getPadding().getImports() == null) {
+                return cu;
+            }
             if (packageName == null || JavaType.Primitive.fromKeyword(fullyQualifiedName) != null) {
                 return cu;
             }

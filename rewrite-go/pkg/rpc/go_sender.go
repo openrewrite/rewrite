@@ -55,13 +55,25 @@ func (s *GoSender) Visit(t java.Tree, p any) java.Tree {
 		s.sendParseError(pe, p.(*SendQueue))
 		return pe
 	}
-	if gm, ok := t.(*golang.GoMod); ok {
-		sendGoMod(gm, p.(*SendQueue))
-		return gm
-	}
-	if gs, ok := t.(*golang.GoSum); ok {
-		sendGoSum(gs, p.(*SendQueue))
-		return gs
+	switch n := t.(type) {
+	case *golang.GoMod:
+		sendGoMod(n, p.(*SendQueue))
+		return n
+	case *golang.GoModDirective:
+		sendGoModDirective(n, p.(*SendQueue))
+		return n
+	case *golang.GoModBlock:
+		sendGoModBlock(n, p.(*SendQueue))
+		return n
+	case *golang.GoModValue:
+		sendGoModValue(n, p.(*SendQueue))
+		return n
+	case *golang.GoSum:
+		sendGoSum(n, p.(*SendQueue))
+		return n
+	case *golang.GoSumLine:
+		sendGoSumLine(n, p.(*SendQueue))
+		return n
 	}
 	return s.GoVisitor.Visit(t, p)
 }
@@ -543,7 +555,7 @@ func (s *GoSender) VisitCommClause(cc *golang.CommClause, p any) java.J {
 // the framework switch.
 func (s *GoSender) sendParseError(pe *java.ParseError, q *SendQueue) {
 	q.GetAndSend(pe, func(v any) any { return v.(*java.ParseError).Ident.String() }, nil)
-	q.GetAndSend(pe, func(v any) any { return v.(*java.ParseError).Markers },
+	q.GetAndSend(pe, func(v any) any { return AsRef(v.(*java.ParseError).Markers) },
 		func(v any) { SendMarkersCodec(v.(java.Markers), q) })
 	q.GetAndSend(pe, func(v any) any { return v.(*java.ParseError).SourcePath }, nil)
 	q.GetAndSend(pe, func(v any) any { return v.(*java.ParseError).CharsetName }, nil)

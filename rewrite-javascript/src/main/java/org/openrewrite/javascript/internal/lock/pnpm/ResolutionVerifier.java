@@ -1,0 +1,52 @@
+/*
+ * Copyright 2026 the original author or authors.
+ * <p>
+ * Licensed under the Moderne Source Available License (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ * <p>
+ * https://docs.moderne.io/licensing/moderne-source-available-license
+ * <p>
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+package org.openrewrite.javascript.internal.lock.pnpm;
+
+import lombok.Value;
+import org.jspecify.annotations.Nullable;
+
+/**
+ * Port of @pnpm/resolving.resolver-base's {@code ResolutionVerifier} (pnpm 11.2.2), without the cache's policy slot.
+ */
+interface ResolutionVerifier {
+
+    /**
+     * What {@code verify} answers: ok, or the violation's code and reason.
+     */
+    @Value
+    class Result {
+        static final Result OK = new Result(true, null, null);
+
+        boolean ok;
+
+        @Nullable
+        String code;
+
+        @Nullable
+        String reason;
+    }
+
+    Result verify(@Nullable Object resolution, String name, String version);
+
+    /**
+     * {@link #verify(Object, String, String)} of an entry whose dep path names a non-semver version (a tarball's URL),
+     * which from 11.5.2 the npm verifier passes.
+     */
+    default Result verify(@Nullable Object resolution, String name, String version,
+                          @Nullable String nonSemverVersion) {
+        return verify(resolution, name, version);
+    }
+}

@@ -30,32 +30,6 @@ type Receiver interface {
 	Visit(t java.Tree, p any) java.Tree
 }
 
-// receiveBlockBody receives a `*Block` field that Java ships as a
-// RightPadded<Statement> (J.ForLoop/ForEachLoop.body, ...).
-//
-// Passing the existing block as the receive baseline is essential. On a CHANGE
-// — e.g. a recipe edited a single nested statement — the unchanged siblings and
-// every whitespace/sub-field resolve to NO_CHANGE against this baseline. The
-// previous code passed nil, so q.Receive's CHANGE path materialized a fresh,
-// empty block (newObj) and every NO_CHANGE field then resolved to its zero
-// value: block prefix, statement prefixes and End space all collapsed (printed
-// `if cond{returnx}`), and nested NO_CHANGE nodes such as an inner If's
-// Condition came back nil — crashing the printer / coerceToStatementRP.
-func receiveBlockBody(r Receiver, q *ReceiveQueue, before *java.Block) *java.Block {
-	var baseline any
-	if before != nil {
-		baseline = java.RightPadded[java.Statement]{Element: before}
-	}
-	result := q.Receive(baseline, func(v any) any { return receiveRightPadded(r, q, v) })
-	if result == nil {
-		return before
-	}
-	if blk, ok := coerceToStatementRP(result).Element.(*java.Block); ok {
-		return blk
-	}
-	return before
-}
-
 // JavaReceiver deserializes J (shared Java-like) AST nodes via the
 // visitor pattern. Mirrors org.openrewrite.java.internal.rpc.JavaReceiver.
 //
@@ -450,8 +424,9 @@ func (r *JavaReceiver) VisitForLoop(f *java.ForLoop, p any) java.J {
 	if result := q.Receive(ctrl, func(v any) any { return r.Visit(v.(java.Tree), q) }); result != nil {
 		f.Control = *result.(*java.ForControl)
 	}
-	// body - Java sends RightPadded<Statement> wrapping the Block
-	f.Body = receiveBlockBody(r, q, f.Body)
+	if body := q.Receive(f.Body, func(v any) any { return receiveRightPadded(r, q, v) }); body != nil {
+		f.Body = coerceToStatementRP(body)
+	}
 	return f
 }
 
@@ -505,8 +480,9 @@ func (r *JavaReceiver) VisitForEachLoop(f *java.ForEachLoop, p any) java.J {
 	if result := q.Receive(ctrl, func(v any) any { return r.Visit(v.(java.Tree), q) }); result != nil {
 		f.Control = *result.(*java.ForEachControl)
 	}
-	// body - Java sends RightPadded<Statement> wrapping the Block
-	f.Body = receiveBlockBody(r, q, f.Body)
+	if body := q.Receive(f.Body, func(v any) any { return receiveRightPadded(r, q, v) }); body != nil {
+		f.Body = coerceToStatementRP(body)
+	}
 	return f
 }
 
@@ -544,15 +520,7 @@ func (r *JavaReceiver) VisitCase(cs *java.Case, p any) java.J {
 	cs = &c
 	q.Receive(nil, nil) // type enum
 	cs.Expressions = receiveContainer[java.Expression](r, q, cs.Expressions)
-	// statements - Java sends Container<RightPadded<Statement>>, extract to Go's []RightPadded[Statement]
-	var stmtsBefore any
-	if cs.Body != nil {
-		stmtsBefore = java.Container[java.Statement]{Elements: cs.Body}
-	}
-	if result := q.Receive(stmtsBefore, func(v any) any { return receiveContainerTyped[java.Statement](r, q, v) }); result != nil {
-		cont := result.(java.Container[java.Statement])
-		cs.Body = cont.Elements
-	}
+	cs.Body = receiveContainer[java.Statement](r, q, cs.Body)
 	q.Receive(nil, nil) // body
 	q.Receive(nil, nil) // guard
 	return cs
@@ -680,8 +648,7 @@ func (r *JavaReceiver) VisitImport(imp *java.Import, p any) java.J {
 	// static (always false for Go, but must receive full LeftPadded protocol)
 	staticBefore := java.LeftPadded[bool]{Before: java.EmptySpace, Element: false}
 	q.Receive(staticBefore, func(v any) any { return receiveLeftPadded(r, q, v) })
-	// qualid (Expression - could be Literal or FieldAccess depending on direction)
-	imp.Qualid = receiveValue(q, imp.Qualid, func(e java.Expression) any { return r.Visit(e, q) })
+	imp.Qualid = receiveValue(q, imp.Qualid, func(e *java.FieldAccess) any { return r.Visit(e, q) })
 	// alias
 	var beforeAlias any
 	if imp.Alias != nil {

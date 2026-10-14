@@ -75,6 +75,8 @@ interface SlotConstraints {
     readonly noLeadingDeclarationToken?: boolean;
     /** The slot is followed by `.`, so a bare integer literal would lex as a decimal point. */
     readonly followedByDot?: boolean;
+    /** The slot holds a `TypeTree`, so anything else is wrapped in `JS.TypeTreeExpression` as the parser does. */
+    readonly typeTree?: boolean;
 }
 
 /** The precedence of `expression` as printed; a kind this module does not model counts as Primary. */
@@ -247,7 +249,7 @@ function slotConstraints(parent: J, childId: string): SlotConstraints | undefine
         case J.Kind.NewClass: {
             const newClass = parent as J.NewClass;
             if (newClass.class?.id === childId) {
-                return {precedence: Precedence.Call, noCallShape: true, noOptionalChain: true};
+                return {precedence: Precedence.Call, noCallShape: true, noOptionalChain: true, typeTree: true};
             }
             return isContainerElement(newClass.arguments, childId) ? {precedence: Precedence.Assignment} : undefined;
         }
@@ -325,22 +327,42 @@ export function requiredPrecedence(parent: J, childId: string): number | undefin
  */
 export function maybeParenthesize(parent: J | undefined, childId: string, expression: J,
                                   slotMarkers?: Markers): J {
-    if (!parent) {
-        return expression;
-    }
-
-    const constraints = slotConstraints(parent, childId);
+    const constraints = parent && slotConstraints(parent, childId);
     if (!constraints) {
-        return expression;
+        return followsTrailingMarker(expression, slotMarkers) ? parenthesize(expression, slotMarkers) : expression;
     }
 
     // A statement wrapper is transparent here: the parentheses belong around the expression
     if (expression.kind === JS.Kind.ExpressionStatement) {
         const inner = (expression as JS.ExpressionStatement).expression;
-        const wrapped = wrapIfNeeded(parent, childId, constraints, inner, slotMarkers);
+        const wrapped = wrapIfNeeded(parent!, childId, constraints, inner, slotMarkers);
         return wrapped === inner ? expression : {...expression, expression: wrapped} as JS.ExpressionStatement;
     }
-    return wrapIfNeeded(parent, childId, constraints, expression, slotMarkers);
+    const wrapped = wrapIfNeeded(parent!, childId, constraints, expression, slotMarkers);
+    return constraints.typeTree ? asTypeTree(wrapped) : wrapped;
+}
+
+/** Whether the slot puts a `!` or `?.` after `expression`, which binds looser than the left-hand side they follow. */
+function followsTrailingMarker(expression: J, slotMarkers: Markers | undefined): boolean {
+    return !!slotMarkers?.markers.some(isTrailingMarker) && precedenceOf(expression) < Precedence.Call;
+}
+
+function asTypeTree(expression: J): J {
+    switch (expression.kind) {
+        case J.Kind.Identifier:
+        case J.Kind.FieldAccess:
+        case J.Kind.ArrayType:
+        case J.Kind.ParameterizedType:
+        case JS.Kind.TypeTreeExpression:
+            return expression;
+    }
+    return {
+        kind: JS.Kind.TypeTreeExpression,
+        id: randomId(),
+        prefix: expression.prefix,
+        markers: emptyMarkers,
+        expression: {...expression, prefix: emptySpace}
+    } as JS.TypeTreeExpression;
 }
 
 /** The nearest enclosing LST node in a cursor path, skipping the padding wrappers visitors push. */
@@ -383,7 +405,7 @@ export function parenthesize(expression: J, slotMarkers?: Markers): J.Parenthese
 
 function wrapIfNeeded(parent: J, childId: string, constraints: SlotConstraints, expression: J,
                       slotMarkers: Markers | undefined): J {
-    if (precedenceOf(expression) < constraints.precedence ||
+    if (precedenceOf(expression) < constraints.precedence || followsTrailingMarker(expression, slotMarkers) ||
         (constraints.noCallShape && isCallShaped(expression)) ||
         (constraints.noOptionalChain && hasOptionalChain(expression)) ||
         (constraints.noLeadingObjectLiteral && startsWithObjectLiteral(expression)) ||
@@ -582,7 +604,7 @@ function leftmostChild(expression: J): J | undefined {
 }
 
 /** Markers the printer emits *after* the node they sit on. */
-function isTrailingMarker(marker: Marker): boolean {
+export function isTrailingMarker(marker: Marker): boolean {
     return marker.kind === JS.Markers.NonNullAssertion || marker.kind === JS.Markers.Optional;
 }
 

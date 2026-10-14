@@ -40,12 +40,14 @@ export async function activate(marketplace: RecipeMarketplace): Promise<void> {
         AsyncCallbackInSyncArrayMethod,
         AutoFormat,
         OrderImports,
-        ChangeImport
+        ChangeImport,
+        ChangeMethodTargetToImport
     } = await import("./javascript/recipes/index.js");
     await marketplace.install(AsyncCallbackInSyncArrayMethod, JavaScript);
     await marketplace.install(AutoFormat, JavaScript);
     await marketplace.install(OrderImports, JavaScript);
     await marketplace.install(ChangeImport, JavaScript);
+    await marketplace.install(ChangeMethodTargetToImport, JavaScript);
 
     const {FindDependency, Search} = await import("./javascript/search/index.js");
     await marketplace.install(FindDependency, Search);

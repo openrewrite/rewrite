@@ -58,27 +58,29 @@ def outer(items):
 '''
 
 
-@pytest.fixture(scope="module")
-def cu():
-    """The fixture parsed with type attribution, as UsesType needs types."""
+def _parse_attributed(source: str):
+    """``source`` parsed with type attribution, as UsesType needs types."""
     workspace = tempfile.mkdtemp()
     try:
         file_path = os.path.join(workspace, "nested.py")
         with open(file_path, "w") as f:
-            f.write(NESTED_SOURCE)
+            f.write(source)
         from rewrite.python.ty_client import TyTypesClient
 
         client = TyTypesClient()
         if not client.initialize(workspace):
             pytest.skip("ty-types is unavailable, so there is no attribution to search")
         try:
-            return ParserVisitor(NESTED_SOURCE, file_path, client).visit(
-                ast.parse(NESTED_SOURCE)
-            )
+            return ParserVisitor(source, file_path, client).visit(ast.parse(source))
         finally:
             client.shutdown()
     finally:
         shutil.rmtree(workspace, ignore_errors=True)
+
+
+@pytest.fixture(scope="module")
+def cu():
+    return _parse_attributed(NESTED_SOURCE)
 
 
 def _matches(visitor, cu) -> bool:
@@ -126,3 +128,9 @@ def test_uses_type_reads_attribution_off_expression_only_nodes(cu):
     # `list` is attributed to the comprehension itself, a `Py` node that is an
     # `Expression` without being a `TypedTree`.
     assert _matches(UsesType("list"), cu)
+
+
+def test_uses_type_reaches_a_type_only_used_as_an_optional():
+    optional_only = _parse_attributed(
+        "import re\n\ndef first(s: str):\n    m = re.match('a', s)\n    return m\n")
+    assert _matches(UsesType("re.Match"), optional_only)

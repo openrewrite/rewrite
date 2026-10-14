@@ -17,8 +17,14 @@ package org.openrewrite.groovy.tree;
 
 import org.junit.jupiter.api.Test;
 import org.openrewrite.Issue;
+import org.openrewrite.groovy.GroovyIsoVisitor;
+import org.openrewrite.java.tree.J;
 import org.openrewrite.test.RewriteTest;
 
+import java.util.ArrayList;
+import java.util.List;
+
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.groovy.Assertions.groovy;
 
 @SuppressWarnings({"GroovyUnusedAssignment", "GrUnnecessarySemicolon"})
@@ -297,6 +303,187 @@ class AnnotationTest implements RewriteTest {
               import groovy.transform.Field
 
               @Field def a = [1, 2, 3]
+              """
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/8979")
+    @Test
+    void groovyTransformFieldAnnotationInsideBlock() {
+        rewriteRun(
+          groovy(
+            """
+              import groovy.transform.Field
+              if (true) {
+                  @Field def list = []
+              }
+              try {
+                  if (false) {
+                      @Field Map<String, Integer> other = [a: 1]
+                  }
+              } finally {
+              }
+              """,
+            spec -> spec.beforeRecipe(cu -> {
+                List<J.VariableDeclarations> fields = new ArrayList<>();
+                new GroovyIsoVisitor<Integer>() {
+                    @Override
+                    public J.VariableDeclarations visitVariableDeclarations(J.VariableDeclarations multiVariable, Integer p) {
+                        fields.add(multiVariable);
+                        return multiVariable;
+                    }
+                }.visit(cu, 0);
+                assertThat(fields).hasSize(2);
+                assertThat(fields.get(0).getVariables().getFirst().getInitializer()).isInstanceOf(G.ListLiteral.class);
+                assertThat(fields.get(1).getVariables().getFirst().getInitializer()).isInstanceOf(G.MapLiteral.class);
+            })
+          )
+        );
+    }
+
+    @Test
+    void groovyTransformFieldAnnotationAmongOtherAnnotations() {
+        rewriteRun(
+          groovy(
+            """
+              import groovy.transform.Field
+              @Deprecated @Field def x = 1
+              @Field @Deprecated def y = 2
+              if (true) {
+                  @Deprecated
+                  @groovy.transform.Field
+                  @SuppressWarnings("unused") String z = "z"
+              }
+              """,
+            spec -> spec.beforeRecipe(cu -> {
+                List<List<String>> annotations = new ArrayList<>();
+                new GroovyIsoVisitor<Integer>() {
+                    @Override
+                    public J.VariableDeclarations visitVariableDeclarations(J.VariableDeclarations multiVariable, Integer p) {
+                        annotations.add(multiVariable.getLeadingAnnotations().stream().map(J.Annotation::getSimpleName).toList());
+                        return multiVariable;
+                    }
+                }.visit(cu, 0);
+                assertThat(annotations).containsExactly(
+                  List.of("Deprecated", "Field"),
+                  List.of("Field", "Deprecated"),
+                  List.of("Deprecated", "Field", "SuppressWarnings")
+                );
+            })
+          )
+        );
+    }
+
+    @Test
+    void annotationsAfterModifiers() {
+        rewriteRun(
+          groovy(
+            """
+              import groovy.transform.Field
+              final @Field x = 1
+              final @Deprecated y = 2
+              final   @Deprecated   String z = "z"
+              @Deprecated
+              public @SuppressWarnings("unused") final class A {
+                  private @Deprecated String s
+                  private @Deprecated t
+                  public @Deprecated A() {}
+                  public @Deprecated void m(final @Deprecated String p, final @Deprecated q) {}
+                  public @Deprecated <T> T n() { null }
+                  def @Deprecated o() {}
+              }
+              public @Deprecated class B {}
+              """,
+            spec -> spec.beforeRecipe(cu -> {
+                List<String> annotations = new ArrayList<>();
+                new GroovyIsoVisitor<Integer>() {
+                    @Override
+                    public J.ClassDeclaration visitClassDeclaration(J.ClassDeclaration classDecl, Integer p) {
+                        annotations.add(classDecl.getSimpleName() + " " + names(classDecl.getAllAnnotations()));
+                        return super.visitClassDeclaration(classDecl, p);
+                    }
+
+                    @Override
+                    public J.MethodDeclaration visitMethodDeclaration(J.MethodDeclaration method, Integer p) {
+                        annotations.add(method.getSimpleName() + " " + names(method.getAllAnnotations()));
+                        return super.visitMethodDeclaration(method, p);
+                    }
+
+                    @Override
+                    public J.VariableDeclarations visitVariableDeclarations(J.VariableDeclarations multiVariable, Integer p) {
+                        annotations.add(multiVariable.getVariables().getFirst().getSimpleName() + " " + names(multiVariable.getAllAnnotations()));
+                        return super.visitVariableDeclarations(multiVariable, p);
+                    }
+
+                    private List<String> names(List<J.Annotation> annotations) {
+                        return annotations.stream().map(J.Annotation::getSimpleName).toList();
+                    }
+                }.visit(cu, 0);
+                assertThat(annotations).containsExactly(
+                  "x [Field]", "y [Deprecated]", "z [Deprecated]",
+                  "A [Deprecated, SuppressWarnings]",
+                  "s [Deprecated]", "t [Deprecated]",
+                  "A [Deprecated]",
+                  "m [Deprecated]", "p [Deprecated]", "q [Deprecated]",
+                  "n [Deprecated]", "o [Deprecated]",
+                  "B [Deprecated]"
+                );
+            })
+          )
+        );
+    }
+
+    @Test
+    void annotationsAfterModifiersInOtherDeclarations() {
+        rewriteRun(
+          groovy(
+            """
+              final @Deprecated a = 1, b = 2
+              final @Deprecated def (c, d) = [1, 2]
+              void m(final @Deprecated String... args) {}
+              public @Deprecated trait T {}
+              class C {
+                  private /* c */ @Deprecated /* d */ final /* e */ @SuppressWarnings('x') /* f */ String s
+                  public @groovy.transform.Memoized def m() { 1 }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void groovyTransformFieldAnnotationFollowedBySemicolon() {
+        rewriteRun(
+          groovy(
+            """
+              import groovy.transform.Field
+              // a comment
+              @Field def x = 1;
+              @Field def y = 2 ; println y
+              """
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/8978")
+    @Test
+    void baseScriptDeclaration() {
+        rewriteRun(
+          groovy(
+            """
+              @groovy.transform.BaseScript groovy.lang.Script base
+              println 1
+              """,
+            spec -> spec.beforeRecipe(cu -> assertThat(
+              ((J.VariableDeclarations) cu.getStatements().getFirst()).getVariables().getFirst().getInitializer()).isNull())
+          ),
+          groovy(
+            """
+              import groovy.transform.BaseScript
+
+              @BaseScript com.example.ScriptLoader baseScript
+              println 1
               """
           )
         );

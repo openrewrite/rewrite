@@ -28,9 +28,13 @@ import (
 var defaultReceiver = NewGoReceiver()
 
 type ReceiveQueue struct {
-	batch []RpcObjectData
-	refs  map[int]any
-	pull  func() []RpcObjectData
+	batch    []RpcObjectData
+	refs     map[int]any
+	received []int // the refs defined through this queue
+	pull     func() []RpcObjectData
+
+	// Set while the next value read is an entry of a Markers.
+	readingMarkers bool
 
 	typePool map[string]java.JavaType
 }
@@ -60,6 +64,16 @@ func NewReceiveQueue(refs map[int]any, pull func() []RpcObjectData) *ReceiveQueu
 		refs: refs,
 		pull: pull,
 	}
+}
+
+// RollBackRefs drops the refs received through this queue, for when what it
+// was receiving failed to arrive whole. The sender of a failed transfer
+// forgets the refs it assigned in it as well.
+func (q *ReceiveQueue) RollBackRefs() {
+	for _, ref := range q.received {
+		delete(q.refs, ref)
+	}
+	q.received = nil
 }
 
 // PeekBatch returns the current batch without consuming. Useful for checking
@@ -115,7 +129,7 @@ func (q *ReceiveQueue) Receive(before any, onChange func(any) any) any {
 		// New object or forward declaration
 		if msg.ValueType == nil {
 			before = msg.Value
-		} else if obj, known := newObjIfKnown(*msg.ValueType); known {
+		} else if obj, known := q.newObj(*msg.ValueType); known {
 			before = obj
 		} else if scalar, ok := inlineScalar(msg.Value); ok {
 			before = scalar
@@ -125,6 +139,7 @@ func (q *ReceiveQueue) Receive(before any, onChange func(any) any) any {
 		if ref != nil {
 			// Store before deserialization to handle cycles
 			q.refs[*ref] = before
+			q.received = append(q.received, *ref)
 		}
 		// Intentional fall-through to CHANGE
 		fallthrough
@@ -135,7 +150,7 @@ func (q *ReceiveQueue) Receive(before any, onChange func(any) any) any {
 		// before=nil drop every sub-field message of a CHANGE-typed object,
 		// silently desyncing the wire.
 		if isNilValue(before) && msg.ValueType != nil {
-			if obj, known := newObjIfKnown(*msg.ValueType); known {
+			if obj, known := q.newObj(*msg.ValueType); known {
 				before = obj
 			} else if scalar, ok := inlineScalar(msg.Value); ok {
 				before = scalar
@@ -406,6 +421,19 @@ func toInt(v any) int {
 	default:
 		panic(fmt.Sprintf("cannot convert %T to int", v))
 	}
+}
+
+// newObj creates the instance a message's type names. An entry of a Markers is
+// a marker whatever its class is called, so one this side has no type for is
+// kept as a GenericMarker.
+func (q *ReceiveQueue) newObj(valueType string) (any, bool) {
+	if obj, known := newObjIfKnown(valueType); known {
+		return obj, true
+	}
+	if q.readingMarkers {
+		return java.GenericMarker{JavaType: valueType}, true
+	}
+	return nil, false
 }
 
 // Factory registry for creating empty instances by Java class name.

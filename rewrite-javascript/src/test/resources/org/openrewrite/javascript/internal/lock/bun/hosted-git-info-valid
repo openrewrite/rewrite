@@ -1,0 +1,4737 @@
+{
+ "bitbucket": {
+  "bitbucket:foo/bar": {
+   "type": "bitbucket",
+   "user": "foo",
+   "project": "bar",
+   "default": "shortcut"
+  },
+  "bitbucket:foo/bar#branch": {
+   "type": "bitbucket",
+   "user": "foo",
+   "project": "bar",
+   "default": "shortcut",
+   "committish": "branch"
+  },
+  "bitbucket:user@foo/bar": {
+   "type": "bitbucket",
+   "user": "foo",
+   "project": "bar",
+   "default": "shortcut",
+   "auth": null
+  },
+  "bitbucket:user@foo/bar#branch": {
+   "type": "bitbucket",
+   "user": "foo",
+   "project": "bar",
+   "default": "shortcut",
+   "auth": null,
+   "committish": "branch"
+  },
+  "bitbucket:user:password@foo/bar": {
+   "type": "bitbucket",
+   "user": "foo",
+   "project": "bar",
+   "default": "shortcut",
+   "auth": null
+  },
+  "bitbucket:user:password@foo/bar#branch": {
+   "type": "bitbucket",
+   "user": "foo",
+   "project": "bar",
+   "default": "shortcut",
+   "auth": null,
+   "committish": "branch"
+  },
+  "bitbucket::password@foo/bar": {
+   "type": "bitbucket",
+   "user": "foo",
+   "project": "bar",
+   "default": "shortcut",
+   "auth": null
+  },
+  "bitbucket::password@foo/bar#branch": {
+   "type": "bitbucket",
+   "user": "foo",
+   "project": "bar",
+   "default": "shortcut",
+   "auth": null,
+   "committish": "branch"
+  },
+  "bitbucket:foo/bar.git": {
+   "type": "bitbucket",
+   "user": "foo",
+   "project": "bar",
+   "default": "shortcut"
+  },
+  "bitbucket:foo/bar.git#branch": {
+   "type": "bitbucket",
+   "user": "foo",
+   "project": "bar",
+   "default": "shortcut",
+   "committish": "branch"
+  },
+  "bitbucket:user@foo/bar.git": {
+   "type": "bitbucket",
+   "user": "foo",
+   "project": "bar",
+   "default": "shortcut",
+   "auth": null
+  },
+  "bitbucket:user@foo/bar.git#branch": {
+   "type": "bitbucket",
+   "user": "foo",
+   "project": "bar",
+   "default": "shortcut",
+   "auth": null,
+   "committish": "branch"
+  },
+  "bitbucket:user:password@foo/bar.git": {
+   "type": "bitbucket",
+   "user": "foo",
+   "project": "bar",
+   "default": "shortcut",
+   "auth": null
+  },
+  "bitbucket:user:password@foo/bar.git#branch": {
+   "type": "bitbucket",
+   "user": "foo",
+   "project": "bar",
+   "default": "shortcut",
+   "auth": null,
+   "committish": "branch"
+  },
+  "bitbucket::password@foo/bar.git": {
+   "type": "bitbucket",
+   "user": "foo",
+   "project": "bar",
+   "default": "shortcut",
+   "auth": null
+  },
+  "bitbucket::password@foo/bar.git#branch": {
+   "type": "bitbucket",
+   "user": "foo",
+   "project": "bar",
+   "default": "shortcut",
+   "auth": null,
+   "committish": "branch"
+  },
+  "git@bitbucket.org:foo/bar": {
+   "type": "bitbucket",
+   "user": "foo",
+   "project": "bar",
+   "default": "sshurl",
+   "auth": null
+  },
+  "git@bitbucket.org:foo/bar#branch": {
+   "type": "bitbucket",
+   "user": "foo",
+   "project": "bar",
+   "default": "sshurl",
+   "auth": null,
+   "committish": "branch"
+  },
+  "user@bitbucket.org:foo/bar": {
+   "type": "bitbucket",
+   "user": "foo",
+   "project": "bar",
+   "default": "sshurl",
+   "auth": null
+  },
+  "user@bitbucket.org:foo/bar#branch": {
+   "type": "bitbucket",
+   "user": "foo",
+   "project": "bar",
+   "default": "sshurl",
+   "auth": null,
+   "committish": "branch"
+  },
+  "user:password@bitbucket.org:foo/bar": {
+   "type": "bitbucket",
+   "user": "foo",
+   "project": "bar",
+   "default": "sshurl",
+   "auth": null
+  },
+  "user:password@bitbucket.org:foo/bar#branch": {
+   "type": "bitbucket",
+   "user": "foo",
+   "project": "bar",
+   "default": "sshurl",
+   "auth": null,
+   "committish": "branch"
+  },
+  ":password@bitbucket.org:foo/bar": {
+   "type": "bitbucket",
+   "user": "foo",
+   "project": "bar",
+   "default": "sshurl",
+   "auth": null
+  },
+  ":password@bitbucket.org:foo/bar#branch": {
+   "type": "bitbucket",
+   "user": "foo",
+   "project": "bar",
+   "default": "sshurl",
+   "auth": null,
+   "committish": "branch"
+  },
+  "git@bitbucket.org:foo/bar.git": {
+   "type": "bitbucket",
+   "user": "foo",
+   "project": "bar",
+   "default": "sshurl",
+   "auth": null
+  },
+  "git@bitbucket.org:foo/bar.git#branch": {
+   "type": "bitbucket",
+   "user": "foo",
+   "project": "bar",
+   "default": "sshurl",
+   "auth": null,
+   "committish": "branch"
+  },
+  "user@bitbucket.org:foo/bar.git": {
+   "type": "bitbucket",
+   "user": "foo",
+   "project": "bar",
+   "default": "sshurl",
+   "auth": null
+  },
+  "user@bitbucket.org:foo/bar.git#branch": {
+   "type": "bitbucket",
+   "user": "foo",
+   "project": "bar",
+   "default": "sshurl",
+   "auth": null,
+   "committish": "branch"
+  },
+  "user:password@bitbucket.org:foo/bar.git": {
+   "type": "bitbucket",
+   "user": "foo",
+   "project": "bar",
+   "default": "sshurl",
+   "auth": null
+  },
+  "user:password@bitbucket.org:foo/bar.git#branch": {
+   "type": "bitbucket",
+   "user": "foo",
+   "project": "bar",
+   "default": "sshurl",
+   "auth": null,
+   "committish": "branch"
+  },
+  ":password@bitbucket.org:foo/bar.git": {
+   "type": "bitbucket",
+   "user": "foo",
+   "project": "bar",
+   "default": "sshurl",
+   "auth": null
+  },
+  ":password@bitbucket.org:foo/bar.git#branch": {
+   "type": "bitbucket",
+   "user": "foo",
+   "project": "bar",
+   "default": "sshurl",
+   "auth": null,
+   "committish": "branch"
+  },
+  "git+ssh://bitbucket.org:foo/bar": {
+   "type": "bitbucket",
+   "user": "foo",
+   "project": "bar",
+   "default": "sshurl"
+  },
+  "git+ssh://bitbucket.org:foo/bar#branch": {
+   "type": "bitbucket",
+   "user": "foo",
+   "project": "bar",
+   "default": "sshurl",
+   "committish": "branch"
+  },
+  "git+ssh://user@bitbucket.org:foo/bar": {
+   "type": "bitbucket",
+   "user": "foo",
+   "project": "bar",
+   "default": "sshurl",
+   "auth": null
+  },
+  "git+ssh://user@bitbucket.org:foo/bar#branch": {
+   "type": "bitbucket",
+   "user": "foo",
+   "project": "bar",
+   "default": "sshurl",
+   "auth": null,
+   "committish": "branch"
+  },
+  "git+ssh://user:password@bitbucket.org:foo/bar": {
+   "type": "bitbucket",
+   "user": "foo",
+   "project": "bar",
+   "default": "sshurl",
+   "auth": null
+  },
+  "git+ssh://user:password@bitbucket.org:foo/bar#branch": {
+   "type": "bitbucket",
+   "user": "foo",
+   "project": "bar",
+   "default": "sshurl",
+   "auth": null,
+   "committish": "branch"
+  },
+  "git+ssh://:password@bitbucket.org:foo/bar": {
+   "type": "bitbucket",
+   "user": "foo",
+   "project": "bar",
+   "default": "sshurl",
+   "auth": null
+  },
+  "git+ssh://:password@bitbucket.org:foo/bar#branch": {
+   "type": "bitbucket",
+   "user": "foo",
+   "project": "bar",
+   "default": "sshurl",
+   "auth": null,
+   "committish": "branch"
+  },
+  "git+ssh://bitbucket.org:foo/bar.git": {
+   "type": "bitbucket",
+   "user": "foo",
+   "project": "bar",
+   "default": "sshurl"
+  },
+  "git+ssh://bitbucket.org:foo/bar.git#branch": {
+   "type": "bitbucket",
+   "user": "foo",
+   "project": "bar",
+   "default": "sshurl",
+   "committish": "branch"
+  },
+  "git+ssh://user@bitbucket.org:foo/bar.git": {
+   "type": "bitbucket",
+   "user": "foo",
+   "project": "bar",
+   "default": "sshurl",
+   "auth": null
+  },
+  "git+ssh://user@bitbucket.org:foo/bar.git#branch": {
+   "type": "bitbucket",
+   "user": "foo",
+   "project": "bar",
+   "default": "sshurl",
+   "auth": null,
+   "committish": "branch"
+  },
+  "git+ssh://user:password@bitbucket.org:foo/bar.git": {
+   "type": "bitbucket",
+   "user": "foo",
+   "project": "bar",
+   "default": "sshurl",
+   "auth": null
+  },
+  "git+ssh://user:password@bitbucket.org:foo/bar.git#branch": {
+   "type": "bitbucket",
+   "user": "foo",
+   "project": "bar",
+   "default": "sshurl",
+   "auth": null,
+   "committish": "branch"
+  },
+  "git+ssh://:password@bitbucket.org:foo/bar.git": {
+   "type": "bitbucket",
+   "user": "foo",
+   "project": "bar",
+   "default": "sshurl",
+   "auth": null
+  },
+  "git+ssh://:password@bitbucket.org:foo/bar.git#branch": {
+   "type": "bitbucket",
+   "user": "foo",
+   "project": "bar",
+   "default": "sshurl",
+   "auth": null,
+   "committish": "branch"
+  },
+  "ssh://bitbucket.org:foo/bar": {
+   "type": "bitbucket",
+   "user": "foo",
+   "project": "bar",
+   "default": "sshurl"
+  },
+  "ssh://bitbucket.org:foo/bar#branch": {
+   "type": "bitbucket",
+   "user": "foo",
+   "project": "bar",
+   "default": "sshurl",
+   "committish": "branch"
+  },
+  "ssh://user@bitbucket.org:foo/bar": {
+   "type": "bitbucket",
+   "user": "foo",
+   "project": "bar",
+   "default": "sshurl",
+   "auth": null
+  },
+  "ssh://user@bitbucket.org:foo/bar#branch": {
+   "type": "bitbucket",
+   "user": "foo",
+   "project": "bar",
+   "default": "sshurl",
+   "auth": null,
+   "committish": "branch"
+  },
+  "ssh://user:password@bitbucket.org:foo/bar": {
+   "type": "bitbucket",
+   "user": "foo",
+   "project": "bar",
+   "default": "sshurl",
+   "auth": null
+  },
+  "ssh://user:password@bitbucket.org:foo/bar#branch": {
+   "type": "bitbucket",
+   "user": "foo",
+   "project": "bar",
+   "default": "sshurl",
+   "auth": null,
+   "committish": "branch"
+  },
+  "ssh://:password@bitbucket.org:foo/bar": {
+   "type": "bitbucket",
+   "user": "foo",
+   "project": "bar",
+   "default": "sshurl",
+   "auth": null
+  },
+  "ssh://:password@bitbucket.org:foo/bar#branch": {
+   "type": "bitbucket",
+   "user": "foo",
+   "project": "bar",
+   "default": "sshurl",
+   "auth": null,
+   "committish": "branch"
+  },
+  "ssh://bitbucket.org:foo/bar.git": {
+   "type": "bitbucket",
+   "user": "foo",
+   "project": "bar",
+   "default": "sshurl"
+  },
+  "ssh://bitbucket.org:foo/bar.git#branch": {
+   "type": "bitbucket",
+   "user": "foo",
+   "project": "bar",
+   "default": "sshurl",
+   "committish": "branch"
+  },
+  "ssh://user@bitbucket.org:foo/bar.git": {
+   "type": "bitbucket",
+   "user": "foo",
+   "project": "bar",
+   "default": "sshurl",
+   "auth": null
+  },
+  "ssh://user@bitbucket.org:foo/bar.git#branch": {
+   "type": "bitbucket",
+   "user": "foo",
+   "project": "bar",
+   "default": "sshurl",
+   "auth": null,
+   "committish": "branch"
+  },
+  "ssh://user:password@bitbucket.org:foo/bar.git": {
+   "type": "bitbucket",
+   "user": "foo",
+   "project": "bar",
+   "default": "sshurl",
+   "auth": null
+  },
+  "ssh://user:password@bitbucket.org:foo/bar.git#branch": {
+   "type": "bitbucket",
+   "user": "foo",
+   "project": "bar",
+   "default": "sshurl",
+   "auth": null,
+   "committish": "branch"
+  },
+  "ssh://:password@bitbucket.org:foo/bar.git": {
+   "type": "bitbucket",
+   "user": "foo",
+   "project": "bar",
+   "default": "sshurl",
+   "auth": null
+  },
+  "ssh://:password@bitbucket.org:foo/bar.git#branch": {
+   "type": "bitbucket",
+   "user": "foo",
+   "project": "bar",
+   "default": "sshurl",
+   "auth": null,
+   "committish": "branch"
+  },
+  "git+https://bitbucket.org/foo/bar": {
+   "type": "bitbucket",
+   "user": "foo",
+   "project": "bar",
+   "default": "https"
+  },
+  "git+https://bitbucket.org/foo/bar#branch": {
+   "type": "bitbucket",
+   "user": "foo",
+   "project": "bar",
+   "default": "https",
+   "committish": "branch"
+  },
+  "git+https://user@bitbucket.org/foo/bar": {
+   "type": "bitbucket",
+   "user": "foo",
+   "project": "bar",
+   "default": "https",
+   "auth": "user"
+  },
+  "git+https://user@bitbucket.org/foo/bar#branch": {
+   "type": "bitbucket",
+   "user": "foo",
+   "project": "bar",
+   "default": "https",
+   "auth": "user",
+   "committish": "branch"
+  },
+  "git+https://user:password@bitbucket.org/foo/bar": {
+   "type": "bitbucket",
+   "user": "foo",
+   "project": "bar",
+   "default": "https",
+   "auth": "user:password"
+  },
+  "git+https://user:password@bitbucket.org/foo/bar#branch": {
+   "type": "bitbucket",
+   "user": "foo",
+   "project": "bar",
+   "default": "https",
+   "auth": "user:password",
+   "committish": "branch"
+  },
+  "git+https://:password@bitbucket.org/foo/bar": {
+   "type": "bitbucket",
+   "user": "foo",
+   "project": "bar",
+   "default": "https",
+   "auth": ":password"
+  },
+  "git+https://:password@bitbucket.org/foo/bar#branch": {
+   "type": "bitbucket",
+   "user": "foo",
+   "project": "bar",
+   "default": "https",
+   "auth": ":password",
+   "committish": "branch"
+  },
+  "git+https://bitbucket.org/foo/bar.git": {
+   "type": "bitbucket",
+   "user": "foo",
+   "project": "bar",
+   "default": "https"
+  },
+  "git+https://bitbucket.org/foo/bar.git#branch": {
+   "type": "bitbucket",
+   "user": "foo",
+   "project": "bar",
+   "default": "https",
+   "committish": "branch"
+  },
+  "git+https://user@bitbucket.org/foo/bar.git": {
+   "type": "bitbucket",
+   "user": "foo",
+   "project": "bar",
+   "default": "https",
+   "auth": "user"
+  },
+  "git+https://user@bitbucket.org/foo/bar.git#branch": {
+   "type": "bitbucket",
+   "user": "foo",
+   "project": "bar",
+   "default": "https",
+   "auth": "user",
+   "committish": "branch"
+  },
+  "git+https://user:password@bitbucket.org/foo/bar.git": {
+   "type": "bitbucket",
+   "user": "foo",
+   "project": "bar",
+   "default": "https",
+   "auth": "user:password"
+  },
+  "git+https://user:password@bitbucket.org/foo/bar.git#branch": {
+   "type": "bitbucket",
+   "user": "foo",
+   "project": "bar",
+   "default": "https",
+   "auth": "user:password",
+   "committish": "branch"
+  },
+  "git+https://:password@bitbucket.org/foo/bar.git": {
+   "type": "bitbucket",
+   "user": "foo",
+   "project": "bar",
+   "default": "https",
+   "auth": ":password"
+  },
+  "git+https://:password@bitbucket.org/foo/bar.git#branch": {
+   "type": "bitbucket",
+   "user": "foo",
+   "project": "bar",
+   "default": "https",
+   "auth": ":password",
+   "committish": "branch"
+  },
+  "https://bitbucket.org/foo/bar": {
+   "type": "bitbucket",
+   "user": "foo",
+   "project": "bar",
+   "default": "https"
+  },
+  "https://bitbucket.org/foo/bar#branch": {
+   "type": "bitbucket",
+   "user": "foo",
+   "project": "bar",
+   "default": "https",
+   "committish": "branch"
+  },
+  "https://user@bitbucket.org/foo/bar": {
+   "type": "bitbucket",
+   "user": "foo",
+   "project": "bar",
+   "default": "https",
+   "auth": "user"
+  },
+  "https://user@bitbucket.org/foo/bar#branch": {
+   "type": "bitbucket",
+   "user": "foo",
+   "project": "bar",
+   "default": "https",
+   "auth": "user",
+   "committish": "branch"
+  },
+  "https://user:password@bitbucket.org/foo/bar": {
+   "type": "bitbucket",
+   "user": "foo",
+   "project": "bar",
+   "default": "https",
+   "auth": "user:password"
+  },
+  "https://user:password@bitbucket.org/foo/bar#branch": {
+   "type": "bitbucket",
+   "user": "foo",
+   "project": "bar",
+   "default": "https",
+   "auth": "user:password",
+   "committish": "branch"
+  },
+  "https://:password@bitbucket.org/foo/bar": {
+   "type": "bitbucket",
+   "user": "foo",
+   "project": "bar",
+   "default": "https",
+   "auth": ":password"
+  },
+  "https://:password@bitbucket.org/foo/bar#branch": {
+   "type": "bitbucket",
+   "user": "foo",
+   "project": "bar",
+   "default": "https",
+   "auth": ":password",
+   "committish": "branch"
+  },
+  "https://bitbucket.org/foo/bar.git": {
+   "type": "bitbucket",
+   "user": "foo",
+   "project": "bar",
+   "default": "https"
+  },
+  "https://bitbucket.org/foo/bar.git#branch": {
+   "type": "bitbucket",
+   "user": "foo",
+   "project": "bar",
+   "default": "https",
+   "committish": "branch"
+  },
+  "https://user@bitbucket.org/foo/bar.git": {
+   "type": "bitbucket",
+   "user": "foo",
+   "project": "bar",
+   "default": "https",
+   "auth": "user"
+  },
+  "https://user@bitbucket.org/foo/bar.git#branch": {
+   "type": "bitbucket",
+   "user": "foo",
+   "project": "bar",
+   "default": "https",
+   "auth": "user",
+   "committish": "branch"
+  },
+  "https://user:password@bitbucket.org/foo/bar.git": {
+   "type": "bitbucket",
+   "user": "foo",
+   "project": "bar",
+   "default": "https",
+   "auth": "user:password"
+  },
+  "https://user:password@bitbucket.org/foo/bar.git#branch": {
+   "type": "bitbucket",
+   "user": "foo",
+   "project": "bar",
+   "default": "https",
+   "auth": "user:password",
+   "committish": "branch"
+  },
+  "https://:password@bitbucket.org/foo/bar.git": {
+   "type": "bitbucket",
+   "user": "foo",
+   "project": "bar",
+   "default": "https",
+   "auth": ":password"
+  },
+  "https://:password@bitbucket.org/foo/bar.git#branch": {
+   "type": "bitbucket",
+   "user": "foo",
+   "project": "bar",
+   "default": "https",
+   "auth": ":password",
+   "committish": "branch"
+  }
+ },
+ "gist": {
+  "gist:feedbeef": {
+   "type": "gist",
+   "user": null,
+   "project": "feedbeef",
+   "default": "shortcut"
+  },
+  "gist:feedbeef#branch": {
+   "type": "gist",
+   "user": null,
+   "project": "feedbeef",
+   "default": "shortcut",
+   "committish": "branch"
+  },
+  "gist:user@feedbeef": {
+   "type": "gist",
+   "user": null,
+   "project": "feedbeef",
+   "default": "shortcut",
+   "auth": null
+  },
+  "gist:user@feedbeef#branch": {
+   "type": "gist",
+   "user": null,
+   "project": "feedbeef",
+   "default": "shortcut",
+   "auth": null,
+   "committish": "branch"
+  },
+  "gist:user:password@feedbeef": {
+   "type": "gist",
+   "user": null,
+   "project": "feedbeef",
+   "default": "shortcut",
+   "auth": null
+  },
+  "gist:user:password@feedbeef#branch": {
+   "type": "gist",
+   "user": null,
+   "project": "feedbeef",
+   "default": "shortcut",
+   "auth": null,
+   "committish": "branch"
+  },
+  "gist::password@feedbeef": {
+   "type": "gist",
+   "user": null,
+   "project": "feedbeef",
+   "default": "shortcut",
+   "auth": null
+  },
+  "gist::password@feedbeef#branch": {
+   "type": "gist",
+   "user": null,
+   "project": "feedbeef",
+   "default": "shortcut",
+   "auth": null,
+   "committish": "branch"
+  },
+  "gist:feedbeef.git": {
+   "type": "gist",
+   "user": null,
+   "project": "feedbeef",
+   "default": "shortcut"
+  },
+  "gist:feedbeef.git#branch": {
+   "type": "gist",
+   "user": null,
+   "project": "feedbeef",
+   "default": "shortcut",
+   "committish": "branch"
+  },
+  "gist:user@feedbeef.git": {
+   "type": "gist",
+   "user": null,
+   "project": "feedbeef",
+   "default": "shortcut",
+   "auth": null
+  },
+  "gist:user@feedbeef.git#branch": {
+   "type": "gist",
+   "user": null,
+   "project": "feedbeef",
+   "default": "shortcut",
+   "auth": null,
+   "committish": "branch"
+  },
+  "gist:user:password@feedbeef.git": {
+   "type": "gist",
+   "user": null,
+   "project": "feedbeef",
+   "default": "shortcut",
+   "auth": null
+  },
+  "gist:user:password@feedbeef.git#branch": {
+   "type": "gist",
+   "user": null,
+   "project": "feedbeef",
+   "default": "shortcut",
+   "auth": null,
+   "committish": "branch"
+  },
+  "gist::password@feedbeef.git": {
+   "type": "gist",
+   "user": null,
+   "project": "feedbeef",
+   "default": "shortcut",
+   "auth": null
+  },
+  "gist::password@feedbeef.git#branch": {
+   "type": "gist",
+   "user": null,
+   "project": "feedbeef",
+   "default": "shortcut",
+   "auth": null,
+   "committish": "branch"
+  },
+  "gist:/feedbeef": {
+   "type": "gist",
+   "user": null,
+   "project": "feedbeef",
+   "default": "shortcut"
+  },
+  "gist:/feedbeef#branch": {
+   "type": "gist",
+   "user": null,
+   "project": "feedbeef",
+   "default": "shortcut",
+   "committish": "branch"
+  },
+  "gist:user@/feedbeef": {
+   "type": "gist",
+   "user": null,
+   "project": "feedbeef",
+   "default": "shortcut",
+   "auth": null
+  },
+  "gist:user@/feedbeef#branch": {
+   "type": "gist",
+   "user": null,
+   "project": "feedbeef",
+   "default": "shortcut",
+   "auth": null,
+   "committish": "branch"
+  },
+  "gist:user:password@/feedbeef": {
+   "type": "gist",
+   "user": null,
+   "project": "feedbeef",
+   "default": "shortcut",
+   "auth": null
+  },
+  "gist:user:password@/feedbeef#branch": {
+   "type": "gist",
+   "user": null,
+   "project": "feedbeef",
+   "default": "shortcut",
+   "auth": null,
+   "committish": "branch"
+  },
+  "gist::password@/feedbeef": {
+   "type": "gist",
+   "user": null,
+   "project": "feedbeef",
+   "default": "shortcut",
+   "auth": null
+  },
+  "gist::password@/feedbeef#branch": {
+   "type": "gist",
+   "user": null,
+   "project": "feedbeef",
+   "default": "shortcut",
+   "auth": null,
+   "committish": "branch"
+  },
+  "gist:/feedbeef.git": {
+   "type": "gist",
+   "user": null,
+   "project": "feedbeef",
+   "default": "shortcut"
+  },
+  "gist:/feedbeef.git#branch": {
+   "type": "gist",
+   "user": null,
+   "project": "feedbeef",
+   "default": "shortcut",
+   "committish": "branch"
+  },
+  "gist:user@/feedbeef.git": {
+   "type": "gist",
+   "user": null,
+   "project": "feedbeef",
+   "default": "shortcut",
+   "auth": null
+  },
+  "gist:user@/feedbeef.git#branch": {
+   "type": "gist",
+   "user": null,
+   "project": "feedbeef",
+   "default": "shortcut",
+   "auth": null,
+   "committish": "branch"
+  },
+  "gist:user:password@/feedbeef.git": {
+   "type": "gist",
+   "user": null,
+   "project": "feedbeef",
+   "default": "shortcut",
+   "auth": null
+  },
+  "gist:user:password@/feedbeef.git#branch": {
+   "type": "gist",
+   "user": null,
+   "project": "feedbeef",
+   "default": "shortcut",
+   "auth": null,
+   "committish": "branch"
+  },
+  "gist::password@/feedbeef.git": {
+   "type": "gist",
+   "user": null,
+   "project": "feedbeef",
+   "default": "shortcut",
+   "auth": null
+  },
+  "gist::password@/feedbeef.git#branch": {
+   "type": "gist",
+   "user": null,
+   "project": "feedbeef",
+   "default": "shortcut",
+   "auth": null,
+   "committish": "branch"
+  },
+  "gist:foo/feedbeef": {
+   "type": "gist",
+   "user": "foo",
+   "project": "feedbeef",
+   "default": "shortcut"
+  },
+  "gist:foo/feedbeef#branch": {
+   "type": "gist",
+   "user": "foo",
+   "project": "feedbeef",
+   "default": "shortcut",
+   "committish": "branch"
+  },
+  "gist:user@foo/feedbeef": {
+   "type": "gist",
+   "user": "foo",
+   "project": "feedbeef",
+   "default": "shortcut",
+   "auth": null
+  },
+  "gist:user@foo/feedbeef#branch": {
+   "type": "gist",
+   "user": "foo",
+   "project": "feedbeef",
+   "default": "shortcut",
+   "auth": null,
+   "committish": "branch"
+  },
+  "gist:user:password@foo/feedbeef": {
+   "type": "gist",
+   "user": "foo",
+   "project": "feedbeef",
+   "default": "shortcut",
+   "auth": null
+  },
+  "gist:user:password@foo/feedbeef#branch": {
+   "type": "gist",
+   "user": "foo",
+   "project": "feedbeef",
+   "default": "shortcut",
+   "auth": null,
+   "committish": "branch"
+  },
+  "gist::password@foo/feedbeef": {
+   "type": "gist",
+   "user": "foo",
+   "project": "feedbeef",
+   "default": "shortcut",
+   "auth": null
+  },
+  "gist::password@foo/feedbeef#branch": {
+   "type": "gist",
+   "user": "foo",
+   "project": "feedbeef",
+   "default": "shortcut",
+   "auth": null,
+   "committish": "branch"
+  },
+  "gist:foo/feedbeef.git": {
+   "type": "gist",
+   "user": "foo",
+   "project": "feedbeef",
+   "default": "shortcut"
+  },
+  "gist:foo/feedbeef.git#branch": {
+   "type": "gist",
+   "user": "foo",
+   "project": "feedbeef",
+   "default": "shortcut",
+   "committish": "branch"
+  },
+  "gist:user@foo/feedbeef.git": {
+   "type": "gist",
+   "user": "foo",
+   "project": "feedbeef",
+   "default": "shortcut",
+   "auth": null
+  },
+  "gist:user@foo/feedbeef.git#branch": {
+   "type": "gist",
+   "user": "foo",
+   "project": "feedbeef",
+   "default": "shortcut",
+   "auth": null,
+   "committish": "branch"
+  },
+  "gist:user:password@foo/feedbeef.git": {
+   "type": "gist",
+   "user": "foo",
+   "project": "feedbeef",
+   "default": "shortcut",
+   "auth": null
+  },
+  "gist:user:password@foo/feedbeef.git#branch": {
+   "type": "gist",
+   "user": "foo",
+   "project": "feedbeef",
+   "default": "shortcut",
+   "auth": null,
+   "committish": "branch"
+  },
+  "gist::password@foo/feedbeef.git": {
+   "type": "gist",
+   "user": "foo",
+   "project": "feedbeef",
+   "default": "shortcut",
+   "auth": null
+  },
+  "gist::password@foo/feedbeef.git#branch": {
+   "type": "gist",
+   "user": "foo",
+   "project": "feedbeef",
+   "default": "shortcut",
+   "auth": null,
+   "committish": "branch"
+  },
+  "git://gist.github.com/feedbeef": {
+   "type": "gist",
+   "user": null,
+   "project": "feedbeef",
+   "default": "git"
+  },
+  "git://gist.github.com/feedbeef#branch": {
+   "type": "gist",
+   "user": null,
+   "project": "feedbeef",
+   "default": "git",
+   "committish": "branch"
+  },
+  "git://user@gist.github.com/feedbeef": {
+   "type": "gist",
+   "user": null,
+   "project": "feedbeef",
+   "default": "git",
+   "auth": "user"
+  },
+  "git://user@gist.github.com/feedbeef#branch": {
+   "type": "gist",
+   "user": null,
+   "project": "feedbeef",
+   "default": "git",
+   "auth": "user",
+   "committish": "branch"
+  },
+  "git://user:password@gist.github.com/feedbeef": {
+   "type": "gist",
+   "user": null,
+   "project": "feedbeef",
+   "default": "git",
+   "auth": "user:password"
+  },
+  "git://user:password@gist.github.com/feedbeef#branch": {
+   "type": "gist",
+   "user": null,
+   "project": "feedbeef",
+   "default": "git",
+   "auth": "user:password",
+   "committish": "branch"
+  },
+  "git://:password@gist.github.com/feedbeef": {
+   "type": "gist",
+   "user": null,
+   "project": "feedbeef",
+   "default": "git",
+   "auth": ":password"
+  },
+  "git://:password@gist.github.com/feedbeef#branch": {
+   "type": "gist",
+   "user": null,
+   "project": "feedbeef",
+   "default": "git",
+   "auth": ":password",
+   "committish": "branch"
+  },
+  "git://gist.github.com/feedbeef.git": {
+   "type": "gist",
+   "user": null,
+   "project": "feedbeef",
+   "default": "git"
+  },
+  "git://gist.github.com/feedbeef.git#branch": {
+   "type": "gist",
+   "user": null,
+   "project": "feedbeef",
+   "default": "git",
+   "committish": "branch"
+  },
+  "git://user@gist.github.com/feedbeef.git": {
+   "type": "gist",
+   "user": null,
+   "project": "feedbeef",
+   "default": "git",
+   "auth": "user"
+  },
+  "git://user@gist.github.com/feedbeef.git#branch": {
+   "type": "gist",
+   "user": null,
+   "project": "feedbeef",
+   "default": "git",
+   "auth": "user",
+   "committish": "branch"
+  },
+  "git://user:password@gist.github.com/feedbeef.git": {
+   "type": "gist",
+   "user": null,
+   "project": "feedbeef",
+   "default": "git",
+   "auth": "user:password"
+  },
+  "git://user:password@gist.github.com/feedbeef.git#branch": {
+   "type": "gist",
+   "user": null,
+   "project": "feedbeef",
+   "default": "git",
+   "auth": "user:password",
+   "committish": "branch"
+  },
+  "git://:password@gist.github.com/feedbeef.git": {
+   "type": "gist",
+   "user": null,
+   "project": "feedbeef",
+   "default": "git",
+   "auth": ":password"
+  },
+  "git://:password@gist.github.com/feedbeef.git#branch": {
+   "type": "gist",
+   "user": null,
+   "project": "feedbeef",
+   "default": "git",
+   "auth": ":password",
+   "committish": "branch"
+  },
+  "git://gist.github.com/foo/feedbeef": {
+   "type": "gist",
+   "user": "foo",
+   "project": "feedbeef",
+   "default": "git"
+  },
+  "git://gist.github.com/foo/feedbeef#branch": {
+   "type": "gist",
+   "user": "foo",
+   "project": "feedbeef",
+   "default": "git",
+   "committish": "branch"
+  },
+  "git://user@gist.github.com/foo/feedbeef": {
+   "type": "gist",
+   "user": "foo",
+   "project": "feedbeef",
+   "default": "git",
+   "auth": "user"
+  },
+  "git://user@gist.github.com/foo/feedbeef#branch": {
+   "type": "gist",
+   "user": "foo",
+   "project": "feedbeef",
+   "default": "git",
+   "auth": "user",
+   "committish": "branch"
+  },
+  "git://user:password@gist.github.com/foo/feedbeef": {
+   "type": "gist",
+   "user": "foo",
+   "project": "feedbeef",
+   "default": "git",
+   "auth": "user:password"
+  },
+  "git://user:password@gist.github.com/foo/feedbeef#branch": {
+   "type": "gist",
+   "user": "foo",
+   "project": "feedbeef",
+   "default": "git",
+   "auth": "user:password",
+   "committish": "branch"
+  },
+  "git://:password@gist.github.com/foo/feedbeef": {
+   "type": "gist",
+   "user": "foo",
+   "project": "feedbeef",
+   "default": "git",
+   "auth": ":password"
+  },
+  "git://:password@gist.github.com/foo/feedbeef#branch": {
+   "type": "gist",
+   "user": "foo",
+   "project": "feedbeef",
+   "default": "git",
+   "auth": ":password",
+   "committish": "branch"
+  },
+  "git://gist.github.com/foo/feedbeef.git": {
+   "type": "gist",
+   "user": "foo",
+   "project": "feedbeef",
+   "default": "git"
+  },
+  "git://gist.github.com/foo/feedbeef.git#branch": {
+   "type": "gist",
+   "user": "foo",
+   "project": "feedbeef",
+   "default": "git",
+   "committish": "branch"
+  },
+  "git://user@gist.github.com/foo/feedbeef.git": {
+   "type": "gist",
+   "user": "foo",
+   "project": "feedbeef",
+   "default": "git",
+   "auth": "user"
+  },
+  "git://user@gist.github.com/foo/feedbeef.git#branch": {
+   "type": "gist",
+   "user": "foo",
+   "project": "feedbeef",
+   "default": "git",
+   "auth": "user",
+   "committish": "branch"
+  },
+  "git://user:password@gist.github.com/foo/feedbeef.git": {
+   "type": "gist",
+   "user": "foo",
+   "project": "feedbeef",
+   "default": "git",
+   "auth": "user:password"
+  },
+  "git://user:password@gist.github.com/foo/feedbeef.git#branch": {
+   "type": "gist",
+   "user": "foo",
+   "project": "feedbeef",
+   "default": "git",
+   "auth": "user:password",
+   "committish": "branch"
+  },
+  "git://:password@gist.github.com/foo/feedbeef.git": {
+   "type": "gist",
+   "user": "foo",
+   "project": "feedbeef",
+   "default": "git",
+   "auth": ":password"
+  },
+  "git://:password@gist.github.com/foo/feedbeef.git#branch": {
+   "type": "gist",
+   "user": "foo",
+   "project": "feedbeef",
+   "default": "git",
+   "auth": ":password",
+   "committish": "branch"
+  },
+  "git@gist.github.com:feedbeef": {
+   "type": "gist",
+   "user": null,
+   "project": "feedbeef",
+   "default": "sshurl",
+   "auth": null
+  },
+  "git@gist.github.com:feedbeef#branch": {
+   "type": "gist",
+   "user": null,
+   "project": "feedbeef",
+   "default": "sshurl",
+   "auth": null,
+   "committish": "branch"
+  },
+  "user@gist.github.com:feedbeef": {
+   "type": "gist",
+   "user": null,
+   "project": "feedbeef",
+   "default": "sshurl",
+   "auth": null
+  },
+  "user@gist.github.com:feedbeef#branch": {
+   "type": "gist",
+   "user": null,
+   "project": "feedbeef",
+   "default": "sshurl",
+   "auth": null,
+   "committish": "branch"
+  },
+  "user:password@gist.github.com:feedbeef": {
+   "type": "gist",
+   "user": null,
+   "project": "feedbeef",
+   "default": "sshurl",
+   "auth": null
+  },
+  "user:password@gist.github.com:feedbeef#branch": {
+   "type": "gist",
+   "user": null,
+   "project": "feedbeef",
+   "default": "sshurl",
+   "auth": null,
+   "committish": "branch"
+  },
+  ":password@gist.github.com:feedbeef": {
+   "type": "gist",
+   "user": null,
+   "project": "feedbeef",
+   "default": "sshurl",
+   "auth": null
+  },
+  ":password@gist.github.com:feedbeef#branch": {
+   "type": "gist",
+   "user": null,
+   "project": "feedbeef",
+   "default": "sshurl",
+   "auth": null,
+   "committish": "branch"
+  },
+  "git@gist.github.com:feedbeef.git": {
+   "type": "gist",
+   "user": null,
+   "project": "feedbeef",
+   "default": "sshurl",
+   "auth": null
+  },
+  "git@gist.github.com:feedbeef.git#branch": {
+   "type": "gist",
+   "user": null,
+   "project": "feedbeef",
+   "default": "sshurl",
+   "committish": "branch",
+   "auth": null
+  },
+  "user@gist.github.com:feedbeef.git": {
+   "type": "gist",
+   "user": null,
+   "project": "feedbeef",
+   "default": "sshurl",
+   "auth": null
+  },
+  "user@gist.github.com:feedbeef.git#branch": {
+   "type": "gist",
+   "user": null,
+   "project": "feedbeef",
+   "default": "sshurl",
+   "auth": null,
+   "committish": "branch"
+  },
+  "user:password@gist.github.com:feedbeef.git": {
+   "type": "gist",
+   "user": null,
+   "project": "feedbeef",
+   "default": "sshurl",
+   "auth": null
+  },
+  "user:password@gist.github.com:feedbeef.git#branch": {
+   "type": "gist",
+   "user": null,
+   "project": "feedbeef",
+   "default": "sshurl",
+   "auth": null,
+   "committish": "branch"
+  },
+  ":password@gist.github.com:feedbeef.git": {
+   "type": "gist",
+   "user": null,
+   "project": "feedbeef",
+   "default": "sshurl",
+   "auth": null
+  },
+  ":password@gist.github.com:feedbeef.git#branch": {
+   "type": "gist",
+   "user": null,
+   "project": "feedbeef",
+   "default": "sshurl",
+   "auth": null,
+   "committish": "branch"
+  },
+  "git@gist.github.com:foo/feedbeef": {
+   "type": "gist",
+   "user": "foo",
+   "project": "feedbeef",
+   "default": "sshurl",
+   "auth": null
+  },
+  "git@gist.github.com:foo/feedbeef#branch": {
+   "type": "gist",
+   "user": "foo",
+   "project": "feedbeef",
+   "default": "sshurl",
+   "auth": null,
+   "committish": "branch"
+  },
+  "user@gist.github.com:foo/feedbeef": {
+   "type": "gist",
+   "user": "foo",
+   "project": "feedbeef",
+   "default": "sshurl",
+   "auth": null
+  },
+  "user@gist.github.com:foo/feedbeef#branch": {
+   "type": "gist",
+   "user": "foo",
+   "project": "feedbeef",
+   "default": "sshurl",
+   "auth": null,
+   "committish": "branch"
+  },
+  "user:password@gist.github.com:foo/feedbeef": {
+   "type": "gist",
+   "user": "foo",
+   "project": "feedbeef",
+   "default": "sshurl",
+   "auth": null
+  },
+  "user:password@gist.github.com:foo/feedbeef#branch": {
+   "type": "gist",
+   "user": "foo",
+   "project": "feedbeef",
+   "default": "sshurl",
+   "auth": null,
+   "committish": "branch"
+  },
+  ":password@gist.github.com:foo/feedbeef": {
+   "type": "gist",
+   "user": "foo",
+   "project": "feedbeef",
+   "default": "sshurl",
+   "auth": null
+  },
+  ":password@gist.github.com:foo/feedbeef#branch": {
+   "type": "gist",
+   "user": "foo",
+   "project": "feedbeef",
+   "default": "sshurl",
+   "auth": null,
+   "committish": "branch"
+  },
+  "git@gist.github.com:foo/feedbeef.git": {
+   "type": "gist",
+   "user": "foo",
+   "project": "feedbeef",
+   "default": "sshurl",
+   "auth": null
+  },
+  "git@gist.github.com:foo/feedbeef.git#branch": {
+   "type": "gist",
+   "user": "foo",
+   "project": "feedbeef",
+   "default": "sshurl",
+   "auth": null,
+   "committish": "branch"
+  },
+  "user@gist.github.com:foo/feedbeef.git": {
+   "type": "gist",
+   "user": "foo",
+   "project": "feedbeef",
+   "default": "sshurl",
+   "auth": null
+  },
+  "user@gist.github.com:foo/feedbeef.git#branch": {
+   "type": "gist",
+   "user": "foo",
+   "project": "feedbeef",
+   "default": "sshurl",
+   "auth": null,
+   "committish": "branch"
+  },
+  "user:password@gist.github.com:foo/feedbeef.git": {
+   "type": "gist",
+   "user": "foo",
+   "project": "feedbeef",
+   "default": "sshurl",
+   "auth": null
+  },
+  "user:password@gist.github.com:foo/feedbeef.git#branch": {
+   "type": "gist",
+   "user": "foo",
+   "project": "feedbeef",
+   "default": "sshurl",
+   "auth": null,
+   "committish": "branch"
+  },
+  ":password@gist.github.com:foo/feedbeef.git": {
+   "type": "gist",
+   "user": "foo",
+   "project": "feedbeef",
+   "default": "sshurl",
+   "auth": null
+  },
+  ":password@gist.github.com:foo/feedbeef.git#branch": {
+   "type": "gist",
+   "user": "foo",
+   "project": "feedbeef",
+   "default": "sshurl",
+   "auth": null,
+   "committish": "branch"
+  },
+  "git+ssh://gist.github.com:feedbeef": {
+   "type": "gist",
+   "user": null,
+   "project": "feedbeef",
+   "default": "sshurl",
+   "auth": null
+  },
+  "git+ssh://gist.github.com:feedbeef#branch": {
+   "type": "gist",
+   "user": null,
+   "project": "feedbeef",
+   "default": "sshurl",
+   "auth": null,
+   "committish": "branch"
+  },
+  "git+ssh://user@gist.github.com:feedbeef": {
+   "type": "gist",
+   "user": null,
+   "project": "feedbeef",
+   "default": "sshurl",
+   "auth": null
+  },
+  "git+ssh://user@gist.github.com:feedbeef#branch": {
+   "type": "gist",
+   "user": null,
+   "project": "feedbeef",
+   "default": "sshurl",
+   "auth": null,
+   "committish": "branch"
+  },
+  "git+ssh://user:password@gist.github.com:feedbeef": {
+   "type": "gist",
+   "user": null,
+   "project": "feedbeef",
+   "default": "sshurl",
+   "auth": null
+  },
+  "git+ssh://user:password@gist.github.com:feedbeef#branch": {
+   "type": "gist",
+   "user": null,
+   "project": "feedbeef",
+   "default": "sshurl",
+   "auth": null,
+   "committish": "branch"
+  },
+  "git+ssh://:password@gist.github.com:feedbeef": {
+   "type": "gist",
+   "user": null,
+   "project": "feedbeef",
+   "default": "sshurl",
+   "auth": null
+  },
+  "git+ssh://:password@gist.github.com:feedbeef#branch": {
+   "type": "gist",
+   "user": null,
+   "project": "feedbeef",
+   "default": "sshurl",
+   "auth": null,
+   "committish": "branch"
+  },
+  "git+ssh://gist.github.com:feedbeef.git": {
+   "type": "gist",
+   "user": null,
+   "project": "feedbeef",
+   "default": "sshurl",
+   "auth": null
+  },
+  "git+ssh://gist.github.com:feedbeef.git#branch": {
+   "type": "gist",
+   "user": null,
+   "project": "feedbeef",
+   "default": "sshurl",
+   "auth": null,
+   "committish": "branch"
+  },
+  "git+ssh://user@gist.github.com:feedbeef.git": {
+   "type": "gist",
+   "user": null,
+   "project": "feedbeef",
+   "default": "sshurl",
+   "auth": null
+  },
+  "git+ssh://user@gist.github.com:feedbeef.git#branch": {
+   "type": "gist",
+   "user": null,
+   "project": "feedbeef",
+   "default": "sshurl",
+   "auth": null,
+   "committish": "branch"
+  },
+  "git+ssh://user:password@gist.github.com:feedbeef.git": {
+   "type": "gist",
+   "user": null,
+   "project": "feedbeef",
+   "default": "sshurl",
+   "auth": null
+  },
+  "git+ssh://user:password@gist.github.com:feedbeef.git#branch": {
+   "type": "gist",
+   "user": null,
+   "project": "feedbeef",
+   "default": "sshurl",
+   "auth": null,
+   "committish": "branch"
+  },
+  "git+ssh://:password@gist.github.com:feedbeef.git": {
+   "type": "gist",
+   "user": null,
+   "project": "feedbeef",
+   "default": "sshurl",
+   "auth": null
+  },
+  "git+ssh://:password@gist.github.com:feedbeef.git#branch": {
+   "type": "gist",
+   "user": null,
+   "project": "feedbeef",
+   "default": "sshurl",
+   "auth": null,
+   "committish": "branch"
+  },
+  "git+ssh://gist.github.com:foo/feedbeef": {
+   "type": "gist",
+   "user": "foo",
+   "project": "feedbeef",
+   "default": "sshurl"
+  },
+  "git+ssh://gist.github.com:foo/feedbeef#branch": {
+   "type": "gist",
+   "user": "foo",
+   "project": "feedbeef",
+   "default": "sshurl",
+   "committish": "branch"
+  },
+  "git+ssh://user@gist.github.com:foo/feedbeef": {
+   "type": "gist",
+   "user": "foo",
+   "project": "feedbeef",
+   "default": "sshurl",
+   "auth": null
+  },
+  "git+ssh://user@gist.github.com:foo/feedbeef#branch": {
+   "type": "gist",
+   "user": "foo",
+   "project": "feedbeef",
+   "default": "sshurl",
+   "auth": null,
+   "committish": "branch"
+  },
+  "git+ssh://user:password@gist.github.com:foo/feedbeef": {
+   "type": "gist",
+   "user": "foo",
+   "project": "feedbeef",
+   "default": "sshurl",
+   "auth": null
+  },
+  "git+ssh://user:password@gist.github.com:foo/feedbeef#branch": {
+   "type": "gist",
+   "user": "foo",
+   "project": "feedbeef",
+   "default": "sshurl",
+   "auth": null,
+   "committish": "branch"
+  },
+  "git+ssh://:password@gist.github.com:foo/feedbeef": {
+   "type": "gist",
+   "user": "foo",
+   "project": "feedbeef",
+   "default": "sshurl",
+   "auth": null
+  },
+  "git+ssh://:password@gist.github.com:foo/feedbeef#branch": {
+   "type": "gist",
+   "user": "foo",
+   "project": "feedbeef",
+   "default": "sshurl",
+   "auth": null,
+   "committish": "branch"
+  },
+  "git+ssh://gist.github.com:foo/feedbeef.git": {
+   "type": "gist",
+   "user": "foo",
+   "project": "feedbeef",
+   "default": "sshurl"
+  },
+  "git+ssh://gist.github.com:foo/feedbeef.git#branch": {
+   "type": "gist",
+   "user": "foo",
+   "project": "feedbeef",
+   "default": "sshurl",
+   "committish": "branch"
+  },
+  "git+ssh://user@gist.github.com:foo/feedbeef.git": {
+   "type": "gist",
+   "user": "foo",
+   "project": "feedbeef",
+   "default": "sshurl",
+   "auth": null
+  },
+  "git+ssh://user@gist.github.com:foo/feedbeef.git#branch": {
+   "type": "gist",
+   "user": "foo",
+   "project": "feedbeef",
+   "default": "sshurl",
+   "auth": null,
+   "committish": "branch"
+  },
+  "git+ssh://user:password@gist.github.com:foo/feedbeef.git": {
+   "type": "gist",
+   "user": "foo",
+   "project": "feedbeef",
+   "default": "sshurl",
+   "auth": null
+  },
+  "git+ssh://user:password@gist.github.com:foo/feedbeef.git#branch": {
+   "type": "gist",
+   "user": "foo",
+   "project": "feedbeef",
+   "default": "sshurl",
+   "auth": null,
+   "committish": "branch"
+  },
+  "git+ssh://:password@gist.github.com:foo/feedbeef.git": {
+   "type": "gist",
+   "user": "foo",
+   "project": "feedbeef",
+   "default": "sshurl",
+   "auth": null
+  },
+  "git+ssh://:password@gist.github.com:foo/feedbeef.git#branch": {
+   "type": "gist",
+   "user": "foo",
+   "project": "feedbeef",
+   "default": "sshurl",
+   "auth": null,
+   "committish": "branch"
+  },
+  "ssh://gist.github.com:feedbeef": {
+   "type": "gist",
+   "user": null,
+   "project": "feedbeef",
+   "default": "sshurl",
+   "auth": null
+  },
+  "ssh://gist.github.com:feedbeef#branch": {
+   "type": "gist",
+   "user": null,
+   "project": "feedbeef",
+   "default": "sshurl",
+   "auth": null,
+   "committish": "branch"
+  },
+  "ssh://user@gist.github.com:feedbeef": {
+   "type": "gist",
+   "user": null,
+   "project": "feedbeef",
+   "default": "sshurl",
+   "auth": null
+  },
+  "ssh://user@gist.github.com:feedbeef#branch": {
+   "type": "gist",
+   "user": null,
+   "project": "feedbeef",
+   "default": "sshurl",
+   "auth": null,
+   "committish": "branch"
+  },
+  "ssh://user:password@gist.github.com:feedbeef": {
+   "type": "gist",
+   "user": null,
+   "project": "feedbeef",
+   "default": "sshurl",
+   "auth": null
+  },
+  "ssh://user:password@gist.github.com:feedbeef#branch": {
+   "type": "gist",
+   "user": null,
+   "project": "feedbeef",
+   "default": "sshurl",
+   "auth": null,
+   "committish": "branch"
+  },
+  "ssh://:password@gist.github.com:feedbeef": {
+   "type": "gist",
+   "user": null,
+   "project": "feedbeef",
+   "default": "sshurl",
+   "auth": null
+  },
+  "ssh://:password@gist.github.com:feedbeef#branch": {
+   "type": "gist",
+   "user": null,
+   "project": "feedbeef",
+   "default": "sshurl",
+   "auth": null,
+   "committish": "branch"
+  },
+  "ssh://gist.github.com:feedbeef.git": {
+   "type": "gist",
+   "user": null,
+   "project": "feedbeef",
+   "default": "sshurl",
+   "auth": null
+  },
+  "ssh://gist.github.com:feedbeef.git#branch": {
+   "type": "gist",
+   "user": null,
+   "project": "feedbeef",
+   "default": "sshurl",
+   "auth": null,
+   "committish": "branch"
+  },
+  "ssh://user@gist.github.com:feedbeef.git": {
+   "type": "gist",
+   "user": null,
+   "project": "feedbeef",
+   "default": "sshurl",
+   "auth": null
+  },
+  "ssh://user@gist.github.com:feedbeef.git#branch": {
+   "type": "gist",
+   "user": null,
+   "project": "feedbeef",
+   "default": "sshurl",
+   "auth": null,
+   "committish": "branch"
+  },
+  "ssh://user:password@gist.github.com:feedbeef.git": {
+   "type": "gist",
+   "user": null,
+   "project": "feedbeef",
+   "default": "sshurl",
+   "auth": null
+  },
+  "ssh://user:password@gist.github.com:feedbeef.git#branch": {
+   "type": "gist",
+   "user": null,
+   "project": "feedbeef",
+   "default": "sshurl",
+   "auth": null,
+   "committish": "branch"
+  },
+  "ssh://:password@gist.github.com:feedbeef.git": {
+   "type": "gist",
+   "user": null,
+   "project": "feedbeef",
+   "default": "sshurl",
+   "auth": null
+  },
+  "ssh://:password@gist.github.com:feedbeef.git#branch": {
+   "type": "gist",
+   "user": null,
+   "project": "feedbeef",
+   "default": "sshurl",
+   "auth": null,
+   "committish": "branch"
+  },
+  "ssh://gist.github.com:foo/feedbeef": {
+   "type": "gist",
+   "user": "foo",
+   "project": "feedbeef",
+   "default": "sshurl"
+  },
+  "ssh://gist.github.com:foo/feedbeef#branch": {
+   "type": "gist",
+   "user": "foo",
+   "project": "feedbeef",
+   "default": "sshurl",
+   "committish": "branch"
+  },
+  "ssh://user@gist.github.com:foo/feedbeef": {
+   "type": "gist",
+   "user": "foo",
+   "project": "feedbeef",
+   "default": "sshurl",
+   "auth": null
+  },
+  "ssh://user@gist.github.com:foo/feedbeef#branch": {
+   "type": "gist",
+   "user": "foo",
+   "project": "feedbeef",
+   "default": "sshurl",
+   "auth": null,
+   "committish": "branch"
+  },
+  "ssh://user:password@gist.github.com:foo/feedbeef": {
+   "type": "gist",
+   "user": "foo",
+   "project": "feedbeef",
+   "default": "sshurl",
+   "auth": null
+  },
+  "ssh://user:password@gist.github.com:foo/feedbeef#branch": {
+   "type": "gist",
+   "user": "foo",
+   "project": "feedbeef",
+   "default": "sshurl",
+   "auth": null,
+   "committish": "branch"
+  },
+  "ssh://:password@gist.github.com:foo/feedbeef": {
+   "type": "gist",
+   "user": "foo",
+   "project": "feedbeef",
+   "default": "sshurl",
+   "auth": null
+  },
+  "ssh://:password@gist.github.com:foo/feedbeef#branch": {
+   "type": "gist",
+   "user": "foo",
+   "project": "feedbeef",
+   "default": "sshurl",
+   "auth": null,
+   "committish": "branch"
+  },
+  "ssh://gist.github.com:foo/feedbeef.git": {
+   "type": "gist",
+   "user": "foo",
+   "project": "feedbeef",
+   "default": "sshurl"
+  },
+  "ssh://gist.github.com:foo/feedbeef.git#branch": {
+   "type": "gist",
+   "user": "foo",
+   "project": "feedbeef",
+   "default": "sshurl",
+   "committish": "branch"
+  },
+  "ssh://user@gist.github.com:foo/feedbeef.git": {
+   "type": "gist",
+   "user": "foo",
+   "project": "feedbeef",
+   "default": "sshurl",
+   "auth": null
+  },
+  "ssh://user@gist.github.com:foo/feedbeef.git#branch": {
+   "type": "gist",
+   "user": "foo",
+   "project": "feedbeef",
+   "default": "sshurl",
+   "auth": null,
+   "committish": "branch"
+  },
+  "ssh://user:password@gist.github.com:foo/feedbeef.git": {
+   "type": "gist",
+   "user": "foo",
+   "project": "feedbeef",
+   "default": "sshurl",
+   "auth": null
+  },
+  "ssh://user:password@gist.github.com:foo/feedbeef.git#branch": {
+   "type": "gist",
+   "user": "foo",
+   "project": "feedbeef",
+   "default": "sshurl",
+   "auth": null,
+   "committish": "branch"
+  },
+  "ssh://:password@gist.github.com:foo/feedbeef.git": {
+   "type": "gist",
+   "user": "foo",
+   "project": "feedbeef",
+   "default": "sshurl",
+   "auth": null
+  },
+  "ssh://:password@gist.github.com:foo/feedbeef.git#branch": {
+   "type": "gist",
+   "user": "foo",
+   "project": "feedbeef",
+   "default": "sshurl",
+   "auth": null,
+   "committish": "branch"
+  },
+  "git+https://gist.github.com/feedbeef": {
+   "type": "gist",
+   "user": null,
+   "project": "feedbeef",
+   "default": "https"
+  },
+  "git+https://gist.github.com/feedbeef#branch": {
+   "type": "gist",
+   "user": null,
+   "project": "feedbeef",
+   "default": "https",
+   "committish": "branch"
+  },
+  "git+https://user@gist.github.com/feedbeef": {
+   "type": "gist",
+   "user": null,
+   "project": "feedbeef",
+   "default": "https",
+   "auth": "user"
+  },
+  "git+https://user@gist.github.com/feedbeef#branch": {
+   "type": "gist",
+   "user": null,
+   "project": "feedbeef",
+   "default": "https",
+   "auth": "user",
+   "committish": "branch"
+  },
+  "git+https://user:password@gist.github.com/feedbeef": {
+   "type": "gist",
+   "user": null,
+   "project": "feedbeef",
+   "default": "https",
+   "auth": "user:password"
+  },
+  "git+https://user:password@gist.github.com/feedbeef#branch": {
+   "type": "gist",
+   "user": null,
+   "project": "feedbeef",
+   "default": "https",
+   "auth": "user:password",
+   "committish": "branch"
+  },
+  "git+https://:password@gist.github.com/feedbeef": {
+   "type": "gist",
+   "user": null,
+   "project": "feedbeef",
+   "default": "https",
+   "auth": ":password"
+  },
+  "git+https://:password@gist.github.com/feedbeef#branch": {
+   "type": "gist",
+   "user": null,
+   "project": "feedbeef",
+   "default": "https",
+   "auth": ":password",
+   "committish": "branch"
+  },
+  "git+https://gist.github.com/feedbeef.git": {
+   "type": "gist",
+   "user": null,
+   "project": "feedbeef",
+   "default": "https"
+  },
+  "git+https://gist.github.com/feedbeef.git#branch": {
+   "type": "gist",
+   "user": null,
+   "project": "feedbeef",
+   "default": "https",
+   "committish": "branch"
+  },
+  "git+https://user@gist.github.com/feedbeef.git": {
+   "type": "gist",
+   "user": null,
+   "project": "feedbeef",
+   "default": "https",
+   "auth": "user"
+  },
+  "git+https://user@gist.github.com/feedbeef.git#branch": {
+   "type": "gist",
+   "user": null,
+   "project": "feedbeef",
+   "default": "https",
+   "auth": "user",
+   "committish": "branch"
+  },
+  "git+https://user:password@gist.github.com/feedbeef.git": {
+   "type": "gist",
+   "user": null,
+   "project": "feedbeef",
+   "default": "https",
+   "auth": "user:password"
+  },
+  "git+https://user:password@gist.github.com/feedbeef.git#branch": {
+   "type": "gist",
+   "user": null,
+   "project": "feedbeef",
+   "default": "https",
+   "auth": "user:password",
+   "committish": "branch"
+  },
+  "git+https://:password@gist.github.com/feedbeef.git": {
+   "type": "gist",
+   "user": null,
+   "project": "feedbeef",
+   "default": "https",
+   "auth": ":password"
+  },
+  "git+https://:password@gist.github.com/feedbeef.git#branch": {
+   "type": "gist",
+   "user": null,
+   "project": "feedbeef",
+   "default": "https",
+   "auth": ":password",
+   "committish": "branch"
+  },
+  "git+https://gist.github.com/foo/feedbeef": {
+   "type": "gist",
+   "user": "foo",
+   "project": "feedbeef",
+   "default": "https"
+  },
+  "git+https://gist.github.com/foo/feedbeef#branch": {
+   "type": "gist",
+   "user": "foo",
+   "project": "feedbeef",
+   "default": "https",
+   "committish": "branch"
+  },
+  "git+https://user@gist.github.com/foo/feedbeef": {
+   "type": "gist",
+   "user": "foo",
+   "project": "feedbeef",
+   "default": "https",
+   "auth": "user"
+  },
+  "git+https://user@gist.github.com/foo/feedbeef#branch": {
+   "type": "gist",
+   "user": "foo",
+   "project": "feedbeef",
+   "default": "https",
+   "auth": "user",
+   "committish": "branch"
+  },
+  "git+https://user:password@gist.github.com/foo/feedbeef": {
+   "type": "gist",
+   "user": "foo",
+   "project": "feedbeef",
+   "default": "https",
+   "auth": "user:password"
+  },
+  "git+https://user:password@gist.github.com/foo/feedbeef#branch": {
+   "type": "gist",
+   "user": "foo",
+   "project": "feedbeef",
+   "default": "https",
+   "auth": "user:password",
+   "committish": "branch"
+  },
+  "git+https://:password@gist.github.com/foo/feedbeef": {
+   "type": "gist",
+   "user": "foo",
+   "project": "feedbeef",
+   "default": "https",
+   "auth": ":password"
+  },
+  "git+https://:password@gist.github.com/foo/feedbeef#branch": {
+   "type": "gist",
+   "user": "foo",
+   "project": "feedbeef",
+   "default": "https",
+   "auth": ":password",
+   "committish": "branch"
+  },
+  "git+https://gist.github.com/foo/feedbeef.git": {
+   "type": "gist",
+   "user": "foo",
+   "project": "feedbeef",
+   "default": "https"
+  },
+  "git+https://gist.github.com/foo/feedbeef.git#branch": {
+   "type": "gist",
+   "user": "foo",
+   "project": "feedbeef",
+   "default": "https",
+   "committish": "branch"
+  },
+  "git+https://user@gist.github.com/foo/feedbeef.git": {
+   "type": "gist",
+   "user": "foo",
+   "project": "feedbeef",
+   "default": "https",
+   "auth": "user"
+  },
+  "git+https://user@gist.github.com/foo/feedbeef.git#branch": {
+   "type": "gist",
+   "user": "foo",
+   "project": "feedbeef",
+   "default": "https",
+   "auth": "user",
+   "committish": "branch"
+  },
+  "git+https://user:password@gist.github.com/foo/feedbeef.git": {
+   "type": "gist",
+   "user": "foo",
+   "project": "feedbeef",
+   "default": "https",
+   "auth": "user:password"
+  },
+  "git+https://user:password@gist.github.com/foo/feedbeef.git#branch": {
+   "type": "gist",
+   "user": "foo",
+   "project": "feedbeef",
+   "default": "https",
+   "auth": "user:password",
+   "committish": "branch"
+  },
+  "git+https://:password@gist.github.com/foo/feedbeef.git": {
+   "type": "gist",
+   "user": "foo",
+   "project": "feedbeef",
+   "default": "https",
+   "auth": ":password"
+  },
+  "git+https://:password@gist.github.com/foo/feedbeef.git#branch": {
+   "type": "gist",
+   "user": "foo",
+   "project": "feedbeef",
+   "default": "https",
+   "auth": ":password",
+   "committish": "branch"
+  },
+  "https://gist.github.com/feedbeef": {
+   "type": "gist",
+   "user": null,
+   "project": "feedbeef",
+   "default": "https"
+  },
+  "https://gist.github.com/feedbeef#branch": {
+   "type": "gist",
+   "user": null,
+   "project": "feedbeef",
+   "default": "https",
+   "committish": "branch"
+  },
+  "https://user@gist.github.com/feedbeef": {
+   "type": "gist",
+   "user": null,
+   "project": "feedbeef",
+   "default": "https",
+   "auth": "user"
+  },
+  "https://user@gist.github.com/feedbeef#branch": {
+   "type": "gist",
+   "user": null,
+   "project": "feedbeef",
+   "default": "https",
+   "auth": "user",
+   "committish": "branch"
+  },
+  "https://user:password@gist.github.com/feedbeef": {
+   "type": "gist",
+   "user": null,
+   "project": "feedbeef",
+   "default": "https",
+   "auth": "user:password"
+  },
+  "https://user:password@gist.github.com/feedbeef#branch": {
+   "type": "gist",
+   "user": null,
+   "project": "feedbeef",
+   "default": "https",
+   "auth": "user:password",
+   "committish": "branch"
+  },
+  "https://:password@gist.github.com/feedbeef": {
+   "type": "gist",
+   "user": null,
+   "project": "feedbeef",
+   "default": "https",
+   "auth": ":password"
+  },
+  "https://:password@gist.github.com/feedbeef#branch": {
+   "type": "gist",
+   "user": null,
+   "project": "feedbeef",
+   "default": "https",
+   "auth": ":password",
+   "committish": "branch"
+  },
+  "https://gist.github.com/feedbeef.git": {
+   "type": "gist",
+   "user": null,
+   "project": "feedbeef",
+   "default": "https"
+  },
+  "https://gist.github.com/feedbeef.git#branch": {
+   "type": "gist",
+   "user": null,
+   "project": "feedbeef",
+   "default": "https",
+   "committish": "branch"
+  },
+  "https://user@gist.github.com/feedbeef.git": {
+   "type": "gist",
+   "user": null,
+   "project": "feedbeef",
+   "default": "https",
+   "auth": "user"
+  },
+  "https://user@gist.github.com/feedbeef.git#branch": {
+   "type": "gist",
+   "user": null,
+   "project": "feedbeef",
+   "default": "https",
+   "auth": "user",
+   "committish": "branch"
+  },
+  "https://user:password@gist.github.com/feedbeef.git": {
+   "type": "gist",
+   "user": null,
+   "project": "feedbeef",
+   "default": "https",
+   "auth": "user:password"
+  },
+  "https://user:password@gist.github.com/feedbeef.git#branch": {
+   "type": "gist",
+   "user": null,
+   "project": "feedbeef",
+   "default": "https",
+   "auth": "user:password",
+   "committish": "branch"
+  },
+  "https://:password@gist.github.com/feedbeef.git": {
+   "type": "gist",
+   "user": null,
+   "project": "feedbeef",
+   "default": "https",
+   "auth": ":password"
+  },
+  "https://:password@gist.github.com/feedbeef.git#branch": {
+   "type": "gist",
+   "user": null,
+   "project": "feedbeef",
+   "default": "https",
+   "auth": ":password",
+   "committish": "branch"
+  },
+  "https://gist.github.com/foo/feedbeef": {
+   "type": "gist",
+   "user": "foo",
+   "project": "feedbeef",
+   "default": "https"
+  },
+  "https://gist.github.com/foo/feedbeef#branch": {
+   "type": "gist",
+   "user": "foo",
+   "project": "feedbeef",
+   "default": "https",
+   "committish": "branch"
+  },
+  "https://user@gist.github.com/foo/feedbeef": {
+   "type": "gist",
+   "user": "foo",
+   "project": "feedbeef",
+   "default": "https",
+   "auth": "user"
+  },
+  "https://user@gist.github.com/foo/feedbeef#branch": {
+   "type": "gist",
+   "user": "foo",
+   "project": "feedbeef",
+   "default": "https",
+   "auth": "user",
+   "committish": "branch"
+  },
+  "https://user:password@gist.github.com/foo/feedbeef": {
+   "type": "gist",
+   "user": "foo",
+   "project": "feedbeef",
+   "default": "https",
+   "auth": "user:password"
+  },
+  "https://user:password@gist.github.com/foo/feedbeef#branch": {
+   "type": "gist",
+   "user": "foo",
+   "project": "feedbeef",
+   "default": "https",
+   "auth": "user:password",
+   "committish": "branch"
+  },
+  "https://:password@gist.github.com/foo/feedbeef": {
+   "type": "gist",
+   "user": "foo",
+   "project": "feedbeef",
+   "default": "https",
+   "auth": ":password"
+  },
+  "https://:password@gist.github.com/foo/feedbeef#branch": {
+   "type": "gist",
+   "user": "foo",
+   "project": "feedbeef",
+   "default": "https",
+   "auth": ":password",
+   "committish": "branch"
+  },
+  "https://gist.github.com/foo/feedbeef.git": {
+   "type": "gist",
+   "user": "foo",
+   "project": "feedbeef",
+   "default": "https"
+  },
+  "https://gist.github.com/foo/feedbeef.git#branch": {
+   "type": "gist",
+   "user": "foo",
+   "project": "feedbeef",
+   "default": "https",
+   "committish": "branch"
+  },
+  "https://user@gist.github.com/foo/feedbeef.git": {
+   "type": "gist",
+   "user": "foo",
+   "project": "feedbeef",
+   "default": "https",
+   "auth": "user"
+  },
+  "https://user@gist.github.com/foo/feedbeef.git#branch": {
+   "type": "gist",
+   "user": "foo",
+   "project": "feedbeef",
+   "default": "https",
+   "auth": "user",
+   "committish": "branch"
+  },
+  "https://user:password@gist.github.com/foo/feedbeef.git": {
+   "type": "gist",
+   "user": "foo",
+   "project": "feedbeef",
+   "default": "https",
+   "auth": "user:password"
+  },
+  "https://user:password@gist.github.com/foo/feedbeef.git#branch": {
+   "type": "gist",
+   "user": "foo",
+   "project": "feedbeef",
+   "default": "https",
+   "auth": "user:password",
+   "committish": "branch"
+  },
+  "https://:password@gist.github.com/foo/feedbeef.git": {
+   "type": "gist",
+   "user": "foo",
+   "project": "feedbeef",
+   "default": "https",
+   "auth": ":password"
+  },
+  "https://:password@gist.github.com/foo/feedbeef.git#branch": {
+   "type": "gist",
+   "user": "foo",
+   "project": "feedbeef",
+   "default": "https",
+   "auth": ":password",
+   "committish": "branch"
+  }
+ },
+ "github": {
+  "github:foo/bar": {
+   "type": "github",
+   "user": "foo",
+   "project": "bar",
+   "default": "shortcut"
+  },
+  "github:foo/bar#lk/br@nch.t#st:^1.0.0-pre.4": {
+   "type": "github",
+   "user": "foo",
+   "project": "bar",
+   "default": "shortcut",
+   "committish": "lk/br@nch.t#st:^1.0.0-pre.4"
+  },
+  "github:user@foo/bar": {
+   "type": "github",
+   "user": "foo",
+   "project": "bar",
+   "default": "shortcut",
+   "auth": null
+  },
+  "github:user@foo/bar#lk/br@nch.t#st:^1.0.0-pre.4": {
+   "type": "github",
+   "user": "foo",
+   "project": "bar",
+   "default": "shortcut",
+   "auth": null,
+   "committish": "lk/br@nch.t#st:^1.0.0-pre.4"
+  },
+  "github:user:password@foo/bar": {
+   "type": "github",
+   "user": "foo",
+   "project": "bar",
+   "default": "shortcut",
+   "auth": null
+  },
+  "github:user:password@foo/bar#lk/br@nch.t#st:^1.0.0-pre.4": {
+   "type": "github",
+   "user": "foo",
+   "project": "bar",
+   "default": "shortcut",
+   "auth": null,
+   "committish": "lk/br@nch.t#st:^1.0.0-pre.4"
+  },
+  "github::password@foo/bar": {
+   "type": "github",
+   "user": "foo",
+   "project": "bar",
+   "default": "shortcut",
+   "auth": null
+  },
+  "github::password@foo/bar#lk/br@nch.t#st:^1.0.0-pre.4": {
+   "type": "github",
+   "user": "foo",
+   "project": "bar",
+   "default": "shortcut",
+   "auth": null,
+   "committish": "lk/br@nch.t#st:^1.0.0-pre.4"
+  },
+  "github:foo/bar.git": {
+   "type": "github",
+   "user": "foo",
+   "project": "bar",
+   "default": "shortcut"
+  },
+  "github:foo/bar.git#lk/br@nch.t#st:^1.0.0-pre.4": {
+   "type": "github",
+   "user": "foo",
+   "project": "bar",
+   "default": "shortcut",
+   "committish": "lk/br@nch.t#st:^1.0.0-pre.4"
+  },
+  "github:user@foo/bar.git": {
+   "type": "github",
+   "user": "foo",
+   "project": "bar",
+   "default": "shortcut",
+   "auth": null
+  },
+  "github:user@foo/bar.git#lk/br@nch.t#st:^1.0.0-pre.4": {
+   "type": "github",
+   "user": "foo",
+   "project": "bar",
+   "default": "shortcut",
+   "auth": null,
+   "committish": "lk/br@nch.t#st:^1.0.0-pre.4"
+  },
+  "github:user:password@foo/bar.git": {
+   "type": "github",
+   "user": "foo",
+   "project": "bar",
+   "default": "shortcut",
+   "auth": null
+  },
+  "github:user:password@foo/bar.git#lk/br@nch.t#st:^1.0.0-pre.4": {
+   "type": "github",
+   "user": "foo",
+   "project": "bar",
+   "default": "shortcut",
+   "auth": null,
+   "committish": "lk/br@nch.t#st:^1.0.0-pre.4"
+  },
+  "github::password@foo/bar.git": {
+   "type": "github",
+   "user": "foo",
+   "project": "bar",
+   "default": "shortcut",
+   "auth": null
+  },
+  "github::password@foo/bar.git#lk/br@nch.t#st:^1.0.0-pre.4": {
+   "type": "github",
+   "user": "foo",
+   "project": "bar",
+   "default": "shortcut",
+   "auth": null,
+   "committish": "lk/br@nch.t#st:^1.0.0-pre.4"
+  },
+  "git://github.com/foo/bar": {
+   "type": "github",
+   "user": "foo",
+   "project": "bar",
+   "default": "git"
+  },
+  "git://github.com/foo/bar#lk/br@nch.t#st:^1.0.0-pre.4": {
+   "type": "github",
+   "user": "foo",
+   "project": "bar",
+   "default": "git",
+   "committish": "lk/br@nch.t#st:^1.0.0-pre.4"
+  },
+  "git://user@github.com/foo/bar": {
+   "type": "github",
+   "user": "foo",
+   "project": "bar",
+   "default": "git",
+   "auth": "user"
+  },
+  "git://user@github.com/foo/bar#lk/br@nch.t#st:^1.0.0-pre.4": {
+   "type": "github",
+   "user": "foo",
+   "project": "bar",
+   "default": "git",
+   "auth": "user",
+   "committish": "lk/br@nch.t#st:^1.0.0-pre.4"
+  },
+  "git://user:password@github.com/foo/bar": {
+   "type": "github",
+   "user": "foo",
+   "project": "bar",
+   "default": "git",
+   "auth": "user:password"
+  },
+  "git://user:password@github.com/foo/bar#lk/br@nch.t#st:^1.0.0-pre.4": {
+   "type": "github",
+   "user": "foo",
+   "project": "bar",
+   "default": "git",
+   "auth": "user:password",
+   "committish": "lk/br@nch.t#st:^1.0.0-pre.4"
+  },
+  "git://:password@github.com/foo/bar": {
+   "type": "github",
+   "user": "foo",
+   "project": "bar",
+   "default": "git",
+   "auth": ":password"
+  },
+  "git://:password@github.com/foo/bar#lk/br@nch.t#st:^1.0.0-pre.4": {
+   "type": "github",
+   "user": "foo",
+   "project": "bar",
+   "default": "git",
+   "auth": ":password",
+   "committish": "lk/br@nch.t#st:^1.0.0-pre.4"
+  },
+  "git://github.com/foo/bar.git": {
+   "type": "github",
+   "user": "foo",
+   "project": "bar",
+   "default": "git"
+  },
+  "git://github.com/foo/bar.git#lk/br@nch.t#st:^1.0.0-pre.4": {
+   "type": "github",
+   "user": "foo",
+   "project": "bar",
+   "default": "git",
+   "committish": "lk/br@nch.t#st:^1.0.0-pre.4"
+  },
+  "git://git@github.com/foo/bar.git": {
+   "type": "github",
+   "user": "foo",
+   "project": "bar",
+   "default": "git",
+   "auth": "git"
+  },
+  "git://git@github.com/foo/bar.git#lk/br@nch.t#st:^1.0.0-pre.4": {
+   "type": "github",
+   "user": "foo",
+   "project": "bar",
+   "default": "git",
+   "auth": "git",
+   "committish": "lk/br@nch.t#st:^1.0.0-pre.4"
+  },
+  "git://user:password@github.com/foo/bar.git": {
+   "type": "github",
+   "user": "foo",
+   "project": "bar",
+   "default": "git",
+   "auth": "user:password"
+  },
+  "git://user:password@github.com/foo/bar.git#lk/br@nch.t#st:^1.0.0-pre.4": {
+   "type": "github",
+   "user": "foo",
+   "project": "bar",
+   "default": "git",
+   "auth": "user:password",
+   "committish": "lk/br@nch.t#st:^1.0.0-pre.4"
+  },
+  "git://:password@github.com/foo/bar.git": {
+   "type": "github",
+   "user": "foo",
+   "project": "bar",
+   "default": "git",
+   "auth": ":password"
+  },
+  "git://:password@github.com/foo/bar.git#lk/br@nch.t#st:^1.0.0-pre.4": {
+   "type": "github",
+   "user": "foo",
+   "project": "bar",
+   "default": "git",
+   "auth": ":password",
+   "committish": "lk/br@nch.t#st:^1.0.0-pre.4"
+  },
+  "user@github.com:foo/bar": {
+   "type": "github",
+   "user": "foo",
+   "project": "bar",
+   "default": "sshurl",
+   "auth": null
+  },
+  "user@github.com:foo/bar#lk/br@nch.t#st:^1.0.0-pre.4": {
+   "type": "github",
+   "user": "foo",
+   "project": "bar",
+   "default": "sshurl",
+   "auth": null,
+   "committish": "lk/br@nch.t#st:^1.0.0-pre.4"
+  },
+  "user:password@github.com:foo/bar": {
+   "type": "github",
+   "user": "foo",
+   "project": "bar",
+   "default": "sshurl",
+   "auth": null
+  },
+  "user:password@github.com:foo/bar#lk/br@nch.t#st:^1.0.0-pre.4": {
+   "type": "github",
+   "user": "foo",
+   "project": "bar",
+   "default": "sshurl",
+   "auth": null,
+   "committish": "lk/br@nch.t#st:^1.0.0-pre.4"
+  },
+  ":password@github.com:foo/bar": {
+   "type": "github",
+   "user": "foo",
+   "project": "bar",
+   "default": "sshurl",
+   "auth": null
+  },
+  ":password@github.com:foo/bar#lk/br@nch.t#st:^1.0.0-pre.4": {
+   "type": "github",
+   "user": "foo",
+   "project": "bar",
+   "default": "sshurl",
+   "auth": null,
+   "committish": "lk/br@nch.t#st:^1.0.0-pre.4"
+  },
+  "user@github.com:foo/bar.git": {
+   "type": "github",
+   "user": "foo",
+   "project": "bar",
+   "default": "sshurl",
+   "auth": null
+  },
+  "user@github.com:foo/bar.git#lk/br@nch.t#st:^1.0.0-pre.4": {
+   "type": "github",
+   "user": "foo",
+   "project": "bar",
+   "default": "sshurl",
+   "auth": null,
+   "committish": "lk/br@nch.t#st:^1.0.0-pre.4"
+  },
+  "user:password@github.com:foo/bar.git": {
+   "type": "github",
+   "user": "foo",
+   "project": "bar",
+   "default": "sshurl",
+   "auth": null
+  },
+  "user:password@github.com:foo/bar.git#lk/br@nch.t#st:^1.0.0-pre.4": {
+   "type": "github",
+   "user": "foo",
+   "project": "bar",
+   "default": "sshurl",
+   "auth": null,
+   "committish": "lk/br@nch.t#st:^1.0.0-pre.4"
+  },
+  ":password@github.com:foo/bar.git": {
+   "type": "github",
+   "user": "foo",
+   "project": "bar",
+   "default": "sshurl",
+   "auth": null
+  },
+  ":password@github.com:foo/bar.git#lk/br@nch.t#st:^1.0.0-pre.4": {
+   "type": "github",
+   "user": "foo",
+   "project": "bar",
+   "default": "sshurl",
+   "auth": null,
+   "committish": "lk/br@nch.t#st:^1.0.0-pre.4"
+  },
+  "git+ssh://github.com:foo/bar": {
+   "type": "github",
+   "user": "foo",
+   "project": "bar",
+   "default": "sshurl"
+  },
+  "git+ssh://github.com:foo/bar#lk/br@nch.t#st:^1.0.0-pre.4": {
+   "type": "github",
+   "user": "foo",
+   "project": "bar",
+   "default": "sshurl",
+   "committish": "lk/br@nch.t#st:^1.0.0-pre.4"
+  },
+  "git+ssh://user@github.com:foo/bar": {
+   "type": "github",
+   "user": "foo",
+   "project": "bar",
+   "default": "sshurl",
+   "auth": null
+  },
+  "git+ssh://user@github.com:foo/bar#lk/br@nch.t#st:^1.0.0-pre.4": {
+   "type": "github",
+   "user": "foo",
+   "project": "bar",
+   "default": "sshurl",
+   "auth": null,
+   "committish": "lk/br@nch.t#st:^1.0.0-pre.4"
+  },
+  "git+ssh://user:password@github.com:foo/bar": {
+   "type": "github",
+   "user": "foo",
+   "project": "bar",
+   "default": "sshurl",
+   "auth": null
+  },
+  "git+ssh://user:password@github.com:foo/bar#lk/br@nch.t#st:^1.0.0-pre.4": {
+   "type": "github",
+   "user": "foo",
+   "project": "bar",
+   "default": "sshurl",
+   "auth": null,
+   "committish": "lk/br@nch.t#st:^1.0.0-pre.4"
+  },
+  "git+ssh://:password@github.com:foo/bar": {
+   "type": "github",
+   "user": "foo",
+   "project": "bar",
+   "default": "sshurl",
+   "auth": null
+  },
+  "git+ssh://:password@github.com:foo/bar#lk/br@nch.t#st:^1.0.0-pre.4": {
+   "type": "github",
+   "user": "foo",
+   "project": "bar",
+   "default": "sshurl",
+   "auth": null,
+   "committish": "lk/br@nch.t#st:^1.0.0-pre.4"
+  },
+  "git+ssh://github.com:foo/bar.git": {
+   "type": "github",
+   "user": "foo",
+   "project": "bar",
+   "default": "sshurl"
+  },
+  "git+ssh://github.com:foo/bar.git#lk/br@nch.t#st:^1.0.0-pre.4": {
+   "type": "github",
+   "user": "foo",
+   "project": "bar",
+   "default": "sshurl",
+   "committish": "lk/br@nch.t#st:^1.0.0-pre.4"
+  },
+  "git+ssh://user@github.com:foo/bar.git": {
+   "type": "github",
+   "user": "foo",
+   "project": "bar",
+   "default": "sshurl",
+   "auth": null
+  },
+  "git+ssh://user@github.com:foo/bar.git#lk/br@nch.t#st:^1.0.0-pre.4": {
+   "type": "github",
+   "user": "foo",
+   "project": "bar",
+   "default": "sshurl",
+   "auth": null,
+   "committish": "lk/br@nch.t#st:^1.0.0-pre.4"
+  },
+  "git+ssh://user:password@github.com:foo/bar.git": {
+   "type": "github",
+   "user": "foo",
+   "project": "bar",
+   "default": "sshurl",
+   "auth": null
+  },
+  "git+ssh://user:password@github.com:foo/bar.git#lk/br@nch.t#st:^1.0.0-pre.4": {
+   "type": "github",
+   "user": "foo",
+   "project": "bar",
+   "default": "sshurl",
+   "auth": null,
+   "committish": "lk/br@nch.t#st:^1.0.0-pre.4"
+  },
+  "git+ssh://:password@github.com:foo/bar.git": {
+   "type": "github",
+   "user": "foo",
+   "project": "bar",
+   "default": "sshurl",
+   "auth": null
+  },
+  "git+ssh://:password@github.com:foo/bar.git#lk/br@nch.t#st:^1.0.0-pre.4": {
+   "type": "github",
+   "user": "foo",
+   "project": "bar",
+   "default": "sshurl",
+   "auth": null,
+   "committish": "lk/br@nch.t#st:^1.0.0-pre.4"
+  },
+  "ssh://github.com:foo/bar": {
+   "type": "github",
+   "user": "foo",
+   "project": "bar",
+   "default": "sshurl"
+  },
+  "ssh://github.com:foo/bar#lk/br@nch.t#st:^1.0.0-pre.4": {
+   "type": "github",
+   "user": "foo",
+   "project": "bar",
+   "default": "sshurl",
+   "committish": "lk/br@nch.t#st:^1.0.0-pre.4"
+  },
+  "ssh://user@github.com:foo/bar": {
+   "type": "github",
+   "user": "foo",
+   "project": "bar",
+   "default": "sshurl",
+   "auth": null
+  },
+  "ssh://user@github.com:foo/bar#lk/br@nch.t#st:^1.0.0-pre.4": {
+   "type": "github",
+   "user": "foo",
+   "project": "bar",
+   "default": "sshurl",
+   "auth": null,
+   "committish": "lk/br@nch.t#st:^1.0.0-pre.4"
+  },
+  "ssh://user:password@github.com:foo/bar": {
+   "type": "github",
+   "user": "foo",
+   "project": "bar",
+   "default": "sshurl",
+   "auth": null
+  },
+  "ssh://user:password@github.com:foo/bar#lk/br@nch.t#st:^1.0.0-pre.4": {
+   "type": "github",
+   "user": "foo",
+   "project": "bar",
+   "default": "sshurl",
+   "auth": null,
+   "committish": "lk/br@nch.t#st:^1.0.0-pre.4"
+  },
+  "ssh://:password@github.com:foo/bar": {
+   "type": "github",
+   "user": "foo",
+   "project": "bar",
+   "default": "sshurl",
+   "auth": null
+  },
+  "ssh://:password@github.com:foo/bar#lk/br@nch.t#st:^1.0.0-pre.4": {
+   "type": "github",
+   "user": "foo",
+   "project": "bar",
+   "default": "sshurl",
+   "auth": null,
+   "committish": "lk/br@nch.t#st:^1.0.0-pre.4"
+  },
+  "ssh://github.com:foo/bar.git": {
+   "type": "github",
+   "user": "foo",
+   "project": "bar",
+   "default": "sshurl"
+  },
+  "ssh://github.com:foo/bar.git#lk/br@nch.t#st:^1.0.0-pre.4": {
+   "type": "github",
+   "user": "foo",
+   "project": "bar",
+   "default": "sshurl",
+   "committish": "lk/br@nch.t#st:^1.0.0-pre.4"
+  },
+  "ssh://user@github.com:foo/bar.git": {
+   "type": "github",
+   "user": "foo",
+   "project": "bar",
+   "default": "sshurl",
+   "auth": null
+  },
+  "ssh://user@github.com:foo/bar.git#lk/br@nch.t#st:^1.0.0-pre.4": {
+   "type": "github",
+   "user": "foo",
+   "project": "bar",
+   "default": "sshurl",
+   "auth": null,
+   "committish": "lk/br@nch.t#st:^1.0.0-pre.4"
+  },
+  "ssh://user:password@github.com:foo/bar.git": {
+   "type": "github",
+   "user": "foo",
+   "project": "bar",
+   "default": "sshurl",
+   "auth": null
+  },
+  "ssh://user:password@github.com:foo/bar.git#lk/br@nch.t#st:^1.0.0-pre.4": {
+   "type": "github",
+   "user": "foo",
+   "project": "bar",
+   "default": "sshurl",
+   "auth": null,
+   "committish": "lk/br@nch.t#st:^1.0.0-pre.4"
+  },
+  "ssh://:password@github.com:foo/bar.git": {
+   "type": "github",
+   "user": "foo",
+   "project": "bar",
+   "default": "sshurl",
+   "auth": null
+  },
+  "ssh://:password@github.com:foo/bar.git#lk/br@nch.t#st:^1.0.0-pre.4": {
+   "type": "github",
+   "user": "foo",
+   "project": "bar",
+   "default": "sshurl",
+   "auth": null,
+   "committish": "lk/br@nch.t#st:^1.0.0-pre.4"
+  },
+  "git+https://github.com/foo/bar": {
+   "type": "github",
+   "user": "foo",
+   "project": "bar",
+   "default": "https"
+  },
+  "git+https://github.com/foo/bar#lk/br@nch.t#st:^1.0.0-pre.4": {
+   "type": "github",
+   "user": "foo",
+   "project": "bar",
+   "default": "https",
+   "committish": "lk/br@nch.t#st:^1.0.0-pre.4"
+  },
+  "git+https://user@github.com/foo/bar": {
+   "type": "github",
+   "user": "foo",
+   "project": "bar",
+   "default": "https",
+   "auth": "user"
+  },
+  "git+https://user@github.com/foo/bar#lk/br@nch.t#st:^1.0.0-pre.4": {
+   "type": "github",
+   "user": "foo",
+   "project": "bar",
+   "default": "https",
+   "auth": "user",
+   "committish": "lk/br@nch.t#st:^1.0.0-pre.4"
+  },
+  "git+https://user:password@github.com/foo/bar": {
+   "type": "github",
+   "user": "foo",
+   "project": "bar",
+   "default": "https",
+   "auth": "user:password"
+  },
+  "git+https://user:password@github.com/foo/bar#lk/br@nch.t#st:^1.0.0-pre.4": {
+   "type": "github",
+   "user": "foo",
+   "project": "bar",
+   "default": "https",
+   "auth": "user:password",
+   "committish": "lk/br@nch.t#st:^1.0.0-pre.4"
+  },
+  "git+https://:password@github.com/foo/bar": {
+   "type": "github",
+   "user": "foo",
+   "project": "bar",
+   "default": "https",
+   "auth": ":password"
+  },
+  "git+https://:password@github.com/foo/bar#lk/br@nch.t#st:^1.0.0-pre.4": {
+   "type": "github",
+   "user": "foo",
+   "project": "bar",
+   "default": "https",
+   "auth": ":password",
+   "committish": "lk/br@nch.t#st:^1.0.0-pre.4"
+  },
+  "git+https://github.com/foo/bar.git": {
+   "type": "github",
+   "user": "foo",
+   "project": "bar",
+   "default": "https"
+  },
+  "git+https://github.com/foo/bar.git#lk/br@nch.t#st:^1.0.0-pre.4": {
+   "type": "github",
+   "user": "foo",
+   "project": "bar",
+   "default": "https",
+   "committish": "lk/br@nch.t#st:^1.0.0-pre.4"
+  },
+  "git+https://user@github.com/foo/bar.git": {
+   "type": "github",
+   "user": "foo",
+   "project": "bar",
+   "default": "https",
+   "auth": "user"
+  },
+  "git+https://user@github.com/foo/bar.git#lk/br@nch.t#st:^1.0.0-pre.4": {
+   "type": "github",
+   "user": "foo",
+   "project": "bar",
+   "default": "https",
+   "auth": "user",
+   "committish": "lk/br@nch.t#st:^1.0.0-pre.4"
+  },
+  "git+https://user:password@github.com/foo/bar.git": {
+   "type": "github",
+   "user": "foo",
+   "project": "bar",
+   "default": "https",
+   "auth": "user:password"
+  },
+  "git+https://user:password@github.com/foo/bar.git#lk/br@nch.t#st:^1.0.0-pre.4": {
+   "type": "github",
+   "user": "foo",
+   "project": "bar",
+   "default": "https",
+   "auth": "user:password",
+   "committish": "lk/br@nch.t#st:^1.0.0-pre.4"
+  },
+  "git+https://:password@github.com/foo/bar.git": {
+   "type": "github",
+   "user": "foo",
+   "project": "bar",
+   "default": "https",
+   "auth": ":password"
+  },
+  "git+https://:password@github.com/foo/bar.git#lk/br@nch.t#st:^1.0.0-pre.4": {
+   "type": "github",
+   "user": "foo",
+   "project": "bar",
+   "default": "https",
+   "auth": ":password",
+   "committish": "lk/br@nch.t#st:^1.0.0-pre.4"
+  },
+  "https://github.com/foo/bar": {
+   "type": "github",
+   "user": "foo",
+   "project": "bar",
+   "default": "https"
+  },
+  "https://github.com/foo/bar#lk/br@nch.t#st:^1.0.0-pre.4": {
+   "type": "github",
+   "user": "foo",
+   "project": "bar",
+   "default": "https",
+   "committish": "lk/br@nch.t#st:^1.0.0-pre.4"
+  },
+  "https://user@github.com/foo/bar": {
+   "type": "github",
+   "user": "foo",
+   "project": "bar",
+   "default": "https",
+   "auth": "user"
+  },
+  "https://user@github.com/foo/bar#lk/br@nch.t#st:^1.0.0-pre.4": {
+   "type": "github",
+   "user": "foo",
+   "project": "bar",
+   "default": "https",
+   "auth": "user",
+   "committish": "lk/br@nch.t#st:^1.0.0-pre.4"
+  },
+  "https://user:password@github.com/foo/bar": {
+   "type": "github",
+   "user": "foo",
+   "project": "bar",
+   "default": "https",
+   "auth": "user:password"
+  },
+  "https://user:password@github.com/foo/bar#lk/br@nch.t#st:^1.0.0-pre.4": {
+   "type": "github",
+   "user": "foo",
+   "project": "bar",
+   "default": "https",
+   "auth": "user:password",
+   "committish": "lk/br@nch.t#st:^1.0.0-pre.4"
+  },
+  "https://:password@github.com/foo/bar": {
+   "type": "github",
+   "user": "foo",
+   "project": "bar",
+   "default": "https",
+   "auth": ":password"
+  },
+  "https://:password@github.com/foo/bar#lk/br@nch.t#st:^1.0.0-pre.4": {
+   "type": "github",
+   "user": "foo",
+   "project": "bar",
+   "default": "https",
+   "auth": ":password",
+   "committish": "lk/br@nch.t#st:^1.0.0-pre.4"
+  },
+  "https://github.com/foo/bar.git": {
+   "type": "github",
+   "user": "foo",
+   "project": "bar",
+   "default": "https"
+  },
+  "https://github.com/foo/bar.git#lk/br@nch.t#st:^1.0.0-pre.4": {
+   "type": "github",
+   "user": "foo",
+   "project": "bar",
+   "default": "https",
+   "committish": "lk/br@nch.t#st:^1.0.0-pre.4"
+  },
+  "https://user@github.com/foo/bar.git": {
+   "type": "github",
+   "user": "foo",
+   "project": "bar",
+   "default": "https",
+   "auth": "user"
+  },
+  "https://user@github.com/foo/bar.git#lk/br@nch.t#st:^1.0.0-pre.4": {
+   "type": "github",
+   "user": "foo",
+   "project": "bar",
+   "default": "https",
+   "auth": "user",
+   "committish": "lk/br@nch.t#st:^1.0.0-pre.4"
+  },
+  "https://user:password@github.com/foo/bar.git": {
+   "type": "github",
+   "user": "foo",
+   "project": "bar",
+   "default": "https",
+   "auth": "user:password"
+  },
+  "https://user:password@github.com/foo/bar.git#lk/br@nch.t#st:^1.0.0-pre.4": {
+   "type": "github",
+   "user": "foo",
+   "project": "bar",
+   "default": "https",
+   "auth": "user:password",
+   "committish": "lk/br@nch.t#st:^1.0.0-pre.4"
+  },
+  "https://:password@github.com/foo/bar.git": {
+   "type": "github",
+   "user": "foo",
+   "project": "bar",
+   "default": "https",
+   "auth": ":password"
+  },
+  "https://:password@github.com/foo/bar.git#lk/br@nch.t#st:^1.0.0-pre.4": {
+   "type": "github",
+   "user": "foo",
+   "project": "bar",
+   "default": "https",
+   "auth": ":password",
+   "committish": "lk/br@nch.t#st:^1.0.0-pre.4"
+  },
+  "https://www.github.com/foo/bar": {
+   "type": "github",
+   "user": "foo",
+   "project": "bar",
+   "default": "https"
+  },
+  "foo/bar#branch with space": {
+   "type": "github",
+   "user": "foo",
+   "project": "bar",
+   "default": "shortcut",
+   "committish": "branch with space"
+  },
+  "foo/bar#branch:with:colons": {
+   "type": "github",
+   "user": "foo",
+   "project": "bar",
+   "default": "shortcut",
+   "committish": "branch:with:colons"
+  },
+  "https://github.com/foo/bar/tree/branch": {
+   "type": "github",
+   "user": "foo",
+   "project": "bar",
+   "default": "https",
+   "committish": "branch"
+  },
+  "user..blerg--/..foo-js# . . . . . some . tags / / /": {
+   "type": "github",
+   "user": "user..blerg--",
+   "project": "..foo-js",
+   "default": "shortcut",
+   "committish": " . . . . . some . tags / / /"
+  }
+ },
+ "gitlab": {
+  "gitlab:foo/bar": {
+   "type": "gitlab",
+   "user": "foo",
+   "project": "bar",
+   "default": "shortcut"
+  },
+  "gitlab:foo/bar#branch": {
+   "type": "gitlab",
+   "user": "foo",
+   "project": "bar",
+   "default": "shortcut",
+   "committish": "branch"
+  },
+  "gitlab:user@foo/bar": {
+   "type": "gitlab",
+   "user": "foo",
+   "project": "bar",
+   "default": "shortcut",
+   "auth": null
+  },
+  "gitlab:user@foo/bar#branch": {
+   "type": "gitlab",
+   "user": "foo",
+   "project": "bar",
+   "default": "shortcut",
+   "auth": null,
+   "committish": "branch"
+  },
+  "gitlab:user:password@foo/bar": {
+   "type": "gitlab",
+   "user": "foo",
+   "project": "bar",
+   "default": "shortcut",
+   "auth": null
+  },
+  "gitlab:user:password@foo/bar#branch": {
+   "type": "gitlab",
+   "user": "foo",
+   "project": "bar",
+   "default": "shortcut",
+   "auth": null,
+   "committish": "branch"
+  },
+  "gitlab::password@foo/bar": {
+   "type": "gitlab",
+   "user": "foo",
+   "project": "bar",
+   "default": "shortcut",
+   "auth": null
+  },
+  "gitlab::password@foo/bar#branch": {
+   "type": "gitlab",
+   "user": "foo",
+   "project": "bar",
+   "default": "shortcut",
+   "auth": null,
+   "committish": "branch"
+  },
+  "gitlab:foo/bar.git": {
+   "type": "gitlab",
+   "user": "foo",
+   "project": "bar",
+   "default": "shortcut"
+  },
+  "gitlab:foo/bar.git#branch": {
+   "type": "gitlab",
+   "user": "foo",
+   "project": "bar",
+   "default": "shortcut",
+   "committish": "branch"
+  },
+  "gitlab:user@foo/bar.git": {
+   "type": "gitlab",
+   "user": "foo",
+   "project": "bar",
+   "default": "shortcut",
+   "auth": null
+  },
+  "gitlab:user@foo/bar.git#branch": {
+   "type": "gitlab",
+   "user": "foo",
+   "project": "bar",
+   "default": "shortcut",
+   "auth": null,
+   "committish": "branch"
+  },
+  "gitlab:user:password@foo/bar.git": {
+   "type": "gitlab",
+   "user": "foo",
+   "project": "bar",
+   "default": "shortcut",
+   "auth": null
+  },
+  "gitlab:user:password@foo/bar.git#branch": {
+   "type": "gitlab",
+   "user": "foo",
+   "project": "bar",
+   "default": "shortcut",
+   "auth": null,
+   "committish": "branch"
+  },
+  "gitlab::password@foo/bar.git": {
+   "type": "gitlab",
+   "user": "foo",
+   "project": "bar",
+   "default": "shortcut",
+   "auth": null
+  },
+  "gitlab::password@foo/bar.git#branch": {
+   "type": "gitlab",
+   "user": "foo",
+   "project": "bar",
+   "default": "shortcut",
+   "auth": null,
+   "committish": "branch"
+  },
+  "gitlab:foo/bar/baz": {
+   "type": "gitlab",
+   "user": "foo/bar",
+   "project": "baz",
+   "default": "shortcut"
+  },
+  "gitlab:foo/bar/baz#branch": {
+   "type": "gitlab",
+   "user": "foo/bar",
+   "project": "baz",
+   "default": "shortcut",
+   "committish": "branch"
+  },
+  "gitlab:user@foo/bar/baz": {
+   "type": "gitlab",
+   "user": "foo/bar",
+   "project": "baz",
+   "default": "shortcut",
+   "auth": null
+  },
+  "gitlab:user@foo/bar/baz#branch": {
+   "type": "gitlab",
+   "user": "foo/bar",
+   "project": "baz",
+   "default": "shortcut",
+   "auth": null,
+   "committish": "branch"
+  },
+  "gitlab:user:password@foo/bar/baz": {
+   "type": "gitlab",
+   "user": "foo/bar",
+   "project": "baz",
+   "default": "shortcut",
+   "auth": null
+  },
+  "gitlab:user:password@foo/bar/baz#branch": {
+   "type": "gitlab",
+   "user": "foo/bar",
+   "project": "baz",
+   "default": "shortcut",
+   "auth": null,
+   "committish": "branch"
+  },
+  "gitlab::password@foo/bar/baz": {
+   "type": "gitlab",
+   "user": "foo/bar",
+   "project": "baz",
+   "default": "shortcut",
+   "auth": null
+  },
+  "gitlab::password@foo/bar/baz#branch": {
+   "type": "gitlab",
+   "user": "foo/bar",
+   "project": "baz",
+   "default": "shortcut",
+   "auth": null,
+   "committish": "branch"
+  },
+  "gitlab:foo/bar/baz.git": {
+   "type": "gitlab",
+   "user": "foo/bar",
+   "project": "baz",
+   "default": "shortcut"
+  },
+  "gitlab:foo/bar/baz.git#branch": {
+   "type": "gitlab",
+   "user": "foo/bar",
+   "project": "baz",
+   "default": "shortcut",
+   "committish": "branch"
+  },
+  "gitlab:user@foo/bar/baz.git": {
+   "type": "gitlab",
+   "user": "foo/bar",
+   "project": "baz",
+   "default": "shortcut",
+   "auth": null
+  },
+  "gitlab:user@foo/bar/baz.git#branch": {
+   "type": "gitlab",
+   "user": "foo/bar",
+   "project": "baz",
+   "default": "shortcut",
+   "auth": null,
+   "committish": "branch"
+  },
+  "gitlab:user:password@foo/bar/baz.git": {
+   "type": "gitlab",
+   "user": "foo/bar",
+   "project": "baz",
+   "default": "shortcut",
+   "auth": null
+  },
+  "gitlab:user:password@foo/bar/baz.git#branch": {
+   "type": "gitlab",
+   "user": "foo/bar",
+   "project": "baz",
+   "default": "shortcut",
+   "auth": null,
+   "committish": "branch"
+  },
+  "gitlab::password@foo/bar/baz.git": {
+   "type": "gitlab",
+   "user": "foo/bar",
+   "project": "baz",
+   "default": "shortcut",
+   "auth": null
+  },
+  "gitlab::password@foo/bar/baz.git#branch": {
+   "type": "gitlab",
+   "user": "foo/bar",
+   "project": "baz",
+   "default": "shortcut",
+   "auth": null,
+   "committish": "branch"
+  },
+  "user@gitlab.com:foo/bar": {
+   "type": "gitlab",
+   "user": "foo",
+   "project": "bar",
+   "default": "sshurl",
+   "auth": null
+  },
+  "user@gitlab.com:foo/bar#branch": {
+   "type": "gitlab",
+   "user": "foo",
+   "project": "bar",
+   "default": "sshurl",
+   "auth": null,
+   "committish": "branch"
+  },
+  "user:password@gitlab.com:foo/bar": {
+   "type": "gitlab",
+   "user": "foo",
+   "project": "bar",
+   "default": "sshurl",
+   "auth": null
+  },
+  "user:password@gitlab.com:foo/bar#branch": {
+   "type": "gitlab",
+   "user": "foo",
+   "project": "bar",
+   "default": "sshurl",
+   "auth": null,
+   "committish": "branch"
+  },
+  ":password@gitlab.com:foo/bar": {
+   "type": "gitlab",
+   "user": "foo",
+   "project": "bar",
+   "default": "sshurl",
+   "auth": null
+  },
+  ":password@gitlab.com:foo/bar#branch": {
+   "type": "gitlab",
+   "user": "foo",
+   "project": "bar",
+   "default": "sshurl",
+   "auth": null,
+   "committish": "branch"
+  },
+  "user@gitlab.com:foo/bar.git": {
+   "type": "gitlab",
+   "user": "foo",
+   "project": "bar",
+   "default": "sshurl",
+   "auth": null
+  },
+  "user@gitlab.com:foo/bar.git#branch": {
+   "type": "gitlab",
+   "user": "foo",
+   "project": "bar",
+   "default": "sshurl",
+   "auth": null,
+   "committish": "branch"
+  },
+  "user:password@gitlab.com:foo/bar.git": {
+   "type": "gitlab",
+   "user": "foo",
+   "project": "bar",
+   "default": "sshurl",
+   "auth": null
+  },
+  "user:password@gitlab.com:foo/bar.git#branch": {
+   "type": "gitlab",
+   "user": "foo",
+   "project": "bar",
+   "default": "sshurl",
+   "auth": null,
+   "committish": "branch"
+  },
+  ":password@gitlab.com:foo/bar.git": {
+   "type": "gitlab",
+   "user": "foo",
+   "project": "bar",
+   "default": "sshurl",
+   "auth": null
+  },
+  ":password@gitlab.com:foo/bar.git#branch": {
+   "type": "gitlab",
+   "user": "foo",
+   "project": "bar",
+   "default": "sshurl",
+   "auth": null,
+   "committish": "branch"
+  },
+  "user@gitlab.com:foo/bar/baz": {
+   "type": "gitlab",
+   "user": "foo/bar",
+   "project": "baz",
+   "default": "sshurl",
+   "auth": null
+  },
+  "user@gitlab.com:foo/bar/baz#branch": {
+   "type": "gitlab",
+   "user": "foo/bar",
+   "project": "baz",
+   "default": "sshurl",
+   "auth": null,
+   "committish": "branch"
+  },
+  "user:password@gitlab.com:foo/bar/baz": {
+   "type": "gitlab",
+   "user": "foo/bar",
+   "project": "baz",
+   "default": "sshurl",
+   "auth": null
+  },
+  "user:password@gitlab.com:foo/bar/baz#branch": {
+   "type": "gitlab",
+   "user": "foo/bar",
+   "project": "baz",
+   "default": "sshurl",
+   "auth": null,
+   "committish": "branch"
+  },
+  ":password@gitlab.com:foo/bar/baz": {
+   "type": "gitlab",
+   "user": "foo/bar",
+   "project": "baz",
+   "default": "sshurl",
+   "auth": null
+  },
+  ":password@gitlab.com:foo/bar/baz#branch": {
+   "type": "gitlab",
+   "user": "foo/bar",
+   "project": "baz",
+   "default": "sshurl",
+   "auth": null,
+   "committish": "branch"
+  },
+  "user@gitlab.com:foo/bar/baz.git": {
+   "type": "gitlab",
+   "user": "foo/bar",
+   "project": "baz",
+   "default": "sshurl",
+   "auth": null
+  },
+  "user@gitlab.com:foo/bar/baz.git#branch": {
+   "type": "gitlab",
+   "user": "foo/bar",
+   "project": "baz",
+   "default": "sshurl",
+   "auth": null,
+   "committish": "branch"
+  },
+  "user:password@gitlab.com:foo/bar/baz.git": {
+   "type": "gitlab",
+   "user": "foo/bar",
+   "project": "baz",
+   "default": "sshurl",
+   "auth": null
+  },
+  "user:password@gitlab.com:foo/bar/baz.git#branch": {
+   "type": "gitlab",
+   "user": "foo/bar",
+   "project": "baz",
+   "default": "sshurl",
+   "auth": null,
+   "committish": "branch"
+  },
+  ":password@gitlab.com:foo/bar/baz.git": {
+   "type": "gitlab",
+   "user": "foo/bar",
+   "project": "baz",
+   "default": "sshurl",
+   "auth": null
+  },
+  ":password@gitlab.com:foo/bar/baz.git#branch": {
+   "type": "gitlab",
+   "user": "foo/bar",
+   "project": "baz",
+   "default": "sshurl",
+   "auth": null,
+   "committish": "branch"
+  },
+  "git+ssh://gitlab.com:foo/bar": {
+   "type": "gitlab",
+   "user": "foo",
+   "project": "bar",
+   "default": "sshurl"
+  },
+  "git+ssh://gitlab.com:foo/bar#branch": {
+   "type": "gitlab",
+   "user": "foo",
+   "project": "bar",
+   "default": "sshurl",
+   "committish": "branch"
+  },
+  "git+ssh://user@gitlab.com:foo/bar": {
+   "type": "gitlab",
+   "user": "foo",
+   "project": "bar",
+   "default": "sshurl",
+   "auth": null
+  },
+  "git+ssh://user@gitlab.com:foo/bar#branch": {
+   "type": "gitlab",
+   "user": "foo",
+   "project": "bar",
+   "default": "sshurl",
+   "auth": null,
+   "committish": "branch"
+  },
+  "git+ssh://user:password@gitlab.com:foo/bar": {
+   "type": "gitlab",
+   "user": "foo",
+   "project": "bar",
+   "default": "sshurl",
+   "auth": null
+  },
+  "git+ssh://user:password@gitlab.com:foo/bar#branch": {
+   "type": "gitlab",
+   "user": "foo",
+   "project": "bar",
+   "default": "sshurl",
+   "auth": null,
+   "committish": "branch"
+  },
+  "git+ssh://:password@gitlab.com:foo/bar": {
+   "type": "gitlab",
+   "user": "foo",
+   "project": "bar",
+   "default": "sshurl",
+   "auth": null
+  },
+  "git+ssh://:password@gitlab.com:foo/bar#branch": {
+   "type": "gitlab",
+   "user": "foo",
+   "project": "bar",
+   "default": "sshurl",
+   "auth": null,
+   "committish": "branch"
+  },
+  "git+ssh://gitlab.com:foo/bar.git": {
+   "type": "gitlab",
+   "user": "foo",
+   "project": "bar",
+   "default": "sshurl"
+  },
+  "git+ssh://gitlab.com:foo/bar.git#branch": {
+   "type": "gitlab",
+   "user": "foo",
+   "project": "bar",
+   "default": "sshurl",
+   "committish": "branch"
+  },
+  "git+ssh://user@gitlab.com:foo/bar.git": {
+   "type": "gitlab",
+   "user": "foo",
+   "project": "bar",
+   "default": "sshurl",
+   "auth": null
+  },
+  "git+ssh://user@gitlab.com:foo/bar.git#branch": {
+   "type": "gitlab",
+   "user": "foo",
+   "project": "bar",
+   "default": "sshurl",
+   "auth": null,
+   "committish": "branch"
+  },
+  "git+ssh://user:password@gitlab.com:foo/bar.git": {
+   "type": "gitlab",
+   "user": "foo",
+   "project": "bar",
+   "default": "sshurl",
+   "auth": null
+  },
+  "git+ssh://user:password@gitlab.com:foo/bar.git#branch": {
+   "type": "gitlab",
+   "user": "foo",
+   "project": "bar",
+   "default": "sshurl",
+   "auth": null,
+   "committish": "branch"
+  },
+  "git+ssh://:password@gitlab.com:foo/bar.git": {
+   "type": "gitlab",
+   "user": "foo",
+   "project": "bar",
+   "default": "sshurl",
+   "auth": null
+  },
+  "git+ssh://:password@gitlab.com:foo/bar.git#branch": {
+   "type": "gitlab",
+   "user": "foo",
+   "project": "bar",
+   "default": "sshurl",
+   "auth": null,
+   "committish": "branch"
+  },
+  "git+ssh://gitlab.com:foo/bar/baz": {
+   "type": "gitlab",
+   "user": "foo/bar",
+   "project": "baz",
+   "default": "sshurl"
+  },
+  "git+ssh://gitlab.com:foo/bar/baz#branch": {
+   "type": "gitlab",
+   "user": "foo/bar",
+   "project": "baz",
+   "default": "sshurl",
+   "committish": "branch"
+  },
+  "git+ssh://user@gitlab.com:foo/bar/baz": {
+   "type": "gitlab",
+   "user": "foo/bar",
+   "project": "baz",
+   "default": "sshurl",
+   "auth": null
+  },
+  "git+ssh://user@gitlab.com:foo/bar/baz#branch": {
+   "type": "gitlab",
+   "user": "foo/bar",
+   "project": "baz",
+   "default": "sshurl",
+   "auth": null,
+   "committish": "branch"
+  },
+  "git+ssh://user:password@gitlab.com:foo/bar/baz": {
+   "type": "gitlab",
+   "user": "foo/bar",
+   "project": "baz",
+   "default": "sshurl",
+   "auth": null
+  },
+  "git+ssh://user:password@gitlab.com:foo/bar/baz#branch": {
+   "type": "gitlab",
+   "user": "foo/bar",
+   "project": "baz",
+   "default": "sshurl",
+   "auth": null,
+   "committish": "branch"
+  },
+  "git+ssh://:password@gitlab.com:foo/bar/baz": {
+   "type": "gitlab",
+   "user": "foo/bar",
+   "project": "baz",
+   "default": "sshurl",
+   "auth": null
+  },
+  "git+ssh://:password@gitlab.com:foo/bar/baz#branch": {
+   "type": "gitlab",
+   "user": "foo/bar",
+   "project": "baz",
+   "default": "sshurl",
+   "auth": null,
+   "committish": "branch"
+  },
+  "git+ssh://gitlab.com:foo/bar/baz.git": {
+   "type": "gitlab",
+   "user": "foo/bar",
+   "project": "baz",
+   "default": "sshurl"
+  },
+  "git+ssh://gitlab.com:foo/bar/baz.git#branch": {
+   "type": "gitlab",
+   "user": "foo/bar",
+   "project": "baz",
+   "default": "sshurl",
+   "committish": "branch"
+  },
+  "git+ssh://user@gitlab.com:foo/bar/baz.git": {
+   "type": "gitlab",
+   "user": "foo/bar",
+   "project": "baz",
+   "default": "sshurl",
+   "auth": null
+  },
+  "git+ssh://user@gitlab.com:foo/bar/baz.git#branch": {
+   "type": "gitlab",
+   "user": "foo/bar",
+   "project": "baz",
+   "default": "sshurl",
+   "auth": null,
+   "committish": "branch"
+  },
+  "git+ssh://user:password@gitlab.com:foo/bar/baz.git": {
+   "type": "gitlab",
+   "user": "foo/bar",
+   "project": "baz",
+   "default": "sshurl",
+   "auth": null
+  },
+  "git+ssh://user:password@gitlab.com:foo/bar/baz.git#branch": {
+   "type": "gitlab",
+   "user": "foo/bar",
+   "project": "baz",
+   "default": "sshurl",
+   "auth": null,
+   "committish": "branch"
+  },
+  "git+ssh://:password@gitlab.com:foo/bar/baz.git": {
+   "type": "gitlab",
+   "user": "foo/bar",
+   "project": "baz",
+   "default": "sshurl",
+   "auth": null
+  },
+  "git+ssh://:password@gitlab.com:foo/bar/baz.git#branch": {
+   "type": "gitlab",
+   "user": "foo/bar",
+   "project": "baz",
+   "default": "sshurl",
+   "auth": null,
+   "committish": "branch"
+  },
+  "ssh://gitlab.com:foo/bar": {
+   "type": "gitlab",
+   "user": "foo",
+   "project": "bar",
+   "default": "sshurl"
+  },
+  "ssh://gitlab.com:foo/bar#branch": {
+   "type": "gitlab",
+   "user": "foo",
+   "project": "bar",
+   "default": "sshurl",
+   "committish": "branch"
+  },
+  "ssh://user@gitlab.com:foo/bar": {
+   "type": "gitlab",
+   "user": "foo",
+   "project": "bar",
+   "default": "sshurl",
+   "auth": null
+  },
+  "ssh://user@gitlab.com:foo/bar#branch": {
+   "type": "gitlab",
+   "user": "foo",
+   "project": "bar",
+   "default": "sshurl",
+   "auth": null,
+   "committish": "branch"
+  },
+  "ssh://user:password@gitlab.com:foo/bar": {
+   "type": "gitlab",
+   "user": "foo",
+   "project": "bar",
+   "default": "sshurl",
+   "auth": null
+  },
+  "ssh://user:password@gitlab.com:foo/bar#branch": {
+   "type": "gitlab",
+   "user": "foo",
+   "project": "bar",
+   "default": "sshurl",
+   "auth": null,
+   "committish": "branch"
+  },
+  "ssh://:password@gitlab.com:foo/bar": {
+   "type": "gitlab",
+   "user": "foo",
+   "project": "bar",
+   "default": "sshurl",
+   "auth": null
+  },
+  "ssh://:password@gitlab.com:foo/bar#branch": {
+   "type": "gitlab",
+   "user": "foo",
+   "project": "bar",
+   "default": "sshurl",
+   "auth": null,
+   "committish": "branch"
+  },
+  "ssh://gitlab.com:foo/bar.git": {
+   "type": "gitlab",
+   "user": "foo",
+   "project": "bar",
+   "default": "sshurl"
+  },
+  "ssh://gitlab.com:foo/bar.git#branch": {
+   "type": "gitlab",
+   "user": "foo",
+   "project": "bar",
+   "default": "sshurl",
+   "committish": "branch"
+  },
+  "ssh://user@gitlab.com:foo/bar.git": {
+   "type": "gitlab",
+   "user": "foo",
+   "project": "bar",
+   "default": "sshurl",
+   "auth": null
+  },
+  "ssh://user@gitlab.com:foo/bar.git#branch": {
+   "type": "gitlab",
+   "user": "foo",
+   "project": "bar",
+   "default": "sshurl",
+   "auth": null,
+   "committish": "branch"
+  },
+  "ssh://user:password@gitlab.com:foo/bar.git": {
+   "type": "gitlab",
+   "user": "foo",
+   "project": "bar",
+   "default": "sshurl",
+   "auth": null
+  },
+  "ssh://user:password@gitlab.com:foo/bar.git#branch": {
+   "type": "gitlab",
+   "user": "foo",
+   "project": "bar",
+   "default": "sshurl",
+   "auth": null,
+   "committish": "branch"
+  },
+  "ssh://:password@gitlab.com:foo/bar.git": {
+   "type": "gitlab",
+   "user": "foo",
+   "project": "bar",
+   "default": "sshurl",
+   "auth": null
+  },
+  "ssh://:password@gitlab.com:foo/bar.git#branch": {
+   "type": "gitlab",
+   "user": "foo",
+   "project": "bar",
+   "default": "sshurl",
+   "auth": null,
+   "committish": "branch"
+  },
+  "ssh://gitlab.com:foo/bar/baz": {
+   "type": "gitlab",
+   "user": "foo/bar",
+   "project": "baz",
+   "default": "sshurl"
+  },
+  "ssh://gitlab.com:foo/bar/baz#branch": {
+   "type": "gitlab",
+   "user": "foo/bar",
+   "project": "baz",
+   "default": "sshurl",
+   "committish": "branch"
+  },
+  "ssh://user@gitlab.com:foo/bar/baz": {
+   "type": "gitlab",
+   "user": "foo/bar",
+   "project": "baz",
+   "default": "sshurl",
+   "auth": null
+  },
+  "ssh://user@gitlab.com:foo/bar/baz#branch": {
+   "type": "gitlab",
+   "user": "foo/bar",
+   "project": "baz",
+   "default": "sshurl",
+   "auth": null,
+   "committish": "branch"
+  },
+  "ssh://user:password@gitlab.com:foo/bar/baz": {
+   "type": "gitlab",
+   "user": "foo/bar",
+   "project": "baz",
+   "default": "sshurl",
+   "auth": null
+  },
+  "ssh://user:password@gitlab.com:foo/bar/baz#branch": {
+   "type": "gitlab",
+   "user": "foo/bar",
+   "project": "baz",
+   "default": "sshurl",
+   "auth": null,
+   "committish": "branch"
+  },
+  "ssh://:password@gitlab.com:foo/bar/baz": {
+   "type": "gitlab",
+   "user": "foo/bar",
+   "project": "baz",
+   "default": "sshurl",
+   "auth": null
+  },
+  "ssh://:password@gitlab.com:foo/bar/baz#branch": {
+   "type": "gitlab",
+   "user": "foo/bar",
+   "project": "baz",
+   "default": "sshurl",
+   "auth": null,
+   "committish": "branch"
+  },
+  "ssh://gitlab.com:foo/bar/baz.git": {
+   "type": "gitlab",
+   "user": "foo/bar",
+   "project": "baz",
+   "default": "sshurl"
+  },
+  "ssh://gitlab.com:foo/bar/baz.git#branch": {
+   "type": "gitlab",
+   "user": "foo/bar",
+   "project": "baz",
+   "default": "sshurl",
+   "committish": "branch"
+  },
+  "ssh://user@gitlab.com:foo/bar/baz.git": {
+   "type": "gitlab",
+   "user": "foo/bar",
+   "project": "baz",
+   "default": "sshurl",
+   "auth": null
+  },
+  "ssh://user@gitlab.com:foo/bar/baz.git#branch": {
+   "type": "gitlab",
+   "user": "foo/bar",
+   "project": "baz",
+   "default": "sshurl",
+   "auth": null,
+   "committish": "branch"
+  },
+  "ssh://user:password@gitlab.com:foo/bar/baz.git": {
+   "type": "gitlab",
+   "user": "foo/bar",
+   "project": "baz",
+   "default": "sshurl",
+   "auth": null
+  },
+  "ssh://user:password@gitlab.com:foo/bar/baz.git#branch": {
+   "type": "gitlab",
+   "user": "foo/bar",
+   "project": "baz",
+   "default": "sshurl",
+   "auth": null,
+   "committish": "branch"
+  },
+  "ssh://:password@gitlab.com:foo/bar/baz.git": {
+   "type": "gitlab",
+   "user": "foo/bar",
+   "project": "baz",
+   "default": "sshurl",
+   "auth": null
+  },
+  "ssh://:password@gitlab.com:foo/bar/baz.git#branch": {
+   "type": "gitlab",
+   "user": "foo/bar",
+   "project": "baz",
+   "default": "sshurl",
+   "auth": null,
+   "committish": "branch"
+  },
+  "git+https://gitlab.com/foo/bar": {
+   "type": "gitlab",
+   "user": "foo",
+   "project": "bar",
+   "default": "https"
+  },
+  "git+https://gitlab.com/foo/bar#branch": {
+   "type": "gitlab",
+   "user": "foo",
+   "project": "bar",
+   "default": "https",
+   "committish": "branch"
+  },
+  "git+https://user@gitlab.com/foo/bar": {
+   "type": "gitlab",
+   "user": "foo",
+   "project": "bar",
+   "default": "https",
+   "auth": "user"
+  },
+  "git+https://user@gitlab.com/foo/bar#branch": {
+   "type": "gitlab",
+   "user": "foo",
+   "project": "bar",
+   "default": "https",
+   "auth": "user",
+   "committish": "branch"
+  },
+  "git+https://user:password@gitlab.com/foo/bar": {
+   "type": "gitlab",
+   "user": "foo",
+   "project": "bar",
+   "default": "https",
+   "auth": "user:password"
+  },
+  "git+https://user:password@gitlab.com/foo/bar#branch": {
+   "type": "gitlab",
+   "user": "foo",
+   "project": "bar",
+   "default": "https",
+   "auth": "user:password",
+   "committish": "branch"
+  },
+  "git+https://:password@gitlab.com/foo/bar": {
+   "type": "gitlab",
+   "user": "foo",
+   "project": "bar",
+   "default": "https",
+   "auth": ":password"
+  },
+  "git+https://:password@gitlab.com/foo/bar#branch": {
+   "type": "gitlab",
+   "user": "foo",
+   "project": "bar",
+   "default": "https",
+   "auth": ":password",
+   "committish": "branch"
+  },
+  "git+https://gitlab.com/foo/bar.git": {
+   "type": "gitlab",
+   "user": "foo",
+   "project": "bar",
+   "default": "https"
+  },
+  "git+https://gitlab.com/foo/bar.git#branch": {
+   "type": "gitlab",
+   "user": "foo",
+   "project": "bar",
+   "default": "https",
+   "committish": "branch"
+  },
+  "git+https://user@gitlab.com/foo/bar.git": {
+   "type": "gitlab",
+   "user": "foo",
+   "project": "bar",
+   "default": "https",
+   "auth": "user"
+  },
+  "git+https://user@gitlab.com/foo/bar.git#branch": {
+   "type": "gitlab",
+   "user": "foo",
+   "project": "bar",
+   "default": "https",
+   "auth": "user",
+   "committish": "branch"
+  },
+  "git+https://user:password@gitlab.com/foo/bar.git": {
+   "type": "gitlab",
+   "user": "foo",
+   "project": "bar",
+   "default": "https",
+   "auth": "user:password"
+  },
+  "git+https://user:password@gitlab.com/foo/bar.git#branch": {
+   "type": "gitlab",
+   "user": "foo",
+   "project": "bar",
+   "default": "https",
+   "auth": "user:password",
+   "committish": "branch"
+  },
+  "git+https://:password@gitlab.com/foo/bar.git": {
+   "type": "gitlab",
+   "user": "foo",
+   "project": "bar",
+   "default": "https",
+   "auth": ":password"
+  },
+  "git+https://:password@gitlab.com/foo/bar.git#branch": {
+   "type": "gitlab",
+   "user": "foo",
+   "project": "bar",
+   "default": "https",
+   "auth": ":password",
+   "committish": "branch"
+  },
+  "git+https://gitlab.com/foo/bar/baz": {
+   "type": "gitlab",
+   "user": "foo/bar",
+   "project": "baz",
+   "default": "https"
+  },
+  "git+https://gitlab.com/foo/bar/baz#branch": {
+   "type": "gitlab",
+   "user": "foo/bar",
+   "project": "baz",
+   "default": "https",
+   "committish": "branch"
+  },
+  "git+https://user@gitlab.com/foo/bar/baz": {
+   "type": "gitlab",
+   "user": "foo/bar",
+   "project": "baz",
+   "default": "https",
+   "auth": "user"
+  },
+  "git+https://user@gitlab.com/foo/bar/baz#branch": {
+   "type": "gitlab",
+   "user": "foo/bar",
+   "project": "baz",
+   "default": "https",
+   "auth": "user",
+   "committish": "branch"
+  },
+  "git+https://user:password@gitlab.com/foo/bar/baz": {
+   "type": "gitlab",
+   "user": "foo/bar",
+   "project": "baz",
+   "default": "https",
+   "auth": "user:password"
+  },
+  "git+https://user:password@gitlab.com/foo/bar/baz#branch": {
+   "type": "gitlab",
+   "user": "foo/bar",
+   "project": "baz",
+   "default": "https",
+   "auth": "user:password",
+   "committish": "branch"
+  },
+  "git+https://:password@gitlab.com/foo/bar/baz": {
+   "type": "gitlab",
+   "user": "foo/bar",
+   "project": "baz",
+   "default": "https",
+   "auth": ":password"
+  },
+  "git+https://:password@gitlab.com/foo/bar/baz#branch": {
+   "type": "gitlab",
+   "user": "foo/bar",
+   "project": "baz",
+   "default": "https",
+   "auth": ":password",
+   "committish": "branch"
+  },
+  "git+https://gitlab.com/foo/bar/baz.git": {
+   "type": "gitlab",
+   "user": "foo/bar",
+   "project": "baz",
+   "default": "https"
+  },
+  "git+https://gitlab.com/foo/bar/baz.git#branch": {
+   "type": "gitlab",
+   "user": "foo/bar",
+   "project": "baz",
+   "default": "https",
+   "committish": "branch"
+  },
+  "git+https://user@gitlab.com/foo/bar/baz.git": {
+   "type": "gitlab",
+   "user": "foo/bar",
+   "project": "baz",
+   "default": "https",
+   "auth": "user"
+  },
+  "git+https://user@gitlab.com/foo/bar/baz.git#branch": {
+   "type": "gitlab",
+   "user": "foo/bar",
+   "project": "baz",
+   "default": "https",
+   "auth": "user",
+   "committish": "branch"
+  },
+  "git+https://user:password@gitlab.com/foo/bar/baz.git": {
+   "type": "gitlab",
+   "user": "foo/bar",
+   "project": "baz",
+   "default": "https",
+   "auth": "user:password"
+  },
+  "git+https://user:password@gitlab.com/foo/bar/baz.git#branch": {
+   "type": "gitlab",
+   "user": "foo/bar",
+   "project": "baz",
+   "default": "https",
+   "auth": "user:password",
+   "committish": "branch"
+  },
+  "git+https://:password@gitlab.com/foo/bar/baz.git": {
+   "type": "gitlab",
+   "user": "foo/bar",
+   "project": "baz",
+   "default": "https",
+   "auth": ":password"
+  },
+  "git+https://:password@gitlab.com/foo/bar/baz.git#branch": {
+   "type": "gitlab",
+   "user": "foo/bar",
+   "project": "baz",
+   "default": "https",
+   "auth": ":password",
+   "committish": "branch"
+  },
+  "https://gitlab.com/foo/bar": {
+   "type": "gitlab",
+   "user": "foo",
+   "project": "bar",
+   "default": "https"
+  },
+  "https://gitlab.com/foo/bar#branch": {
+   "type": "gitlab",
+   "user": "foo",
+   "project": "bar",
+   "default": "https",
+   "committish": "branch"
+  },
+  "https://user@gitlab.com/foo/bar": {
+   "type": "gitlab",
+   "user": "foo",
+   "project": "bar",
+   "default": "https",
+   "auth": "user"
+  },
+  "https://user@gitlab.com/foo/bar#branch": {
+   "type": "gitlab",
+   "user": "foo",
+   "project": "bar",
+   "default": "https",
+   "auth": "user",
+   "committish": "branch"
+  },
+  "https://user:password@gitlab.com/foo/bar": {
+   "type": "gitlab",
+   "user": "foo",
+   "project": "bar",
+   "default": "https",
+   "auth": "user:password"
+  },
+  "https://user:password@gitlab.com/foo/bar#branch": {
+   "type": "gitlab",
+   "user": "foo",
+   "project": "bar",
+   "default": "https",
+   "auth": "user:password",
+   "committish": "branch"
+  },
+  "https://:password@gitlab.com/foo/bar": {
+   "type": "gitlab",
+   "user": "foo",
+   "project": "bar",
+   "default": "https",
+   "auth": ":password"
+  },
+  "https://:password@gitlab.com/foo/bar#branch": {
+   "type": "gitlab",
+   "user": "foo",
+   "project": "bar",
+   "default": "https",
+   "auth": ":password",
+   "committish": "branch"
+  },
+  "https://gitlab.com/foo/bar.git": {
+   "type": "gitlab",
+   "user": "foo",
+   "project": "bar",
+   "default": "https"
+  },
+  "https://gitlab.com/foo/bar.git#branch": {
+   "type": "gitlab",
+   "user": "foo",
+   "project": "bar",
+   "default": "https",
+   "committish": "branch"
+  },
+  "https://user@gitlab.com/foo/bar.git": {
+   "type": "gitlab",
+   "user": "foo",
+   "project": "bar",
+   "default": "https",
+   "auth": "user"
+  },
+  "https://user@gitlab.com/foo/bar.git#branch": {
+   "type": "gitlab",
+   "user": "foo",
+   "project": "bar",
+   "default": "https",
+   "auth": "user",
+   "committish": "branch"
+  },
+  "https://user:password@gitlab.com/foo/bar.git": {
+   "type": "gitlab",
+   "user": "foo",
+   "project": "bar",
+   "default": "https",
+   "auth": "user:password"
+  },
+  "https://user:password@gitlab.com/foo/bar.git#branch": {
+   "type": "gitlab",
+   "user": "foo",
+   "project": "bar",
+   "default": "https",
+   "auth": "user:password",
+   "committish": "branch"
+  },
+  "https://:password@gitlab.com/foo/bar.git": {
+   "type": "gitlab",
+   "user": "foo",
+   "project": "bar",
+   "default": "https",
+   "auth": ":password"
+  },
+  "https://:password@gitlab.com/foo/bar.git#branch": {
+   "type": "gitlab",
+   "user": "foo",
+   "project": "bar",
+   "default": "https",
+   "auth": ":password",
+   "committish": "branch"
+  },
+  "https://gitlab.com/foo/bar/baz": {
+   "type": "gitlab",
+   "user": "foo/bar",
+   "project": "baz",
+   "default": "https"
+  },
+  "https://gitlab.com/foo/bar/baz#branch": {
+   "type": "gitlab",
+   "user": "foo/bar",
+   "project": "baz",
+   "default": "https",
+   "committish": "branch"
+  },
+  "https://user@gitlab.com/foo/bar/baz": {
+   "type": "gitlab",
+   "user": "foo/bar",
+   "project": "baz",
+   "default": "https",
+   "auth": "user"
+  },
+  "https://user@gitlab.com/foo/bar/baz#branch": {
+   "type": "gitlab",
+   "user": "foo/bar",
+   "project": "baz",
+   "default": "https",
+   "auth": "user",
+   "committish": "branch"
+  },
+  "https://user:password@gitlab.com/foo/bar/baz": {
+   "type": "gitlab",
+   "user": "foo/bar",
+   "project": "baz",
+   "default": "https",
+   "auth": "user:password"
+  },
+  "https://user:password@gitlab.com/foo/bar/baz#branch": {
+   "type": "gitlab",
+   "user": "foo/bar",
+   "project": "baz",
+   "default": "https",
+   "auth": "user:password",
+   "committish": "branch"
+  },
+  "https://:password@gitlab.com/foo/bar/baz": {
+   "type": "gitlab",
+   "user": "foo/bar",
+   "project": "baz",
+   "default": "https",
+   "auth": ":password"
+  },
+  "https://:password@gitlab.com/foo/bar/baz#branch": {
+   "type": "gitlab",
+   "user": "foo/bar",
+   "project": "baz",
+   "default": "https",
+   "auth": ":password",
+   "committish": "branch"
+  },
+  "https://gitlab.com/foo/bar/baz.git": {
+   "type": "gitlab",
+   "user": "foo/bar",
+   "project": "baz",
+   "default": "https"
+  },
+  "https://gitlab.com/foo/bar/baz.git#branch": {
+   "type": "gitlab",
+   "user": "foo/bar",
+   "project": "baz",
+   "default": "https",
+   "committish": "branch"
+  },
+  "https://user@gitlab.com/foo/bar/baz.git": {
+   "type": "gitlab",
+   "user": "foo/bar",
+   "project": "baz",
+   "default": "https",
+   "auth": "user"
+  },
+  "https://user@gitlab.com/foo/bar/baz.git#branch": {
+   "type": "gitlab",
+   "user": "foo/bar",
+   "project": "baz",
+   "default": "https",
+   "auth": "user",
+   "committish": "branch"
+  },
+  "https://user:password@gitlab.com/foo/bar/baz.git": {
+   "type": "gitlab",
+   "user": "foo/bar",
+   "project": "baz",
+   "default": "https",
+   "auth": "user:password"
+  },
+  "https://user:password@gitlab.com/foo/bar/baz.git#branch": {
+   "type": "gitlab",
+   "user": "foo/bar",
+   "project": "baz",
+   "default": "https",
+   "auth": "user:password",
+   "committish": "branch"
+  },
+  "https://:password@gitlab.com/foo/bar/baz.git": {
+   "type": "gitlab",
+   "user": "foo/bar",
+   "project": "baz",
+   "default": "https",
+   "auth": ":password"
+  },
+  "https://:password@gitlab.com/foo/bar/baz.git#branch": {
+   "type": "gitlab",
+   "user": "foo/bar",
+   "project": "baz",
+   "default": "https",
+   "auth": ":password",
+   "committish": "branch"
+  }
+ },
+ "misc": {},
+ "sourcehut": {
+  "sourcehut:~foo/bar": {
+   "type": "sourcehut",
+   "user": "~foo",
+   "project": "bar",
+   "default": "shortcut"
+  },
+  "sourcehut:~foo/bar#branch": {
+   "type": "sourcehut",
+   "user": "~foo",
+   "project": "bar",
+   "default": "shortcut",
+   "committish": "branch"
+  },
+  "sourcehut:~foo/bar.git": {
+   "type": "sourcehut",
+   "user": "~foo",
+   "project": "bar",
+   "default": "shortcut"
+  },
+  "sourcehut:~foo/bar.git#branch": {
+   "type": "sourcehut",
+   "user": "~foo",
+   "project": "bar",
+   "default": "shortcut",
+   "committish": "branch"
+  },
+  "git@git.sr.ht:~foo/bar": {
+   "type": "sourcehut",
+   "user": "~foo",
+   "project": "bar",
+   "default": "sshurl",
+   "auth": null
+  },
+  "git@git.sr.ht:~foo/bar#branch": {
+   "type": "sourcehut",
+   "user": "~foo",
+   "project": "bar",
+   "default": "sshurl",
+   "auth": null,
+   "committish": "branch"
+  },
+  "git@git.sr.ht:~foo/bar.git": {
+   "type": "sourcehut",
+   "user": "~foo",
+   "project": "bar",
+   "default": "sshurl",
+   "auth": null
+  },
+  "git@git.sr.ht:~foo/bar.git#branch": {
+   "type": "sourcehut",
+   "user": "~foo",
+   "project": "bar",
+   "default": "sshurl",
+   "auth": null,
+   "committish": "branch"
+  },
+  "git+ssh://git@git.sr.ht:~foo/bar": {
+   "type": "sourcehut",
+   "user": "~foo",
+   "project": "bar",
+   "default": "sshurl"
+  },
+  "git+ssh://git@git.sr.ht:~foo/bar#branch": {
+   "type": "sourcehut",
+   "user": "~foo",
+   "project": "bar",
+   "default": "sshurl",
+   "committish": "branch"
+  },
+  "git+ssh://git@git.sr.ht:~foo/bar.git": {
+   "type": "sourcehut",
+   "user": "~foo",
+   "project": "bar",
+   "default": "sshurl"
+  },
+  "git+ssh://git@git.sr.ht:~foo/bar.git#branch": {
+   "type": "sourcehut",
+   "user": "~foo",
+   "project": "bar",
+   "default": "sshurl",
+   "committish": "branch"
+  },
+  "https://git.sr.ht/~foo/bar": {
+   "type": "sourcehut",
+   "user": "~foo",
+   "project": "bar",
+   "default": "https"
+  },
+  "https://git.sr.ht/~foo/bar#branch": {
+   "type": "sourcehut",
+   "user": "~foo",
+   "project": "bar",
+   "default": "https",
+   "committish": "branch"
+  },
+  "https://git.sr.ht/~foo/bar.git": {
+   "type": "sourcehut",
+   "user": "~foo",
+   "project": "bar",
+   "default": "https"
+  },
+  "https://git.sr.ht/~foo/bar.git#branch": {
+   "type": "sourcehut",
+   "user": "~foo",
+   "project": "bar",
+   "default": "https",
+   "committish": "branch"
+  }
+ }
+}

@@ -64,16 +64,17 @@ export function replaceIndentAfterLastNewline(ws: string, newIndent: string): st
     return ws.substring(0, lastNewline + 1) + newIndent;
 }
 
+const isTextComment = (comment: Comment): comment is TextComment => comment.kind === J.Kind.TextComment;
+
 /**
- * Checks if a Space contains any newlines (in whitespace or comment suffixes).
+ * Checks if a Space contains a line terminator. A block comment spanning lines counts as one, as it
+ * does for automatic semicolon insertion.
  */
 export function spaceContainsNewline(space: J.Space | undefined): boolean {
     if (!space) return false;
     if (space.whitespace.includes("\n")) return true;
-    return space.comments.some(c => c.suffix.includes("\n"));
+    return space.comments.some(c => c.suffix.includes("\n") || (isTextComment(c) && c.text.includes("\n")));
 }
-
-const isTextComment = (comment: Comment): comment is TextComment => comment.kind === J.Kind.TextComment;
 
 /**
  * Re-indents a line's leading whitespace when the enclosing construct moves from `oldMargin` to

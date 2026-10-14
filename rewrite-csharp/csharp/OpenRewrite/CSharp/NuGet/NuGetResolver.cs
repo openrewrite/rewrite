@@ -212,7 +212,7 @@ public static class NuGetResolver
 
     private sealed class SerilogMSBuildLogger : Microsoft.Build.Framework.ILogger
     {
-        private readonly SortedSet<string> _errorCodes = new(StringComparer.OrdinalIgnoreCase);
+        private readonly HashSet<string> _errorCodes = new(StringComparer.OrdinalIgnoreCase);
         private readonly List<string> _errors = new();
 
         public bool ReportedMissingWorkloads
@@ -233,21 +233,12 @@ public static class NuGetResolver
             }
         }
 
-        public string? FailureSignature
-        {
-            get
-            {
-                lock (_errorCodes)
-                    return _errorCodes.Count > 0 ? string.Join(",", _errorCodes) : null;
-            }
-        }
-
         /// <summary>The distinct MSBuild errors raised, most useful first.</summary>
         public IReadOnlyList<string> Errors
         {
             get
             {
-                lock (_errorCodes)
+                lock (_errors)
                     return _errors.ToList();
             }
         }
@@ -265,6 +256,9 @@ public static class NuGetResolver
                 {
                     if (!string.IsNullOrEmpty(e.Code))
                         _errorCodes.Add(e.Code);
+                }
+                lock (_errors)
+                {
                     var text = string.IsNullOrEmpty(e.Code) ? e.Message : e.Code + ": " + e.Message;
                     if (_errors.Count < 5 && !_errors.Contains(text))
                         _errors.Add(text);
@@ -313,8 +307,8 @@ public static class NuGetResolver
     /// <summary>
     /// Produces the restore dependency graph for a solution or project via the
     /// <c>GenerateRestoreGraphFile</c> MSBuild target, one child evaluation for the whole
-    /// solution, falling back to per-project evaluation and stopping early on a shared root
-    /// failure. Returns null when no project produced a graph.
+    /// solution, falling back to per-project evaluation when the solution as a whole fails.
+    /// Returns null when no project produced a graph.
     /// </summary>
     public static DependencyGraphSpec? CreateDependencyGraphSpec(
         string path,
@@ -341,34 +335,12 @@ public static class NuGetResolver
 
         var merged = new DependencyGraphSpec();
         var any = false;
-        string? repeatedFailure = null;
-        var repeatedFailureCount = 0;
-        var skipped = 0;
         foreach (var projectPath in projects)
         {
-            if (repeatedFailureCount >= RootFailureThreshold)
-            {
-                skipped++;
-                continue;
-            }
-
-            var dgSpec = GenerateRestoreGraph(projectPath, extraGlobalProperties, out var failureSignature);
+            var dgSpec = GenerateRestoreGraph(projectPath, extraGlobalProperties);
             if (dgSpec == null)
-            {
-                if (failureSignature != null && failureSignature == repeatedFailure)
-                {
-                    repeatedFailureCount++;
-                }
-                else
-                {
-                    repeatedFailure = failureSignature;
-                    repeatedFailureCount = failureSignature == null ? 0 : 1;
-                }
                 continue;
-            }
 
-            repeatedFailure = null;
-            repeatedFailureCount = 0;
             foreach (var project in dgSpec.Projects)
             {
                 if (merged.GetProjectSpec(project.RestoreMetadata?.ProjectUniqueName) == null)
@@ -378,12 +350,6 @@ public static class NuGetResolver
                 merged.AddRestore(restore);
             any = true;
         }
-
-        if (skipped > 0)
-            Log.Warning("Restore graph generation failed identically for {Threshold} consecutive projects " +
-                        "in {Path} ({Failure}); skipped the remaining {Skipped} projects rather than " +
-                        "re-proving the same root cause",
-                RootFailureThreshold, path, repeatedFailure, skipped);
 
         return any ? merged : null;
     }
@@ -454,6 +420,35 @@ public static class NuGetResolver
             !string.IsNullOrEmpty(Environment.GetEnvironmentVariable("EnableWindowsTargeting")))
             return;
         properties["EnableWindowsTargeting"] = "true";
+    }
+
+    /// <summary>
+    /// Sets <c>AndroidUseManagedDesignTimeResourceGenerator=true</c> on non-Windows hosts, as the
+    /// Android SDK already does on Windows. Otherwise design-time builds of <c>net*-android</c>
+    /// projects compile resources with <c>aapt2</c> and fail against any JDK newer than the
+    /// workload supports (JDK 25 against a workload that accepts up to 21, say), leaving the
+    /// project without references. Skipped when the variable is set in the environment, so an
+    /// explicit choice wins.
+    /// </summary>
+    public static void ApplyAndroidDesignTimeDefault(IDictionary<string, string> properties)
+    {
+        if (OperatingSystem.IsWindows() ||
+            !string.IsNullOrEmpty(Environment.GetEnvironmentVariable("AndroidUseManagedDesignTimeResourceGenerator")))
+            return;
+        properties["AndroidUseManagedDesignTimeResourceGenerator"] = "true";
+    }
+
+    /// <summary>
+    /// Sets <c>CheckEolWorkloads=false</c>, so projects on an out-of-support workload
+    /// (<c>net8.0-android</c> on a .NET 10 SDK, say) still evaluate instead of failing with
+    /// <c>NETSDK1202</c>. Those are the codebases most in need of an upgrade, and they have to
+    /// parse first. Skipped when the variable is set in the environment, so an explicit choice wins.
+    /// </summary>
+    public static void ApplyOutOfSupportWorkloadsDefault(IDictionary<string, string> properties)
+    {
+        if (!string.IsNullOrEmpty(Environment.GetEnvironmentVariable("CheckEolWorkloads")))
+            return;
+        properties["CheckEolWorkloads"] = "false";
     }
 
     private static readonly object BuildGate = new();
@@ -571,6 +566,8 @@ public static class NuGetResolver
             ["DesignTimeBuild"] = "true",
         };
         ApplyWindowsTargetingDefault(globalProps);
+        ApplyAndroidDesignTimeDefault(globalProps);
+        ApplyOutOfSupportWorkloadsDefault(globalProps);
         if (extraGlobalProperties != null)
         {
             foreach (var (k, v) in extraGlobalProperties)
@@ -581,9 +578,7 @@ public static class NuGetResolver
         return globalProps;
     }
 
-    private const int RootFailureThreshold = 3;
-
-    private static readonly Dictionary<string, (DependencyGraphSpec? Graph, string? Failure)> GraphCache =
+    private static readonly Dictionary<string, DependencyGraphSpec?> GraphCache =
         new(StringComparer.Ordinal);
 
     private static long _graphGenerationMs;
@@ -623,13 +618,7 @@ public static class NuGetResolver
 
     private static DependencyGraphSpec? GenerateRestoreGraph(
         string projectPath,
-        IDictionary<string, string>? extraGlobalProperties) =>
-        GenerateRestoreGraph(projectPath, extraGlobalProperties, out _);
-
-    private static DependencyGraphSpec? GenerateRestoreGraph(
-        string projectPath,
-        IDictionary<string, string>? extraGlobalProperties,
-        out string? failureSignature)
+        IDictionary<string, string>? extraGlobalProperties)
     {
         var cacheKey = GraphCacheKey(projectPath, extraGlobalProperties);
         lock (GraphCache)
@@ -637,28 +626,25 @@ public static class NuGetResolver
             if (GraphCache.TryGetValue(cacheKey, out var cached))
             {
                 Log.Debug("NuGetResolver: restore graph cache hit for {Project}", projectPath);
-                failureSignature = cached.Failure;
-                return cached.Graph;
+                return cached;
             }
         }
 
         var sw = Stopwatch.StartNew();
-        var graph = GenerateRestoreGraphUncached(projectPath, extraGlobalProperties, out failureSignature);
+        var graph = GenerateRestoreGraphUncached(projectPath, extraGlobalProperties);
         Interlocked.Add(ref _graphGenerationMs, (long)sw.Elapsed.TotalMilliseconds);
 
         lock (GraphCache)
         {
-            GraphCache[cacheKey] = (graph, failureSignature);
+            GraphCache[cacheKey] = graph;
         }
         return graph;
     }
 
     private static DependencyGraphSpec? GenerateRestoreGraphUncached(
         string projectPath,
-        IDictionary<string, string>? extraGlobalProperties,
-        out string? failureSignature)
+        IDictionary<string, string>? extraGlobalProperties)
     {
-        failureSignature = null;
         MSBuildEnvironment.Ensure();
         EvaluationCounts.AddOrUpdate(projectPath, 1, (_, n) => n + 1);
         var outputPath = Path.Combine(Path.GetTempPath(),
@@ -678,6 +664,8 @@ public static class NuGetResolver
                 ["ExcludeRestorePackageImports"] = "true",
             };
             ApplyWindowsTargetingDefault(globalProps);
+            ApplyAndroidDesignTimeDefault(globalProps);
+            ApplyOutOfSupportWorkloadsDefault(globalProps);
             if (extraGlobalProperties != null)
             {
                 foreach (var (k, v) in extraGlobalProperties)
@@ -720,9 +708,6 @@ public static class NuGetResolver
                     buildLogger.Errors.Count > 0
                         ? string.Join(" | ", buildLogger.Errors)
                         : result.Exception?.Message ?? "(no MSBuild error reported)");
-                failureSignature = buildLogger.FailureSignature
-                                   ?? result.Exception?.GetType().Name
-                                   ?? "build-failed";
                 return null;
             }
 
@@ -733,7 +718,6 @@ public static class NuGetResolver
         {
             Log.Debug("NuGetResolver: restore graph generation failed for {Project}: {Error}",
                 projectPath, ex.Message);
-            failureSignature = ex.GetType().Name;
             return null;
         }
         finally

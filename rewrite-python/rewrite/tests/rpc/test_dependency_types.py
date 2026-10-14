@@ -206,16 +206,16 @@ class TestTypeshedResolution:
         try:
             server.handle_dependency_types({"name": "os", "pythonVersion": "3.11"})
             assert captured["python_version"] == "3.11"
-            assert ("os", None, "3.11") in server._dependency_types_pending
+            assert ("os", None, "3.11", None) in server._dependency_types_pending
 
             # A different requested version must not drain 3.11's pending pages.
             server.handle_dependency_types({"name": "os", "pythonVersion": "3.12"})
             assert captured["python_version"] == "3.12"
-            assert ("os", None, "3.12") in server._dependency_types_pending
+            assert ("os", None, "3.12", None) in server._dependency_types_pending
 
             server.handle_dependency_types({"name": "os", "pythonVersion": "not-a-version"})
             assert captured["python_version"] is None  # malformed falls back
-            assert ("os", None, None) in server._dependency_types_pending
+            assert ("os", None, None, None) in server._dependency_types_pending
         finally:
             server._dependency_types_pending.clear()
 
@@ -234,6 +234,32 @@ class TestTypeshedResolution:
         server._dependency_types_pending.clear()
         with pytest.raises(ValueError):
             handle_dependency_types({"name": "greetlib", "version": "1.0.0"})
+
+    def test_package_request_with_path_resolves_there_without_dependency_env(self, tmp_path, monkeypatch):
+        import rewrite.rpc.server as server
+        monkeypatch.setattr(server, "_last_dependency_path", None)
+        monkeypatch.delenv("VIRTUAL_ENV", raising=False)
+        fetched = tmp_path / "greetlib-1.0.0"
+        (fetched / "greetlib").mkdir(parents=True)
+        (fetched / "greetlib" / "__init__.py").write_text("class A: ...\n")
+        di = fetched / "greetlib-1.0.0.dist-info"
+        di.mkdir()
+        (di / "RECORD").write_text("greetlib/__init__.py,sha256=abc,16\n")
+        captured = {}
+
+        def fake_build(own_artifacts, root, virtual_env, stdlib_dir, python_version=None):
+            captured.update(own_artifacts=own_artifacts, root=root, virtual_env=virtual_env)
+            return [{"state": "END_OF_OBJECT"}]
+
+        monkeypatch.setattr(server, "_build_exported_types_data", fake_build)
+        server._dependency_types_pending.clear()
+
+        data = handle_dependency_types({"name": "greetlib", "version": "1.0.0", "path": str(fetched)})
+
+        assert data[-1]["state"] == "END_OF_OBJECT"
+        assert captured["own_artifacts"] == [str(fetched / "greetlib" / "__init__.py")]
+        assert captured["root"] == str(fetched)
+        assert captured["virtual_env"] is None
 
 
 class TestRichness:
@@ -502,6 +528,7 @@ class TestExportedTypes:
                 f.write("")
             with open(os.path.join(pkg, "thing.py"), "w", encoding="utf-8") as f:
                 f.write("class Thing:\n"
+                        "    def __init__(self):\n        self._url = None\n"
                         "    def api(self):\n        return 0\n")
             with open(os.path.join(pkg, "thing.pyi"), "w", encoding="utf-8") as f:
                 f.write("class Thing:\n"
@@ -516,8 +543,9 @@ class TestExportedTypes:
             things = [k for k in by_fqn if k.endswith("thing.Thing")]
             assert len(things) == 1  # the .py and .pyi collapse to one entry
             thing = by_fqn[things[0]]
-            method_names = {m._name for m in (thing._methods or [])}
-            assert "api" in method_names
+            api = next(m for m in thing._methods or [] if m._name == "api")
+            # The runtime class's self-assigned `_url` makes it richer, yet the stub's signature wins.
+            assert api._return_type == JavaType.Primitive.Int
         finally:
             shutil.rmtree(root, ignore_errors=True)
 
@@ -594,7 +622,7 @@ class TestExportedTypes:
         venv = _fake_dependency_env(tmp_path)
         monkeypatch.setattr(server, "_last_dependency_path", str(venv))
         params = {"name": "greetlib", "version": "1.0.0"}
-        key = ("greetlib", "1.0.0", None)
+        key = ("greetlib", "1.0.0", None, None)
         server._dependency_types_pending.clear()
 
         # A single-shot run: one response carrying the whole answer.

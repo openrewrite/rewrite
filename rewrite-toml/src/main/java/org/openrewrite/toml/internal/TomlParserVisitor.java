@@ -19,7 +19,6 @@ import org.antlr.v4.runtime.ParserRuleContext;
 import org.antlr.v4.runtime.Token;
 import org.antlr.v4.runtime.tree.ParseTree;
 import org.antlr.v4.runtime.tree.RuleNode;
-import org.antlr.v4.runtime.tree.TerminalNode;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.FileAttributes;
 import org.openrewrite.internal.EncodingDetectingInputStream;
@@ -42,7 +41,6 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.function.BiFunction;
 
-import static java.util.Collections.emptyList;
 import static java.util.Collections.singletonList;
 import static org.openrewrite.Tree.randomId;
 
@@ -89,21 +87,6 @@ public class TomlParserVisitor extends TomlParserBaseVisitor<Toml> {
 
     @Override
     public Toml.Document visitDocument(TomlParser.DocumentContext ctx) {
-        if (!ctx.children.isEmpty() && ctx.children.get(0) instanceof TerminalNode && ((TerminalNode) ctx.children.get(0)).getSymbol().getType() == TomlParser.EOF) {
-            new Toml.Document(
-                    randomId(),
-                    path,
-                    Space.EMPTY,
-                    Markers.EMPTY,
-                    charset.name(),
-                    charsetBomMarked,
-                    null,
-                    fileAttributes,
-                    emptyList(),
-                    Space.EMPTY
-            );
-        }
-
         List<TomlValue> elements = new ArrayList<>();
         for (TomlParser.ExpressionContext expr: ctx.expression()) {
             TomlValue element = (TomlValue) visit(expr);
