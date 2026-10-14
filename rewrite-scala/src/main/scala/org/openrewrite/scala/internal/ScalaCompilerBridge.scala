@@ -127,7 +127,9 @@ class ScalaCompilerBridge {
         // trees of its own rather than the ones the LST is built from.
         val unit = parseForTyping(entry)
         units.add(unit)
-        indexes.put(unit, UntypedNodeIndex(unit.untpdTree))
+        val index = UntypedNodeIndex(unit.untpdTree)
+        indexes.put(unit, index)
+        recorder.track(index)
         sourceEntries.add(entry)
         parsedTrees.add(parsed.rawTree)
       } catch {
@@ -171,9 +173,12 @@ class ScalaCompilerBridge {
             case _: Throwable =>
           }
         }
+        typedRecorder.clear()
       } catch {
         case _: Throwable =>
           // Batch compilation failed entirely; all units keep typedTree=None
+      } finally {
+        recorder.clear()
       }
     }
 
@@ -262,7 +267,9 @@ class ScalaCompilerBridge {
           }.transform(unit.untpdTree)
         }
         units.add(unit)
-        indexes.put(unit, UntypedNodeIndex(unit.untpdTree))
+        val index = UntypedNodeIndex(unit.untpdTree)
+        indexes.put(unit, index)
+        recorder.track(index)
       }
       run.compileUnits(toScalaList(units))
       Some(Typing(run, units, typerTrees, recorder, indexes))

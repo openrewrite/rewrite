@@ -21,7 +21,7 @@ import dotty.tools.dotc.core.Contexts.*
 import dotty.tools.dotc.core.Types.{Type, TypeVars}
 import dotty.tools.dotc.typer.{Typer, TyperPhase}
 
-import java.util.IdentityHashMap
+import java.util.{Collections, IdentityHashMap}
 import scala.collection.mutable
 
 /**
@@ -88,17 +88,50 @@ private[internal] object UntypedNodeIndex {
  * typed tree they were adapted from. When a tree is typed or adapted more than once, the
  * last result wins. Arguments of calls are typed and adapted in separate steps, so the
  * adaptation can't be recorded together with the typing.
+ *
+ * Only the tracked nodes of the parsed source are recorded, and only the adaptations of their
+ * latest typings, so trees the typer builds and discards along the way, for instance while
+ * searching implicits or resolving overloads, aren't kept alive.
  */
 private[internal] final class TyperRecorder {
+  private val sources = Collections.newSetFromMap(new IdentityHashMap[untpd.Tree, java.lang.Boolean]())
   private val typed = new IdentityHashMap[untpd.Tree, tpd.Tree]()
+  // How many source nodes each typed tree is currently the typing of
+  private val typings = new IdentityHashMap[tpd.Tree, Integer]()
   private val adapted = new IdentityHashMap[tpd.Tree, tpd.Tree]()
 
-  def recordTyped(tree: untpd.Tree, result: tpd.Tree): Unit = typed.put(tree, result)
+  def track(index: UntypedNodeIndex): Unit = index.foreach((_, trees) => trees.foreach(sources.add))
 
-  def recordAdapted(tree: tpd.Tree, result: tpd.Tree): Unit = adapted.put(tree, result)
+  def recordTyped(tree: untpd.Tree, result: tpd.Tree): Unit =
+    if (sources.contains(tree)) {
+      val previous = typed.put(tree, result)
+      if (previous ne result) {
+        if (previous != null) release(previous)
+        val count = typings.get(result)
+        typings.put(result, if (count == null) 1 else count + 1)
+      }
+    }
+
+  private def release(typing: tpd.Tree): Unit = {
+    val count = typings.get(typing)
+    if (count == null || count <= 1) {
+      typings.remove(typing)
+      adapted.remove(typing)
+    } else typings.put(typing, count - 1)
+  }
+
+  def recordAdapted(tree: tpd.Tree, result: tpd.Tree): Unit =
+    if (typings.containsKey(tree)) adapted.put(tree, result)
 
   def get(tree: untpd.Tree): Option[TypedNode] =
     Option(typed.get(tree)).map(own => TypedNode(own, Option(adapted.get(own)).getOrElse(own)))
+
+  def clear(): Unit = {
+    sources.clear()
+    typed.clear()
+    typings.clear()
+    adapted.clear()
+  }
 }
 
 private[internal] class RecordingTyper(recorder: TyperRecorder, nestingLevel: Int = 0) extends Typer(nestingLevel) {
