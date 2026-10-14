@@ -248,6 +248,64 @@ class ScalaTypeAttributionTest implements RewriteTest {
     }
 
     @Test
+    void unqualifiedMethodCallIsNamedAfterTheMethod() {
+        rewriteRun(
+          scala(
+            """
+            class Foo {
+              def greet(name: String): String = name
+              def byBlock(f: => Unit): Unit = f
+              def run = {
+                greet("x")
+                `greet`("y")
+                byBlock { println("hi") }
+              }
+            }
+            """,
+            spec -> spec.afterRecipe(cu -> {
+                List<J.MethodInvocation> invocations = findAll(cu, J.MethodInvocation.class, m -> true);
+                assertThat(invocations)
+                  .extracting(J.MethodInvocation::getSimpleName)
+                  .containsExactly("greet", "greet", "byBlock", "println");
+                assertThat(invocations).allSatisfy(m -> {
+                    assertThat(m.getSelect()).isNull();
+                    assertThat(m.getMethodType()).isNotNull();
+                    assertThat(m.getMethodType().getName()).isEqualTo(m.getSimpleName());
+                    assertThat(m.getName().getType()).isSameAs(m.getMethodType());
+                });
+            })
+          )
+        );
+    }
+
+    @Test
+    void applySugarOnValueKeepsApplyName() {
+        rewriteRun(
+          scala(
+            """
+            class Foo {
+              val f: Int => Int = _ + 1
+              val arr = Array(1, 2)
+              def run = {
+                f(1)
+                arr(0)
+              }
+            }
+            """,
+            spec -> spec.afterRecipe(cu -> {
+                for (String callee : List.of("f", "arr")) {
+                    J.MethodInvocation m = find(cu, J.MethodInvocation.class,
+                      i -> i.getSelect() instanceof J.Identifier s && s.getSimpleName().equals(callee));
+                    assertThat(m.getSimpleName()).isEqualTo("apply");
+                    assertThat(m.getMethodType()).isNotNull();
+                    assertThat(m.getMethodType().getName()).isEqualTo("apply");
+                }
+            })
+          )
+        );
+    }
+
+    @Test
     void namedVariableHasType() {
         rewriteRun(
           scala(
@@ -407,6 +465,10 @@ class ScalaTypeAttributionTest implements RewriteTest {
     }
 
     private static <T extends J> T find(J cu, Class<T> type, Predicate<T> matching) {
+        return findAll(cu, type, matching).getFirst();
+    }
+
+    private static <T extends J> List<T> findAll(J cu, Class<T> type, Predicate<T> matching) {
         List<T> found = new ArrayList<>();
         new ScalaIsoVisitor<List<T>>() {
             @Override
@@ -418,6 +480,6 @@ class ScalaTypeAttributionTest implements RewriteTest {
             }
         }.visit(cu, found);
         assertThat(found).as("%s matching in %s", type.getSimpleName(), cu.printTrimmed()).isNotEmpty();
-        return found.getFirst();
+        return found;
     }
 }

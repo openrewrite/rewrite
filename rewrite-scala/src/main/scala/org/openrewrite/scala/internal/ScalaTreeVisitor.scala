@@ -827,11 +827,16 @@ class ScalaTreeVisitor(
   private def visitFunctionApplication(app: Trees.Apply[?], id: Trees.Ident[?]): J.MethodInvocation = {
     val prefix = extractPrefix(app.span)
 
-    // In Scala, arr(0) is syntactic sugar for arr.apply(0)
-    // We'll represent it as a method invocation with "apply" as the method name
-
-    // The select is the identifier (e.g., "arr")
-    val select = visitIdent(id).asInstanceOf[Expression]
+    // `greet(x)` calling a method `greet` maps like Java's unqualified call: no select, name `greet`.
+    // `arr(0)`, `f(x)`, `List(1)` desugar to `<ident>.apply(...)`: select is the identifier, name is `apply`.
+    val methodType = methodTypeOfTree(app)
+    val callee = visitIdent(id).asInstanceOf[Expression]
+    val directCallName: Option[J.Identifier] = callee match {
+      case name: J.Identifier if methodType != null && name.getSimpleName != "apply" &&
+        methodType.getName == name.getSimpleName =>
+        Some(name.withType(methodType).withFieldType(null))
+      case _ => None
+    }
 
     // Detect argument delimiter form:
     //   `{ ... }` — block argument (`Seq { 1 }`)
@@ -846,8 +851,9 @@ class ScalaTreeVisitor(
     val args = new util.ArrayList[JRightPadded[Expression]]()
     var argContainerPrefix = Space.EMPTY
     val markers = new util.ArrayList[org.openrewrite.marker.Marker]()
-    import org.openrewrite.scala.marker.FunctionApplication
-    markers.add(FunctionApplication.create())
+    if (directCallName.isEmpty) {
+      markers.add(FunctionApplication.create())
+    }
 
     if (isBlockArg) {
       // Block argument: Seq { 1 } — mark as block arg and visit args directly
@@ -928,17 +934,20 @@ class ScalaTreeVisitor(
       }
     }
 
-    val methodName = ident("apply")
+    val (select, methodName) = directCallName match {
+      case Some(name) => (null, name)
+      case None => (JRightPadded.build(callee), ident("apply"))
+    }
 
     new J.MethodInvocation(
       Tree.randomId(),
       prefix,
       Markers.build(markers),
-      JRightPadded.build(select),
+      select,
       null, // typeParameters
       methodName,
       JContainer.build(argContainerPrefix, args, Markers.EMPTY),
-      methodTypeOfTree(app)
+      methodType
     )
   }
 

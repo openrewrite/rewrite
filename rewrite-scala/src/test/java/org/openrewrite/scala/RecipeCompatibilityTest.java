@@ -171,6 +171,27 @@ class RecipeCompatibilityTest implements RewriteTest {
         );
     }
 
+    @Test
+    void changeMethodNameOnUnqualifiedInvocation() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeMethodName("MyClass greet(..)", "hello", null, null)),
+          scala(
+            """
+              class MyClass {
+                def greet(name: String): String = name
+                def run = greet("world")
+              }
+              """,
+            """
+              class MyClass {
+                def hello(name: String): String = name
+                def run = hello("world")
+              }
+              """
+          )
+        );
+    }
+
     // ---- ChangeType ----
 
     @Test
