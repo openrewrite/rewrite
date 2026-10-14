@@ -74,6 +74,7 @@ class ScalaTreeVisitor(
   private var cursor = 0
   private var isInImportContext = false
   private var currentSyntheticParams: Set[String] = Set.empty
+  private val namedArgumentCalls = new java.util.IdentityHashMap[Trees.NamedArg[?], Trees.Apply[?]]()
 
   /** Look up JavaType by span (primary) or name (fallback). */
   private def typeFor(span: Spans.Span): JavaType = typeMapping.map(_.typeFor(span)).orNull
@@ -255,7 +256,22 @@ class ScalaTreeVisitor(
     }
   }
   
-  def visitTree(tree: Trees.Tree[?]): J = withAdaptationMarkers(tree, visitTreeAsWritten(tree))
+  def visitTree(tree: Trees.Tree[?]): J = {
+    rememberNamedArgumentCalls(tree)
+    withAdaptationMarkers(tree, visitTreeAsWritten(tree))
+  }
+
+  /** Curried calls map their inner applications without visiting them as trees of their own. */
+  private def rememberNamedArgumentCalls(tree: Trees.Tree[?]): Unit = tree match {
+    case app: Trees.Apply[?] =>
+      app.args.foreach {
+        case namedArg: Trees.NamedArg[?] => namedArgumentCalls.put(namedArg, app)
+        case _ =>
+      }
+      rememberNamedArgumentCalls(app.fun)
+    case typeApply: Trees.TypeApply[?] => rememberNamedArgumentCalls(typeApply.fun)
+    case _ =>
+  }
 
   private def visitTreeAsWritten(tree: Trees.Tree[?]): J = {
     tree match {
@@ -2976,6 +2992,10 @@ class ScalaTreeVisitor(
     // the identifier itself carries the bare name and a Quoted marker.
     val identNameQuoted = displayName.length >= 2 && displayName.startsWith("`") && displayName.endsWith("`")
     val identName = if (identNameQuoted) displayName.substring(1, displayName.length - 1) else displayName
+    val variableType = variableTypeAt(vd)
+    val paramType = if (variableType != null) variableType.getType else null
+    // A `_` parameter is a fresh `_$N` variable the source never names
+    val paramVariableType = if (identName == "_") null else variableType
 
     // Detect `implicit` modifier on the lambda parameter. The Scala 3 parser
     // exposes it on `vd.mods` but it sits in the source *before* `vd.span.start`
@@ -3021,9 +3041,9 @@ class ScalaTreeVisitor(
     // that can carry it.
     if (!hasExplicitType || vd.tpt == untpd.EmptyTree) {
       if (implicitModifier == null) {
-        ident(identName, prefix, quoted = identNameQuoted)
+        ident(identName, prefix, paramType, paramVariableType, quoted = identNameQuoted)
       } else {
-        val name = ident(identName, namePrefix, quoted = identNameQuoted)
+        val name = ident(identName, namePrefix, paramType, paramVariableType, quoted = identNameQuoted)
         val variable = new J.VariableDeclarations.NamedVariable(
           Tree.randomId(),
           Space.EMPTY,
@@ -3031,7 +3051,7 @@ class ScalaTreeVisitor(
           name,
           Collections.emptyList(),
           null,
-          null
+          paramVariableType
         )
         new J.VariableDeclarations(
           Tree.randomId(),
@@ -3046,7 +3066,7 @@ class ScalaTreeVisitor(
       }
     } else {
       // With a type, we need a full variable declaration
-      val name = ident(identName, namePrefix, quoted = identNameQuoted)
+      val name = ident(identName, namePrefix, paramType, paramVariableType, quoted = identNameQuoted)
 
       // Extract the type
       val sourceText = extractSource(vd.span)
@@ -3083,7 +3103,7 @@ class ScalaTreeVisitor(
         name,
         Collections.emptyList(),
         null,
-        null
+        paramVariableType
       )
 
       val modifiers: java.util.List[J.Modifier] =
@@ -7507,7 +7527,7 @@ class ScalaTreeVisitor(
     val prefix = extractPrefix(interp.span)
     val interpStart = Math.max(0, interp.span.start - offsetAdjustment)
     val interpName = interp.id.toString
-    val interpolator = ident(interpName)
+    val interpolator = ident(interpName, typeInfo = methodTypeAt(interp))
     cursor = Math.max(cursor, interpStart + interpName.length)
     val delimiter = if (source.startsWith("\"\"\"", cursor)) "\"\"\"" else "\""
     cursor = Math.min(source.length, cursor + delimiter.length)
@@ -7638,7 +7658,11 @@ class ScalaTreeVisitor(
     // namedArg.name.toString strips the backticks, but the source may show `name`.
     val spanStart = Math.max(0, namedArg.span.start - offsetAdjustment)
     val isBacktickQuoted = isBacktickQuotedNameAt(spanStart + 1, nameText.length)
-    val nameId = ident(nameText, quoted = isBacktickQuoted)
+    val parameter = Option(namedArgumentCalls.get(namedArg))
+      .flatMap(call => typeMapping.flatMap(_.parameterOf(call.asInstanceOf[untpd.Tree], nameText)))
+      .orNull
+    val nameId = ident(nameText, typeInfo = if (parameter != null) parameter.getType else null,
+      fieldType = parameter, quoted = isBacktickQuoted)
 
     // Advance past name (and surrounding backticks if any), then find "="
     val nameLen = if (isBacktickQuoted) nameText.length + 2 else nameText.length
@@ -7663,7 +7687,8 @@ class ScalaTreeVisitor(
     // At-binding pattern: `p@Person(name, _)`, `all@List(head, _*)`, `msg@(_: String)`.
     val prefix = extractPrefix(bind.span)
     val nameStr = bind.name.toString
-    val name = ident(nameStr)
+    val bound = variableTypeAt(bind)
+    val name = ident(nameStr, typeInfo = if (bound != null) bound.getType else null, fieldType = bound)
     cursor = cursor + nameStr.length
     val atPos = positionOfNext("@", cursor)
     val beforeAt = if (atPos >= cursor) ScalaSpace.format(source, cursor, atPos) else Space.EMPTY

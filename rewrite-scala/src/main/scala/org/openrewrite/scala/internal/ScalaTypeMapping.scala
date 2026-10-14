@@ -185,6 +185,20 @@ class ScalaTypeMapping(typeFactory: JavaTypeFactory, typedTree: tpd.Tree,
       }
     }
 
+  /** The parameter that the named argument `name` of the call is passed to. */
+  def parameterOf(call: untpd.Tree, name: String): Option[JavaType.Variable] =
+    typedNodes.get(call)
+      .flatMap(node => calledSymbol(application(resolved(node))))
+      .flatMap(method => method.paramSymss.flatten.find(p => p.isTerm && p.name.toString == name))
+      .flatMap(parameter => Option(try mapVariableType(parameter) catch { case _: Throwable => null }))
+
+  /** Named arguments passed out of order are lifted into a block that ends with the call itself. */
+  private def application(tree: tpd.Tree): tpd.Tree = tree match {
+    case Trees.Block(_, expr) => application(expr)
+    case Trees.Typed(expr, _) => application(expr)
+    case _ => tree
+  }
+
   /** The variable a definition or reference refers to, if it refers to a variable. */
   def variableTypeOf(tree: untpd.Tree): Option[JavaType.Variable] =
     typedNodes.get(tree).flatMap { node =>
