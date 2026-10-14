@@ -20,6 +20,7 @@ import com.fasterxml.jackson.annotation.ObjectIdGenerators;
 import lombok.Value;
 import lombok.With;
 
+import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
 
@@ -49,10 +50,7 @@ public class GitHistory implements Marker {
 
         Author author;
 
-        /**
-         * Seconds since the epoch.
-         */
-        long authorTime;
+        Instant authorTime;
     }
 
     @JsonIdentityInfo(generator = ObjectIdGenerators.IntSequenceGenerator.class, property = "@ref")
