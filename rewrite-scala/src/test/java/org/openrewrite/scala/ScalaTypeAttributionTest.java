@@ -17,6 +17,7 @@ package org.openrewrite.scala;
 
 import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.Test;
+import org.openrewrite.java.JavaParser;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.java.tree.TypeUtils;
@@ -455,6 +456,53 @@ class ScalaTypeAttributionTest implements RewriteTest {
                 J.VariableDeclarations.NamedVariable x = find(cu, J.VariableDeclarations.NamedVariable.class, v -> v.getSimpleName().equals("x"));
                 assertThat(TypeUtils.asFullyQualified(x.getName().getType()).getFullyQualifiedName())
                   .isEqualTo("scala.collection.immutable.Vector");
+            })
+          )
+        );
+    }
+
+    @Test
+    void defaultParserHasScalaLibraryOnClasspath() {
+        rewriteRun(
+          spec -> spec.parser(ScalaParser.builder()),
+          scala(
+            """
+            class Foo {
+              val xs = List(1)
+            }
+            """,
+            spec -> spec.afterRecipe(cu -> {
+                J.MethodInvocation listApply = method(cu, "apply");
+                assertThat(listApply.getMethodType()).isNotNull();
+                assertThat(listApply.getMethodType().getDeclaringType().getFullyQualifiedName())
+                  .startsWith("scala.collection");
+            })
+          )
+        );
+    }
+
+    @Test
+    void scalaLibraryIsOnClasspathWhenOnlyNonScalaJarsAreGiven() {
+        rewriteRun(
+          spec -> spec.parser(ScalaParser.builder().classpath(JavaParser.dependenciesFromClasspath("assertj-core"))),
+          scala(
+            """
+            import org.assertj.core.api.Assertions
+
+            class Foo {
+              val xs = List(1)
+              val a = Assertions.assertThat(1)
+            }
+            """,
+            spec -> spec.afterRecipe(cu -> {
+                J.MethodInvocation listApply = method(cu, "apply");
+                assertThat(listApply.getMethodType()).isNotNull();
+                assertThat(listApply.getMethodType().getDeclaringType().getFullyQualifiedName())
+                  .startsWith("scala.collection");
+                J.MethodInvocation assertThatCall = method(cu, "assertThat");
+                assertThat(assertThatCall.getMethodType()).isNotNull();
+                assertThat(assertThatCall.getMethodType().getDeclaringType().getFullyQualifiedName())
+                  .isEqualTo("org.assertj.core.api.Assertions");
             })
           )
         );
