@@ -40,10 +40,14 @@ namespace OpenRewrite.CSharp.NuGet;
 
 /// <summary>
 /// Points in-process MSBuild at the .NET SDK by setting <c>MSBUILD_EXE_PATH</c>, which is all the
-/// engine needs to resolve <c>Microsoft.NET.Sdk</c> and the rest of the SDK's targets. The
-/// workload resolver is disabled alongside it: restore graphs never need workloads, and it fails
-/// the whole evaluation by calling <c>getcwd()</c> when the working directory has been removed.
-/// Child <c>dotnet</c> processes must not inherit either — see <see cref="ScrubFrom"/>.
+/// engine needs to resolve <c>Microsoft.NET.Sdk</c> and the rest of the SDK's targets. Child
+/// <c>dotnet</c> processes must not inherit it — see <see cref="ScrubFrom"/>.
+/// <para>
+/// The SDK's workload resolver reads the process working directory on every evaluation, even
+/// when the project path is known, and fails the evaluation of every SDK-style project once that
+/// directory has been deleted. <see cref="EnsureWorkingDirectory"/> moves the process to a
+/// directory that exists before each evaluation.
+/// </para>
 /// <para>
 /// <c>MSBuildLocator.Register*</c> is NOT needed with current MSBuild libraries and must not be
 /// reintroduced. Reference <c>Microsoft.Build</c>, <c>Microsoft.Build.Tasks.Core</c> and
@@ -57,6 +61,7 @@ internal static class MSBuildEnvironment
 
     public static void Ensure()
     {
+        EnsureWorkingDirectory();
         lock (Lock)
         {
             if (_configured)
@@ -74,20 +79,34 @@ internal static class MSBuildEnvironment
             }
 
             Environment.SetEnvironmentVariable("MSBUILD_EXE_PATH", msbuild);
-            Environment.SetEnvironmentVariable("MSBuildEnableWorkloadResolver", "false");
             Log.Debug("MSBuildEnvironment: MSBUILD_EXE_PATH={Path}", msbuild);
         }
     }
 
+    public static void EnsureWorkingDirectory()
+    {
+        try
+        {
+            if (Directory.Exists(Directory.GetCurrentDirectory()))
+                return;
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+        }
+
+        var fallback = Path.GetTempPath();
+        Log.Debug("MSBuildEnvironment: working directory no longer exists, moving to {Path}", fallback);
+        Directory.SetCurrentDirectory(fallback);
+    }
+
     /// <summary>
-    /// Removes the variables this class set from a child process's environment. A child
+    /// Removes the variable this class set from a child process's environment. A child
     /// <c>dotnet</c> initializes its own MSBuild and fails with "The type initializer for
     /// 'Microsoft.Build.Execution.BuildParameters' threw an exception" if it inherits ours.
     /// </summary>
     public static void ScrubFrom(System.Diagnostics.ProcessStartInfo psi)
     {
         psi.Environment.Remove("MSBUILD_EXE_PATH");
-        psi.Environment.Remove("MSBuildEnableWorkloadResolver");
     }
 
     private static string? FindSdkMSBuild()
@@ -195,6 +214,24 @@ public static class NuGetResolver
     {
         private readonly SortedSet<string> _errorCodes = new(StringComparer.OrdinalIgnoreCase);
         private readonly List<string> _errors = new();
+
+        public bool ReportedMissingWorkloads
+        {
+            get
+            {
+                lock (_errorCodes)
+                    return _errorCodes.Contains("NETSDK1147") || _errorCodes.Contains("NETSDK1178");
+            }
+        }
+
+        public bool ReportedTargetFrameworkNeedingNewerSdk
+        {
+            get
+            {
+                lock (_errorCodes)
+                    return _errorCodes.Contains("NETSDK1045");
+            }
+        }
 
         public string? FailureSignature
         {
@@ -421,6 +458,129 @@ public static class NuGetResolver
 
     private static readonly object BuildGate = new();
 
+    /// <summary>The workloads a project needs but the SDK does not have installed.</summary>
+    /// <param name="TargetFramework">The target framework that needs them.</param>
+    /// <param name="Workloads">Installable workload IDs that provide the missing packs.</param>
+    /// <param name="Packs">The missing workload packs, including those no workload for this
+    /// operating system provides.</param>
+    public sealed record MissingWorkloads(
+        string TargetFramework,
+        IReadOnlyList<string> Workloads,
+        IReadOnlyList<string> Packs);
+
+    /// <summary>
+    /// Evaluates <paramref name="projectPath"/> for <paramref name="targetFramework"/> and reports
+    /// the workloads it needs that are not installed, or null when none are missing.
+    /// </summary>
+    public static MissingWorkloads? FindMissingWorkloads(
+        string projectPath,
+        string? targetFramework,
+        IDictionary<string, string>? extraGlobalProperties)
+    {
+        MSBuildEnvironment.Ensure();
+        var globalProps = DesignTimeProperties(targetFramework, extraGlobalProperties);
+
+        try
+        {
+            lock (BuildGate)
+            {
+                using var projectCollection = new ProjectCollection(globalProps);
+                var instance = new ProjectInstance(projectPath, globalProps, null, projectCollection);
+                var packs = instance.GetItems("MissingWorkloadPack")
+                    .Select(i => i.EvaluatedInclude)
+                    .Distinct(StringComparer.OrdinalIgnoreCase)
+                    .ToList();
+                if (packs.Count == 0)
+                    return null;
+
+                instance.Build(new[] { "GetSuggestedWorkloads" }, null, out var outputs);
+                var workloads = outputs.TryGetValue("GetSuggestedWorkloads", out var suggested)
+                    ? suggested.Items.Select(i => i.ItemSpec).Distinct(StringComparer.OrdinalIgnoreCase).ToList()
+                    : new List<string>();
+                return new MissingWorkloads(instance.GetPropertyValue("TargetFramework"), workloads, packs);
+            }
+        }
+        catch (Exception ex)
+        {
+            Log.Debug("NuGetResolver: could not check {Project} ({TargetFramework}) for missing workloads: {Error}",
+                projectPath, targetFramework, ex.Message);
+            return null;
+        }
+    }
+
+    /// <summary>A target framework newer than the installed .NET SDK can build.</summary>
+    /// <param name="TargetFramework">The target framework alias.</param>
+    /// <param name="SdkVersion">The installed .NET SDK version.</param>
+    public sealed record UnsupportedTargetFramework(string TargetFramework, string SdkVersion);
+
+    /// <summary>
+    /// Evaluates <paramref name="projectPath"/> for <paramref name="targetFramework"/> and reports
+    /// it when the target framework needs a newer .NET SDK than the installed one (NETSDK1045),
+    /// or null when the SDK supports it.
+    /// </summary>
+    public static UnsupportedTargetFramework? FindTargetFrameworkNeedingNewerSdk(
+        string projectPath,
+        string? targetFramework,
+        IDictionary<string, string>? extraGlobalProperties)
+    {
+        MSBuildEnvironment.Ensure();
+        var globalProps = DesignTimeProperties(targetFramework, extraGlobalProperties);
+
+        try
+        {
+            lock (BuildGate)
+            {
+                using var projectCollection = new ProjectCollection(globalProps);
+                var instance = new ProjectInstance(projectPath, globalProps, null, projectCollection);
+                if (targetFramework == null && instance.GetPropertyValue("TargetFramework").Length == 0 &&
+                    instance.GetPropertyValue("TargetFrameworks")
+                        .Split(';', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries) is [var only])
+                {
+                    globalProps["TargetFramework"] = only;
+                    instance = new ProjectInstance(projectPath, globalProps, null, projectCollection);
+                }
+                var maximum = instance.GetPropertyValue("TargetFrameworkIdentifier") switch
+                {
+                    ".NETCoreApp" => instance.GetPropertyValue("NETCoreAppMaximumVersion"),
+                    ".NETStandard" => instance.GetPropertyValue("NETStandardMaximumVersion"),
+                    _ => ""
+                };
+                if (!Version.TryParse(maximum, out var maximumVersion) ||
+                    !Version.TryParse(instance.GetPropertyValue("_TargetFrameworkVersionWithoutV"), out var version) ||
+                    Normalized(version) <= Normalized(maximumVersion))
+                    return null;
+                return new UnsupportedTargetFramework(
+                    instance.GetPropertyValue("TargetFramework"),
+                    instance.GetPropertyValue("NETCoreSdkVersion"));
+            }
+        }
+        catch (Exception ex)
+        {
+            Log.Debug("NuGetResolver: could not check whether the SDK supports {Project} ({TargetFramework}): {Error}",
+                projectPath, targetFramework, ex.Message);
+            return null;
+        }
+    }
+
+    private static Dictionary<string, string> DesignTimeProperties(
+        string? targetFramework,
+        IDictionary<string, string>? extraGlobalProperties)
+    {
+        var globalProps = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+        {
+            ["DesignTimeBuild"] = "true",
+        };
+        ApplyWindowsTargetingDefault(globalProps);
+        if (extraGlobalProperties != null)
+        {
+            foreach (var (k, v) in extraGlobalProperties)
+                globalProps[k] = v;
+        }
+        if (targetFramework != null)
+            globalProps["TargetFramework"] = targetFramework;
+        return globalProps;
+    }
+
     private const int RootFailureThreshold = 3;
 
     private static readonly Dictionary<string, (DependencyGraphSpec? Graph, string? Failure)> GraphCache =
@@ -525,38 +685,49 @@ public static class NuGetResolver
             }
 
             var buildLogger = new SerilogMSBuildLogger();
-            lock (BuildGate)
+            var result = BuildRestoreGraph(projectPath, globalProps, buildLogger);
+            Version? netCoreAppMaximum = null;
+            while (result.OverallResult != BuildResultCode.Success)
             {
-                using var projectCollection = new ProjectCollection(globalProps);
-                var parameters = new BuildParameters(projectCollection)
+                if (buildLogger.ReportedMissingWorkloads && !globalProps.ContainsKey("DesignTimeBuild"))
                 {
-                    DisableInProcNode = false,
-                    EnableNodeReuse = false,
-                    MaxNodeCount = 1,
-                    Loggers = new Microsoft.Build.Framework.ILogger[] { buildLogger },
-                };
-                var requestData = new BuildRequestData(
-                    projectPath,
-                    globalProps.ToDictionary(p => p.Key, p => (string?)p.Value, StringComparer.OrdinalIgnoreCase),
-                    null,
-                    new[] { "GenerateRestoreGraphFile" },
-                    null);
-                var result = BuildManager.DefaultBuildManager.Build(parameters, requestData);
-                if (result.OverallResult != BuildResultCode.Success || !File.Exists(outputPath))
-                {
-                    Log.Warning("Restore graph generation failed for {Project}: {Errors}",
-                        projectPath,
-                        buildLogger.Errors.Count > 0
-                            ? string.Join(" | ", buildLogger.Errors)
-                            : result.Exception?.Message ?? "(no MSBuild error reported)");
-                    failureSignature = buildLogger.FailureSignature
-                                       ?? result.Exception?.GetType().Name
-                                       ?? "build-failed";
-                    return null;
+                    Log.Debug("NuGetResolver: {Project} targets platforms without an installed workload; " +
+                              "regenerating its restore graph as a design-time build", projectPath);
+                    globalProps["DesignTimeBuild"] = "true";
                 }
+                else if (buildLogger.ReportedTargetFrameworkNeedingNewerSdk && netCoreAppMaximum == null)
+                {
+                    Log.Debug("NuGetResolver: {Project} targets frameworks newer than the installed SDK supports; " +
+                              "regenerating its restore graph without them", projectPath);
+                    netCoreAppMaximum = NetCoreAppMaximumVersion(projectPath, globalProps);
+                    if (netCoreAppMaximum == null)
+                        break;
+                    globalProps["NETCoreAppMaximumVersion"] = UnboundedFrameworkVersion;
+                    globalProps["NETStandardMaximumVersion"] = UnboundedFrameworkVersion;
+                }
+                else
+                {
+                    break;
+                }
+                buildLogger = new SerilogMSBuildLogger();
+                result = BuildRestoreGraph(projectPath, globalProps, buildLogger);
             }
 
-            return DependencyGraphSpec.Load(outputPath);
+            if (result.OverallResult != BuildResultCode.Success || !File.Exists(outputPath))
+            {
+                Log.Warning("Restore graph generation failed for {Project}: {Errors}",
+                    projectPath,
+                    buildLogger.Errors.Count > 0
+                        ? string.Join(" | ", buildLogger.Errors)
+                        : result.Exception?.Message ?? "(no MSBuild error reported)");
+                failureSignature = buildLogger.FailureSignature
+                                   ?? result.Exception?.GetType().Name
+                                   ?? "build-failed";
+                return null;
+            }
+
+            var dgSpec = WithoutUnresolvedPlatforms(DependencyGraphSpec.Load(outputPath));
+            return netCoreAppMaximum == null ? dgSpec : WithoutFrameworksNewerThan(dgSpec, netCoreAppMaximum);
         }
         catch (Exception ex)
         {
@@ -569,6 +740,117 @@ public static class NuGetResolver
         {
             try { File.Delete(outputPath); } catch { /* best effort */ }
         }
+    }
+
+    private static BuildResult BuildRestoreGraph(
+        string projectPath,
+        Dictionary<string, string> globalProps,
+        SerilogMSBuildLogger buildLogger)
+    {
+        lock (BuildGate)
+        {
+            using var projectCollection = new ProjectCollection(globalProps);
+            var parameters = new BuildParameters(projectCollection)
+            {
+                DisableInProcNode = false,
+                EnableNodeReuse = false,
+                MaxNodeCount = 1,
+                Loggers = new Microsoft.Build.Framework.ILogger[] { buildLogger },
+            };
+            var requestData = new BuildRequestData(
+                projectPath,
+                globalProps.ToDictionary(p => p.Key, p => (string?)p.Value, StringComparer.OrdinalIgnoreCase),
+                null,
+                new[] { "GenerateRestoreGraphFile" },
+                null);
+            return BuildManager.DefaultBuildManager.Build(parameters, requestData);
+        }
+    }
+
+    private static readonly System.Collections.Concurrent.ConcurrentDictionary<string, IReadOnlySet<string>>
+        UnresolvedPlatformsByProject = new(StringComparer.OrdinalIgnoreCase);
+
+    /// <summary>
+    /// Target framework aliases of <paramref name="projectPath"/> that restore left out because
+    /// their platform (<c>net10.0-ios</c>, say) resolved no version, which is what happens when the
+    /// workload that provides the platform is not installed.
+    /// </summary>
+    public static IReadOnlySet<string> UnresolvedPlatformTargetFrameworks(string projectPath) =>
+        UnresolvedPlatformsByProject.TryGetValue(Path.GetFullPath(projectPath), out var frameworks)
+            ? frameworks
+            : new HashSet<string>();
+
+    private const string UnboundedFrameworkVersion = "1000000.0";
+
+    private static Version? NetCoreAppMaximumVersion(string projectPath, Dictionary<string, string> globalProps)
+    {
+        lock (BuildGate)
+        {
+            using var projectCollection = new ProjectCollection(globalProps);
+            var instance = new ProjectInstance(projectPath, globalProps, null, projectCollection);
+            return Version.TryParse(instance.GetPropertyValue("NETCoreAppMaximumVersion"), out var maximum)
+                ? maximum
+                : null;
+        }
+    }
+
+    private static DependencyGraphSpec WithoutFrameworksNewerThan(DependencyGraphSpec dgSpec, Version netCoreAppMaximum)
+    {
+        foreach (var spec in dgSpec.Projects)
+        {
+            var unsupported = spec.TargetFrameworks
+                .Where(tf => tf.FrameworkName.Framework switch
+                {
+                    FrameworkConstants.FrameworkIdentifiers.NetCoreApp =>
+                        Normalized(tf.FrameworkName.Version) > Normalized(netCoreAppMaximum),
+                    FrameworkConstants.FrameworkIdentifiers.NetStandard =>
+                        Normalized(tf.FrameworkName.Version) > Normalized(FrameworkConstants.CommonFrameworks.NetStandard21.Version),
+                    _ => false
+                })
+                .ToList();
+            RemoveTargetFrameworks(spec, unsupported);
+            if (unsupported.Count > 0)
+                Log.Debug("NuGetResolver: not restoring {Frameworks} of {Project}: the installed SDK does not support them",
+                    string.Join(", ", unsupported.Select(f => f.TargetAlias)), spec.FilePath);
+        }
+        return dgSpec;
+    }
+
+    private static Version Normalized(Version version) =>
+        new(version.Major, version.Minor, Math.Max(version.Build, 0), Math.Max(version.Revision, 0));
+
+    private static void RemoveTargetFrameworks(PackageSpec spec, IEnumerable<TargetFrameworkInformation> frameworks)
+    {
+        foreach (var framework in frameworks)
+        {
+            spec.TargetFrameworks.Remove(framework);
+            var metadata = spec.RestoreMetadata;
+            if (metadata == null)
+                continue;
+            metadata.OriginalTargetFrameworks.Remove(framework.TargetAlias);
+            foreach (var info in metadata.TargetFrameworks.Where(i => i.TargetAlias == framework.TargetAlias).ToList())
+                metadata.TargetFrameworks.Remove(info);
+        }
+    }
+
+    private static DependencyGraphSpec WithoutUnresolvedPlatforms(DependencyGraphSpec dgSpec)
+    {
+        foreach (var spec in dgSpec.Projects)
+        {
+            var unresolved = spec.TargetFrameworks
+                .Where(tf => tf.FrameworkName.HasPlatform &&
+                             tf.FrameworkName.PlatformVersion == FrameworkConstants.EmptyVersion)
+                .ToList();
+            RemoveTargetFrameworks(spec, unresolved);
+            if (unresolved.Count > 0 && (spec.RestoreMetadata?.ProjectPath ?? spec.FilePath) is { } projectPath)
+                UnresolvedPlatformsByProject[Path.GetFullPath(projectPath)] = unresolved
+                    .Select(f => f.TargetAlias)
+                    .ToHashSet(StringComparer.OrdinalIgnoreCase);
+            if (unresolved.Count > 0)
+                Log.Debug("NuGetResolver: not restoring {Frameworks} of {Project}: no installed workload provides the platform",
+                    string.Join(", ", unresolved.Select(f => f.TargetAlias)), spec.FilePath);
+        }
+        return dgSpec;
     }
 
 
@@ -593,7 +875,12 @@ public static class NuGetResolver
         foreach (var project in dgSpec.Projects)
         {
             var style = project.RestoreMetadata?.ProjectStyle;
-            if (style == ProjectStyle.PackageReference || style == ProjectStyle.DotnetCliTool ||
+            if (project.TargetFrameworks.Count == 0)
+            {
+                Log.Debug("NuGetResolver: skipping restore of {Project}: none of its target frameworks can be restored",
+                    project.RestoreMetadata?.ProjectUniqueName);
+            }
+            else if (style == ProjectStyle.PackageReference || style == ProjectStyle.DotnetCliTool ||
                 style == ProjectStyle.Standalone)
             {
                 restorable.AddProject(project);

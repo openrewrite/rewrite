@@ -382,6 +382,12 @@ public class RewriteRpcServer
             if (!seenProjects.Add(project.FilePath!))
                 continue;
 
+            if (solutionParser.ProjectsNotParsed.Contains(Path.GetFullPath(project.FilePath!)))
+            {
+                EmitProjectFile(project.FilePath!);
+                continue;
+            }
+
             projectIndex++;
             Log.Debug("RPC ParseSolution: parsing project [{ProjectIndex}/{ProjectCount}] {ProjectName}",
                 projectIndex, projectList.Count, Path.GetFileNameWithoutExtension(project.FilePath));
@@ -414,7 +420,8 @@ public class RewriteRpcServer
             // A diagnostic can name a project that nonetheless evaluated far enough to yield its
             // documents (an unresolvable ProjectReference, say). Recovering from disk there would
             // resurrect files the project deliberately excludes, so leave those projects alone.
-            if (projectsWithSources.Contains(Path.GetFullPath(projectPath)))
+            if (projectsWithSources.Contains(Path.GetFullPath(projectPath)) ||
+                solutionParser.ProjectsNotParsed.Contains(Path.GetFullPath(projectPath)))
                 continue;
 
             var recovered = solutionParser.ParseProjectWithoutMSBuild(projectPath, rootDir,
