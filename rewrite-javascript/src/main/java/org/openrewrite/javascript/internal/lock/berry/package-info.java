@@ -22,7 +22,8 @@
  * resolver, the fetcher, patchUtils), packages/plugin-link, plugin-git, plugin-http, plugin-file, plugin-exec and
  * plugin-jsr (their resolvers and fetchers), packages/plugin-compat, packages/plugin-catalog,
  * packages/yarnpkg-extensions (as data, in {@code yarn-releases.json.gz}) and packages/plugin-essentials (the install
- * command). It is distributed under the BSD 2-Clause License:
+ * command), with what each other Yarn 4.x release does otherwise beside it ({@code YarnRelease}, from the tags
+ * {@code @yarnpkg/cli/<version>}). It is distributed under the BSD 2-Clause License:
  * <pre>
  * Copyright (c) 2016-present, Yarn Contributors.
  * All rights reserved.

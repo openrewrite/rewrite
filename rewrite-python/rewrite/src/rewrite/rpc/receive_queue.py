@@ -23,7 +23,7 @@ This processes the same JSON format that Python sends:
 ]
 """
 from collections import deque
-from typing import Any, Callable, Deque, Dict, List, NamedTuple, Optional, Set, TypeVar, cast
+from typing import Any, Callable, Deque, Dict, List, Optional, Set, TypeVar, cast
 
 from rewrite import Markers
 from rewrite.rpc.send_queue import RpcObjectState
@@ -55,17 +55,29 @@ class _FrozenList(list):
 _EMPTY_LIST: List[Any] = _FrozenList()
 
 
-class RpcObjectData(NamedTuple):
+class RpcObjectData:
     """Data structure for RPC object messages.
 
-    Tuple-backed (no __dict__) for cheap instantiation: ~70M of these are
-    created per medium-set sequential run and they're never mutated.
+    Slotted rather than tuple-backed: about 20% cheaper to construct on 3.12, and ~70M of these
+    are created per medium-set sequential run. Read by attribute only — the send side builds
+    plain dicts, so one of these never reaches json.dumps.
     """
-    state: RpcObjectState
-    value_type: Optional[str] = None
-    value: Any = None
-    ref: Optional[int] = None
-    trace: Optional[str] = None
+
+    __slots__ = ('state', 'value_type', 'value', 'ref', 'trace')
+
+    def __init__(self, state: RpcObjectState, value_type: Optional[str] = None,
+                 value: Any = None, ref: Optional[int] = None, trace: Optional[str] = None):
+        self.state = state
+        self.value_type = value_type
+        self.value = value
+        self.ref = ref
+        self.trace = trace
+
+    # receive_list reports a desynchronized queue by formatting the message it got, which a
+    # default object repr would reduce to an address.
+    def __repr__(self) -> str:
+        return (f"RpcObjectData(state={self.state}, value_type={self.value_type!r}, "
+                f"value={self.value!r}, ref={self.ref!r}, trace={self.trace!r})")
 
 
 class RpcReceiveQueue:

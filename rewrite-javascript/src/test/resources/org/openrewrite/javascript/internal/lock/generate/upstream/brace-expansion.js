@@ -13,8 +13,9 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-// brace-expansion 1.1.11 and 5.0.6 for upstream-calls.js: expand. 5.0.6's tests import its build, which is the copy
-// npm 11.17.0 bundles: BRACE_EXPANSION_5 names that package's directory.
+// brace-expansion 1.1.11, 5.0.6 and 5.0.9 for upstream-calls.js: expand. A 5.x release's tests import its build, which
+// is the copy npm bundles (5.0.6 in npm 11.17.0, 5.0.9 in npm 11.19.1): BRACE_EXPANSION_5 names that package's
+// directory.
 const fs = require('fs')
 const path = require('path')
 
@@ -35,6 +36,16 @@ module.exports = {
     expand => (expand.expand || expand)('{a},{,b}'),
     expand => (expand.expand || expand)('{a}y,,z}'),
     expand => (expand.expand || expand)('{a}{b,c},,d}'),
-    expand => (expand.expand || expand)('{1..3}{a,b}')
+    expand => (expand.expand || expand)('{1..3}{a,b}'),
+    // 5.0.9 combines the sets left to right and drops an empty result by the first set alone
+    expand => (expand.expand || expand)('{x,y}{a},}'),
+    expand => (expand.expand || expand)('{,a}{b},}'),
+    expand => (expand.expand || expand)('{,a}{b}c,}'),
+    expand => (expand.expand || expand)('{a,b}{}c,}'),
+    expand => (expand.expand || expand)('{,a}{},}'),
+    expand => (expand.expand || expand)('{,}{a},}'),
+    expand => (expand.expand || expand)('{,x}{{a,b}}'),
+    expand => (expand.expand || expand)('{a,b}{c},d}{e,f}'),
+    expand => (expand.expand || expand)('x${a,b}{c,d}{,e}')
   ]
 }

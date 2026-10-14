@@ -181,3 +181,41 @@ func writeFile(t *testing.T, dir, name, content string) {
 	t.Helper()
 	require.NoError(t, os.WriteFile(filepath.Join(dir, name), []byte(content), 0o644), "write")
 }
+
+func TestParseGoListModulesUnresolvedIncludesErrorText(t *testing.T) {
+	// given: `go list -e -m -json all` output where two modules failed lookup with the same error
+	stream := `
+{"Path":"example.com/m","Main":true,"GoVersion":"1.22"}
+{"Path":"github.com/tidwall/redcon","Version":"v1.9.9","Error":{"Err":"module lookup disabled by GOPROXY=off"}}
+{"Path":"gonum.org/v1/plot","Version":"v0.99.0","Error":{"Err":"module lookup disabled by GOPROXY=off"}}
+`
+
+	// when
+	mods, err := parseGoListModules([]byte(stream))
+
+	// then
+	assert.Nil(t, mods)
+	require.Error(t, err)
+	assert.Equal(t, "go list -m: 2 module(s) unresolved (build list unreliable): "+
+		"github.com/tidwall/redcon, gonum.org/v1/plot: module lookup disabled by GOPROXY=off", err.Error())
+}
+
+func TestParseGoListModulesUnresolvedListsDistinctErrors(t *testing.T) {
+	// given: unresolved modules failing for different reasons
+	stream := `
+{"Path":"example.com/m","Main":true}
+{"Path":"github.com/a/cached","Version":"v1.0.0","Error":{"Err":"module lookup disabled by GOPROXY=off"}}
+{"Path":"github.com/b/gone","Version":"v0.1.0","Error":{"Err":"reading https://proxy.golang.org/github.com/b/gone/@v/v0.1.0.mod: 404 Not Found"}}
+{"Path":"github.com/c/cached","Version":"v2.0.0","Error":{"Err":"module lookup disabled by GOPROXY=off"}}
+`
+
+	// when
+	_, err := parseGoListModules([]byte(stream))
+
+	// then
+	require.Error(t, err)
+	assert.Equal(t, "go list -m: 3 module(s) unresolved (build list unreliable): "+
+		"github.com/a/cached, github.com/b/gone, github.com/c/cached: "+
+		"module lookup disabled by GOPROXY=off; "+
+		"reading https://proxy.golang.org/github.com/b/gone/@v/v0.1.0.mod: 404 Not Found", err.Error())
+}

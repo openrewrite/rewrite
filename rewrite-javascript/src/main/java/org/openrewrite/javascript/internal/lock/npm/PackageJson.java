@@ -30,11 +30,21 @@ import java.util.Map;
 import static org.openrewrite.javascript.internal.lock.npm.Js.truthy;
 
 /**
- * Port of @npmcli/package-json 7.0.5 as arborist reads a manifest: {@link #normalize(String)} runs the
- * {@code normalizeSteps}, {@link #syncNormalize(Map)} the synchronous ones, as {@code Node} does on its package.
+ * Port of @npmcli/package-json 7.0.5 as arborist reads a manifest: {@link #normalize(String, NpmRelease)} runs the
+ * {@code normalizeSteps}, {@link #syncNormalize(Map, NpmRelease)} the synchronous ones, as {@code Node} does on its
+ * package.
  */
 @Getter
 public final class PackageJson {
+
+    /**
+     * The @npmcli/package-json release whose {@code bin} step normalizes a fetched manifest: 7.0.5, which npm 11.17.0
+     * bundles and every release from 6.0.1 reads as there; 5.2.0, which like 5.1.1 drops a name or a path that starts
+     * with a dot; or 5.1.0, which like read-package-json-fast before it keeps a colon in a path.
+     */
+    public enum Release {
+        V5_1_0, V5_2_0, V7_0_5
+    }
 
     /**
      * Thrown where npm would read the package's files: {@code directories.bin} without {@code bin}.
@@ -84,11 +94,11 @@ public final class PackageJson {
     }
 
     /**
-     * {@code PackageJson.normalize(path)}: JsonParseException as {@code Invalid package.json}, an Error for a falsy
-     * value, a TypeError for a truthy one that is not an object or array.
+     * {@code PackageJson.normalize(path)} of the library the npm {@code release} bundles: JsonParseException as {@code
+     * Invalid package.json}, an Error for a falsy value, a TypeError for a truthy one that is not an object or array.
      */
     @SuppressWarnings("unchecked")
-    public static PackageJson normalize(String text) {
+    public static PackageJson normalize(String text, NpmRelease release) {
         JsonParseEvenBetterErrors.Parsed parsed;
         try {
             parsed = JsonParseEvenBetterErrors.parse(text);
@@ -105,19 +115,25 @@ public final class PackageJson {
         }
         // an array has none of the properties the steps read, so it normalizes to an empty manifest
         Map<String, Object> data = value instanceof Map ? (Map<String, Object>) value : new LinkedHashMap<>();
+        // read-package-json-fast keeps the _ fields of a file before npm 7.5.6 (2.0.2)
+        List<String> steps = new ArrayList<>(NORMALIZE_STEPS);
+        if (!release.stripsUnderscoreFieldsOfFiles()) {
+            steps.remove("_attributes");
+        }
         Object directories = data.get("directories");
         Object binDir = directories instanceof Map ? ((Map<?, ?>) directories).get("bin") : null;
-        if (truthy(binDir) && !truthy(data.get("bin"))) {
+        // read-package-json-fast reads no directories.bin before npm 7.20.1 (2.0.3)
+        if (truthy(binDir) && !truthy(data.get("bin")) && release.readsBinDirectoryOfFiles()) {
             if (!(binDir instanceof String)) {
                 throw new FieldError("directories.bin", "ref.replace is not a function");
             }
             data.remove("bin");
             throw new NeedsPackageFiles("\"directories\": {\"bin\": " + Js.quote((String) binDir) +
                                         "} names the package's files, which are not known",
-                    syncSteps(data, NORMALIZE_STEPS));
+                    syncSteps(data, steps, release));
         }
         normalizeBin(data);
-        syncSteps(data, NORMALIZE_STEPS);
+        syncSteps(data, steps, release);
         return new PackageJson(data, parsed.getIndent(), parsed.getNewline());
     }
 
@@ -128,14 +144,14 @@ public final class PackageJson {
         return new PackageJson(content, null, null);
     }
 
-    static Map<String, Object> syncNormalize(Map<String, Object> data) {
+    static Map<String, Object> syncNormalize(Map<String, Object> data, NpmRelease release) {
         List<String> steps = new ArrayList<>(NORMALIZE_STEPS);
         steps.remove("_attributes");
-        return syncSteps(data, steps);
+        return syncSteps(data, steps, release);
     }
 
     @SuppressWarnings("unchecked")
-    private static Map<String, Object> syncSteps(Map<String, Object> data, List<String> steps) {
+    private static Map<String, Object> syncSteps(Map<String, Object> data, List<String> steps, NpmRelease release) {
         Object name = data.get("name");
         Object version = data.get("version");
         String pkgId = name + "@" + version;
@@ -169,9 +185,31 @@ public final class PackageJson {
             data.remove("bundleDependencies");
         }
 
+        // the overrides step, which 8.0.0 adds: the field is left absent or an object with keys
+        if (data.containsKey("overrides") && release.normalizesOverrides()) {
+            Object ov = data.get("overrides");
+            if (!(ov instanceof Map) || ((Map<?, ?>) ov).isEmpty()) {
+                data.remove("overrides");
+            }
+        }
+
         Object dependencies = data.get("dependencies");
         Object optionalDependencies = data.get("optionalDependencies");
-        if (truthy(dependencies) && (optionalDependencies instanceof Map || optionalDependencies instanceof List)) {
+        if (release.foldsOptionalDependencies()) {
+            // read-package-json-fast 1.2.1's foldinOptionalDeps: the optional dependencies are listed as dependencies too
+            if (optionalDependencies instanceof Map || optionalDependencies instanceof List) {
+                if (!truthy(dependencies)) {
+                    dependencies = new LinkedHashMap<String, Object>();
+                    data.put("dependencies", dependencies);
+                }
+                for (Map.Entry<String, Object> optional : Js.entries(optionalDependencies)) {
+                    if (dependencies instanceof Map && !"__proto__".equals(optional.getKey())) {
+                        ((Map<String, Object>) dependencies).put(optional.getKey(), optional.getValue());
+                    }
+                }
+            }
+        } else if (truthy(dependencies) &&
+                   (optionalDependencies instanceof Map || optionalDependencies instanceof List)) {
             for (String optional : Js.keys(optionalDependencies)) {
                 Js.deleteSloppy(dependencies, optional);
             }
@@ -250,6 +288,133 @@ public final class PackageJson {
             }
         }
         pkg.remove("bin");
+    }
+
+    /**
+     * The {@code bin} step of {@code release} over a fetched manifest.
+     */
+    @SuppressWarnings("unchecked")
+    static void normalizeBin(Map<String, Object> pkg, Release release) {
+        if (release == Release.V7_0_5) {
+            normalizeBin(pkg);
+            return;
+        }
+        if (release == Release.V5_1_0) {
+            // its loop reads as npm-normalize-package-bin's, which already ran over the manifest when it was picked
+            normalizePackageBin(pkg);
+            return;
+        }
+        Object bin = pkg.get("bin");
+        if (truthy(bin)) {
+            if (bin instanceof String && truthy(pkg.get("name"))) {
+                Map<String, Object> object = new LinkedHashMap<>();
+                object.put(Js.string(pkg.get("name")), bin);
+                bin = object;
+                pkg.put("bin", bin);
+            } else if (bin instanceof List) {
+                Map<String, Object> object = new LinkedHashMap<>();
+                for (Object k : (List<Object>) bin) {
+                    if (!(k instanceof String)) {
+                        throw new IllegalArgumentException(
+                                "The \"path\" argument must be of type string. Received " + Js.received(k));
+                    }
+                    object.put(PosixPath.basename((String) k), k);
+                }
+                bin = object;
+                pkg.put("bin", bin);
+            }
+            if (bin instanceof Map) {
+                Map<String, Object> bins = (Map<String, Object>) bin;
+                for (String binKey : Js.keys(bins)) {
+                    Object target = bins.get(binKey);
+                    if (!(target instanceof String)) {
+                        bins.remove(binKey);
+                        continue;
+                    }
+                    String base = PosixPath.basename(secureAndUnixifyPath5_2_0(binKey));
+                    if (base.isEmpty()) {
+                        bins.remove(binKey);
+                        continue;
+                    }
+                    String binTarget = secureAndUnixifyPath5_2_0((String) target);
+                    if (binTarget.isEmpty()) {
+                        bins.remove(binKey);
+                        continue;
+                    }
+                    if (!base.equals(binKey)) {
+                        bins.remove(binKey);
+                    }
+                    bins.put(base, binTarget);
+                }
+                if (bins.isEmpty()) {
+                    pkg.remove("bin");
+                }
+                return;
+            }
+        }
+        pkg.remove("bin");
+    }
+
+    // 5.1.1 and 5.2.0: securePath empties every path whose first name starts with a dot, not only ./
+    private static String secureAndUnixifyPath5_2_0(String ref) {
+        String secured = PosixPath.join(".", PosixPath.join("/", unixifyPath(ref)));
+        return unixifyPath(secured.startsWith(".") ? "" : secured);
+    }
+
+    /**
+     * Port of npm-normalize-package-bin 5.0.0, the same since 3.0.1: {@code bin} as a new object of base names to
+     * paths under the package, a colon in a path kept.
+     */
+    @SuppressWarnings("unchecked")
+    static void normalizePackageBin(Map<String, Object> pkg) {
+        Object bin = pkg.get("bin");
+        if (!truthy(bin)) {
+            pkg.remove("bin");
+            return;
+        }
+        Map<String, Object> orig;
+        if (bin instanceof String) {
+            if (!truthy(pkg.get("name"))) {
+                pkg.remove("bin");
+                return;
+            }
+            orig = new LinkedHashMap<>();
+            orig.put(Js.string(pkg.get("name")), bin);
+        } else if (bin instanceof List) {
+            orig = new LinkedHashMap<>();
+            for (Object k : (List<Object>) bin) {
+                if (!(k instanceof String)) {
+                    throw new IllegalArgumentException(
+                            "The \"path\" argument must be of type string. Received " + Js.received(k));
+                }
+                orig.put(PosixPath.basename((String) k), k);
+            }
+        } else if (bin instanceof Map) {
+            orig = (Map<String, Object>) bin;
+        } else {
+            pkg.remove("bin");
+            return;
+        }
+        Map<String, Object> clean = new LinkedHashMap<>();
+        for (String binKey : Js.keys(orig)) {
+            String base = PosixPath.join("/", PosixPath.basename(binKey.replace('\\', '/').replace(':', '/')))
+                    .substring(1);
+            Object target = orig.get(binKey);
+            if (!(target instanceof String) || base.isEmpty()) {
+                continue;
+            }
+            String binTarget = PosixPath.join("/", ((String) target).replace('\\', '/')).replace('\\', '/')
+                    .substring(1);
+            if (binTarget.isEmpty()) {
+                continue;
+            }
+            clean.put(base, binTarget);
+        }
+        if (clean.isEmpty()) {
+            pkg.remove("bin");
+        } else {
+            pkg.put("bin", clean);
+        }
     }
 
     private static String unixifyPath(String ref) {

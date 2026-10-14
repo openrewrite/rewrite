@@ -40,4 +40,13 @@ interface ResolutionVerifier {
     }
 
     Result verify(@Nullable Object resolution, String name, String version);
+
+    /**
+     * {@link #verify(Object, String, String)} of an entry whose dep path names a non-semver version (a tarball's URL),
+     * which from 11.5.2 the npm verifier passes.
+     */
+    default Result verify(@Nullable Object resolution, String name, String version,
+                          @Nullable String nonSemverVersion) {
+        return verify(resolution, name, version);
+    }
 }

@@ -31,8 +31,6 @@ import java.util.Map;
  */
 final class PackageCompatibility {
 
-    static final String YARN_VERSION = "1.22.22";
-
     // process.versions of the Node 24 build the recordings ran on, other than node itself
     private static final List<String> NODE_COMPONENTS = Arrays.asList("acorn", "ada", "amaro", "ares", "brotli",
             "cldr", "icu", "llhttp", "merve", "modules", "napi", "nbytes", "ncrypto", "nghttp2", "nghttp3", "ngtcp2",
@@ -96,7 +94,7 @@ final class PackageCompatibility {
      */
     private @Nullable String version(String name) {
         if ("yarn".equals(name)) {
-            return YARN_VERSION;
+            return config.getRelease().toString();
         }
         if ("node".equals(name)) {
             String node = host.getNodeVersion();
@@ -120,11 +118,11 @@ final class PackageCompatibility {
         Object engines = info.get("engines");
         if (shouldCheckPlatform(os, config.isIgnorePlatform()) && host.getOs() != null &&
             !isValid((List<?>) os, host.getOs())) {
-            pushed.add(Lang.format("The platform $0 is incompatible with this module.", host.getOs()));
+            pushed.add(Lang.format(config.getRelease(), "The platform $0 is incompatible with this module.", host.getOs()));
         }
         if (shouldCheckCpu(cpu, config.isIgnorePlatform()) && host.getCpu() != null &&
             !isValid((List<?>) cpu, host.getCpu())) {
-            pushed.add(Lang.format("The CPU architecture $0 is incompatible with this module.", host.getCpu()));
+            pushed.add(Lang.format(config.getRelease(), "The CPU architecture $0 is incompatible with this module.", host.getCpu()));
         }
         if (shouldCheckEngines(engines, ignoreEngines)) {
             for (String key : Js.keys(engines)) {
@@ -135,8 +133,11 @@ final class PackageCompatibility {
                     continue;
                 }
                 if (!actual.isEmpty() && !testEngine(name, range, actual, config.isLooseSemver())) {
-                    pushed.add(Lang.format("The engine $0 is incompatible with this module. Expected version " +
-                                           "$1. Got $2", name, range, actual));
+                    pushed.add(config.getRelease().namesTheEngineVersion() ?
+                            Lang.format(config.getRelease(), "The engine $0 is incompatible with this module. Expected version $1. Got $2",
+                                    name, range, actual) :
+                            Lang.format(config.getRelease(), "The engine $0 is incompatible with this module. Expected version $1.", name,
+                                    range));
                 }
             }
         }
@@ -150,7 +151,8 @@ final class PackageCompatibility {
             }
         }
         if (didError) {
-            throw new MessageError("Found incompatible module.");
+            throw new MessageError(config.getRelease().endsFoundIncompatibleWithAPeriod() ?
+                    "Found incompatible module." : "Found incompatible module");
         }
     }
 
@@ -176,5 +178,15 @@ final class PackageCompatibility {
         return shouldCheckCpu(manifest.get("cpu"), ignorePlatform) ||
                shouldCheckPlatform(manifest.get("os"), ignorePlatform) ||
                shouldCheckEngines(manifest.get("engines"), ignoreEngines);
+    }
+
+    /**
+     * install.js {@code init} before 1.15.0: the root is checked where its engines is an object, {@code typeof null}
+     * among them, and {@code --ignore-engines} is not given.
+     */
+    static boolean checksRootEngines(Manifest manifest, boolean ignoreEngines) {
+        Object engines = manifest.get("engines");
+        return !ignoreEngines && (engines instanceof Map || engines instanceof List ||
+                                  engines == null && manifest.data.containsKey("engines"));
     }
 }

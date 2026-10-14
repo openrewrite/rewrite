@@ -18,8 +18,12 @@ package org.openrewrite.javascript.internal.lock.npm;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.javascript.internal.lock.PosixPath;
 
+import java.util.ArrayDeque;
+import java.util.Deque;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.Objects;
+import java.util.Set;
 
 import static org.openrewrite.javascript.internal.lock.npm.Js.truthy;
 
@@ -32,9 +36,23 @@ public class Link extends Node {
     public Link(Options options) {
         super(linkOptions(options));
         Node target = options.getTarget();
+        if (!getRelease().rootsTargetWithLink()) {
+            // arborist 1: a target made here is rooted in the link's tree and lists the link among its links in
+            setTarget(target != null ? target : new Node(options.toBuilder()
+                    .path(options.getRealpath())
+                    .parent(null)
+                    .root(getRoot())
+                    .linkIn(this)
+                    .build()));
+            Shrinkwrap meta = getRoot().getMeta();
+            if (meta != null) {
+                meta.add(this);
+            }
+            return;
+        }
         if (target != null) {
             setTarget(target);
-        } else if (Objects.equals(getRealpath(), getRoot().getPath())) {
+        } else if (getRelease().targetsRootItLinksTo() && Objects.equals(getRealpath(), getRoot().getPath())) {
             setTarget(getRoot());
         } else {
             setTarget(new Node(options.toBuilder()
@@ -52,6 +70,12 @@ public class Link extends Node {
         if (!truthy(realpath) && (target == null || target.getPath() == null)) {
             throw new IllegalArgumentException("must provide realpath for Link node");
         }
+        if (!options.getRelease().rootsTargetWithLink()) {
+            // arborist 1 roots a link made without a parent nowhere: it is its own root
+            return options.toBuilder()
+                    .realpath(truthy(realpath) ? realpath : target.getPath())
+                    .build();
+        }
         Node root = options.getRoot() != null ? options.getRoot() :
                 options.getParent() != null ? options.getParent().getRoot() :
                         options.getFsParent() != null ? options.getFsParent().getRoot() :
@@ -64,6 +88,10 @@ public class Link extends Node {
 
     @Override
     public Object getVersion() {
+        if (!getRelease().readsLinkVersionFromTarget()) {
+            // arborist 1 has no getter of its own: node.js's reads the package the link took from its target
+            return super.getVersion();
+        }
         if (target != null) {
             return target.getVersion();
         }
@@ -78,6 +106,24 @@ public class Link extends Node {
 
     public void setTarget(@Nullable Node target) {
         Node current = this.target;
+        if (!getRelease().rootsTargetWithLink()) {
+            // arborist 1's setter: the link takes the target's package and path, and roots a target that is its own root
+            if (current != null) {
+                current.getLinksIn().remove(this);
+            }
+            this.target = target;
+            if (target == null) {
+                setPackage(new LinkedHashMap<>());
+                return;
+            }
+            setPackage(target.getPackage());
+            setRealpath(target.getPath());
+            if (target.getRoot() == target) {
+                target.setRoot(getRoot());
+            }
+            target.getLinksIn().add(this);
+            return;
+        }
         if (target == current) {
             return;
         }
@@ -121,7 +167,8 @@ public class Link extends Node {
     public @Nullable String getResolved() {
         String path = getPath();
         String realpath = getRealpath();
-        return path != null && realpath != null ? "file:" + Relpath.relpath(PosixPath.dirname(path), realpath) : null;
+        return path != null && realpath != null ? "file:" + ConsistentResolve.escapeHash(
+                Relpath.relpath(PosixPath.dirname(path), realpath), getRelease()) : null;
     }
 
     @Override
@@ -134,21 +181,65 @@ public class Link extends Node {
 
     @Override
     void recalculateOutEdgesOverrides() {
+        if (!getRelease().forwardsLinkOverridesToTarget()) {
+            // a link has no method of its own yet, and node.js's goes over the edges out a link never has
+            super.recalculateOutEdgesOverrides();
+            return;
+        }
         OverrideSet overrides = getOverrides();
+        if (!getRelease().forwardsLinkOverridesWithMatchingRule()) {
+            if (target != null) {
+                target.updateOverridesEdgeInAdded(overrides);
+            }
+            return;
+        }
         if (target == null || overrides == null) {
             return;
         }
-        boolean hasMatchingRule = false;
-        for (OverrideSet rule : overrides.getRuleset().values()) {
-            if (target.getEdgesOut().has(rule.getName())) {
-                hasMatchingRule = true;
-                break;
+        if (getRelease().linkOverridesMatchSubtree()) {
+            if (!overrideMatchesSubtree(overrides, target)) {
+                return;
+            }
+        } else {
+            boolean hasMatchingRule = false;
+            for (OverrideSet rule : overrides.getRuleset().values()) {
+                if (target.getEdgesOut().has(rule.getName())) {
+                    hasMatchingRule = true;
+                    break;
+                }
+            }
+            if (!hasMatchingRule) {
+                return;
             }
         }
-        if (!hasMatchingRule) {
-            return;
-        }
         target.updateOverridesEdgeInAdded(overrides);
+    }
+
+    // whether an override rule applies to an edge reachable from the target at any depth
+    private static boolean overrideMatchesSubtree(OverrideSet overrides, Node target) {
+        Set<@Nullable Node> seen = new HashSet<>();
+        Deque<Node> stack = new ArrayDeque<>();
+        stack.push(target);
+        while (!stack.isEmpty()) {
+            Node node = stack.pop();
+            Node resolved = node.isLink() ? node.getTarget() : node;
+            if (seen.contains(resolved)) {
+                continue;
+            }
+            seen.add(resolved);
+            if (resolved == null) {
+                throw new IllegalArgumentException("Cannot read properties of null (reading 'edgesOut')");
+            }
+            for (Edge edge : resolved.getEdgesOut().values()) {
+                if (Objects.equals(overrides.getEdgeRule(edge).getName(), edge.getName())) {
+                    return true;
+                }
+                if (edge.getTo() != null) {
+                    stack.push(edge.getTo());
+                }
+            }
+        }
+        return false;
     }
 
     @Override

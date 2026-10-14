@@ -74,7 +74,7 @@ class SemverTest {
         if (!rightResult.valid) {
             throw new IllegalArgumentException("Invalid SemVer: " + right);
         }
-        return leftResult.version.max().orderWithoutBuild(rightResult.version.max());
+        return leftResult.version.max().orderWithoutBuild(rightResult.version.max(), BunRelease.PORTED);
     }
 
     private static boolean isAllAscii(String s) {

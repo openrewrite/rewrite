@@ -438,7 +438,7 @@ class YarnClassicLockRegeneratorTest {
         Config options = YarnClassicScenarios.defaults();
         PackageResolver resolver = new PackageResolver(options, new Lockfile(), new ResolutionMap(options),
                 YarnClassicScenarios.NO_REGISTRY, new ProjectFiles(built.getManifests(), built.getPaths(),
-                built.getCwd()),
+                built.getCwd(), null),
                 Host.UNKNOWN);
         PackageRequest request = new PackageRequest(DependencyRequestPattern.builder().pattern("x@lib")
                 .registry("npm").optional(false).parentNames(new ArrayList<>()).build(), resolver);

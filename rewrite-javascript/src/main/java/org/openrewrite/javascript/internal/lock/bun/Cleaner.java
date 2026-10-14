@@ -34,18 +34,38 @@ final class Cleaner {
     private final int[] mapping;
     private final List<int[]> cloneQueue = new ArrayList<>();
 
-    private Cleaner(Lockfile old) {
+    /**
+     * From 1.4.0, whether an optional peer's resolution keeps its target alive ({@code keep_optional_peer_targets});
+     * where not, the peers are bound in {@link #flush} to what survived ({@code optional_peers}).
+     */
+    private final boolean keepOptionalPeerTargets;
+    private final List<int[]> optionalPeers = new ArrayList<>();
+
+    private Cleaner(Lockfile old, boolean keepOptionalPeerTargets) {
         this.old = old;
-        this.lockfile = new Lockfile();
+        this.lockfile = new Lockfile(old.release);
         this.mapping = new int[old.packages.size()];
         Arrays.fill(mapping, INVALID_PACKAGE_ID);
+        this.keepOptionalPeerTargets = keepOptionalPeerTargets || !old.release.dropsWhatOnlyOptionalPeersHold();
     }
 
+    /**
+     * The clean of an install that changes no resolution.
+     */
     static Lockfile clean(Lockfile old) {
-        Cleaner cloner = new Cleaner(old);
+        return clean(old, true);
+    }
+
+    /**
+     * @param keepOptionalPeerTargets whether the install is frozen or changes no resolution
+     *                                ({@link PackageDiff.Summary#changesResolutions}), so that from 1.4.0 a package
+     *                                only optional peers resolve to survives
+     */
+    static Lockfile clean(Lockfile old, boolean keepOptionalPeerTargets) {
+        Cleaner cloner = new Cleaner(old, keepOptionalPeerTargets);
         Lockfile lockfile = cloner.lockfile;
-        lockfile.overrides = old.overrides.cloneMap();
-        lockfile.catalogs = old.catalogs.cloneMap();
+        lockfile.overrides = old.overrides.cloneMap(old.release);
+        lockfile.catalogs = old.catalogs.cloneMap(old.release);
 
         Package root = old.rootPackage();
         if (root == null) {
@@ -68,6 +88,9 @@ final class Cleaner {
         cloner.flush();
 
         lockfile.trustedDependencies = old.trustedDependencies;
+        if (old.release.keepsTheLockfileVersionItRead()) {
+            lockfile.textLockfileVersion = old.textLockfileVersion;
+        }
         lockfile.patchedDependencies = new LinkedHashMap<>(old.patchedDependencies);
         return lockfile;
     }
@@ -84,6 +107,13 @@ final class Cleaner {
                 continue;
             }
             lockfile.resolutions.set(resolveId, clonePackage(old.packages.get(oldResolution)));
+        }
+        // the reader binds these before it hoists; the hoist below has to see the same bindings
+        for (int[] pending : optionalPeers) {
+            int mapped = mapping[pending[0]];
+            if (mapped < maxPackageId) {
+                lockfile.resolutions.set(pending[1], mapped);
+            }
         }
         if (!lockfile.packages.isEmpty()) {
             lockfile.resolve();
@@ -112,7 +142,7 @@ final class Cleaner {
         mapping[pkg.meta.id] = newPackage.meta.id;
 
         for (Dependency oldDep : oldDependencies) {
-            lockfile.dependencies.add(oldDep.cloneDependency());
+            lockfile.dependencies.add(oldDep.cloneDependency(old.release));
             lockfile.resolutions.add(INVALID_PACKAGE_ID);
         }
 
@@ -120,6 +150,11 @@ final class Cleaner {
             int oldResolution = oldResolutions.get(i);
             if (oldResolution >= maxPackageId) {
                 lockfile.resolutions.set(prevLen + i, INVALID_PACKAGE_ID);
+                continue;
+            }
+            // a peer slot must not keep its target alive
+            if (oldDependencies.get(i).behavior.isOptionalPeer() && !keepOptionalPeerTargets) {
+                optionalPeers.add(new int[]{oldResolution, newPackage.dependenciesOff + i});
                 continue;
             }
             int mapped = mapping[oldResolution];

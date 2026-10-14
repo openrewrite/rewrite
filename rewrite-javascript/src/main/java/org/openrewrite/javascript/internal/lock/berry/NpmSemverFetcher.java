@@ -49,7 +49,7 @@ final class NpmSemverFetcher implements Fetcher {
 
     private static byte[] fetchFromNetwork(Locator locator, FetchOptions opts) {
         String version = YarnpkgSemverUtils.clean(locator.reference.substring(NpmHttpUtils.PROTOCOL.length()));
-        String url = NpmHttpUtils.getLocatorUrl(locator);
+        String url = NpmHttpUtils.getLocatorUrl(locator, opts.getProject().configuration.getRelease());
         try {
             return NpmHttpUtils.get(url, locator, String.valueOf(version), opts.getProject(), opts.getRegistry());
         } catch (ReportError e) {

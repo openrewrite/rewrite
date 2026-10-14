@@ -23,12 +23,16 @@ import java.util.regex.Pattern;
 
 /**
  * Port of validate-npm-package-name's errors, all that {@code validForOldPackages} counts: 4.0.0, which pnpm 11.2.2's
- * @pnpm/npm-package-arg calls, and 7.0.2, which npm-package-arg 13.0.2 and pnpm's parse-overrides call.
+ * @pnpm/npm-package-arg calls, 7.0.2, which npm-package-arg 13.0.2 and pnpm's parse-overrides call, and the releases
+ * npm 11 bundled before it (6.0.0, 6.0.1, and 6.0.2, whose code 7.0.0 keeps).
  */
 public final class ValidateNpmPackageName {
 
     public enum Release {
         V4_0_0,
+        V6_0_0,
+        V6_0_1,
+        V6_0_2,
         V7_0_2
     }
 
@@ -42,7 +46,10 @@ public final class ValidateNpmPackageName {
     }
 
     public static List<String> errors(String name, Release release) {
+        // 7.0.1 refuses a leading hyphen, 6.0.2 rewords the excluded names, 6.0.1 looks at a scoped name's own start
         boolean v7 = release == Release.V7_0_2;
+        boolean excludes = v7 || release == Release.V6_0_2;
+        boolean scopedPeriod = excludes || release == Release.V6_0_1;
         List<String> errors = new ArrayList<>();
         if (name.isEmpty()) {
             errors.add("name length must be greater than zero");
@@ -61,7 +68,7 @@ public final class ValidateNpmPackageName {
         }
         for (String excludedName : new String[]{"node_modules", "favicon.ico"}) {
             if (name.toLowerCase(Locale.ROOT).equals(excludedName)) {
-                errors.add(excludedName + (v7 ? " is not a valid package name" : " is a blacklisted name"));
+                errors.add(excludedName + (excludes ? " is not a valid package name" : " is a blacklisted name"));
             }
         }
         if (!UriComponent.encodeURIComponent(name).equals(name)) {
@@ -69,7 +76,7 @@ public final class ValidateNpmPackageName {
             if (nameMatch.find()) {
                 String user = nameMatch.group(1);
                 String pkg = nameMatch.group(2);
-                if (v7 && pkg.startsWith(".")) {
+                if (scopedPeriod && pkg.startsWith(".")) {
                     errors.add("name cannot start with a period");
                 }
                 if (user != null && UriComponent.encodeURIComponent(user).equals(user) &&

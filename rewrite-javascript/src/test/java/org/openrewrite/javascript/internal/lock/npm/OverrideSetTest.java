@@ -148,6 +148,23 @@ class OverrideSetTest {
             assertThat(bazEdgeRule.getEdgeRule("buzz", buzzSpec).getValue()).isEqualTo("$buzz");
         }
 
+        // arborist before npm 9.3.0 intersects the edge's spec with the rule's key as two ranges: a range still takes
+        // the rule, a spec that is no range throws node-semver's TypeError
+        @Test
+        void edgeRuleIsARangeIntersectionBefore9_3_0() {
+            OverrideSet overrides = new OverrideSet(obj("foo", "1.0.0", "bar@^1.0.0", "2.0.0"), NpmRelease.of("9.2.0"));
+            assertThat(overrides.getEdgeRule("foo", "^1.0.0").getValue()).isEqualTo("1.0.0");
+            assertThat(overrides.getEdgeRule("bar", "^1.5.0").getValue()).isEqualTo("2.0.0");
+            assertThat(overrides.getEdgeRule("bar", "^2.0.0").isRoot()).isTrue();
+            assertThatThrownBy(() -> overrides.getEdgeRule("foo", "npm:foo2@^1.0.0"))
+              .isInstanceOf(IllegalArgumentException.class);
+            assertThatThrownBy(() -> overrides.getEdgeRule("foo", "latest")).isInstanceOf(IllegalArgumentException.class);
+
+            OverrideSet from930 = new OverrideSet(obj("foo", "1.0.0"), NpmRelease.of("9.3.0"));
+            assertThat(from930.getEdgeRule("foo", "npm:foo2@^1.0.0").getValue()).isEqualTo("1.0.0");
+            assertThat(from930.getEdgeRule("foo", "latest").getValue()).isEqualTo("1.0.0");
+        }
+
         @Test
         void gitSpecsWork() {
             OverrideSet overrides = referenceOverrides();

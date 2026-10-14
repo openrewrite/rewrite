@@ -19,6 +19,7 @@ import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 
 import java.util.LinkedHashMap;
+import java.util.Objects;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatCode;
@@ -185,6 +186,54 @@ class LinkTest {
         assertThat(link.getVersion()).isEqualTo("1.2.3");
     }
 
+    // link.js, from npm 7.1.1 (arborist 2.0.0): a link reads its version from its target; before, from the package it
+    // took when the target was set, which a later change of the target's package leaves as it was
+    @Test
+    void linkKeepsVersionItTookFromTargetBefore711() {
+        for (String version : new String[]{"7.1.0", "7.1.1"}) {
+            NpmRelease release = NpmRelease.of(version);
+            Node root = node(opts().release(release).path("/path/to/root").pkg(obj("name", "root")));
+            Node target = node(opts().release(release).path("/path/to/root/packages/b").root(root)
+              .pkg(obj("name", "b", "version", "1.0.0")));
+            Link link = link(opts().release(release).path("/path/to/root/node_modules/b")
+              .realpath("/path/to/root/packages/b").target(target).parent(root));
+            target.setPackage(obj("name", "b", "version", "2.0.0"));
+            assertThat(link.getVersion()).as("npm %s", version).isEqualTo("7.1.0".equals(version) ? "1.0.0" : "2.0.0");
+        }
+    }
+
+    // link.js, from npm 7.1.1 (arborist 2.0.0): a link made without a parent takes its target's root and is placed by
+    // it; before, it is its own root, and roots only a target that is its own root
+    @Test
+    void linkTakesRootOfTargetFrom711() {
+        for (String version : new String[]{"7.1.0", "7.1.1"}) {
+            NpmRelease release = NpmRelease.of(version);
+            boolean roots = "7.1.1".equals(version);
+            Node root = node(opts().release(release).path("/path/to/root").pkg(obj("name", "root")));
+            Node target = node(opts().release(release).path("/path/to/root/packages/b").root(root)
+              .pkg(obj("name", "b", "version", "1.0.0")));
+            Link link = link(opts().release(release).path("/path/to/root/node_modules/b")
+              .realpath("/path/to/root/packages/b").target(target));
+            assertThat(link.getRoot()).as("npm %s", version).isSameAs(roots ? root : link);
+            assertThat(link.getParent()).as("npm %s", version).isSameAs(roots ? root : null);
+            assertThat(target.getRoot()).isSameAs(root);
+            assertThat(target.getLinksIn()).containsExactly(link);
+
+            if (!roots) {
+                // arborist 1: the target a link makes lives in the link's tree, and follows the link into another
+                Link loose = link(opts().release(release).path("/elsewhere/node_modules/c").realpath("/elsewhere/c"));
+                Node made = Objects.requireNonNull(loose.getTarget());
+                assertThat(loose.getRoot()).isSameAs(loose);
+                assertThat(made.getRoot()).isSameAs(loose);
+                assertThat(made.getLinksIn()).containsExactly(loose);
+                loose.setParent(root);
+                assertThat(loose.getRoot()).isSameAs(root);
+                assertThat(made.getRoot()).isSameAs(root);
+                assertThat(loose.getTarget()).isSameAs(made);
+            }
+        }
+    }
+
     @Test
     void recalculateOutEdgesOverridesForwardsOverridesToTarget() {
         Node root = node(opts().path("/path/to/root").loadOverrides(true).pkg(obj("name", "root",
@@ -224,6 +273,50 @@ class LinkTest {
         assertThat(bazEdge).isNotNull();
         assertThat(bazEdge.getOverrides()).as("unrelated edge keeps edge.overrides undefined").isNull();
         assertThat(bazEdge.getSpec()).isEqualTo("1.0.0");
+    }
+
+    // link.js overrideMatchesSubtree, from npm 11.18.0 (npm/cli#9619): a rule naming a dependency below the target
+    @Test
+    void recalculateOutEdgesOverridesForwardsWhenARuleAppliesBelowTheTargetFrom1118() {
+        for (String version : new String[]{"11.17.0", "11.18.0"}) {
+            NpmRelease release = NpmRelease.of(version);
+            Node root = node(opts().release(release).path("/path/to/root").loadOverrides(true).pkg(obj("name", "root",
+              "dependencies", obj("foo", "1.0.0"), "overrides", obj("bar", "2.0.0"))));
+            Node target = node(opts().release(release).path("/path/to/store/foo").root(root)
+              .pkg(obj("name", "foo", "version", "1.0.0", "dependencies", obj("baz", "1.0.0"))));
+            Node baz = node(opts().release(release).parent(target)
+              .pkg(obj("name", "baz", "version", "1.0.0", "dependencies", obj("bar", "1.0.0"))));
+            link(opts().release(release).pkg(obj("name", "foo", "version", "1.0.0"))
+              .path("/path/to/root/node_modules/foo").realpath("/path/to/store/foo").target(target).parent(root));
+
+            Edge barEdge = baz.getEdgesOut().get("bar");
+            if ("11.18.0".equals(version)) {
+                assertThat(target.getOverrides()).as("npm %s forwards to the target", version).isNotNull();
+                assertThat(barEdge.getSpec()).as("npm %s overrides the transitive edge", version).isEqualTo("2.0.0");
+            } else {
+                assertThat(target.getOverrides()).as("npm %s forwards nothing", version).isNull();
+                assertThat(barEdge.getSpec()).as("npm %s leaves the transitive edge", version).isEqualTo("1.0.0");
+            }
+        }
+    }
+
+    // getEdgeRule matches on name and spec, so from npm 11.18.0 a rule for another version of a declared dependency
+    // no longer gives the target the override set (npm/cli#9357)
+    @Test
+    void recalculateOutEdgesOverridesIgnoresARuleForAnotherVersionFrom1118() {
+        for (String version : new String[]{"11.17.0", "11.18.0"}) {
+            NpmRelease release = NpmRelease.of(version);
+            Node root = node(opts().release(release).path("/path/to/root").loadOverrides(true).pkg(obj("name", "root",
+              "dependencies", obj("foo", "1.0.0"), "overrides", obj("bar@2", "3.0.0"))));
+            Node target = node(opts().release(release).path("/path/to/store/foo").root(root)
+              .pkg(obj("name", "foo", "version", "1.0.0", "dependencies", obj("bar", "1.0.0"))));
+            link(opts().release(release).pkg(obj("name", "foo", "version", "1.0.0"))
+              .path("/path/to/root/node_modules/foo").realpath("/path/to/store/foo").target(target).parent(root));
+
+            assertThat(target.getOverrides() != null).as("npm %s gives the target the override set", version)
+              .isEqualTo("11.17.0".equals(version));
+            assertThat(target.getEdgesOut().get("bar").getSpec()).isEqualTo("1.0.0");
+        }
     }
 
     @Test

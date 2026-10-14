@@ -17,6 +17,7 @@ package org.openrewrite.javascript.internal.lock.pnpm;
 
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.javascript.internal.lock.CannotKnow;
+import org.openrewrite.javascript.internal.lock.EcmaScript;
 import org.openrewrite.javascript.internal.lock.JsError;
 
 import java.util.Arrays;
@@ -24,6 +25,7 @@ import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 
 /**
  * Port of @pnpm/pkg-manifest.utils src/convertEnginesRuntimeToDependencies.ts (pnpm 11.2.2).
@@ -35,13 +37,19 @@ final class PkgManifestUtils {
     private PkgManifestUtils() {
     }
 
+    static void convertEnginesRuntimeToDependencies(Map<String, @Nullable Object> manifest, String enginesFieldName,
+                                                    String dependenciesFieldName) {
+        convertEnginesRuntimeToDependencies(manifest, enginesFieldName, dependenciesFieldName, PnpmRelease.PORTED);
+    }
+
     /**
      * Adds {@code <runtime>: runtime:<version>} to the dependencies field for each runtime the engines field asks
-     * pnpm to download.
+     * pnpm to download: from 11.9.0 a version that is a string, trimmed ({@link PnpmRelease#trimsRuntimeVersions});
+     * before, any truthy one as it is, asked where the two differ.
      */
     @SuppressWarnings("unchecked")
     static void convertEnginesRuntimeToDependencies(Map<String, @Nullable Object> manifest, String enginesFieldName,
-                                                    String dependenciesFieldName) {
+                                                    String dependenciesFieldName, PnpmRelease release) {
         for (String runtimeName : RUNTIME_NAMES) {
             Object enginesFieldRuntime = property(manifest.get(enginesFieldName), "runtime");
             if (enginesFieldRuntime == null || enginesFieldRuntime == Js.UNDEFINED ||
@@ -55,7 +63,10 @@ final class PkgManifestUtils {
                 continue;
             }
             Object version = property(runtime, "version");
-            if (!Js.truthy(version)) {
+            String asIs = Js.truthy(version) ? Js.string(version) : null;
+            String trimmed = version instanceof String ? EcmaScript.trim((String) version) : null;
+            String runtimeVersion = Objects.equals(asIs, trimmed) || !release.trimsRuntimeVersions() ? asIs : trimmed;
+            if (runtimeVersion == null) {
                 continue;
             }
             Object deps = manifest.get(dependenciesFieldName);
@@ -67,15 +78,20 @@ final class PkgManifestUtils {
                 throw new CannotKnow("what pnpm makes of " + dependenciesFieldName + " (" + Js.typeOf(deps) +
                                      ", where pnpm defines a property)");
             }
-            ((Map<String, @Nullable Object>) deps).put(runtimeName, "runtime:" + Js.string(version));
+            ((Map<String, @Nullable Object>) deps).put(runtimeName, "runtime:" + runtimeVersion);
         }
+    }
+
+    static void applyRuntimeOnFailOverride(Map<String, @Nullable Object> manifest, Object onFailOverride) {
+        applyRuntimeOnFailOverride(manifest, onFailOverride, PnpmRelease.PORTED);
     }
 
     /**
      * The {@code runtimeOnFail} setting over every runtime of both engines fields.
      */
     @SuppressWarnings("unchecked")
-    static void applyRuntimeOnFailOverride(Map<String, @Nullable Object> manifest, Object onFailOverride) {
+    static void applyRuntimeOnFailOverride(Map<String, @Nullable Object> manifest, Object onFailOverride,
+                                           PnpmRelease release) {
         for (String[] fields : new String[][]{{"devEngines", "devDependencies"}, {"engines", "dependencies"}}) {
             Object enginesFieldRuntime = property(manifest.get(fields[0]), "runtime");
             if (enginesFieldRuntime == null || enginesFieldRuntime == Js.UNDEFINED) {
@@ -99,13 +115,17 @@ final class PkgManifestUtils {
                 if (Js.truthy(deps) && deps instanceof Map) {
                     for (String runtimeName : RUNTIME_NAMES) {
                         Object dep = ((Map<String, @Nullable Object>) deps).get(runtimeName);
-                        if (dep instanceof String && ((String) dep).startsWith("runtime:")) {
+                        // from 11.15.1 only a runtime the engines field names
+                        // (PnpmRelease#dropsOnlyTheRuntimesTheEnginesFieldNames), asked of one it does not
+                        if (dep instanceof String && ((String) dep).startsWith("runtime:") &&
+                            (find(runtimes, runtimeName) != null ||
+                             !release.dropsOnlyTheRuntimesTheEnginesFieldNames())) {
                             ((Map<String, @Nullable Object>) deps).remove(runtimeName);
                         }
                     }
                 }
             } else {
-                convertEnginesRuntimeToDependencies(manifest, fields[0], fields[1]);
+                convertEnginesRuntimeToDependencies(manifest, fields[0], fields[1], release);
             }
         }
     }

@@ -39,7 +39,7 @@ final class FileResolver {
 
     Promise<Manifest> resolve() {
         PackageResolver resolver = request.resolver;
-        String location = location(loc, "file:");
+        String location = location(resolver.files, loc, "file:");
         if (request.config.isLinkFileDependencies()) {
             Manifest manifest = new Manifest();
             manifest.put("_uid", "");
@@ -59,15 +59,17 @@ final class FileResolver {
         return read.promise.then(text -> {
             if (text == null && resolver.files.isMissing(location)) {
                 // yarn prints the absolute path, relative to the root here
-                throw new MessageError(Lang.format("Package $1 refers to a non-existing file '$0'.", location,
-                        request.pattern.split("@", -1)[0]));
+                throw new MessageError(request.config.getRelease().namesThePackageOfAMissingFile() ?
+                        Lang.format(request.config.getRelease(), "Package $1 refers to a non-existing file '$0'.", location,
+                                request.pattern.split("@", -1)[0]) :
+                        Lang.format(request.config.getRelease(), "$0 doesn't exist.", location));
             }
             if (text == null) {
                 throw new CannotKnow("the package.json of " + FILE_PROTOCOL_PREFIX + loc + ", which the project's " +
                                      "manifests do not include");
             }
             Manifest manifest = Config.tryManifest(location, text, request.config.isLooseSemver(),
-                    false, "");
+                    false, "", request.config.getRelease());
             PackageRemote remote = new PackageRemote();
             remote.type = "copy";
             remote.registry = manifest.get("_registry");
@@ -80,16 +82,17 @@ final class FileResolver {
     }
 
     /**
-     * {@code path.resolve(config.lockfileFolder, loc)} as a location in the project.
+     * {@code path.resolve(config.lockfileFolder, loc)} as a location from the project's root, among the directories
+     * the host holds.
      */
-    static String location(String loc, String protocol) {
+    static String location(ProjectFiles files, String loc, String protocol) {
         if (PosixPath.isAbsolute(loc)) {
             throw new CannotKnow("where the project sits on disk, which the " + protocol + loc + " target is read " +
                                  "relative to");
         }
         String location = ProjectFiles.location(loc);
-        if (location == null) {
-            throw new CannotKnow("the package.json of " + protocol + loc + ", outside the project");
+        if (location == null || files.isOutside(location)) {
+            throw new CannotKnow("the package.json of " + protocol + loc + ", " + files.outside());
         }
         return location;
     }

@@ -20,6 +20,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -109,8 +110,13 @@ func goListModules(dir string) ([]golang.GoResolvedDependency, error) {
 	if err != nil && len(stdout) == 0 {
 		return nil, err
 	}
+	return parseGoListModules(stdout)
+}
+
+func parseGoListModules(stdout []byte) ([]golang.GoResolvedDependency, error) {
 	var out []golang.GoResolvedDependency
-	var unresolved []string
+	var unresolved, errs []string
+	seenErr := make(map[string]bool)
 	dec := json.NewDecoder(bytes.NewReader(stdout))
 	for {
 		var m goModule
@@ -129,6 +135,10 @@ func goListModules(dir string) ([]golang.GoResolvedDependency, error) {
 		// falls back to go.sum-only and marks the result untrustworthy.
 		if m.Error != nil && !m.Main {
 			unresolved = append(unresolved, m.Path)
+			if e := strings.TrimSpace(m.Error.Err); e != "" && !seenErr[e] {
+				seenErr[e] = true
+				errs = append(errs, e)
+			}
 		}
 		rd := golang.GoResolvedDependency{
 			ModulePath:      m.Path,
@@ -144,8 +154,12 @@ func goListModules(dir string) ([]golang.GoResolvedDependency, error) {
 		out = append(out, rd)
 	}
 	if len(unresolved) > 0 {
-		return nil, fmt.Errorf("go list -m: %d module(s) unresolved (build list unreliable): %s",
+		msg := fmt.Sprintf("go list -m: %d module(s) unresolved (build list unreliable): %s",
 			len(unresolved), strings.Join(unresolved, ", "))
+		if len(errs) > 0 {
+			msg += ": " + strings.Join(errs, "; ")
+		}
+		return nil, errors.New(msg)
 	}
 	return out, nil
 }

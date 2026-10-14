@@ -13,8 +13,9 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-// hosted-git-info 4.1.0 and 9.0.3 for upstream-calls.js: fromUrl and the GitHost methods, a GitHost written with its
-// fields and the fromUrl arguments that made it ("from").
+// hosted-git-info 3.0.7, 3.0.8, 4.0.2, 4.1.0, 9.0.2 and 9.0.3 for upstream-calls.js: fromUrl and the GitHost methods,
+// a GitHost written with its fields and the fromUrl arguments that made it ("from"). Run 3.0.7 and 3.0.8 with NODE_PATH
+// naming the node_modules of npm 7.4.3 and 7.6.3, for their lru-cache.
 const fs = require('fs')
 const path = require('path')
 
@@ -34,7 +35,7 @@ function isGitHost(v) {
 
 module.exports = {
   library: 'hosted-git-info',
-  entry: (dir, release) => release.startsWith('4.') ? 'index.js' : 'lib/index.js',
+  entry: (dir, release) => /^[34]\./.test(release) ? 'index.js' : 'lib/index.js',
   tests: dir => fs.readdirSync(path.join(dir, 'test')).filter(f => f.endsWith('.js')).sort().map(f => 'test/' + f),
   differences: DIFFERENCES.map(url => hgi => {
     const host = hgi.fromUrl(url)

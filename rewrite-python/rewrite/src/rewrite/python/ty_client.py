@@ -35,7 +35,7 @@ import tempfile
 import threading
 import time
 from pathlib import Path
-from typing import Any, Dict, Optional
+from typing import Any, Dict, List, Optional
 
 from .type_mapping import SessionTypeCache
 
@@ -121,6 +121,11 @@ class TyTypesClient:
         # starts (a fresh client, or ``initialize`` with a different root) so no
         # state leaks across unrelated parses.
         self.session_types: Dict[int, Dict[str, Any]] = {}
+        # The session table's classLiterals, indexed as they arrive: by class name (the first id
+        # wins, as the per-file back-fill used to give) and by module. A file's mapping falls back
+        # to them instead of copying the whole session table, which grows with every file.
+        self.session_class_literals: Dict[str, int] = {}
+        self.session_classes_by_module: Dict[str, List[int]] = {}
 
         # The JavaTypes those descriptors resolve to, sharing their lifetime.
         self.java_types = SessionTypeCache()
@@ -350,6 +355,8 @@ class TyTypesClient:
             # A new ty session numbers its type ids from scratch, so ids from an
             # earlier session would collide.
             self.session_types.clear()
+            self.session_class_literals.clear()
+            self.session_classes_by_module.clear()
             self.java_types.clear()
             self._start_process(project_root)
 
@@ -411,7 +418,16 @@ class TyTypesClient:
             types = result.get('types')
             if types:
                 for type_id_str, descriptor in types.items():
-                    self.session_types.setdefault(int(type_id_str), descriptor)
+                    type_id = int(type_id_str)
+                    if type_id in self.session_types:
+                        continue
+                    self.session_types[type_id] = descriptor
+                    if descriptor.get('kind') == 'classLiteral':
+                        class_name = descriptor.get('className')
+                        if class_name:
+                            self.session_class_literals.setdefault(class_name, type_id)
+                        self.session_classes_by_module.setdefault(
+                            descriptor.get('moduleName') or '', []).append(type_id)
         return result
 
     @property

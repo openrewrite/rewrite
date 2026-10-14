@@ -16,6 +16,7 @@
 package org.openrewrite.javascript.internal.lock.npm;
 
 import org.jspecify.annotations.Nullable;
+import org.openrewrite.javascript.internal.lock.JsError;
 
 import java.util.ArrayList;
 import java.util.LinkedHashSet;
@@ -35,7 +36,7 @@ final class ExplainEresolve {
     private ExplainEresolve() {
     }
 
-    static String explain(Map<String, Object> expl, int depth) {
+    static String explain(Map<String, Object> expl, int depth, NpmRelease release) {
         Map<String, Object> edge = map(expl.get("edge"));
         Map<String, Object> dep = map(expl.get("dep"));
         Map<String, Object> current = map(expl.get("current"));
@@ -43,6 +44,26 @@ final class ExplainEresolve {
         Map<String, Object> currentEdge = map(expl.get("currentEdge"));
 
         List<String> out = new ArrayList<>();
+        if (!release.explainsPeerConflictAsCurrentAndPeer()) {
+            // the explanation build-ideal-tree.js gives before npm 7.20.3: its peerConflict is the conflicting peer
+            Map<String, Object> from = edge == null ? null : map(edge.get("from"));
+            if (from != null && map(from.get("whileInstalling")) != null) {
+                out.add("While resolving: " + printNode(map(from.get("whileInstalling"))));
+            }
+            if (current != null) {
+                out.add("Found: " + explainNode(current, depth, new LinkedHashSet<>(), release));
+            } else if (currentEdge != null) {
+                out.add("Found: " + explainEdge(currentEdge, depth, new LinkedHashSet<>(), release));
+            }
+            out.add("\nCould not resolve dependency:\n" + explainEdge(edge, depth, new LinkedHashSet<>(), release));
+            if (peerConflict != null) {
+                out.add("\nConflicting peer dependency: " +
+                        explainNode(peerConflict, depth, new LinkedHashSet<>(), release));
+            }
+            return String.join("\n", out);
+        }
+
+
         Map<String, Object> whileInstalling = dep != null && map(dep.get("whileInstalling")) != null ?
                 map(dep.get("whileInstalling")) :
                 current != null && map(current.get("whileInstalling")) != null ? map(current.get("whileInstalling")) :
@@ -53,26 +74,27 @@ final class ExplainEresolve {
         }
 
         if (current != null) {
-            out.add("Found: " + explainNode(current, depth, new LinkedHashSet<>()));
+            out.add("Found: " + explainNode(current, depth, new LinkedHashSet<>(), release));
         } else if (peerConflict != null && map(peerConflict.get("current")) != null) {
-            out.add("Found: " + explainNode(map(peerConflict.get("current")), depth, new LinkedHashSet<>()));
+            out.add("Found: " + explainNode(map(peerConflict.get("current")), depth, new LinkedHashSet<>(), release));
         } else if (currentEdge != null) {
-            out.add("Found: " + explainEdge(currentEdge, depth, new LinkedHashSet<>()));
+            out.add("Found: " + explainEdge(currentEdge, depth, new LinkedHashSet<>(), release));
         } else if (edge != null) {
-            out.add("Found: " + explainEdge(edge, depth, new LinkedHashSet<>()));
+            out.add("Found: " + explainEdge(edge, depth, new LinkedHashSet<>(), release));
         }
 
-        out.add("\nCould not resolve dependency:\n" + explainEdge(edge, depth, new LinkedHashSet<>()));
+        out.add("\nCould not resolve dependency:\n" + explainEdge(edge, depth, new LinkedHashSet<>(), release));
 
         if (peerConflict != null) {
             out.add("\nConflicting peer dependency: " +
-                    explainNode(map(peerConflict.get("peer")), depth, new LinkedHashSet<>()));
+                    explainNode(map(peerConflict.get("peer")), depth, new LinkedHashSet<>(), release));
         }
         return String.join("\n", out);
     }
 
-    private static String explainNode(Map<String, Object> node, int depth, Set<String> seen) {
-        return printNode(node) + explainDependents(node, depth, seen) + explainLinksIn(node, depth, seen);
+    private static String explainNode(Map<String, Object> node, int depth, Set<String> seen, NpmRelease release) {
+        return printNode(node) + explainDependents(node, depth, seen, release) +
+               explainLinksIn(node, depth, seen, release);
     }
 
     private static String printNode(Map<String, Object> node) {
@@ -80,19 +102,19 @@ final class ExplainEresolve {
         return pkgid + (truthy(node.get("location")) ? "\n" + string(node.get("location")) : "");
     }
 
-    private static String explainLinksIn(Map<String, Object> node, int depth, Set<String> seen) {
+    private static String explainLinksIn(Map<String, Object> node, int depth, Set<String> seen, NpmRelease release) {
         List<Object> linksIn = list(node.get("linksIn"));
         if (linksIn == null || linksIn.isEmpty() || depth <= 0) {
             return "";
         }
         List<String> messages = new ArrayList<>();
         for (Object link : linksIn) {
-            messages.add(explainNode(map(link), depth - 1, seen));
+            messages.add(explainNode(map(link), depth - 1, seen, release));
         }
         return ("\n" + String.join("\n", messages)).replace("\n", "\n  ");
     }
 
-    private static String explainDependents(Map<String, Object> node, int depth, Set<String> seen) {
+    private static String explainDependents(Map<String, Object> node, int depth, Set<String> seen, NpmRelease release) {
         List<Object> dependents = list(node.get("dependents"));
         if (dependents == null || dependents.isEmpty() || depth <= 0) {
             return "";
@@ -100,7 +122,7 @@ final class ExplainEresolve {
         int max = (int) Math.ceil(depth / 2.0);
         List<String> messages = new ArrayList<>();
         for (int i = 0; i < Math.min(max, dependents.size()); i++) {
-            messages.add(explainEdge(map(dependents.get(i)), depth, seen));
+            messages.add(explainEdge(map(dependents.get(i)), depth, seen, release));
         }
         if (dependents.size() > max) {
             int len = 0;
@@ -108,6 +130,10 @@ final class ExplainEresolve {
             List<String> showNames = new ArrayList<>();
             for (int i = max; i < dependents.size(); i++) {
                 Map<String, Object> from = map(map(dependents.get(i)).get("from"));
+                if (!release.namesRootProjectAmongMoreDependents() && (from == null || from.get("name") == null)) {
+                    // before npm 7.0.11 the length of the name of the root project, whose explanation has none
+                    throw new JsError(JsError.TYPE_ERROR, "Cannot read properties of undefined (reading 'length')");
+                }
                 String depName = from != null && truthy(from.get("name")) ? string(from.get("name")) :
                         "the root project";
                 len += depName.length();
@@ -122,7 +148,7 @@ final class ExplainEresolve {
         return ("\n" + String.join("\n", messages)).replace("\n", "\n  ");
     }
 
-    private static String explainEdge(Map<String, Object> edge, int depth, Set<String> seen) {
+    private static String explainEdge(Map<String, Object> edge, int depth, Set<String> seen, NpmRelease release) {
         String name = string(edge.get("name"));
         String type = string(edge.get("type"));
         String spec = string(edge.get("spec"));
@@ -133,12 +159,22 @@ final class ExplainEresolve {
         if (truthy(edge.get("overridden"))) {
             dep = "overridden " + dep + " (was \"" + string(edge.get("rawSpec")) + "\")";
         }
-        String fromMsg = " from " + explainFrom(from, depth, seen);
+        String fromMsg = " from " + explainFrom(from, depth, seen, release);
+        // npm 12.0.0 notes an edge a root packageExtensions rule added, or a root .npm-extension changed
+        Map<String, Object> packageExtensions = map(edge.get("packageExtensions"));
+        String extMsg = packageExtensions == null ? "" :
+                " (added by packageExtensions[\"" + string(packageExtensions.get("selector")) + "\"]." +
+                string(packageExtensions.get("field")) + "." + name + ")";
+        Map<String, Object> npmExtension = map(edge.get("npmExtension"));
+        String npmExtMsg = npmExtension == null ? "" :
+                " (changed by .npm-extension " + string(npmExtension.get("extensionPoint")) + " " +
+                string(npmExtension.get("field")) + "." + name + ")";
         return ("prod".equals(type) ? "" : type + " ") + (truthy(edge.get("bundled")) ? "bundled " : "") + dep +
-                fromMsg;
+                fromMsg + extMsg + npmExtMsg;
     }
 
-    private static String explainFrom(@Nullable Map<String, Object> from, int depth, Set<String> seen) {
+    private static String explainFrom(@Nullable Map<String, Object> from, int depth, Set<String> seen,
+                                      NpmRelease release) {
         if (from == null || !truthy(from.get("name")) && !truthy(from.get("version"))) {
             return "the root project";
         }
@@ -148,8 +184,8 @@ final class ExplainEresolve {
             return printNode(from);
         }
         seen.add(nodeId);
-        String result = printNode(from) + explainDependents(from, depth - 1, seen) +
-                explainLinksIn(from, depth - 1, seen);
+        String result = printNode(from) + explainDependents(from, depth - 1, seen, release) +
+                explainLinksIn(from, depth - 1, seen, release);
         seen.remove(nodeId);
         return result;
     }

@@ -164,7 +164,8 @@ final class Project {
         if (content == null) {
             return;
         }
-        Map<String, @Nullable Object> parsed = parsedLockfile = Syml.parseSyml(content);
+        Map<String, @Nullable Object> parsed = parsedLockfile = Syml.parseSyml(content,
+                configuration.getRelease());
         Object metadata = parsed.get("__metadata");
         if (Js.truthy(metadata)) {
             Object lockfileVersion = Js.get(metadata, "version");
@@ -1142,7 +1143,7 @@ final class Project {
             lockEntry.put("linkType", pkg.linkType.toLowerCase(Locale.ROOT));
             lockEntry.put("resolution", StructUtils.stringifyLocator(pkg));
             String checksum = storedChecksums.get(pkg.locatorHash);
-            if (checksum != null && configuration.getRelease().isChecksumWithoutCacheKey()) {
+            if (checksum != null && configuration.getRelease().writesChecksumWithoutCacheKey()) {
                 int cacheKeyIndex = checksum.indexOf('/');
                 if (cacheKeyIndex == -1) {
                     throw new JsError(JsError.ERROR, "Assertion failed: Expected the checksum to reference its " +

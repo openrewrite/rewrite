@@ -21,7 +21,10 @@ import org.openrewrite.javascript.internal.LockFileRegeneration.Result;
 import org.openrewrite.javascript.internal.lock.yarnclassic.YarnClassicLockRegenerator;
 import org.openrewrite.javascript.internal.lock.yarnclassic.YarnClassicLockRegenerator.Inputs;
 import org.openrewrite.javascript.internal.lock.yarnclassic.YarnClassicManifestRules;
+import org.openrewrite.javascript.internal.lock.yarnclassic.YarnClassicRelease;
+import org.openrewrite.javascript.internal.lock.yarnclassic.YarnClassicReleases;
 import org.openrewrite.javascript.internal.registry.NpmRegistryClient;
+import org.openrewrite.javascript.marker.NodeResolutionResult.PackageManager;
 
 import java.util.Arrays;
 import java.util.LinkedHashMap;
@@ -48,6 +51,11 @@ final class YarnClassicInputs implements Port {
     }
 
     @Override
+    public boolean writes(String lock) {
+        return !YarnBerryInputs.PORT.writes(lock);
+    }
+
+    @Override
     public boolean reads(String fileName) {
         return CONFIG_FILES.contains(fileName);
     }
@@ -59,21 +67,42 @@ final class YarnClassicInputs implements Port {
 
     @Override
     public InstallRoot installRoot(LockDirectory dir) {
-        return YarnClassicLockRegenerator.installRoot(project(dir).build());
+        // the release from(...) installs as; the regeneration reports one the engine does not reproduce
+        YarnClassicRelease release;
+        try {
+            release = release(dir.packageManagerVersion(PackageManager.YarnClassic));
+        } catch (CannotKnow e) {
+            return InstallRoot.STOPS_HERE;
+        }
+        return YarnClassicLockRegenerator.installRoot(project(dir).release(release).build());
+    }
+
+    // the release the NodeRuntime marker records, none without one
+    private static @Nullable YarnClassicRelease release(@Nullable String version) {
+        return version == null ? null : YarnClassicReleases.installedAs(version);
     }
 
     @Override
     public Result regenerate(LockDirectory dir, HostInputs host, NpmRegistryClient client) {
-        return new YarnClassicLockRegenerator(from(dir, host), new HostRegistrySource(host.transport(), client))
-                .regenerate();
+        Inputs inputs;
+        try {
+            inputs = from(dir, host);
+        } catch (CannotKnow e) {
+            return Result.failure(LockOnlyInstall.cannotKnow(e));
+        }
+        return new YarnClassicLockRegenerator(inputs, new HostRegistrySource(host.transport(), client)).regenerate();
     }
 
     /**
-     * With the home .npmrc yarn reads under the project's: the host's registries as the user's global and user
-     * npmrc, with the host's credentials for the registries the project names too.
+     * As the Yarn release that built the LST, 1.22.22 where the host recorded none. With the home .npmrc yarn reads
+     * under the project's: the host's registries as the user's global and user npmrc, with the host's credentials for
+     * the registries the project names too.
+     *
+     * @throws CannotKnow where the yarn that built the LST is a release the engine does not reproduce
      */
     static Inputs from(LockDirectory dir, HostInputs host) {
         return project(dir)
+                .release(release(host.packageManagerVersion(PackageManager.YarnClassic)))
                 .host(host.getHost())
                 .env(host.getEnvironment().process())
                 .homeFile(".npmrc", host.userNpmrc(HostInputs.GLOBAL_AND_USER))
@@ -94,21 +123,38 @@ final class YarnClassicInputs implements Port {
                 configFiles.put(path, file.getValue());
             }
         }
+        // every package.json the host read, by location from the lock's directory: a file: or link: dependency leads
+        // to one outside it too
+        Map<String, String> manifests = new LinkedHashMap<>();
+        for (Map.Entry<String, String> file : dir.getFiles().entrySet()) {
+            String path = file.getKey();
+            if ("package.json".equals(path)) {
+                manifests.put("", file.getValue());
+            } else if (path.endsWith("/package.json")) {
+                manifests.put(path.substring(0, path.length() - "/package.json".length()), file.getValue());
+            }
+        }
+        manifests.putAll(dir.getManifests());
         return Inputs.builder()
                 .lock(dir.getLock())
-                .manifests(dir.getManifests())
+                .manifests(manifests)
                 .configFiles(configFiles)
                 .paths(paths(dir))
                 .directory(dir.getPath())
                 .cwd(dir.getRunsIn());
     }
 
-    // the paths under the lock's directory and those directly in a directory above it
+    // the paths under the lock's directory, those directly in a directory above it, and each package.json elsewhere
     private static @Nullable Set<String> paths(LockDirectory dir) {
         Set<String> paths = dir.pathsUnder("");
         Set<String> above = dir.pathsAbove("");
-        if (paths != null && above != null) {
+        if (paths != null && above != null && dir.getPaths() != null) {
             paths.addAll(above);
+            for (String held : dir.getPaths()) {
+                if (held.endsWith("/package.json")) {
+                    paths.add(held);
+                }
+            }
         }
         return paths;
     }

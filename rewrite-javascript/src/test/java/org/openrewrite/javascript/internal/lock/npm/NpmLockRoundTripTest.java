@@ -52,7 +52,8 @@ class NpmLockRoundTripTest {
     @MethodSource("locks")
     void writesBackWhatNpmWrites(String name, NpmScenarios.Lock lock) {
         String expect = lock.getScenario().expect();
-        NpmOptions options = ScenarioReplay.options(lock.getNpmrc());
+        // a lock is loaded and written as the release that recorded the scenario
+        NpmOptions options = ScenarioReplay.options(lock.getScenario().release(), lock.getNpmrc());
         if (expect != null && expect.startsWith("malformed override key ") && !lock.isBefore()) {
             String key = expect.substring("malformed override key ".length());
             assertThatThrownBy(() -> roundTrip(lock, options)).as(expect)

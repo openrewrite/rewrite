@@ -54,7 +54,8 @@ final class BunRuntimeResolver {
             result.resolution = current.getResolution();
             return result;
         }
-        String versionSpec = bareSpecifier.substring("runtime:".length());
+        String versionSpec = NodeRuntimeResolver.runtimeSpec(bareSpecifier.substring("runtime:".length()),
+                resolveFromNpm.getRelease());
         NpmResolver.ResolveResult npmResolution = resolveFromNpm.resolveNpm(
                 new ResolveDependencies.WantedDependency(wantedDependency.getAlias(), versionSpec,
                         wantedDependency.isDev(), wantedDependency.isOptional()),

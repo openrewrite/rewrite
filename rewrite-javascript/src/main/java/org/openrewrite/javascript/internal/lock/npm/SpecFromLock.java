@@ -33,30 +33,31 @@ final class SpecFromLock {
     /**
      * @return {@code null} where arborist returns an empty object, for an entry no spec can be read from.
      */
-    static @Nullable Spec specFromLock(@Nullable String name, Map<String, Object> lock, @Nullable String where) {
+    static @Nullable Spec specFromLock(@Nullable String name, Map<String, Object> lock, @Nullable String where,
+                                       Spec.Options npa) {
         try {
             if (truthy(lock.get("version"))) {
-                Spec spec = Spec.resolve(name, string(lock.get("version")), where);
+                Spec spec = Spec.resolve(name, string(lock.get("version")), where, npa);
                 if (truthy(lock.get("integrity")) || spec.getType() == Spec.Type.GIT) {
                     return spec;
                 }
             }
             if (truthy(lock.get("from"))) {
-                Spec spec = Spec.resolve(name, string(lock.get("from")), where);
+                Spec spec = Spec.resolve(name, string(lock.get("from")), where, npa);
                 if (spec.isRegistry() && truthy(lock.get("version"))) {
-                    return Spec.resolve(name, string(lock.get("version")), where);
+                    return Spec.resolve(name, string(lock.get("version")), where, npa);
                 } else if (!truthy(lock.get("resolved"))) {
                     return spec;
                 }
             }
             if (truthy(lock.get("resolved"))) {
-                return Spec.resolve(name, string(lock.get("resolved")), where);
+                return Spec.resolve(name, string(lock.get("resolved")), where, npa);
             }
         } catch (IllegalArgumentException ignored) {
             // fall back to the version alone
         }
         try {
-            return Spec.resolve(name, string(lock.get("version")), where);
+            return Spec.resolve(name, string(lock.get("version")), where, npa);
         } catch (IllegalArgumentException e) {
             return null;
         }

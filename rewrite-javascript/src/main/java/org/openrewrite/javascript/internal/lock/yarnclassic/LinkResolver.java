@@ -39,24 +39,32 @@ final class LinkResolver {
 
     Promise<Manifest> resolve() {
         PackageResolver resolver = request.resolver;
-        String location = FileResolver.location(loc, LINK_PROTOCOL_PREFIX);
+        String location = FileResolver.location(resolver.files, loc, LINK_PROTOCOL_PREFIX);
         String name = PosixPath.basename(location.isEmpty() ? "." : location);
         Io<@Nullable String> read = Io.issue(resolver.loop, request.io, () -> resolver.files.manifest(location));
         request.awaited(read);
+        YarnClassicRelease release = request.config.getRelease();
         return read.promise.then(text -> {
             Manifest manifest;
-            if (location.isEmpty() || text == null && resolver.files.isAbsent(location + "/package.json")) {
+            // before 1.17.0 a directory that is there is read, package.json or not; before 1.18.0 the lockfile's too
+            boolean absent = release.linksADirectoryWithoutManifest() ?
+                    resolver.files.isAbsent(location + "/package.json") : resolver.files.isMissing(location);
+            if (location.isEmpty() && release.linksTheLockfileFolderAsADirectory() || text == null && absent) {
                 manifest = new Manifest();
                 manifest.put("_uid", "");
                 manifest.put("name", name);
                 manifest.put("version", "0.0.0");
                 manifest.put("_registry", NpmResolver.NPM_REGISTRY_ID);
+            } else if (text == null && !release.linksADirectoryWithoutManifest() &&
+                       resolver.files.isAbsent(location + "/package.json") &&
+                       resolver.files.isAbsent(location + "/yarn.json")) {
+                throw new MessageError("Couldn't find a package.json file in " + Js.jsonStringify(location));
             } else if (text == null) {
                 throw new CannotKnow("the package.json of " + LINK_PROTOCOL_PREFIX + loc + ", which the project's " +
                                      "manifests do not include");
             } else {
                 manifest = Config.tryManifest(location, text, request.config.isLooseSemver(),
-                        false, "");
+                        false, "", release);
             }
             PackageRemote remote = new PackageRemote();
             remote.type = "link";

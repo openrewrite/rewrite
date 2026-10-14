@@ -144,9 +144,16 @@ public class MSBuildProject implements Marker, Serializable, RpcCodec<MSBuildPro
         @Builder.Default
         List<PackageReference> packageReferences = emptyList();
 
+        /**
+         * The transitive closure of NuGet packages resolved for this target framework.
+         * Referenced projects are not packages and are reported in {@link #projectReferences}.
+         */
         @Builder.Default
         List<ResolvedPackage> resolvedPackages = emptyList();
 
+        /**
+         * The transitive closure of projects referenced for this target framework.
+         */
         @Builder.Default
         List<ProjectReference> projectReferences = emptyList();
 
@@ -159,7 +166,7 @@ public class MSBuildProject implements Marker, Serializable, RpcCodec<MSBuildPro
             q.getAndSendListAsRef(after, TargetFramework::getResolvedPackages,
                     rp -> rp.getName() + "@" + rp.getResolvedVersion(),
                     rp -> rp.rpcSend(rp, q));
-            q.getAndSendList(after, TargetFramework::getProjectReferences,
+            q.getAndSendListAsRef(after, TargetFramework::getProjectReferences,
                     ProjectReference::getInclude,
                     pr -> pr.rpcSend(pr, q));
         }
@@ -212,7 +219,7 @@ public class MSBuildProject implements Marker, Serializable, RpcCodec<MSBuildPro
     }
 
     /**
-     * A resolved package (or referenced project) from the restore dependency graph, carrying
+     * A resolved NuGet package from the restore dependency graph, carrying
      * the full per-target-framework asset information from the NuGet {@code LockFile}
      * (produced by an in-process {@code PackageSpec}/{@code RestoreRunner} restore).
      * Asset lists hold package-relative paths with {@code _._} placeholder entries stripped,
@@ -234,7 +241,8 @@ public class MSBuildProject implements Marker, Serializable, RpcCodec<MSBuildPro
         int depth;
 
         /**
-         * Library type from the lock file: "package" or "project".
+         * Library type from the lock file. Always "package" in markers that model referenced
+         * projects as {@link ProjectReference}s; "project" only in markers built before that.
          */
         @Builder.Default
         String type = "package";
@@ -389,23 +397,70 @@ public class MSBuildProject implements Marker, Serializable, RpcCodec<MSBuildPro
     }
 
     /**
-     * A project-to-project reference within a solution.
+     * A project-to-project reference from the restore dependency graph. A referenced project is
+     * compiled from source alongside this one rather than consumed as a NuGet package, so it is
+     * modelled as its own kind of graph node with edges to the packages and further projects it
+     * brings in.
      */
+    @JsonIdentityInfo(generator = ObjectIdGenerators.IntSequenceGenerator.class, property = "@ref")
     @Value
     @With
     @Builder
     @AllArgsConstructor
     public static class ProjectReference implements Serializable, RpcCodec<ProjectReference> {
+        /**
+         * Path to the referenced project file, relative to the referencing project's directory.
+         */
         String include;
+
+        /**
+         * The referenced project's name in the restore graph, which is its assembly name.
+         */
+        @Nullable
+        String name;
+
+        /**
+         * Shortest distance from the project owning this marker: 0 for a project it references
+         * directly, higher for one reached only through another project reference.
+         */
+        int depth;
+
+        /**
+         * Projects this one references in turn.
+         */
+        @Builder.Default
+        List<ProjectReference> projectReferences = emptyList();
+
+        /**
+         * NuGet packages this project depends on directly. Instances are shared with the
+         * owning {@link TargetFramework#getResolvedPackages()}.
+         */
+        @Builder.Default
+        List<ResolvedPackage> resolvedPackages = emptyList();
 
         @Override
         public void rpcSend(ProjectReference after, RpcSendQueue q) {
             q.getAndSend(after, ProjectReference::getInclude);
+            q.getAndSend(after, ProjectReference::getName);
+            q.getAndSend(after, ProjectReference::getDepth);
+            q.getAndSendListAsRef(after, ProjectReference::getProjectReferences,
+                    ProjectReference::getInclude,
+                    pr -> pr.rpcSend(pr, q));
+            q.getAndSendListAsRef(after, ProjectReference::getResolvedPackages,
+                    rp -> rp.getName() + "@" + rp.getResolvedVersion(),
+                    rp -> rp.rpcSend(rp, q));
         }
 
         @Override
         public ProjectReference rpcReceive(ProjectReference before, RpcReceiveQueue q) {
-            return before.withInclude(q.receive(before.include));
+            return before
+                    .withInclude(q.receive(before.include))
+                    .withName(q.receive(before.name))
+                    .withDepth(q.receive(before.depth))
+                    .withProjectReferences(q.receiveList(before.projectReferences,
+                            pr -> pr.rpcReceive(pr, q)))
+                    .withResolvedPackages(q.receiveList(before.resolvedPackages,
+                            rp -> rp.rpcReceive(rp, q)));
         }
     }
 

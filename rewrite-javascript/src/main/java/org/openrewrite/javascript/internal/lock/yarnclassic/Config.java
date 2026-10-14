@@ -98,6 +98,11 @@ final class Config {
     @Getter(AccessLevel.NONE)
     private final Inputs inputs;
 
+    /**
+     * The release that installs.
+     */
+    private final YarnClassicRelease release;
+
     private final boolean looseSemver;
     private final boolean focus;
 
@@ -143,6 +148,7 @@ final class Config {
      */
     Config(Inputs inputs, Map<String, @Nullable Object> flags) {
         this.inputs = inputs;
+        release = inputs.installsAs();
         looseSemver = !Js.truthy(flags.get("strictSemver"));
         focus = Js.truthy(flags.get("focus"));
         ignorePlatform = Js.truthy(flags.get("ignorePlatform"));
@@ -151,19 +157,21 @@ final class Config {
 
         requireWorkspaceRootAbove(inputs, looseSemver);
         workspaceRoot = findWorkspaceRoot(inputs, looseSemver);
-        if (focus && (workspaceRoot < 0 || workspaceRoot == 0 && inputs.getCwd().isEmpty())) {
-            throw new MessageError("This command can only be run inside an individual workspace.");
+        if (release.focusesByPackageName()) {
+            requireFocusInAWorkspace();
         }
-        if (workspaceRoot < 0 && !inputs.getCwd().isEmpty()) {
+        // before 1.8.0 install's init stops a focus outside a workspace before yarn writes that lock
+        if (workspaceRoot < 0 && !inputs.getCwd().isEmpty() && !(focus && !release.focusesByPackageName())) {
             throw new CannotKnow("the lock yarn writes: run in " + inputs.getCwd() + ", which no workspaces list, it " +
                                  "makes that directory its lockfileFolder and writes its yarn.lock, not this lock");
         }
-        focusedWorkspaceName = focus ? readRootManifest().getName() : null;
+        focusedWorkspaceName = !focus ? null : release.focusesByPackageName() ? readRootManifest().getName() :
+                PosixPath.basename(inputs.getCwd());
 
         Map<String, String> configFiles = inputs.configFilesFromCwd();
         Map<String, String> env = inputs.getEnv();
-        npmConfig = loadNpmConfig(configFiles, inputs.getHomeFiles(), env);
-        yarnConfig = loadYarnConfig(configFiles, inputs.getHomeFiles(), env);
+        npmConfig = loadNpmConfig(configFiles, inputs.getHomeFiles(), env, release);
+        yarnConfig = loadYarnConfig(configFiles, inputs.getHomeFiles(), env, release);
         Object registry = flags.get("registry");
         if (registry != null) {
             yarnConfig.put("registry", registry);
@@ -175,24 +183,41 @@ final class Config {
         String manifest = up.isEmpty() ? inputs.getManifests().get("") :
                 inputs.getConfigFiles().get(up + "package.json");
         lockfileFolderManifest = manifest == null ? null :
-                tryManifest(lockfileFolder, manifest, looseSemver, false, lockfileFolder);
+                tryManifest(lockfileFolder, manifest, looseSemver, false, lockfileFolder, release);
 
         workspacesEnabled = !Boolean.FALSE.equals(getOption("workspaces-experimental"));
         workspacesNohoistEnabled = !Boolean.FALSE.equals(getOption("workspaces-nohoist-experimental"));
         enableLockfileVersions = Js.truthy(getOption("yarn-enable-lockfile-versions"));
         linkFileDependencies = Js.truthy(getOption("yarn-link-file-dependencies"));
         packBuiltPackages = Js.truthy(getOption("experimental-pack-script-packages-in-mirror"));
-        autoAddIntegrity = !boolifyWithDefault(Js.string(getOption("unsafe-disable-integrity-migration")), true);
+        Object integrityMigration = getOption("unsafe-disable-integrity-migration");
+        autoAddIntegrity = release.keepsEntriesWithoutIntegrity() ?
+                !boolifyWithDefault(Js.string(integrityMigration), true) : !Js.truthy(integrityMigration);
         Object productionFlag = flags.get("production");
         // an environment the host does not know counts as one without these variables
         boolean productionEnv = env != null && "production".equals(env.get("NODE_ENV")) &&
                                 !"false".equals(env.get("NPM_CONFIG_PRODUCTION")) &&
                                 !"false".equals(env.get("YARN_PRODUCTION"));
-        production = productionFlag != null ? boolify(productionFlag) :
-                Js.truthy(getOption("production")) || productionEnv;
+        if (release.letsTheProductionFlagWin()) {
+            production = productionFlag != null ? boolify(productionFlag) :
+                    Js.truthy(getOption("production")) || productionEnv;
+        } else {
+            production = !"false".equals(productionFlag) &&
+                         (Js.truthy(getOption("production")) || productionEnv || Js.truthy(productionFlag));
+        }
         if (workspaceRoot >= 0 && !workspacesEnabled) {
             throw new MessageError("Your project root defines workspaces but the feature is disabled in your Yarn " +
                                    "config. Please check \"workspaces-experimental\" in your .yarnrc file.");
+        }
+    }
+
+    /**
+     * A focused install runs in a workspace below its root: config.js {@code init}, install.js {@code init} before
+     * 1.8.0.
+     */
+    void requireFocusInAWorkspace() {
+        if (focus && (workspaceRoot < 0 || workspaceRoot == 0 && inputs.getCwd().isEmpty())) {
+            throw new MessageError("This command can only be run inside an individual workspace.");
         }
     }
 
@@ -219,7 +244,7 @@ final class Config {
             }
             throw CannotKnow.unread(cwd + "/package.json");
         }
-        return tryManifest(cwd, text, looseSemver, true, "");
+        return tryManifest(cwd, text, looseSemver, true, "", release);
     }
 
     // findWorkspaceRoot starts where yarn runs: a manifest with workspaces below this lock's stops it there
@@ -236,8 +261,8 @@ final class Config {
                 }
                 continue;
             }
-            Map<String, @Nullable Object> ws = extractWorkspaces(tryManifest(dir, text, looseSemver, true, null));
-            if (ws != null && Js.truthy(ws.get("packages"))) {
+            if (workspaceGlobs(tryManifest(dir, text, looseSemver, true, null, inputs.installsAs()),
+                    inputs.installsAs()) != null) {
                 throw new CannotKnow("the lock yarn writes: run in " + inputs.getCwd() + " it stops at the " +
                                      "workspaces of " + file + ", not at this lock");
             }
@@ -252,15 +277,29 @@ final class Config {
         String cwd = inputs.getCwd();
         for (int depth = 0; depth <= inputs.reach(); depth++) {
             Manifest manifest = findManifest(inputs, depth, looseSemver);
-            Map<String, @Nullable Object> ws = manifest == null ? null : extractWorkspaces(manifest);
-            if (ws != null && Js.truthy(ws.get("packages"))) {
+            Object globs = manifest == null ? null : workspaceGlobs(manifest, inputs.installsAs());
+            if (globs != null) {
                 String relativePath = depth == 0 ? cwd : cwd.isEmpty() ? inputs.relativePath(depth) :
                         inputs.relativePath(depth) + "/" + cwd;
                 return relativePath.isEmpty() ||
-                       !Micromatch.micromatch(singletonList(relativePath), ws.get("packages")).isEmpty() ? depth : -1;
+                       !Micromatch.micromatch(singletonList(relativePath), globs).isEmpty() ? depth : -1;
             }
         }
         return -1;
+    }
+
+    /**
+     * What {@code findWorkspaceRoot} matches the path from a manifest's directory against, null where the manifest
+     * makes no workspace root: {@code extractWorkspaces}' packages from 1.5.0; before, its {@code workspaces} as they
+     * are, any truthy value.
+     */
+    static @Nullable Object workspaceGlobs(Manifest manifest, YarnClassicRelease release) {
+        if (!release.readsTheWorkspacesObject()) {
+            Object workspaces = manifest.get("workspaces");
+            return Js.truthy(workspaces) ? workspaces : null;
+        }
+        Map<String, @Nullable Object> ws = extractWorkspaces(manifest);
+        return ws != null && Js.truthy(ws.get("packages")) ? ws.get("packages") : null;
     }
 
     // findManifest: the directory's package.json, else its yarn.json
@@ -268,7 +307,8 @@ final class Config {
         String up = up(depth);
         String text = depth == 0 ? inputs.getManifests().get("") : inputs.getConfigFiles().get(up + "package.json");
         if (text != null) {
-            return tryManifest(depth == 0 ? "" : up.substring(0, up.length() - 1), text, looseSemver, true, null);
+            return tryManifest(depth == 0 ? "" : up.substring(0, up.length() - 1), text, looseSemver, true, null,
+                    inputs.installsAs());
         }
         Set<String> paths = inputs.getPaths();
         for (String name : depth == 0 ? singletonList("yarn.json") : Arrays.asList("package.json", "yarn.json")) {
@@ -284,11 +324,19 @@ final class Config {
      */
     static Manifest tryManifest(String location, String text, boolean looseSemver, boolean isRoot,
                                 @Nullable String lockfileFolder) {
+        return tryManifest(location, text, looseSemver, isRoot, lockfileFolder, YarnClassicRelease.PORTED);
+    }
+
+    /**
+     * {@code tryManifest} as {@code release} normalizes.
+     */
+    static Manifest tryManifest(String location, String text, boolean looseSemver, boolean isRoot,
+                                @Nullable String lockfileFolder, YarnClassicRelease release) {
         String file = location.isEmpty() ? "package.json" : location + "/package.json";
         Manifest manifest = manifest(Fs.readJson(file, text), "_registry");
         manifest.put("_registry", NpmResolver.NPM_REGISTRY_ID);
         manifest.put("_loc", file);
-        return NormalizeManifest.normalizeManifest(manifest, location, lockfileFolder, isRoot, looseSemver);
+        return NormalizeManifest.normalizeManifest(manifest, location, lockfileFolder, isRoot, looseSemver, release);
     }
 
     /**
@@ -300,7 +348,8 @@ final class Config {
      * {@code readManifest} of a directory a fetch extracted into yarn's cache: its .yarn-metadata.json's manifest as
      * it is, else its package.json or yarn.json normalized, else {@link #NO_MANIFEST}.
      */
-    static @Nullable Object readManifest(TarFs dest, String dir, Object registry, boolean looseSemver) {
+    static @Nullable Object readManifest(TarFs dest, String dir, Object registry, boolean looseSemver,
+                                         YarnClassicRelease release) {
         TarFs.Node metadata = dest.get(".yarn-metadata.json");
         if (metadata != null) {
             Object json = Fs.readJson(PosixPath.join(dir, ".yarn-metadata.json"), text(metadata));
@@ -323,7 +372,7 @@ final class Config {
             Manifest manifest = manifest(Fs.readJson(loc, text(file)), "_registry");
             manifest.put("_registry", "yarn.json".equals(filename) ? "yarn" : NpmResolver.NPM_REGISTRY_ID);
             manifest.put("_loc", loc);
-            return NormalizeManifest.normalizeManifest(manifest, null, "", false, looseSemver);
+            return NormalizeManifest.normalizeManifest(manifest, null, "", false, looseSemver, release);
         }
         return NO_MANIFEST;
     }
@@ -359,8 +408,11 @@ final class Config {
      * {@code workspaces} array, even an empty one, or an object with one.
      */
     static boolean isWorkspaceRoot(Manifest manifest) {
-        Map<String, @Nullable Object> ws = extractWorkspaces(manifest);
-        return ws != null && Js.truthy(ws.get("packages"));
+        return isWorkspaceRoot(manifest, YarnClassicRelease.PORTED);
+    }
+
+    static boolean isWorkspaceRoot(Manifest manifest, YarnClassicRelease release) {
+        return workspaceGlobs(manifest, release) != null;
     }
 
     @SuppressWarnings("unchecked")
@@ -407,9 +459,15 @@ final class Config {
         }
         if (wsCopy != null && Js.truthy(wsCopy.get("nohoist")) && Js.length(wsCopy.get("nohoist")) > 0) {
             if (!workspacesNohoistEnabled) {
+                // a warning from 1.6.0; before, every warning is thrown
+                if (!release.throwsOnlyWorkspaceErrors()) {
+                    errors.add(Lang.format(release, "$0 defines nohoist but the feature is disabled in your Yarn config. " +
+                                           "Please check \"workspaces-nohoist-experimental\" in your .yarnrc file.",
+                            manifest.getName()));
+                }
                 wsCopy.put("nohoist", null);
             } else if (!isPrivate) {
-                errors.add(Lang.format("nohoist config is ignored in $0 because it is not a private package. If " +
+                errors.add(Lang.format(release, "nohoist config is ignored in $0 because it is not a private package. If " +
                                        "you think nohoist should be allowed in public packages, please submit an " +
                                        "issue for your use case.", manifest.getName()));
                 wsCopy.put("nohoist", null);
@@ -437,13 +495,13 @@ final class Config {
         for (String file : files) {
             String loc = Objects.requireNonNull(ProjectFiles.location(PosixPath.dirname(file)));
             Manifest manifest = tryManifest(loc, Objects.requireNonNull(inputs.getManifests().get(loc)),
-                    looseSemver, false, "");
+                    looseSemver, false, "", release);
             if (!Js.truthy(manifest.getName()) || !Js.truthy(manifest.getVersion())) {
                 continue;
             }
             String name = Js.string(manifest.getName());
             if (workspaces.containsKey(name)) {
-                throw new MessageError(Lang.format("There are more than one workspace with name $0", name));
+                throw new MessageError(Lang.format(release, "There are more than one workspace with name $0", name));
             }
             workspaces.put(name, new WorkspaceLayout.Workspace(loc, manifest));
         }
@@ -454,9 +512,24 @@ final class Config {
      * {@code resolveWorkspaces} up to its glob, which calls replace on every pattern before the first glob starts.
      */
     List<?> workspacePatterns(Manifest root) {
-        Map<String, @Nullable Object> ws = getWorkspaces(root, true);
-        Object patterns = ws != null && Js.truthy(ws.get("packages")) ? ws.get("packages") : new ArrayList<>();
+        Object patterns;
+        if (release.readsTheWorkspacesObject()) {
+            Map<String, @Nullable Object> ws = getWorkspaces(root, true);
+            patterns = ws != null && Js.truthy(ws.get("packages")) ? ws.get("packages") : new ArrayList<>();
+        } else {
+            // before 1.5.0 the root's workspaces as they are, of a private root where they have a length
+            patterns = Js.truthy(root.get("workspaces")) ? root.get("workspaces") : new ArrayList<>();
+            Object length = patterns instanceof Map ? ((Map<?, ?>) patterns).get("length") : (Object) Js.length(patterns);
+            if (!Js.truthy(root.get("private")) && length instanceof Number && ((Number) length).doubleValue() > 0) {
+                throw new MessageError(release.endsTheWorkspacesPrivacyMessageWithAPeriod() ?
+                        "Workspaces can only be enabled in private projects." :
+                        "Workspaces can only be enabled in private projects");
+            }
+        }
         if (!(patterns instanceof List)) {
+            if (!release.requiresAnArrayOfWorkspaces()) {
+                throw new JsError(JsError.TYPE_ERROR, "patterns.map is not a function");
+            }
             throw new MessageError("The workspaces field in package.json must be an array.");
         }
         for (Object pattern : (List<?>) patterns) {
@@ -480,7 +553,9 @@ final class Config {
             prefix += "./";
         }
         String include = base + "/+(package.json|yarn.json)";
-        String ignore = base + "/node_modules/**/+(package.json|yarn.json)";
+        // every manifest under the pattern's node_modules from 1.6.0; before, one level down
+        String ignore = base + (release.ignoresEveryManifestUnderNodeModules() ? "/node_modules/**/" :
+                "/node_modules/*/") + "+(package.json|yarn.json)";
         Set<String> files = new LinkedHashSet<>();
         for (String loc : inputs.getManifests().keySet()) {
             if (!loc.isEmpty()) {
@@ -553,10 +628,11 @@ final class Config {
     // base-registry.js init then npm-registry.js loadConfig: the yarn_ and npm_config_ keys over every .npmrc
     private static Map<String, @Nullable Object> loadNpmConfig(Map<String, String> configFiles,
                                                                Map<String, String> home,
-                                                               @Nullable Map<String, String> env) {
+                                                               @Nullable Map<String, String> env,
+                                                               YarnClassicRelease release) {
         Map<String, @Nullable Object> npmConfig = new LinkedHashMap<>();
-        mergeEnv(npmConfig, "yarn_", env);
-        mergeEnv(npmConfig, "npm_config_", env);
+        mergeEnv(npmConfig, "yarn_", env, release);
+        mergeEnv(npmConfig, "npm_config_", env, release);
         for (String loc : getPossibleConfigLocations("npmrc", configFiles)) {
             String file = loc.startsWith(Rc.HOME) ? home.get(loc.substring(Rc.HOME.length())) : configFiles.get(loc);
             if (file == null) {
@@ -564,7 +640,7 @@ final class Config {
             }
             Map<String, @Nullable Object> config = new LinkedHashMap<>();
             String text = file.replace("\r\n", "\n");
-            for (Map.Entry<String, @Nullable Object> entry : Ini.decode(text, Ini.Release.V1_3_5).entrySet()) {
+            for (Map.Entry<String, @Nullable Object> entry : Ini.decode(text, release.ini()).entrySet()) {
                 config.put(entry.getKey(), envReplace(normalizeConfigOption(entry.getValue()), env));
             }
             config.putAll(npmConfig);
@@ -576,16 +652,26 @@ final class Config {
     // base-registry.js init then yarn-registry.js loadConfig: the yarn_ keys over every .yarnrc over yarn's defaults
     private static Map<String, @Nullable Object> loadYarnConfig(Map<String, String> configFiles,
                                                                 Map<String, String> home,
-                                                                @Nullable Map<String, String> env) {
+                                                                @Nullable Map<String, String> env,
+                                                                YarnClassicRelease release) {
         Map<String, @Nullable Object> yarnConfig = new LinkedHashMap<>();
-        mergeEnv(yarnConfig, "yarn_", env);
+        mergeEnv(yarnConfig, "yarn_", env, release);
         for (String loc : getPossibleConfigLocations("yarnrc", configFiles)) {
             String file = loc.startsWith(Rc.HOME) ? home.get(loc.substring(Rc.HOME.length())) : configFiles.get(loc);
             if (file == null) {
                 continue;
             }
             Map<String, @Nullable Object> config = new LinkedHashMap<>();
-            Js.assign(config, LockfileParser.parseLockfile(file.replace("\r\n", "\n"), ".yarnrc").getObject());
+            Js.assign(config, LockfileParser.parseLockfile(file.replace("\r\n", "\n"), ".yarnrc", release)
+                    .getObject());
+            for (String key : relativeKeys(release)) {
+                Object valueLoc = config.get(key);
+                // path.resolve(path.dirname(loc), valueLoc) where no file before set the key; the engine keeps the
+                // path as the file gives it
+                if (!Js.truthy(yarnConfig.get(key)) && Js.truthy(valueLoc) && !(valueLoc instanceof String)) {
+                    throw Js.invalidArgType("The \"paths[1]\" argument must be of type string", valueLoc);
+                }
+            }
             config.putAll(yarnConfig);
             yarnConfig = config;
         }
@@ -594,20 +680,44 @@ final class Config {
         return withDefaults;
     }
 
+    // yarn-registry.js RELATIVE_KEYS, in its order: before 1.9.0 the offline mirror alone
+    private static List<String> relativeKeys(YarnClassicRelease release) {
+        List<String> keys = new ArrayList<>();
+        keys.add("yarn-offline-mirror");
+        if (release.resolvesCacheFolder()) {
+            keys.add("cache-folder");
+        }
+        if (release.resolvesGlobalFolder()) {
+            keys.add("global-folder");
+        }
+        if (release.resolvesOfflineCacheFolder()) {
+            keys.add("offline-cache-folder");
+        }
+        if (release.resolvesYarnPath()) {
+            keys.add("yarn-path");
+        }
+        return keys;
+    }
+
     // base-registry.js mergeEnv
     private static void mergeEnv(Map<String, @Nullable Object> config, String prefix,
-                                 @Nullable Map<String, String> env) {
+                                 @Nullable Map<String, String> env, YarnClassicRelease release) {
         if (env == null) {
             return;
         }
         for (Map.Entry<String, String> envEntry : env.entrySet()) {
             String key = envEntry.getKey().toLowerCase(Locale.ROOT);
-            if (!key.startsWith(prefix)) {
+            if (release.mergesEnvOfItsPrefixOnly() ? !key.startsWith(prefix) : !key.contains(prefix)) {
                 continue;
             }
             Object val = normalizeConfigOption(envEntry.getValue());
-            key = key.substring(prefix.length()).replace("__", ".");
-            key = UNDERSCORE.matcher(key).replaceAll("$1-");
+            // removePrefix
+            if (key.startsWith(prefix)) {
+                key = key.substring(prefix.length());
+            }
+            key = key.replace("__", ".");
+            key = release.keepsTheLeadingUnderscoresOfEnvKeys() ? UNDERSCORE.matcher(key).replaceAll("$1-") :
+                    key.replace('_', '-');
             ObjectPath.set(config, key, val);
         }
     }
@@ -689,7 +799,8 @@ final class Config {
         Object alwaysAuth = getRegistryOrGlobalOption(registry, "always-auth");
         // urlParts is pure in yarn, so the url's parts are asked only where they decide
         if (!Js.truthy(alwaysAuth) && getScope(packageIdent).isEmpty() ||
-            !isRequestToRegistry(requestUrl, registry) && !requestNeedsAuth(requestUrl)) {
+            !isRequestToRegistry(requestUrl, registry) &&
+            !(release.authenticatesToARegistryOfAnAuthToken() && requestNeedsAuth(requestUrl))) {
             return null;
         }
         String auth = getAuth(packageIdent);
@@ -701,7 +812,8 @@ final class Config {
         String[] registry = urlParts(registryUrl);
         Object customHostSuffix = getRegistryOrGlobalOption(registryUrl, "custom-host-suffix");
         boolean requestToRegistryHost = request[0].equals(registry[0]);
-        boolean requestToYarn = YARN_REGISTRY.contains(request[0]) && DEFAULT_REGISTRY.contains(registry[0]);
+        boolean requestToYarn = release.takesYarnsRegistryForNpms() && YARN_REGISTRY.contains(request[0]) &&
+                                DEFAULT_REGISTRY.contains(registry[0]);
         boolean requestToRegistryPath = request[1].startsWith(registry[1]);
         boolean customHostSuffixInUse = customHostSuffix instanceof String &&
                                         request[0].endsWith((String) customHostSuffix);
@@ -713,6 +825,7 @@ final class Config {
         for (String option : Js.keys(npmConfig)) {
             String[] parts = option.split(":", -1);
             if (parts.length > 1 && (parts.length == 2 && "_authToken".equals(parts[1]) ||
+                                     release.authenticatesToARegistryOfAPassword() &&
                                      "_password".equals(parts[1]))) {
                 String[] registry = urlParts(parts[0]);
                 if (request[0].equals(registry[0]) && request[1].startsWith(registry[1])) {
@@ -866,6 +979,17 @@ final class Config {
     // util/conversion.js
     static boolean boolify(@Nullable Object val) {
         return !FALSY_STRINGS.contains(Js.string(val).toLowerCase(Locale.ROOT));
+    }
+
+    /**
+     * {@code boolify} of {@code release}: before 1.6.0 cli/index.js's, false only for a value whose string is
+     * {@code false} or for the string {@code 0}, so that the number 0 is true.
+     */
+    static boolean boolify(@Nullable Object val, YarnClassicRelease release) {
+        if (!release.readsZeroAsFalse()) {
+            return !"false".equals(Js.string(val).toLowerCase(Locale.ROOT)) && !"0".equals(val);
+        }
+        return boolify(val);
     }
 
     static boolean boolifyWithDefault(@Nullable Object val, boolean defaultResult) {

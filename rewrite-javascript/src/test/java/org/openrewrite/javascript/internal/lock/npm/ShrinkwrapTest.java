@@ -254,7 +254,7 @@ class ShrinkwrapTest {
     }
 
     private static YarnLock.Entry entry(String integrity, String resolved, String version, String... specs) {
-        YarnLock.Entry entry = new YarnLock.Entry(Arrays.asList(specs));
+        YarnLock.Entry entry = new YarnLock.Entry(Arrays.asList(specs), NpmRelease.PORTED);
         entry.set("integrity", integrity);
         entry.set("resolved", resolved);
         entry.set("version", version);
@@ -487,6 +487,65 @@ class ShrinkwrapTest {
         assertThat(canonical(v2Data)).as("v2 is superset of v1 and v3").isEqualTo(canonical(merged));
         assertThat(v1Data).as("v1 data does not have packages").doesNotContainKey("packages");
         assertThat(v3Data).as("v3 data does not have dependencies").doesNotContainKey("dependencies");
+    }
+
+    // arborist 3.0.0 (npm 8.0.0) reads and writes every lock as its constant lockfileVersion 2, with the legacy
+    // dependencies beside the packages; arborist 4.0.1 (npm 8.1.0) keeps a newer version and writes packages alone
+    @Test
+    void writesEveryLockAsVersion2Before8_1_0() {
+        String dir = "/fixtures/v3";
+        String lock = "{\"name\": \"v3\", \"lockfileVersion\": 3, \"requires\": true, \"packages\": " +
+                      "{\"\": {\"name\": \"v3\"}, \"node_modules/a\": {\"version\": \"1.0.0\"}}}";
+        Map<String, Object> packages = obj("", obj("name", "v3"), "node_modules/a", obj("version", "1.0.0"));
+        for (String release : new String[]{"8.0.0", "8.1.0"}) {
+            NpmRelease npm = NpmRelease.of(release);
+            Shrinkwrap sw = new Shrinkwrap(dir, NpmOptions.builder().release(npm).build())
+              .load(projectFiles(lock, null, null));
+            assertThat(Js.toNumber(sw.getOriginalLockfileVersion())).as(release).isEqualTo(3.0);
+            Node root = node(opts().path(dir).realpath(dir).pkg(obj("name", "v3")).release(npm));
+            Node a = node(opts().pkg(obj("name", "a", "version", "1.0.0")).parent(root).release(npm));
+            root.unsetDepFlags();
+            a.unsetDepFlags();
+            sw.add(root);
+            assertThat(canonical(sw.commit())).as(release).isEqualTo(canonical("8.0.0".equals(release) ?
+              obj("name", "v3", "lockfileVersion", 2, "requires", true, "packages", packages,
+                "dependencies", obj("a", obj("version", "1.0.0"))) :
+              obj("name", "v3", "lockfileVersion", 3, "requires", true, "packages", packages)));
+        }
+    }
+
+    // shrinkwrap.js commit from npm 7.1.1 (arborist 2.0.0) writes the inventory of the tree's root; before, the tree's
+    // own, which a tree that arborist 1's link target setter roots under a link to the project no longer holds
+    @Test
+    @SuppressWarnings("unchecked")
+    void commitsTheTreesOwnInventoryBefore7_1_1() {
+        String dir = "/fixtures/self";
+        for (String release : new String[]{"7.1.0", "7.1.1"}) {
+            NpmRelease npm = NpmRelease.of(release);
+            Shrinkwrap sw = new Shrinkwrap(dir, NpmOptions.builder().release(npm).build())
+              .load(projectFiles(null, null, null));
+            Node root = node(opts().path(dir).realpath(dir).pkg(obj("name", "self", "version", "1.0.0")).release(npm));
+            node(opts().pkg(obj("name", "a", "version", "1.0.0")).parent(root).release(npm));
+            sw.add(root);
+            link(opts().path(dir + "/node_modules/self").realpath(dir).target(root).release(npm));
+            Map<String, Object> packages = (Map<String, Object>) sw.commit().get("packages");
+            assertThat(packages.keySet()).as(release).containsExactlyElementsOf("7.1.0".equals(release) ?
+              Arrays.asList("") : Arrays.asList("", "node_modules/a", "node_modules/self"));
+        }
+    }
+
+    // arborist 2.8.1 (npm 7.20.6) names the root entry whatever the directory; before, only a package named otherwise
+    @Test
+    void rootEntryNamedOnlyAfterAnotherDirectoryBefore7_20_6() {
+        for (String release : new String[]{"7.20.5", "7.20.6"}) {
+            NpmOptions options = NpmOptions.builder().release(NpmRelease.of(release)).build();
+            Node sameName = node(opts().path("/projects/p").realpath("/projects/p").pkg(obj("name", "p")));
+            Node otherName = node(opts().path("/projects/project").realpath("/projects/project").pkg(obj("name", "p")));
+            assertThat(Shrinkwrap.metaFromNode(sameName, "/projects/p", options).get("name")).as(release)
+              .isEqualTo("7.20.5".equals(release) ? null : "p");
+            assertThat(Shrinkwrap.metaFromNode(otherName, "/projects/project", options).get("name")).as(release)
+              .isEqualTo("p");
+        }
     }
 
     @Test

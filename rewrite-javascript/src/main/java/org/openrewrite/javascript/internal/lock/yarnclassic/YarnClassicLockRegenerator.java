@@ -40,8 +40,8 @@ import java.util.Set;
 import java.util.regex.Pattern;
 
 /**
- * A lock-only {@code yarn install} (yarn 1.22.22), run as cli/index.js runs it: {@link Cli}, {@link Config},
- * {@link Install}.
+ * A lock-only {@code yarn install} (yarn 1.22.22, and each release of {@link YarnClassicReleases#PROVEN} beside it),
+ * run as cli/index.js runs it: {@link Cli}, {@link Config}, {@link Install}.
  */
 public final class YarnClassicLockRegenerator {
 
@@ -109,6 +109,20 @@ public final class YarnClassicLockRegenerator {
 
         @Builder.Default
         Host host = Host.UNKNOWN;
+
+        /**
+         * The release that built the LST, as its {@code NodeRuntime} marker records it
+         * ({@link YarnClassicReleases#installedAs}); null where the host recorded none.
+         */
+        @Nullable
+        YarnClassicRelease release;
+
+        /**
+         * The release that installs: the one that built the LST, 1.22.22 where the host recorded none.
+         */
+        YarnClassicRelease installsAs() {
+            return release == null ? YarnClassicRelease.PORTED : release;
+        }
 
         /**
          * The config files by their path from the directory yarn runs in.
@@ -209,7 +223,12 @@ public final class YarnClassicLockRegenerator {
     String install(String lock) {
         Inputs these = lock.equals(inputs.getLock()) ? inputs : inputs.toBuilder().lock(lock).build();
         requireConfigFiles(these);
-        Map<String, @Nullable Object> flags = start(these);
+        Map<String, @Nullable Object> flags;
+        try {
+            flags = start(these);
+        } catch (Cli.HandedOver e) {
+            return lock;
+        }
         Config config = new Config(these, flags);
         String saved = new Install(these, config, flags, registry).run();
         return saved == null ? lock : saved;
@@ -219,11 +238,20 @@ public final class YarnClassicLockRegenerator {
      * cli/index.js {@code start} and {@code main}: the flags the .yarnrc chain gives the install.
      */
     static Map<String, @Nullable Object> start(Inputs inputs) {
-        Map<String, @Nullable Object> rc = Rc.getRcConfigForCwd(inputs.configFilesFromCwd(), inputs.getHomeFiles());
+        Map<String, @Nullable Object> rc;
+        try {
+            rc = Rc.getRcConfigForCwd(inputs.configFilesFromCwd(), inputs.getHomeFiles(), inputs.installsAs());
+        } catch (Cli.Crash e) {
+            throw e;
+        } catch (JsError e) {
+            throw new Cli.Crash(e);
+        } catch (MessageError e) {
+            throw new Cli.Crash(new JsError(JsError.ERROR, String.valueOf(e.getMessage())));
+        }
         Cli cli = new Cli(inputs);
         cli.start(rc);
         cli.main();
-        return Rc.getRcArgs(rc);
+        return Rc.getRcArgs(rc, inputs.installsAs());
     }
 
     // every install reads the config files of the directory it runs in and of each directory above it
@@ -256,28 +284,55 @@ public final class YarnClassicLockRegenerator {
     }
 
     private Failure failure(RuntimeException e) {
-        return INSTALL.failure(outcome(e));
+        return INSTALL.failure(outcome(e, inputs.installsAs()));
     }
 
-    private static RuntimeException outcome(RuntimeException e) {
+    private static RuntimeException outcome(RuntimeException e, YarnClassicRelease release) {
         if (e instanceof LocaleCompare.UnknownOrder) {
             return new CannotKnow("the order yarn finds the workspaces in: " + e.getMessage());
         }
         if (e instanceof MessageError) {
-            String message = String.valueOf(e.getMessage());
-            return Rejected.rejects(reasonFor(message), message);
+            MessageError error = (MessageError) e;
+            String message = String.valueOf(error.getMessage());
+            return error.isRewrapped() ? Rejected.crashes(reasonFor(message), null, report(error, release)) :
+                    Rejected.rejects(reasonFor(message), report(error, release));
         }
         // the registry's 404 is its verdict, as in every port; yarn's own plain Errors (a TTY question) have no code
         if (e instanceof NpmRegistry.NotFound) {
             return Rejected.rejects(SharedError.PACKAGE_NOT_FOUND, ((NpmRegistry.NotFound) e).getPackageName(),
-                    e.toString());
+                    unexpectedError((JsError) e, release));
+        }
+        // start's catch prints the stack of what ends yarn before main reports
+        if (e instanceof Cli.Crash) {
+            Cli.Crash crash = (Cli.Crash) e;
+            Reason reason = crash.isSyntaxError() ? Reason.MALFORMED_MANIFEST : Reason.RESOLUTION_REQUIRED;
+            return Rejected.crashes(reason, null, crash.toString());
         }
         if (e instanceof JsError) {
             JsError error = (JsError) e;
             Reason reason = error.isSyntaxError() ? Reason.MALFORMED_MANIFEST : Reason.RESOLUTION_REQUIRED;
-            return Rejected.crashes(reason, null, error.toString());
+            return Rejected.crashes(reason, null, unexpectedError(error, release));
         }
         return e;
+    }
+
+    /**
+     * cli/index.js {@code main}'s report of an error that is no MessageError: its stack, whose first line is the
+     * error's name and message; {@code onUnexpectedError}'s {@code An unexpected error occurred: "<message>".} before
+     * 1.22.20. Yarn 1.22.20 reports none; its words are the error's.
+     */
+    static String unexpectedError(JsError error, YarnClassicRelease release) {
+        return release.reportsUnexpectedErrors() ? Lang.format(release, "An unexpected error occurred: $0.",
+                String.valueOf(error.getMessage())) : error.toString();
+    }
+
+    /**
+     * cli/index.js {@code main}'s report of one of yarn's own errors: its message, or, where {@code instanceof
+     * MessageError} fails it (1.4.0 to 1.5.1), {@code onUnexpectedError}'s words.
+     */
+    static String report(MessageError error, YarnClassicRelease release) {
+        String message = String.valueOf(error.getMessage());
+        return release.tellsItsErrorsByClass() ? message : Lang.format(release, "An unexpected error occurred: $0.", message);
     }
 
     private static Reason reasonFor(String message) {

@@ -41,6 +41,8 @@ final class PackageRequest {
     private static final Pattern GIT_PROTOCOL = Pattern.compile("^git(\\+[a-z0-9]+)?://");
 
     private static final List<String> REQUIRED_PACKAGE_KEYS = Arrays.asList("name", "version", "_uid");
+    private static final String FLAT_GLOBAL_ERROR = "The package $0 requires a flat dependency graph. Add `\"flat\": " +
+                                                    "true` to your package.json and try again.";
 
     final @Nullable PackageRequest parentRequest;
     final List<String> parentNames;
@@ -66,7 +68,9 @@ final class PackageRequest {
 
     PackageRequest(DependencyRequestPattern req, PackageResolver resolver) {
         this.parentRequest = req.getParentRequest();
-        this.parentNames = req.getParentNames() == null ? Collections.emptyList() : req.getParentNames();
+        this.parentNames = req.getParentNames() == null ||
+                           !resolver.config.getRelease().passesTheParentNamesDown() ? Collections.emptyList() :
+                req.getParentNames();
         this.lockfile = resolver.lockfile;
         this.registry = req.getRegistry();
         this.resolver = resolver;
@@ -118,13 +122,19 @@ final class PackageRequest {
         remote.type = preferredRemoteType;
         remote.reference = url;
         remote.hash = hash;
-        remote.integrity = shrunk.get("integrity");
+        boolean integrity = config.getRelease().recordsIntegrity();
+        remote.integrity = integrity ? shrunk.get("integrity") : null;
         remote.registry = shrunk.get("registry");
-        remote.packageName = shrunk.get("name");
+        remote.packageName = integrity ? shrunk.get("name") : null;
         manifest.remote = remote;
-        manifest.put("optionalDependencies", or(shrunk.get("optionalDependencies")));
-        manifest.put("dependencies", or(shrunk.get("dependencies")));
-        manifest.put("prebuiltVariants", or(shrunk.get("prebuiltVariants")));
+        if (config.getRelease().keepsPrebuiltVariants()) {
+            manifest.put("optionalDependencies", or(shrunk.get("optionalDependencies")));
+            manifest.put("dependencies", or(shrunk.get("dependencies")));
+            manifest.put("prebuiltVariants", or(shrunk.get("prebuiltVariants")));
+        } else {
+            manifest.put("optionalDependencies", shrunk.get("optionalDependencies"));
+            manifest.put("dependencies", shrunk.get("dependencies"));
+        }
         manifest.locked = shrunk;
         return manifest;
     }
@@ -135,7 +145,8 @@ final class PackageRequest {
 
     Promise<Manifest> findVersionOnRegistry(String pattern) {
         return normalize(pattern).then(normalized -> {
-            ExoticResolvers.Kind exoticResolver = ExoticResolvers.getExoticResolver(normalized.getRange());
+            ExoticResolvers.Kind exoticResolver = ExoticResolvers.getExoticResolver(normalized.getRange(),
+                    config.getRelease());
             if (exoticResolver != null) {
                 return findExoticVersionInfo(exoticResolver, normalized.getRange()).then(found -> {
                     Manifest data = found.copy();
@@ -145,10 +156,16 @@ final class PackageRequest {
             }
             NpmResolver npmResolver = getRegistryResolver(normalized.getName(), normalized.getRange());
             return Promise.async(resolver.loop, npmResolver::resolve).recover(err -> {
-                // only JavaScript's errors are yarn's; the host's failure to fetch stays the host's
-                if (err instanceof JsError && parentRequest != null && Js.truthy(parentRequest.pattern)) {
-                    throw new MessageError(Lang.format("Couldn't find package $0 required by $1 on the $2 registry.",
-                            pattern, parentRequest.pattern, registry));
+                // only JavaScript's errors are yarn's; the host's failure to fetch stays the host's, and yarn's own
+                // rejection is no MessageError to instanceof in 1.5.x
+                YarnClassicRelease release = config.getRelease();
+                boolean ownRejection = err instanceof MessageError && !release.tellsItsErrorsByClass();
+                if (release.namesTheParentOfAPackageNotFound() && (err instanceof JsError || ownRejection) &&
+                    parentRequest != null && Js.truthy(parentRequest.pattern)) {
+                    MessageError notFound = new MessageError(Lang.format(config.getRelease(), "Couldn't find package $0 required by $1 " +
+                                                                         "on the $2 registry.", pattern,
+                            parentRequest.pattern, registry));
+                    throw ownRejection ? notFound.rewrapped() : notFound;
                 }
                 throw err;
             });
@@ -159,20 +176,20 @@ final class PackageRequest {
         if ("npm".equals(registry) || "yarn".equals(registry)) {
             return new NpmResolver(this, name, range);
         }
-        throw new MessageError(Lang.format("Unknown registry resolver $0", registry));
+        throw new MessageError(Lang.format(config.getRelease(), "Unknown registry resolver $0", registry));
     }
 
     Promise<String> normalizeRange(String pattern) {
         EventLoop loop = resolver.loop;
         if (pattern.indexOf(':') > -1 || pattern.indexOf('@') > -1 ||
-            ExoticResolvers.getExoticResolver(pattern) != null) {
+            ExoticResolvers.getExoticResolver(pattern, config.getRelease()) != null) {
             return Promise.resolved(loop, pattern);
         }
         if (NodeSemver.validRange(pattern, Config.SEMVER) == null) {
             String location = ProjectFiles.location(resolver.files.cwd(), pattern);
-            if (location == null) {
-                throw new CannotKnow("whether " + pattern + "/package.json exists outside the project, which makes " +
-                                     "the range " + pattern + " a file: dependency");
+            if (location == null || resolver.files.isOutside(location)) {
+                throw new CannotKnow("whether " + pattern + "/package.json exists " + resolver.files.outside() +
+                                     ", which makes the range " + pattern + " a file: dependency");
             }
             Io<Boolean> exists = Io.issue(loop, io, () -> resolver.files.hasManifest(location) ||
                                                               resolver.files.holds(PosixPath.join(location,
@@ -199,7 +216,7 @@ final class PackageRequest {
     }
 
     Promise<Manifest> findVersionInfo() {
-        ExoticResolvers.Kind exoticResolver = ExoticResolvers.getExoticResolver(pattern);
+        ExoticResolvers.Kind exoticResolver = ExoticResolvers.getExoticResolver(pattern, config.getRelease());
         if (exoticResolver != null) {
             return findExoticVersionInfo(exoticResolver, pattern);
         }
@@ -225,8 +242,8 @@ final class PackageRequest {
 
     void resolveToExistingVersion(Manifest info) {
         NormalizedPattern normalized = NormalizedPattern.normalizePattern(pattern);
-        String solvedRange = NodeSemver.validRange(normalized.getRange(), Config.SEMVER) != null ?
-                Js.templateString(info.getVersion()) : normalized.getRange();
+        Object solvedRange = NodeSemver.validRange(normalized.getRange(), Config.SEMVER) != null ?
+                info.getVersion() : normalized.getRange();
         Manifest resolved = resolver.getHighestRangeVersionMatch(normalized.getName(), solvedRange, info);
         if (resolved == null) {
             throw new JsError(Js.INVARIANT_VIOLATION, "should have a resolved reference");
@@ -237,14 +254,17 @@ final class PackageRequest {
         }
         ref.addRequest(this);
         ref.addPattern(pattern, resolved);
-        ref.addOptional(optional);
+        if (config.getRelease().tellsOptionalRequestsApart()) {
+            ref.addOptional(optional);
+        }
     }
 
     Promise<Void> find(boolean fresh, boolean frozen) {
         return Promise.async(resolver.loop, this::findVersionInfo).then(info -> {
             Object version = info.getVersion();
-            if (!(version instanceof String) || NodeSemver.valid((String) version, Config.SEMVER) == null) {
-                throw new MessageError(Lang.format("Can't add $0: invalid package version $1.", info.getName(),
+            if (config.getRelease().rejectsAnInvalidVersion() &&
+                (!(version instanceof String) || NodeSemver.valid((String) version, Config.SEMVER) == null)) {
+                throw new MessageError(Lang.format(config.getRelease(), "Can't add $0: invalid package version $1.", info.getName(),
                         info.getVersion()));
             }
             info.fresh = fresh;
@@ -252,8 +272,8 @@ final class PackageRequest {
 
             NormalizedPattern normalized = NormalizedPattern.normalizePattern(pattern);
             String name = normalized.getName();
-            String solvedRange = NodeSemver.validRange(normalized.getRange(), Config.SEMVER) != null ?
-                    (String) info.getVersion() : normalized.getRange();
+            Object solvedRange = NodeSemver.validRange(normalized.getRange(), Config.SEMVER) != null ?
+                    info.getVersion() : normalized.getRange();
             Manifest resolved = !info.fresh || frozen ?
                     resolver.getExactVersionMatch(name, solvedRange, info) :
                     resolver.getHighestRangeVersionMatch(name, solvedRange, info);
@@ -265,12 +285,13 @@ final class PackageRequest {
             }
 
             if (Js.truthy(info.get("flat")) && !resolver.flat) {
-                throw new MessageError(Lang.format("The package $0 requested to be flat, but the project is not " +
-                                                   "flat. Please use the --flat flag.",
-                        Js.templateString(info.getName()) + "@" + Js.templateString(info.getVersion())));
+                throw new MessageError(config.getRelease().namesTheFlatPackage() ?
+                        Lang.format(config.getRelease(), FLAT_GLOBAL_ERROR,
+                                Js.templateString(info.getName()) + "@" + Js.templateString(info.getVersion())) :
+                        FLAT_GLOBAL_ERROR.replace("$0", "undefined@undefined"));
             }
 
-            validateVersionInfo(info);
+            validateVersionInfo(info, config.getRelease());
 
             PackageRemote remote = info.remote;
             if (remote == null) {
@@ -339,12 +360,12 @@ final class PackageRequest {
         });
     }
 
-    static void validateVersionInfo(Manifest info) {
+    static void validateVersionInfo(Manifest info, YarnClassicRelease release) {
         String human = Js.templateString(info.getName()) + "@" + Js.templateString(info.getVersion());
         info.put("version", getPackageVersion(info));
         for (String key : REQUIRED_PACKAGE_KEYS) {
             if (!Js.truthy(info.get(key))) {
-                throw new MessageError(Lang.format("Package $0 doesn't have a $1.", human, key));
+                throw new MessageError(Lang.format(release, "Package $0 doesn't have a $1.", human, key));
             }
         }
     }

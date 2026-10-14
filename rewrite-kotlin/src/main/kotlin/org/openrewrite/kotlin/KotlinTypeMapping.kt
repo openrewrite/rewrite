@@ -29,6 +29,7 @@ import org.jetbrains.kotlin.fir.resolve.getContainingClassSymbol
 import org.jetbrains.kotlin.fir.declarations.*
 import org.jetbrains.kotlin.fir.declarations.DirectDeclarationsAccess
 import org.jetbrains.kotlin.fir.declarations.impl.FirPrimaryConstructor
+import org.jetbrains.kotlin.fir.declarations.utils.isScriptTopLevelDeclaration
 import org.jetbrains.kotlin.fir.declarations.utils.isStatic
 import org.jetbrains.kotlin.fir.declarations.utils.modality
 import org.jetbrains.kotlin.fir.declarations.utils.visibility
@@ -624,7 +625,7 @@ class KotlinTypeMapping(
         val paramNamesArr: kotlin.Array<String>? = if (function.valueParameters.isNotEmpty()) {
             kotlin.Array(function.valueParameters.size) { function.valueParameters[it].name.asString() }
         } else null
-        var methodFlags = mapToFlagsBitmap(function.visibility, function.modality, function.isStatic)
+        var methodFlags = mapToFlagsBitmap(function.visibility, function.modality, function.isStatic || isFileFacadeMember(function.symbol))
         if (function.symbol is FirConstructorSymbol) {
             methodFlags = methodFlags and (1L shl 4).inv()
         }
@@ -832,7 +833,7 @@ class KotlinTypeMapping(
         } else null
         var invocationFlags = when (sym) {
             is FirConstructorSymbol -> mapToFlagsBitmap(sym.visibility, sym.modality, sym.isStatic)
-            is FirNamedFunctionSymbol -> mapToFlagsBitmap(sym.visibility, sym.modality, sym.isStatic)
+            is FirNamedFunctionSymbol -> mapToFlagsBitmap(sym.visibility, sym.modality, sym.isStatic || isFileFacadeMember(sym))
             else -> {
                 throw UnsupportedOperationException("Unsupported method symbol: ${sym.javaClass.name}")
             }
@@ -1274,7 +1275,7 @@ class KotlinTypeMapping(
 
     @OptIn(SymbolInternals::class)
     fun variableType(variable: FirVariable, parent: Any?, signature: String): Variable {
-        var variableFlags = mapToFlagsBitmap(variable.visibility, variable.modality, variable.isStatic)
+        var variableFlags = mapToFlagsBitmap(variable.visibility, variable.modality, variable.isStatic || isFileFacadeMember(variable.symbol))
         if (variable is FirEnumEntry) {
             variableFlags = variableFlags or (1L shl 14) // Enum
         }
@@ -1698,6 +1699,17 @@ class KotlinTypeMapping(
             else -> FullyQualified.Kind.Class
         }
     }
+
+    /**
+     * Top-level functions and properties compile to static members of the file's JVM facade class.
+     */
+    @OptIn(SymbolInternals::class)
+    private fun isFileFacadeMember(symbol: FirCallableSymbol<*>): Boolean =
+        (symbol is FirNamedFunctionSymbol && symbol.origin != FirDeclarationOrigin.SamConstructor || symbol is FirPropertySymbol) &&
+                symbol.callableId?.isLocal == false &&
+                symbol.dispatchReceiverType == null &&
+                symbol.containingClassLookupTag() == null &&
+                symbol.fir.isScriptTopLevelDeclaration != true
 
     private fun mapToFlagsBitmap(visibility: Visibility, modality: Modality?, isStatic: Boolean): Long {
         var bitMask: Long = 0

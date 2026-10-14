@@ -35,6 +35,7 @@ import static org.openrewrite.javascript.semver.NodeSemver.Options.LOOSE;
 final class DepValid {
 
     private static final Pattern COMMIT = Pattern.compile("^[a-fA-F0-9]{40,64}$");
+    private static final Pattern SHA1_COMMIT = Pattern.compile("^[a-fA-F0-9]{40}$");
 
     /**
      * An error dep-valid records on the requesting node, for a spec nothing could satisfy.
@@ -78,7 +79,8 @@ final class DepValid {
             return null;
         }
         try {
-            Spec parsed = Spec.resolve(child.getName(), (String) spec, requestor.getRealpath());
+            Spec parsed = Spec.resolve(child.getName(), (String) spec, requestor.getRealpath(),
+                    requestor.getRelease().npmPackageArg());
             if (parsed.getType() != Spec.Type.GIT) {
                 return null;
             }
@@ -103,7 +105,8 @@ final class DepValid {
         Spec spec;
         try {
             spec = Spec.resolve(child.getName(), requested.isEmpty() ? "*" : requested,
-                    FromPath.fromPath(requestor, requestor.getEdgesOut().get(child.getName())));
+                    FromPath.fromPath(requestor, requestor.getEdgesOut().get(child.getName())),
+                    requestor.getRelease().npmPackageArg());
         } catch (IllegalArgumentException er) {
             requestor.getErrors().add(new DependencyError(er.getMessage(), child.getName(), requested, er));
             return false;
@@ -117,6 +120,8 @@ final class DepValid {
             return false;
         }
 
+        NodeSemver.Options loose = LOOSE.release(requestor.getRelease().semver());
+        Spec.Options npa = requestor.getRelease().npmPackageArg();
         switch (requested.getType()) {
             case RANGE:
                 if ("*".equals(requested.getFetchSpec())) {
@@ -124,7 +129,7 @@ final class DepValid {
                 }
                 // fall through
             case VERSION:
-                return NodeSemver.satisfies(child.getVersion(), requested.getFetchSpec(), LOOSE);
+                return NodeSemver.satisfies(child.getVersion(), requested.getFetchSpec(), loose);
             case DIRECTORY:
                 return linkValid(child, requested, requestor);
             case FILE:
@@ -132,16 +137,18 @@ final class DepValid {
             case ALIAS:
                 return depValid(child, requested.getSubSpec(), requestor);
             case TAG:
-                return truthy(child.getResolved()) && Spec.npa(child.getResolved(), null).getType() == Spec.Type.REMOTE;
+                return truthy(child.getResolved()) &&
+                       Spec.npa(child.getResolved(), null, npa).getType() == Spec.Type.REMOTE;
             case REMOTE:
                 return requested.getFetchSpec() != null && Js.strictEquals(child.getResolved(),
                         requested.getFetchSpec());
             case GIT: {
-                Spec resRepo = Spec.npa(truthy(child.getResolved()) ? child.getResolved() : "", null);
+                Spec resRepo = Spec.npa(truthy(child.getResolved()) ? child.getResolved() : "", null, npa);
                 GitHost resHost = resRepo.getHosted();
                 GitHost reqHost = requested.getHosted();
                 String reqCommittish = requested.getGitCommittish() == null ? "" : requested.getGitCommittish();
-                boolean reqCommit = COMMIT.matcher(reqCommittish).matches();
+                boolean reqCommit = (requestor.getRelease().readsSha256Commits() ? COMMIT : SHA1_COMMIT)
+                        .matcher(reqCommittish).matches();
                 GitHost.Opts nc = GitHost.Opts.of(null, !reqCommit);
                 if (resHost == null) {
                     if (!Objects.equals(resRepo.getFetchSpec(), requested.getFetchSpec())) {
@@ -153,7 +160,7 @@ final class DepValid {
                     }
                 }
                 if (!truthy(requested.getGitRange())) {
-                    if (!reqCommit) {
+                    if (!reqCommit && requestor.getRelease().comparesLockedGitCommittish()) {
                         String locked = lockedGitCommittish(child, requestor);
                         if (locked != null && !locked.equals(reqCommittish)) {
                             return false;
@@ -161,7 +168,7 @@ final class DepValid {
                     }
                     return true;
                 }
-                return NodeSemver.satisfies(child.getPackage().get("version"), requested.getGitRange(), LOOSE);
+                return NodeSemver.satisfies(child.getPackage().get("version"), requested.getGitRange(), loose);
             }
             default:
                 break;
@@ -173,7 +180,7 @@ final class DepValid {
 
     private static boolean linkValid(Node child, Spec requested, Node requestor) {
         boolean isLink = child.isLink();
-        if (requestor.isInstallLinks() && !child.isWorkspace()) {
+        if (requestor.isInstallLinks() && (!child.isWorkspace() || !requestor.getRelease().keepsWorkspaceLinksValid())) {
             return !isLink;
         }
         return isLink && child.getRealpath() != null &&
@@ -185,6 +192,10 @@ final class DepValid {
             return false;
         }
         if (truthy(child.getResolved())) {
+            if (!child.getRelease().comparesTarballPathsWithSlashes()) {
+                // before npm 7.0.13, as written
+                return Js.strictEquals(child.getResolved(), "file:" + requested.getFetchSpec());
+            }
             if (!(child.getResolved() instanceof String)) {
                 throw new IllegalArgumentException("child.resolved.replace is not a function");
             }

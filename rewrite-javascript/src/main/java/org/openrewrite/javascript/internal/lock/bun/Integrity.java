@@ -15,12 +15,14 @@
  */
 package org.openrewrite.javascript.internal.lock.bun;
 
+import org.openrewrite.javascript.internal.lock.CannotKnow;
+
 import java.util.Arrays;
 import java.util.Base64;
 
 /**
- * Port of bun's src/install/integrity.zig (bun 1.3.10): the digest decoded and encoded again with Zig's unpadded
- * base64, then {@code =} appended for sha1 and {@code ==} for every other algorithm.
+ * Port of bun's src/install/integrity.zig (bun 1.3.10), with integrity.rs (1.4.0) beside it: the digest decoded and
+ * encoded again with Zig's unpadded base64, then {@code =} appended for sha1 and {@code ==} for every other algorithm.
  */
 final class Integrity {
 
@@ -51,6 +53,16 @@ final class Integrity {
     }
 
     static Integrity parseSHASum(String buf) {
+        return parseSHASum(buf, BunRelease.PORTED);
+    }
+
+    /**
+     * {@code parseSHASum}: the first 40 characters as pairs of digits, letters read in base 36; from 1.4.0
+     * hexadecimal digits only, an odd count of them an error ({@link BunRelease#readsAShasumAsHexadecimal()}).
+     *
+     * @throws IllegalArgumentException {@code InvalidCharacter}
+     */
+    static Integrity parseSHASum(String buf, BunRelease release) {
         if (buf.isEmpty()) {
             return UNKNOWN;
         }
@@ -58,6 +70,21 @@ final class Integrity {
         int end = Math.min(40, buf.length());
         int outI = 0;
         int i = 0;
+        if (release.readsAShasumAsHexadecimal()) {
+            if (end % 2 != 0) {
+                throw new IllegalArgumentException("InvalidCharacter");
+            }
+            while (i < end) {
+                int hi = hexValue(buf.charAt(i));
+                int lo = hexValue(buf.charAt(i + 1));
+                if (hi < 0 || lo < 0) {
+                    throw new IllegalArgumentException("InvalidCharacter");
+                }
+                value[outI++] = (byte) (hi << 4 | lo);
+                i += 2;
+            }
+            return new Integrity(Tag.SHA1, value);
+        }
         while (i < end) {
             int x0 = hexDigit(buf.charAt(i));
             i++;
@@ -84,12 +111,61 @@ final class Integrity {
         throw new IllegalArgumentException("InvalidCharacter");
     }
 
+    // hex_digit_value: -1 for anything but 0-9, a-f and A-F
+    private static int hexValue(char c) {
+        if (c >= '0' && c <= '9') {
+            return c - '0';
+        } else if (c >= 'a' && c <= 'f') {
+            return c - 'a' + 10;
+        } else if (c >= 'A' && c <= 'F') {
+            return c - 'A' + 10;
+        }
+        return -1;
+    }
+
     static Integrity parse(String buf) {
+        return parse(buf, BunRelease.PORTED);
+    }
+
+    /**
+     * {@code parse}: the whole string is one hash; from 1.4.0 the strongest of the hashes it holds separated by ASCII
+     * whitespace, each read up to a {@code ?} ({@link BunRelease#keepsTheStrongestOfSeveralHashes()}); before 1.2.20
+     * decoded from its eighth character ({@link BunRelease#decodesAnIntegrityPastItsAlgorithm()}), and before 1.2.21
+     * into 64 bytes whatever its algorithm ({@link BunRelease#refusesAnIntegrityLongerThanItsDigest()}).
+     *
+     * @throws CannotKnow before 1.2.21 for a hash of more than 64 bytes, which bun decodes past its buffer
+     */
+    static Integrity parse(String buf, BunRelease release) {
+        if (!release.keepsTheStrongestOfSeveralHashes()) {
+            return parseEntry(buf, false, release);
+        }
+        Integrity strongest = UNKNOWN;
+        int start = 0;
+        for (int i = 0; i <= buf.length(); i++) {
+            if (i == buf.length() || isAsciiWhitespace(buf.charAt(i))) {
+                Integrity parsed = parseEntry(buf.substring(start, i), true, release);
+                if (parsed.tag.ordinal() > strongest.tag.ordinal()) {
+                    strongest = parsed;
+                }
+                start = i + 1;
+            }
+        }
+        return strongest;
+    }
+
+    // u8::is_ascii_whitespace: no vertical tab
+    private static boolean isAsciiWhitespace(char c) {
+        return c == ' ' || c == '\t' || c == '\n' || c == '\u000C' || c == '\r';
+    }
+
+    // parse_entry, the hash read up to a '?' from 1.4.0
+    private static Integrity parseEntry(String buf, boolean cutAtQuery, BunRelease release) {
         if (buf.length() < "sha256-".length()) {
             return UNKNOWN;
         }
         int dash = buf.substring(0, Math.min(buf.length(), 7)).indexOf('-');
-        if (dash < 0 || buf.length() <= dash + 1) {
+        boolean pastAlgorithm = release.decodesAnIntegrityPastItsAlgorithm();
+        if (dash < 0 || pastAlgorithm && buf.length() <= dash + 1) {
             return UNKNOWN;
         }
         Tag tag;
@@ -109,14 +185,22 @@ final class Integrity {
             default:
                 return UNKNOWN;
         }
-        String input = Strings.trimRight(buf.substring(dash + 1), "=");
+        // before 1.2.20 from past "sha256-" whatever the algorithm, two characters into a sha1's hash
+        String hash = buf.substring(pastAlgorithm ? dash + 1 : "sha256-".length());
+        int query = cutAtQuery ? hash.indexOf('?') : -1;
+        String input = Strings.trimRight(query >= 0 ? hash.substring(0, query) : hash, "=");
         int leftover = input.length() % 4;
         if (leftover == 1) {
             return UNKNOWN;
         }
         int decodedSize = input.length() / 4 * 3 + leftover * 3 / 4;
-        if (decodedSize > tag.digestLen) {
-            return UNKNOWN;
+        if (release.refusesAnIntegrityLongerThanItsDigest()) {
+            if (decodedSize > tag.digestLen) {
+                return UNKNOWN;
+            }
+        } else if (decodedSize > DIGEST_BUF_LEN && writesPastTheBuffer(input)) {
+            throw new CannotKnow("what bun " + release + " makes of the integrity " + buf + ", whose hash it decodes " +
+                                 "past its 64-byte buffer");
         }
         byte[] out = new byte[DIGEST_BUF_LEN];
         int acc = 0;
@@ -138,6 +222,17 @@ final class Integrity {
             return UNKNOWN;
         }
         return new Integrity(tag, out);
+    }
+
+    // std.base64 Decoder.decode into 64 bytes: its chunked loops stop short of the buffer's end, and the byte-a-time
+    // loop after them writes the 65th byte at the 87th character unchecked, unless a character before it is invalid
+    private static boolean writesPastTheBuffer(String input) {
+        for (int k = 0; k <= 86; k++) {
+            if (base64Index(input.charAt(k)) < 0) {
+                return false;
+            }
+        }
+        return true;
     }
 
     private static int base64Index(char c) {

@@ -16,6 +16,7 @@
 package org.openrewrite.javascript.internal.lock.yarnclassic;
 
 import org.jspecify.annotations.Nullable;
+import org.openrewrite.javascript.internal.lock.CannotKnow;
 import org.openrewrite.javascript.internal.lock.JsError;
 import org.openrewrite.javascript.internal.lock.PosixPath;
 
@@ -28,7 +29,8 @@ import java.util.Map;
 
 /**
  * Port of tar-fs 1.16.3 {@code extract} on POSIX as yarn 1.22.22's tarball fetcher calls it ({@code strip: 1} and its
- * {@code map} of link targets): the directory an archive extracts into.
+ * {@code map} of link targets), and of 1.16.0, which yarn bundles before 1.10.0: the directory an archive extracts
+ * into.
  */
 final class TarFs {
 
@@ -43,12 +45,22 @@ final class TarFs {
         private int offset;
         private int size;
 
+        /**
+         * The entry's name where the archive ends inside its content: its write runs on after the extract finishes, so
+         * what a read finds there follows the timing of the disk.
+         */
+        private @Nullable String cut;
+
         private Node(boolean directory, @Nullable String symlink) {
             this.directory = directory;
             this.symlink = symlink;
         }
 
         byte[] content() {
+            if (cut != null) {
+                throw new CannotKnow("what yarn reads of " + cut + ", which the tarball's archive ends inside: the " +
+                                     "extract finishes there, the file's write runs on");
+            }
             return Arrays.copyOfRange(archive, offset, offset + size);
         }
     }
@@ -57,7 +69,26 @@ final class TarFs {
 
     private final Map<String, Node> tree = new HashMap<>();
 
-    private TarFs() {
+    /**
+     * The tar-fs yarn bundles: 1.16.3 from yarn 1.10.0; before, 1.16.0, which neither refuses an entry whose directory
+     * is a link ({@code validate}) nor keeps a hard link's target inside the directory (1.15.2, before yarn 1.7.0,
+     * extracts as 1.16.0 does on POSIX).
+     */
+    enum Release {
+        V1_16_0,
+        V1_16_3
+    }
+
+    /**
+     * Whether yarn's map keeps every link inside the directory (from yarn 1.22.0).
+     */
+    private final boolean jail;
+
+    private final Release release;
+
+    private TarFs(boolean jail, Release release) {
+        this.jail = jail;
+        this.release = release;
         tree.put("", new Node(true, null));
     }
 
@@ -65,8 +96,25 @@ final class TarFs {
      * @throws JsError the error the extraction stops with: an entry type it does not write, a path through a file.
      */
     static TarFs extract(byte[] tar) {
-        TarFs fs = new TarFs();
-        TarStream.extract(tar, fs::entry);
+        return extract(tar, true, Release.V1_16_3);
+    }
+
+    /**
+     * {@code extract} of tar-fs {@code release} with yarn's map of link targets into the directory ({@code jail}), as
+     * yarn 1.22.0 and later extract; before, a link out of the directory reaches the disk around yarn's cache.
+     */
+    static TarFs extract(byte[] tar, boolean jail, Release release) {
+        return extract(tar, jail, release, TarStream.Release.V1_6_1, true);
+    }
+
+    /**
+     * {@code extract} with tar-stream {@code streamRelease}, on a Writable that fails an archive that ends early or
+     * not ({@link TarStream#extract(byte[], TarStream.OnEntry, TarStream.Release, boolean)}).
+     */
+    static TarFs extract(byte[] tar, boolean jail, Release release, TarStream.Release streamRelease,
+                         boolean failsWhereTheDataEnds) {
+        TarFs fs = new TarFs(jail, release);
+        TarStream.extract(tar, fs::entry, streamRelease, failsWhereTheDataEnds);
         return fs;
     }
 
@@ -76,7 +124,7 @@ final class TarFs {
         if (Js.truthy(linkname) && ("link".equals(header.type) || PosixPath.isAbsolute(linkname))) {
             header.linkname = strip(linkname);
         }
-        if (Js.truthy(header.linkname)) {
+        if (jail && Js.truthy(header.linkname)) {
             String basePath = PosixPath.dirname(PosixPath.join("/", header.name));
             header.linkname = PosixPath.relative("/", PosixPath.join(basePath, header.linkname));
         }
@@ -86,10 +134,12 @@ final class TarFs {
             return;
         }
         String dir = parent(name);
-        validate(dir);
+        if (release == Release.V1_16_3) {
+            validate(dir);
+        }
         mkdirp(dir);
         if ("file".equals(header.type)) {
-            write(name, archive, offset, size);
+            write(name, archive, offset, size, header.cut);
         } else if ("link".equals(header.type) || "symlink".equals(header.type)) {
             if (header.linkname == null) {
                 throw Js.invalidArgType("The \"" + ("link".equals(header.type) ? "path" : "target") +
@@ -97,13 +147,33 @@ final class TarFs {
             }
             unlink(name);
             if ("link".equals(header.type)) {
-                link(PosixPath.join("/", header.linkname).substring(1), name);
+                link(hardLinkTarget(header.linkname), name);
             } else {
                 create(name, new Node(false, header.linkname), "symlink");
             }
         } else {
             throw new JsError(JsError.ERROR, "unsupported type for " + name + " (" + header.type + ")");
         }
+    }
+
+    /**
+     * A hard link's source: 1.16.3 joins its target to the directory as a path from its root; 1.16.0 resolves it from
+     * the directory, out of it where it climbs out or is absolute.
+     */
+    private String hardLinkTarget(String linkname) {
+        if (release == Release.V1_16_3) {
+            return PosixPath.join("/", linkname).substring(1);
+        }
+        String target = PosixPath.normalize(linkname);
+        if (PosixPath.isAbsolute(target) || "..".equals(target) || target.startsWith("../")) {
+            throw outside(linkname);
+        }
+        return ".".equals(target) ? "" : target;
+    }
+
+    private static CannotKnow outside(String location) {
+        return new CannotKnow("what the files outside yarn's cache directory hold that a link of the archive leads " +
+                              "to (" + location + ")");
     }
 
     private static String strip(String name) {
@@ -128,6 +198,9 @@ final class TarFs {
             String segment = todo.removeFirst();
             if ("..".equals(segment)) {
                 if (done.isEmpty()) {
+                    if (!jail && links > 0) {
+                        throw outside(location);
+                    }
                     return null;
                 }
                 done.remove(done.size() - 1);
@@ -177,6 +250,10 @@ final class TarFs {
         mkdirp(parent(dir));
         String real = real(dir, true);
         Node node = node(real);
+        // without validate, 1.16.0 makes the directories a link leads to, an absolute one on the disk around the cache
+        if (real == null && release == Release.V1_16_0) {
+            throw outside(dir);
+        }
         if (real == null || node != null && !node.directory) {
             throw error("EEXIST: file already exists, mkdir '" + dir + "'");
         }
@@ -186,7 +263,7 @@ final class TarFs {
     }
 
     // createWriteStream opens through symbolic links; a directory is no file to write
-    private void write(String name, byte[] archive, int offset, int size) {
+    private void write(String name, byte[] archive, int offset, int size, boolean cut) {
         String real = real(name, true);
         Node node = node(real);
         if (node == null) {
@@ -202,6 +279,7 @@ final class TarFs {
         node.archive = archive;
         node.offset = offset;
         node.size = size;
+        node.cut = cut ? name : null;
     }
 
     // tar-fs ignores what unlink says: a directory stays

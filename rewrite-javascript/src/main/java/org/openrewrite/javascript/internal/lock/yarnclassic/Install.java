@@ -33,6 +33,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -65,8 +66,28 @@ final class Install {
         private final boolean frozenLockfile;
         private final boolean updateChecksums;
         private final boolean skipIntegrityCheck;
+        private final boolean global;
+
+        /**
+         * install's arguments with the flags {@code run} names beside them: what the rc args leave before 1.1.0.
+         */
+        private final List<String> args = new ArrayList<>();
 
         Flags(Config config, Map<String, @Nullable Object> rawFlags) {
+            Object given = rawFlags.get(Rc.ARGS);
+            if (given instanceof List) {
+                for (Object arg : (List<?>) given) {
+                    args.add(Js.string(arg));
+                }
+                String[][] named = {{"saveDev", "--dev"}, {"savePeer", "--peer"}, {"saveOptional", "--optional"},
+                        {"saveExact", "--exact"}, {"saveTilde", "--tilde"}};
+                for (String[] flag : named) {
+                    if (Js.truthy(rawFlags.get(flag[0]))) {
+                        args.add(flag[1]);
+                    }
+                }
+            }
+            global = Js.truthy(rawFlags.get("global"));
             ignorePlatform = Js.truthy(rawFlags.get("ignorePlatform")) ||
                              Js.truthy(config.getOption("ignore-platform"));
             ignoreEngines = Js.truthy(rawFlags.get("ignoreEngines")) || Js.truthy(config.getOption("ignore-engines"));
@@ -100,7 +121,15 @@ final class Install {
      */
     @Nullable
     String run() {
-        return init(lockfile());
+        Lockfile lockfile = lockfile();
+        if (!flags.getArgs().isEmpty()) {
+            String example = String.join(" ", flags.getArgs());
+            throw new MessageError(flags.isGlobal() ?
+                    Lang.format(config.getRelease(), "`--global` has been deprecated. Please run $0 instead.", "yarn global " + example) :
+                    Lang.format(config.getRelease(), "`install` has been replaced with `add` to add new dependencies. Run $0 instead.",
+                            "yarn add " + example));
+        }
+        return init(lockfile);
     }
 
     /**
@@ -112,7 +141,7 @@ final class Install {
             installAtWorkspaceRoot(config.getWorkspaceRoot(),
                     Objects.requireNonNull(config.getLockfileFolderManifest()));
         }
-        return flags.isLockfile() ? Lockfile.fromDirectory(inputs.getLock()) : new Lockfile();
+        return flags.isLockfile() ? Lockfile.fromDirectory(inputs.getLock(), config.getRelease()) : new Lockfile();
     }
 
     /**
@@ -120,6 +149,9 @@ final class Install {
      */
     @Nullable
     String init(Lockfile lockfile) {
+        if (!config.getRelease().focusesByPackageName()) {
+            config.requireFocusInAWorkspace();
+        }
         if (lockfile.getLockfilev2() != null) {
             throw Rejected.discardsLock("the lock is a Yarn Berry lock (__metadata)");
         }
@@ -137,15 +169,22 @@ final class Install {
         List<String> errors = new ArrayList<>();
         PackageCompatibility compatibility = new PackageCompatibility(config, inputs.getHost(), errors);
         try {
-            if (PackageCompatibility.shouldCheck(request.getManifest(), flags.isIgnoreEngines(),
-                    flags.isIgnorePlatform())) {
+            if (config.getRelease().checksTheRootsPlatform() ?
+                    PackageCompatibility.shouldCheck(request.getManifest(), flags.isIgnoreEngines(),
+                            flags.isIgnorePlatform()) :
+                    PackageCompatibility.checksRootEngines(request.getManifest(), flags.isIgnoreEngines())) {
                 compatibility.checkOne(request.getManifest(), flags.isIgnoreEngines());
             }
 
             PackageResolver resolver = new PackageResolver(config, lockfile, resolutionMap, registry,
-                    new ProjectFiles(inputs.getManifests(), inputs.getPaths(), inputs.getCwd()), inputs.getHost());
+                    new ProjectFiles(inputs.getManifests(), inputs.getPaths(), inputs.getCwd(),
+                            inputs.getDirectory() == null ? null : inputs.reach()), inputs.getHost());
             resolver.focus = config.isFocus();
             resolver.focusedWorkspaceName = config.getFocusedWorkspaceName();
+            YarnClassicRelease release = config.getRelease();
+            if (release.keepsTheLockEntryOfATopLevelPattern() && !release.keepsTheLockEntryOfAResolvedPattern()) {
+                resolutionMap.topLevelPatterns = new LinkedHashSet<>(request.getPatterns());
+            }
             resolver.init(request.getRequests(), request.isFlat(), flags.isFrozenLockfile(),
                     request.getWorkspaceLayout());
             List<String> topLevelPatterns = request.getPatterns();
@@ -160,8 +199,10 @@ final class Install {
                     lockfile, inputs.getLock(), inputs.getHost());
         } catch (MessageError e) {
             if (!errors.isEmpty()) {
-                throw Rejected.rejects(errors.get(0).startsWith("The engine ") ? SharedError.UNSUPPORTED_ENGINE :
-                        SharedError.UNSUPPORTED_PLATFORM, null, errors.get(0) + " " + e.getMessage());
+                // each error is the package's name and version, then the message
+                throw Rejected.rejects(errors.get(0).contains(": The engine ") ? SharedError.UNSUPPORTED_ENGINE :
+                        SharedError.UNSUPPORTED_PLATFORM, null, errors.get(0) + " " +
+                                                              YarnClassicLockRegenerator.report(e, config.getRelease()));
             }
             throw e;
         }
@@ -170,15 +211,58 @@ final class Install {
     // the fetch step, then the link step's read of each package's .yarn-metadata.json in yarn's cache
     private void fetchStep(PackageResolver resolver, PackageCompatibility compatibility) {
         Set<String> unfetched = new HashSet<>();
+        YarnClassicRelease release = config.getRelease();
         resolver.updateManifests(PackageFetcher.fetch(resolver.getManifests(), PackageFetcher.remote(resolver,
-                registry, config), unfetched));
+                registry, config), unfetched, release));
         compatibility.check(resolver.getManifests(), flags.isIgnoreEngines());
         for (Manifest manifest : resolver.getManifests()) {
             PackageReference ref = manifest.reference;
-            if (ref != null && !ref.ignore && unfetched.contains(PackageFetcher.generateModuleCachePath(ref))) {
-                throw new JsError(JsError.ERROR, "ENOENT: no such file or directory, open '" +
-                                                 PackageFetcher.generateModuleCachePath(ref) + "/.yarn-metadata.json'");
+            if (ref == null || ref.ignore) {
+                continue;
             }
+            String dest = PackageFetcher.generateModuleCachePath(ref, release);
+            if (unfetched.contains(dest)) {
+                throw new JsError(JsError.ERROR, "ENOENT: no such file or directory, open '" + dest +
+                                                 "/.yarn-metadata.json'");
+            }
+        }
+        if (!release.linksBinsWhenFetched()) {
+            linkBins(resolver);
+        }
+    }
+
+    /**
+     * The link step's links of each installed package's bins before 1.11.0, where {@code path.join} throws for a
+     * target that is no string; yarn links them several at a time, so which of two such packages it reaches first is
+     * not known.
+     */
+    private static void linkBins(PackageResolver resolver) {
+        JsError first = null;
+        String firstPackage = null;
+        for (Manifest manifest : resolver.getManifests()) {
+            PackageReference ref = manifest.reference;
+            if (ref == null || ref.ignore) {
+                continue;
+            }
+            Object bin = manifest.get("bin");
+            for (String name : Js.keys(bin)) {
+                Object target = Js.get(bin, name);
+                if (target instanceof String) {
+                    continue;
+                }
+                JsError error = Js.invalidArgType("The \"path\" argument must be of type string", target);
+                String pkg = Js.templateString(manifest.getName()) + "@" + Js.templateString(manifest.getVersion());
+                if (first == null) {
+                    first = error;
+                    firstPackage = pkg;
+                } else if (!first.getMessage().equals(error.getMessage())) {
+                    throw new CannotKnow("which of the bins of " + firstPackage + " and " + pkg + " yarn " +
+                                         "links first: the link step fails at it");
+                }
+            }
+        }
+        if (first != null) {
+            throw first;
         }
     }
 
@@ -251,7 +335,7 @@ final class Install {
             String cwd = up.substring(0, up.length() - 1);
             String text = Objects.requireNonNull(inputs.getConfigFiles().get(up + "package.json"));
             Manifest projectManifestJson = NormalizeManifest.normalizeManifest(Config.manifest(Fs.readJson(up +
-                    "package.json", text), "_registry"), cwd, cwd, true, config.isLooseSemver());
+                    "package.json", text), "_registry"), cwd, cwd, true, config.isLooseSemver(), config.getRelease());
             Map<String, @Nullable Object> resolutions = new LinkedHashMap<>();
             Js.assign(resolutions, projectManifestJson.get("resolutions"));
             new ResolutionMap(config).init(resolutions);
@@ -289,15 +373,16 @@ final class Install {
         }
         String registry = NpmResolver.NPM_REGISTRY_ID;
         Manifest projectManifestJson = NormalizeManifest.normalizeManifest(Config.manifest(Fs.readJson(
-                "package.json", rootText), "_registry"), "", "", true, config.isLooseSemver());
+                "package.json", rootText), "_registry"), "", "", true, config.isLooseSemver(), config.getRelease());
         Manifest manifest = projectManifestJson;
-        boolean workspaceRootFolder = Config.isWorkspaceRoot(projectManifestJson);
+        boolean workspaceRootFolder = Config.isWorkspaceRoot(projectManifestJson, config.getRelease());
 
         Map<String, @Nullable Object> resolutions = new LinkedHashMap<>();
         Js.assign(resolutions, projectManifestJson.get("resolutions"));
         resolutionMap.init(resolutions);
         for (String packageName : Js.keys(resolutionMap.resolutionsByPackage)) {
-            boolean optional = ObjectPath.has(manifest.get("optionalDependencies"), packageName) &&
+            boolean optional = config.getRelease().resolvesOptionalDependenciesOptionally() &&
+                               ObjectPath.has(manifest.get("optionalDependencies"), packageName) &&
                                flags.isIgnoreOptional();
             for (ResolutionMap.Resolution resolution : resolutionMap.resolutionsByPackage.get(packageName)) {
                 resolutionDeps.add(DependencyRequestPattern.builder().registry(registry)
@@ -315,7 +400,9 @@ final class Install {
             for (String name : Js.keys(depMap)) {
                 String pattern = name;
                 if (lockfile.getLocked(pattern) == null) {
-                    pattern += "@" + Js.string(Js.get(depMap, name));
+                    // the key is there, so its null is JSON's (kept before 1.1.0 empties a falsy range)
+                    Object range = Js.get(depMap, name);
+                    pattern += "@" + (range == null ? "null" : Js.string(range));
                 }
                 patterns.add(pattern);
                 deps.add(DependencyRequestPattern.builder().pattern(pattern).registry(registry).hint(hint)
@@ -332,8 +419,11 @@ final class Install {
         if (workspaceRootFolder) {
             Map<String, WorkspaceLayout.Workspace> workspaces = config.resolveWorkspaces(projectManifestJson);
             workspaceLayout = new WorkspaceLayout(workspaces, config);
+            boolean rootsDependencies = config.getRelease().requestsTheRootsDependenciesFromTheAggregator();
             Map<String, @Nullable Object> workspaceDependencies = new LinkedHashMap<>();
-            Js.assign(workspaceDependencies, projectManifestJson.get("dependencies"));
+            if (rootsDependencies) {
+                Js.assign(workspaceDependencies, projectManifestJson.get("dependencies"));
+            }
             for (String workspaceName : Js.keys(workspaces)) {
                 workspaceDependencies.put(workspaceName, workspaces.get(workspaceName).getManifest().getVersion());
             }
@@ -343,12 +433,14 @@ final class Install {
             virtualDependencyManifest.put("version", "1.0.0");
             virtualDependencyManifest.put("_registry", "npm");
             virtualDependencyManifest.put("dependencies", workspaceDependencies);
-            Map<String, @Nullable Object> devDependencies = new LinkedHashMap<>();
-            Js.assign(devDependencies, projectManifestJson.get("devDependencies"));
-            virtualDependencyManifest.put("devDependencies", devDependencies);
-            Map<String, @Nullable Object> optionalDependencies = new LinkedHashMap<>();
-            Js.assign(optionalDependencies, projectManifestJson.get("optionalDependencies"));
-            virtualDependencyManifest.put("optionalDependencies", optionalDependencies);
+            if (rootsDependencies) {
+                Map<String, @Nullable Object> devDependencies = new LinkedHashMap<>();
+                Js.assign(devDependencies, projectManifestJson.get("devDependencies"));
+                virtualDependencyManifest.put("devDependencies", devDependencies);
+                Map<String, @Nullable Object> optionalDependencies = new LinkedHashMap<>();
+                Js.assign(optionalDependencies, projectManifestJson.get("optionalDependencies"));
+                virtualDependencyManifest.put("optionalDependencies", optionalDependencies);
+            }
             virtualDependencyManifest.put("private", projectManifestJson.get("private"));
             virtualDependencyManifest.put("workspaces", projectManifestJson.get("workspaces"));
             String virtualName = Js.string(virtualDependencyManifest.getName());
@@ -361,15 +453,18 @@ final class Install {
             virtualDep.put("workspaces", virtualDeps);
             pushDeps.push("workspaces", virtualDep, "workspaces", false, true);
 
-            Map<String, @Nullable Object> implicitWorkspaceDependencies = new LinkedHashMap<>(workspaceDependencies);
-            for (String type : OWNED_DEPENDENCY_TYPES) {
-                for (String dependencyName : Js.keys(projectManifestJson.get(type))) {
-                    implicitWorkspaceDependencies.remove(dependencyName);
+            if (config.getRelease().requestsWorkspacesFromTheRoot()) {
+                Map<String, @Nullable Object> implicitWorkspaceDependencies =
+                        new LinkedHashMap<>(workspaceDependencies);
+                for (String type : OWNED_DEPENDENCY_TYPES) {
+                    for (String dependencyName : Js.keys(projectManifestJson.get(type))) {
+                        implicitWorkspaceDependencies.remove(dependencyName);
+                    }
                 }
+                Manifest implicit = new Manifest();
+                implicit.put("dependencies", implicitWorkspaceDependencies);
+                pushDeps.push("dependencies", implicit, "workspaces", false, true);
             }
-            Manifest implicit = new Manifest();
-            implicit.put("dependencies", implicitWorkspaceDependencies);
-            pushDeps.push("dependencies", implicit, "workspaces", false, true);
         }
 
         List<DependencyRequestPattern> requests = new ArrayList<>(resolutionDeps);
@@ -403,9 +498,11 @@ final class Install {
             }
         }
 
-        Map<String, @Nullable Object> lockfileBasedOnResolver = lockfile.getLockfile(resolvedPatterns);
+        Map<String, @Nullable Object> lockfileBasedOnResolver = lockfile.getLockfile(resolvedPatterns,
+                config.getRelease());
 
-        if (!flags.isLockfile() || flags.isPureLockfile() || flags.isFrozenLockfile()) {
+        if (!flags.isLockfile() || flags.isPureLockfile() ||
+            flags.isFrozenLockfile() && config.getRelease().keepsTheLockUnderFrozenLockfile()) {
             return null;
         }
         resolver.requireNoRaces();
@@ -441,6 +538,7 @@ final class Install {
             Map<String, @Nullable Object> manifest = lockfile.getLocked(pattern);
             if (resolverPatternsAreSameAsInLockfile && (manifest == null ||
                     !Objects.equals(manifest.get("resolved"), entry.get("resolved")) ||
+                    config.getRelease().keepsPrebuiltVariants() &&
                     !DeepEqual.deepEqual(manifest.get("prebuiltVariants"), entry.get("prebuiltVariants")))) {
                 resolverPatternsAreSameAsInLockfile = false;
             }
@@ -465,7 +563,7 @@ final class Install {
         }
 
         String lockSource = LockfileStringifier.stringify(lockfileBasedOnResolver, false,
-                config.isEnableLockfileVersions(), processVersion(host.getNodeVersion(), config));
+                config.isEnableLockfileVersions(), processVersion(host.getNodeVersion(), config), config.getRelease());
         return Fs.writeFilePreservingEol(rawLock, lockSource, host.getOs());
     }
 

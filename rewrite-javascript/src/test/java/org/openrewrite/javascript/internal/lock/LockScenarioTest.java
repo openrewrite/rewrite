@@ -52,7 +52,12 @@ public abstract class LockScenarioTest extends ScenarioTest {
         Failure failure = result.getFailure();
         String thrown = failure == null ? String.valueOf(result.getErrorMessage()) :
                 failure.getReason() + ": " + failure.getDetail();
-        if (expect.isExact() && expected != null) {
+        boolean exact = expect.isExact();
+        if (Expect.EXACT_OR.equals(expect.getKind())) {
+            exact = result.isSuccess();
+            expect = Expect.of(expect.getRest());
+        }
+        if (exact && expected != null) {
             if (!result.isSuccess()) {
                 failed(label, http, "failed", thrown, " expected " + packageManager +
                                                       "'s lock but regeneration failed: " + thrown);
@@ -75,6 +80,12 @@ public abstract class LockScenarioTest extends ScenarioTest {
         if (!names(expect, requireNonNull(failure), http)) {
             failed(label, http, "wrong-failure", "expected " + expect + " got " + thrown,
                     " expected \"" + expect + "\" but got " + thrown);
+        }
+        if ("unstable".equals(expect.getKind()) && expected != null && failure.getWritten() != null &&
+            !expected.equals(failure.getWritten())) {
+            // the lock the second install changes is the one the package manager wrote first
+            failed(label, http, "mismatch", firstDifference(expected, failure.getWritten()),
+                    " wrote another first lock than " + packageManager + " before its second install changes it");
         }
         record(label, "expected-failure", thrown + http.describe());
     }

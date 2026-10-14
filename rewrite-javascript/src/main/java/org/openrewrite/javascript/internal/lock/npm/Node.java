@@ -110,8 +110,27 @@ public class Node {
         @Nullable
         OverrideSet overrides;
 
+        /**
+         * What a root {@code packageExtensions} rule added to the manifest, from npm 12.0.0: its selector and the
+         * names it added by field, as the lock holds it, whatever JSON type that has.
+         */
+        @Nullable
+        Object packageExtensionsApplied;
+
+        /**
+         * What a root .npm-extension changed in the manifest, from npm 12.0.0, as the lock holds it.
+         */
+        @Nullable
+        Object npmExtensionApplied;
+
         @Nullable
         Node parent;
+
+        /**
+         * The patch record of npm 12.0.0, {@code path} and {@code integrity}, as the lock holds it.
+         */
+        @Nullable
+        Object patched;
 
         @Nullable
         String path;
@@ -128,6 +147,12 @@ public class Node {
 
         @Nullable
         String realpath;
+
+        /**
+         * The npm release whose arborist the node belongs to; a tree's nodes share it.
+         */
+        @Builder.Default
+        NpmRelease release = NpmRelease.PORTED;
 
         @Nullable
         Object resolved;
@@ -176,6 +201,20 @@ public class Node {
     @Setter
     private @Nullable Object hasShrinkwrap;
 
+    // patched, packageExtensionsApplied and npmExtensionApplied are npm 12.0.0's: set from a lock it reads them
+    // from, by its patchedDependencies and by its packageExtensions
+    @Getter
+    @Setter
+    private @Nullable Object patched;
+
+    @Getter
+    @Setter
+    private @Nullable Object packageExtensionsApplied;
+
+    @Getter
+    @Setter
+    private @Nullable Object npmExtensionApplied;
+
     @Getter
     @Setter
     private boolean installLinks;
@@ -184,7 +223,7 @@ public class Node {
     @Setter
     private boolean legacyPeerDeps;
 
-    private final CaseInsensitiveMap<Node> children = new CaseInsensitiveMap<>();
+    private final CaseInsensitiveMap<Node> children;
 
     @Getter
     private final Set<Node> fsChildren = new LinkedHashSet<>();
@@ -229,7 +268,7 @@ public class Node {
     private final Set<Edge> edgesIn = new LinkedHashSet<>();
 
     @Getter
-    private final CaseInsensitiveMap<Edge> edgesOut = new CaseInsensitiveMap<>();
+    private final CaseInsensitiveMap<Edge> edgesOut;
 
     @Getter
     @Setter
@@ -245,6 +284,9 @@ public class Node {
     @Getter
     private final @Nullable Node sourceReference;
 
+    @Getter
+    private final NpmRelease release;
+
     Map<String, Object> pkg;
     private @Nullable Node parent;
     private @Nullable Node fsParent;
@@ -259,6 +301,10 @@ public class Node {
 
     @SuppressWarnings("unchecked")
     public Node(Options options) {
+        this.release = options.getRelease();
+        // before npm 7.21.0 plain Maps, which tell names apart by case
+        this.children = new CaseInsensitiveMap<>(release.matchesNamesCaseInsensitively());
+        this.edgesOut = new CaseInsensitiveMap<>(release.matchesNamesCaseInsensitively());
         this.errors = new ArrayList<>();
         if (options.getError() != null) {
             this.errors.add(options.getError());
@@ -270,7 +316,7 @@ public class Node {
         } else {
             Map<String, Object> content = options.getPkg() instanceof Map ?
                     (Map<String, Object>) options.getPkg() : new LinkedHashMap<>();
-            this.pkg = PackageJson.syncNormalize(content);
+            this.pkg = PackageJson.syncNormalize(content, release);
         }
 
         String path = options.getPath();
@@ -283,7 +329,9 @@ public class Node {
 
         this.path = truthy(path) ? PosixPath.resolve(path) : null;
 
-        if (!truthy(this.name) && (this.path == null || !this.path.equals(PosixPath.dirname(this.path)))) {
+        // before npm 7.1.0 a node at the filesystem root needs a name too
+        if (!truthy(this.name) && (!release.acceptsUnnamedFilesystemRoot() || this.path == null ||
+                                    !this.path.equals(PosixPath.dirname(this.path)))) {
             throw new IllegalArgumentException("could not detect node name from path or package");
         }
 
@@ -291,7 +339,7 @@ public class Node {
 
         setResolved(truthy(options.getResolved()) ? options.getResolved() : null);
         if (!truthy(getResolved())) {
-            Object resolved = ConsistentResolve.consistentResolve(pkg.get("_resolved"));
+            Object resolved = ConsistentResolve.consistentResolve(pkg.get("_resolved"), release);
             if (truthy(resolved) && !(Js.string(resolved).startsWith("file:") && truthy(pkg.get("_where")))) {
                 setResolved(resolved);
             }
@@ -300,8 +348,13 @@ public class Node {
         this.integrity = truthy(options.getIntegrity()) ? options.getIntegrity() :
                 truthy(legacyIntegrity) ? legacyIntegrity : null;
         Object legacyHasShrinkwrap = pkg.get("_hasShrinkwrap");
-        this.hasShrinkwrap = truthy(options.getHasShrinkwrap()) ? options.getHasShrinkwrap() :
+        Object hasShrinkwrap = truthy(options.getHasShrinkwrap()) ? options.getHasShrinkwrap() :
                 truthy(legacyHasShrinkwrap) ? legacyHasShrinkwrap : false;
+        // a node has no hasShrinkwrap from npm 12.0.0: nothing below reads a dependency's npm-shrinkwrap.json
+        this.hasShrinkwrap = truthy(hasShrinkwrap) && !release.readsNpmShrinkwrap() ? false : hasShrinkwrap;
+        this.patched = truthy(options.getPatched()) ? options.getPatched() : null;
+        this.packageExtensionsApplied = options.getPackageExtensionsApplied();
+        this.npmExtensionApplied = options.getNpmExtensionApplied();
         this.installLinks = options.isInstallLinks();
         this.legacyPeerDeps = options.isLegacyPeerDeps();
 
@@ -322,10 +375,10 @@ public class Node {
 
         if (options.getOverrides() != null) {
             this.overrides = options.getOverrides();
-        } else if (options.isLoadOverrides()) {
+        } else if (options.isLoadOverrides() && release.readsOverrides()) {
             Object overrides = pkg.get("overrides");
             if (truthy(overrides) && !Js.keys(overrides).isEmpty()) {
-                this.overrides = new OverrideSet(overrides);
+                this.overrides = new OverrideSet(overrides, release);
             }
         }
 
@@ -340,11 +393,16 @@ public class Node {
             setRoot(options.getRoot());
         }
 
+        // arborist 1's root setter returns before it locates a node that is its own root
+        if (!release.placesNodesFromRoot() && isRoot()) {
+            location = "";
+        }
+
         for (Options c : options.getChildren()) {
-            new Node(c.toBuilder().parent(this).build());
+            new Node(c.toBuilder().parent(this).release(release).build());
         }
         for (Options c : options.getFsChildren()) {
-            new Node(c.toBuilder().fsParent(this).build());
+            new Node(c.toBuilder().fsParent(this).release(release).build());
         }
 
         loadDeps();
@@ -435,6 +493,9 @@ public class Node {
         }
         if (!Objects.equals(overrides.getName(), name)) {
             return false;
+        }
+        if (!release.propagatesOverrideSets()) {
+            return true;
         }
         for (Edge edge : edgesIn) {
             if (edge.getOverrides() != null && Objects.equals(edge.getOverrides().getName(), name) &&
@@ -544,7 +605,9 @@ public class Node {
     }
 
     public boolean isDescendantOf(Node node) {
-        for (Node p = this; p != null; p = p.getResolveParent()) {
+        // before npm 7.20.0, through parents only
+        boolean throughResolveParents = release.descendsThroughResolveParents();
+        for (Node p = this; p != null; p = throughResolveParents ? p.getResolveParent() : p.parent) {
             if (p == node) {
                 return true;
             }
@@ -553,12 +616,14 @@ public class Node {
     }
 
     public boolean shouldOmit(Set<String> omitSet) {
-        if (omitSet.isEmpty()) {
-            return false;
-        }
-        Node top = getTop();
-        if (!top.isProjectRoot() && !top.isWorkspace()) {
-            return false;
+        if (release.omitsUnderProjectTopsOnly()) {
+            if (omitSet.isEmpty()) {
+                return false;
+            }
+            Node top = getTop();
+            if (!top.isProjectRoot() && !top.isWorkspace()) {
+                return false;
+            }
         }
         return (peer && omitSet.contains("peer")) ||
                (dev && omitSet.contains("dev")) ||
@@ -638,7 +703,7 @@ public class Node {
             return false;
         }
         for (Edge edge : edgesIn) {
-            if (!Spec.npa(edge.getSpec()).isRegistry()) {
+            if (!Spec.npa(edge.getSpec(), null, release.npmPackageArg()).isRegistry()) {
                 return false;
             }
         }
@@ -670,6 +735,10 @@ public class Node {
     }
 
     public void setRoot(@Nullable Node root) {
+        if (!release.placesNodesFromRoot()) {
+            LegacyNode.setRoot(this, root);
+            return;
+        }
         while (root != null && root.getRoot() != root) {
             root = root.getRoot();
         }
@@ -864,8 +933,15 @@ public class Node {
             }
         }
 
-        if (isLink() && target != null && getTarget() == null && root != this) {
+        // before npm 7.8.0 a link taken out of the tree takes its target out with it
+        if (isLink() && target != null && getTarget() == null &&
+            (root != this || !release.keepsTargetOfDetachedLink())) {
             target.setRoot(root);
+        }
+
+        if (!release.propagatesOverrideSets() && release.takesParentOverrideRuleWhenRooted() && overrides == null &&
+            parent != null && parent.overrides != null) {
+            overrides = parent.overrides.getNodeRule(this);
         }
     }
 
@@ -878,13 +954,56 @@ public class Node {
             return;
         }
         for (Map.Entry<String, String> ws : workspaces.entrySet()) {
-            new Edge(this, Edge.Type.WORKSPACE, ws.getKey(), "file:" + ws.getValue());
+            new Edge(this, Edge.Type.WORKSPACE, ws.getKey(),
+                    "file:" + ConsistentResolve.escapeHash(ws.getValue(), release));
         }
     }
 
     void loadDeps() {
         Object pd = pkg.get("peerDependencies");
         Object ad = truthy(pkg.get("acceptDependencies")) ? pkg.get("acceptDependencies") : Collections.emptyMap();
+        if (!release.loadsPeerDepsFirst()) {
+            loadDepsKeepingEarlierEdges(pd, ad);
+            return;
+        }
+        loadPeerDeps(pd, ad, true);
+
+        loadDepType(pkg.get("dependencies"), Edge.Type.PROD, ad, true);
+        loadDepType(pkg.get("optionalDependencies"), Edge.Type.OPTIONAL, ad, true);
+
+        boolean thisDev = isTop() && path != null;
+        boolean srcDev = sourceReference == null || (sourceReference.isTop() && sourceReference.getPath() != null);
+        if (thisDev && srcDev) {
+            loadDepType(pkg.get("devDependencies"), Edge.Type.DEV, ad, true);
+        }
+    }
+
+    // [_loadDeps] before npm 7.12.0: optional dependencies first, and an edge of a name already loaded kept
+    private void loadDepsKeepingEarlierEdges(@Nullable Object pd, Object ad) {
+        loadDepType(pkg.get("optionalDependencies"), Edge.Type.OPTIONAL, ad, false);
+        if (!release.loadsProdDepsLast()) {
+            loadDepType(pkg.get("dependencies"), Edge.Type.PROD, ad, false);
+        }
+
+        // before npm 7.1.1 a virtual root loads its source's devDependencies as any top; then none until 7.5.1
+        boolean srcDev = release.loadsDevDepsOfTopSources() ?
+                sourceReference == null || sourceReference.isTop() && sourceReference.getPath() != null :
+                sourceReference == null || !release.skipsDevDepsOfVirtualRoots();
+        boolean loadsDev = isTop() && path != null && srcDev;
+        if (loadsDev && release.loadsDevDepsBeforePeerDeps()) {
+            loadDepType(pkg.get("devDependencies"), Edge.Type.DEV, ad, false);
+        }
+        loadPeerDeps(pd, ad, false);
+        if (loadsDev && !release.loadsDevDepsBeforePeerDeps()) {
+            loadDepType(pkg.get("devDependencies"), Edge.Type.DEV, ad, false);
+        }
+
+        if (release.loadsProdDepsLast()) {
+            loadDepType(pkg.get("dependencies"), Edge.Type.PROD, ad, false);
+        }
+    }
+
+    private void loadPeerDeps(@Nullable Object pd, Object ad, boolean replaces) {
         if ((pd instanceof Map || pd instanceof List) && !legacyPeerDeps) {
             Object pm = pkg.get("peerDependenciesMeta");
             if (!truthy(pm)) {
@@ -904,24 +1023,21 @@ public class Node {
                     peerDependencies.put(dep.getKey(), dep.getValue());
                 }
             }
-            loadDepType(peerDependencies, Edge.Type.PEER, ad);
-            loadDepType(peerOptional, Edge.Type.PEER_OPTIONAL, ad);
-        }
-
-        loadDepType(pkg.get("dependencies"), Edge.Type.PROD, ad);
-        loadDepType(pkg.get("optionalDependencies"), Edge.Type.OPTIONAL, ad);
-
-        boolean thisDev = isTop() && path != null;
-        boolean srcDev = sourceReference == null || (sourceReference.isTop() && sourceReference.getPath() != null);
-        if (thisDev && srcDev) {
-            loadDepType(pkg.get("devDependencies"), Edge.Type.DEV, ad);
+            loadDepType(peerDependencies, Edge.Type.PEER, ad, replaces);
+            loadDepType(peerOptional, Edge.Type.PEER_OPTIONAL, ad, replaces);
         }
     }
 
-    private void loadDepType(@Nullable Object deps, Edge.Type type, Object ad) {
+    /**
+     * @param replaces whether an edge replaces an earlier one of its name that is no workspace's, as from npm 7.12.0;
+     *                 before, the earlier one is kept, but a dev edge a prod one replaces from npm 7.5.5.
+     */
+    private void loadDepType(@Nullable Object deps, Edge.Type type, Object ad, boolean replaces) {
         for (Map.Entry<String, Object> dep : Js.entries(truthy(deps) ? deps : Collections.emptyMap())) {
             Edge current = edgesOut.get(dep.getKey());
-            if (current == null || current.getType() != Edge.Type.WORKSPACE) {
+            boolean create = replaces ? current == null || current.getType() != Edge.Type.WORKSPACE :
+                    current == null || release.loadsProdDepsLast() && current.isDev() && type == Edge.Type.PROD;
+            if (create) {
                 if (!(dep.getValue() instanceof String)) {
                     throw new IllegalArgumentException("must provide string spec");
                 }
@@ -940,6 +1056,10 @@ public class Node {
     }
 
     public void setFsParent(@Nullable Node fsParent) {
+        if (!release.placesNodesFromRoot()) {
+            LegacyNode.setFsParent(this, fsParent);
+            return;
+        }
         if (fsParent == null) {
             if (this.fsParent != null) {
                 setRoot(null);
@@ -1001,11 +1121,15 @@ public class Node {
         if (!Objects.equals(node.name, name)) {
             return false;
         }
-        if (!Js.strictEquals(node.getPackageName(), getPackageName())) {
+        if (release.comparesPackageNamesToReplace() && !Js.strictEquals(node.getPackageName(), getPackageName())) {
             return false;
         }
 
-        if (edgesOut.size() > 0) {
+        if (!release.propagatesOverrideSets()) {
+            if (node.overrides != overrides) {
+                return false;
+            }
+        } else if (edgesOut.size() > 0) {
             if (node.overrides != null) {
                 if (!node.overrides.isEqual(overrides)) {
                     return false;
@@ -1018,8 +1142,10 @@ public class Node {
         }
 
         Set<String> ignore = new LinkedHashSet<>(ignorePeers);
-        Set<Node> depSet = GatherDepSet.gatherDepSet(Collections.singletonList(this),
-                e -> e.getTo() != this && e.isValid());
+        // before npm 7.0.11 every edge in counts, from this node's own dependencies too
+        Set<Node> depSet = release.ignoresOwnDepSetToReplace() ?
+                GatherDepSet.gatherDepSet(Collections.singletonList(this), e -> e.getTo() != this && e.isValid()) :
+                Collections.emptySet();
 
         for (Edge edge : edgesIn) {
             if (!isTop() && edge.getFrom().parent == parent && edge.isPeer() && ignore.contains(edge.getFrom().name)) {
@@ -1053,7 +1179,11 @@ public class Node {
             return false;
         }
 
-        if (getResolveParent() == null || getResolveParent().getResolveParent() == null) {
+        // before npm 7.14.0, this.parent.parent
+        boolean fromResolveParents = release.dedupesFromResolveParents();
+        Node up = fromResolveParents ? getResolveParent() : parent;
+        Node upper = up == null ? null : fromResolveParents ? up.getResolveParent() : up.parent;
+        if (up == null || upper == null) {
             return false;
         }
 
@@ -1061,7 +1191,7 @@ public class Node {
             return true;
         }
 
-        Node other = getResolveParent().getResolveParent().resolve(name);
+        Node other = upper.resolve(name);
 
         if (other == null) {
             return false;
@@ -1073,6 +1203,10 @@ public class Node {
 
         if (!other.canReplace(this)) {
             return false;
+        }
+
+        if (!release.propagatesOverrideSets()) {
+            return preferDedupe || NodeSemver.compare(other.getVersion(), getVersion(), DEFAULT) >= 0;
         }
 
         if (preferDedupe || NodeSemver.compare(other.getVersion(), getVersion(), DEFAULT) == 0) {
@@ -1091,10 +1225,10 @@ public class Node {
     }
 
     public boolean satisfies(String requested) {
-        Spec parsed = Spec.npa(requested);
+        Spec parsed = Spec.npa(requested, null, release.npmPackageArg());
         String name = parsed.getName() != null ? parsed.getName() : this.name;
         return Objects.equals(this.name, name) && satisfies(new Edge(
-                new Node(options().path(getRoot().realpath).build()),
+                new Node(options().path(getRoot().realpath).release(release).build()),
                 Edge.Type.PROD, name, parsed.getRawSpec()));
     }
 
@@ -1128,6 +1262,11 @@ public class Node {
     }
 
     public void replace(Node node) {
+        if (!release.placesNodesFromRoot()) {
+            // arborist 1's replace(node) is node.replaceWith(this)
+            LegacyNode.replaceWith(node, this);
+            return;
+        }
         delistFromMeta();
 
         if (node.parent != null && node.parent.getChildren().get(name) == node) {
@@ -1146,7 +1285,7 @@ public class Node {
             for (Node kid : node.getChildren().values()) {
                 kid.setParent(this);
             }
-            if (node.isLink() && node.getTarget() != null) {
+            if (node.isLink() && node.getTarget() != null && release.dropsTargetOfReplacedLink()) {
                 node.getTarget().setRoot(null);
             }
         }
@@ -1165,6 +1304,10 @@ public class Node {
     }
 
     public void setParent(@Nullable Node parent) {
+        if (!release.placesNodesFromRoot()) {
+            LegacyNode.setParent(this, parent);
+            return;
+        }
         if (parent == null) {
             if (this.parent != null) {
                 setRoot(null);
@@ -1199,6 +1342,10 @@ public class Node {
 
         if (pathChange) {
             changePath(newPath);
+        }
+
+        if (!release.propagatesOverrideSets() && parent.overrides != null) {
+            overrides = parent.overrides.getNodeRule(this);
         }
 
         setRoot(parent.getRoot());
@@ -1250,6 +1397,25 @@ public class Node {
         if (root.meta != null) {
             root.meta.add(this);
         }
+    }
+
+    // this[_parent], this[_fsParent], this[_root] and this[_explanation], which arborist 1's setters (LegacyNode) assign
+    // directly
+
+    void parentReference(@Nullable Node parent) {
+        this.parent = parent;
+    }
+
+    void fsParentReference(@Nullable Node fsParent) {
+        this.fsParent = fsParent;
+    }
+
+    void rootReference(Node root) {
+        this.root = root;
+    }
+
+    void clearExplanation() {
+        explanation = null;
     }
 
     /**
@@ -1355,7 +1521,11 @@ public class Node {
     }
 
     void addEdgeIn(Edge edge) {
-        if (overrides == null || !overrides.isEqual(edge.getOverrides())) {
+        if (!release.propagatesOverrideSets()) {
+            if (edge.getOverrides() != null) {
+                overrides = edge.getOverrides();
+            }
+        } else if (overrides == null || !overrides.isEqual(edge.getOverrides())) {
             updateOverridesEdgeInAdded(edge.getOverrides());
         }
         edgesIn.add(edge);

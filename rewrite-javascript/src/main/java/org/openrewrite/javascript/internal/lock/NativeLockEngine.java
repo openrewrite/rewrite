@@ -59,8 +59,8 @@ public final class NativeLockEngine {
 
     public static Result regenerate(Port port, Request request, ExecutionContext ctx) {
         try {
-            return port.regenerate(LockDirectory.of(request), HostInputs.of(ctx, request.getMarker(), Instant.now()),
-                    NodeExecutionContextView.view(ctx).getRegistryClient());
+            return port.regenerate(LockDirectory.of(request), HostInputs.of(ctx, request.getMarker(),
+                    request.getRuntime(), Instant.now()), NodeExecutionContextView.view(ctx).getRegistryClient());
         } catch (NodeRegistryException nre) {
             return Result.failure(LockOnlyInstall.failure(nre));
         }

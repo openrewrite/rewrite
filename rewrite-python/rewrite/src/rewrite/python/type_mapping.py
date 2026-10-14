@@ -300,6 +300,25 @@ class SessionTypeCache:
         self.by_fqn.clear()
 
 
+class _WithFallback(dict):
+    """A file's own entries, falling back on lookup to a table the ty session keeps.
+
+    The session's tables grow with every file, so copying them into each file's
+    made a parse or an exported-types enumeration quadratic in its file count.
+    Only ``get`` falls back; iteration and ``in`` see the file's own entries.
+    """
+
+    __slots__ = ('_fallback',)
+
+    def __init__(self, fallback: Dict[Any, Any]):
+        super().__init__()
+        self._fallback = fallback
+
+    def get(self, key, default=None):
+        value = dict.get(self, key)
+        return value if value is not None else self._fallback.get(key, default)
+
+
 class PythonTypeMapping:
     """Maps Python types to JavaType for recipe matching.
 
@@ -377,11 +396,15 @@ class PythonTypeMapping:
         # the same ty ``--serve`` session. ty deduplicates descriptors across a
         # session, so a type first seen in an earlier file is omitted from later
         # files' responses; this table restores those descriptors as a fallback
-        # (see TyTypesClient.session_types and _build_index back-fill).
+        # (see TyTypesClient.session_types).
         self._session_types: Dict[int, Dict[str, Any]] = (
             ty_client.session_types if ty_client is not None
             and hasattr(ty_client, 'session_types') else {}
         )
+        session_class_literals = getattr(ty_client, 'session_class_literals', None)
+        self._type_registry = _WithFallback(self._session_types)
+        self._class_literal_index = _WithFallback(
+            session_class_literals if session_class_literals is not None else {})
 
         # Fetch all types in one batch call
         if ty_client is not None:
@@ -480,7 +503,10 @@ class PythonTypeMapping:
             if binding is not None:
                 self._binding_index[(node['start'], node['end'])] = binding
 
-        # Merge types into registry (keys are strings in JSON)
+        # Merge types into registry (keys are strings in JSON). Descriptors this
+        # file's response omitted because ty's shared --serve session already
+        # emitted them for an earlier file resolve through the registry's fallback
+        # to the session table; this file's own take precedence.
         for type_id_str, descriptor in result.get('types', {}).items():
             tid = int(type_id_str)
             self._type_registry[tid] = descriptor
@@ -489,19 +515,6 @@ class PythonTypeMapping:
                 cn = descriptor.get('className', '')
                 if cn:
                     self._class_literal_index[cn] = tid
-
-        # Back-fill descriptors that this file's response omitted because ty's
-        # shared --serve session already emitted them for an earlier file. The
-        # session table is keyed by ty's session-stable ids, so a referenced id
-        # absent from this file's registry resolves through the cumulative table.
-        # File-local descriptors take precedence (setdefault) — they are the
-        # authoritative, full descriptors for types this file is the first to see.
-        for tid, descriptor in self._session_types.items():
-            if self._type_registry.setdefault(tid, descriptor) is descriptor and \
-                    descriptor.get('kind') == 'classLiteral':
-                cn = descriptor.get('className', '')
-                if cn:
-                    self._class_literal_index.setdefault(cn, tid)
 
     def _lookup_type_id(self, node: ast.AST) -> Optional[int]:
         """Look up a node's type ID by converting AST position to byte offset.
