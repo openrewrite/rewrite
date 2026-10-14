@@ -21,6 +21,8 @@ import org.openrewrite.java.JavaParser;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.java.tree.TypeUtils;
+import org.openrewrite.scala.marker.EtaExpansion;
+import org.openrewrite.scala.marker.ImplicitConversion;
 import org.openrewrite.test.RewriteTest;
 
 import java.util.ArrayList;
@@ -506,6 +508,235 @@ class ScalaTypeAttributionTest implements RewriteTest {
             })
           )
         );
+    }
+
+    @Test
+    void implicitlyConvertedExpressionKeepsItsOwnTypeAndIsMarked() {
+        rewriteRun(
+          scala(
+            """
+            import scala.language.implicitConversions
+
+            class Foo {
+              implicit def intToStr(i: Int): String = i.toString
+              val n = 1
+              val s: String = n
+              val k = "12".toInt
+            }
+            """,
+            spec -> spec.afterRecipe(cu -> {
+                J.Identifier n = find(cu, J.Identifier.class, i -> i.getSimpleName().equals("n") && i.getMarkers().findFirst(ImplicitConversion.class).isPresent());
+                assertThat(n.getType()).isEqualTo(JavaType.Primitive.Int);
+                ImplicitConversion intToStr = n.getMarkers().findFirst(ImplicitConversion.class).orElseThrow();
+                assertThat(intToStr.getConversion().getName()).isEqualTo("intToStr");
+                assertThat(TypeUtils.isString(intToStr.getType())).isTrue();
+
+                J.Literal twelve = find(cu, J.Literal.class, l -> "12".equals(l.getValue()));
+                assertThat(TypeUtils.isString(twelve.getType())).isTrue();
+                ImplicitConversion augmentString = twelve.getMarkers().findFirst(ImplicitConversion.class).orElseThrow();
+                assertThat(augmentString.getConversion().getName()).isEqualTo("augmentString");
+                assertThat(TypeUtils.asFullyQualified(augmentString.getType()).getFullyQualifiedName())
+                  .isEqualTo("scala.collection.StringOps");
+            })
+          )
+        );
+    }
+
+    @Test
+    void conversionGivenAsInstanceIsMarked() {
+        rewriteRun(
+          scala(
+            """
+            class Foo {
+              given Conversion[Double, String] = _.toString
+              val s: String = 1.5
+            }
+            """,
+            spec -> spec.afterRecipe(cu -> {
+                J.Literal literal = find(cu, J.Literal.class, l -> Double.valueOf(1.5).equals(l.getValue()));
+                assertThat(literal.getType()).isEqualTo(JavaType.Primitive.Double);
+                ImplicitConversion conversion = literal.getMarkers().findFirst(ImplicitConversion.class).orElseThrow();
+                assertThat(conversion.getConversion().getName()).isEqualTo("apply");
+                assertThat(conversion.getConversion().getDeclaringType().getFullyQualifiedName()).isEqualTo("scala.Conversion");
+                assertThat(TypeUtils.isString(conversion.getType())).isTrue();
+            })
+          )
+        );
+    }
+
+    @Test
+    void explicitCallOfConversionMethodIsNotMarked() {
+        rewriteRun(
+          scala(
+            """
+            class Foo {
+              implicit def intToStr(i: Int): String = i.toString
+              val s = intToStr(5)
+            }
+            """,
+            spec -> spec.afterRecipe(cu -> {
+                J.Literal five = find(cu, J.Literal.class, l -> Integer.valueOf(5).equals(l.getValue()));
+                assertThat(five.getMarkers().findFirst(ImplicitConversion.class)).isEmpty();
+                assertThat(application(cu, "intToStr").getMarkers().findFirst(ImplicitConversion.class)).isEmpty();
+            })
+          )
+        );
+    }
+
+    @Test
+    void etaExpandedMethodReferenceIsMarked() {
+        rewriteRun(
+          scala(
+            """
+            class Foo {
+              def inc(i: Int): Int = i + 1
+              val xs = List(1).map(inc)
+              val ys = List(1).map(this.inc)
+              val zs = List(1).map(x => inc(x))
+            }
+            """,
+            spec -> spec.afterRecipe(cu -> {
+                J.Identifier inc = find(cu, J.Identifier.class, i -> i.getSimpleName().equals("inc") && i.getMarkers().findFirst(EtaExpansion.class).isPresent());
+                assertThat(inc.getType()).isEqualTo(JavaType.Primitive.Int);
+                EtaExpansion eta = inc.getMarkers().findFirst(EtaExpansion.class).orElseThrow();
+                assertThat(eta.getMethod().getName()).isEqualTo("inc");
+                JavaType.Parameterized function = TypeUtils.asParameterized(eta.getType());
+                assertThat(function.getFullyQualifiedName()).isEqualTo("scala.Function1");
+                assertThat(function.getTypeParameters()).containsExactly(JavaType.Primitive.Int, JavaType.Primitive.Int);
+
+                J.FieldAccess thisInc = find(cu, J.FieldAccess.class, f -> f.getSimpleName().equals("inc"));
+                assertThat(thisInc.getMarkers().findFirst(EtaExpansion.class)).isPresent();
+
+                J.MethodInvocation call = application(cu, "inc");
+                assertThat(call.getMarkers().findFirst(EtaExpansion.class)).isEmpty();
+                assertThat(call.getName().getMarkers().findFirst(EtaExpansion.class)).isEmpty();
+            })
+          )
+        );
+    }
+
+    @Test
+    void explicitEtaExpansionHasFunctionType() {
+        rewriteRun(
+          scala(
+            """
+            class Foo {
+              def inc(i: Int): Int = i + 1
+              val f = inc _
+            }
+            """,
+            spec -> spec.afterRecipe(cu -> {
+                J.MemberReference reference = find(cu, J.MemberReference.class, r -> true);
+                assertThat(TypeUtils.asFullyQualified(reference.getType()).getFullyQualifiedName()).isEqualTo("scala.Function1");
+            })
+          )
+        );
+    }
+
+    @Test
+    void illTypedCallsHaveNoMethodType() {
+        rewriteRun(
+          spec -> spec.typeValidationOptions(org.openrewrite.test.TypeValidation.none()),
+          scala(
+            """
+            class Person(name: String)
+
+            class Foo {
+              def g(s: String): Int = 1
+              val wrongArgument = g(true)
+              val wrongArity = g("a", "b")
+              val wrongConstructorArgument = new Person(1)
+            }
+            """,
+            spec -> spec.afterRecipe(cu -> {
+                J.MethodInvocation wrongArgument = find(cu, J.MethodInvocation.class,
+                  m -> isApplicationOf(m, "g") && m.getArguments().size() == 1);
+                assertThat(wrongArgument.getMethodType()).isNull();
+                assertThat(wrongArgument.getType()).isNull();
+                J.MethodInvocation wrongArity = find(cu, J.MethodInvocation.class,
+                  m -> isApplicationOf(m, "g") && m.getArguments().size() == 2);
+                assertThat(wrongArity.getMethodType()).isNull();
+                J.NewClass newPerson = find(cu, J.NewClass.class, n -> true);
+                assertThat(newPerson.getConstructorType()).isNull();
+            })
+          )
+        );
+    }
+
+    @Test
+    void callWithUnresolvedArgumentKeepsMethodType() {
+        rewriteRun(
+          spec -> spec.typeValidationOptions(org.openrewrite.test.TypeValidation.none()),
+          scala(
+            """
+            class Foo {
+              def g(s: String): Int = 1
+              val x = g(missing.Thing.value)
+            }
+            """,
+            spec -> spec.afterRecipe(cu -> {
+                J.MethodInvocation g = application(cu, "g");
+                assertThat(g.getMethodType()).isNotNull();
+                assertThat(g.getMethodType().getName()).isEqualTo("g");
+            })
+          )
+        );
+    }
+
+    @Test
+    void referenceToOverloadedMethodHasTypeOfResolvedAlternative() {
+        rewriteRun(
+          scala(
+            """
+            import scala.math.max
+
+            class Foo {
+              def f = {
+                println("hello")
+                max(1, 2)
+              }
+            }
+            """,
+            spec -> spec.afterRecipe(cu -> {
+                J.MethodInvocation println = application(cu, "println");
+                assertThat(println.getMethodType().getName()).isEqualTo("println");
+                assertThat(println.getType()).isEqualTo(JavaType.Primitive.Void);
+                J.MethodInvocation max = application(cu, "max");
+                assertThat(max.getMethodType().getParameterTypes()).containsExactly(JavaType.Primitive.Int, JavaType.Primitive.Int);
+                assertThat(max.getType()).isEqualTo(JavaType.Primitive.Int);
+            })
+          )
+        );
+    }
+
+    @Test
+    void callInForComprehensionHasItsOwnMethodType() {
+        rewriteRun(
+          scala(
+            """
+            class Foo {
+              def f = for (x <- Some(1)) println(x)
+              def g = for (i <- 0 to 10) yield i
+            }
+            """,
+            spec -> spec.afterRecipe(cu -> {
+                J.MethodInvocation some = application(cu, "Some");
+                assertThat(some.getMethodType().getName()).isEqualTo("apply");
+                assertThat(some.getMethodType().getDeclaringType().getFullyQualifiedName()).isEqualTo("scala.Some");
+                assertThat(method(cu, "to").getMethodType().getName()).isEqualTo("to");
+            })
+          )
+        );
+    }
+
+    private static J.MethodInvocation application(J cu, String function) {
+        return find(cu, J.MethodInvocation.class, m -> isApplicationOf(m, function));
+    }
+
+    private static boolean isApplicationOf(J.MethodInvocation m, String function) {
+        return m.getSelect() == null ?
+          m.getSimpleName().equals(function) :
+          m.getSimpleName().equals("apply") && m.getSelect() instanceof J.Identifier i && i.getSimpleName().equals(function);
     }
 
     private static J.MethodInvocation method(J cu, String name) {

@@ -15,8 +15,9 @@
  */
 package org.openrewrite.scala.internal
 
-import dotty.tools.dotc.ast.{tpd, Trees}
+import dotty.tools.dotc.ast.{tpd, untpd, Trees}
 import dotty.tools.dotc.core.Constants
+import dotty.tools.dotc.core.StdNames.nme
 import dotty.tools.dotc.core.Contexts.*
 import dotty.tools.dotc.core.Flags
 import dotty.tools.dotc.core.Symbols
@@ -28,13 +29,15 @@ import org.openrewrite.java.internal.{JavaReflectionTypeMapping, JavaTypeFactory
 import org.openrewrite.java.tree.{Flag, JavaType, TypeUtils}
 
 import java.util
-import java.util.{ArrayList, Collections}
+import java.util.{ArrayList, Collections, IdentityHashMap}
 import scala.collection.mutable
 
 /**
  * Maps Dotty compiler types to OpenRewrite's JavaType model.
  *
- * Uses two lookup strategies:
+ * Nodes of the untyped tree are first looked up in [[TypedNodes]], which holds the typed tree
+ * the typer produced from each of them. For nodes the typer didn't record, there are two
+ * further lookup strategies:
  * 1. Span-based: maps source position → typed tree node for direct type extraction.
  *    Typed nodes spanning exactly the untpd node's source range are preferred; nodes
  *    the typer marks synthetic (e.g. the `Apply` of an infix operation) still cover
@@ -43,7 +46,8 @@ import scala.collection.mutable
  *
  * Both maps are built from the typed tree using Dotty's TreeTraverser.
  */
-class ScalaTypeMapping(typeFactory: JavaTypeFactory, typedTree: tpd.Tree)(using ctx: Context) {
+class ScalaTypeMapping(typeFactory: JavaTypeFactory, typedTree: tpd.Tree,
+                       typedNodes: TypedNodes = TypedNodes.empty)(using ctx: Context) {
 
   private val signatureBuilder = new ScalaTypeSignatureBuilder
   private val unknown: JavaType = JavaType.Unknown.getInstance()
@@ -59,6 +63,9 @@ class ScalaTypeMapping(typeFactory: JavaTypeFactory, typedTree: tpd.Tree)(using 
   // Name-based lookup: symbol name → Symbol (fallback)
   private val symbolsByName: mutable.Map[String, Symbol] = mutable.Map.empty
 
+  // Implicit conversions the typer inserted, by the tree they convert
+  private val conversions = new IdentityHashMap[tpd.Tree, tpd.Apply]()
+
   // Build both maps via a single traversal
   buildMaps()
 
@@ -69,6 +76,11 @@ class ScalaTypeMapping(typeFactory: JavaTypeFactory, typedTree: tpd.Tree)(using 
           // Index by start position for span lookup
           if (tree.span.exists && !tree.span.isZeroExtent && !tree.isInstanceOf[Trees.InferredTypeTree[?]]) {
             spanMap.getOrElseUpdate(tree.span.start, mutable.ListBuffer.empty) += tree
+          }
+
+          tree match {
+            case app @ Trees.Apply(fn, List(arg)) if isInsertedConversion(app, fn, arg) => conversions.put(arg, app)
+            case _ =>
           }
 
           // Index by name for name-based fallback
@@ -92,6 +104,127 @@ class ScalaTypeMapping(typeFactory: JavaTypeFactory, typedTree: tpd.Tree)(using 
       case _: Throwable => // If traversal fails, maps stay empty; types will be null
     }
   }
+
+  /**
+   * The typer inserts a conversion as a call spanning just the converted tree, which
+   * tells it apart from a call of the same method the author wrote.
+   */
+  private def isInsertedConversion(app: tpd.Apply, fn: tpd.Tree, arg: tpd.Tree): Boolean =
+    try {
+      app.span.exists && arg.span.exists &&
+        app.span.start == arg.span.start && app.span.end == arg.span.end && {
+        val sym = fn.symbol
+        sym.exists && sym.is(Flags.Method) && !sym.isConstructor &&
+          (sym.isOneOf(Flags.GivenOrImplicit) || sym.name == nme.apply && sym.owner.derivesFrom(ctx.definitions.ConversionClass))
+      }
+    } catch {
+      case _: Throwable => false
+    }
+
+  // --- Node-based lookup ---
+
+  /** The type of the node as typed on its own, before any adaptation to its context. */
+  def typeOf(tree: untpd.Tree): Option[JavaType] =
+    typedNodes.get(tree).flatMap(node => Option(expressionType(resolved(node))))
+
+  /**
+   * The node typed on its own, with the alternative of an overloaded method it refers to
+   * resolved. The typer picks the alternative while adapting the reference to its context.
+   */
+  private def resolved(node: TypedNode): tpd.Tree = {
+    val own = node.own
+    if ((node.adapted eq own) || !isOverloaded(own)) own
+    else {
+      var found: tpd.Tree = null
+      try {
+        new tpd.TreeTraverser {
+          override def traverse(tree: tpd.Tree)(using Context): Unit =
+            if (found == null) {
+              if (tree.getClass == own.getClass && tree.span == own.span && !isOverloaded(tree)) found = tree
+              else traverseChildren(tree)
+            }
+        }.traverse(node.adapted)
+      } catch {
+        case _: Throwable =>
+      }
+      if (found != null) found else own
+    }
+  }
+
+  private def isOverloaded(tree: tpd.Tree): Boolean =
+    try tree.tpe match {
+      case ref: TermRef => ref.denot.isOverloaded
+      case _ => false
+    } catch {
+      case _: Throwable => false
+    }
+
+  /**
+   * The method a call, method reference or method definition refers to. A call that doesn't
+   * type-check has none, even if the compiler resolved the name of the method it calls.
+   */
+  def methodTypeOf(tree: untpd.Tree): Option[JavaType.Method] =
+    typedNodes.get(tree).flatMap { node =>
+      if (isIllTypedCall(tree, node)) Some(null)
+      else calledSymbol(resolved(node)).filterNot(isErrorSymbol).map(sym => try mapMethodType(sym) catch { case _: Throwable => null })
+    }
+
+  /** The variable a definition or reference refers to, if it refers to a variable. */
+  def variableTypeOf(tree: untpd.Tree): Option[JavaType.Variable] =
+    typedNodes.get(tree).flatMap { node =>
+      val sym = try resolved(node).symbol catch { case _: Throwable => null }
+      if (sym == null || !sym.exists) None
+      else Some(if (isVariable(sym)) try mapVariableType(sym) catch { case _: Throwable => null } else null)
+    }
+
+  /** The implicit conversion the typer applied to the node's value, if any. */
+  def implicitConversionOf(tree: untpd.Tree): Option[(JavaType.Method, JavaType)] =
+    typedNodes.get(tree).flatMap { node =>
+      Option(conversions.get(node.adapted)).orElse(Option(conversions.get(node.own)))
+    }.map { conversion =>
+      val sym = conversion.fun.symbol
+      (if (isErrorSymbol(sym)) null else try mapMethodType(sym) catch { case _: Throwable => null }, expressionType(conversion))
+    }
+
+  /** The method and resulting function type, if the typer eta-expanded the method the node refers to. */
+  def etaExpansionOf(tree: untpd.Tree): Option[(JavaType.Method, JavaType)] =
+    typedNodes.get(tree).filter(node => (node.adapted ne node.own) && isClosure(node.adapted)).flatMap { node =>
+      calledSymbol(resolved(node)).filterNot(isErrorSymbol).map { sym =>
+        (try mapMethodType(sym) catch { case _: Throwable => null }, expressionType(node.adapted))
+      }
+    }
+
+  private def isClosure(tree: tpd.Tree): Boolean = tree match {
+    case Trees.Block(List(_: Trees.DefDef[?]), _: Trees.Closure[?]) => true
+    case Trees.Block(List(_: Trees.DefDef[?]), Trees.Typed(_: Trees.Closure[?], _)) => true
+    case Trees.Typed(expr, _) => isClosure(expr)
+    case _ => false
+  }
+
+  /**
+   * Whether the call itself fails to type-check: the method can't be resolved or applied,
+   * or an argument doesn't conform to the parameter it is passed to. A call with an argument
+   * that doesn't type-check itself, typically for a missing dependency, can't be judged.
+   */
+  private def isIllTypedCall(tree: untpd.Tree, node: TypedNode): Boolean = {
+    val arguments: List[untpd.Tree] = tree match {
+      case app: untpd.Apply => app.args
+      case infix: untpd.InfixOp => List(infix.right)
+      case _ => return false
+    }
+    def flatten(arg: untpd.Tree): List[untpd.Tree] = arg match {
+      case Trees.NamedArg(_, value) => flatten(value)
+      case untpd.Parens(inner) => flatten(inner)
+      case untpd.Tuple(elems) => elems.flatMap(flatten)
+      case _ => List(arg)
+    }
+    val typedArguments = arguments.flatMap(flatten).flatMap(typedNodes.get)
+    if (typedArguments.exists(a => isErrorType(a.own))) false
+    else isErrorType(node.own) || typedArguments.exists(a => isErrorType(a.adapted))
+  }
+
+  private def isErrorType(tree: tpd.Tree): Boolean =
+    try tree.tpe.isError catch { case _: Throwable => false }
 
   // --- Public API ---
 
@@ -512,7 +645,7 @@ class ScalaTypeMapping(typeFactory: JavaTypeFactory, typedTree: tpd.Tree)(using 
           case ci: ClassInfo => ci.decls.toList
           case _ => Nil
         }
-        val fieldSyms = decls.filter(s => !s.is(Flags.Method) && !s.isClass && !s.name.toString.startsWith("$"))
+        val fieldSyms = decls.filter(s => s.isTerm && !s.is(Flags.Method) && !s.name.toString.startsWith("$"))
         if (fieldSyms.nonEmpty) {
           val fs = new ArrayList[JavaType.Variable]()
           fieldSyms.foreach { f =>
