@@ -924,9 +924,11 @@ public class RecipeRunCycle<LSS extends LargeSourceSet> {
         try {
             return Markup.error(after, t);
         } catch (Throwable unmarkable) {
+            t.addSuppressed(unmarkable);
             try {
                 return Markup.error(original, t);
             } catch (Throwable stillUnmarkable) {
+                t.addSuppressed(stillUnmarkable);
                 return original;
             }
         }

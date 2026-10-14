@@ -32,10 +32,23 @@ public class ExceptionUtils {
     public static String sanitizeStackTrace(Throwable t, Class<?> until) {
         StringJoiner sanitized = new StringJoiner("\n");
         Throwable cause = t instanceof RecipeRunException ? t.getCause() : t;
-        sanitized.add(cause.getClass().getName() + ": " + cause.getLocalizedMessage());
+        addSanitized(sanitized, "", cause, until);
+        for (Throwable suppressed : t.getSuppressed()) {
+            addSanitized(sanitized, "Suppressed: ", suppressed, until);
+        }
+        if (cause != t) {
+            for (Throwable suppressed : cause.getSuppressed()) {
+                addSanitized(sanitized, "Suppressed: ", suppressed, until);
+            }
+        }
+        return sanitized.toString();
+    }
+
+    private static void addSanitized(StringJoiner sanitized, String prefix, Throwable t, Class<?> until) {
+        sanitized.add(prefix + t.getClass().getName() + ": " + t.getLocalizedMessage());
 
         int i = 0;
-        for (StackTraceElement stackTraceElement : cause.getStackTrace()) {
+        for (StackTraceElement stackTraceElement : t.getStackTrace()) {
             if (stackTraceElement.getClassName().equals(until.getName())) {
                 break;
             }
@@ -45,7 +58,6 @@ public class ExceptionUtils {
             }
             sanitized.add("  " + stackTraceElement);
         }
-        return sanitized.toString();
     }
 
     public static boolean containsCircularReferences(Throwable exception) {

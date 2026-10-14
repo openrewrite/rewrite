@@ -110,7 +110,9 @@ class RecipeSchedulerTest implements RewriteTest {
         List<SourcesFileErrors.Row> errors = run.getDataTableRows(SourcesFileErrors.class);
         assertThat(errors).singleElement().satisfies(row -> {
             assertThat(row.getSourcePath()).isEqualTo("hello.txt");
-            assertThat(row.getStackTrace()).contains("boom");
+            assertThat(row.getStackTrace())
+              .startsWith(BoomException.class.getName())
+              .contains("Suppressed: " + ClassCastException.class.getName());
         });
     }
 
