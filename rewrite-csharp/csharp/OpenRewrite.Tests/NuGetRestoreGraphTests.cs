@@ -113,31 +113,45 @@ public class NuGetRestoreGraphTests : IDisposable
     }
 
     [Fact]
-    public void SharedRootFailureStopsTheFallbackEarly()
+    public void ProjectsFailingAloneDoNotCostHealthyProjectsTheirGraph()
     {
-        var names = Enumerable.Range(1, 10).Select(i => "Proj" + i).ToArray();
-        foreach (var name in names)
+        var broken = Enumerable.Range(1, 4).Select(i => "Broken" + i).ToArray();
+        foreach (var name in broken)
         {
-            WriteFile($"{name}/{name}.csproj", """
+            WriteFile($"{name}/{name}.csproj", $"""
                 <Project Sdk="Microsoft.NET.Sdk">
-                  <Import Project="../Missing/Shared.props" />
+                  <Import Project="{name}.Missing.props" />
                   <PropertyGroup>
                     <TargetFramework>net10.0</TargetFramework>
                   </PropertyGroup>
                 </Project>
                 """);
         }
-        var entries = string.Join("\n", names.Select(n => $"  <Project Path=\"{n}/{n}.csproj\" />"));
-        WriteFile("Broken.slnx", $"<Solution>\n{entries}\n</Solution>");
+        var healthy = new[] { "Healthy1", "Healthy2", "Healthy3" };
+        foreach (var name in healthy)
+        {
+            WriteFile($"{name}/{name}.csproj", """
+                <Project Sdk="Microsoft.NET.Sdk">
+                  <PropertyGroup>
+                    <TargetFramework>net10.0</TargetFramework>
+                  </PropertyGroup>
+                </Project>
+                """);
+        }
+        var entries = string.Join("\n", broken.Concat(healthy).Select(n => $"  <Project Path=\"{n}/{n}.csproj\" />"));
+        WriteFile("Mixed.slnx", $"<Solution>\n{entries}\n</Solution>");
 
         var before = NuGetResolver.GraphEvaluationsUnder(_tempDir);
-        var dgSpec = NuGetResolver.CreateDependencyGraphSpec(Path.Combine(_tempDir, "Broken.slnx"));
+        var dgSpec = NuGetResolver.CreateDependencyGraphSpec(Path.Combine(_tempDir, "Mixed.slnx"));
         var evaluations = NuGetResolver.GraphEvaluationsUnder(_tempDir) - before;
 
-        Assert.Null(dgSpec);
-        Assert.True(evaluations <= 5,
-            $"{evaluations} evaluations for 10 projects failing the same way; the fallback did " +
-            "not stop after recognizing one shared root cause");
+        Assert.NotNull(dgSpec);
+        Assert.Equal(1 + broken.Length + healthy.Length, evaluations);
+        var names = dgSpec.Projects
+            .Select(p => Path.GetFileNameWithoutExtension(p.RestoreMetadata?.ProjectPath ?? p.FilePath))
+            .OrderBy(n => n, StringComparer.OrdinalIgnoreCase)
+            .ToArray();
+        Assert.Equal(healthy, names);
     }
 
     [Fact]
