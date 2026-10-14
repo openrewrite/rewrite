@@ -26,8 +26,10 @@ import org.openrewrite.TreeVisitor;
 import org.openrewrite.gradle.trait.GradleDependency;
 import org.openrewrite.groovy.tree.G;
 import org.openrewrite.java.JavaIsoVisitor;
+import org.openrewrite.java.tree.Comment;
 import org.openrewrite.java.tree.Expression;
 import org.openrewrite.java.tree.J;
+import org.openrewrite.java.tree.Space;
 import org.openrewrite.java.tree.Statement;
 import org.openrewrite.marker.Markers;
 
@@ -72,16 +74,36 @@ public class RemoveDuplicateDependencies extends Recipe {
 
                 Set<String> seen = new HashSet<>();
                 List<Statement> statements = new ArrayList<>(body.getStatements().size());
+                // The prefix of the removed duplicates, to be carried over to the next statement that is kept
+                Space removedPrefix = null;
+                boolean previousRemoved = false;
                 for (Statement statement : body.getStatements()) {
+                    Space prefix = previousRemoved ? withoutTrailingComments(statement.getPrefix()) : statement.getPrefix();
                     String key = dependencyKey(bodyCursor, statement);
-                    if (key == null || seen.add(key)) {
-                        statements.add(statement);
+                    if (key == null) {
+                        // Any other statement, such as a variable assignment, could change what a later
+                        // declaration that reads the same refers to, so only compare declarations that are adjacent
+                        seen.clear();
+                    } else if (!seen.add(key)) {
+                        removedPrefix = removedPrefix == null ? prefix : merge(removedPrefix, prefix, true);
+                        previousRemoved = true;
+                        continue;
                     }
+                    if (removedPrefix != null) {
+                        prefix = merge(removedPrefix, prefix, true);
+                        removedPrefix = null;
+                    }
+                    statements.add(statement.withPrefix(prefix));
+                    previousRemoved = false;
                 }
                 if (statements.size() == body.getStatements().size()) {
                     return m;
                 }
-                return m.withArguments(singletonList(lambda.withBody(body.withStatements(statements))));
+                Space end = previousRemoved ? withoutTrailingComments(body.getEnd()) : body.getEnd();
+                if (removedPrefix != null) {
+                    end = merge(removedPrefix, end, false);
+                }
+                return m.withArguments(singletonList(lambda.withBody(body.withStatements(statements).withEnd(end))));
             }
 
             private @Nullable String dependencyKey(Cursor bodyCursor, Statement statement) {
@@ -104,6 +126,47 @@ public class RemoveDuplicateDependencies extends Recipe {
                         dependency.getSimpleName() + canonical(dependency.getArguments(), cursor);
             }
         });
+    }
+
+    /**
+     * Drop the comments at the start of a space that are on the same line as the preceding element,
+     * as they belong to that element.
+     */
+    private static Space withoutTrailingComments(Space space) {
+        List<Comment> comments = space.getComments();
+        String whitespace = space.getWhitespace();
+        int i = 0;
+        while (i < comments.size() && !whitespace.contains("\n")) {
+            whitespace = comments.get(i).getSuffix();
+            i++;
+        }
+        return i == 0 ? space : Space.build(whitespace, comments.subList(i, comments.size()));
+    }
+
+    /**
+     * Combine the prefix of removed statements with the prefix of the element that follows them, so that comments
+     * of the removed statements are not lost and, optionally, a blank line before them is retained.
+     */
+    private static Space merge(Space removed, Space next, boolean keepBlankLines) {
+        if (removed.getComments().isEmpty()) {
+            if (keepBlankLines &&
+                    newlines(removed.getWhitespace()) > newlines(next.getWhitespace()) &&
+                    next.getWhitespace().contains("\n")) {
+                String r = removed.getWhitespace();
+                String n = next.getWhitespace();
+                return next.withWhitespace(r.substring(0, r.lastIndexOf('\n')) + n.substring(n.lastIndexOf('\n')));
+            }
+            return next;
+        }
+        List<Comment> comments = new ArrayList<>(removed.getComments());
+        int last = comments.size() - 1;
+        comments.set(last, comments.get(last).withSuffix(next.getWhitespace()));
+        comments.addAll(next.getComments());
+        return Space.build(removed.getWhitespace(), comments);
+    }
+
+    private static long newlines(String whitespace) {
+        return whitespace.chars().filter(c -> c == '\n').count();
     }
 
     /**
@@ -149,6 +212,13 @@ public class RemoveDuplicateDependencies extends Recipe {
             J.MethodInvocation invocation = (J.MethodInvocation) expression;
             return invocation.getSimpleName() + canonical(invocation.getArguments(), cursor);
         }
-        return expression.withMarkers(Markers.EMPTY).printTrimmed(cursor).replaceAll("\\s+", " ");
+        // Collapse formatting, but not the contents of string literals
+        J normalized = new JavaIsoVisitor<Integer>() {
+            @Override
+            public Space visitSpace(@Nullable Space space, Space.Location loc, Integer p) {
+                return space == null || space.isEmpty() ? space : Space.SINGLE_SPACE;
+            }
+        }.visitNonNull(expression, 0, cursor);
+        return normalized.withMarkers(Markers.EMPTY).printTrimmed(cursor);
     }
 }
