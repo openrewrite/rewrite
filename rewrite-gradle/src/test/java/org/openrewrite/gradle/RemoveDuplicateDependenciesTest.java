@@ -22,6 +22,7 @@ import org.openrewrite.test.RewriteTest;
 
 import static org.openrewrite.gradle.Assertions.buildGradle;
 import static org.openrewrite.gradle.Assertions.buildGradleKts;
+import static org.openrewrite.gradle.Assertions.settingsGradle;
 import static org.openrewrite.gradle.toolingapi.Assertions.withToolingApi;
 
 class RemoveDuplicateDependenciesTest implements RewriteTest {
@@ -368,6 +369,15 @@ class RemoveDuplicateDependenciesTest implements RewriteTest {
     @Test
     void removeDuplicateProjectDependency() {
         rewriteRun(
+          settingsGradle("include 'core'"),
+          buildGradle(
+            """
+              plugins {
+                  id 'java-library'
+              }
+              """,
+            spec -> spec.path("core/build.gradle")
+          ),
           buildGradle(
             """
               plugins {
@@ -386,6 +396,152 @@ class RemoveDuplicateDependenciesTest implements RewriteTest {
 
               dependencies {
                   implementation project(":core")
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void keepDependenciesWhenVariableValueChanges() {
+        rewriteRun(
+          buildGradle(
+            """
+              plugins {
+                  id 'java-library'
+              }
+
+              repositories {
+                  mavenCentral()
+              }
+
+              def dependency = 'com.google.guava:guava:29.0-jre'
+              dependencies {
+                  implementation dependency
+                  dependency = 'junit:junit:4.13'
+                  implementation dependency
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void keepDependenciesWhenInterpolatedValueChanges() {
+        rewriteRun(
+          buildGradle(
+            """
+              plugins {
+                  id 'java-library'
+              }
+
+              repositories {
+                  mavenCentral()
+              }
+
+              def v = '29.0-jre'
+              dependencies {
+                  implementation "com.google.guava:guava:$v"
+                  v = '30.1-jre'
+                  implementation "com.google.guava:guava:$v"
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void keepDependenciesWhoseStringsDifferOnlyInWhitespace() {
+        rewriteRun(
+          buildGradle(
+            """
+              plugins {
+                  id 'java-library'
+              }
+
+              repositories {
+                  mavenCentral()
+              }
+
+              dependencies {
+                  implementation fileTree(dir: 'libs', include: ['a b.jar'])
+                  implementation fileTree(dir: 'libs', include: ['a  b.jar'])
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void retainCommentsAndBlankLinesOfRemovedDuplicate() {
+        rewriteRun(
+          buildGradle(
+            """
+              plugins {
+                  id 'java-library'
+              }
+
+              repositories {
+                  mavenCentral()
+              }
+
+              dependencies {
+                  implementation "com.google.guava:guava:29.0-jre" // core
+
+                  // testing
+                  implementation "com.google.guava:guava:29.0-jre" // duplicate
+                  testImplementation "junit:junit:4.13"
+              }
+              """,
+            """
+              plugins {
+                  id 'java-library'
+              }
+
+              repositories {
+                  mavenCentral()
+              }
+
+              dependencies {
+                  implementation "com.google.guava:guava:29.0-jre" // core
+
+                  // testing
+                  testImplementation "junit:junit:4.13"
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void removeLastDuplicateWithTrailingComment() {
+        rewriteRun(
+          buildGradle(
+            """
+              plugins {
+                  id 'java-library'
+              }
+
+              repositories {
+                  mavenCentral()
+              }
+
+              dependencies {
+                  implementation "com.google.guava:guava:29.0-jre"
+                  implementation "com.google.guava:guava:29.0-jre" // duplicate
+              }
+              """,
+            """
+              plugins {
+                  id 'java-library'
+              }
+
+              repositories {
+                  mavenCentral()
+              }
+
+              dependencies {
+                  implementation "com.google.guava:guava:29.0-jre"
               }
               """
           )
