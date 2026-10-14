@@ -1190,8 +1190,8 @@ public class ReloadableJava21ParserVisitor extends TreePathScanner<J, Space> {
         JContainer<Statement> params = JContainer.empty();
         if (!isCompactConstructor) {
             Space paramFmt = sourceBefore("(");
-            params = !node.getParameters().isEmpty() ?
-                    JContainer.build(paramFmt, convertAll(node.getParameters(), commaDelim, t -> sourceBefore(")")),
+            params = !node.getParameters().isEmpty() || node.getReceiverParameter() != null ?
+                    JContainer.build(paramFmt, convertAll(parametersWithReceiver(node), commaDelim, t -> sourceBefore(")")),
                             Markers.EMPTY) :
                     JContainer.build(paramFmt, singletonList(padRight(new J.Empty(randomId(), sourceBefore(")"),
                             Markers.EMPTY), EMPTY)), Markers.EMPTY);
@@ -1796,10 +1796,14 @@ public class ReloadableJava21ParserVisitor extends TreePathScanner<J, Space> {
         for (int i = 0; i < nodes.size(); i++) {
             JCVariableDecl n = (JCVariableDecl) nodes.get(i);
 
-            Space namedVarPrefix = sourceBefore(n.getName().toString());
+            String varName = n.nameexpr != null ? receiverName(n) : n.getName().toString();
+            Space namedVarPrefix = sourceBefore(varName);
 
             JavaType.Variable type = typeMapping.variableType(n.sym);
-            J.Identifier name = new J.Identifier(randomId(), EMPTY, Markers.EMPTY, emptyList(), n.getName().toString(),
+            if (n.nameexpr != null && type != null) {
+                type = type.withName(varName);
+            }
+            J.Identifier name = new J.Identifier(randomId(), EMPTY, Markers.EMPTY, emptyList(), varName,
                     type != null ? type.getType() : null,
                     type);
             List<JLeftPadded<Space>> dimensionsAfterName = arrayDimensions();
@@ -1818,6 +1822,22 @@ public class ReloadableJava21ParserVisitor extends TreePathScanner<J, Space> {
         }
 
         return new J.VariableDeclarations(randomId(), fmt, Markers.EMPTY, modifierResults.getLeadingAnnotations(), modifierResults.getModifiers(), typeExpr, varargs, vars);
+    }
+
+    private List<Tree> parametersWithReceiver(MethodTree node) {
+        List<Tree> params = new ArrayList<>(node.getParameters().size() + 1);
+        if (node.getReceiverParameter() != null) {
+            params.add(node.getReceiverParameter());
+        }
+        params.addAll(node.getParameters());
+        return params;
+    }
+
+    /**
+     * Receiver parameters are named `this` or `Outer.this`, the latter of which is kept verbatim as the identifier name.
+     */
+    private String receiverName(JCVariableDecl receiver) {
+        return source.substring(receiver.nameexpr.getStartPosition(), receiver.nameexpr.getEndPosition(endPosTable));
     }
 
     private List<JLeftPadded<Space>> arrayDimensions() {
