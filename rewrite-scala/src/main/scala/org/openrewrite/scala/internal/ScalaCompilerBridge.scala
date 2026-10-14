@@ -89,6 +89,7 @@ class ScalaCompilerBridge {
     val cpString = ScalaCompilerBridge.buildClasspath(classpath)
     val configuredCtx: Context = configuredContext(storeReporter, cpString, outputDir)
     val typerTrees = new IdentityHashMap[CompilationUnit, tpd.Tree]()
+    val recorder = new TyperRecorder
 
     // Create the Run up front. Run construction initializes Definitions and
     // ContextBase state (e.g., `ctx.base.TypeBoundsEmpty`) that the parser
@@ -99,7 +100,7 @@ class ScalaCompilerBridge {
     // at all, fall back to a bare context, where `with` types fail per-file.
     val (runOpt, parseContext) =
       try {
-        val r = new TyperTreeCapturingCompiler(typerTrees).newRun(using configuredCtx)
+        val r = new TyperTreeCapturingCompiler(typerTrees, recorder).newRun(using configuredCtx)
         (Some(r), r.runContext)
       } catch {
         case _: Throwable => (None, configuredCtx)
@@ -108,7 +109,9 @@ class ScalaCompilerBridge {
 
     // Phase 1: Parse all sources into CompilationUnits
     val units = new ArrayList[CompilationUnit]()
+    val indexes = new IdentityHashMap[CompilationUnit, UntypedNodeIndex]()
     val sourceEntries = new ArrayList[SourceEntry]()
+    val parsedTrees = new ArrayList[untpd.Tree]()
 
     val srcIter = sources.iterator()
     while (srcIter.hasNext) {
@@ -122,8 +125,13 @@ class ScalaCompilerBridge {
         // is what the typer needs — it's the form the parser actually produced.
         // The typer records types on the untyped trees it is given, so it gets
         // trees of its own rather than the ones the LST is built from.
-        units.add(parseForTyping(entry))
+        val unit = parseForTyping(entry)
+        units.add(unit)
+        val index = UntypedNodeIndex(unit.untpdTree)
+        indexes.put(unit, index)
+        recorder.track(index)
         sourceEntries.add(entry)
+        parsedTrees.add(parsed.rawTree)
       } catch {
         case _: Throwable =>
           // Leave this entry out of the results so the caller falls back to a
@@ -138,10 +146,10 @@ class ScalaCompilerBridge {
         firstRun.compileUnits(toScalaList(units))
 
         val unresolvable = unresolvableWildcardImports(units, typerTrees)(using firstRun.runContext)
-        val (run, typedUnits, typedTrees) =
-          if (unresolvable.isEmpty) (firstRun, units, typerTrees)
-          else retypeWithoutImports(sourceEntries, unresolvable, configuredCtx)
-            .getOrElse((firstRun, units, typerTrees))
+        val firstTyping = Typing(firstRun, units, typerTrees, recorder, indexes)
+        val Typing(run, typedUnits, typedTrees, typedRecorder, typedIndexes) =
+          if (unresolvable.isEmpty) firstTyping
+          else retypeWithoutImports(sourceEntries, unresolvable, configuredCtx).getOrElse(firstTyping)
 
         // Use the run's context — symbols from tpd.Tree are only valid in this context
         given runCtx: Context = run.runContext
@@ -156,15 +164,21 @@ class ScalaCompilerBridge {
           try {
             val typedTree = Option(typedTrees.get(unit)).getOrElse(unit.tpdTree)
             if (typedTree != null && !typedTree.isEmpty) {
-              results.put(path, existing.copy(typedTree = Some(typedTree), context = runCtx))
+              val typedNodes = Option(typedIndexes.get(unit))
+                .map(TypedNodes.pair(parsedTrees.get(i), _, typedRecorder))
+                .getOrElse(TypedNodes.empty)
+              results.put(path, existing.copy(typedTree = Some(typedTree), typedNodes = typedNodes, context = runCtx))
             }
           } catch {
             case _: Throwable =>
           }
         }
+        typedRecorder.clear()
       } catch {
         case _: Throwable =>
           // Batch compilation failed entirely; all units keep typedTree=None
+      } finally {
+        recorder.clear()
       }
     }
 
@@ -231,13 +245,15 @@ class ScalaCompilerBridge {
    */
   private def retypeWithoutImports(entries: JList[SourceEntry],
                                    imports: Map[String, Set[(Int, Int)]],
-                                   ctx0: Context): Option[(Run, JList[CompilationUnit], IdentityHashMap[CompilationUnit, tpd.Tree])] =
+                                   ctx0: Context): Option[Typing] =
     try {
       val typerTrees = new IdentityHashMap[CompilationUnit, tpd.Tree]()
-      val run = new TyperTreeCapturingCompiler(typerTrees)
+      val recorder = new TyperRecorder
+      val run = new TyperTreeCapturingCompiler(typerTrees, recorder)
         .newRun(using ctx0.fresh.setReporter(new StoreReporter(null)))
       given Context = run.runContext
       val units = new ArrayList[CompilationUnit]()
+      val indexes = new IdentityHashMap[CompilationUnit, UntypedNodeIndex]()
       entries.forEach { entry =>
         val unit = parseForTyping(entry)
         val dropped = imports.getOrElse(entry.path, Set.empty)
@@ -251,9 +267,12 @@ class ScalaCompilerBridge {
           }.transform(unit.untpdTree)
         }
         units.add(unit)
+        val index = UntypedNodeIndex(unit.untpdTree)
+        indexes.put(unit, index)
+        recorder.track(index)
       }
       run.compileUnits(toScalaList(units))
-      Some((run, units, typerTrees))
+      Some(Typing(run, units, typerTrees, recorder, indexes))
     } catch {
       case _: Throwable => None
     }
@@ -499,12 +518,15 @@ object ScalaCompilerBridge {
  * after typing while letting the later phases run for their diagnostics.
  *
  * Units are type-checked from the untyped trees the bridge parsed, rather than
- * being parsed again by the compiler's parser phase.
+ * being parsed again by the compiler's parser phase, and the typer records the
+ * typed tree of each of their nodes.
  */
-private class TyperTreeCapturingCompiler(typerTrees: IdentityHashMap[CompilationUnit, tpd.Tree]) extends Compiler {
+private class TyperTreeCapturingCompiler(typerTrees: IdentityHashMap[CompilationUnit, tpd.Tree],
+                                         recorder: TyperRecorder) extends Compiler {
   override def phases: List[List[Phase]] = {
     val all = super.phases.map(_.map {
       case _: Parser => new KeepParsedTrees
+      case _: TyperPhase => new RecordingTyperPhase(recorder)
       case phase => phase
     })
     val typerGroup = all.indexWhere(_.exists(_.isInstanceOf[TyperPhase]))
@@ -515,6 +537,13 @@ private class TyperTreeCapturingCompiler(typerTrees: IdentityHashMap[Compilation
     }
   }
 }
+
+/** The outcome of type-checking a batch of units in one run. */
+private case class Typing(run: Run,
+                          units: JList[CompilationUnit],
+                          typerTrees: IdentityHashMap[CompilationUnit, tpd.Tree],
+                          recorder: TyperRecorder,
+                          indexes: IdentityHashMap[CompilationUnit, UntypedNodeIndex])
 
 private class KeepParsedTrees extends Parser {
   override def parse(using ctx: Context): Boolean =
@@ -585,7 +614,8 @@ case class ScalaParseResult(
   warnings: JList[ScalaWarning],
   wasWrapped: Boolean = false,
   wasObjectWrapped: Boolean = false,
-  context: Context
+  context: Context,
+  typedNodes: TypedNodes = TypedNodes.empty
 )
 
 private[internal] object ScalaParseResultConstants:
