@@ -2292,17 +2292,7 @@ public class CSharpPrinter<P> extends CSharpVisitor<PrintOutputCapture<P>> {
 
         List<JRightPadded<J.VariableDeclarations.NamedVariable>> variables = multiVariable.getPadding().getVariables();
         for (int i = 0; i < variables.size(); i++) {
-            J.VariableDeclarations.NamedVariable variable = variables.get(i).getElement();
-            beforeSyntax(variable, p);
-            visit(variable.getName(), p);
-
-            JLeftPadded<Expression> initializer = variable.getPadding().getInitializer();
-            if (initializer != null) {
-                visitSpace(initializer.getBefore(), p);
-                p.append('=');
-                visit(initializer.getElement(), p);
-            }
-            afterSyntax(variable, p);
+            visit(variables.get(i).getElement(), p);
 
             if (i < variables.size() - 1) {
                 visitSpace(variables.get(i).getAfter(), p);
@@ -2312,6 +2302,22 @@ public class CSharpPrinter<P> extends CSharpVisitor<PrintOutputCapture<P>> {
 
         afterSyntax(multiVariable, p);
         return multiVariable;
+    }
+
+    @Override
+    public J visitVariable(J.VariableDeclarations.NamedVariable variable, PrintOutputCapture<P> p) {
+        beforeSyntax(variable, p);
+        visit(variable.getName(), p);
+
+        JLeftPadded<Expression> initializer = variable.getPadding().getInitializer();
+        if (initializer != null) {
+            visitSpace(initializer.getBefore(), p);
+            p.append('=');
+            visit(initializer.getElement(), p);
+        }
+
+        afterSyntax(variable, p);
+        return variable;
     }
 
     /**
