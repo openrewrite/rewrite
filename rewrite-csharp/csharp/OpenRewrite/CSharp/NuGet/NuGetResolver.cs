@@ -931,6 +931,8 @@ public static class NuGetResolver
                     Log.Debug("NuGetResolver: commit failed for {Project}: {Error}", projectPath, ex.Message);
                 }
             }
+            if (pair.Result.LockFile != null)
+                PackageCompileAssets.RecordPackageFolders(pair.Result.LockFile);
             if (projectPath != null && pair.Result.LockFile != null)
                 lockFiles[Path.GetFullPath(projectPath)] = pair.Result.LockFile;
         }

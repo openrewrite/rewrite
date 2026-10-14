@@ -542,8 +542,9 @@ public class RewriteRpcServer
 
     /// <summary>
     /// Resolves a coordinate to assembly paths: a null version names a BCL assembly in this
-    /// runtime's shared framework directory; otherwise the NuGet package's lib/ (or ref/)
-    /// assets nearest the target framework. References are always the shared framework.
+    /// runtime's shared framework directory; otherwise the NuGet package's compile assemblies
+    /// for the target framework (<see cref="PackageCompileAssets"/>). References are always the
+    /// shared framework.
     /// </summary>
     private static (List<string> Own, List<string> References) ResolveDependency(DependencyRequest request)
     {
@@ -559,37 +560,17 @@ public class RewriteRpcServer
             return ([dll], bcl);
         }
 
-        var root = Environment.GetEnvironmentVariable("NUGET_PACKAGES")
-            ?? Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), ".nuget", "packages");
-        var package = Path.Combine(root, request.Id.ToLowerInvariant(), request.Version);
-        var target = NuGetFramework.Parse(request.TargetFramework);
-        var own = NearestAssets(Path.Combine(package, "lib"), target)
-            ?? NearestAssets(Path.Combine(package, "ref"), target)
-            ?? throw new InvalidOperationException(
-                $"No assemblies compatible with {request.TargetFramework} in {package}");
+        var folders = PackageCompileAssets.PackageFolders();
+        var package = PackageCompileAssets.FindPackageDirectory(request.Id, request.Version, folders)
+            ?? throw new DirectoryNotFoundException(
+                $"Package {request.Id} {request.Version} not found in {string.Join(", ", folders)}");
+        var own = PackageCompileAssets.CompileAssemblies(package, NuGetFramework.Parse(request.TargetFramework));
+        if (own.Count == 0)
+        {
+            throw new InvalidOperationException(
+                $"No compile assemblies compatible with {request.TargetFramework} in {package}");
+        }
         return (own, bcl);
-    }
-
-    /// <summary>
-    /// The *.dll files of the asset folder nearest <paramref name="target"/>, or null when no
-    /// folder is compatible or the nearest holds no assemblies (a _._ placeholder).
-    /// </summary>
-    private static List<string>? NearestAssets(string assetsDir, NuGetFramework target)
-    {
-        if (!Directory.Exists(assetsDir))
-        {
-            return null;
-        }
-        var candidates = Directory.GetDirectories(assetsDir)
-            .Select(dir => (Framework: NuGetFramework.Parse(Path.GetFileName(dir)), Dir: dir))
-            .ToList();
-        var nearest = new FrameworkReducer().GetNearest(target, candidates.Select(c => c.Framework).ToList());
-        if (nearest == null)
-        {
-            return null;
-        }
-        var dlls = Directory.GetFiles(candidates.First(c => nearest.Equals(c.Framework)).Dir, "*.dll").ToList();
-        return dlls.Count == 0 ? null : dlls;
     }
 
     [JsonRpcMethod("GetObject", UseSingleObjectParameterDeserialization = true)]
@@ -2430,7 +2411,7 @@ public class DependencyRequest
     /// <summary>Package version; null names a BCL assembly in the runtime's shared framework.</summary>
     public string? Version { get; set; }
 
-    /// <summary>Framework whose nearest lib/ assets to enumerate, e.g. "net10.0".</summary>
+    /// <summary>Framework whose compile assets to enumerate, e.g. "net10.0".</summary>
     public string TargetFramework { get; set; } = "";
 }
 
