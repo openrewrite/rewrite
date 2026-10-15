@@ -967,4 +967,118 @@ class YamlParserTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void tagOnMappingEntryFollowedByBlockMappingOnNextLine() {
+        rewriteRun(
+          yaml(
+            """
+              workspace: !workspace
+                components:
+                  - dst: x
+              """
+          )
+        );
+    }
+
+    @Test
+    void tagOnCloudFormationUserDataFollowedByBlockMapping() {
+        rewriteRun(
+          yaml(
+            """
+              Resources:
+                Instance:
+                  Properties:
+                    UserData: !Base64
+                      Fn::Sub:
+                        - |
+                          #!/bin/bash -x
+                        - {}
+              """
+          )
+        );
+    }
+
+    @Test
+    void pythonTagWithColonsFollowedByBlockMapping() {
+        rewriteRun(
+          yaml(
+            """
+              markdown_extensions:
+                - toc:
+                    slugify: !!python/object/apply:pymdownx.slugs.slugify
+                      kwds:
+                        case: lower
+                - other
+              """
+          )
+        );
+    }
+
+    @Test
+    void tagFollowedByCommentAndBlockMapping() {
+        rewriteRun(
+          yaml(
+            """
+              a: !Tag # comment
+                # another
+                b: c
+                d: e
+              """
+          )
+        );
+    }
+
+    @Test
+    void tagWithDeeperIndentedBlockMapping() {
+        rewriteRun(
+          yaml(
+            """
+              a: !Tag
+
+                      b: c
+                      d: e
+              """
+          )
+        );
+    }
+
+    @Test
+    void tagOnRootBlockMapping() {
+        rewriteRun(
+          yaml(
+            """
+              !Tag
+              a: b
+              """
+          )
+        );
+    }
+
+    @Test
+    void tagOnSequenceEntryBlockMappingOnNextLine() {
+        rewriteRun(
+          yaml(
+            """
+              - !Tag
+                a: b
+              - key: !Other
+                  x: y
+              """
+          )
+        );
+    }
+
+    @Test
+    void tagWithFlowMapping() {
+        rewriteRun(
+          yaml(
+            """
+              a: !Tag {b: c}
+              d: !Tag
+                {e: f}
+              """
+          )
+        );
+    }
 }

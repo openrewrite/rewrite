@@ -589,4 +589,236 @@ class HelmTemplateParsingTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void multilineCommentBetweenMappingEntries() {
+        rewriteRun(
+          yaml(
+            """
+              spec:
+                replicas: 1
+                {{/*
+                  comment spanning lines
+                */}}
+                serviceName: x
+              """
+          )
+        );
+    }
+
+    @Test
+    void multilineCommentAtStartOfFile() {
+        rewriteRun(
+          yaml(
+            """
+              {{- if and .Values.hubble.enabled .Values.hubble.tls.enabled }}
+              {{/*
+              Because Kubernetes job specs are immutable, Helm will fail patch this job if
+              the spec changes between releases.
+              */}}
+              apiVersion: batch/v1
+              kind: Job
+              {{- end }}
+              """
+          )
+        );
+    }
+
+    @Test
+    void multilineCommentFirstInFile() {
+        rewriteRun(
+          yaml(
+            """
+              {{/*
+              multi-line comment
+              */}}
+              a: b
+              """
+          )
+        );
+    }
+
+    @Test
+    void multilineTrimmedComment() {
+        rewriteRun(
+          yaml(
+            """
+              a: b
+              {{- /*
+              multi-line comment
+              */ -}}
+              c: d
+              """
+          )
+        );
+    }
+
+    @Test
+    void multilineAction() {
+        rewriteRun(
+          yaml(
+            """
+              spec:
+                containers:
+                  - name: kafka
+                    {{- $defaultEnv := list
+                        (dict "name" "_POD_NAME" "valueFrom" (dict "fieldRef" (dict "fieldPath" "metadata.labels['apps.kubernetes.io/pod-index']")))
+                        (dict "name" "CLUSTER_ID" "value" (.clusterId | default ""))
+                    -}}
+                    {{- $env := concat $defaultEnv .extraEnv }}
+                    env:
+                      {{- toYaml $env | nindent 6 }}
+              """
+          )
+        );
+    }
+
+    @Test
+    void actionWithBracesInQuotedString() {
+        rewriteRun(
+          yaml(
+            """
+              {{- if .Values.hubble.metrics.dashboards.enabled }}
+              {{- range $path, $fileContents := $files }}
+              {{- $dashboardName := regexReplaceAll "(^.*/)(.*)\\.json$" $path "${2}" }}
+              ---
+              apiVersion: v1
+              kind: ConfigMap
+              metadata:
+                name: {{ $dashboardName | trunc 63 | trimSuffix "-" }}
+              {{- end }}
+              {{- end }}
+              """
+          )
+        );
+    }
+
+    @Test
+    void inlineActionWithBracesInQuotedString() {
+        rewriteRun(
+          yaml(
+            """
+              a: {{ regexReplaceAll "(x)" .Values.y "${1}" }}
+              b: {{ "}}" }}
+              c: next
+              """
+          )
+        );
+    }
+
+    @Test
+    void trailingSpaceAfterStandaloneAction() {
+        rewriteRun(
+          yaml(
+            """
+              spec:
+                egress:
+                - toPorts:
+                  - ports:
+                    {{- range $port := .Values.ports }}\s
+                    - port: "{{ $port }}"
+                      protocol: TCP
+                    {{- end }}
+                {{- if .Values.cidrs }}
+                  to: x
+                {{- end }}\s
+              """
+          )
+        );
+    }
+
+    @Test
+    void flowMappingsAreStillFlowMappings() {
+        rewriteRun(
+          yaml(
+            """
+              a: {b: 1, c: {d: 2}}
+              e: [{f: 1}, {g: 2}]
+              h: {}
+              """,
+            spec -> spec.afterRecipe(docs -> {
+                var mapping = (Yaml.Mapping) docs.getDocuments().getFirst().getBlock();
+                var a = (Yaml.Mapping) mapping.getEntries().getFirst().getValue();
+                assertThat(a.getOpeningBracePrefix()).isNotNull();
+                assertThat(a.getEntries()).hasSize(2);
+            })
+          )
+        );
+    }
+
+    @Test
+    void doubleBracesInQuotedScalars() {
+        rewriteRun(
+          yaml(
+            """
+              a: "{{ not closed on this line"
+              b: '{{ also "unbalanced }}'
+              c: "{{ .Values.x }}-{{ .Values.y }}"
+              d: "text {{ with \\"escaped\\" quote }} text"
+              """
+          )
+        );
+    }
+
+    @Test
+    void unterminatedMultilineActionIsLeftAlone() {
+        rewriteRun(
+          yaml(
+            """
+              a: |
+                {{- if .Values.x
+                {{ .Values.y }}
+                text
+              b: c
+              """
+          )
+        );
+    }
+
+    @Test
+    void multilineActionClosedWithTrimMarker() {
+        rewriteRun(
+          yaml(
+            """
+              {{ if and
+                  (ne (index .Values.extraConfig "x") "true")
+                  (or .Values.a .Values.b) -}}
+                {{ fail "invalid" }}
+              {{- end }}
+              a: b
+              """
+          )
+        );
+    }
+
+    @Test
+    void trailingSpaceAfterStandaloneActionBeforeSequence() {
+        rewriteRun(
+          yaml(
+            """
+              egress:
+              - toPorts:
+                - ports:
+                  {{- range $port := .Values.ports }}\s
+                  - port: "{{ $port }}"
+                    protocol: TCP
+                  {{- end }}
+              """
+          )
+        );
+    }
+
+    @Test
+    void trailingSpaceAfterStandaloneActionBeforeMappingEntry() {
+        rewriteRun(
+          yaml(
+            """
+              metadata:
+                annotations:
+                {{- toYaml .Values.annotations | nindent 4 }}\s
+                namespace: x
+              """
+          )
+        );
+    }
 }
