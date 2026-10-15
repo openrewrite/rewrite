@@ -43,6 +43,7 @@ import org.openrewrite.yaml.marker.OmitColon;
 import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.*;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -52,6 +53,8 @@ import static java.util.Collections.*;
 import static org.openrewrite.Tree.randomId;
 
 public class YamlParser implements org.openrewrite.Parser {
+    private static final Path GITHUB_ACTIONS_LOCKFILE = Paths.get(".github", "workflows", "actions.lock");
+
     private static final Pattern VARIABLE_PATTERN = Pattern.compile(":\\s+(@[^\n\r@]+@)");
     // Only match single-line Helm templates that don't span multiple lines
     private static final Pattern HELM_TEMPLATE_PATTERN = Pattern.compile("\\{\\{[^{}\\n\\r]*}}");
@@ -873,7 +876,8 @@ public class YamlParser implements org.openrewrite.Parser {
     @Override
     public boolean accept(Path path) {
         String fileName = path.toString();
-        return fileName.endsWith(".yml") || fileName.endsWith(".yaml");
+        return fileName.endsWith(".yml") || fileName.endsWith(".yaml") ||
+               path.endsWith(GITHUB_ACTIONS_LOCKFILE);
     }
 
     @Override
