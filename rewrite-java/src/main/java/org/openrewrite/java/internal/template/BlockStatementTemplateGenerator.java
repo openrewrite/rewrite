@@ -77,7 +77,7 @@ public class BlockStatementTemplateGenerator {
                     if (contextSensitive) {
                         contextTemplate(next(cursor), cursor.getValue(), before, after, cursor.getValue(), mode);
                     } else {
-                        contextFreeTemplate(next(cursor), cursor.getValue(), typeVariables, before, after);
+                        contextFreeTemplate(next(cursor), cursor.getValue(), typeVariables, before, after, location, mode);
                     }
 
                     return before.toString().trim() +
@@ -217,8 +217,15 @@ public class BlockStatementTemplateGenerator {
         return js;
     }
 
+    /// Inserting before or after a statement makes the template a sibling statement, even when the anchor is
+    /// an expression statement like `list.add(x)` or `super(x)` whose value the stub would otherwise bind.
+    protected static boolean insertsBesideStatement(Space.Location location, JavaCoordinates.Mode mode) {
+        return location == Space.Location.STATEMENT_PREFIX && mode != REPLACEMENT;
+    }
+
     @SuppressWarnings("DataFlowIssue")
-    protected void contextFreeTemplate(Cursor cursor, J j, Collection<JavaType.GenericTypeVariable> typeVariables, StringBuilder before, StringBuilder after) {
+    protected void contextFreeTemplate(Cursor cursor, J j, Collection<JavaType.GenericTypeVariable> typeVariables, StringBuilder before, StringBuilder after,
+                                       Space.Location location, JavaCoordinates.Mode mode) {
         String classDeclaration = typeVariables.isEmpty() ? "Template" :
                 "Template<" + typeVariables.stream().map(TypeUtils::toGenericTypeString).collect(joining(", ")) + ">";
         if (j instanceof J.Lambda && "Object".equals(bindType)) {
@@ -231,6 +238,9 @@ public class BlockStatementTemplateGenerator {
                     "Templating a method reference requires a cursor so that it can be properly parsed and type-attributed. " +
                     "Mark this template as context-sensitive by calling JavaTemplate.Builder#contextSensitive() or " +
                     "specify the type by calling JavaTemplate.Builder#bindType()");
+        } else if (j instanceof Expression && insertsBesideStatement(location, mode)) {
+            before.insert(0, String.format("class %s {{\n", classDeclaration));
+            after.append("\n}}");
         } else if (j instanceof J.MethodInvocation) {
             before.insert(0, String.format("class %s {{\n", classDeclaration));
             JavaType.Method methodType = ((J.MethodInvocation) j).getMethodType();

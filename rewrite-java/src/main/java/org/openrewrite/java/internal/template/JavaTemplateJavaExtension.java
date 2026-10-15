@@ -127,6 +127,12 @@ public class JavaTemplateJavaExtension extends JavaTemplateLanguageExtension {
              * is not an indentation level, so its neighbours are placed rather than formatted.
              */
             private List<Statement> spliceAround(Statement anchor, List<Statement> gen, Integer p) {
+                if (gen.isEmpty() && mode != JavaCoordinates.Mode.REPLACEMENT && !substitutedTemplate.trim().isEmpty()) {
+                    throw new IllegalArgumentException("Expected a template that would generate at least one " +
+                                                       "statement to insert " + (mode == JavaCoordinates.Mode.BEFORE ? "before" : "after") + " a statement, but generated none. " +
+                                                       "Template:\n" + substitutedTemplate + "\nSubstitutions:\n" + substitutions +
+                                                       "\nStatement:\n" + anchor);
+                }
                 boolean anchorBeginsLine = anchor.getPrefix().getWhitespace().contains("\n");
                 Cursor parent = getCursor();
                 for (int i = 0; i < gen.size(); i++) {

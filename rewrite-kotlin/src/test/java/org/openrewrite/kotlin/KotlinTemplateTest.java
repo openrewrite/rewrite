@@ -1161,4 +1161,19 @@ class KotlinTemplateTest implements RewriteTest {
               """)
           ));
     }
+
+    @Test
+    void insertDeclarationBeforeExpressionStatement() {
+        rewriteRun(
+          spec -> spec.recipe(insertAtTopLevel(true)).typeValidationOptions(TypeValidation.none()),
+          kotlinScript(
+            """
+              println("x")
+              """,
+            spec -> spec.after(a -> """
+              val y = 2
+              println("x")
+              """)
+          ));
+    }
 }
