@@ -43,6 +43,10 @@
     <PackageReference Include="Microsoft.Build" Version="18.9.6" />
     <PackageReference Include="Microsoft.Build.Tasks.Core" Version="18.9.6" />
     <PackageReference Include="Microsoft.Build.Utilities.Core" Version="18.9.6" />
+    <!-- Overrides the 10.0.10 that Microsoft.Build.Tasks.Core pulls in, for CVE-2026-96958,
+         CVE-2026-96959, CVE-2026-96960, CVE-2026-84008 and CVE-2026-70162. -->
+    <PackageReference Include="System.Security.Cryptography.Pkcs" Version="10.0.13" />
+    <PackageReference Include="System.Security.Cryptography.Xml" Version="10.0.13" />
     <PackageReference Include="JetBrains.Annotations" Version="2025.2.4" />
     <PackageReference Include="Microsoft.CodeAnalysis.CSharp" Version="5.6.0" PrivateAssets="none" />
     <PackageReference Include="Microsoft.CodeAnalysis.CSharp.Workspaces" Version="5.6.0" PrivateAssets="none" />
