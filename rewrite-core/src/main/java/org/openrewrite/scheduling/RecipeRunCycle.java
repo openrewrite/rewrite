@@ -534,7 +534,6 @@ public class RecipeRunCycle<LSS extends LargeSourceSet> {
                         // that later fails to apply on a freshly cloned repository
                         return src;
                     }
-                    recipeRunStats.recordSourceFileChanged(src, after);
                 } else if (ctx.hasNewMessages()) {
                     // consider any recipes adding new messages as a changing recipe (which can request another cycle)
                     madeChangesInThisCycle.add(recipe);
@@ -637,9 +636,6 @@ public class RecipeRunCycle<LSS extends LargeSourceSet> {
                     recordBatchSourceFileResultFast(originalBefore, fetched, batch.recipeStacks.get(i),
                             searchResultsByRecipe, ctx);
                 }
-            }
-            if (!originalBefore.getMarkers().findFirst(Generated.class).isPresent()) {
-                recipeRunStats.recordSourceFileChanged(originalBefore, fetched);
             }
             for (int i = 0; i < batch.recipeStacks.size(); i++) {
                 if (response.getResults().get(i).isModified()) {
@@ -808,6 +804,10 @@ public class RecipeRunCycle<LSS extends LargeSourceSet> {
             // The edit changed the tree but not the file, such as by updating a marker that doesn't
             // print, and found nothing in it, so the file has no result for this recipe.
             return;
+        }
+
+        if (before == null || !before.getMarkers().findFirst(Generated.class).isPresent()) {
+            recipeRunStats.recordSourceFileChanged(before, after);
         }
 
         String beforePath = (before == null) ? "" : before.getSourcePath().toString();

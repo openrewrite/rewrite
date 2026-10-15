@@ -184,7 +184,7 @@ class SourceFileResultsTest implements RewriteTest {
      * Records a Gradle version in the {@link BuildTool} marker, as a Gradle upgrade does, which changes the tree but
      * not what the file prints.
      */
-    private static Recipe recordGradleVersion(String version) {
+    static Recipe recordGradleVersion(String version) {
         return toRecipe(() -> new PlainTextVisitor<>() {
             @Override
             public PlainText visitText(PlainText text, ExecutionContext ctx) {
