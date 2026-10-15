@@ -270,6 +270,32 @@ class YamlParserTest implements RewriteTest {
     }
 
     @Test
+    void asteriskPatternInsideQuotedScalar() {
+        rewriteRun(
+          yaml(
+            """
+              msg: "user.info: *** could not be installed ***"
+              single: 'user.info: *** could not be installed ***'
+              escaped: "say \\"hi\\": *** done ***"
+              foo: bar
+              """
+          )
+        );
+    }
+
+    @Test
+    void asteriskPlaceholderAfterApostropheInPlainScalar() {
+        rewriteRun(
+          yaml(
+            """
+              it's: *** REMOVED ***
+              foo: bar
+              """
+          )
+        );
+    }
+
+    @Test
     void asteriskPatternInsideBlockScalar() {
         // Markdown bold text inside a literal block scalar must not be mangled
         // by the asterisk placeholder preprocessing.
