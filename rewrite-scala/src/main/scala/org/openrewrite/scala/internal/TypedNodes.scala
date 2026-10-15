@@ -38,6 +38,26 @@ final case class TypedNode(own: tpd.Tree, adapted: tpd.Tree)
  */
 final class TypedNodes private (nodes: IdentityHashMap[untpd.Tree, TypedNode]) {
   def get(tree: untpd.Tree): Option[TypedNode] = Option(nodes.get(tree))
+
+  // The innermost node each typed tree is the typing or adaptation of
+  private lazy val owners: IdentityHashMap[tpd.Tree, untpd.Tree] = {
+    val owners = new IdentityHashMap[tpd.Tree, untpd.Tree]()
+    def claim(typed: tpd.Tree, tree: untpd.Tree): Unit = {
+      val current = owners.get(typed)
+      if (current == null || encloses(current, tree)) owners.put(typed, tree)
+    }
+    nodes.forEach { (tree, node) =>
+      claim(node.adapted, tree)
+      claim(node.own, tree)
+    }
+    owners
+  }
+
+  private def encloses(outer: untpd.Tree, inner: untpd.Tree): Boolean =
+    outer.span.contains(inner.span) && outer.span != inner.span
+
+  /** The node of the untyped tree that the typed tree is the typing or adaptation of, if any. */
+  def ownerOf(tree: tpd.Tree): Option[untpd.Tree] = Option(owners.get(tree))
 }
 
 object TypedNodes {

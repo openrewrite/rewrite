@@ -483,6 +483,42 @@ class MethodDeclarationTest implements RewriteTest {
         );
     }
 
+    @Test
+    void implicitParamListAfterEmptyParamList() {
+        rewriteRun(
+            scala(
+                """
+                object Test {
+                  def run()(implicit t: Int): Int = t
+                }
+                """,
+                spec -> spec.afterRecipe(cu -> {
+                    J.MethodDeclaration run = (J.MethodDeclaration) ((J.ClassDeclaration) cu.getStatements().getFirst()).getBody().getStatements().getFirst();
+                    assertThat(run.getParameters()).isEmpty();
+                    assertThat(((J.Identifier) run.getReturnTypeExpression()).getSimpleName()).isEqualTo("Int");
+                    J.Lambda curried = (J.Lambda) run.getBody().getStatements().getFirst();
+                    J.VariableDeclarations t = (J.VariableDeclarations) curried.getParameters().getParameters().getFirst();
+                    assertThat(t.getVariables().getFirst().getSimpleName()).isEqualTo("t");
+                })
+            )
+        );
+    }
+
+    @Test
+    void emptyCurriedParamLists() {
+        rewriteRun(
+            scala(
+                """
+                object Test {
+                  def f(a: Int)(): Int = a
+                  def g()(): Int = 1
+                  def h()(using s: String)(): String = s
+                }
+                """
+            )
+        );
+    }
+
     @Nested
     class Using implements RewriteTest {
 

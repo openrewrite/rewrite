@@ -17,6 +17,8 @@ package org.openrewrite.scala.internal
 
 import dotty.tools.dotc.ast.{tpd, untpd, Trees}
 import dotty.tools.dotc.core.Constants
+import dotty.tools.dotc.core.NameKinds.DefaultGetterName
+import dotty.tools.dotc.core.Names.Name
 import dotty.tools.dotc.core.StdNames.nme
 import dotty.tools.dotc.core.Contexts.*
 import dotty.tools.dotc.core.Flags
@@ -31,6 +33,18 @@ import org.openrewrite.java.tree.{Flag, JavaType, TypeUtils}
 import java.util
 import java.util.{ArrayList, Collections, IdentityHashMap}
 import scala.collection.mutable
+import scala.jdk.CollectionConverters.*
+
+/**
+ * What a selector of an import or export imports.
+ *
+ * @param symbolType the imported definition: the class for a type or an object, the variable
+ *                   for a value, the method for a method, unknown when it can't be resolved
+ * @param nameType   the type of the imported name, as for a reference to it
+ * @param variable   the imported object or value, if any
+ * @param isImplicit whether the import brings an implicit or given definition into scope
+ */
+final case class Imported(symbolType: JavaType, nameType: JavaType, variable: JavaType.Variable, isImplicit: Boolean)
 
 /**
  * Maps Dotty compiler types to OpenRewrite's JavaType model.
@@ -66,13 +80,21 @@ class ScalaTypeMapping(typeFactory: JavaTypeFactory, typedTree: tpd.Tree,
   // Implicit conversions the typer inserted, by the tree they convert
   private val conversions = new IdentityHashMap[tpd.Tree, tpd.Apply]()
 
+  // Implicit arguments the typer inserted, by the innermost node of the untyped tree whose typing they are part of
+  private val implicitArguments = new IdentityHashMap[untpd.Tree, ArrayList[tpd.Tree]]()
+
   // Build both maps via a single traversal
   buildMaps()
 
   private def buildMaps(): Unit = {
     try {
       val traverser = new tpd.TreeTraverser {
+        private var owner: untpd.Tree = null
+
         override def traverse(tree: tpd.Tree)(using Context): Unit = {
+          val enclosingOwner = owner
+          typedNodes.ownerOf(tree).foreach(owner = _)
+
           // Index by start position for span lookup
           if (tree.span.exists && !tree.span.isZeroExtent && !tree.isInstanceOf[Trees.InferredTypeTree[?]]) {
             spanMap.getOrElseUpdate(tree.span.start, mutable.ListBuffer.empty) += tree
@@ -80,6 +102,11 @@ class ScalaTypeMapping(typeFactory: JavaTypeFactory, typedTree: tpd.Tree,
 
           tree match {
             case app @ Trees.Apply(fn, List(arg)) if isInsertedConversion(app, fn, arg) => conversions.put(arg, app)
+            case _ =>
+          }
+          tree match {
+            case Trees.Apply(fn, args) if owner != null && isInsertedImplicitApplication(fn, args) =>
+              implicitArguments.computeIfAbsent(owner, _ => new ArrayList()).addAll(args.asJava)
             case _ =>
           }
 
@@ -97,6 +124,7 @@ class ScalaTypeMapping(typeFactory: JavaTypeFactory, typedTree: tpd.Tree,
           }
 
           traverseChildren(tree)
+          owner = enclosingOwner
         }
       }
       traverser.traverse(typedTree)
@@ -117,6 +145,20 @@ class ScalaTypeMapping(typeFactory: JavaTypeFactory, typedTree: tpd.Tree,
         sym.exists && sym.is(Flags.Method) && !sym.isConstructor &&
           (sym.isOneOf(Flags.GivenOrImplicit) || sym.name == nme.apply && sym.owner.derivesFrom(ctx.definitions.ConversionClass))
       }
+    } catch {
+      case _: Throwable => false
+    }
+
+  /**
+   * The typer passes implicit arguments by applying the tree that takes them to arguments it
+   * found by implicit search, which it positions at the end of that tree, not spanning any source.
+   */
+  private def isInsertedImplicitApplication(fn: tpd.Tree, args: List[tpd.Tree]): Boolean =
+    try {
+      args.nonEmpty && args.forall(arg => !arg.span.exists || arg.span.isZeroExtent) && (fn.tpe.widen match {
+        case mt: MethodType => mt.isImplicitMethod
+        case _ => false
+      })
     } catch {
       case _: Throwable => false
     }
@@ -214,6 +256,72 @@ class ScalaTypeMapping(typeFactory: JavaTypeFactory, typedTree: tpd.Tree,
     }.map { conversion =>
       val sym = conversion.fun.symbol
       (if (isErrorSymbol(sym)) null else try mapMethodType(sym) catch { case _: Throwable => null }, expressionType(conversion))
+    }
+
+  /** The definitions the typer passed as implicit arguments while typing the node, if any. */
+  def implicitArgumentsOf(tree: untpd.Tree): Option[util.List[JavaType]] =
+    Option(implicitArguments.get(tree)).map { args =>
+      val definitions = new ArrayList[JavaType]()
+      args.forEach(arg => implicitDefinition(arg).foreach(definitions.add))
+      definitions
+    }.filterNot(_.isEmpty)
+
+  private def implicitDefinition(arg: tpd.Tree): Option[JavaType] = arg match {
+    case Trees.Typed(expr, _) => implicitDefinition(expr)
+    case Trees.TypeApply(fn, _) => implicitDefinition(fn)
+    case Trees.Apply(fn, _) => implicitDefinition(fn)
+    case Trees.Block(_, expr) => implicitDefinition(expr)
+    case Trees.Inlined(call, _, expansion) => implicitDefinition(if (call.isEmpty) expansion else call)
+    case _ =>
+      try {
+        val sym = arg.symbol
+        if (sym == null || !sym.exists || isErrorSymbol(sym) || sym.name.is(DefaultGetterName)) None
+        else if (isVariable(sym)) Option(mapVariableType(sym))
+        else if (sym.is(Flags.Method)) Option(mapMethodType(sym))
+        else None
+      } catch {
+        case _: Throwable => None
+      }
+  }
+
+  /**
+   * What the selector of an import or export imports. A name that is both a type and an
+   * object, such as a class and its companion, is attributed as the type, with the object
+   * as its variable.
+   */
+  def importedOf(tree: untpd.Tree, name: Name): Option[Imported] =
+    typedNodes.get(tree).map(_.own).collect {
+      case imp: Trees.ImportOrExport[?] => imported(imp.expr.asInstanceOf[tpd.Tree], name)
+    }
+
+  private def imported(qualifier: tpd.Tree, name: Name): Imported =
+    try {
+      val prefix = qualifier.tpe
+      if (prefix == null || prefix.isError) return Imported(unknown, unknown, null, isImplicit = false)
+      val typeSym = prefix.member(name.toTypeName).symbol
+      val terms = prefix.member(name.toTermName).alternatives.map(_.symbol).filter(sym => sym.exists && !isErrorSymbol(sym))
+      val isImplicit = terms.exists(_.isOneOf(Flags.GivenOrImplicit))
+      val value = terms.find(isVariable)
+      val variable = value.map(mapVariableType).orNull
+      if (typeSym.exists && !isErrorSymbol(typeSym)) {
+        val tpe = mapType(typeSym.typeRef)
+        Imported(tpe, tpe, variable, isImplicit)
+      } else value match {
+        case Some(module) if module.is(Flags.Module) =>
+          val tpe = mapType(module.termRef)
+          Imported(tpe, tpe, variable, isImplicit)
+        case Some(_) =>
+          Imported(variable, variable.getType, variable, isImplicit)
+        case None => terms.find(_.is(Flags.Method)) match {
+          case Some(method) =>
+            val methodType = mapMethodType(method)
+            Imported(methodType, methodType, null, isImplicit)
+          case None if terms.exists(_.is(Flags.Package)) => Imported(null, null, null, isImplicit = false)
+          case None => Imported(unknown, unknown, null, isImplicit = false)
+        }
+      }
+    } catch {
+      case _: Throwable => Imported(null, null, null, isImplicit = false)
     }
 
   /** The method and resulting function type, if the typer eta-expanded the method the node refers to. */
