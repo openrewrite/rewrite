@@ -79,6 +79,70 @@ class GradleProjectTest implements RewriteTest {
     }
 
     @Test
+    void capturesDependencyExcludeRules() {
+        rewriteRun(
+          spec -> spec.recipe(new UpgradeDependencyInMarker(
+            new GroupArtifactVersion("org.apache.httpcomponents", "httpclient", "4.5.13"),
+            "implementation",
+            (original, updated) -> assertThat(original.getConfiguration("implementation").getRequested())
+              .filteredOn(dep -> "httpclient".equals(dep.getArtifactId()))
+              .singleElement()
+              .satisfies(dep -> assertThat(dep.getExclusions()).containsExactlyInAnyOrder(
+                new GroupArtifact("commons-logging", "commons-logging"),
+                new GroupArtifact("commons-codec", "*")))
+          )),
+          buildGradle(
+            """
+              plugins {
+                  id("java")
+              }
+              repositories {
+                  mavenCentral()
+              }
+              dependencies {
+                  implementation("org.apache.httpcomponents:httpclient:4.5.13") {
+                      exclude group: "commons-logging", module: "commons-logging"
+                      exclude group: "commons-codec"
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void reResolutionPreservesDependencyExcludeRules() {
+        rewriteRun(
+          spec -> spec.recipe(new UpgradeDependencyInMarker(
+            new GroupArtifactVersion("org.apache.httpcomponents", "httpclient", "4.5.14"),
+            "implementation",
+            (original, updated) -> {
+                assertThat(original.getConfiguration("compileClasspath").getResolved())
+                  .noneMatch(dep -> "commons-logging".equals(dep.getArtifactId()));
+                assertThat(updated.getConfiguration("compileClasspath").getResolved())
+                  .anyMatch(dep -> "httpclient".equals(dep.getArtifactId()) && "4.5.14".equals(dep.getVersion()))
+                  .noneMatch(dep -> "commons-logging".equals(dep.getArtifactId()));
+            }
+          )),
+          buildGradle(
+            """
+              plugins {
+                  id("java")
+              }
+              repositories {
+                  mavenCentral()
+              }
+              dependencies {
+                  implementation("org.apache.httpcomponents:httpclient:4.5.13") {
+                      exclude group: "commons-logging", module: "commons-logging"
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
     void repositoryWithCredentials() {
         rewriteRun(
           spec -> spec.recipe(new UpgradeDependencyInMarker(
