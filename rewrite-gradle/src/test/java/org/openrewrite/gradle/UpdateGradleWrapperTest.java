@@ -1033,6 +1033,60 @@ class UpdateGradleWrapperTest implements RewriteTest {
     }
 
     @Test
+    void doNotAddWrapperWhenRootIsNotAGradleBuild() {
+        rewriteRun(
+          spec -> spec.afterRecipe(run -> assertThat(run.getChangeset().getAllResults()).isEmpty()),
+          dir("fixtures/example",
+            buildGradle(
+              """
+                plugins {
+                    id "java"
+                }
+                """
+            )
+          )
+        );
+    }
+
+    @Test
+    void doNotAddWrapperToRootWhenNestedBuildHasItsOwnWrapper() {
+        rewriteRun(
+          spec -> spec.afterRecipe(run -> assertThat(run.getChangeset().getAllResults())
+            .allSatisfy(result -> assertThat(Objects.requireNonNull(result.getAfter()).getSourcePath()).startsWithRaw(Path.of("infra")))),
+          dir("infra",
+            buildGradle(
+              """
+                plugins {
+                    id "java"
+                }
+                """
+            ),
+            properties(
+              """
+                distributionBase=GRADLE_USER_HOME
+                distributionPath=wrapper/dists
+                distributionUrl=https\\://services.gradle.org/distributions/gradle-7.4-bin.zip
+                zipStoreBase=GRADLE_USER_HOME
+                zipStorePath=wrapper/dists
+                """,
+              """
+                distributionBase=GRADLE_USER_HOME
+                distributionPath=wrapper/dists
+                distributionUrl=https\\://services.gradle.org/distributions/gradle-7.4.2-bin.zip
+                zipStoreBase=GRADLE_USER_HOME
+                zipStorePath=wrapper/dists
+                distributionSha256Sum=29e49b10984e585d8118b7d0bc452f944e386458df27371b49b4ac1dec4b7fda
+                """,
+              spec -> spec.path("gradle/wrapper/gradle-wrapper.properties")
+            ),
+            text("", spec -> spec.path(WRAPPER_SCRIPT_LOCATION).after(notEmpty)),
+            text("", spec -> spec.path(WRAPPER_BATCH_LOCATION).after(notEmpty)),
+            other("", spec -> spec.path(WRAPPER_JAR_LOCATION))
+          )
+        );
+    }
+
+    @Test
     void failRecipeIfBothVersionAndDistributionUriAreProvided() {
         assertThat(new UpdateGradleWrapper("7.4.2", "bin", false, "https://company.com/repo/gradle-7.4.2-bin.zip", null).validate().isInvalid()).isTrue();
     }

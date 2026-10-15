@@ -154,6 +154,9 @@ public class UpdateGradleWrapper extends ScanningRecipe<UpdateGradleWrapper.Grad
 
     @Data
     public static class GradleWrapperState {
+        /**
+         * Whether the root of the repository is a Gradle build, and so the place a missing wrapper belongs.
+         */
         boolean gradleProject = false;
         boolean needsWrapperUpdate = false;
 
@@ -269,7 +272,10 @@ public class UpdateGradleWrapper extends ScanningRecipe<UpdateGradleWrapper.Grad
                 new TreeVisitor<Tree, ExecutionContext>() {
                     @Override
                     public boolean isAcceptable(SourceFile sourceFile, ExecutionContext ctx) {
-                        if (new FindGradleProject(FindGradleProject.SearchCriteria.Marker).getVisitor().visitNonNull(sourceFile, ctx) != sourceFile) {
+                        // a Gradle build in a subdirectory, such as a test fixture or an included build with
+                        // its own wrapper, does not make the root a place a wrapper belongs
+                        if (sourceFile.getSourcePath().getParent() == null &&
+                            new FindGradleProject(FindGradleProject.SearchCriteria.Marker).getVisitor().visitNonNull(sourceFile, ctx) != sourceFile) {
                             acc.gradleProject = true;
                         }
 
