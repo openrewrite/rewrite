@@ -23,7 +23,9 @@ import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.java.tree.TypeUtils;
 import org.openrewrite.scala.marker.EtaExpansion;
 import org.openrewrite.scala.marker.FunctionApplication;
+import org.openrewrite.scala.marker.ImplicitArguments;
 import org.openrewrite.scala.marker.ImplicitConversion;
+import org.openrewrite.scala.marker.ImplicitImport;
 import org.openrewrite.scala.tree.S;
 import org.openrewrite.test.RewriteTest;
 
@@ -545,6 +547,146 @@ class ScalaTypeAttributionTest implements RewriteTest {
     }
 
     @Test
+    void importsAreAttributedWithTheImportedDefinition() {
+        rewriteRun(
+          spec -> spec.typeValidationOptions(org.openrewrite.test.TypeValidation.none()),
+          scala(
+            """
+            import scala.concurrent.ExecutionContext.Implicits.global
+            import scala.concurrent.Future
+            import scala.math.max
+            import akka.actor.ActorSystem
+            import scala.jdk.CollectionConverters._
+            import Defaults.v
+            import Defaults.iv
+            import Defaults.IO
+            import Defaults.{helper => h, iv => i2}
+
+            object Defaults {
+              def helper: Int = 1
+              val v: Int = 2
+              implicit val iv: String = "s"
+              implicit object IO
+            }
+            """,
+            spec -> spec.afterRecipe(cu -> {
+                J.Import global = importOf(cu, "global");
+                assertThat(global.getMarkers().findFirst(ImplicitImport.class)).isPresent();
+                JavaType.Method globalMethod = (JavaType.Method) global.getQualid().getType();
+                assertThat(globalMethod.getName()).isEqualTo("global");
+                assertThat(globalMethod.getDeclaringType().getFullyQualifiedName()).isEqualTo("scala.concurrent.ExecutionContext$.Implicits");
+
+                J.Import future = importOf(cu, "Future");
+                assertThat(TypeUtils.asFullyQualified(future.getQualid().getType()).getFullyQualifiedName()).isEqualTo("scala.concurrent.Future");
+                assertThat(future.getQualid().getName().getFieldType().getName()).isEqualTo("Future");
+                assertThat(future.getMarkers().findFirst(ImplicitImport.class)).isEmpty();
+
+                JavaType.Method max = (JavaType.Method) importOf(cu, "max").getQualid().getType();
+                assertThat(max.getDeclaringType().getFullyQualifiedName()).isEqualTo("scala.math.package");
+
+                assertThat(importOf(cu, "ActorSystem").getQualid().getType()).isInstanceOf(JavaType.Unknown.class);
+                assertThat(importOf(cu, "_").getQualid().getType()).isNull();
+
+                J.Import v = importOf(cu, "v");
+                JavaType.Variable vVariable = (JavaType.Variable) v.getQualid().getType();
+                assertThat(vVariable.getName()).isEqualTo("v");
+                assertThat(TypeUtils.asFullyQualified(vVariable.getOwner()).getFullyQualifiedName()).isEqualTo("Defaults");
+                assertThat(v.getQualid().getName().getType()).isEqualTo(JavaType.Primitive.Int);
+                assertThat(v.getQualid().getName().getFieldType()).isEqualTo(vVariable);
+                assertThat(v.getMarkers().findFirst(ImplicitImport.class)).isEmpty();
+
+                J.Import iv = importOf(cu, "iv");
+                assertThat(iv.getQualid().getType()).isInstanceOf(JavaType.Variable.class);
+                assertThat(iv.getMarkers().findFirst(ImplicitImport.class)).isPresent();
+
+                J.Import io = importOf(cu, "IO");
+                assertThat(TypeUtils.asFullyQualified(io.getQualid().getType()).getFullyQualifiedName()).isEqualTo("Defaults$.IO");
+                assertThat(io.getQualid().getName().getFieldType().getName()).isEqualTo("IO");
+                assertThat(io.getMarkers().findFirst(ImplicitImport.class)).isPresent();
+
+                S.ImportSelector helper = find(cu, S.ImportSelector.class, sel -> sel.getName() != null && sel.getName().getSimpleName().equals("helper"));
+                assertThat(((JavaType.Method) helper.getName().getType()).getName()).isEqualTo("helper");
+                assertThat(helper.getAlias().getType()).isEqualTo(helper.getName().getType());
+                assertThat(helper.getMarkers().findFirst(ImplicitImport.class)).isEmpty();
+                S.ImportSelector i2 = find(cu, S.ImportSelector.class, sel -> sel.getName() != null && sel.getName().getSimpleName().equals("iv"));
+                assertThat(i2.getName().getFieldType().getName()).isEqualTo("iv");
+                assertThat(i2.getMarkers().findFirst(ImplicitImport.class)).isPresent();
+            })
+          )
+        );
+    }
+
+    @Test
+    void implicitArgumentsPassedByTheCompilerAreMarked() {
+        rewriteRun(
+          scala(
+            """
+            import scala.concurrent.ExecutionContext
+            import scala.concurrent.ExecutionContext.Implicits.global
+            import scala.concurrent.Future
+
+            class Foo {
+              val f = Future { 1 }
+              val explicit = Future(2)(ExecutionContext.global)
+              val sorted = List((1, "a")).sorted
+              def g = for { a <- f } yield a
+            }
+            """,
+            spec -> spec.afterRecipe(cu -> {
+                ImplicitArguments future = application(cu, "Future").getMarkers().findFirst(ImplicitArguments.class).orElseThrow();
+                assertThat(future.getArguments()).singleElement().satisfies(arg -> {
+                    JavaType.Method global = (JavaType.Method) arg;
+                    assertThat(global.getName()).isEqualTo("global");
+                    assertThat(global.getDeclaringType().getFullyQualifiedName()).isEqualTo("scala.concurrent.ExecutionContext$.Implicits");
+                });
+
+                J.MethodInvocation explicit = find(cu, J.MethodInvocation.class, m -> m.getArguments().getFirst() instanceof J.Literal l && Integer.valueOf(2).equals(l.getValue()));
+                assertThat(explicit.getMarkers().findFirst(ImplicitArguments.class)).isEmpty();
+
+                J.FieldAccess sorted = find(cu, J.FieldAccess.class, fa -> fa.getSimpleName().equals("sorted"));
+                assertThat(sorted.getMarkers().findFirst(ImplicitArguments.class).orElseThrow().getArguments())
+                  .extracting(arg -> arg instanceof JavaType.Method m ? m.getName() : ((JavaType.Variable) arg).getName())
+                  .containsExactly("Tuple2", "Int", "String");
+
+                S.For forYield = find(cu, S.For.class, l -> true);
+                assertThat(forYield.getMarkers().findFirst(ImplicitArguments.class).orElseThrow().getArguments())
+                  .singleElement().extracting(arg -> ((JavaType.Method) arg).getName()).isEqualTo("global");
+            })
+          )
+        );
+    }
+
+    @Test
+    void importedGivenPassedToUsingClauseIsMarked() {
+        rewriteRun(
+          scala(
+            """
+            object Defaults {
+              given name: String = "x"
+            }
+
+            class Foo {
+              def greet(using s: String): String = s
+              def implied = {
+                import Defaults.name
+                greet
+              }
+            }
+            """,
+            spec -> spec.afterRecipe(cu -> {
+                J.Identifier greet = find(cu, J.Identifier.class, i -> i.getSimpleName().equals("greet") && i.getMarkers().findFirst(ImplicitArguments.class).isPresent());
+                assertThat(greet.getMarkers().findFirst(ImplicitArguments.class).orElseThrow().getArguments()).singleElement().satisfies(arg -> {
+                    JavaType.Variable name = (JavaType.Variable) arg;
+                    assertThat(name.getName()).isEqualTo("name");
+                    assertThat(TypeUtils.asFullyQualified(name.getOwner()).getFullyQualifiedName()).isEqualTo("Defaults");
+                });
+                assertThat(importOf(cu, "name").getMarkers().findFirst(ImplicitImport.class)).isPresent();
+            })
+          )
+        );
+    }
+
+    @Test
     void conversionGivenAsInstanceIsMarked() {
         rewriteRun(
           scala(
@@ -943,6 +1085,10 @@ class ScalaTypeAttributionTest implements RewriteTest {
         return m.getSelect() == null ?
           m.getSimpleName().equals(function) :
           m.getSimpleName().equals("apply") && m.getSelect() instanceof J.Identifier i && i.getSimpleName().equals(function);
+    }
+
+    private static J.Import importOf(J cu, String name) {
+        return find(cu, J.Import.class, i -> i.getQualid().getSimpleName().equals(name));
     }
 
     private static J.MethodInvocation method(J cu, String name) {

@@ -19,6 +19,7 @@ import dotty.tools.dotc.ast.{Trees, untpd, tpd}
 import dotty.tools.dotc.core.Constants.*
 import dotty.tools.dotc.core.Contexts.*
 import dotty.tools.dotc.core.Flags
+import dotty.tools.dotc.core.StdNames.nme
 import dotty.tools.dotc.util.Spans
 import org.openrewrite.Tree
 import org.openrewrite.java.tree.*
@@ -31,7 +32,9 @@ import org.openrewrite.scala.marker.DottedMatch
 import org.openrewrite.scala.marker.EtaExpansion
 import org.openrewrite.scala.marker.ExtraConstructorParamLists
 import org.openrewrite.scala.marker.Implicit
+import org.openrewrite.scala.marker.ImplicitArguments
 import org.openrewrite.scala.marker.ImplicitConversion
+import org.openrewrite.scala.marker.ImplicitImport
 import org.openrewrite.scala.marker.InfixTypeNotation
 import org.openrewrite.scala.marker.LambdaParameter
 import org.openrewrite.scala.marker.IndentedSyntax
@@ -113,6 +116,9 @@ class ScalaTreeVisitor(
     }
     ofNode(tree)(_.etaExpansionOf(_)).foreach { (method, functionType) =>
       markers = markers.computeByType(new EtaExpansion(Tree.randomId(), method, functionType), (_, m) => m)
+    }
+    ofNode(tree)(_.implicitArgumentsOf(_)).foreach { arguments =>
+      markers = markers.computeByType(new ImplicitArguments(Tree.randomId(), arguments), (_, m) => m)
     }
     if (markers eq j.getMarkers) j else j.withMarkers(markers)
   }
@@ -2420,7 +2426,7 @@ class ScalaTreeVisitor(
         new J.Import(
           Tree.randomId(),
           prefix,
-          Markers.EMPTY,
+          implicitImportMarkers(imp, Markers.EMPTY),
           JLeftPadded.build(false),
           qualid,
           null
@@ -2506,7 +2512,7 @@ class ScalaTreeVisitor(
     val markers = Markers.EMPTY.addIfAbsent(new CommaContinuation(Tree.randomId()))
 
     if (keyword == "import") {
-      new J.Import(Tree.randomId(), prefix, markers, JLeftPadded.build(false), qualid, null)
+      new J.Import(Tree.randomId(), prefix, implicitImportMarkers(tree, markers), JLeftPadded.build(false), qualid, null)
     } else {
       new S.Export(Tree.randomId(), prefix, markers, qualid)
     }
@@ -2533,9 +2539,9 @@ class ScalaTreeVisitor(
             if (cursor < source.length && source.charAt(cursor) == '.') cursor += 1
             val selName = wildcardOrName(is, sIdent, tree.span)
             val selQuoted = cursor < source.length && source.charAt(cursor) == '`'
-            val selectorType: JavaType = lookupSelectorType(tree.expr, selName)
+            val imported = importedBySelector(tree, is, selName)
             new J.FieldAccess(Tree.randomId(), Space.EMPTY, Markers.EMPTY,
-              id, JLeftPadded.build(ident(selName, Space.EMPTY, selectorType, quoted = selQuoted)), selectorType)
+              id, JLeftPadded.build(ident(selName, Space.EMPTY, imported.nameType, imported.variable, quoted = selQuoted)), imported.symbolType)
           case _ =>
             throw new IllegalStateException("Unexpected non-simple selector in continuation")
         }
@@ -2553,9 +2559,9 @@ class ScalaTreeVisitor(
           if (cursor < source.length && source.charAt(cursor) == '.') cursor += 1
           val selectorName = wildcardOrName(is, idTree, tree.span)
           val selectorQuoted = cursor < source.length && source.charAt(cursor) == '`'
-          val selectorType: JavaType = lookupSelectorType(tree.expr, selectorName)
+          val imported = importedBySelector(tree, is, selectorName)
           qualid = new J.FieldAccess(Tree.randomId(), Space.EMPTY, Markers.EMPTY,
-            qualid, JLeftPadded.build(ident(selectorName, Space.EMPTY, selectorType, quoted = selectorQuoted)), selectorType)
+            qualid, JLeftPadded.build(ident(selectorName, Space.EMPTY, imported.nameType, imported.variable, quoted = selectorQuoted)), imported.symbolType)
         case _ =>
       }
     }
@@ -2686,7 +2692,7 @@ class ScalaTreeVisitor(
       val p = indexOfNextNonWhitespace(selStart)
       val selPrefix = ScalaSpace.format(source.substring(selStart, p))
       cursor = p
-      val selectorNode = parseImportSelector(sel)
+      val selectorNode = parseImportSelector(tree, keyword, sel)
       selectorElems.add(new JRightPadded(selectorNode.withPrefix(selPrefix), Space.EMPTY, Markers.EMPTY))
       if (cursor < adjustedEnd) cursor = adjustedEnd
       val selectorContainerB: JContainer[S.ImportSelector] =
@@ -2720,7 +2726,7 @@ class ScalaTreeVisitor(
       val selPrefix = ScalaSpace.format(source.substring(selStart, p))
       cursor = p
 
-      val selectorNode = parseImportSelector(sel)
+      val selectorNode = parseImportSelector(tree, keyword, sel)
 
       val afterSel = cursor
       val q = indexOfNextNonWhitespace(afterSel)
@@ -2778,7 +2784,7 @@ class ScalaTreeVisitor(
    * The prefix space is set by the caller; this method produces a selector
    * with `Space.EMPTY` prefix.
    */
-  private def parseImportSelector(sel: untpd.ImportSelector): S.ImportSelector = {
+  private def parseImportSelector(tree: Trees.ImportOrExport[?], keyword: String, sel: untpd.ImportSelector): S.ImportSelector = {
     if (sel.isGiven) {
       val kw = "given"
       if (cursor + kw.length > source.length || !source.startsWith(kw, cursor)) {
@@ -2821,13 +2827,16 @@ class ScalaTreeVisitor(
       val nameStartAbs = Math.max(0, sel.imported.span.start - offsetAdjustment)
       val nameEndAbs = Math.max(0, sel.imported.span.end - offsetAdjustment)
       val displayName = source.substring(nameStartAbs, nameEndAbs)
-      val nameIdent = ident(displayName, Space.EMPTY, null)
+      val imported = ofNode(tree)(_.importedOf(_, sel.imported.name)).getOrElse(Imported(null, null, null, isImplicit = false))
+      val nameIdent = ident(displayName, Space.EMPTY, imported.nameType, imported.variable)
       cursor = nameEndAbs
+      val isImplicitImport = imported.isImplicit && keyword == "import"
+      val selectorMarkers = if (isImplicitImport) Markers.EMPTY.add(new ImplicitImport(Tree.randomId())) else Markers.EMPTY
 
       sel.renamed match {
         case untpd.EmptyTree =>
           S.ImportSelector.build(
-            Tree.randomId(), Space.EMPTY, Markers.EMPTY,
+            Tree.randomId(), Space.EMPTY, selectorMarkers,
             false, null, false, false, nameIdent, null, false
           )
         case renamed: Trees.Ident[?] =>
@@ -2848,9 +2857,14 @@ class ScalaTreeVisitor(
           val aliasPrefix = ScalaSpace.format(source.substring(cursor, renamedStartAbs))
           val aliasDisplay = source.substring(renamedStartAbs, renamedEndAbs)
           cursor = renamedEndAbs
-          val aliasIdent = ident(aliasDisplay, aliasPrefix, null)
+          val isHidden = renamed.name == nme.WILDCARD
+          val aliasIdent =
+            if (isHidden) ident(aliasDisplay, aliasPrefix, null)
+            else ident(aliasDisplay, aliasPrefix, imported.nameType, imported.variable)
+          val arrowMarkers = unicodeArrowMarkers(useUnicodeArrow)
           S.ImportSelector.build(
-            Tree.randomId(), Space.EMPTY, unicodeArrowMarkers(useUnicodeArrow),
+            Tree.randomId(), Space.EMPTY,
+            if (isImplicitImport && !isHidden) arrowMarkers.add(new ImplicitImport(Tree.randomId())) else arrowMarkers,
             false, null, false, false, nameIdent,
             new JLeftPadded(beforeArrow, aliasIdent, Markers.EMPTY),
             useAsKeyword
@@ -2922,6 +2936,24 @@ class ScalaTreeVisitor(
     }
     "_"
   }
+
+  /**
+   * What the single selector of a simple import or export imports. Without a typing of the
+   * import, a selector naming a class is still attributed by its fully qualified name.
+   */
+  private def importedBySelector(tree: Trees.ImportOrExport[?], is: untpd.ImportSelector, selectorName: String): Imported =
+    if (is.isWildcard) Imported(null, null, null, isImplicit = false)
+    else ofNode(tree)(_.importedOf(_, is.imported.name)).getOrElse {
+      val tpe = lookupSelectorType(tree.expr, selectorName)
+      Imported(tpe, tpe, null, isImplicit = false)
+    }
+
+  private def implicitImportMarkers(tree: Trees.ImportOrExport[?], markers: Markers): Markers =
+    tree.selectors match {
+      case List(is: untpd.ImportSelector) if !is.isWildcard && ofNode(tree)(_.importedOf(_, is.imported.name)).exists(_.isImplicit) =>
+        markers.add(new ImplicitImport(Tree.randomId()))
+      case _ => markers
+    }
 
   /**
    * Best-effort type lookup for a selector by FQN. Useful for imports
@@ -6591,14 +6623,6 @@ class ScalaTreeVisitor(
           if (closeParen >= 0) cursor = closeParen + 1
         }
 
-        // Build additional param lists as J.Lambda.Parameters for later wrapping
-        for (extraList <- valueParamLists.tail) {
-          val extraParams = extraList.collect { case vd: Trees.ValDef[?] => vd }
-          if (extraParams.nonEmpty) {
-            curriedParamLists.add(visitParamListAsLambdaParams(extraParams))
-          }
-        }
-
         JContainer.build(parenSpace, jParams, Markers.EMPTY)
       } else if (hasParensInSource) {
         buildEmptyParamList()
@@ -6613,6 +6637,13 @@ class ScalaTreeVisitor(
       // Parameterless method — mark so printer omits ()
       JContainer.build(Space.EMPTY, new util.ArrayList[JRightPadded[Statement]](),
         Markers.build(Collections.singletonList(new org.openrewrite.scala.marker.OmitBraces(Tree.randomId()))))
+    }
+
+    // Build additional param lists as J.Lambda.Parameters for later wrapping
+    if (valueParamLists.nonEmpty) {
+      for (extraList <- valueParamLists.tail) {
+        curriedParamLists.add(visitParamListAsLambdaParams(extraList.collect { case vd: Trees.ValDef[?] => vd }))
+      }
     }
 
     // Handle return type `: ReturnType` — only if explicitly written in source
