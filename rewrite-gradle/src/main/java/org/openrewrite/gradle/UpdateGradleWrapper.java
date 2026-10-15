@@ -43,6 +43,8 @@ import org.openrewrite.semver.VersionComparator;
 import org.openrewrite.text.PlainText;
 
 import java.net.URI;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.time.ZonedDateTime;
 import java.util.*;
 
@@ -160,6 +162,12 @@ public class UpdateGradleWrapper extends ScanningRecipe<UpdateGradleWrapper.Grad
         boolean gradleProject = false;
         boolean needsWrapperUpdate = false;
 
+        /**
+         * The directories that hold a `gradle/wrapper/gradle-wrapper.properties`, which are the only ones
+         * whose `gradlew`, `gradlew.bat` and wrapper jar are part of a wrapper.
+         */
+        Set<Path> wrapperDirectories = new HashSet<>();
+
         @Nullable
         BuildTool currentMarker;
 
@@ -201,6 +209,7 @@ public class UpdateGradleWrapper extends ScanningRecipe<UpdateGradleWrapper.Grad
                         } else if (!PathUtils.matchesGlob(sourceFile.getSourcePath(), "**/" + WRAPPER_PROPERTIES_LOCATION_RELATIVE_PATH)) {
                             return false;
                         }
+                        acc.wrapperDirectories.add(wrapperDirectory(sourceFile.getSourcePath(), 3));
 
                         acc.currentMarker = sourceFile.getMarkers().findFirst(BuildTool.class)
                                 .filter(buildTool -> buildTool.getType() == BuildTool.Type.Gradle)
@@ -341,6 +350,7 @@ public class UpdateGradleWrapper extends ScanningRecipe<UpdateGradleWrapper.Grad
                     .orElseThrow(() -> new IllegalArgumentException("Could not parse as properties"))
                     .withSourcePath(WRAPPER_PROPERTIES_LOCATION);
             gradleWrapperFiles.add(gradleWrapperProperties);
+            acc.wrapperDirectories.add(wrapperDirectory(WRAPPER_PROPERTIES_LOCATION, 3));
         }
 
         FileAttributes wrapperScriptAttributes = new FileAttributes(now, now, now, true, true, true, 1L);
@@ -405,7 +415,8 @@ public class UpdateGradleWrapper extends ScanningRecipe<UpdateGradleWrapper.Grad
                 }
 
                 GradleWrapper gradleWrapper = getGradleWrapper(acc.currentDistributionUrl, ctx);
-                if (sourceFile instanceof PlainText && PathUtils.matchesGlob(sourceFile.getSourcePath(), "**/" + WRAPPER_SCRIPT_LOCATION_RELATIVE_PATH)) {
+                if (sourceFile instanceof PlainText && PathUtils.matchesGlob(sourceFile.getSourcePath(), "**/" + WRAPPER_SCRIPT_LOCATION_RELATIVE_PATH) &&
+                    acc.wrapperDirectories.contains(wrapperDirectory(sourceFile.getSourcePath(), 1))) {
                     String gradlewText = unixScript(gradleWrapper, ctx);
                     PlainText gradlew = (PlainText) setExecutable(sourceFile);
                     if (!gradlewText.equals(gradlew.getText())) {
@@ -413,7 +424,8 @@ public class UpdateGradleWrapper extends ScanningRecipe<UpdateGradleWrapper.Grad
                     }
                     return gradlew;
                 }
-                if (sourceFile instanceof PlainText && PathUtils.matchesGlob(sourceFile.getSourcePath(), "**/" + WRAPPER_BATCH_LOCATION_RELATIVE_PATH)) {
+                if (sourceFile instanceof PlainText && PathUtils.matchesGlob(sourceFile.getSourcePath(), "**/" + WRAPPER_BATCH_LOCATION_RELATIVE_PATH) &&
+                    acc.wrapperDirectories.contains(wrapperDirectory(sourceFile.getSourcePath(), 1))) {
                     String gradlewBatText = batchScript(gradleWrapper, ctx);
                     PlainText gradlewBat = (PlainText) setExecutable(sourceFile);
                     if (!gradlewBatText.equals(gradlewBat.getText())) {
@@ -424,7 +436,8 @@ public class UpdateGradleWrapper extends ScanningRecipe<UpdateGradleWrapper.Grad
                 if (sourceFile instanceof Properties.File && PathUtils.matchesGlob(sourceFile.getSourcePath(), "**/" + WRAPPER_PROPERTIES_LOCATION_RELATIVE_PATH)) {
                     return new WrapperPropertiesVisitor(gradleWrapper, distributionChecksum(gradleWrapper)).visitNonNull(sourceFile, ctx);
                 }
-                if ((sourceFile instanceof Quark || sourceFile instanceof Remote) && PathUtils.matchesGlob(sourceFile.getSourcePath(), "**/" + WRAPPER_JAR_LOCATION_RELATIVE_PATH)) {
+                if ((sourceFile instanceof Quark || sourceFile instanceof Remote) && PathUtils.matchesGlob(sourceFile.getSourcePath(), "**/" + WRAPPER_JAR_LOCATION_RELATIVE_PATH) &&
+                    acc.wrapperDirectories.contains(wrapperDirectory(sourceFile.getSourcePath(), 3))) {
                     return gradleWrapper.wrapperJar(sourceFile);
                 }
                 if (sourceFile instanceof JavaSourceFile && IsBuildGradle.matches(sourceFile.getSourcePath())) {
@@ -436,6 +449,19 @@ public class UpdateGradleWrapper extends ScanningRecipe<UpdateGradleWrapper.Grad
                 return sourceFile;
             }
         };
+    }
+
+    /**
+     * The directory a wrapper file belongs to, the one that holds `gradlew` and `gradle/wrapper`.
+     *
+     * @param depth how many path elements the wrapper file is below that directory
+     */
+    private static Path wrapperDirectory(Path sourcePath, int depth) {
+        Path directory = sourcePath;
+        for (int i = 0; i < depth && directory != null; i++) {
+            directory = directory.getParent();
+        }
+        return directory == null ? Paths.get("") : directory;
     }
 
     private static <T extends SourceFile> T setExecutable(T sourceFile) {

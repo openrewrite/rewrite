@@ -1087,6 +1087,39 @@ class UpdateGradleWrapperTest implements RewriteTest {
     }
 
     @Test
+    void doNotUpdateWrapperScriptsWithoutWrapperProperties() {
+        rewriteRun(
+          spec -> spec.allSources(source -> source.markers(new BuildTool(Tree.randomId(), BuildTool.Type.Gradle, "7.4"))),
+          properties(
+            """
+              distributionBase=GRADLE_USER_HOME
+              distributionPath=wrapper/dists
+              distributionUrl=https\\://services.gradle.org/distributions/gradle-7.4-bin.zip
+              zipStoreBase=GRADLE_USER_HOME
+              zipStorePath=wrapper/dists
+              """,
+            """
+              distributionBase=GRADLE_USER_HOME
+              distributionPath=wrapper/dists
+              distributionUrl=https\\://services.gradle.org/distributions/gradle-7.4.2-bin.zip
+              zipStoreBase=GRADLE_USER_HOME
+              zipStorePath=wrapper/dists
+              distributionSha256Sum=29e49b10984e585d8118b7d0bc452f944e386458df27371b49b4ac1dec4b7fda
+              """,
+            spec -> spec.path("gradle/wrapper/gradle-wrapper.properties")
+          ),
+          gradlew,
+          gradlewBat,
+          gradleWrapperJarQuark,
+          // an included build with copies of the wrapper scripts, but no gradle/wrapper of its own
+          dir("included-build",
+            text("#!/bin/sh\necho stale\n", spec -> spec.path(WRAPPER_SCRIPT_LOCATION)),
+            text("@rem stale\r\n", spec -> spec.path(WRAPPER_BATCH_LOCATION))
+          )
+        );
+    }
+
+    @Test
     void failRecipeIfBothVersionAndDistributionUriAreProvided() {
         assertThat(new UpdateGradleWrapper("7.4.2", "bin", false, "https://company.com/repo/gradle-7.4.2-bin.zip", null).validate().isInvalid()).isTrue();
     }
