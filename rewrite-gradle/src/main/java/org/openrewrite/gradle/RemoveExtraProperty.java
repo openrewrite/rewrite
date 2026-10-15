@@ -27,7 +27,7 @@ import org.openrewrite.java.tree.Statement;
 @EqualsAndHashCode(callSuper = false)
 public class RemoveExtraProperty extends Recipe {
 
-    String displayName = "Remove Extra Property";
+    String displayName = "Remove Gradle extra property";
 
     String description = "Gradle's [ExtraPropertiesExtension](https://docs.gradle.org/current/dsl/org.gradle.api.plugins.ExtraPropertiesExtension.html) " +
             "is a commonly used mechanism for setting arbitrary key/value pairs on a project. " +
@@ -64,10 +64,13 @@ public class RemoveExtraProperty extends Recipe {
             }
 
             private boolean isEmptyExtBlock(J.MethodInvocation method) {
-                return "ext".equals(method.getSimpleName()) && method.getArguments().size() == 1 &&
-                       method.getArguments().get(0) instanceof J.Lambda &&
-                       ((J.Lambda) method.getArguments().get(0)).getBody() instanceof J.Block &&
-                       ((J.Block) ((J.Lambda) method.getArguments().get(0)).getBody()).getStatements().isEmpty();
+                if (!"ext".equals(method.getSimpleName()) || method.getArguments().size() != 1 ||
+                    !(method.getArguments().get(0) instanceof J.Lambda)) {
+                    return false;
+                }
+                J body = ((J.Lambda) method.getArguments().get(0)).getBody();
+                return body instanceof J.Block && ((J.Block) body).getStatements().isEmpty() &&
+                       ((J.Block) body).getEnd().getComments().isEmpty();
             }
         });
     }

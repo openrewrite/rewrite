@@ -32,25 +32,18 @@ import java.util.List;
 import java.util.Set;
 import java.util.UUID;
 
-/**
- * Removes the statements of a Gradle build script that a subclass marks with {@link #remove(Statement)} while
- * visiting them, once the block or script holding them has been visited. The comments about a removed statement
- * go with it, while those about what surrounds it stay.
- */
+/// Removes the statements of a Gradle build script that a subclass marks with [#remove(Statement)] while
+/// visiting them, once the block or script holding them has been visited. The comments about a removed statement
+/// go with it, while those about what surrounds it stay.
 public abstract class RemoveStatementsVisitor<P> extends JavaIsoVisitor<P> {
     private final Set<UUID> removed = new HashSet<>();
 
-    /**
-     * Mark a statement for removal from the block or script holding it.
-     */
     protected void remove(Statement statement) {
         removed.add(statement.getId());
     }
 
-    /**
-     * Whether a statement is marked for removal, the last statement of a closure being its implicit return.
-     */
-    protected boolean isRemoved(Statement statement) {
+    // The last statement of a closure is its implicit return
+    private boolean isRemoved(Statement statement) {
         Tree tree = statement instanceof J.Return && ((J.Return) statement).getExpression() != null ?
                 ((J.Return) statement).getExpression() : statement;
         return removed.contains(tree.getId());
@@ -58,6 +51,9 @@ public abstract class RemoveStatementsVisitor<P> extends JavaIsoVisitor<P> {
 
     @Override
     public @Nullable J postVisit(J tree, P p) {
+        if (removed.isEmpty()) {
+            return tree;
+        }
         if (tree instanceof J.Block) {
             J.Block block = (J.Block) tree;
             List<Statement> statements = block.getStatements();
@@ -87,11 +83,9 @@ public abstract class RemoveStatementsVisitor<P> extends JavaIsoVisitor<P> {
                 statement.withPrefix(afterRemoved(statements, i, statement.getPrefix(), script)));
     }
 
-    /**
-     * The space of what follows the statement before {@code index}. After a run of removed statements it
-     * loses the comment on the line of the last one, and takes what the first one's prefix holds that is
-     * not about the statement: the comment on the line before it, and the comments a blank line sets apart.
-     */
+    /// The space of what follows the statement before `index`. After a run of removed statements it
+    /// loses the comment on the line of the last one, and takes what the first one's prefix holds that is
+    /// not about the statement: the comment on the line before it, and the comments a blank line sets apart.
     private Space afterRemoved(List<Statement> statements, int index, Space space, boolean script) {
         int first = index;
         while (first > 0 && isRemoved(statements.get(first - 1))) {

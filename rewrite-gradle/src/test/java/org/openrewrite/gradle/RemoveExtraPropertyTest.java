@@ -138,6 +138,25 @@ class RemoveExtraPropertyTest implements RewriteTest {
     }
 
     @Test
+    void keepsExtBlockLeftHoldingOnlyComments() {
+        rewriteRun(
+          buildGradle(
+            """
+              ext {
+                  foo = "bar"
+                  // baz = "qux"
+              }
+              """,
+            """
+              ext {
+                  // baz = "qux"
+              }
+              """
+          )
+        );
+    }
+
+    @Test
     void propertyAssignment() {
         rewriteRun(
           buildGradle(
