@@ -373,6 +373,35 @@ class ExcludeDependencyTest implements RewriteTest {
     }
 
     @Test
+    void noOpInSubprojectsAndAllprojects() {
+        rewriteRun(
+          buildGradle(
+            """
+              plugins {
+                  id 'java-library'
+              }
+
+              repositories {
+                  mavenCentral()
+              }
+
+              subprojects {
+                  dependencies {
+                      implementation 'org.apache.httpcomponents:httpclient:4.5.13'
+                  }
+              }
+
+              allprojects {
+                  dependencies {
+                      implementation 'org.apache.httpcomponents:httpclient:4.5.13'
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
     void mapNotationDeclarationGroovy() {
         rewriteRun(
           buildGradle(
@@ -400,6 +429,154 @@ class ExcludeDependencyTest implements RewriteTest {
 
               dependencies {
                   implementation(group: 'org.apache.httpcomponents', name: 'httpclient', version: '4.5.13') {
+                      exclude group: 'commons-logging', module: 'commons-logging'
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void matchesTwoSpaceIndentation() {
+        rewriteRun(
+          buildGradle(
+            """
+              plugins {
+                id 'java-library'
+              }
+
+              repositories {
+                mavenCentral()
+              }
+
+              dependencies {
+                implementation 'org.apache.httpcomponents:httpclient:4.5.13'
+              }
+              """,
+            """
+              plugins {
+                id 'java-library'
+              }
+
+              repositories {
+                mavenCentral()
+              }
+
+              dependencies {
+                implementation('org.apache.httpcomponents:httpclient:4.5.13') {
+                  exclude group: 'commons-logging', module: 'commons-logging'
+                }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void matchesTabIndentation() {
+        rewriteRun(
+          buildGradle(
+            """
+              plugins {
+              \tid 'java-library'
+              }
+
+              repositories {
+              \tmavenCentral()
+              }
+
+              dependencies {
+              \timplementation 'org.apache.httpcomponents:httpclient:4.5.13'
+              }
+              """,
+            """
+              plugins {
+              \tid 'java-library'
+              }
+
+              repositories {
+              \tmavenCentral()
+              }
+
+              dependencies {
+              \timplementation('org.apache.httpcomponents:httpclient:4.5.13') {
+              \t\texclude group: 'commons-logging', module: 'commons-logging'
+              \t}
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void matchesIndentationOfNestedDependenciesBlock() {
+        rewriteRun(
+          buildGradle(
+            """
+              plugins {
+                  id 'java-library'
+              }
+
+              repositories {
+                  mavenCentral()
+              }
+
+              if (true) {
+                  dependencies {
+                      implementation 'org.apache.httpcomponents:httpclient:4.5.13'
+                  }
+              }
+              """,
+            """
+              plugins {
+                  id 'java-library'
+              }
+
+              repositories {
+                  mavenCentral()
+              }
+
+              if (true) {
+                  dependencies {
+                      implementation('org.apache.httpcomponents:httpclient:4.5.13') {
+                          exclude group: 'commons-logging', module: 'commons-logging'
+                      }
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void fillsEmptyExistingClosure() {
+        rewriteRun(
+          buildGradle(
+            """
+              plugins {
+                  id 'java-library'
+              }
+
+              repositories {
+                  mavenCentral()
+              }
+
+              dependencies {
+                  implementation('org.apache.httpcomponents:httpclient:4.5.13') {}
+              }
+              """,
+            """
+              plugins {
+                  id 'java-library'
+              }
+
+              repositories {
+                  mavenCentral()
+              }
+
+              dependencies {
+                  implementation('org.apache.httpcomponents:httpclient:4.5.13') {
                       exclude group: 'commons-logging', module: 'commons-logging'
                   }
               }
@@ -448,6 +625,42 @@ class ExcludeDependencyTest implements RewriteTest {
                   .contains("org.apache.httpcomponents:httpcore", "commons-codec:commons-codec");
                 assertThat(resolved(cu, "runtimeClasspath")).doesNotContain("commons-logging:commons-logging");
             })
+          )
+        );
+    }
+
+    @Test
+    void kotlinDslMatchesTwoSpaceIndentation() {
+        rewriteRun(
+          buildGradleKts(
+            """
+              plugins {
+                `java-library`
+              }
+
+              repositories {
+                mavenCentral()
+              }
+
+              dependencies {
+                implementation("org.apache.httpcomponents:httpclient:4.5.13")
+              }
+              """,
+            """
+              plugins {
+                `java-library`
+              }
+
+              repositories {
+                mavenCentral()
+              }
+
+              dependencies {
+                implementation("org.apache.httpcomponents:httpclient:4.5.13") {
+                  exclude(group = "commons-logging", module = "commons-logging")
+                }
+              }
+              """
           )
         );
     }
@@ -667,6 +880,14 @@ class ExcludeDependencyTest implements RewriteTest {
         assertThat(new ExcludeDependency("commons-logging", "commons-*", null).validate().isValid()).isFalse();
         assertThat(new ExcludeDependency("*", "commons-logging", null).validate().isValid()).isTrue();
         assertThat(new ExcludeDependency("commons-logging", "*", null).validate().isValid()).isTrue();
+    }
+
+    @Test
+    void validationFailsOnCharactersOutsideCoordinateSyntax() {
+        assertThat(new ExcludeDependency("commons-logging'", "commons-logging", null).validate().isValid()).isFalse();
+        assertThat(new ExcludeDependency("commons-logging", "commons\"logging", null).validate().isValid()).isFalse();
+        assertThat(new ExcludeDependency("${group}", "commons-logging", null).validate().isValid()).isFalse();
+        assertThat(new ExcludeDependency("org.apache_commons-1", "commons.logging", null).validate().isValid()).isTrue();
     }
 
     @Test

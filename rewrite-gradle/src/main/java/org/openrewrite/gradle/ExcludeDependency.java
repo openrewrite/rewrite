@@ -24,6 +24,7 @@ import org.openrewrite.Option;
 import org.openrewrite.Parser;
 import org.openrewrite.Preconditions;
 import org.openrewrite.Recipe;
+import org.openrewrite.SourceFile;
 import org.openrewrite.Tree;
 import org.openrewrite.TreeVisitor;
 import org.openrewrite.Validated;
@@ -48,6 +49,7 @@ import org.openrewrite.tree.ParseError;
 
 import java.nio.file.Paths;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashSet;
@@ -56,14 +58,20 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
+import java.util.regex.Pattern;
 
 import static java.util.Collections.emptyList;
 import static java.util.Collections.emptySet;
+import static java.util.Collections.singleton;
 import static java.util.Collections.singletonList;
 
 @Value
 @EqualsAndHashCode(callSuper = false)
 public class ExcludeDependency extends Recipe {
+
+    private static final String STUB_CACHE_KEY = ExcludeDependency.class.getName() + ".stubCache";
+    private static final Set<String> SKIPPED_BLOCKS = new HashSet<>(Arrays.asList("buildscript", "subprojects", "allprojects"));
+    private static final Pattern COORDINATE = Pattern.compile("[A-Za-z0-9_.\\-]+");
 
     @Option(displayName = "Group",
             description = "The first part of a dependency coordinate `com.google.guava:guava:VERSION`. " +
@@ -115,14 +123,14 @@ public class ExcludeDependency extends Recipe {
                 "At least one of `groupId` or `artifactId` must be provided (and not `*`)",
                 this,
                 r -> effective(r.groupId) != null || effective(r.artifactId) != null))
-                .and(Validated.test("groupId", "Partial wildcards are not supported; use an exact group or `*`",
+                .and(Validated.test("groupId", "Must be an exact group (letters, digits, `.`, `-`, `_`) or `*`; partial wildcards are not supported",
                         groupId, ExcludeDependency::isExactOrBareWildcard))
-                .and(Validated.test("artifactId", "Partial wildcards are not supported; use an exact artifact or `*`",
+                .and(Validated.test("artifactId", "Must be an exact artifact (letters, digits, `.`, `-`, `_`) or `*`; partial wildcards are not supported",
                         artifactId, ExcludeDependency::isExactOrBareWildcard));
     }
 
     private static boolean isExactOrBareWildcard(@Nullable String v) {
-        return v == null || "*".equals(v) || !v.contains("*");
+        return v == null || effective(v) == null || COORDINATE.matcher(v).matches();
     }
 
     private static @Nullable String effective(@Nullable String v) {
@@ -163,8 +171,8 @@ public class ExcludeDependency extends Recipe {
                 .asVisitor((dep, ctx) -> {
                     J.MethodInvocation m = dep.getTree();
 
-                    // Skip classpath dependencies inside buildscript { }
-                    if (insideBuildscript(dep.getCursor())) {
+                    // buildscript { } is the plugin classpath; subprojects/allprojects { } target other projects' models
+                    if (insideSkippedBlock(dep.getCursor())) {
                         return m;
                     }
 
@@ -197,7 +205,7 @@ public class ExcludeDependency extends Recipe {
                             dep.getConfigurationName(),
                             declared,
                             ListUtils.concat(existingExclusions(m, kotlinDsl), toGroupArtifact(effG, effA))));
-                    return attachExclude(m, kotlinDsl, effG, effA, ctx);
+                    return attachExclude(m, dep.getCursor(), kotlinDsl, effG, effA, ctx);
                 });
     }
 
@@ -270,16 +278,20 @@ public class ExcludeDependency extends Recipe {
         return false;
     }
 
-    private static boolean insideBuildscript(Cursor cursor) {
+    private static boolean insideSkippedBlock(Cursor cursor) {
+        return enclosingInvocation(cursor, SKIPPED_BLOCKS) != null;
+    }
+
+    private static @Nullable Cursor enclosingInvocation(Cursor cursor, Set<String> names) {
         Cursor c = cursor.getParent();
         while (c != null) {
             Object v = c.getValue();
-            if (v instanceof J.MethodInvocation && "buildscript".equals(((J.MethodInvocation) v).getSimpleName())) {
-                return true;
+            if (v instanceof J.MethodInvocation && names.contains(((J.MethodInvocation) v).getSimpleName())) {
+                return c;
             }
             c = c.getParent();
         }
-        return false;
+        return null;
     }
 
     private boolean alreadyExcludedBy(J.MethodInvocation m, boolean kotlinDsl,
@@ -362,21 +374,31 @@ public class ExcludeDependency extends Recipe {
         return null;
     }
 
-    private J.MethodInvocation attachExclude(J.MethodInvocation m, boolean kotlinDsl,
+    private J.MethodInvocation attachExclude(J.MethodInvocation m, Cursor cursor, boolean kotlinDsl,
                                              @Nullable String effG, @Nullable String effA, ExecutionContext ctx) {
+        String declIndent = indentOf(cursor);
+        String bodyIndent = declIndent + indentStep(cursor, declIndent);
         J.Lambda existingLambda = trailingLambda(m);
         if (existingLambda != null && existingLambda.getBody() instanceof J.Block) {
             Statement excludeStmt = parseExcludeStatement(kotlinDsl, effG, effA, ctx);
             J.Block body = (J.Block) existingLambda.getBody();
-            Space indentPrefix = body.getStatements().isEmpty() ?
-                    Space.format("\n    ") :
-                    body.getStatements().get(body.getStatements().size() - 1).getPrefix();
+            Space indentPrefix;
+            if (body.getStatements().isEmpty()) {
+                body = body.withEnd(Space.format("\n" + declIndent));
+                indentPrefix = Space.format("\n" + bodyIndent);
+            } else {
+                indentPrefix = body.getStatements().get(body.getStatements().size() - 1).getPrefix();
+            }
             Statement withPrefix = excludeStmt.withPrefix(indentPrefix);
             J.Block newBody = body.withStatements(ListUtils.concat(body.getStatements(), withPrefix));
             J.Lambda newLambda = existingLambda.withBody(newBody);
             return m.withArguments(ListUtils.map(m.getArguments(), a -> a == existingLambda ? newLambda : a));
         }
         J.Lambda freshLambda = parseFreshLambda(kotlinDsl, effG, effA, ctx);
+        J.Block freshBody = (J.Block) freshLambda.getBody();
+        freshLambda = freshLambda.withBody(freshBody
+                .withStatements(ListUtils.map(freshBody.getStatements(), st -> st.withPrefix(Space.format("\n" + bodyIndent))))
+                .withEnd(Space.format("\n" + declIndent)));
         List<Expression> args = m.getArguments();
         if (!kotlinDsl) {
             // Reinstate parens on Groovy's parens-less invocation form (strip OmitParentheses + leading
@@ -389,6 +411,27 @@ public class ExcludeDependency extends Recipe {
             });
         }
         return m.withArguments(ListUtils.concat(args, freshLambda));
+    }
+
+    // An implicit return around the last statement of a closure holds that statement's prefix.
+    private static String indentOf(Cursor cursor) {
+        J j = cursor.getValue();
+        Space prefix = j.getPrefix();
+        Object parent = cursor.getParentTreeCursor().getValue();
+        if (parent instanceof J.Return && ((J.Return) parent).getExpression() == j) {
+            prefix = ((J.Return) parent).getPrefix();
+        }
+        return prefix.getLastWhitespace().contains("\n") ? prefix.getIndent() : "";
+    }
+
+    // One indent step, measured as the declaration's indent beyond its enclosing dependencies block.
+    private static String indentStep(Cursor cursor, String declIndent) {
+        Cursor deps = enclosingInvocation(cursor, singleton("dependencies"));
+        String depsIndent = deps == null ? "" : indentOf(deps);
+        if (declIndent.length() > depsIndent.length() && declIndent.startsWith(depsIndent)) {
+            return declIndent.substring(depsIndent.length());
+        }
+        return "    ";
     }
 
     private static Statement unwrapReturn(Statement s) {
@@ -438,53 +481,34 @@ public class ExcludeDependency extends Recipe {
     }
 
     private J.Lambda parseStubLambda(boolean kotlinDsl, @Nullable String effG, @Nullable String effA, ExecutionContext ctx) {
-        if (kotlinDsl) {
-            String snippet =
-                    "dependencies {\n" +
-                            "    implementation(\"x:x:1\") {\n" +
-                            "        " + kotlinExcludeSyntax(effG, effA) + "\n" +
-                            "    }\n" +
-                            "}";
-            J.MethodInvocation deps = (J.MethodInvocation) ((J.Block) parseKotlin(snippet, ctx).getStatements().get(0)).getStatements().get(0);
+        String snippet =
+                "dependencies {\n" +
+                        "    " + (kotlinDsl ? "implementation(\"x:x:1\")" : "implementation('x:x:1')") + " {\n" +
+                        "        " + (kotlinDsl ? kotlinExcludeSyntax(effG, effA) : groovyExcludeSyntax(effG, effA)) + "\n" +
+                        "    }\n" +
+                        "}";
+        // GradleParser is slow, and the snippet only varies with the DSL, so parse it once per run.
+        Map<String, J.Lambda> cache = ctx.computeMessageIfAbsent(STUB_CACHE_KEY, k -> new HashMap<>());
+        return cache.computeIfAbsent(snippet, s -> {
+            J.MethodInvocation deps = (J.MethodInvocation) parseAsGradle(s, kotlinDsl, ctx).get(0);
             J.Lambda depsLambda = (J.Lambda) deps.getArguments().get(deps.getArguments().size() - 1);
             J.MethodInvocation stub = (J.MethodInvocation) unwrapReturn(((J.Block) depsLambda.getBody()).getStatements().get(0));
             return (J.Lambda) stub.getArguments().get(stub.getArguments().size() - 1);
+        });
+    }
+
+    private static List<Statement> parseAsGradle(String snippet, boolean kotlinDsl, ExecutionContext ctx) {
+        SourceFile cu = GradleParser.builder().build()
+                .parseInputs(singletonList(Parser.Input.fromString(Paths.get(kotlinDsl ? "build.gradle.kts" : "build.gradle"), snippet)), null, ctx)
+                .findFirst()
+                .orElseThrow(() -> new IllegalStateException("Could not parse Gradle snippet"));
+        if (cu instanceof ParseError) {
+            throw ((ParseError) cu).toException();
         }
-        String snippet =
-                "dependencies {\n" +
-                        "    implementation('x:x:1') {\n" +
-                        "        " + groovyExcludeSyntax(effG, effA) + "\n" +
-                        "    }\n" +
-                        "}";
-        J.MethodInvocation deps = (J.MethodInvocation) parseGroovy(snippet, ctx).getStatements().get(0);
-        J.Lambda depsLambda = (J.Lambda) deps.getArguments().get(deps.getArguments().size() - 1);
-        J.MethodInvocation stub = (J.MethodInvocation) unwrapReturn(((J.Block) depsLambda.getBody()).getStatements().get(0));
-        return (J.Lambda) stub.getArguments().get(stub.getArguments().size() - 1);
-    }
-
-    private static G.CompilationUnit parseGroovy(String snippet, ExecutionContext ctx) {
-        return (G.CompilationUnit) GradleParser.builder().build()
-                .parseInputs(singletonList(Parser.Input.fromString(Paths.get("build.gradle"), snippet)), null, ctx)
-                .map(p -> {
-                    if (p instanceof ParseError) {
-                        throw ((ParseError) p).toException();
-                    }
-                    return (Tree) p;
-                })
-                .findFirst()
-                .orElseThrow(() -> new IllegalStateException("Could not parse Groovy snippet"));
-    }
-
-    private static K.CompilationUnit parseKotlin(String snippet, ExecutionContext ctx) {
-        return (K.CompilationUnit) GradleParser.builder().build()
-                .parseInputs(singletonList(Parser.Input.fromString(Paths.get("build.gradle.kts"), snippet)), null, ctx)
-                .map(p -> {
-                    if (p instanceof ParseError) {
-                        throw ((ParseError) p).toException();
-                    }
-                    return (Tree) p;
-                })
-                .findFirst()
-                .orElseThrow(() -> new IllegalStateException("Could not parse Kotlin DSL snippet"));
+        if (cu instanceof K.CompilationUnit) {
+            // Kotlin scripts wrap their top-level statements in a block
+            return ((J.Block) ((K.CompilationUnit) cu).getStatements().get(0)).getStatements();
+        }
+        return ((G.CompilationUnit) cu).getStatements();
     }
 }
