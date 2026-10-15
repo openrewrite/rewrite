@@ -102,6 +102,26 @@ public class YamlParser implements org.openrewrite.Parser {
                 });
     }
 
+    private static boolean isInsideQuotedScalar(String source, int index) {
+        int lineStart = Math.max(source.lastIndexOf('\n', index - 1), source.lastIndexOf('\r', index - 1)) + 1;
+        char quote = 0;
+        for (int i = lineStart; i < index; i++) {
+            char c = source.charAt(i);
+            if (quote == 0) {
+                char prev = i == lineStart ? ' ' : source.charAt(i - 1);
+                if ((c == '"' || c == '\'') &&
+                    (Character.isWhitespace(prev) || prev == '[' || prev == '{' || prev == ',')) {
+                    quote = c;
+                }
+            } else if (quote == '"' && c == '\\') {
+                i++;
+            } else if (c == quote) {
+                quote = 0;
+            }
+        }
+        return quote != 0;
+    }
+
     /**
      * A brace group carrying an anchor or alias and standing alone as a value or element is flow
      * syntax rather than a placeholder. SnakeYAML has to see it, or the anchor never registers and
@@ -177,6 +197,11 @@ public class YamlParser implements org.openrewrite.Parser {
         Matcher asteriskMatcher = ASTERISK_PLACEHOLDER_PATTERN.matcher(processedSource);
         pos = 0;
         while (pos < processedSource.length() && asteriskMatcher.find(pos)) {
+            if (isInsideQuotedScalar(processedSource, asteriskMatcher.start())) {
+                yamlSourceWithPlaceholders.append(processedSource, pos, asteriskMatcher.end());
+                pos = asteriskMatcher.end();
+                continue;
+            }
             yamlSourceWithPlaceholders.append(processedSource, pos, asteriskMatcher.start(1));
             String uuid = UUID.randomUUID().toString();
             variableByUuid.put(uuid, asteriskMatcher.group(1));
