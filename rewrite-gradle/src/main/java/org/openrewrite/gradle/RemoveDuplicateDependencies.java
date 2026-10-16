@@ -32,6 +32,8 @@ import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.Space;
 import org.openrewrite.java.tree.Statement;
 import org.openrewrite.marker.Markers;
+import org.openrewrite.maven.tree.Dependency;
+import org.openrewrite.maven.tree.DependencyNotation;
 
 import java.time.Duration;
 import java.util.*;
@@ -48,7 +50,8 @@ public class RemoveDuplicateDependencies extends Recipe {
     String description = "Removes duplicated dependency declarations from the `dependencies` block of `build.gradle` " +
             "and `build.gradle.kts` files. A declaration is only considered a duplicate when an earlier declaration " +
             "in the same `dependencies` block uses the same configuration and the same coordinates, including " +
-            "version, classifier and extension. Declarations that differ only by version are left untouched.";
+            "version, classifier and extension, whether those are written as a single string or as separate " +
+            "arguments. Declarations that differ only by version are left untouched.";
 
     Duration estimatedEffortPerOccurrence = Duration.ofMinutes(2);
 
@@ -177,6 +180,13 @@ public class RemoveDuplicateDependencies extends Recipe {
         if (arguments.size() == 1 && arguments.get(0) instanceof G.MapLiteral) {
             // `implementation([group: 'g', name: 'a'])` is equivalent to `implementation group: 'g', name: 'a'`
             arguments = new ArrayList<>(((G.MapLiteral) arguments.get(0)).getElements());
+        } else if (arguments.size() == 1 && arguments.get(0) instanceof J.Literal &&
+                ((J.Literal) arguments.get(0)).getValue() instanceof String) {
+            String notation = (String) ((J.Literal) arguments.get(0)).getValue();
+            Dependency dependency = DependencyNotation.parse(notation);
+            if (dependency != null && DependencyNotation.toStringNotation(dependency).equals(notation)) {
+                return asNamedArguments(dependency);
+            }
         }
         List<String> parts = new ArrayList<>(arguments.size());
         boolean named = true;
@@ -190,6 +200,23 @@ public class RemoveDuplicateDependencies extends Recipe {
             Collections.sort(parts);
         }
         return parts.stream().collect(joining(",", "(", ")"));
+    }
+
+    /**
+     * The same representation as the named arguments `group: 'g', name: 'a', version: 'v'` produce, so that
+     * `'g:a:v'` compares as equal to them.
+     */
+    private static String asNamedArguments(Dependency dependency) {
+        Map<String, @Nullable String> components = new TreeMap<>();
+        components.put("classifier", dependency.getClassifier());
+        components.put("ext", dependency.getType());
+        components.put("group", dependency.getGroupId());
+        components.put("name", dependency.getArtifactId());
+        components.put("version", dependency.getVersion());
+        return components.entrySet().stream()
+                .filter(component -> component.getValue() != null)
+                .map(component -> "'" + component.getKey() + "':'" + component.getValue() + "'")
+                .collect(joining(",", "(", ")"));
     }
 
     private static String canonical(Expression expression, Cursor cursor) {
