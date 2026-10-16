@@ -22,6 +22,11 @@ import org.openrewrite.yaml.tree.Yaml;
 import java.util.List;
 import java.util.UUID;
 
+/**
+ * Keeps a trailing inline comment attached to its original entry after entries move.
+ * YAML stores this comment on {@code Document.End}; when another entry follows its owner,
+ * the comment belongs in that entry's prefix.
+ */
 final class YamlDocumentEndCommentRelocator {
     private YamlDocumentEndCommentRelocator() {
     }
@@ -86,6 +91,7 @@ final class YamlDocumentEndCommentRelocator {
                 return super.visitMappingEntry(entry.withPrefix(prefixWithComment(entry.getPrefix())), p);
             }
             Yaml.Mapping.Entry visited = super.visitMappingEntry(entry, p);
+            // Visit children first so they are not mistaken for entries following the owner.
             if (ownerId.equals(entry.getId())) {
                 ownerFound = true;
             }
@@ -99,6 +105,7 @@ final class YamlDocumentEndCommentRelocator {
                 return super.visitSequenceEntry(entry.withPrefix(prefixWithComment(entry.getPrefix())), p);
             }
             Yaml.Sequence.Entry visited = super.visitSequenceEntry(entry, p);
+            // Visit children first so they are not mistaken for entries following the owner.
             if (ownerId.equals(entry.getId())) {
                 ownerFound = true;
             }
@@ -106,8 +113,11 @@ final class YamlDocumentEndCommentRelocator {
         }
 
         private String prefixWithComment(String prefix) {
-            return sameInlineComment(prefix, comment) ? prefix :
-                    comment + (StringUtils.hasLineBreak(prefix) ? "" : linebreak) + prefix;
+            if (sameInlineComment(prefix, comment)) {
+                return prefix;
+            }
+            String separator = StringUtils.hasLineBreak(prefix) ? "" : linebreak;
+            return comment + separator + prefix;
         }
     }
 
@@ -128,13 +138,24 @@ final class YamlDocumentEndCommentRelocator {
     }
 
     private static String linebreak(String text) {
-        return text.contains("\r\n") ? "\r\n" : text.indexOf('\r') >= 0 ? "\r" : "\n";
+        if (text.contains("\r\n")) {
+            return "\r\n";
+        }
+        if (text.indexOf('\r') >= 0) {
+            return "\r";
+        }
+        return "\n";
     }
 
     private static int firstLineBreak(String text) {
         int linefeed = text.indexOf('\n');
         int carriageReturn = text.indexOf('\r');
-        return linefeed == -1 ? carriageReturn :
-                carriageReturn == -1 ? linefeed : Math.min(linefeed, carriageReturn);
+        if (linefeed == -1) {
+            return carriageReturn;
+        }
+        if (carriageReturn == -1) {
+            return linefeed;
+        }
+        return Math.min(linefeed, carriageReturn);
     }
 }

@@ -215,27 +215,6 @@ public class ChangePropertyKey extends Recipe {
         }
     }
 
-    private boolean hasExcludedValues(Yaml.Mapping.Entry propertyEntry) {
-        if (propertyEntry.getValue() instanceof Yaml.Mapping) {
-            for (Yaml.Mapping.Entry entry : ((Yaml.Mapping) propertyEntry.getValue()).getEntries()) {
-                if (anyMatch(entry, excludedSubKeys())) {
-                    return true;
-                }
-            }
-        }
-        return false;
-    }
-
-    private boolean anyMatch(Yaml.Mapping.Entry entry, List<String> subKeys) {
-        for (String subKey : subKeys) {
-            if (entry.getKey().getValue().equals(subKey) ||
-                    entry.getKey().getValue().startsWith(subKey + ".")) {
-                return true;
-            }
-        }
-        return false;
-    }
-
     private static boolean noneMatch(Yaml.Mapping.Entry entry, List<String> subKeys) {
         for (String subKey : subKeys) {
             if (entry.getKey().getValue().equals(subKey) ||
@@ -265,10 +244,9 @@ public class ChangePropertyKey extends Recipe {
 
         @Override
         public Yaml.Document visitDocument(Yaml.Document document, P p) {
-            Yaml.Document before = document;
             changed = false;
-            Yaml.Document visited = super.visitDocument(document, p);
-            return changed ? YamlDocumentEndCommentRelocator.relocate(before, visited) : visited;
+            Yaml.Document d = super.visitDocument(document, p);
+            return changed ? YamlDocumentEndCommentRelocator.relocate(document, d) : d;
         }
 
         @Override
@@ -284,6 +262,7 @@ public class ChangePropertyKey extends Recipe {
                 }
                 // A shared scope can survive while intermediate ancestors of the moved property
                 // disappear. Preserve comments from exactly the entries that disappear.
+                StringBuilder newEntryPrefixBuilder = new StringBuilder(newEntryPrefix);
                 List<Yaml.Mapping.Entry> path = new ArrayList<>();
                 if (!hasExcludedValues(entryToReplace) && pathToEntry(scope, path)) {
                     boolean[] removed = new boolean[path.size()];
@@ -291,9 +270,13 @@ public class ChangePropertyKey extends Recipe {
                     for (int i = path.size() - 2; i >= 0; i--) {
                         removed[i] = removed[i + 1] && ((Yaml.Mapping) path.get(i).getValue()).getEntries().size() == 1;
                     }
-                    if (!removed[0] && newEntryPrefix.contains("#")) {
-                        int lastBreak = newEntryPrefix.lastIndexOf('\n');
-                        newEntryPrefix = lastBreak < 0 ? "" : newEntryPrefix.substring(lastBreak);
+                    if (!removed[0] && newEntryPrefixBuilder.indexOf("#") >= 0) {
+                        int lastBreak = newEntryPrefixBuilder.lastIndexOf("\n");
+                        if (lastBreak < 0) {
+                            newEntryPrefixBuilder.setLength(0);
+                        } else {
+                            newEntryPrefixBuilder.delete(0, lastBreak);
+                        }
                     }
                     for (int i = 1; i < path.size(); i++) {
                         if (!removed[i]) {
@@ -306,15 +289,15 @@ public class ChangePropertyKey extends Recipe {
                             prefix = breakAt < 0 ? "" : prefix.substring(breakAt);
                         }
                         if (prefix.contains("#")) {
-                            if (!newEntryPrefix.contains("\n")) {
-                                newEntryPrefix += "\n";
+                            if (newEntryPrefixBuilder.indexOf("\n") < 0) {
+                                newEntryPrefixBuilder.append('\n');
                             }
-                            newEntryPrefix += prefix.trim() + "\n";
+                            newEntryPrefixBuilder.append(prefix.trim()).append('\n');
                         }
                     }
                 }
                 Yaml.Mapping.Entry newEntry = new Yaml.Mapping.Entry(randomId(),
-                        newEntryPrefix,
+                        newEntryPrefixBuilder.toString(),
                         Markers.EMPTY,
                         new Yaml.Scalar(randomId(), "", Markers.EMPTY,
                                 Yaml.Scalar.Style.PLAIN, null, null, subproperty),
@@ -363,6 +346,27 @@ public class ChangePropertyKey extends Recipe {
             }
 
             return m;
+        }
+
+        private boolean hasExcludedValues(Yaml.Mapping.Entry propertyEntry) {
+            if (propertyEntry.getValue() instanceof Yaml.Mapping) {
+                for (Yaml.Mapping.Entry entry : ((Yaml.Mapping) propertyEntry.getValue()).getEntries()) {
+                    if (anyMatch(entry, excludedSubKeys())) {
+                        return true;
+                    }
+                }
+            }
+            return false;
+        }
+
+        private boolean anyMatch(Yaml.Mapping.Entry entry, List<String> subKeys) {
+            for (String subKey : subKeys) {
+                if (entry.getKey().getValue().equals(subKey) ||
+                        entry.getKey().getValue().startsWith(subKey + ".")) {
+                    return true;
+                }
+            }
+            return false;
         }
 
         private boolean pathToEntry(Yaml.Mapping.Entry entry, List<Yaml.Mapping.Entry> path) {
