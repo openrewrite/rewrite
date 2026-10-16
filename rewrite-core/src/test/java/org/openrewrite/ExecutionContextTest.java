@@ -16,6 +16,7 @@
 package org.openrewrite;
 
 import org.junit.jupiter.api.Test;
+import org.openrewrite.scheduling.WatchableExecutionContext;
 import org.openrewrite.test.RewriteTest;
 import org.openrewrite.test.TypeValidation;
 import org.openrewrite.text.PlainText;
@@ -24,6 +25,7 @@ import org.openrewrite.text.PlainTextVisitor;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.openrewrite.test.RewriteTest.toRecipe;
 import static org.openrewrite.test.SourceSpecs.text;
 
@@ -47,5 +49,39 @@ class ExecutionContextTest implements RewriteTest {
           text("hello world")
         );
         assertThat(cycles.get()).isEqualTo(2);
+    }
+
+    @Test
+    void computeMessageIfAbsentThroughWrapperIsValidated() {
+        ExecutionContext ctx = new WatchableExecutionContext(
+          CursorValidatingExecutionContextView.view(new InMemoryExecutionContext())
+            .setValidateImmutableExecutionContext(true));
+
+        assertThatThrownBy(() -> ctx.computeMessageIfAbsent("test", k -> "value"))
+          .isInstanceOf(AssertionError.class)
+          .hasMessageContaining("Recipe mutated execution context key \"test\"");
+        assertThat(ctx.<String>getMessage("test")).isNull();
+    }
+
+    @Test
+    void computeMessageIfAbsentOnPresentKeyIsNotAMutation() {
+        CursorValidatingExecutionContextView view = CursorValidatingExecutionContextView.view(new InMemoryExecutionContext());
+        view.putMessage("test", "value");
+        view.setValidateImmutableExecutionContext(true);
+        ExecutionContext ctx = new WatchableExecutionContext(view);
+
+        assertThat(ctx.<String>computeMessageIfAbsent("test", k -> "other")).isEqualTo("value");
+    }
+
+    @Test
+    void writesThroughGetMessagesAreValidated() {
+        ExecutionContext ctx = new WatchableExecutionContext(
+          CursorValidatingExecutionContextView.view(new InMemoryExecutionContext())
+            .setValidateImmutableExecutionContext(true));
+
+        assertThatThrownBy(() -> ctx.getMessages().computeIfAbsent("test", k -> "value"))
+          .isInstanceOf(AssertionError.class)
+          .hasMessageContaining("Recipe mutated execution context key \"test\"");
+        assertThat(ctx.<String>getMessage("test")).isNull();
     }
 }
