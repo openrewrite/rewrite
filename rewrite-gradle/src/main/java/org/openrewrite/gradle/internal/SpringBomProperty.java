@@ -250,11 +250,15 @@ public class SpringBomProperty {
      */
     public static JavaSourceFile addDeclaration(Cursor scope, String name, String value) {
         JavaSourceFile cu = scope.getValue();
+        List<Statement> statements = topLevelStatements(cu);
+        if (statements.isEmpty()) {
+            // A template is placed next to a statement, and an empty script has none
+            return cu;
+        }
         JavaTemplate declaration = cu instanceof K.CompilationUnit ?
                 KotlinTemplate.builder("extra[\"" + name + "\"] = \"" + value + "\"").build() :
                 GroovyTemplate.builder("ext['" + name + "'] = '" + value + "'").build();
 
-        List<Statement> statements = topLevelStatements(cu);
         int plugins = lastPluginsBlock(statements);
         // A coordinate places the declaration but says nothing about spacing, and Gradle scripts set their
         // top-level blocks apart with a blank line
