@@ -17,10 +17,7 @@ using OpenRewrite.CSharp.NuGet;
 
 namespace OpenRewrite.Tests;
 
-[CollectionDefinition("WorkingDirectory", DisableParallelization = true)]
-public class WorkingDirectoryCollection;
-
-[Collection("WorkingDirectory")]
+[Collection(ProcessEnvironmentCollection.Name)]
 public class WorkingDirectoryTests : IDisposable
 {
     private readonly string _tempDir = Path.Combine(Path.GetTempPath(),
@@ -62,5 +59,30 @@ public class WorkingDirectoryTests : IDisposable
         Directory.Delete(workingDirectory);
 
         Assert.NotNull(NuGetResolver.CreateDependencyGraphSpec(after));
+    }
+
+    [Fact]
+    public async Task InProcessBuildsNeverLendTheirProjectDirectoryOutsideTheGate()
+    {
+        var projects = Enumerable.Range(0, 3).Select(i => WriteProject("Borrowed" + i)).ToList();
+        var observed = new HashSet<string>();
+        using var done = new CancellationTokenSource();
+
+        var observer = Task.Run(() =>
+        {
+            while (!done.IsCancellationRequested)
+            {
+                using (MSBuildEnvironment.EnterOperatingEnvironment())
+                    observed.Add(Directory.GetCurrentDirectory());
+            }
+        });
+
+        foreach (var project in projects)
+            Assert.NotNull(NuGetResolver.CreateDependencyGraphSpec(project));
+        await done.CancelAsync();
+        await observer;
+
+        Assert.NotEmpty(observed);
+        Assert.DoesNotContain(observed, directory => directory.Contains(Path.GetFileName(_tempDir)));
     }
 }

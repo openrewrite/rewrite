@@ -441,7 +441,6 @@ public class SolutionParser
 
         _restoredLockFiles = await SolutionRestore.RunAsync(path, hasPackagesConfig, msbuildProperties, ct);
 
-        MSBuildEnvironment.EnsureWorkingDirectory();
         var sw = Stopwatch.StartNew();
         Log.Debug("MSBuildWorkspace: creating workspace");
         var workspace = msbuildProperties.Count > 0
@@ -467,11 +466,14 @@ public class SolutionParser
         Log.Debug(">> MSBuildWorkspace.Open ({FileName})", Path.GetFileName(path));
         try
         {
-            if (path.EndsWith(".sln", StringComparison.OrdinalIgnoreCase) ||
-                path.EndsWith(".slnx", StringComparison.OrdinalIgnoreCase))
-                solution = await workspace.OpenSolutionAsync(path, progress, cancellationToken: ct);
-            else
-                solution = (await workspace.OpenProjectAsync(path, progress, cancellationToken: ct)).Solution;
+            using (await MSBuildEnvironment.EnterOperatingEnvironmentAsync(ct))
+            {
+                if (path.EndsWith(".sln", StringComparison.OrdinalIgnoreCase) ||
+                    path.EndsWith(".slnx", StringComparison.OrdinalIgnoreCase))
+                    solution = await workspace.OpenSolutionAsync(path, progress, cancellationToken: ct);
+                else
+                    solution = (await workspace.OpenProjectAsync(path, progress, cancellationToken: ct)).Solution;
+            }
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
