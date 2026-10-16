@@ -70,12 +70,12 @@ class ScalaASTConverter {
 
     // Build type mapping from typed tree if available
     val mapping: Option[ScalaTypeMapping] = if (typeFactory != null) {
-      parseResult.typedTree.map(tpd => new ScalaTypeMapping(typeFactory, tpd))
+      parseResult.typedTree.map(tpd => new ScalaTypeMapping(typeFactory, tpd, parseResult.typedNodes))
     } else None
 
     val visitor = new ScalaTreeVisitor(source, offsetAdjustment, mapping)
     // Traverse the untyped tree for source-faithful structure.
-    // Types are extracted via ScalaTypeMapping's span-based lookup into the typed tree.
+    // Types are extracted via ScalaTypeMapping, which knows the typed tree of each of its nodes.
     val tree: Trees.Tree[?] = parseResult.tree
 
     // Check if tree is empty (parse error case)

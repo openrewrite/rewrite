@@ -48,7 +48,7 @@ func (p *PrintOutputCapture) BeforePrefix(markers java.Markers) {
 	if p.markerPrinter == nil {
 		return
 	}
-	for _, m := range markers.Entries {
+	for _, m := range markers.Entries() {
 		if s := p.markerPrinter.BeforePrefix(m, GoCommentWrapper); s != "" {
 			p.buf.WriteString(s)
 		}
@@ -59,7 +59,7 @@ func (p *PrintOutputCapture) BeforeSyntax(markers java.Markers) {
 	if p.markerPrinter == nil {
 		return
 	}
-	for _, m := range markers.Entries {
+	for _, m := range markers.Entries() {
 		if s := p.markerPrinter.BeforeSyntax(m, GoCommentWrapper); s != "" {
 			p.buf.WriteString(s)
 		}
@@ -70,7 +70,7 @@ func (p *PrintOutputCapture) AfterSyntax(markers java.Markers) {
 	if p.markerPrinter == nil {
 		return
 	}
-	for _, m := range markers.Entries {
+	for _, m := range markers.Entries() {
 		if s := p.markerPrinter.AfterSyntax(m, GoCommentWrapper); s != "" {
 			p.buf.WriteString(s)
 		}

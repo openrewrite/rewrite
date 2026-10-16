@@ -342,4 +342,40 @@ class CopyTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void jsonFormWithSpaceBeforeComma() {
+        rewriteRun(
+          docker(
+            """
+              FROM x
+              COPY ["a" , "b" , "/dst/"]
+              """
+          )
+        );
+    }
+
+    @Test
+    void sourceUrlWithEqualsInQueryString() {
+        rewriteRun(
+          docker(
+            """
+              FROM x
+              COPY https://a.org/r?filepath=org/j/p-1.jar /opt/p-1.jar
+              """
+          )
+        );
+    }
+
+    @Test
+    void destinationContainingEquals() {
+        rewriteRun(
+          docker(
+            """
+              FROM x
+              COPY a /opt/a=b/
+              """
+          )
+        );
+    }
 }

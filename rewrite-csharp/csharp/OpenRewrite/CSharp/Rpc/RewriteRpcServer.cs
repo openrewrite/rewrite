@@ -324,7 +324,8 @@ public class RewriteRpcServer
                 response.Items.Add(new ParseSolutionResponseItem
                 {
                     Id = id,
-                    SourceFileType = sourceFileType
+                    SourceFileType = sourceFileType,
+                    SourcePath = sourceFile.SourcePath
                 });
             }
 
@@ -366,7 +367,8 @@ public class RewriteRpcServer
                 response.Items.Add(new ParseSolutionResponseItem
                 {
                     Id = csprojDoc.Id.ToString(),
-                    SourceFileType = "org.openrewrite.xml.tree.Xml$Document"
+                    SourceFileType = "org.openrewrite.xml.tree.Xml$Document",
+                    SourcePath = csprojDoc.SourcePath
                 });
             }
             catch (Exception ex)
@@ -381,6 +383,12 @@ public class RewriteRpcServer
         {
             if (!seenProjects.Add(project.FilePath!))
                 continue;
+
+            if (solutionParser.ProjectsNotParsed.Contains(Path.GetFullPath(project.FilePath!)))
+            {
+                EmitProjectFile(project.FilePath!);
+                continue;
+            }
 
             projectIndex++;
             Log.Debug("RPC ParseSolution: parsing project [{ProjectIndex}/{ProjectCount}] {ProjectName}",
@@ -414,7 +422,8 @@ public class RewriteRpcServer
             // A diagnostic can name a project that nonetheless evaluated far enough to yield its
             // documents (an unresolvable ProjectReference, say). Recovering from disk there would
             // resurrect files the project deliberately excludes, so leave those projects alone.
-            if (projectsWithSources.Contains(Path.GetFullPath(projectPath)))
+            if (projectsWithSources.Contains(Path.GetFullPath(projectPath)) ||
+                solutionParser.ProjectsNotParsed.Contains(Path.GetFullPath(projectPath)))
                 continue;
 
             var recovered = solutionParser.ParseProjectWithoutMSBuild(projectPath, rootDir,
@@ -533,8 +542,9 @@ public class RewriteRpcServer
 
     /// <summary>
     /// Resolves a coordinate to assembly paths: a null version names a BCL assembly in this
-    /// runtime's shared framework directory; otherwise the NuGet package's lib/ (or ref/)
-    /// assets nearest the target framework. References are always the shared framework.
+    /// runtime's shared framework directory; otherwise the NuGet package's compile assemblies
+    /// for the target framework (<see cref="PackageCompileAssets"/>). References are always the
+    /// shared framework.
     /// </summary>
     private static (List<string> Own, List<string> References) ResolveDependency(DependencyRequest request)
     {
@@ -550,37 +560,17 @@ public class RewriteRpcServer
             return ([dll], bcl);
         }
 
-        var root = Environment.GetEnvironmentVariable("NUGET_PACKAGES")
-            ?? Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), ".nuget", "packages");
-        var package = Path.Combine(root, request.Id.ToLowerInvariant(), request.Version);
-        var target = NuGetFramework.Parse(request.TargetFramework);
-        var own = NearestAssets(Path.Combine(package, "lib"), target)
-            ?? NearestAssets(Path.Combine(package, "ref"), target)
-            ?? throw new InvalidOperationException(
-                $"No assemblies compatible with {request.TargetFramework} in {package}");
+        var folders = PackageCompileAssets.PackageFolders();
+        var package = PackageCompileAssets.FindPackageDirectory(request.Id, request.Version, folders)
+            ?? throw new DirectoryNotFoundException(
+                $"Package {request.Id} {request.Version} not found in {string.Join(", ", folders)}");
+        var own = PackageCompileAssets.CompileAssemblies(package, NuGetFramework.Parse(request.TargetFramework));
+        if (own.Count == 0)
+        {
+            throw new InvalidOperationException(
+                $"No compile assemblies compatible with {request.TargetFramework} in {package}");
+        }
         return (own, bcl);
-    }
-
-    /// <summary>
-    /// The *.dll files of the asset folder nearest <paramref name="target"/>, or null when no
-    /// folder is compatible or the nearest holds no assemblies (a _._ placeholder).
-    /// </summary>
-    private static List<string>? NearestAssets(string assetsDir, NuGetFramework target)
-    {
-        if (!Directory.Exists(assetsDir))
-        {
-            return null;
-        }
-        var candidates = Directory.GetDirectories(assetsDir)
-            .Select(dir => (Framework: NuGetFramework.Parse(Path.GetFileName(dir)), Dir: dir))
-            .ToList();
-        var nearest = new FrameworkReducer().GetNearest(target, candidates.Select(c => c.Framework).ToList());
-        if (nearest == null)
-        {
-            return null;
-        }
-        var dlls = Directory.GetFiles(candidates.First(c => nearest.Equals(c.Framework)).Dir, "*.dll").ToList();
-        return dlls.Count == 0 ? null : dlls;
     }
 
     [JsonRpcMethod("GetObject", UseSingleObjectParameterDeserialization = true)]
@@ -612,7 +602,16 @@ public class RewriteRpcServer
         var pages = _inProgressGetObject.GetOrAdd(request.Id, id =>
             new Lazy<Channel<List<RpcObjectData>>>(() => StartTransfer(id, after, request.SourceFileType))).Value;
 
-        var page = await pages.Reader.ReadAsync();
+        List<RpcObjectData> page;
+        try
+        {
+            page = await pages.Reader.ReadAsync();
+        }
+        catch (ChannelClosedException e) when (e.InnerException != null)
+        {
+            _inProgressGetObject.TryRemove(request.Id, out _);
+            throw e.InnerException;
+        }
         if (page.Count > 0 && page[^1].State == END_OF_OBJECT)
         {
             _inProgressGetObject.TryRemove(request.Id, out _);
@@ -625,11 +624,51 @@ public class RewriteRpcServer
     /// the producer until the remote takes the previous page, which bounds what is held to two
     /// pages and lets the remote fetch one while this side fills the next.
     /// </summary>
+    /// <summary>
+    /// The remote failed to receive an object it had asked for. Forgets that it holds the object
+    /// and the refs assigned while sending it, so that the next transfer sends both whole.
+    /// </summary>
+    [JsonRpcMethod("AbortGetObject", UseSingleObjectParameterDeserialization = true)]
+    public async Task<bool> AbortGetObject(AbortGetObjectRequest request)
+    {
+        if (_inProgressGetObject.TryRemove(request.Id, out var pages))
+        {
+            try
+            {
+                // the traversal is waiting to hand over pages nobody will ask for
+                await foreach (var _ in pages.Value.Reader.ReadAllAsync())
+                {
+                }
+            }
+            catch (Exception)
+            {
+                // a transfer that failed by itself has nothing left to hand over
+            }
+        }
+
+        _remoteObjects.TryRemove(request.Id, out _);
+        if (_lastTransfer is { } last && last.Id == request.Id)
+        {
+            _localRefs.RollbackTo(last.RefHighWater);
+        }
+        else
+        {
+            // not the latest transfer, so which refs it assigned is no longer known
+            _localRefs.Clear();
+        }
+        return true;
+    }
+
+    private sealed record Transfer(string Id, int RefHighWater);
+
+    private volatile Transfer? _lastTransfer;
+
     private Channel<List<RpcObjectData>> StartTransfer(string id, object after, string? sourceFileType)
     {
         var pages = Channel.CreateBounded<List<RpcObjectData>>(1);
         var before = _remoteObjects.GetValueOrDefault(id);
         var refHighWater = _localRefs.HighWater;
+        _lastTransfer = new Transfer(id, refHighWater);
 
         // On the thread pool because the drain blocks whenever the channel is full, and the
         // thread that has to drain it is the one serving the next GetObject.
@@ -643,6 +682,7 @@ public class RewriteRpcServer
                 false,
                 TreeCodec.Instance
             );
+            Exception? failure = null;
             try
             {
                 sendQueue.Send(after, before, null);
@@ -655,14 +695,20 @@ public class RewriteRpcServer
                 // baseline the remote never finished receiving.
                 _remoteObjects.TryRemove(id, out _);
                 _localRefs.RollbackTo(refHighWater);
-                Log.Debug("RPC GetObject: EXCEPTION sending {Id} ({ObjType}): {ExType}: {ExMessage}",
-                    id, after.GetType().Name, ex.GetType().Name, ex.Message);
+                var sourcePath = (after as SourceFile)?.SourcePath;
+                Log.Warning("RPC GetObject: EXCEPTION sending {Id} ({ObjType}, {SourcePath}): {Exception}",
+                    id, after.GetType().Name, sourcePath, ex.ToString());
+                failure = new InvalidOperationException(
+                    $"Failed to send {after.GetType().Name} {id}{(sourcePath == null ? "" : $" ({sourcePath})")}: {ex.GetType().Name}: {ex.Message}", ex);
             }
             finally
             {
-                sendQueue.Put(new RpcObjectData { State = END_OF_OBJECT });
-                sendQueue.Flush();
-                pages.Writer.Complete();
+                if (failure == null)
+                {
+                    sendQueue.Put(new RpcObjectData { State = END_OF_OBJECT });
+                    sendQueue.Flush();
+                }
+                pages.Writer.Complete(failure);
             }
         });
         return pages;
@@ -694,14 +740,39 @@ public class RewriteRpcServer
             if (tree is OpenRewrite.Xml.Xml)
                 new OpenRewrite.Xml.XmlPrinter<int>().Visit((OpenRewrite.Xml.Xml)tree, capture);
             else
-                new CSharpPrinter<int>().Visit(tree, capture);
-            return capture.ToString();
+                new CSharpPrinter<int>().Visit(tree, capture, await GetCursorFromRemoteAsync(request.CursorIds, request.SourceFileType));
+            var printed = capture.ToString();
+            // Java prints a source file that was read with a byte order mark with the mark restored
+            return tree is CompilationUnit { CharsetBomMarked: true } && printed.Length > 0 && printed[0] != '\uFEFF'
+                ? '\uFEFF' + printed
+                : printed;
         }
         catch (Exception ex)
         {
             throw new InvalidOperationException(
                 $"Print: Failed to print tree {request.TreeId} (type: {request.SourceFileType}, treeType: {tree.GetType().Name}): {ex.Message}\n{ex.StackTrace}", ex);
         }
+    }
+
+    private Task<Cursor> GetCursorFromRemoteAsync(List<string>? cursorIds, string? sourceFileType) =>
+        RebuildCursorAsync(cursorIds, async id => await GetObjectFromRemoteAsync(id, sourceFileType));
+
+    /// <summary>
+    /// Rebuilds the cursor a tree is printed or visited under from the ids of its ancestors,
+    /// innermost first.
+    /// </summary>
+    internal static async Task<Cursor> RebuildCursorAsync(IReadOnlyList<string>? cursorIds, Func<string, Task<object>> fetch)
+    {
+        var cursor = new Cursor();
+        for (var i = (cursorIds?.Count ?? 0) - 1; i >= 0; i--)
+        {
+            // only a tree is keyed by its own id; padding and the root have no codec to arrive by
+            if (Guid.TryParse(cursorIds![i], out _))
+            {
+                cursor = new Cursor(cursor, await fetch(cursorIds[i]));
+            }
+        }
+        return cursor;
     }
 
     /// <summary>
@@ -721,13 +792,16 @@ public class RewriteRpcServer
         // The following page is requested before this one is handed to the queue, so the
         // remote serializes it while this side deserializes what it already has.
         Task<List<RpcObjectData>>? nextPage = null;
+        var awaitingPage = false;
         var q = new RpcReceiveQueue(
             _remoteRefs,
             () =>
             {
                 var pending = nextPage;
                 nextPage = null;
+                awaitingPage = true;
                 var page = (pending ?? RequestPage()).GetAwaiter().GetResult();
+                awaitingPage = false;
                 // A page ending in END_OF_OBJECT has no successor; the remote drops its
                 // transfer state when it sends that marker, so asking again would restart
                 // the transfer rather than return nothing.
@@ -775,6 +849,7 @@ public class RewriteRpcServer
             // Reset our tracking of the remote state so the next interaction
             // forces a full object sync (ADD) instead of a delta (CHANGE).
             _remoteObjects.TryRemove(id, out _);
+            q.RollBackRefs();
             var pending = nextPage;
             nextPage = null;
             if (pending != null)
@@ -785,6 +860,20 @@ public class RewriteRpcServer
                 try
                 {
                     pending.GetAwaiter().GetResult();
+                }
+                catch
+                {
+                    // the original failure is the one worth reporting
+                }
+            }
+            if (!awaitingPage)
+            {
+                // The failure is this side's, so the remote still counts the object and the refs it
+                // sent with it as received. A remote without the method is no worse off than before.
+                try
+                {
+                    await _jsonRpc!.InvokeWithParameterObjectAsync<bool>(
+                        "AbortGetObject", new AbortGetObjectRequest { Id = id });
                 }
                 catch
                 {
@@ -1226,10 +1315,12 @@ public class RewriteRpcServer
     private static void CheckVersionCompatibility(Assembly pluginAssembly)
     {
         var hostAssembly = typeof(RewriteRpcServer).Assembly;
-        var hostVersion = hostAssembly.GetName().Version;
+        var hostName = hostAssembly.GetName();
+        var hostVersion = hostName.Version;
 
+        // Match on the host's assembly name (OpenRewrite), not the NuGet package id (OpenRewrite.CSharp).
         var openRewriteRef = pluginAssembly.GetReferencedAssemblies()
-            .FirstOrDefault(a => string.Equals(a.Name, "OpenRewrite.CSharp",
+            .FirstOrDefault(a => string.Equals(a.Name, hostName.Name,
                 StringComparison.OrdinalIgnoreCase));
 
         if (openRewriteRef?.Version == null || hostVersion == null)
@@ -1330,7 +1421,7 @@ public class RewriteRpcServer
             throw new InvalidOperationException($"Recipe {request.Id} has no live instance (installed without constructor)");
         }
 
-        return Task.FromResult(PrepareInstance(recipe, request.Options));
+        return Task.FromResult(PrepareInstance(recipe, request.Options, request.AcceptsCausesAnotherCycle == true));
     }
 
     /// <summary>
@@ -1339,7 +1430,8 @@ public class RewriteRpcServer
     /// A child that is <see cref="IDelegatesTo"/> carries only <c>DelegatesTo</c> and
     /// no children; all other children have their own <c>RecipeList</c> populated.
     /// </summary>
-    private PrepareRecipeResponse PrepareInstance(Recipe recipe, Dictionary<string, object?>? options)
+    private PrepareRecipeResponse PrepareInstance(Recipe recipe, Dictionary<string, object?>? options,
+        bool acceptsCausesAnotherCycle)
     {
         // If options are provided, create a new instance with options applied.
         if (options is { Count: > 0 })
@@ -1347,12 +1439,15 @@ public class RewriteRpcServer
             recipe = InstantiateWithOptions(recipe.GetType(), options);
         }
 
-        // Validate required options on the instantiated recipe — the root against the caller's
-        // options, and every child against the values its parent set in GetRecipeList(). Because
-        // PrepareInstance recurses, this covers the whole tree, and it's the only place the C# tree
-        // gets validated: declarative recipes bundled in an artifact often ship without a test that
-        // runs validateAll, so this is the safety net against executing a broken recipe. Delegating
-        // recipes forward to a Java recipe that validates its own options, so they are skipped here.
+        // Validate required options and the recipe's own Validate() constraints on the instantiated
+        // recipe — the root against the caller's options, and every child against the values its
+        // parent set in GetRecipeList(). Because PrepareInstance recurses, this covers the whole
+        // tree, and it's the only place the C# tree gets validated: declarative recipes bundled in
+        // an artifact often ship without a test that runs validateAll, so this is the safety net
+        // against executing a broken recipe. It is also the only place that reports a bad option
+        // once: the visitor factories run per source file, so validating there turns one
+        // misconfiguration into one error per file. Delegating recipes forward to a Java recipe that
+        // validates its own options, so they are skipped here.
         if (recipe is not IDelegatesTo)
         {
             var descriptor = recipe.GetDescriptor();
@@ -1364,6 +1459,13 @@ public class RewriteRpcServer
                         $"Missing required option `{option.Name}` for recipe `{descriptor.Name}`.");
                 }
             }
+
+            var validationErrors = recipe.Validate().ToList();
+            if (validationErrors.Count > 0)
+            {
+                throw new ArgumentException(
+                    $"Invalid options for recipe `{descriptor.Name}`: {string.Join(" ", validationErrors)}");
+            }
         }
 
         var id = Tree.RandomId().ToString();
@@ -1374,7 +1476,8 @@ public class RewriteRpcServer
             Id = id,
             Descriptor = RecipeDescriptorDto.FromDescriptor(recipe.GetDescriptor()),
             EditVisitor = $"edit:{id}",
-            ScanVisitor = recipe is IScanningRecipe ? $"scan:{id}" : null
+            ScanVisitor = recipe is IScanningRecipe ? $"scan:{id}" : null,
+            CausesAnotherCycle = acceptsCausesAnotherCycle && recipe.CausesAnotherCycle ? true : null
         };
 
         if (recipe is IDelegatesTo del)
@@ -1391,7 +1494,7 @@ public class RewriteRpcServer
             OptimizePreconditions(recipe, response);
             // Whole-tree preparation: children are real instances in this recipe's own ALC.
             response.RecipeList = recipe.GetRecipeList()
-                .Select(child => PrepareInstance(child, null))
+                .Select(child => PrepareInstance(child, null, acceptsCausesAnotherCycle))
                 .ToList();
         }
 
@@ -1655,6 +1758,7 @@ public class RewriteRpcServer
         // Fetch tree from the remote (Java) process
         CaptureRefCheckpoint(request.TreeId);
         var tree = await GetObjectFromRemoteAsync(request.TreeId, request.SourceFileType);
+        var cursor = await GetCursorFromRemoteAsync(request.CursorIds, request.SourceFileType);
 
         if (phase != "scan" && phase != "edit")
         {
@@ -1674,7 +1778,7 @@ public class RewriteRpcServer
             visitor = recipe.GetVisitor();
         }
 
-        var result = visitor.Visit(tree, ctx);
+        var result = visitor.Visit(tree, ctx, cursor);
 
         var modified = !ReferenceEquals(tree, result);
         if (result == null)
@@ -1710,6 +1814,7 @@ public class RewriteRpcServer
         var sw = Stopwatch.StartNew();
         CaptureRefCheckpoint(request.TreeId);
         var tree = await GetObjectFromRemoteAsync(request.TreeId, request.SourceFileType);
+        var cursor = await GetCursorFromRemoteAsync(request.CursorIds, request.SourceFileType);
         var fetchMs = sw.ElapsedMilliseconds;
 
         var ctx = GetOrCreateExecutionContext(request.PId);
@@ -1745,7 +1850,7 @@ public class RewriteRpcServer
             }
 
             var visitStart = sw.ElapsedMilliseconds;
-            var result = visitor.Visit(tree, ctx);
+            var result = visitor.Visit(tree, ctx, cursor);
             visitMs += sw.ElapsedMilliseconds - visitStart;
 
             var modified = !ReferenceEquals(tree, result);
@@ -2306,7 +2411,7 @@ public class DependencyRequest
     /// <summary>Package version; null names a BCL assembly in the runtime's shared framework.</summary>
     public string? Version { get; set; }
 
-    /// <summary>Framework whose nearest lib/ assets to enumerate, e.g. "net10.0".</summary>
+    /// <summary>Framework whose compile assets to enumerate, e.g. "net10.0".</summary>
     public string TargetFramework { get; set; } = "";
 }
 
@@ -2323,8 +2428,8 @@ public class ParseSolutionResponseItem
     public string Id { get; set; } = "";
     public string SourceFileType { get; set; } = "";
 
-    // Relative source path; only populated for Quark items, from which the Java
-    // side builds the Quark locally. Null for normal items (fetched via GetObject).
+    // Relative source path. The Java side builds Quark items from it locally, and names the
+    // file in the ParseError it substitutes when fetching any other item fails.
     public string? SourcePath { get; set; }
 }
 
@@ -2332,6 +2437,11 @@ public class GetObjectRequest
 {
     public string Id { get; set; } = "";
     public string? SourceFileType { get; set; }
+}
+
+public class AbortGetObjectRequest
+{
+    public string Id { get; set; } = "";
 }
 
 [JsonPolymorphic(TypeDiscriminatorPropertyName = "kind")]
@@ -2380,6 +2490,8 @@ public class PrintRequest
     public string? SourcePath { get; set; }
     public string? SourceFileType { get; set; }
     public string? MarkerPrinter { get; set; }
+    [JsonPropertyName("cursor")]
+    public List<string>? CursorIds { get; set; }
 }
 
 public class EvictRequest
@@ -2522,6 +2634,9 @@ public class PrepareRecipeRequest
 {
     public string Id { get; set; } = "";
     public Dictionary<string, object?>? Options { get; set; }
+
+    // Older Java hosts reject unknown response fields, so CausesAnotherCycle is only sent when asked.
+    public bool? AcceptsCausesAnotherCycle { get; set; }
 }
 
 public class PrepareRecipeResponse
@@ -2534,6 +2649,7 @@ public class PrepareRecipeResponse
     public List<Precondition> ScanPreconditions { get; set; } = [];
     public DelegatesTo? DelegatesTo { get; set; }
     public List<PrepareRecipeResponse> RecipeList { get; set; } = [];
+    public bool? CausesAnotherCycle { get; set; }
 }
 
 public class DelegatesTo

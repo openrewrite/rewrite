@@ -33,6 +33,8 @@ public class ChangeMethodName extends Recipe {
     private static final Predicate<String> IS_NOT_RESERVED_KEYWORD = s -> !JavaKeywordUtils.isReservedKeyword(s);
     private static final Predicate<String> IS_NOT_RESERVED_LITERAL = s -> !JavaKeywordUtils.isReservedLiteral(s);
     private static final Predicate<String> IS_VALID_METHOD_PATTERN = s -> s.matches(VALID_JAVA_METHOD_PATTERN);
+    private static final Predicate<String> LOOKS_LIKE_METHOD_PATTERN =
+          s -> s != null && (s.indexOf('(') >= 0 || s.indexOf('.') >= 0 || s.indexOf(' ') >= 0);
     private static final Predicate<String> IS_VALID_METHOD_NAME = IS_NOT_RESERVED_KEYWORD
           .and(IS_NOT_RESERVED_LITERAL)
           .and(IS_VALID_METHOD_PATTERN);
@@ -74,15 +76,17 @@ public class ChangeMethodName extends Recipe {
         return super.validate()
               .and(MethodMatcher.validate(methodPattern))
               .and(Validated.test("newMethodName",
-                    "should not be a Java Reserved Keyword.",
+                    "should not be a reserved keyword.",
                     newMethodName,
                     IS_NOT_RESERVED_KEYWORD))
               .and(Validated.test("newMethodName",
-                    "should not be a Java Reserved Literal.",
+                    "should not be a reserved literal.",
                     newMethodName,
                     IS_NOT_RESERVED_LITERAL))
               .and(Validated.test("newMethodName",
-                    "should be a valid Java method name.",
+                    LOOKS_LIKE_METHOD_PATTERN.test(newMethodName) ?
+                          "should be just the new name of the method, not a method pattern." :
+                          "should be a valid method name.",
                     newMethodName,
                     IS_VALID_METHOD_PATTERN));
     }

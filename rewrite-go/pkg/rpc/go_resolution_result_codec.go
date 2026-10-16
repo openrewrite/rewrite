@@ -146,6 +146,12 @@ func sendGoResolutionResult(m golang.GoResolutionResult, q *SendQueue) {
 	// emptyAsNil so a marker deserialized from a pre-status LST (status "") travels
 	// as null, never as an empty string the Java side would feed to Enum.valueOf.
 	q.GetAndSend(m, func(x any) any { return emptyAsNil(string(x.(golang.GoResolutionResult).ResolutionStatus)) }, nil)
+
+	q.GetAndSendList(m,
+		func(x any) []any { return stringSlice(x.(golang.GoResolutionResult).UnresolvedImports) },
+		func(x any) any { return x },
+		func(x any) { q.GetAndSend(x, func(y any) any { return y }, nil) })
+	q.GetAndSend(m, func(x any) any { return emptyAsNil(x.(golang.GoResolutionResult).ResolutionError) }, nil)
 }
 
 // receiveGoResolutionResult mirrors Java's
@@ -169,7 +175,25 @@ func receiveGoResolutionResult(before golang.GoResolutionResult, q *ReceiveQueue
 	before.ResolvedDependencies = recvResolvedDeps(q, before.ResolvedDependencies)
 	before.PackageModules = recvPackageModules(q, before.PackageModules)
 	before.ResolutionStatus = golang.GoResolutionStatus(receiveScalar[string](q, string(before.ResolutionStatus)))
+	before.UnresolvedImports = recvStrings(q, before.UnresolvedImports)
+	before.ResolutionError = receiveNullableString(q, before.ResolutionError)
 	return before
+}
+
+func recvStrings(q *ReceiveQueue, before []string) []string {
+	beforeAny := stringSlice(before)
+	afterAny := q.ReceiveList(beforeAny, func(v any) any {
+		s, _ := v.(string)
+		return receiveScalar[string](q, s)
+	})
+	if afterAny == nil {
+		return nil
+	}
+	out := make([]string, len(afterAny))
+	for i, v := range afterAny {
+		out[i] = v.(string)
+	}
+	return out
 }
 
 func recvRequires(q *ReceiveQueue, before []golang.GoRequire) []golang.GoRequire {

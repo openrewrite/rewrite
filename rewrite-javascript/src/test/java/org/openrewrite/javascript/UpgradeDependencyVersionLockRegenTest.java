@@ -22,6 +22,7 @@ import org.openrewrite.HttpSenderExecutionContextView;
 import org.openrewrite.InMemoryExecutionContext;
 import org.openrewrite.ipc.http.HttpSender;
 import org.openrewrite.javascript.marker.NodeResolutionResult.PackageManager;
+import org.openrewrite.javascript.table.NodeLockRegenerationFailures;
 import org.openrewrite.marker.Markup;
 import org.openrewrite.test.RewriteTest;
 
@@ -43,10 +44,8 @@ import static org.openrewrite.javascript.Assertions.packageLock;
 import static org.openrewrite.javascript.Assertions.pnpmLock;
 
 /**
- * PM-free end-to-end tests of native lock regeneration for a closure-unchanged version bump. No
- * package manager is executed: the registry is stubbed over the run's {@link HttpSender} with
- * recorded packument/manifest responses, and the regenerated lock is asserted byte-identical to a
- * golden recorded from a real {@code npm}/{@code pnpm} install.
+ * Native lock regeneration for a version bump over a stubbed {@link HttpSender}, each lock byte-identical to the one
+ * npm or pnpm wrote; a bump whose lock cannot be regenerated keeps the edit and warns.
  */
 class UpgradeDependencyVersionLockRegenTest implements RewriteTest {
 
@@ -98,6 +97,38 @@ class UpgradeDependencyVersionLockRegenTest implements RewriteTest {
     }
 
     @Test
+    void aBumpWhoseLockCannotBeRegeneratedKeepsTheEditAndWarns() {
+        String pkgBefore = "{\n" +
+                "  \"name\": \"npm-lock-v3\",\n" +
+                "  \"version\": \"1.0.0\",\n" +
+                "  \"dependencies\": {\n" +
+                "    \"is-odd\": \"3.0.0\"\n" +
+                "  }\n" +
+                "}\n";
+        String lock = resource("lock/npm/v3/before");
+
+        rewriteRun(
+                spec -> spec.recipe(new UpgradeDependencyVersion("is-odd", null, "3.0.1")).executionContext(ctx)
+                        .dataTable(NodeLockRegenerationFailures.Row.class, rows -> {
+                            assertThat(rows).hasSize(1);
+                            assertThat(rows.get(0).getSourcePath()).isEqualTo("package.json");
+                            assertThat(rows.get(0).getPackageName()).isEqualTo("is-odd");
+                        }),
+                packageJson(pkgBefore, null,
+                        nodeResolutionResult(PackageManager.Npm, dependency("is-odd", "3.0.0")),
+                        s -> s.after(actual -> {
+                            assertThat(actual).contains("\"is-odd\": \"3.0.1\"")
+                              .contains("npm rejects this edit (E404)");
+                            return actual;
+                        }).afterRecipe(doc -> assertThat(doc.getMarkers().findFirst(Markup.Warn.class)).isPresent())),
+                packageLock(lock, null, s -> s.noTrim().after(actual -> {
+                    assertThat(actual).contains("\"node_modules/is-odd\": {\n      \"version\": \"3.0.0\"");
+                    return actual;
+                }).afterRecipe(doc -> assertThat(doc.getMarkers().findFirst(Markup.Warn.class)).isPresent()))
+        );
+    }
+
+    @Test
     void npmWorkspaceMemberBumpRegeneratesRootLockByteExact() {
         routes.put("https://registry.npmjs.org/is-odd", resource("lock/npm/v3/http/is-odd"));
         routes.put("https://registry.npmjs.org/is-odd/3.0.0", resource("lock/npm/v3/http/is-odd-3.0.0"));
@@ -139,6 +170,60 @@ class UpgradeDependencyVersionLockRegenTest implements RewriteTest {
                 pnpmLock(resource("lock/pnpm/v9/before"), resource("lock/pnpm/v9/after"),
                         s -> s.noTrim())
         );
+    }
+
+    @Test
+    void npmLockOfAnotherProjectIsLeftAsItIs() {
+        String pkg = "{\n" +
+                "  \"name\": \"npm-lock-v3\",\n" +
+                "  \"version\": \"1.0.0\",\n" +
+                "  \"dependencies\": {\n" +
+                "    \"is-odd\": \"3.0.0\"\n" +
+                "  }\n" +
+                "}\n";
+
+        // examples/demo is no workspace member and has no lock: the root's install reads its manifest but not
+        // its dependencies, so the root lock is regenerated as it was and must not be reported as changed
+        rewriteRun(
+                spec -> spec.recipe(new UpgradeDependencyVersion("typescript", null, "^5.9.3")).executionContext(ctx)
+                        .afterRecipe(run -> assertThat(run.getChangeset().getAllResults())
+                                .extracting(r -> r.getBefore() == null ? null : r.getBefore().getSourcePath().toString())
+                                .containsExactly("examples/demo/package.json")),
+                packageJson(pkg, null, nodeResolutionResult(PackageManager.Npm, dependency("is-odd", "3.0.0"))),
+                packageLock(resource("lock/npm/v3/before"), null, s -> s.noTrim()),
+                packageJson(demo("^5.0.0"), demo("^5.9.3"),
+                        nodeResolutionResult(PackageManager.Npm, dependency("typescript", "^5.0.0")),
+                        s -> s.path("examples/demo/package.json"))
+        );
+    }
+
+    @Test
+    void pnpmLockOfAnotherProjectIsLeftAsItIs() {
+        routes.put("https://registry.npmjs.org/ms", resource("lock/pnpm/v9/http/ms"));
+        routes.put("https://registry.npmjs.org/ms/2.1.2", resource("lock/pnpm/v9/http/ms-2.1.2"));
+
+        rewriteRun(
+                spec -> spec.recipe(new UpgradeDependencyVersion("typescript", null, "^5.9.3")).executionContext(ctx)
+                        .afterRecipe(run -> assertThat(run.getChangeset().getAllResults())
+                                .extracting(r -> r.getBefore() == null ? null : r.getBefore().getSourcePath().toString())
+                                .containsExactly("examples/demo/package.json")),
+                packageJson(resource("lock/pnpm/v9/pkg-before"), null,
+                        nodeResolutionResult(PackageManager.Pnpm, dependency("ms", "2.1.2"))),
+                pnpmLock(resource("lock/pnpm/v9/before"), null, s -> s.noTrim()),
+                packageJson(demo("^5.0.0"), demo("^5.9.3"),
+                        nodeResolutionResult(PackageManager.Pnpm, dependency("typescript", "^5.0.0")),
+                        s -> s.path("examples/demo/package.json"))
+        );
+    }
+
+    private static String demo(String typescript) {
+        return "{\n" +
+               "  \"name\": \"demo\",\n" +
+               "  \"private\": true,\n" +
+               "  \"devDependencies\": {\n" +
+               "    \"typescript\": \"" + typescript + "\"\n" +
+               "  }\n" +
+               "}\n";
     }
 
     private static String resource(String path) {

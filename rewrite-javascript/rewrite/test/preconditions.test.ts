@@ -16,8 +16,16 @@
 import {RecipeSpec} from "../src/test";
 import {javascript} from "../src/javascript";
 import {ConditionalFindIdentifier, FindIdentifierWithPathPrecondition} from "../fixtures/path-precondition";
+import {FindIdentifierOutsideVendoredOrBundled} from "../fixtures/vendored-precondition";
 import {and, check, CompositePrecondition, not, or, RecipeRef} from "../src/preconditions";
-import {findMethods, findTypes, hasSourcePath, usesMethod, usesType} from "../src/javascript/preconditions";
+import {
+    findMethods,
+    findTypes,
+    hasSourcePath,
+    isVendoredOrBundled,
+    usesMethod,
+    usesType
+} from "../src/javascript/preconditions";
 import {ExecutionContext} from "../src/execution";
 import {TreeVisitor} from "../src/visitor";
 import {Cursor, Tree} from "../src/tree";
@@ -38,6 +46,22 @@ describe('Preconditions', () => {
             {
                 ...javascript('const foo = 2;'),
                 path: 'other.js'
+            }
+        );
+    });
+
+    test('negated vendored-or-bundled precondition - should only mark identifiers outside vendored code', async () => {
+        const spec = new RecipeSpec();
+        spec.recipe = new FindIdentifierOutsideVendoredOrBundled({identifier: 'foo'});
+
+        await spec.rewriteRun(
+            {
+                ...javascript('const foo = 1;', 'const /*~~>*/foo = 1;'),
+                path: 'src/index.js'
+            },
+            {
+                ...javascript('const foo = 2;'),
+                path: 'vendor/lib.js'
             }
         );
     });
@@ -229,5 +253,13 @@ describe('Preconditions composites (in-process)', () => {
         expect(usesType("X").localVisitor).toBeDefined();
         expect(findMethods("*..* a(..)").localVisitor).toBeDefined();
         expect(findTypes("X").localVisitor).toBeDefined();
+        expect(isVendoredOrBundled().localVisitor).toBeDefined();
+    });
+
+    test('isVendoredOrBundled delegates to FindVendoredOrBundled', () => {
+        const ref = isVendoredOrBundled();
+
+        expect(ref.recipeName).toBe("org.openrewrite.javascript.search.FindVendoredOrBundled");
+        expect(ref.options).toEqual({});
     });
 });

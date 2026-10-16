@@ -234,7 +234,6 @@ public interface JavaParser extends Parser {
         protected Collection<Path> classpath = emptyList();
         protected Collection<String> artifactNames = emptyList();
         protected Collection<byte[]> classBytesClasspath = emptyList();
-
         protected JavaTypeCache javaTypeCache = new JavaTypeCache();
 
         @Nullable
@@ -245,31 +244,24 @@ public interface JavaParser extends Parser {
 
         protected Charset charset = Charset.defaultCharset();
         protected boolean logCompilationWarningsAndErrors = false;
+        protected boolean typeAttribution = true;
         protected final List<NamedStyles> styles = new ArrayList<>();
 
         public Builder() {
             super(J.CompilationUnit.class);
         }
 
-        /**
-         * The type cache and type factory are left out: they are mutable, accumulate during parsing, and are
-         * meant to be shared across parsers rather than to distinguish them.
-         */
-        @Override
-        public List<Object> discriminator() {
-            List<Object> discriminator = super.discriminator();
-            discriminator.add(new ArrayList<>(classpath));
-            discriminator.add(new ArrayList<>(artifactNames));
-            discriminator.add(new ArrayList<>(classBytesClasspath));
-            discriminator.add(dependsOn == null ? emptyList() : new ArrayList<>(dependsOn));
-            discriminator.add(charset);
-            discriminator.add(logCompilationWarningsAndErrors);
-            discriminator.add(new ArrayList<>(styles));
-            return discriminator;
-        }
-
         public B logCompilationWarningsAndErrors(boolean logCompilationWarningsAndErrors) {
             this.logCompilationWarningsAndErrors = logCompilationWarningsAndErrors;
+            return (B) this;
+        }
+
+        /**
+         * When false, javac stops after entering symbols: declarations are typed, but expressions are not.
+         * Attributing code whose dependencies are missing can take hours in javac's error recovery.
+         */
+        public B typeAttribution(boolean typeAttribution) {
+            this.typeAttribution = typeAttribution;
             return (B) this;
         }
 

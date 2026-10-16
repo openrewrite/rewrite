@@ -19,7 +19,6 @@ import org.jspecify.annotations.Nullable;
 import org.openrewrite.Cursor;
 import org.openrewrite.PrintOutputCapture;
 import org.openrewrite.csharp.tree.CsDocComment;
-import org.openrewrite.java.tree.J;
 import org.openrewrite.marker.Marker;
 import org.openrewrite.marker.Markers;
 
@@ -28,7 +27,7 @@ import java.util.function.UnaryOperator;
 
 public class CsDocCommentPrinter<P> extends CsDocCommentVisitor<PrintOutputCapture<P>> {
     public CsDocCommentPrinter() {
-        super(new CsDocCommentCSharpPrinter<>());
+        super(new CSharpPrinter<>());
     }
 
     @Override
@@ -140,9 +139,6 @@ public class CsDocCommentPrinter<P> extends CsDocCommentVisitor<PrintOutputCaptu
     private static final UnaryOperator<String> MARKER_WRAPPER =
             out -> "~~" + out + (out.isEmpty() ? "" : "~~") + ">";
 
-    private static final UnaryOperator<String> CSHARP_MARKER_WRAPPER =
-            out -> "/*~~" + out + (out.isEmpty() ? "" : "~~") + ">*/";
-
     private void beforeSyntax(CsDocComment j, PrintOutputCapture<P> p) {
         beforeSyntax(j, p, MARKER_WRAPPER);
     }
@@ -165,46 +161,6 @@ public class CsDocCommentPrinter<P> extends CsDocCommentVisitor<PrintOutputCaptu
     private void afterSyntax(Markers markers, PrintOutputCapture<P> p) {
         for (Marker marker : markers.getMarkers()) {
             p.append(p.getMarkerPrinter().afterSyntax(marker, new Cursor(getCursor(), marker), MARKER_WRAPPER));
-        }
-    }
-
-    /**
-     * Inner printer for handling embedded C# (J) references within cref attributes.
-     */
-    static class CsDocCommentCSharpPrinter<P> extends CSharpVisitor<PrintOutputCapture<P>> {
-        @Override
-        public J visitIdentifier(J.Identifier ident, PrintOutputCapture<P> p) {
-            beforeSyntax(ident, p);
-            p.append(ident.getSimpleName());
-            afterSyntax(ident, p);
-            return ident;
-        }
-
-        @Override
-        public J visitFieldAccess(J.FieldAccess fieldAccess, PrintOutputCapture<P> p) {
-            beforeSyntax(fieldAccess, p);
-            visit(fieldAccess.getTarget(), p);
-            p.append('.');
-            visit(fieldAccess.getName(), p);
-            afterSyntax(fieldAccess, p);
-            return fieldAccess;
-        }
-
-        private void beforeSyntax(J j, PrintOutputCapture<P> p) {
-            for (Marker marker : j.getMarkers().getMarkers()) {
-                p.append(p.getMarkerPrinter().beforePrefix(marker, new Cursor(getCursor(), marker), CSHARP_MARKER_WRAPPER));
-            }
-            p.append(j.getPrefix().getWhitespace());
-            visitMarkers(j.getMarkers(), p);
-            for (Marker marker : j.getMarkers().getMarkers()) {
-                p.append(p.getMarkerPrinter().beforeSyntax(marker, new Cursor(getCursor(), marker), CSHARP_MARKER_WRAPPER));
-            }
-        }
-
-        private void afterSyntax(J j, PrintOutputCapture<P> p) {
-            for (Marker marker : j.getMarkers().getMarkers()) {
-                p.append(p.getMarkerPrinter().afterSyntax(marker, new Cursor(getCursor(), marker), CSHARP_MARKER_WRAPPER));
-            }
         }
     }
 }

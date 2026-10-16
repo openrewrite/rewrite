@@ -113,7 +113,14 @@ public sealed class TargetFramework : IRpcCodec<TargetFramework>
 {
     public string TargetFrameworkMoniker { get; }
     public IList<PackageReference> PackageReferences { get; }
+
+    /// <summary>
+    /// The transitive closure of NuGet packages resolved for this target framework. Referenced
+    /// projects are not packages and are reported in <see cref="ProjectReferences"/>.
+    /// </summary>
     public IList<ResolvedPackage> ResolvedPackages { get; }
+
+    /// <summary>The transitive closure of projects referenced for this target framework.</summary>
     public IList<ProjectReference> ProjectReferences { get; }
 
     public TargetFramework(
@@ -149,8 +156,8 @@ public sealed class TargetFramework : IRpcCodec<TargetFramework>
         q.GetAndSendListAsRef(after, tf => tf.ResolvedPackages,
             rp => (object)(rp.Name + "@" + rp.ResolvedVersion),
             rp => rp.RpcSend(rp, q));
-        q.GetAndSendList(after, tf => tf.ProjectReferences,
-            pr => pr.Include,
+        q.GetAndSendListAsRef(after, tf => tf.ProjectReferences,
+            pr => (object)pr.Include,
             pr => pr.RpcSend(pr, q));
     }
 
@@ -206,7 +213,7 @@ public sealed class PackageReference : IRpcCodec<PackageReference>
 }
 
 /// <summary>
-/// A resolved package (or referenced project) from the restore dependency graph, carrying the
+/// A resolved NuGet package from the restore dependency graph, carrying the
 /// full per-target-framework asset information from the NuGet <c>LockFile</c>. Asset lists hold
 /// package-relative paths with <c>_._</c> placeholder entries stripped, so an empty list means
 /// "the package provides no assets of that kind".
@@ -218,7 +225,10 @@ public sealed class ResolvedPackage : IRpcCodec<ResolvedPackage>
     public IList<ResolvedPackage> Dependencies { get; }
     public int Depth { get; }
 
-    /// <summary>Library type from the lock file: "package" or "project".</summary>
+    /// <summary>
+    /// Library type from the lock file. Always "package" in markers that model referenced projects
+    /// as <see cref="ProjectReference"/>s; "project" only in markers built before that.
+    /// </summary>
     public string Type { get; }
 
     /// <summary>Compile-time assemblies (lib/ref), lock file <c>compile</c> section.</summary>
@@ -405,26 +415,87 @@ public sealed class ResolvedPackage : IRpcCodec<ResolvedPackage>
     }
 }
 
+/// <summary>
+/// A project-to-project reference from the restore dependency graph. A referenced project is
+/// compiled from source alongside this one rather than consumed as a NuGet package, so it is
+/// modelled as its own kind of graph node with edges to the packages and further projects it
+/// brings in.
+/// </summary>
 public sealed class ProjectReference : IRpcCodec<ProjectReference>
 {
+    /// <summary>Path to the referenced project file, relative to the referencing project's directory.</summary>
     public string Include { get; }
 
-    public ProjectReference(string include)
+    /// <summary>The referenced project's name in the restore graph, which is its assembly name.</summary>
+    public string? Name { get; }
+
+    /// <summary>
+    /// Shortest distance from the project owning this marker: 0 for a project it references
+    /// directly, higher for one reached only through another project reference.
+    /// </summary>
+    public int Depth { get; }
+
+    /// <summary>Projects this one references in turn.</summary>
+    public IList<ProjectReference> ProjectReferences { get; }
+
+    /// <summary>
+    /// NuGet packages this project depends on directly. Instances are shared with the owning
+    /// <see cref="TargetFramework.ResolvedPackages"/>.
+    /// </summary>
+    public IList<ResolvedPackage> ResolvedPackages { get; }
+
+    public ProjectReference(
+        string include,
+        string? name = null,
+        int depth = 0,
+        IList<ProjectReference>? projectReferences = null,
+        IList<ResolvedPackage>? resolvedPackages = null)
     {
         Include = include;
+        Name = name;
+        Depth = depth;
+        ProjectReferences = projectReferences ?? [];
+        ResolvedPackages = resolvedPackages ?? [];
     }
 
     public ProjectReference WithInclude(string include) =>
-        include == Include ? this : new(include);
+        include == Include ? this : new(include, Name, Depth, ProjectReferences, ResolvedPackages);
+
+    public ProjectReference WithName(string? name) =>
+        name == Name ? this : new(Include, name, Depth, ProjectReferences, ResolvedPackages);
+
+    public ProjectReference WithDepth(int depth) =>
+        depth == Depth ? this : new(Include, Name, depth, ProjectReferences, ResolvedPackages);
+
+    public ProjectReference WithProjectReferences(IList<ProjectReference> projectReferences) =>
+        ReferenceEquals(projectReferences, ProjectReferences) ? this : new(Include, Name, Depth, projectReferences, ResolvedPackages);
+
+    public ProjectReference WithResolvedPackages(IList<ResolvedPackage> resolvedPackages) =>
+        ReferenceEquals(resolvedPackages, ResolvedPackages) ? this : new(Include, Name, Depth, ProjectReferences, resolvedPackages);
 
     public void RpcSend(ProjectReference after, RpcSendQueue q)
     {
         q.GetAndSend(after, pr => pr.Include);
+        q.GetAndSend(after, pr => pr.Name);
+        q.GetAndSend(after, pr => pr.Depth);
+        q.GetAndSendListAsRef(after, pr => pr.ProjectReferences,
+            pr => (object)pr.Include,
+            pr => pr.RpcSend(pr, q));
+        q.GetAndSendListAsRef(after, pr => pr.ResolvedPackages,
+            rp => (object)(rp.Name + "@" + rp.ResolvedVersion),
+            rp => rp.RpcSend(rp, q));
     }
 
     public ProjectReference RpcReceive(ProjectReference before, RpcReceiveQueue q)
     {
-        return before.WithInclude(q.Receive(before.Include)!);
+        return before
+            .WithInclude(q.Receive(before.Include)!)
+            .WithName(q.Receive(before.Name))
+            .WithDepth(q.ReceiveAndGet<int, int>(before.Depth, x => x))
+            .WithProjectReferences(q.ReceiveList(before.ProjectReferences,
+                pr => pr.RpcReceive(pr, q))!)
+            .WithResolvedPackages(q.ReceiveList(before.ResolvedPackages,
+                rp => rp.RpcReceive(rp, q))!);
     }
 }
 

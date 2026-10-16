@@ -37,7 +37,7 @@ describe('qualified name mapping', () => {
             typescript('const value /*a123*/ : globalThis. globalThis . /*asda*/ globalThis.Promise<string> = null;')
         ));
 
-    test.skip('nested class qualified name', () =>
+    test('nested class qualified name', () =>
         spec.rewriteRun(
             //language=typescript
             typescript(`

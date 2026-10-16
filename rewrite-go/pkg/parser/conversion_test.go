@@ -226,3 +226,14 @@ func TestConversionOperandIsTheExpressionSlot(t *testing.T) {
 	require.True(t, ok)
 	assert.Equal(t, "b", operand.Name)
 }
+
+// The AST gives no position for the `type` of a type switch guard, so
+// whatever stands between it and the parentheses has to be scanned for.
+func TestTypeSwitchGuardKeepsCommentsAroundType(t *testing.T) {
+	src := "package main\n\nfunc f(x any) {\n\tswitch x. /* a */ ( /* b */ type /* c */ ) {\n\t}\n}\n"
+
+	cu, err := parser.NewGoParser().Parse("guard.go", src)
+	require.NoError(t, err)
+
+	require.Equal(t, src, printer.Print(cu))
+}

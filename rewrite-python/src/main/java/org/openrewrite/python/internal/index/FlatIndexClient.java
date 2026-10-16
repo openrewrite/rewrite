@@ -124,8 +124,7 @@ public class FlatIndexClient {
         try (HttpSender.Response response = httpSender.send(request)) {
             int code = response.getCode();
             if (code == 401 || code == 403) {
-                throw new PythonIndexException(Reason.AUTH_FAILED, index.getUrl(),
-                        "HTTP " + code + " from " + pageUrl);
+                throw PythonIndexException.authFailed(index, code, pageUrl);
             }
             if (!response.isSuccessful()) {
                 // the page is the whole index, so any failure is the index being unreachable

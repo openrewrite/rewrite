@@ -52,6 +52,9 @@ interface PackageManagerConfig {
 
     /** Command to list dependencies in JSON format (if supported) */
     listCommand?: string[];
+
+    /** Command that prints the release of the package manager that runs where it is run */
+    versionCommand: string[];
 }
 
 /**
@@ -69,6 +72,7 @@ const PACKAGE_MANAGER_CONFIGS: Record<PackageManager, PackageManagerConfig> = {
         installLockOnlyCommand: ['npm', 'install', '--package-lock-only', '--ignore-scripts', '--legacy-peer-deps'],
         installCommand: ['npm', 'install', '--ignore-scripts', '--legacy-peer-deps'],
         listCommand: ['npm', 'list', '--json', '--all'],
+        versionCommand: ['npm', '--version'],
     },
     [PackageManager.YarnClassic]: {
         lockFile: 'yarn.lock',
@@ -76,6 +80,7 @@ const PACKAGE_MANAGER_CONFIGS: Record<PackageManager, PackageManagerConfig> = {
         installLockOnlyCommand: ['yarn', 'install', '--ignore-scripts'],
         installCommand: ['yarn', 'install', '--ignore-scripts'],
         listCommand: ['yarn', 'list', '--json'],
+        versionCommand: ['yarn', '--version'],
     },
     [PackageManager.YarnBerry]: {
         lockFile: 'yarn.lock',
@@ -83,6 +88,7 @@ const PACKAGE_MANAGER_CONFIGS: Record<PackageManager, PackageManagerConfig> = {
         installLockOnlyCommand: ['yarn', 'install', '--mode', 'skip-build'],
         installCommand: ['yarn', 'install', '--mode', 'skip-build'],
         listCommand: ['yarn', 'info', '--all', '--json'],
+        versionCommand: ['yarn', '--version'],
     },
     [PackageManager.Pnpm]: {
         lockFile: 'pnpm-lock.yaml',
@@ -92,12 +98,14 @@ const PACKAGE_MANAGER_CONFIGS: Record<PackageManager, PackageManagerConfig> = {
         installLockOnlyCommand: ['pnpm', 'install', '--lockfile-only', '--ignore-scripts', '--no-strict-peer-dependencies'],
         installCommand: ['pnpm', 'install', '--ignore-scripts', '--no-strict-peer-dependencies'],
         listCommand: ['pnpm', 'list', '--json', '--depth=Infinity'],
+        versionCommand: ['pnpm', '--version'],
     },
     [PackageManager.Bun]: {
         lockFile: 'bun.lock',
         // Bun doesn't have a lock-only mode; --ignore-scripts prevents lifecycle scripts
         installLockOnlyCommand: ['bun', 'install', '--ignore-scripts'],
         installCommand: ['bun', 'install', '--ignore-scripts'],
+        versionCommand: ['bun', '--version'],
     },
 };
 
@@ -308,6 +316,46 @@ export function runList(pm: PackageManager, cwd: string, timeout: number = 30000
     }
 
     return result.stdout;
+}
+
+/**
+ * A release as a package manager's `--version` prints it: `major.minor.patch`, with a prerelease or build or both.
+ */
+const RELEASE = /^\d+\.\d+\.\d+(?:-[0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*)?(?:\+[0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*)?$/;
+
+/**
+ * What the package manager's `--version` answers, run in `cwd`: in the project's root directory, the release that
+ * would install the project on this machine, since Yarn and pnpm decide there which release runs (`yarnPath`,
+ * corepack, pnpm's own switching).
+ *
+ * It runs as the parser's other package manager commands do, with `COREPACK_ENABLE_DOWNLOAD_PROMPT=0`, no input and
+ * a short timeout, so it never prompts and never throws.
+ *
+ * @param pm The package manager to ask
+ * @param cwd The project's root directory
+ * @param timeout Timeout in milliseconds
+ * @returns The trimmed answer, or undefined when the package manager is not installed, fails, or answers something
+ *          that is no version
+ */
+export function runVersion(pm: PackageManager, cwd: string, timeout: number = 10000): string | undefined {
+    const [cmd, ...args] = PACKAGE_MANAGER_CONFIGS[pm].versionCommand;
+    try {
+        const result = spawnSync(getPlatformCommand(cmd), args, {
+            cwd,
+            encoding: 'utf-8',
+            stdio: ['ignore', 'pipe', 'pipe'],
+            timeout,
+            env: {...process.env, COREPACK_ENABLE_DOWNLOAD_PROMPT: '0'},
+            ...(os.platform() === 'win32' ? { shell: true } : {})
+        });
+        if (result.error || result.status !== 0 || typeof result.stdout !== 'string') {
+            return undefined;
+        }
+        const answer = result.stdout.trim();
+        return RELEASE.test(answer) ? answer : undefined;
+    } catch {
+        return undefined;
+    }
 }
 
 /**

@@ -1,7 +1,8 @@
 import {JavaScriptVisitor} from "./visitor";
-import {J} from "../java";
+import {isIdentifier, J} from "../java";
 import {bindingNames, namesReferencedWithin} from "./scope";
-import {JS, JSX} from "./tree";
+import {sameModule} from "./package-name";
+import {isObjectBindingPattern, JS, JSX} from "./tree";
 import {mapAsync, updateIfChanged} from "../util";
 import {ElementRemovalFormatter} from "../java";
 
@@ -394,7 +395,7 @@ export class RemoveImport<P> extends JavaScriptVisitor<P> {
      * Check if the module name matches the target module
      */
     private matchesTargetModule(moduleName: string): boolean {
-        return moduleName === this.module;
+        return sameModule(moduleName, this.module);
     }
 
     /**
@@ -489,33 +490,24 @@ export class RemoveImport<P> extends JavaScriptVisitor<P> {
             return varDecls;
         }
 
-        const methodInv = initializer as J.MethodInvocation;
-
-        // This is a require() statement
+        const moduleName = this.getModuleNameFromRequire(initializer as J.MethodInvocation);
         const pattern = namedVar.name;
-        if (!pattern) {
+        if (!moduleName || !this.matchesTargetModule(moduleName) || !pattern) {
             return varDecls;
         }
 
         // Handle: const fs = require('fs')
-        if (pattern.kind === J.Kind.Identifier) {
-            const varName = (pattern as J.Identifier).simpleName;
-
-            // For require() statements, check the module name from the require call
-            const moduleName = this.getModuleNameFromRequire(methodInv);
-            if (moduleName && this.matchesTargetModule(moduleName) && !usedNames.has(varName)) {
-                return undefined; // Remove the entire require statement
-            }
+        if (isIdentifier(pattern) && !usedNames.has(pattern.simpleName)) {
+            return undefined; // Remove the entire require statement
         }
 
         // Handle: const { readFile } = require('fs')
-        if (pattern.kind === JS.Kind.ObjectBindingPattern && this.member !== undefined) {
-            const objectPattern = pattern as JS.ObjectBindingPattern;
-            const updatedPattern = await this.processObjectBindingPattern(objectPattern, usedNames, p);
+        if (isObjectBindingPattern(pattern)) {
+            const updatedPattern = await this.processObjectBindingPattern(pattern, usedNames, p);
 
             if (updatedPattern === undefined) {
                 return undefined; // Remove entire require
-            } else if (updatedPattern !== objectPattern) {
+            } else if (updatedPattern !== pattern) {
                 // Update with filtered bindings
                 return this.produceJava(varDecls, p, async draft => {
                     const updatedNamedVar = await this.produceJava(
@@ -666,7 +658,7 @@ export class RemoveImport<P> extends JavaScriptVisitor<P> {
         const moduleName = literal.value?.toString().replace(/['"`]/g, '');
 
         // Match the module name
-        return moduleName === this.module;
+        return moduleName !== undefined && sameModule(moduleName, this.module);
     }
 
 }

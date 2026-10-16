@@ -771,3 +771,44 @@ def test_a_source_the_caller_already_had_survives_the_parse(tmp_path, monkeypatc
 
     assert existing.exists(), "a file the server did not create must not be removed"
     assert pkg.exists()
+
+
+def test_source_path_is_not_relativized_against_an_inferred_project_root(tmp_path, monkeypatch):
+    """Without a ``relativeTo`` the host's other parsers keep its input paths as given,
+    so an inferred project root may only root ty, not rebase the LST's source path."""
+    import rewrite.rpc.server as server
+    import rewrite.python.ty_client as ty_client_module
+    from pathlib import Path
+
+    # given
+    (tmp_path / "pyproject.toml").write_text('[project]\nname = "demo"\n', encoding="utf-8")
+    source_path = tmp_path / "demo" / "http.py"
+
+    observed = {}
+
+    class FakeTyClient:
+        def __init__(self, virtual_env=None, python_version=None):
+            pass
+
+        def initialize(self, project_root):
+            observed["ty_root"] = project_root
+            return True
+
+        def shutdown(self):
+            pass
+
+    monkeypatch.setattr(ty_client_module, "TyTypesClient", FakeTyClient)
+
+    parse_python_source = server.parse_python_source
+
+    def untyped_parse_python_source(source, path="<unknown>", relative_to=None, ty_client=None, **kw):
+        return parse_python_source(source, path, relative_to, None, **kw)
+
+    monkeypatch.setattr(server, "parse_python_source", untyped_parse_python_source)
+
+    # when
+    ids = server.handle_parse({"inputs": [{"text": "x = 1\n", "sourcePath": str(source_path)}]})
+
+    # then
+    assert server.local_objects[ids[0]].source_path == Path(source_path)
+    assert observed["ty_root"] == str(tmp_path)

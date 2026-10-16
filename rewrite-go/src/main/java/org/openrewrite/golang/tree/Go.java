@@ -20,12 +20,11 @@ import lombok.experimental.FieldDefaults;
 import lombok.experimental.NonFinal;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
+import org.openrewrite.golang.GolangPrinter;
 import org.openrewrite.golang.GolangVisitor;
-import org.openrewrite.golang.rpc.GoRewriteRpc;
 import org.openrewrite.java.internal.TypesInUse;
 import org.openrewrite.java.tree.*;
 import org.openrewrite.marker.Markers;
-import org.openrewrite.rpc.request.Print;
 
 import java.lang.ref.SoftReference;
 import java.lang.ref.WeakReference;
@@ -250,16 +249,7 @@ public interface Go extends J {
 
         @Override
         public <P> TreeVisitor<?, PrintOutputCapture<P>> printer(Cursor cursor) {
-            return new TreeVisitor<Tree, PrintOutputCapture<P>>() {
-                @Override
-                public @Nullable Tree preVisit(Tree tree, PrintOutputCapture<P> p) {
-                    GoRewriteRpc rpc = GoRewriteRpc.getOrStart();
-                    Print.MarkerPrinter mappedMarkerPrinter = Print.MarkerPrinter.from(p.getMarkerPrinter());
-                    p.append(rpc.print(tree, cursor, mappedMarkerPrinter));
-                    stopAfterPreVisit();
-                    return tree;
-                }
-            };
+            return new GolangPrinter<>();
         }
 
         public Padding getPadding() {

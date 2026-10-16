@@ -112,7 +112,24 @@ public class PythonRewriteRpc extends RewriteRpc {
     public InstallRecipesResponse installRecipes(File recipes) {
         return send(
                 "InstallRecipes",
-                new InstallRecipesByFile(recipes.getAbsoluteFile().toPath()),
+                new InstallRecipesByFile(recipes.getAbsoluteFile().toPath(), null),
+                InstallRecipesResponse.class
+        );
+    }
+
+    /**
+     * Run a local package's recipes from a venv the caller built, installing nothing. Each call restarts
+     * the bundle on that venv, and its recipes take precedence over a published namesake's. Requires a
+     * {@link Builder#recipeInstallDir(Path)}.
+     *
+     * @param recipes Path to the local package directory, which names the distribution and keys the bundle
+     * @param venv    A venv with that package installed
+     * @return Response with installation details
+     */
+    public InstallRecipesResponse installRecipes(File recipes, Path venv) {
+        return send(
+                "InstallRecipes",
+                new InstallRecipesByFile(recipes.getAbsoluteFile().toPath(), venv.toAbsolutePath().normalize()),
                 InstallRecipesResponse.class
         );
     }
@@ -243,6 +260,9 @@ public class PythonRewriteRpc extends RewriteRpc {
                 if (response == null) {
                     parsingListener.intermediateMessage("Starting project parsing: " + projectPath);
                     response = send("ParseProject", new ParseProject(projectPath, exclusions, relativeTo, dependencyPath, parseOptions(ctx)), ParseProjectResponse.class);
+                    // A setup.py-only project's resolution rides on setup.py, so it leads like any other manifest.
+                    response.sort(Comparator.comparing((ParseProjectResponse.Item item) ->
+                            !"setup.py".equals(Paths.get(item.getSourcePath()).getFileName().toString())));
                     parsingListener.intermediateMessage(String.format("Discovered %,d files to parse", response.size()));
                 }
 
@@ -321,7 +341,8 @@ public class PythonRewriteRpc extends RewriteRpc {
         }
 
         Stream<SourceFile> manifestStream = parseManifest(projectPath, relativeTo, dependencyPath, ctx);
-        return Stream.concat(rpcStream, manifestStream);
+        // Manifests first, so a consumer can read the resolved dependencies before the sources.
+        return Stream.concat(manifestStream, rpcStream);
     }
 
     /**
@@ -524,12 +545,14 @@ public class PythonRewriteRpc extends RewriteRpc {
             Stream<SourceFile> result = new PyProjectTomlParser(commandEnv, dependencyPath).parseInputs(
                     singletonList(pyprojectInput), effectiveRelativeTo, ctx);
 
-            Path uvLockPath = projectPath.resolve("uv.lock");
-            if (Files.exists(uvLockPath)) {
-                Parser.Input uvLockInput = Parser.Input.fromFile(uvLockPath);
-                Stream<SourceFile> uvLockStream = new TomlParser().parseInputs(
-                        singletonList(uvLockInput), effectiveRelativeTo, ctx);
-                result = Stream.concat(result, uvLockStream);
+            for (String lockFileName : Arrays.asList("uv.lock", "poetry.lock", "pdm.lock")) {
+                Path lockPath = projectPath.resolve(lockFileName);
+                if (Files.exists(lockPath)) {
+                    Parser.Input lockInput = Parser.Input.fromFile(lockPath);
+                    Stream<SourceFile> lockStream = new TomlParser().parseInputs(
+                            singletonList(lockInput), effectiveRelativeTo, ctx);
+                    result = Stream.concat(result, lockStream);
+                }
             }
             return result;
         }
@@ -595,13 +618,15 @@ public class PythonRewriteRpc extends RewriteRpc {
         private static Path findDefaultPythonPath() {
             // Try to find a venv in the project structure
             Path basePath = Paths.get(System.getProperty("user.dir"));
+            String venvPython = System.getProperty("os.name").startsWith("Windows") ?
+                    ".venv/Scripts/python.exe" : ".venv/bin/python";
             Path[] searchPaths = {
                 // From rewrite root dir
-                basePath.resolve("rewrite-python/rewrite/.venv/bin/python"),
+                basePath.resolve("rewrite-python/rewrite/" + venvPython),
                 // From rewrite-python dir
-                basePath.resolve("rewrite/.venv/bin/python"),
+                basePath.resolve("rewrite/" + venvPython),
                 // From rewrite-python/rewrite dir
-                basePath.resolve(".venv/bin/python")
+                basePath.resolve(venvPython)
             };
 
             for (Path path : searchPaths) {
@@ -866,17 +891,10 @@ public class PythonRewriteRpc extends RewriteRpc {
             );
 
             String[] cmdArr = cmd.filter(Objects::nonNull).toArray(String[]::new);
-            RewriteRpcProcess process = new RewriteRpcProcess(cmdArr);
-
-            if (workingDirectory != null) {
-                process.setWorkingDirectory(workingDirectory);
-            }
-            process.setStderrRedirect(log);
-
-            process.environment().putAll(environment);
+            Map<String, String> env = new LinkedHashMap<>(environment);
 
             // Set the Python version for the parser
-            process.environment().put("REWRITE_PYTHON_VERSION", pythonVersion);
+            env.put("REWRITE_PYTHON_VERSION", pythonVersion);
 
             // Set up PYTHONPATH for the rewrite package
             List<String> pythonPathParts = new ArrayList<>();
@@ -921,9 +939,15 @@ public class PythonRewriteRpc extends RewriteRpc {
             }
 
             if (!pythonPathParts.isEmpty()) {
-                process.environment().put("PYTHONPATH", String.join(File.pathSeparator, pythonPathParts));
+                env.put("PYTHONPATH", String.join(File.pathSeparator, pythonPathParts));
             }
 
+            RewriteRpcProcess process = RewriteRpcProcess.forLanguage("python")
+                    .command(cmdArr)
+                    .workingDirectory(workingDirectory)
+                    .stderrRedirect(log)
+                    .environment(env)
+                    .build();
             process.start();
 
             try {

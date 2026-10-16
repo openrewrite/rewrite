@@ -20,10 +20,13 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
 import org.junit.jupiter.api.io.TempDir;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.openrewrite.InMemoryExecutionContext;
 import org.openrewrite.SourceFile;
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.tree.J;
+import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.json.tree.Json;
 import org.openrewrite.python.marker.PythonResolutionResult;
 import org.openrewrite.python.rpc.PythonRewriteRpc;
@@ -172,6 +175,38 @@ class ParseProjectIntegTest {
 
     @Test
     @Timeout(value = 60, unit = TimeUnit.SECONDS)
+    void manifestsPrecedeSources() throws Exception {
+        Path pyprojectDir = tempDir.resolve("pyproject_first");
+        Files.createDirectories(pyprojectDir);
+        Files.writeString(pyprojectDir.resolve("a.py"), "x = 1");
+        Files.writeString(pyprojectDir.resolve("b.py"), "y = 2");
+        Files.writeString(pyprojectDir.resolve("pyproject.toml"), """
+                [project]
+                name = "myapp"
+                version = "1.0.0"
+                """);
+
+        assertThat(client().parseProject(pyprojectDir, new InMemoryExecutionContext()).findFirst())
+                .get()
+                .extracting(sf -> sf.getSourcePath().getFileName().toString())
+                .isEqualTo("pyproject.toml");
+
+        Path setupPyDir = tempDir.resolve("setup_py_first");
+        Files.createDirectories(setupPyDir);
+        Files.writeString(setupPyDir.resolve("a.py"), "x = 1");
+        Files.writeString(setupPyDir.resolve("setup.py"), """
+                from setuptools import setup
+                setup(name="myapp", version="1.0.0")
+                """);
+
+        assertThat(client().parseProject(setupPyDir, new InMemoryExecutionContext()).findFirst())
+                .get()
+                .extracting(sf -> sf.getSourcePath().getFileName().toString())
+                .isEqualTo("setup.py");
+    }
+
+    @Test
+    @Timeout(value = 60, unit = TimeUnit.SECONDS)
     void includesPyprojectToml() throws Exception {
         Path projectDir = tempDir.resolve("with_pyproject");
         Files.createDirectories(projectDir);
@@ -198,6 +233,36 @@ class ParseProjectIntegTest {
                 .orElseThrow();
         assertThat(pyproject).isInstanceOf(Toml.Document.class);
         assertThat(pyproject.getMarkers().findFirst(PythonResolutionResult.class)).isPresent();
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"uv.lock", "poetry.lock", "pdm.lock"})
+    @Timeout(value = 60, unit = TimeUnit.SECONDS)
+    void includesPyprojectLockFile(String lockFileName) throws Exception {
+        Path projectDir = tempDir.resolve("with_" + lockFileName.replace('.', '_'));
+        Files.createDirectories(projectDir);
+
+        Files.writeString(projectDir.resolve("main.py"), "x = 1");
+        Files.writeString(projectDir.resolve("pyproject.toml"), """
+                [project]
+                name = "myapp"
+                version = "1.0.0"
+                dependencies = ["requests>=2.28.0"]
+                """);
+        Files.writeString(projectDir.resolve(lockFileName), """
+                [[package]]
+                name = "requests"
+                version = "2.31.0"
+                """);
+
+        List<SourceFile> sources = client()
+                .parseProject(projectDir, new InMemoryExecutionContext())
+                .collect(toList());
+
+        assertThat(sources)
+                .filteredOn(sf -> sf.getSourcePath().getFileName().toString().equals(lockFileName))
+                .singleElement()
+                .isInstanceOf(Toml.Document.class);
     }
 
     @Test
@@ -344,7 +409,7 @@ class ParseProjectIntegTest {
 
     @Test
     @Timeout(value = 60, unit = TimeUnit.SECONDS)
-    void complexLiteralValueSurvivesRpcBridge() throws Exception {
+    void complexLiteralKeepsOnlyItsSource() throws Exception {
         Path projectDir = tempDir.resolve("complex_literal");
         Files.createDirectories(projectDir);
         Files.writeString(projectDir.resolve("main.py"), "x = 0j\n");
@@ -369,9 +434,9 @@ class ParseProjectIntegTest {
 
         assertThat(literals).hasSize(1);
         assertThat(literals.get(0).getValueSource()).isEqualTo("0j");
-        assertThat(literals.get(0).getValue())
-                .as("complex literal value must survive the RPC bridge, not be dropped to null")
-                .isEqualTo("0j");
+        // no JSON number carries a complex, and no primitive names one
+        assertThat(literals.get(0).getValue()).isNull();
+        assertThat(literals.get(0).getType()).isEqualTo(JavaType.Primitive.None);
     }
 
     private PythonRewriteRpc client() {

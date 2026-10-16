@@ -155,25 +155,32 @@ class PsiElementAssociations(val typeMapping: KotlinTypeMapping, val file: FirFi
             // `primary` walked up to an enclosing declaration, whose type describes a different name
             return null
         }
-        if (psiElement != null && fir is FirResolvedQualifier && fir.source != null && (fir.source.psi is KtDotQualifiedExpression || fir.source.psi is KtNameReferenceExpression)) {
-            if (fir.qualifierSymbol is FirRegularClassSymbol) {
-                val classId = (fir.qualifierSymbol as FirRegularClassSymbol).classId
-                return if (isPackage(psiElement, classId)) {
-                    null
-                } else {
-                    val found = matchClassId(psiElement, classId)
-                    typeMapping.type(found, owner)
-                }
+        val qualifier = (fir as? FirResolvedQualifier)?.source?.psi
+        if (psiElement != null && fir is FirResolvedQualifier && (qualifier is KtDotQualifiedExpression || qualifier is KtNameReferenceExpression)) {
+            val symbol = fir.qualifierSymbol
+            if (symbol != null && isPackage(psiElement, qualifier, symbol.classId)) {
+                return null
+            }
+            if (symbol is FirRegularClassSymbol) {
+                return typeMapping.type(matchClassId(psiElement, symbol.classId), owner)
             }
         }
         return if (fir != null) typeMapping.type(fir, owner) else null
     }
 
-    private fun isPackage(psi: PsiElement, classId: ClassId): Boolean {
-        return !classId.packageFqName.isRoot && psi.parent.text == classId.packageFqName.asString()
+    private fun isPackage(psi: PsiElement, qualifier: PsiElement, classId: ClassId): Boolean {
+        val packageDepth = classId.packageFqName.pathSegments().size
+        val fullyQualified = segmentCount(qualifier) == packageDepth + classId.relativeClassName.pathSegments().size
+        val parent = psi.parent
+        val throughPsi = if (parent is KtDotQualifiedExpression && parent.selectorExpression == psi) parent else psi
+        return packageDepth > 0 && fullyQualified && segmentCount(throughPsi) <= packageDepth
     }
 
-    private fun matchClassId(psi: PsiElement, classId: ClassId): ClassId {
+    private fun segmentCount(psi: PsiElement): Int = withoutTypeArguments(psi).split('.').size
+
+    private fun matchClassId(name: PsiElement, classId: ClassId): ClassId {
+        // `Outer.Nested<Int>` nests the name in a call carrying the type arguments
+        val psi = (name.parent as? KtCallExpression)?.takeIf { it.calleeExpression == name } ?: name
         if (psi.parent is KtDotQualifiedExpression) {
             val parent: KtDotQualifiedExpression = psi.parent as KtDotQualifiedExpression
             if (classId.packageFqName.isRoot && psi !is KtDotQualifiedExpression && psi == parent.receiverExpression) {
@@ -195,7 +202,7 @@ class PsiElementAssociations(val typeMapping: KotlinTypeMapping, val file: FirFi
         //   - relative to an imported nested: `B.A` for `A.B.A` -> a trailing run of the nested names
         // The two multi-segment fallbacks require at least two segments so a single receiver name (e.g.
         // the outer `A` of `A.B.A.C`, whose leaf coincidentally repeats deeper) is not matched too deep.
-        val text = psi.text
+        val text = withoutTypeArguments(psi)
         if (text == classId.asFqNameString() || text == classId.relativeClassName.asString()) {
             return classId
         }
@@ -214,6 +221,13 @@ class PsiElementAssociations(val typeMapping: KotlinTypeMapping, val file: FirFi
         }
 
         return classId
+    }
+
+    private fun withoutTypeArguments(psi: PsiElement): String = when (psi) {
+        is KtDotQualifiedExpression -> withoutTypeArguments(psi.receiverExpression) + "." +
+                (psi.selectorExpression?.let { withoutTypeArguments(it) } ?: "")
+        is KtCallExpression -> psi.calleeExpression?.text ?: psi.text
+        else -> psi.text
     }
 
     fun primary(psiElement: PsiElement?) =

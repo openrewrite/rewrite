@@ -109,6 +109,8 @@ class _Workspace:
     paths: Dict[int, Path]
     written: Dict[int, str]
     ty_client: Optional[Any]
+    # Whether ty attributed this run, and if not, why.
+    ty_status: str
 
     def source_path(self, spec: SourceSpec) -> Path:
         return self.paths[id(spec)]
@@ -194,6 +196,7 @@ class RecipeSpec:
         # Parse and validate all source files
         all_parsed: List[Tuple[SourceSpec, SourceFile]] = []
         with self._workspace(specs) as workspace:
+            ty_status = workspace.ty_status
             for kind, kind_specs in specs_by_kind.items():
                 parsed = self._parse(kind_specs, workspace)
                 self._expect_no_parse_failures(parsed)
@@ -225,7 +228,7 @@ class RecipeSpec:
                     result_map[result._before.id] = None
 
         # Validate results match expected after states
-        self._expect_results_to_match_after(source_specs, all_parsed, result_map)
+        self._expect_results_to_match_after(source_specs, all_parsed, result_map, ty_status)
 
     def _group_by_kind(self, specs: List[SourceSpec]) -> Dict[str, List[SourceSpec]]:
         """Group source specs by their kind."""
@@ -262,7 +265,7 @@ class RecipeSpec:
             # Reports the attribution this run produced, which is the one a
             # pattern written for this test has to match.
             from rewrite.python.type_report import dump_types_if_requested
-            dump_types_if_requested(parsed)
+            dump_types_if_requested(parsed, ty_status=workspace.ty_status)
 
             result.append((spec, parsed))
 
@@ -284,7 +287,7 @@ class RecipeSpec:
         paths = {id(spec): spec.path or Path(f"_{uuid4().hex}.{spec.ext}") for spec in specs}
 
         if not self.type_attribution:
-            yield _Workspace(paths, {}, None)
+            yield _Workspace(paths, {}, None, "off, type_attribution=False")
             return
 
         root = next((spec.project_root for spec in specs if spec.project_root), None)
@@ -295,6 +298,7 @@ class RecipeSpec:
         written: Dict[int, str] = {}
         created: List[Path] = []
         ty_client = None
+        ty_status = "on"
         try:
             for spec in specs:
                 if spec.before is None:
@@ -316,11 +320,13 @@ class RecipeSpec:
                 from rewrite.python.ty_client import TyTypesClient
                 # handle_parse resolves this same version for a real parse.
                 ty_client = TyTypesClient(python_version=ty_python_version(detect_from_project(root)))
-                ty_client.initialize(root)
-            except (ImportError, RuntimeError):
+                if not ty_client.initialize(root):
+                    ty_status = f"off, ty could not initialize against {root}"
+            except (ImportError, RuntimeError) as exc:
                 ty_client = None
+                ty_status = f"off, ty-types unavailable: {exc}"
 
-            yield _Workspace(paths, written, ty_client)
+            yield _Workspace(paths, written, ty_client, ty_status)
         finally:
             if ty_client is not None:
                 ty_client.shutdown()
@@ -387,6 +393,7 @@ class RecipeSpec:
         specs: Tuple[SourceSpec, ...],
         parsed: List[Tuple[SourceSpec, SourceFile]],
         result_map: Dict[Any, Optional[SourceFile]],
+        ty_status: str,
     ) -> None:
         """Validate recipe results match expected after states."""
         # Build a map from spec to parsed source file
@@ -427,7 +434,7 @@ class RecipeSpec:
                 if after_sf is None:
                     from rewrite.python.type_report import attribution_hint
                     before_sf = parsed_map.get(id(spec))
-                    hint = "" if before_sf is None else attribution_hint(before_sf)
+                    hint = "" if before_sf is None else attribution_hint(before_sf, ty_status=ty_status)
                     raise AssertionError(
                         f"Expected recipe to produce a change for:\n{dedent(spec.before)}{hint}"
                     )

@@ -48,7 +48,7 @@ func Maybe(e java.Expression, site *visitor.Cursor) java.Expression {
 // Wrap puts e in parentheses, moving e's own leading whitespace out onto them
 // so the result leads the same way e did.
 func Wrap(e java.Expression) java.Expression {
-	inner, ok := format.WithPrefix(e, java.Space{}).(java.Expression)
+	inner, ok := format.WithPrefix(e, java.EmptySpace).(java.Expression)
 	if !ok {
 		return e
 	}
@@ -69,7 +69,7 @@ func WrapType(e java.Expression) java.Expression {
 	return &java.ParenthesizedTypeTree{
 		ID:     uuid.New(),
 		Prefix: parens.Prefix,
-		Type:   parens.WithPrefix(java.Space{}),
+		Type:   parens.WithPrefix(java.EmptySpace),
 	}
 }
 

@@ -62,7 +62,6 @@ class TabsAndIndentsStyleTest implements RewriteTest {
     public void defaults(RecipeSpec spec) {
         spec.recipe(toRecipe(() -> new TabsAndIndentsVisitor<>(null)))
                 .typeValidationOptions(TypeValidation.builder()
-                        .allowNonWhitespaceInWhitespace(true)
                         .identifiers(false)
                         .methodInvocations(false)
                         .build());

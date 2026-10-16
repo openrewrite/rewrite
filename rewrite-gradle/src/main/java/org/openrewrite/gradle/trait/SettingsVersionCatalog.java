@@ -23,10 +23,12 @@ import org.openrewrite.InMemoryExecutionContext;
 import org.openrewrite.SourceFile;
 import org.openrewrite.gradle.IsBuildGradle;
 import org.openrewrite.gradle.internal.ChangeStringLiteral;
+import org.openrewrite.groovy.tree.G;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.java.tree.Expression;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.Statement;
+import org.openrewrite.kotlin.tree.K;
 import org.openrewrite.maven.tree.Dependency;
 import org.openrewrite.maven.tree.DependencyNotation;
 import org.openrewrite.maven.tree.GroupArtifact;
@@ -36,6 +38,7 @@ import java.util.Arrays;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.function.Function;
 import java.util.function.Predicate;
 import java.util.function.UnaryOperator;
 
@@ -83,15 +86,24 @@ class SettingsVersionCatalog implements VersionCatalog {
 
     @Override
     public Map<String, String> getVersionDeclarations() {
-        Map<String, String> versions = new LinkedHashMap<>();
+        return versionDeclarations(Version::getVersion);
+    }
+
+    @Override
+    public Map<String, String> getVersionDeclarationVariables() {
+        return versionDeclarations(Version::getVariable);
+    }
+
+    private Map<String, String> versionDeclarations(Function<Version, String> value) {
+        Map<String, String> declarations = new LinkedHashMap<>();
         new Version.Matcher().lower(cursor).forEach(version -> {
             String alias = version.getAlias();
-            String value = version.getVersion();
-            if (alias != null && value != null) {
-                versions.put(alias, value);
+            String declared = value.apply(version);
+            if (alias != null && declared != null) {
+                declarations.put(alias, declared);
             }
         });
-        return versions;
+        return declarations;
     }
 
     @Override
@@ -162,14 +174,28 @@ class SettingsVersionCatalog implements VersionCatalog {
                 (J.MethodInvocation) select : outer;
     }
 
+    private static @Nullable Expression argument(J.MethodInvocation m, int index) {
+        return index < m.getArguments().size() ? m.getArguments().get(index) : null;
+    }
+
     private static @Nullable String literalArgument(J.MethodInvocation m, int index) {
-        if (index < m.getArguments().size()) {
-            Expression argument = m.getArguments().get(index);
-            if (argument instanceof J.Literal && ((J.Literal) argument).getValue() instanceof String) {
-                return (String) ((J.Literal) argument).getValue();
-            }
+        Expression argument = argument(m, index);
+        return argument instanceof J.Literal && ((J.Literal) argument).getValue() instanceof String ?
+                (String) ((J.Literal) argument).getValue() : null;
+    }
+
+    private static @Nullable String identifierArgument(J.MethodInvocation m, int index) {
+        J argument = argument(m, index);
+        if (argument instanceof G.GString) {
+            List<J> strings = ((G.GString) argument).getStrings();
+            argument = strings.size() == 1 && strings.get(0) instanceof G.GString.Value ?
+                    ((G.GString.Value) strings.get(0)).getTree() : null;
+        } else if (argument instanceof K.StringTemplate) {
+            List<J> strings = ((K.StringTemplate) argument).getStrings();
+            argument = strings.size() == 1 && strings.get(0) instanceof K.StringTemplate.Expression ?
+                    ((K.StringTemplate.Expression) strings.get(0)).getTree() : null;
         }
-        return null;
+        return argument instanceof J.Identifier ? ((J.Identifier) argument).getSimpleName() : null;
     }
 
     /**
@@ -268,6 +294,11 @@ class SettingsVersionCatalog implements VersionCatalog {
             }
             Dependency dependency = coordinates(Trait.super.getTree());
             return dependency == null ? null : dependency.getVersion();
+        }
+
+        @Override
+        public @Nullable String getVersionVariable() {
+            return isChained(getTree(), "version") ? identifierArgument(getTree(), 0) : null;
         }
 
         private Library withVersion(String newVersion) {
@@ -424,6 +455,10 @@ class SettingsVersionCatalog implements VersionCatalog {
             J.MethodInvocation versionConstraint = versionConstraint(Trait.super.getTree());
             return versionConstraint == null ?
                     literalArgument(Trait.super.getTree(), 1) : literalArgument(versionConstraint, 0);
+        }
+
+        private @Nullable String getVariable() {
+            return versionBlock(getTree()) == null ? identifierArgument(getTree(), 1) : null;
         }
 
         private Version withVersion(String newVersion) {

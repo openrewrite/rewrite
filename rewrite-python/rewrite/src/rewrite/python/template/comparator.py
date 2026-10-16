@@ -30,6 +30,7 @@ from typing import Dict, List, Optional, TYPE_CHECKING, Union, cast
 from rewrite.java import J, JavaType, JContainer, JLeftPadded, JRightPadded, Space
 from rewrite.java import tree as j
 from .capture import Capture
+from rewrite.python.type_utils import is_assignable_to
 from .placeholder import from_placeholder
 
 if TYPE_CHECKING:
@@ -329,9 +330,8 @@ class PythonSemanticComparator(PythonComparatorVisitor):
                 if (
                     p_decl.fully_qualified_name == t_decl.fully_qualified_name
                     and p_mt.name == t_mt.name
+                    and self._receiver_free(p_mt, t_mt)
                 ):
-                    # FQN match — skip select comparison (allows different
-                    # import styles to match, e.g. os.path.join vs join).
                     return self._compare_arguments(
                         pattern.padding.arguments,
                         target.padding.arguments,
@@ -346,6 +346,16 @@ class PythonSemanticComparator(PythonComparatorVisitor):
         return self._compare_arguments(
             pattern.padding.arguments, target.padding.arguments, cursor
         )
+
+    @staticmethod
+    def _receiver_free(p_mt: JavaType.Method, t_mt: JavaType.Method) -> bool:
+        """Whether the method type alone identifies two calls, so their receivers need not
+        match or even be spelled. An instance call's receiver is a value the method type does
+        not identify, so ``sys.stdout.write`` is not ``sys.stderr.write``.
+        """
+        if p_mt.is_constructor and t_mt.is_constructor:
+            return True
+        return bool(p_mt.flags_bit_map & t_mt.flags_bit_map & JavaType.Flag.Static)
 
     def _compare_arguments(
         self,
@@ -449,16 +459,17 @@ class PatternMatchingComparator(PythonSemanticComparator):
                     if self._debug:
                         print(f"Capture '{capture_name}' matched against None target")
                     return False
-                return self._capture_node(capture_name, target)
+                return self._capture_node(capture_name, pattern, target)
 
         return super()._compare(pattern, target, cursor)
 
-    def _capture_node(self, name: str, target: J) -> bool:
+    def _capture_node(self, name: str, placeholder: j.Identifier, target: J) -> bool:
         """
         Capture a target node for a placeholder.
 
         Args:
             name: The capture name.
+            placeholder: The pattern's placeholder identifier.
             target: The target node to capture.
 
         Returns:
@@ -478,11 +489,29 @@ class PatternMatchingComparator(PythonSemanticComparator):
                 print(f"Capture '{name}' already has value, checking match")
             return existing.id == target.id
 
+        if not self._has_hinted_type(name, placeholder, target):
+            if self._debug:
+                print(f"Capture '{name}' is not assignable to its type hint")
+            return False
+
         # New capture
         self._captured[name] = target
         if self._debug:
             print(f"Captured '{name}': {type(target).__name__}")
         return True
+
+    def _compare_types(self, p_type, t_type) -> bool:
+        # A pattern type is a bound the target's type has to meet, as in Java's JavaTemplateSemanticallyEqual.
+        if (p_type is not None and not isinstance(p_type, JavaType.Method)
+                and is_assignable_to(p_type, t_type)):
+            return True
+        return super()._compare_types(p_type, t_type)
+
+    def _has_hinted_type(self, name: str, placeholder: j.Identifier, target: J) -> bool:
+        cap = self._captures.get(name)
+        if cap is None or not cap.is_typed:
+            return True
+        return is_assignable_to(placeholder.type, getattr(target, 'type', None))
 
     # -- argument override (variadic capture) ---------------------------------
 
@@ -510,10 +539,13 @@ class PatternMatchingComparator(PythonSemanticComparator):
                 if cap_name:
                     cap = self._captures.get(cap_name)
                     if cap is not None and cap.variadic:
-                        self._captured[cap_name] = [
+                        elements = [
                             rp.element for rp in t_padded
                             if not isinstance(rp.element, j.Empty)
                         ]
+                        if not all(self._has_hinted_type(cap_name, pattern_arg, e) for e in elements):
+                            return False
+                        self._captured[cap_name] = elements
                         if self._debug:
                             print(
                                 f"Variadic capture '{cap_name}': "

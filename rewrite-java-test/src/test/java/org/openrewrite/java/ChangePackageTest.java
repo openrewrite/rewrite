@@ -886,6 +886,46 @@ class ChangePackageTest implements RewriteTest {
     }
 
     @Test
+    void expandedPackageStarDoesNotImportNestedTypes() {
+        InMemoryExecutionContext ctx = new InMemoryExecutionContext();
+        markSourceSetDirty(ctx, "demo");
+        rewriteRun(
+          spec -> spec.recipe(new ChangePackage("before.api", "after.api", true))
+            .parser(JavaParser.fromJavaVersion().dependsOn(
+              "package before.api; public interface FilterRegistration { interface Dynamic {} }",
+              "package before.api; public interface ServletRegistration { interface Dynamic {} }"))
+            .executionContext(ctx),
+          mavenProject("demo",
+            srcMainJava(
+              java(
+                """
+                  import java.util.*;
+                  import before.api.*;
+
+                  class A {
+                      FilterRegistration.Dynamic filter;
+                      ServletRegistration.Dynamic servlet;
+                      List<String> names;
+                  }
+                  """,
+                """
+                  import java.util.*;
+                  import after.api.FilterRegistration;
+                  import after.api.ServletRegistration;
+
+                  class A {
+                      FilterRegistration.Dynamic filter;
+                      ServletRegistration.Dynamic servlet;
+                      List<String> names;
+                  }
+                  """
+              )
+            )
+          )
+        );
+    }
+
+    @Test
     void changePackagePreservesStarImportWhenNoAmbiguity() {
         InMemoryExecutionContext ctx = new InMemoryExecutionContext();
         List<Path> classpath = JavaParser.dependenciesFromResources(ctx,
@@ -2051,6 +2091,30 @@ class ChangePackageTest implements RewriteTest {
                   org.apache.hc.core5.http: debug
               """,
             spec -> spec.path("application.yaml")
+          )
+        );
+    }
+
+    @Test
+    void changePackageInYamlOfHyphenatedProfile() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangePackage(
+            "org.springframework.boot.actuate.autoconfigure.security.servlet",
+            "org.springframework.boot.security.autoconfigure.actuate.web.servlet", null)),
+          yaml(
+            """
+              spring:
+                autoconfigure:
+                  exclude:
+                    - org.springframework.boot.actuate.autoconfigure.security.servlet.ManagementWebSecurityAutoConfiguration
+              """,
+            """
+              spring:
+                autoconfigure:
+                  exclude:
+                    - org.springframework.boot.security.autoconfigure.actuate.web.servlet.ManagementWebSecurityAutoConfiguration
+              """,
+            spec -> spec.path("application-disable-security.yml")
           )
         );
     }

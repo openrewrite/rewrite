@@ -29,14 +29,15 @@ type ExportedTypes = typeof import("../../javascript/package-exported-types.js")
 
 /**
  * Handle a DependencyTypes request: resolve one dependency, named by its npm coordinate, against
- * the most recently parsed project's node_modules, enumerate its public types, and stream them
- * back terminated by END_OF_OBJECT. Built once, returned in {@code batchSize} slices across the
- * client's repeated pulls. A {@code null} version names a TypeScript runtime declaration file
- * (e.g. {@code lib.dom}) instead of an installed package.
+ * the node_modules of {@code path} or else of the most recently parsed project, enumerate its
+ * public types, and stream them back terminated by END_OF_OBJECT. Built once, returned in
+ * {@code batchSize} slices across the client's repeated pulls. A {@code null} version names a
+ * TypeScript runtime declaration file (e.g. {@code lib.dom}) instead of an installed package.
  */
 export class DependencyTypes {
     constructor(private readonly name: string,
-                private readonly version?: string | null) {
+                private readonly version?: string | null,
+                private readonly path?: string | null) {
     }
 
     static handle(connection: rpc.MessageConnection, batchSize: number, metricsCsv?: string): void {
@@ -51,15 +52,17 @@ export class DependencyTypes {
                 metricsCsv,
                 (context) => async (request) => {
                     const version = request.version ?? null;
+                    const projectDir = request.path ?? null;
                     context.target = version ? `${request.name}@${version}` : request.name;
 
-                    const key = JSON.stringify([request.name, version]);
+                    const key = JSON.stringify([request.name, version, projectDir]);
                     if (!pending.has(key)) {
                         // Dynamic import to break the circular dependency with the javascript module.
                         const {exportedTypes} = await import("../../javascript/package-exported-types.js");
-                        const types = version !== null
-                            ? packageTypes(request.name, exportedTypes)
-                            : exportedTypes([runtimeLibFile(request.name)], []);
+                        const types = version === null
+                            ? exportedTypes([runtimeLibFile(request.name)], [])
+                            : packageTypes(request.name, exportedTypes,
+                                projectDir === null ? projectNodeModules() : path.join(projectDir, "node_modules"));
 
                         const q = new RpcSendQueue(new ReferenceMap(), JAVA_TYPE_CLASS, false);
                         const sender = new JavaSender();
@@ -98,8 +101,7 @@ function projectNodeModules(): string {
 }
 
 /** The installed package's own types, falling back to its DefinitelyTyped package when it ships none. */
-function packageTypes(name: string, exportedTypes: ExportedTypes): Type.FullyQualified[] {
-    const nodeModules = projectNodeModules();
+function packageTypes(name: string, exportedTypes: ExportedTypes, nodeModules: string): Type.FullyQualified[] {
     const pkgDir = path.join(nodeModules, ...name.split("/"));
     if (!fs.existsSync(pkgDir)) {
         throw new Error(`Package '${name}' is not installed under ${nodeModules}`);

@@ -93,8 +93,8 @@ func TestIfWithInitIsWrapped(t *testing.T) {
 		t.Fatalf("wrapper must hold the inner *java.If, got %T", wrapper.Statement)
 	}
 	// The prefix (whitespace before `if`) belongs on the outermost node.
-	require.Equalf(t, "\n\t", wrapper.Prefix.Whitespace, "expected wrapper to carry the prefix %q", "\n\t")
-	if inner := wrapper.Statement.(*java.If); inner.Prefix.Whitespace != "" || len(inner.Prefix.Comments) != 0 {
+	require.Equalf(t, "\n\t", wrapper.Prefix.Whitespace(), "expected wrapper to carry the prefix %q", "\n\t")
+	if inner := wrapper.Statement.(*java.If); inner.Prefix.Whitespace() != "" || len(inner.Prefix.Comments()) != 0 {
 		t.Fatalf("inner if must be prefix-less, got %+v", inner.Prefix)
 	}
 }

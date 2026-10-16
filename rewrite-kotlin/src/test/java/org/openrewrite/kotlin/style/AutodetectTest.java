@@ -16,6 +16,7 @@
 package org.openrewrite.kotlin.style;
 
 
+import org.intellij.lang.annotations.Language;
 import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
@@ -121,6 +122,77 @@ class AutodetectTest implements RewriteTest {
         var tabsAndIndents = NamedStyles.merge(TabsAndIndentsStyle.class, singletonList(styles));
 
         assertThat(tabsAndIndents.getFunctionDeclarationParameters().getAlignWhenMultiple()).isTrue();
+    }
+
+    @Test
+    void parametersOnOwnLinesAtContinuationIndent() {
+        assertThat(parametersUseContinuationIndent(
+          """
+            class Test {
+                fun foo(
+                        s1: String,
+                        s2: String
+                ) {
+                }
+            }
+            """
+        )).isTrue();
+
+        assertThat(parametersUseContinuationIndent(
+          """
+            class Outer {
+                data class Item(
+                        val id: String
+                )
+            }
+            """
+        )).isTrue();
+
+        assertThat(parametersUseContinuationIndent(
+          """
+            fun main(
+                    args: Array<String>
+            ) {
+            }
+            """
+        )).isTrue();
+    }
+
+    @Test
+    void parametersOnOwnLinesAtIndentSize() {
+        assertThat(parametersUseContinuationIndent(
+          """
+            class Test {
+                fun foo(
+                    s1: String,
+                    s2: String
+                ) {
+                }
+            }
+            """
+        )).isFalse();
+    }
+
+    @Test
+    void parametersOnOwnLinesAtContinuationIndentWithTabs() {
+        assertThat(parametersUseContinuationIndent(
+          """
+            class Test {
+            	fun foo(
+            			s1: String,
+            			s2: String
+            	) {
+            	}
+            }
+            """
+        )).isTrue();
+    }
+
+    private static boolean parametersUseContinuationIndent(@Language("kotlin") String source) {
+        var detector = Autodetect.detector();
+        kp().parse(source).forEach(detector::sample);
+        var wrappingAndBraces = NamedStyles.merge(WrappingAndBracesStyle.class, singletonList(detector.build()));
+        return wrappingAndBraces.getFunctionDeclarationParameters().getUseContinuationIndent();
     }
 
     @Issue("https://github.com/openrewrite/rewrite/issues/1221")

@@ -298,8 +298,8 @@ class CSharpParseProjectTest implements RewriteTest {
           tempDir.resolve("Broken.csproj"), tempDir, new InMemoryExecutionContext()).toList();
 
         assertThat(sourceFiles).noneMatch(ParseError.class::isInstance);
-        assertThat(sourceFiles).extracting(sf -> sf.getSourcePath().toString())
-          .containsExactlyInAnyOrder("A.cs", "nested/B.cs", "Broken.csproj");
+        assertThat(sourceFiles).extracting(SourceFile::getSourcePath)
+          .containsExactlyInAnyOrder(Paths.get("A.cs"), Paths.get("nested/B.cs"), Paths.get("Broken.csproj"));
     }
 
     // ---- Full working set sweep ----

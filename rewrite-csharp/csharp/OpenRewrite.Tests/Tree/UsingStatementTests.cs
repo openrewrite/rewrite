@@ -13,12 +13,44 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+using OpenRewrite.CSharp;
 using OpenRewrite.Test;
 
 namespace OpenRewrite.Tests.Tree;
 
 public class UsingStatementTests : RewriteTest
 {
+    [Theory]
+    [InlineData("using (var stream = new System.IO.MemoryStream() ) { }")]
+    [InlineData("using ( var stream = new System.IO.MemoryStream() /*c*/ ) { }")]
+    [InlineData("using(content ) { }")]
+    [InlineData("using (content)\n            content.Flush();")]
+    public void ParenthesesWhitespaceRoundTrips(string statement)
+    {
+        RewriteRun(
+            CSharp(
+                $$"""
+                class Foo {
+                    void Bar(System.IO.Stream content) {
+                        {{statement}}
+                    }
+                }
+                """
+            )
+        );
+    }
+
+    [Fact]
+    public void ParenthesesCarryTheirWhitespace()
+    {
+        var usingStatement = TypeOfTests.Single<UsingStatement>(
+            "class Foo { void Bar(System.IO.Stream content) { using  (  content   ) { } } }");
+
+        Assert.Equal("  ", usingStatement.Expression.Prefix.Whitespace);
+        Assert.Equal("  ", usingStatement.Expression.Tree.Element.Prefix.Whitespace);
+        Assert.Equal("   ", usingStatement.Expression.Tree.After.Whitespace);
+    }
+
     [Fact]
     public void UsingWithBlock()
     {

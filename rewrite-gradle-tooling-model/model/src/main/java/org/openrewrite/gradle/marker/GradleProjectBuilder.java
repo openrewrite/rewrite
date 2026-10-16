@@ -408,6 +408,32 @@ public final class GradleProjectBuilder {
             requestedCache = new ConcurrentHashMap<>();
 
     private static org.openrewrite.maven.tree.Dependency dependency(Dependency dep, Configuration configuration) {
+        org.openrewrite.maven.tree.Dependency requested = cachedDependency(dep, configuration);
+        List<GroupArtifact> exclusions = exclusions(dep);
+        // The cache is keyed by GAV alone, so declarations of the same GAV with different excludes must not share it
+        return exclusions.isEmpty() ? requested : requested.withExclusions(exclusions);
+    }
+
+    private static List<GroupArtifact> exclusions(Dependency dep) {
+        if (!(dep instanceof ModuleDependency)) {
+            return emptyList();
+        }
+        Set<ExcludeRule> rules = ((ModuleDependency) dep).getExcludeRules();
+        if (rules.isEmpty()) {
+            return emptyList();
+        }
+        List<GroupArtifact> exclusions = new ArrayList<>(rules.size());
+        for (ExcludeRule rule : rules) {
+            exclusions.add(new GroupArtifact(orWildcard(rule.getGroup()), orWildcard(rule.getModule())));
+        }
+        return exclusions;
+    }
+
+    private static String orWildcard(@Nullable String coordinate) {
+        return coordinate == null || coordinate.isEmpty() ? "*" : coordinate;
+    }
+
+    private static org.openrewrite.maven.tree.Dependency cachedDependency(Dependency dep, Configuration configuration) {
         GroupArtifactVersion gav = groupArtifactVersion(dep);
         return requestedCache.computeIfAbsent(gav, it -> {
                     Map<String, String> attributes = attributes(dep);

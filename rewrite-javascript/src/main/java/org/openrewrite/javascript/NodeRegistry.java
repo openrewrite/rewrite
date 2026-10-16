@@ -15,9 +15,14 @@
  */
 package org.openrewrite.javascript;
 
+import lombok.AllArgsConstructor;
 import lombok.Value;
 import lombok.With;
 import org.jspecify.annotations.Nullable;
+
+import java.util.List;
+
+import static java.util.Collections.emptyList;
 
 /**
  * A single npm registry after environment-variable expansion and credential resolution.
@@ -26,6 +31,7 @@ import org.jspecify.annotations.Nullable;
  */
 @Value
 @With
+@AllArgsConstructor
 public class NodeRegistry {
 
     /**
@@ -78,8 +84,23 @@ public class NodeRegistry {
     boolean strictSsl;
 
     /**
-     * True when the URL or credentials still contain {@code ${VAR}} placeholders whose variables were
-     * unset; using such a registry is a configuration failure and the client refuses to fetch it.
+     * True when the URL still contains {@code ${VAR}} placeholders whose variables were unset; there is
+     * no usable URL to fall back to, so the client refuses to fetch it.
      */
     boolean unresolvedPlaceholders;
+
+    /**
+     * Placeholders, verbatim (e.g. {@code ${NPM_TOKEN}}), in {@code .npmrc} credentials for this registry
+     * whose variables were unset. Like npm, those credentials are still sent as written, and the placeholders
+     * are reported if the registry rejects them. Typical of an LST built where the variables were set and run
+     * where they are not.
+     */
+    List<String> unresolvedCredentialPlaceholders;
+
+    public NodeRegistry(@Nullable String scope, String url, @Nullable String authToken, @Nullable String username,
+                        @Nullable String password, @Nullable String authBase64, boolean alwaysAuth,
+                        @Nullable String cafile, boolean strictSsl, boolean unresolvedPlaceholders) {
+        this(scope, url, authToken, username, password, authBase64, alwaysAuth, cafile, strictSsl,
+                unresolvedPlaceholders, emptyList());
+    }
 }

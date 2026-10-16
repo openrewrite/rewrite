@@ -1,0 +1,105 @@
+{"text":"{}","value":{}}
+{"text":"{\"a\":1}","value":{"a":1}}
+{"text":"{'a':1}","value":{"a":1}}
+{"text":"{a:1}","value":{"a":1}}
+{"text":"{$_:1,_$:2,a‌:3}","value":{"$_":1,"_$":2,"a‌":3}}
+{"text":"{ùńîċõďë:9}","value":{"ùńîċõďë":9}}
+{"text":"{\\u0061\\u0062:1,\\u0024\\u005F:2,\\u005F\\u0024:3}","value":{"ab":1,"$_":2,"_$":3}}
+{"text":"{\"__proto__\":1}","value":{"__proto__":1}}
+{"text":"{abc:1,def:2}","value":{"abc":1,"def":2}}
+{"text":"{a:{b:2}}","value":{"a":{"b":2}}}
+{"text":"[]","value":[]}
+{"text":"[1]","value":[1]}
+{"text":"[1,2]","value":[1,2]}
+{"text":"[1,[2,3]]","value":[1,[2,3]]}
+{"text":"null","value":null}
+{"text":"true","value":true}
+{"text":"false","value":false}
+{"text":"[0,0.,0e0]","value":[0,0,0]}
+{"text":"[1,23,456,7890]","value":[1,23,456,7890]}
+{"text":"[-1,+2,-.1,-0]","value":[-1,2,-0.1,{"$number":"-0"}]}
+{"text":"[.1,.23]","value":[0.1,0.23]}
+{"text":"[1.0,1.23]","value":[1,1.23]}
+{"text":"[1e0,1e1,1e01,1.e0,1.1e0,1e-1,1e+1]","value":[1,10,10,1,1.1,0.1,10]}
+{"text":"[0x1,0x10,0xff,0xFF]","value":[1,16,255,255]}
+{"text":"[Infinity,-Infinity]","value":[{"$number":"Infinity"},{"$number":"-Infinity"}]}
+{"text":"NaN","value":{"$number":"NaN"}}
+{"text":"-NaN","value":{"$number":"NaN"}}
+{"text":"1","value":1}
+{"text":"+1.23e100","value":1.23e+100}
+{"text":"0x1","value":1}
+{"text":"-0x0123456789abcdefABCDEF","value":-1.3754889325393114e+24}
+{"text":"\"abc\"","value":"abc"}
+{"text":"'abc'","value":"abc"}
+{"text":"['\"',\"'\"]","value":["\"","'"]}
+{"text":"'\\b\\f\\n\\r\\t\\v\\0\\x0f\\u01fF\\\n\\\r\n\\\r\\ \\ \\a\\'\\\"'","value":"\b\f\n\r\t\u000b\u0000\u000fǿa'\""}
+{"text":"'  '","value":"  "}
+{"text":"{//comment\n}","value":{}}
+{"text":"{}//comment","value":{}}
+{"text":"{/*comment\n** */}","value":{}}
+{"text":"{\t\u000b\f  ﻿\n\r   }","value":{}}
+{"text":"","error":"JSON5: invalid end of input at 1:1","line":1,"column":1}
+{"text":"//a","error":"JSON5: invalid end of input at 1:4","line":1,"column":4}
+{"text":"/a","error":"JSON5: invalid character 'a' at 1:2","line":1,"column":2}
+{"text":"/*","error":"JSON5: invalid end of input at 1:3","line":1,"column":3}
+{"text":"/**","error":"JSON5: invalid end of input at 1:4","line":1,"column":4}
+{"text":"a","error":"JSON5: invalid character 'a' at 1:1","line":1,"column":1}
+{"text":"{\\a:1}","error":"JSON5: invalid character 'a' at 1:3","line":1,"column":3}
+{"text":"{\\u0021:1}","error":"JSON5: invalid identifier character at 1:2","line":1,"column":2}
+{"text":"{a\\a:1}","error":"JSON5: invalid character 'a' at 1:4","line":1,"column":4}
+{"text":"{a\\u0021:1}","error":"JSON5: invalid identifier character at 1:3","line":1,"column":3}
+{"text":"-a","error":"JSON5: invalid character 'a' at 1:2","line":1,"column":2}
+{"text":".a","error":"JSON5: invalid character 'a' at 1:2","line":1,"column":2}
+{"text":"1ea","error":"JSON5: invalid character 'a' at 1:3","line":1,"column":3}
+{"text":"1e-a","error":"JSON5: invalid character 'a' at 1:4","line":1,"column":4}
+{"text":"0xg","error":"JSON5: invalid character 'g' at 1:3","line":1,"column":3}
+{"text":"\"\n\"","error":"JSON5: invalid character '\\n' at 2:0","line":2,"column":0}
+{"text":"\"","error":"JSON5: invalid end of input at 1:2","line":1,"column":2}
+{"text":"{!:1}","error":"JSON5: invalid character '!' at 1:2","line":1,"column":2}
+{"text":"{a!1}","error":"JSON5: invalid character '!' at 1:3","line":1,"column":3}
+{"text":"{a:1!}","error":"JSON5: invalid character '!' at 1:5","line":1,"column":5}
+{"text":"[1!]","error":"JSON5: invalid character '!' at 1:3","line":1,"column":3}
+{"text":"tru!","error":"JSON5: invalid character '!' at 1:4","line":1,"column":4}
+{"text":"\"\\","error":"JSON5: invalid end of input at 1:3","line":1,"column":3}
+{"text":"\"\\xg\"","error":"JSON5: invalid character 'g' at 1:4","line":1,"column":4}
+{"text":"\"\\x0g\"","error":"JSON5: invalid character 'g' at 1:5","line":1,"column":5}
+{"text":"\"\\u000g\"","error":"JSON5: invalid character 'g' at 1:7","line":1,"column":7}
+{"text":"'\\1'","error":"JSON5: invalid character '1' at 1:3","line":1,"column":3}
+{"text":"'\\2'","error":"JSON5: invalid character '2' at 1:3","line":1,"column":3}
+{"text":"'\\3'","error":"JSON5: invalid character '3' at 1:3","line":1,"column":3}
+{"text":"'\\4'","error":"JSON5: invalid character '4' at 1:3","line":1,"column":3}
+{"text":"'\\5'","error":"JSON5: invalid character '5' at 1:3","line":1,"column":3}
+{"text":"'\\6'","error":"JSON5: invalid character '6' at 1:3","line":1,"column":3}
+{"text":"'\\7'","error":"JSON5: invalid character '7' at 1:3","line":1,"column":3}
+{"text":"'\\8'","error":"JSON5: invalid character '8' at 1:3","line":1,"column":3}
+{"text":"'\\9'","error":"JSON5: invalid character '9' at 1:3","line":1,"column":3}
+{"text":"'\\01'","error":"JSON5: invalid character '1' at 1:4","line":1,"column":4}
+{"text":"1 2","error":"JSON5: invalid character '2' at 1:3","line":1,"column":3}
+{"text":"\u0001","error":"JSON5: invalid character '\\x01' at 1:1","line":1,"column":1}
+{"text":"{","error":"JSON5: invalid end of input at 1:2","line":1,"column":2}
+{"text":"{a","error":"JSON5: invalid end of input at 1:3","line":1,"column":3}
+{"text":"{a:","error":"JSON5: invalid end of input at 1:4","line":1,"column":4}
+{"text":"{a:1","error":"JSON5: invalid end of input at 1:5","line":1,"column":5}
+{"text":"[","error":"JSON5: invalid end of input at 1:2","line":1,"column":2}
+{"text":"[1","error":"JSON5: invalid end of input at 1:3","line":1,"column":3}
+{"text":"{b:1,\"2\":2,a:3,\"1\":4,\"10\":5,\"01\":6}","value":{"1":4,"2":2,"10":5,"b":1,"a":3,"01":6}}
+{"text":"{a:1,b:2,a:3}","value":{"a":3,"b":2}}
+{"text":"{__proto__:1,constructor:2}","value":{"__proto__":1,"constructor":2}}
+{"text":"[-0,+0,-0x0]","value":[{"$number":"-0"},0,{"$number":"-0"}]}
+{"text":"{a:-Infinity,b:+NaN}","value":{"a":{"$number":"-Infinity"},"b":{"$number":"NaN"}}}
+{"text":"'\\uD800'","value":"\ud800"}
+{"text":"'\\uDC00\\uD83D'","value":"\udc00\ud83d"}
+{"text":"{\"\\u0000\":0}","value":{"\u0000":0}}
+{"text":"'\\x41\\u{41}'","error":"JSON5: invalid character '{' at 1:8","line":1,"column":8}
+{"text":"0x","error":"JSON5: invalid end of input at 1:3","line":1,"column":3}
+{"text":"1e","error":"JSON5: invalid end of input at 1:3","line":1,"column":3}
+{"text":".e1","error":"JSON5: invalid character 'e' at 1:2","line":1,"column":2}
+{"text":"{a:1,}","value":{"a":1}}
+{"text":"[1,]","value":[1]}
+{"text":"{,}","error":"JSON5: invalid character ',' at 1:2","line":1,"column":2}
+{"text":"[,]","error":"JSON5: invalid character ',' at 1:2","line":1,"column":2}
+{"text":"{a b:1}","error":"JSON5: invalid character 'b' at 1:4","line":1,"column":4}
+{"text":"{\"a\":1 \"b\":2}","error":"JSON5: invalid character '\\\"' at 1:8","line":1,"column":8}
+{"text":"{a\\u0020:1}","error":"JSON5: invalid identifier character at 1:3","line":1,"column":3}
+{"text":"/**/0/**/","value":0}
+{"text":"0//","value":0}
