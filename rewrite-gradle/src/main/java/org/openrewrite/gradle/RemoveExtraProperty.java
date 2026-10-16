@@ -27,7 +27,7 @@ import org.openrewrite.java.tree.Statement;
 @EqualsAndHashCode(callSuper = false)
 public class RemoveExtraProperty extends Recipe {
 
-    String displayName = "Remove Extra Property";
+    String displayName = "Remove extra property";
 
     String description = "Gradle's [ExtraPropertiesExtension](https://docs.gradle.org/current/dsl/org.gradle.api.plugins.ExtraPropertiesExtension.html) " +
             "is a commonly used mechanism for setting arbitrary key/value pairs on a project. " +
