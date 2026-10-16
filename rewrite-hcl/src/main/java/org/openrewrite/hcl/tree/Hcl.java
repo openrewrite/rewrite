@@ -455,7 +455,7 @@ public interface Hcl extends Tree {
         @Incubating(since = "7.27.0")
         public Hcl.Block withAttributeValue(String attrName, Object value) {
             Attribute attr = getAttribute(attrName);
-            if (attr == null || getAttributeValue(attrName).equals(value)) {
+            if (attr == null || value.equals(getAttributeValue(attrName))) {
                 return this;
             }
 
@@ -463,7 +463,9 @@ public interface Hcl extends Tree {
                 if (b == attr) {
                     if (attr.getValue() instanceof Literal) {
                         Literal l = (Literal) attr.getValue();
-                        return attr.withValue(l.withValue(value.toString()).withValueSource("\"" + value + "\""));
+                        String valueSource = value instanceof String ? "\"" + value + "\"" : value.toString();
+                        return valueSource.equals(l.getValueSource()) ? attr :
+                                attr.withValue(l.withValue(value).withValueSource(valueSource));
                     } else if (attr.getValue() instanceof QuotedTemplate) {
                         QuotedTemplate q = (QuotedTemplate) attr.getValue();
                         return attr.withValue(q.withExpressions(singletonList(new Literal(Tree.randomId(),

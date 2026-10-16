@@ -18,6 +18,7 @@ package org.openrewrite.hcl.tree;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.DocumentExample;
 import org.openrewrite.ExecutionContext;
+import org.openrewrite.Recipe;
 import org.openrewrite.hcl.HclVisitor;
 import org.openrewrite.test.RewriteTest;
 
@@ -53,6 +54,81 @@ class HclAttributeTest implements RewriteTest {
               """
           )
         );
+    }
+
+    @Test
+    void booleanAttributeValue() {
+        rewriteRun(
+          spec -> spec.recipe(withAttributeValue("enabled", false)),
+          hcl(
+            """
+              provider {
+                  enabled = true
+              }
+              """,
+            """
+              provider {
+                  enabled = false
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void numericAttributeValue() {
+        rewriteRun(
+          spec -> spec.recipe(withAttributeValue("count", 3)),
+          hcl(
+            """
+              provider {
+                  count = 1
+              }
+              """,
+            """
+              provider {
+                  count = 3
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void unchangedNumericAttributeValue() {
+        rewriteRun(
+          spec -> spec.recipe(withAttributeValue("count", 1)),
+          hcl(
+            """
+              provider {
+                  count = 1
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void nonLiteralAttributeValueIsLeftAlone() {
+        rewriteRun(
+          spec -> spec.recipe(withAttributeValue("key", "goodbye")),
+          hcl(
+            """
+              provider {
+                  key = var.key
+              }
+              """
+          )
+        );
+    }
+
+    private static Recipe withAttributeValue(String attrName, Object value) {
+        return RewriteTest.toRecipe(() -> new HclVisitor<ExecutionContext>() {
+            @Override
+            public Hcl visitBlock(Hcl.Block block, ExecutionContext ctx) {
+                return block.withAttributeValue(attrName, value);
+            }
+        });
     }
 
     @Test
