@@ -17,15 +17,16 @@ import {Recipe} from "../recipe";
 import {ExecutionContext} from "../execution";
 import {noopVisitor, TreeVisitor} from "../visitor";
 import {Parser} from "../parser";
-import {TreePrinters} from "../print";
-import {SourceFile} from "../tree";
+import {MarkerPrinter, PrintOutputCapture, TreePrinters} from "../print";
+import {Cursor, isTree, rootCursor, SourceFile} from "../tree";
 import {Result, scheduleRun} from "../run";
 import {mapAsync, trimIndent} from "../util";
-import {ParseErrorKind} from "../parse-error";
-import {MarkersKind, ParseExceptionResult} from "../markers";
+import {isParseError, ParseErrorKind} from "../parse-error";
+import {Marker, Markers, MarkersKind, ParseExceptionResult} from "../markers";
+import {isNamedStyles} from "../style";
 import {JavaScriptVisitor} from "../javascript";
 import {attributionHint, dumpTypesIfRequested} from "../javascript/type-report";
-import {J} from "../java";
+import {J, Type} from "../java";
 
 export interface SourceSpec<T extends SourceFile> {
     kind: string,
@@ -42,6 +43,7 @@ export interface SourceSpec<T extends SourceFile> {
 interface RecipeSpecConfiguration {
     checkParsePrintIdempotence: boolean;
     allowEmptyDiff: boolean;
+    checkAddedMarkers: boolean;
     recipe: Recipe;
     recipeExecutionContext: ExecutionContext;
     dataTableAssertions: { [key: string]: (rows: any[]) => void };
@@ -50,6 +52,12 @@ interface RecipeSpecConfiguration {
 export class RecipeSpec {
     checkParsePrintIdempotence: boolean = true
     allowEmptyDiff: boolean = false
+
+    /**
+     * Fails a run whose recipe leaves markers on the LST that neither its sources nor a fresh parse of
+     * its output carry.
+     */
+    checkAddedMarkers: boolean = true
 
     recipe: Recipe = new NoopRecipe()
 
@@ -85,6 +93,7 @@ export class RecipeSpec {
         return {
             checkParsePrintIdempotence: this.checkParsePrintIdempotence,
             allowEmptyDiff: this.allowEmptyDiff,
+            checkAddedMarkers: this.checkAddedMarkers,
             recipe: this.recipe,
             recipeExecutionContext: this.recipeExecutionContext,
             dataTableAssertions: {...this.dataTableAssertions}
@@ -189,6 +198,7 @@ export class RecipeSpec {
             allParsed.map(([_, sourceFile]) => sourceFile),
             this.recipeExecutionContext)).changeset;
 
+        this.checkAddedMarkers && await this.expectNoAddedMarkers(flattenedSpecs, allParsed, changeset);
         await this.expectResultsToMatchAfter(flattenedSpecs, changeset, allParsed);
         await this.expectGeneratedFiles(flattenedSpecs, changeset);
 
@@ -216,6 +226,78 @@ export class RecipeSpec {
                     `Expected:\n${beforeSource}\n\nActual:\n${printed}`
                 );
             }
+        }
+    }
+
+    /**
+     * A marker in the output that no source carries in that kind of place, and that a fresh parse of the
+     * output does not produce either, is one the recipe put there for its own use.
+     */
+    private async expectNoAddedMarkers(specs: SourceSpec<any>[], parsed: [SourceSpec<any>, SourceFile][],
+                                       changeset: Result[]) {
+        const explained = new Set<string>();
+        for (const [_, sourceFile] of parsed) {
+            for (const placement of markerPlacements(sourceFile).keys()) {
+                explained.add(placement);
+            }
+        }
+
+        const added: string[] = [];
+        for (const {before, after} of changeset) {
+            if (!after || after === before) {
+                continue;
+            }
+            let unexplained = [...markerPlacements(after)].filter(([placement, found]) =>
+                !explained.has(placement) && !mayBeAdded(found));
+            if (unexplained.length > 0) {
+                const spec = before ?
+                    parsed.find(([_, sourceFile]) => sourceFile === before)?.[0] :
+                    specs.find(s => s.path === after.sourcePath);
+                const reparsed = spec ? await this.freshParsePlacements(spec, after) : new Set<string>();
+                unexplained = unexplained.filter(([placement]) => !reparsed.has(placement));
+            }
+            if (unexplained.length > 0) {
+                const note = !before ? " (generated)" :
+                    await TreePrinters.print(before) === await TreePrinters.print(after) ?
+                        " (the printed source is unchanged)" : "";
+                added.push(`  ${after.sourcePath}${note}`);
+                for (const [_, placement] of unexplained) {
+                    added.push(`    ${await describePlacement(after, placement)}`);
+                }
+            }
+        }
+
+        if (added.length > 0) {
+            throw new Error([
+                "The recipe added markers to the LST that neither the sources it was given nor a fresh parse of " +
+                "its output contain:",
+                ...added,
+                "Markers travel with the LST to every recipe that runs after this one and to every tool that reads " +
+                "the result, so they are not a place for a recipe to keep information for itself. Instead:",
+                "  - share information between the visit methods of one visitor with cursor messages, " +
+                "e.g. this.cursor.messages.set(key, value) and this.cursor.getNearestMessage(key)",
+                "  - share information between source files, or from scanning to editing, through the accumulator " +
+                "of a ScanningRecipe",
+                "  - keep the recipe idempotent by recognizing code it has already changed, " +
+                "rather than tagging that code",
+                "  - report a finding with foundSearchResult, and a problem with markupError or markupWarn"
+            ].join("\n"));
+        }
+    }
+
+    /**
+     * Code a recipe writes brings along the syntax markers the parser gives that code. A file that does not
+     * parse again explains nothing.
+     */
+    private async freshParsePlacements(spec: SourceSpec<any>, after: SourceFile): Promise<Set<string>> {
+        try {
+            // Without the comments that search results and markup print as
+            const out = new PrintOutputCapture(MarkerPrinter.SANITIZED);
+            const text = await TreePrinters.printer(after).print(after, out);
+            const reparsed = await spec.parser(this.executionContext).parseOne({text, sourcePath: after.sourcePath});
+            return isParseError(reparsed) ? new Set() : new Set(markerPlacements(reparsed).keys());
+        } catch {
+            return new Set();
         }
     }
 
@@ -333,6 +415,90 @@ class ValidateWhitespaceVisitor extends JavaScriptVisitor<ExecutionContext> {
         }
         return ret;
     }
+}
+
+/** Markers that report on an LST rather than describe it, which a recipe is free to leave. */
+const reportingMarkerKinds = new Set<string>([
+    MarkersKind.SearchResult,
+    MarkersKind.MarkupError,
+    MarkersKind.MarkupWarn,
+    MarkersKind.MarkupInfo,
+    MarkersKind.MarkupDebug,
+    MarkersKind.RecipesThatMadeChanges,
+]);
+
+function mayBeAdded({marker, element}: MarkerPlacement): boolean {
+    // A recipe that formats with a style it was given passes the style on to later formatting
+    return reportingMarkerKinds.has(marker.kind) || !element && isNamedStyles(marker);
+}
+
+interface MarkerPlacement {
+    readonly marker: Marker
+    readonly markerKind: string
+    /** What carries the marker, absent for the source file itself. */
+    readonly element?: any
+    readonly cursor: Cursor
+}
+
+/**
+ * The kinds of marker a source file carries, by whether they sit on the source file itself or on an element
+ * within it, padding included, each with the first element found carrying it.
+ */
+function markerPlacements(sourceFile: SourceFile): Map<string, MarkerPlacement> {
+    const placements = new Map<string, MarkerPlacement>();
+    const visited = new Set<object>();
+    const stack: [any, Cursor][] = [[sourceFile, rootCursor()]];
+    while (stack.length > 0) {
+        const [value, cursor] = stack.pop()!;
+        // Type attribution can be cyclic, and reaches far beyond the file
+        if (value === null || typeof value !== "object" || visited.has(value) || Type.isType(value)) {
+            continue;
+        }
+        visited.add(value);
+        let enclosing = cursor;
+        if (value.markers?.kind === MarkersKind.Markers) {
+            const element = value === sourceFile ? undefined : value;
+            for (const marker of (value.markers as Markers).markers) {
+                const placement = `${element ? "element" : "source file"} ${marker.kind}`;
+                if (!placements.has(placement)) {
+                    placements.set(placement, {marker, markerKind: marker.kind, element, cursor});
+                }
+            }
+            enclosing = new Cursor(value, cursor);
+        }
+        // Pushed in reverse, so the walk meets elements in the order they print
+        const fields = Object.entries(value);
+        for (let i = fields.length - 1; i >= 0; i--) {
+            // A marker's own fields are not places in the LST
+            if (fields[i][0] !== "markers") {
+                stack.push([fields[i][1], enclosing]);
+            }
+        }
+    }
+    return placements;
+}
+
+/** Reads as "my.Visited on J.MethodInvocation `foo()`", or as "my.Visited on the source file". */
+async function describePlacement(sourceFile: SourceFile, placement: MarkerPlacement): Promise<string> {
+    const {markerKind, element, cursor} = placement;
+    if (!element) {
+        return `${markerKind} on the source file`;
+    }
+    const kind = String(element.kind).replace(/^.*\./, "").replace(/\$/g, ".");
+    // Padding is shown by what it pads
+    const [tree, enclosing] = isTree(element) ? [element, cursor] : [element.element, new Cursor(element, cursor)];
+    let snippet = "";
+    if (isTree(tree)) {
+        try {
+            const printed = await TreePrinters.printer(sourceFile)
+                .print(tree, new PrintOutputCapture(MarkerPrinter.SANITIZED), enclosing);
+            const line = printed.trim().split("\n")[0].trim();
+            snippet = line.length > 60 ? `${line.substring(0, 60)}...` : line;
+        } catch {
+            // the kind of element alone has to do
+        }
+    }
+    return `${markerKind} on ${kind}${snippet ? ` \`${snippet}\`` : ""}`;
 }
 
 class NoopRecipe extends Recipe {
