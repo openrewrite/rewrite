@@ -121,6 +121,48 @@ class OrderPomElementsTest implements RewriteTest {
         );
     }
 
+    @Test
+    void keepFormattingOfElementsThatDoNotMove() {
+        rewriteRun(
+          pomXml(
+            """
+              <project>
+                  <modelVersion>4.0.0</modelVersion>
+                  <groupId>com.example</groupId>
+                  <artifactId>demo</artifactId>
+                  <version>1.0</version>
+                  <properties>
+                         <java.version>17</java.version>
+                  </properties>
+                  <build>
+                      <plugins>
+                      </plugins>
+                  </build>
+                  <dependencies>
+                  </dependencies>
+              </project>
+              """,
+            """
+              <project>
+                  <modelVersion>4.0.0</modelVersion>
+                  <groupId>com.example</groupId>
+                  <artifactId>demo</artifactId>
+                  <version>1.0</version>
+                  <properties>
+                         <java.version>17</java.version>
+                  </properties>
+                  <dependencies>
+                  </dependencies>
+                  <build>
+                      <plugins>
+                      </plugins>
+                  </build>
+              </project>
+              """
+          )
+        );
+    }
+
     @Issue("https://github.com/openrewrite/rewrite/issues/1228")
     @Test
     void updateDependencyChildTagOrder() {
