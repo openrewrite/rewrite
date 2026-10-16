@@ -53,10 +53,16 @@ public sealed class Validations
     /// </summary>
     public bool FormattingReconciliation { get; init; } = true;
 
+    /// <summary>
+    /// Whether the markers a recipe leaves on the LST are validated to be ones its input sources or a
+    /// fresh parse of its output also carry (search results and markup excepted). Default: enabled.
+    /// </summary>
+    public bool AddedMarkers { get; init; } = true;
+
     /// <summary>All validations enabled with default settings.</summary>
     public static Validations All { get; } = new();
 
-    /// <summary>All validations disabled.</summary>
+    /// <summary>All validations disabled except <see cref="AddedMarkers"/>.</summary>
     public static Validations None { get; } = new()
     {
         WhitespaceInSpaces = false,
