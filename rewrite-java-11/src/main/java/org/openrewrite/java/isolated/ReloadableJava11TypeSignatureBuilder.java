@@ -45,11 +45,7 @@ class ReloadableJava11TypeSignatureBuilder implements JavaTypeSignatureBuilder {
         } else if (type instanceof Type.IntersectionClassType) {
             return intersectionSignature(type);
         } else if (type instanceof Type.ClassType) {
-            try {
-                return ((Type.ClassType) type).typarams_field != null && ((Type.ClassType) type).typarams_field.length() > 0 ? parameterizedSignature(type) : classSignature(type);
-            } catch (Symbol.CompletionFailure ignored) {
-                return ((Type.ClassType) type).typarams_field != null && ((Type.ClassType) type).typarams_field.length() > 0 ? parameterizedSignature(type) : classSignature(type);
-            }
+            return ((Type.ClassType) type).typarams_field != null && ((Type.ClassType) type).typarams_field.length() > 0 ? parameterizedSignature(type) : classSignature(type);
         } else if (type instanceof Type.CapturedType) { // CapturedType must be evaluated before TypeVar
             return genericSignature(type);
         } else if (type instanceof Type.TypeVar) {

@@ -220,6 +220,8 @@ class ReloadableJava17TypeMapping implements JavaTypeMapping<Tree> {
         Type.ClassType symType = (Type.ClassType) sym.type;
         String fqn = sym.flatName().toString();
 
+        // Taken before the initializer may complete the symbol, matching the signature built from the same state.
+        boolean parameterized = classType.typarams_field != null && classType.typarams_field.length() > 0;
         // Flags and kind are read from `flags_field` without completing the symbol, so a factory that already
         // has this type answers without javac loading the class file. An uncompleted symbol has no flags yet,
         // which is why the initializer re-reads them once completion has run.
@@ -285,7 +287,7 @@ class ReloadableJava17TypeMapping implements JavaTypeMapping<Tree> {
             stub.unsafeSet(typeParameters, supertype, owner, listAnnotations(sym), interfaces, fields, methods);
         });
 
-        if (classType.typarams_field != null && classType.typarams_field.length() > 0) {
+        if (parameterized) {
             JavaType.Class finalClazz = clazz;
             return typeFactory.computeParameterized(signature, pt -> {
                 List<JavaType> typeParameters = new ArrayList<>(classType.typarams_field.length());

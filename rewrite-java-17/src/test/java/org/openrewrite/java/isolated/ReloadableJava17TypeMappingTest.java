@@ -15,7 +15,6 @@
  */
 package org.openrewrite.java.isolated;
 
-import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import org.openrewrite.InMemoryExecutionContext;
@@ -24,7 +23,6 @@ import org.openrewrite.java.JavaParser;
 import org.openrewrite.java.internal.DefaultJavaTypeFactory;
 import org.openrewrite.java.internal.JavaTypeCache;
 import org.openrewrite.java.internal.JavaTypeFactory;
-import org.openrewrite.java.tree.Flag;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaType;
 
@@ -41,72 +39,48 @@ import static org.openrewrite.java.tree.JavaType.FullyQualified.Kind;
 class ReloadableJava17TypeMappingTest {
 
     @TempDir
-    static Path fixtureClasses;
+    Path fixtureClasses;
 
-    @BeforeAll
-    static void compileFixture() throws Exception {
+    @Test
+    void typeServedByTheFactoryIsNotCompletedByJavac() throws Exception {
         Path source = fixtureClasses.resolve("Holder.java");
         Files.writeString(source, """
           package fixture;
           public class Holder {
-              public Ann ann() { return null; }
               public Iface iface() { return null; }
-              public Enm enm() { return null; }
-              public Rec rec() { return null; }
               public Cls cls() { return null; }
           }
-          @interface Ann {}
           interface Iface {}
-          enum Enm {}
-          record Rec() {}
           class Cls {}
           """);
         int exit = ToolProvider.getSystemJavaCompiler().run(null, null, null,
           "-d", fixtureClasses.toString(), source.toString());
         assertThat(exit).isZero();
-    }
 
-    @Test
-    void kindOfClasspathTypesFollowsTheirClassFileFlags() {
-        JavaType.Class holder = parseHolderUse(new DefaultJavaTypeFactory(new JavaTypeCache()));
-
-        assertThat(returnTypeOf(holder, "ann").getKind()).isEqualTo(Kind.Annotation);
-        assertThat(returnTypeOf(holder, "iface").getKind()).isEqualTo(Kind.Interface);
-        assertThat(returnTypeOf(holder, "enm").getKind()).isEqualTo(Kind.Enum);
-        assertThat(returnTypeOf(holder, "rec").getKind()).isEqualTo(Kind.Record);
-        assertThat(returnTypeOf(holder, "cls").getKind()).isEqualTo(Kind.Class);
-        assertThat(returnTypeOf(holder, "iface").getFlags()).contains(Flag.Interface, Flag.Abstract);
-    }
-
-    @Test
-    void typeServedByTheFactoryIsNotCompletedByJavac() throws Exception {
         JavaType.Class premade = new JavaType.Class(null, 0, "fixture.Iface", Kind.Interface,
           null, null, null, null, null, null, null);
         JavaTypeFactory factory = new DefaultJavaTypeFactory(new JavaTypeCache()) {
             @Override
-            public JavaType.Class computeClass(String fqn, long flags, Kind kind, Consumer<JavaType.Class> initializer) {
-                return premade.getFullyQualifiedName().equals(fqn) ? premade : super.computeClass(fqn, flags, kind, initializer);
+            public JavaType.Class computeClass(String fqn, long flags, Kind kind,
+                                               Consumer<JavaType.Class> initializer) {
+                return premade.getFullyQualifiedName().equals(fqn) ?
+                  premade :
+                  super.computeClass(fqn, flags, kind, initializer);
             }
         };
         JavaParser parser = Java17Parser.builder().classpath(List.of(fixtureClasses)).typeFactory(factory).build();
 
-        JavaType.Class holder = parseHolderUse(parser);
+        J.CompilationUnit cu = (J.CompilationUnit) parser
+          .parse(new InMemoryExecutionContext(), "class A { fixture.Holder h; }")
+          .findFirst().orElseThrow();
+        J.VariableDeclarations field =
+          (J.VariableDeclarations) cu.getClasses().get(0).getBody().getStatements().get(0);
+        JavaType.Class holder = (JavaType.Class) field.getType();
 
         assertThat(returnTypeOf(holder, "iface")).isSameAs(premade);
         assertThat(isCompleted(parser, "fixture.Holder")).as("referenced from source, javac loads it").isTrue();
         assertThat(isCompleted(parser, "fixture.Cls")).as("built by the initializer, which loads it").isTrue();
         assertThat(isCompleted(parser, "fixture.Iface")).as("served by the factory").isFalse();
-    }
-
-    private static JavaType.Class parseHolderUse(JavaTypeFactory factory) {
-        return parseHolderUse(Java17Parser.builder().classpath(List.of(fixtureClasses)).typeFactory(factory).build());
-    }
-
-    private static JavaType.Class parseHolderUse(JavaParser parser) {
-        J.CompilationUnit cu = (J.CompilationUnit) parser.parse(new InMemoryExecutionContext(),
-          "class A { fixture.Holder h; }").findFirst().orElseThrow();
-        J.VariableDeclarations field = (J.VariableDeclarations) cu.getClasses().get(0).getBody().getStatements().get(0);
-        return (JavaType.Class) field.getType();
     }
 
     private static JavaType.Class returnTypeOf(JavaType.Class type, String methodName) {

@@ -37,10 +37,8 @@ public class JavacSymbolProbe {
         Field contextField = ReloadableJava17Parser.class.getDeclaredField("context");
         contextField.setAccessible(true);
         Context context = (Context) contextField.get(parser);
-        Names names = Names.instance(context);
-        for (Symbol.ClassSymbol sym : Symtab.instance(context).getClassesForName(names.fromString(fqn))) {
-            return sym.completer.isTerminal();
-        }
-        return null;
+        Symtab syms = Symtab.instance(context);
+        Symbol.ClassSymbol sym = syms.getClass(syms.unnamedModule, Names.instance(context).fromString(fqn));
+        return sym == null ? null : sym.completer.isTerminal();
     }
 }
