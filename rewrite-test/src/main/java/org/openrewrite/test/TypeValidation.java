@@ -147,11 +147,25 @@ public class TypeValidation {
     private boolean addedMarkers = true;
 
     /**
+     * Controls whether a recipe that changes nothing in a source file is validated to return the instance it was given
+     * rather than an equal copy. Not turned off by {@link #none()}.
+     */
+    @Builder.Default
+    private boolean unchangedTreeIdentity = true;
+
+    /**
      * Controls whether the recipe is validated not to auto-format a whole source file, class or document root that
      * existed before the run. Not turned off by {@link #none()}.
      */
     @Builder.Default
     private boolean formattingScope = true;
+
+    /**
+     * Controls whether the recipe is run on an empty file of each kind it changed, to check that it doesn't throw.
+     * Not turned off by {@link #none()}.
+     */
+    @Builder.Default
+    private boolean emptySources = true;
 
     /**
      * Controls whether the recipe is rerun with the code it changed respelled to mean the same (a static import for a
@@ -168,13 +182,6 @@ public class TypeValidation {
     private boolean typeAttributedMatching = false;
 
     /**
-     * Controls whether the recipe is run on an empty file of each kind it changed, to check that it doesn't throw.
-     * Not turned off by {@link #none()}.
-     */
-    @Builder.Default
-    private boolean emptySources = true;
-
-    /**
      * Enable all invariant validation checks.
      */
     public static TypeValidation all() {
@@ -182,8 +189,8 @@ public class TypeValidation {
     }
 
     /**
-     * Skip all invariant validation checks except {@link #addedMarkers}, {@link #formattingScope} and
-     * {@link #emptySources}.
+     * Skip all invariant validation checks except {@link #addedMarkers}, {@link #unchangedTreeIdentity},
+     * {@link #formattingScope} and {@link #emptySources}.
      */
     public static TypeValidation none() {
         return builder()

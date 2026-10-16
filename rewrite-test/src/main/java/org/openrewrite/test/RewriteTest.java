@@ -443,6 +443,8 @@ public interface RewriteTest extends SourceSpecs {
         if (TypeValidation.after(testMethodSpec, testClassSpec).addedMarkers()) {
             addedMarkers = new AddedMarkers(beforeSourceFiles, parsersFor, relativeTo, ctx);
         }
+        UnchangedTreeIdentity unchangedTreeIdentity = TypeValidation.after(testMethodSpec, testClassSpec)
+                .unchangedTreeIdentity() ? new UnchangedTreeIdentity() : null;
 
         LargeSourceSet lss;
         if (testMethodSpec.getSourceSet() != null) {
@@ -450,7 +452,8 @@ public interface RewriteTest extends SourceSpecs {
         } else if (testClassSpec.getSourceSet() != null) {
             lss = testClassSpec.getSourceSet().apply(runnableSourceFiles);
         } else {
-            lss = new LargeSourceSetCheckingExpectedCycles(expectedCyclesThatMakeChanges, runnableSourceFiles, addedMarkers);
+            lss = new LargeSourceSetCheckingExpectedCycles(expectedCyclesThatMakeChanges, runnableSourceFiles,
+                    addedMarkers, unchangedTreeIdentity);
         }
 
         recipeCtx = CursorValidatingExecutionContextView.view(recipeCtx)
@@ -469,6 +472,9 @@ public interface RewriteTest extends SourceSpecs {
         RecipeRun recipeRun = formattingScope.record(() -> runner.run(recipe, runnerContext));
         if (addedMarkers != null) {
             addedMarkers.assertNoneAdded(recipeRun.getChangeset().getAllResults());
+        }
+        if (unchangedTreeIdentity != null) {
+            unchangedTreeIdentity.assertNoneFound();
         }
         EmptySources emptySources = TypeValidation.after(testMethodSpec, testClassSpec).emptySources() &&
                                     runner == RewriteRunner.IN_PROCESS &&

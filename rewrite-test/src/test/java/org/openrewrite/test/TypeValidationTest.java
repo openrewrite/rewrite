@@ -19,6 +19,7 @@ import org.junit.jupiter.api.Test;
 
 import java.lang.reflect.Field;
 import java.lang.reflect.Modifier;
+import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -26,12 +27,14 @@ class TypeValidationTest {
 
     @Test
     void noneInvertsEveryFlagFromAll() throws IllegalAccessException {
+        // the checks none() keeps, and one that all() leaves off
+        Set<String> exempt = Set.of("addedMarkers", "unchangedTreeIdentity", "formattingScope", "emptySources",
+          "typeAttributedMatching");
         TypeValidation all = TypeValidation.all();
         TypeValidation none = TypeValidation.none();
         for (Field field : TypeValidation.class.getDeclaredFields()) {
             if (field.getType() == boolean.class && !Modifier.isStatic(field.getModifiers()) && !field.isSynthetic() &&
-                !"addedMarkers".equals(field.getName()) && !"formattingScope".equals(field.getName()) &&
-                !"emptySources".equals(field.getName()) && !"typeAttributedMatching".equals(field.getName())) {
+                !exempt.contains(field.getName())) {
                 field.setAccessible(true);
                 assertThat(field.getBoolean(none))
                   .as("%s is not skipped by none()", field.getName())
@@ -41,18 +44,12 @@ class TypeValidationTest {
     }
 
     @Test
-    void noneStillChecksAddedMarkers() {
-        assertThat(TypeValidation.none().addedMarkers()).isTrue();
-    }
-
-    @Test
-    void noneStillChecksFormattingScope() {
-        assertThat(TypeValidation.none().formattingScope()).isTrue();
-    }
-
-    @Test
-    void noneStillChecksEmptySources() {
-        assertThat(TypeValidation.none().emptySources()).isTrue();
+    void noneKeepsChecksThatDoNotNeedTypeAttribution() {
+        TypeValidation none = TypeValidation.none();
+        assertThat(none.addedMarkers()).isTrue();
+        assertThat(none.unchangedTreeIdentity()).isTrue();
+        assertThat(none.formattingScope()).isTrue();
+        assertThat(none.emptySources()).isTrue();
     }
 
     @Test

@@ -314,12 +314,12 @@ final class AddedMarkers {
         return snippet.isEmpty() ? description : description + " `" + snippet + "`";
     }
 
-    private static String typeName(Class<?> type) {
+    static String typeName(Class<?> type) {
         String name = type.getName();
         return name.substring(name.lastIndexOf('.') + 1).replace('$', '.');
     }
 
-    private static String snippet(Tree owner, Cursor cursor) {
+    static String snippet(Tree owner, Cursor cursor) {
         try {
             String printed = owner.printTrimmed(cursor.getParentOrThrow()).trim();
             int newline = printed.indexOf('\n');

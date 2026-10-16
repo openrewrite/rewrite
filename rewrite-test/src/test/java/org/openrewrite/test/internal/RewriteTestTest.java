@@ -55,6 +55,7 @@ import org.openrewrite.yaml.YamlIsoVisitor;
 import org.openrewrite.yaml.tree.Yaml;
 
 import java.nio.file.Path;
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
 import java.util.Map;
@@ -409,6 +410,177 @@ class RewriteTestTest implements RewriteTest {
                 })),
               text("println \"hello\"")
             );
+        }
+    }
+
+    @Nested
+    class UnchangedTreeIdentity {
+
+        @Test
+        void rejectEqualCopyOfUnchangedFile() {
+            AssertionError e = assertThrows(AssertionError.class, () -> rewriteRun(
+              spec -> spec.recipe(copiesModifiers()),
+              java(
+                """
+                  public class A {}
+                  """
+              )
+            ));
+            assertThat(e).hasMessageContaining("it must return the LST it was given, not an equal copy")
+              .hasMessageContaining("org.openrewrite.test.AdHocRecipe returned an equal copy of A.java in cycle 1")
+              .hasMessageContaining("J.ClassDeclaration `public class A {}` > modifiers: " +
+                                    "a new ArrayList with the same 1 elements");
+        }
+
+        @Test
+        void rejectEqualCopyWhateverTheCycleSettings() {
+            // these settings accept a change in the only cycle, but an equal copy is not one
+            AssertionError e = assertThrows(AssertionError.class, () -> rewriteRun(
+              spec -> spec.cycles(1).expectedCyclesThatMakeChanges(1).recipe(copiesModifiers()),
+              java(
+                """
+                  public class A {}
+                  """
+              )
+            ));
+            assertThat(e).hasMessageContaining("returned an equal copy of A.java in cycle 1");
+        }
+
+        @Test
+        void rejectEqualCopyAfterRealChange() {
+            AssertionError e = assertThrows(AssertionError.class, () -> rewriteRun(
+              spec -> spec.expectedCyclesThatMakeChanges(2).recipe(toRecipe(() -> new JavaIsoVisitor<>() {
+                  @Override
+                  public J.Literal visitLiteral(J.Literal literal, ExecutionContext ctx) {
+                      // changes 1 to 2, then keeps returning 2 with a recomputed String
+                      Object value = literal.getValue();
+                      if (Integer.valueOf(1).equals(value) || Integer.valueOf(2).equals(value)) {
+                          return literal.withValue(2).withValueSource(String.valueOf(2));
+                      }
+                      return literal;
+                  }
+              })),
+              java(
+                """
+                  class A {
+                      int i = 1;
+                  }
+                  """,
+                """
+                  class A {
+                      int i = 2;
+                  }
+                  """
+              )
+            ));
+            assertThat(e).hasMessageContaining("returned an equal copy of A.java in cycle 2")
+              .hasMessageContaining("J.Literal `2` > valueSource: an equal String that is not the same instance \"2\"");
+        }
+
+        @Test
+        void acceptOriginalTree() {
+            rewriteRun(
+              spec -> spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {
+                  @Override
+                  public J.ClassDeclaration visitClassDeclaration(J.ClassDeclaration classDecl, ExecutionContext ctx) {
+                      J.ClassDeclaration c = super.visitClassDeclaration(classDecl, ctx);
+                      // ListUtils.map returns the original list when it changes no element
+                      return c.withModifiers(ListUtils.map(c.getModifiers(), m -> m));
+                  }
+              })),
+              java(
+                """
+                  public class A {}
+                  """
+              )
+            );
+        }
+
+        @Test
+        void acceptEqualCopyInsideChangedFile() {
+            rewriteRun(
+              spec -> spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {
+                  @Override
+                  public J.ClassDeclaration visitClassDeclaration(J.ClassDeclaration classDecl, ExecutionContext ctx) {
+                      J.ClassDeclaration c = super.visitClassDeclaration(classDecl, ctx);
+                      // copying an unrelated list is harmless when the class changes anyway
+                      return c.getBody() == classDecl.getBody() ? c :
+                        c.withModifiers(new ArrayList<>(c.getModifiers()));
+                  }
+
+                  @Override
+                  public J.Literal visitLiteral(J.Literal literal, ExecutionContext ctx) {
+                      return Integer.valueOf(1).equals(literal.getValue()) ?
+                        literal.withValue(2).withValueSource("2") : literal;
+                  }
+              })),
+              java(
+                """
+                  public class A {
+                      int i = 1;
+                  }
+                  """,
+                """
+                  public class A {
+                      int i = 2;
+                  }
+                  """
+              )
+            );
+        }
+
+        @Test
+        void acceptEqualCopyOfFileGeneratedInSameCycle() {
+            rewriteRun(
+              spec -> spec.recipe(toRecipe(() -> new PlainTextVisitor<>() {
+                  @Override
+                  public PlainText visitText(PlainText text, ExecutionContext ctx) {
+                      return text.withSourcePath(Path.of(text.getSourcePath().toString()));
+                  }
+              }).withMaxCycles(1).withGenerator(() -> List.of(PlainText.builder()
+                .sourcePath(Path.of("generated.txt"))
+                .text("generated")
+                .build()))),
+              text(null, "generated", spec -> spec.path("generated.txt"))
+            );
+        }
+
+        @Test
+        void notTurnedOffWithoutTypeValidation() {
+            AssertionError e = assertThrows(AssertionError.class, () -> rewriteRun(
+              spec -> spec.typeValidationOptions(TypeValidation.none()).recipe(copiesModifiers()),
+              java(
+                """
+                  public class A {}
+                  """
+              )
+            ));
+            assertThat(e).hasMessageContaining("returned an equal copy of A.java in cycle 1");
+        }
+
+        @Test
+        void turnedOff() {
+            rewriteRun(
+              spec -> spec.typeValidationOptions(TypeValidation.builder().unchangedTreeIdentity(false).build())
+                .cycles(1)
+                .expectedCyclesThatMakeChanges(1)
+                .recipe(copiesModifiers()),
+              java(
+                """
+                  public class A {}
+                  """
+              )
+            );
+        }
+
+        private Recipe copiesModifiers() {
+            return toRecipe(() -> new JavaIsoVisitor<>() {
+                @Override
+                public J.ClassDeclaration visitClassDeclaration(J.ClassDeclaration classDecl, ExecutionContext ctx) {
+                    J.ClassDeclaration c = super.visitClassDeclaration(classDecl, ctx);
+                    return c.withModifiers(new ArrayList<>(c.getModifiers()));
+                }
+            });
         }
     }
 
