@@ -37,33 +37,33 @@ import static java.util.Collections.singletonList;
 
 @Value
 @EqualsAndHashCode(callSuper = false)
-public class ChangeAttributeKey extends Recipe {
+public class ChangeKey extends Recipe {
     private static final Pattern IDENTIFIER = Pattern.compile("[\\p{L}$_][\\p{L}\\p{N}$_-]*");
     private static final String RENAMED = "RENAMED_ATTRIBUTE";
 
-    @Option(displayName = "Attribute path",
+    @Option(displayName = "Old key path",
             description = "A JSONPath expression locating the attribute to rename.",
             example = "$.resource.name")
-    String attributePath;
+    String oldKeyPath;
 
     @Option(displayName = "New key",
-            description = "The new name of the attribute selected by `attributePath`.",
+            description = "The new name of the attribute selected by `oldKeyPath`.",
             example = "db_name")
     String newKey;
 
-    String displayName = "Change attribute key";
+    String displayName = "Change key";
 
     String description = "Rename an HCL attribute while leaving its value intact. Attributes with a computed key, " +
                          "or with a sibling attribute or block already named `newKey`, are left unchanged.";
 
     @Override
     public String getInstanceNameSuffix() {
-        return String.format("`%s` to `%s`", attributePath, newKey);
+        return String.format("`%s` to `%s`", oldKeyPath, newKey);
     }
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
-        JsonPathMatcher matcher = new JsonPathMatcher(attributePath);
+        JsonPathMatcher matcher = new JsonPathMatcher(oldKeyPath);
         return new HclIsoVisitor<ExecutionContext>() {
             @Override
             public Hcl.Attribute visitAttribute(Hcl.Attribute attribute, ExecutionContext ctx) {

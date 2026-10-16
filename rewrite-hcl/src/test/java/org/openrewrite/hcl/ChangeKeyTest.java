@@ -21,13 +21,13 @@ import org.openrewrite.test.RewriteTest;
 
 import static org.openrewrite.hcl.Assertions.hcl;
 
-class ChangeAttributeKeyTest implements RewriteTest {
+class ChangeKeyTest implements RewriteTest {
 
     @DocumentExample
     @Test
     void renameAttributeInBlock() {
         rewriteRun(
-          spec -> spec.recipe(new ChangeAttributeKey("$.resource.name", "db_name")),
+          spec -> spec.recipe(new ChangeKey("$.resource.name", "db_name")),
           hcl(
             """
               resource "aws_db_instance" "default" {
@@ -48,7 +48,7 @@ class ChangeAttributeKeyTest implements RewriteTest {
     @Test
     void renameAttributeInNestedBlock() {
         rewriteRun(
-          spec -> spec.recipe(new ChangeAttributeKey("$.provider.features.key_vault.purge_soft_delete_on_destroy", "purge_on_destroy")),
+          spec -> spec.recipe(new ChangeKey("$.provider.features.key_vault.purge_soft_delete_on_destroy", "purge_on_destroy")),
           hcl(
             """
               provider "azurerm" {
@@ -77,7 +77,7 @@ class ChangeAttributeKeyTest implements RewriteTest {
     @Test
     void renameWithRecursiveDescent() {
         rewriteRun(
-          spec -> spec.recipe(new ChangeAttributeKey("$..ami", "image_id")),
+          spec -> spec.recipe(new ChangeKey("$..ami", "image_id")),
           hcl(
             """
               resource "aws_instance" "web" {
@@ -102,7 +102,7 @@ class ChangeAttributeKeyTest implements RewriteTest {
     @Test
     void renameTopLevelAttribute() {
         rewriteRun(
-          spec -> spec.recipe(new ChangeAttributeKey("$..region", "aws_region")),
+          spec -> spec.recipe(new ChangeKey("$..region", "aws_region")),
           hcl(
             """
               region = "us-east-1"
@@ -117,7 +117,7 @@ class ChangeAttributeKeyTest implements RewriteTest {
     @Test
     void renameObjectKey() {
         rewriteRun(
-          spec -> spec.recipe(new ChangeAttributeKey("$..Name", "DisplayName")),
+          spec -> spec.recipe(new ChangeKey("$..Name", "DisplayName")),
           hcl(
             """
               resource "aws_instance" "web" {
@@ -142,7 +142,7 @@ class ChangeAttributeKeyTest implements RewriteTest {
     @Test
     void renameQuotedObjectKey() {
         rewriteRun(
-          spec -> spec.recipe(new ChangeAttributeKey("$..['kubernetes.io/role/elb']", "kubernetes.io/role/internal-elb")),
+          spec -> spec.recipe(new ChangeKey("$..['kubernetes.io/role/elb']", "kubernetes.io/role/internal-elb")),
           hcl(
             """
               resource "aws_subnet" "public" {
@@ -165,7 +165,7 @@ class ChangeAttributeKeyTest implements RewriteTest {
     @Test
     void quoteObjectKeyWhenNewKeyIsNotAnIdentifier() {
         rewriteRun(
-          spec -> spec.recipe(new ChangeAttributeKey("$..Role", "kubernetes.io/role")),
+          spec -> spec.recipe(new ChangeKey("$..Role", "kubernetes.io/role")),
           hcl(
             """
               resource "aws_subnet" "public" {
@@ -188,7 +188,7 @@ class ChangeAttributeKeyTest implements RewriteTest {
     @Test
     void noChangeWhenNewKeyIsNotAnIdentifierForBlockAttribute() {
         rewriteRun(
-          spec -> spec.recipe(new ChangeAttributeKey("$.resource.name", "db/name")),
+          spec -> spec.recipe(new ChangeKey("$.resource.name", "db/name")),
           hcl(
             """
               resource "aws_db_instance" "default" {
@@ -202,7 +202,7 @@ class ChangeAttributeKeyTest implements RewriteTest {
     @Test
     void noChangeWhenSiblingAlreadyHasNewKey() {
         rewriteRun(
-          spec -> spec.recipe(new ChangeAttributeKey("$.resource.name", "db_name")),
+          spec -> spec.recipe(new ChangeKey("$.resource.name", "db_name")),
           hcl(
             """
               resource "aws_db_instance" "default" {
@@ -217,7 +217,7 @@ class ChangeAttributeKeyTest implements RewriteTest {
     @Test
     void noChangeWhenPathDoesNotMatch() {
         rewriteRun(
-          spec -> spec.recipe(new ChangeAttributeKey("$.resource.name", "db_name")),
+          spec -> spec.recipe(new ChangeKey("$.resource.name", "db_name")),
           hcl(
             """
               data "aws_db_instance" "default" {
@@ -231,7 +231,7 @@ class ChangeAttributeKeyTest implements RewriteTest {
     @Test
     void noChangeForComputedObjectKey() {
         rewriteRun(
-          spec -> spec.recipe(new ChangeAttributeKey("$..['(var.key)']", "renamed")),
+          spec -> spec.recipe(new ChangeKey("$..['(var.key)']", "renamed")),
           hcl(
             """
               locals {
@@ -247,7 +247,7 @@ class ChangeAttributeKeyTest implements RewriteTest {
     @Test
     void noChangeWhenSiblingBlockHasNewKey() {
         rewriteRun(
-          spec -> spec.recipe(new ChangeAttributeKey("$.resource.foo", "lifecycle")),
+          spec -> spec.recipe(new ChangeKey("$.resource.foo", "lifecycle")),
           hcl(
             """
               resource "aws_instance" "web" {
@@ -264,7 +264,7 @@ class ChangeAttributeKeyTest implements RewriteTest {
     @Test
     void renameOnlyFirstOfSeveralMatchingSiblings() {
         rewriteRun(
-          spec -> spec.recipe(new ChangeAttributeKey("$.resource['foo','bar']", "baz")),
+          spec -> spec.recipe(new ChangeKey("$.resource['foo','bar']", "baz")),
           hcl(
             """
               resource "aws_instance" "web" {
@@ -285,7 +285,7 @@ class ChangeAttributeKeyTest implements RewriteTest {
     @Test
     void doNotAlignInlineObject() {
         rewriteRun(
-          spec -> spec.recipe(new ChangeAttributeKey("$..Name", "DisplayName")),
+          spec -> spec.recipe(new ChangeKey("$..Name", "DisplayName")),
           hcl(
             """
               resource "aws_instance" "web" {
@@ -304,7 +304,7 @@ class ChangeAttributeKeyTest implements RewriteTest {
     @Test
     void doNotRealignUnrelatedAttributeGroup() {
         rewriteRun(
-          spec -> spec.recipe(new ChangeAttributeKey("$.resource.name", "db_name")),
+          spec -> spec.recipe(new ChangeKey("$.resource.name", "db_name")),
           hcl(
             """
               resource "aws_db_instance" "default" {
@@ -329,7 +329,7 @@ class ChangeAttributeKeyTest implements RewriteTest {
     @Test
     void quoteForObjectKey() {
         rewriteRun(
-          spec -> spec.recipe(new ChangeAttributeKey("$..Name", "for")),
+          spec -> spec.recipe(new ChangeKey("$..Name", "for")),
           hcl(
             """
               locals {
