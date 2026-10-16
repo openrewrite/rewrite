@@ -74,14 +74,6 @@ class ReloadableJava25TypeSignatureBuilder implements JavaTypeSignatureBuilder {
         throw new IllegalStateException("Unexpected type " + type.getClass().getName());
     }
 
-    private void completeClassSymbol(Symbol.ClassSymbol classSymbol) {
-        try {
-            classSymbol.complete();
-        } catch (Symbol.CompletionFailure ignore) {
-            // Ignore
-        }
-    }
-
     @Override
     public String arraySignature(Object type) {
         Object elemType = type;
@@ -131,11 +123,7 @@ class ReloadableJava25TypeSignatureBuilder implements JavaTypeSignatureBuilder {
             return "{undefined}";
         }
 
-        Symbol.ClassSymbol sym = (Symbol.ClassSymbol) ((Type.ClassType) type).tsym;
-        if (!sym.completer.isTerminal()) {
-            completeClassSymbol(sym);
-        }
-        return sym.flatName().toString();
+        return ((Type.ClassType) type).tsym.flatName().toString();
     }
 
     @Override

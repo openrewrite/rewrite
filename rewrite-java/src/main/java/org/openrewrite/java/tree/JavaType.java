@@ -613,6 +613,12 @@ public interface JavaType {
             return this;
         }
 
+        public Class unsafeSet(long flags, Kind kind) {
+            this.flagsBitMap = flags;
+            this.kind = kind;
+            return this;
+        }
+
         public Class unsafeSet(long flags, Kind kind, String fullyQualifiedName, @Nullable List<JavaType> typeParameters,
                                @Nullable FullyQualified supertype, @Nullable FullyQualified owningClass,
                                @Nullable List<FullyQualified> annotations, @Nullable List<FullyQualified> interfaces,

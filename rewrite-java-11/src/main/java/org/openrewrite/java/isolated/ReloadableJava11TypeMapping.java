@@ -220,10 +220,14 @@ class ReloadableJava11TypeMapping implements JavaTypeMapping<Tree> {
         Type.ClassType symType = (Type.ClassType) sym.type;
         String fqn = sym.flatName().toString();
 
+        // Flags and kind are read from `flags_field` without completing the symbol, so a factory that already
+        // has this type answers without javac loading the class file. An uncompleted symbol has no flags yet,
+        // which is why the initializer re-reads them once completion has run.
         JavaType.Class clazz = typeFactory.computeClass(fqn, sym.flags_field, getKind(sym), c -> {
             if (!sym.completer.isTerminal()) {
                 completeClassSymbol(sym);
             }
+            c.unsafeSet(sym.flags_field, getKind(sym));
             JavaType.FullyQualified supertype = TypeUtils.asFullyQualified(type(symType.supertype_field));
 
             JavaType.FullyQualified owner = null;
