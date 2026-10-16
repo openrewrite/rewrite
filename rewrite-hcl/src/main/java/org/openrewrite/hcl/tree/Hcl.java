@@ -91,13 +91,33 @@ public interface Hcl extends Tree {
         @Getter
         Expression name;
 
+        /**
+         * @return The name of this attribute. Quoted object keys like {@code "quoted-key" = 1} yield their
+         * unquoted content. Keys whose value is not statically known, such as {@code "${local.a}b"} or
+         * {@code (local.a)}, yield their source text.
+         */
         @JsonIgnore
         public String getSimpleName() {
-            return getSimpleName(name);
-        }
-
-        private String getSimpleName(Expression e) {
-            return e instanceof Parentheses ? getSimpleName(((Parentheses) e).getExpression()) : ((Identifier) e).getName();
+            Expression e = name;
+            while (e instanceof Parentheses) {
+                e = ((Parentheses) e).getExpression();
+            }
+            if (e instanceof Identifier) {
+                return ((Identifier) e).getName();
+            }
+            if (e instanceof QuotedTemplate) {
+                List<Expression> parts = ((QuotedTemplate) e).getExpressions();
+                if (parts.isEmpty()) {
+                    return "";
+                }
+                if (parts.size() == 1 && parts.get(0) instanceof Literal) {
+                    return String.valueOf(((Literal) parts.get(0)).getValue());
+                }
+            }
+            if (e instanceof Literal) {
+                return String.valueOf(((Literal) e).getValue());
+            }
+            return name.printTrimmed(new HclPrinter<>());
         }
 
         HclLeftPadded<Type> type;
