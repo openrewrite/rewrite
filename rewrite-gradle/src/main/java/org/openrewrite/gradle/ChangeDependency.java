@@ -571,9 +571,6 @@ public class ChangeDependency extends ScanningRecipe<ChangeDependency.Accumulato
         Map<String, String> declarations = catalog.getVersionDeclarations();
         Map<GroupArtifact, GroupArtifact> coordinateChanges = new LinkedHashMap<>();
         Map<GroupArtifact, String> selectedVersions = new LinkedHashMap<>();
-        Map<GroupArtifact, String> aliasesByLibrary = new HashMap<>();
-        Map<String, String> selectedVersionsByAlias = new HashMap<>();
-        Set<String> blockedAliases = new HashSet<>();
         List<MavenDownloadingException> failures = new ArrayList<>();
 
         for (Map.Entry<GroupArtifact, VersionCatalog.Entry> library : libraries.entrySet()) {
@@ -582,31 +579,20 @@ public class ChangeDependency extends ScanningRecipe<ChangeDependency.Accumulato
                 continue;
             }
 
-            VersionCatalog.Entry entry = library.getValue();
-            String alias = entry.getVersionRef();
-            if (alias != null) {
-                aliasesByLibrary.put(oldCoordinates, alias);
-                if (!StringUtils.isBlank(newVersion) &&
-                        !isSafeVersionReference(catalog, alias, dependencyMatcher)) {
-                    blockedAliases.add(alias);
-                }
-            }
-
             GroupArtifact newCoordinates = new GroupArtifact(
                     StringUtils.isBlank(newGroupId) ? oldCoordinates.getGroupId() : newGroupId,
                     StringUtils.isBlank(newArtifactId) ? oldCoordinates.getArtifactId() : newArtifactId);
             boolean coordinatesChanged = !oldCoordinates.equals(newCoordinates);
-            String currentVersion = entry.getResolvedVersion(declarations);
+            String currentVersion = library.getValue().getResolvedVersion(declarations);
             String selectedVersion = null;
             if (shouldSelectCatalogVersion(currentVersion)) {
                 try {
-                    selectedVersion = selectCatalogVersion(versionSelector, newCoordinates, currentVersion, ctx);
+                    // The old artifact's version does not bound the version of a relocated one.
+                    selectedVersion = selectCatalogVersion(versionSelector, newCoordinates,
+                            coordinatesChanged ? null : currentVersion, ctx);
                 } catch (MavenDownloadingException e) {
                     failures.add(e);
                 }
-            }
-            if (selectedVersion == null && alias != null && !StringUtils.isBlank(newVersion)) {
-                blockedAliases.add(alias);
             }
             if (selectedVersion == null && shouldSelectCatalogVersion(currentVersion) && !coordinatesChanged) {
                 continue;
@@ -615,20 +601,8 @@ public class ChangeDependency extends ScanningRecipe<ChangeDependency.Accumulato
             coordinateChanges.put(oldCoordinates, newCoordinates);
             if (selectedVersion != null) {
                 selectedVersions.put(newCoordinates, selectedVersion);
-                if (alias != null) {
-                    String previous = selectedVersionsByAlias.putIfAbsent(alias, selectedVersion);
-                    if (previous != null && !previous.equals(selectedVersion)) {
-                        blockedAliases.add(alias);
-                    }
-                }
             }
         }
-
-        coordinateChanges.entrySet().removeIf(change -> {
-            String alias = aliasesByLibrary.get(change.getKey());
-            return alias != null && blockedAliases.contains(alias);
-        });
-        selectedVersions.keySet().retainAll(coordinateChanges.values());
 
         VersionCatalog updated = catalog;
         for (Map.Entry<GroupArtifact, GroupArtifact> change : coordinateChanges.entrySet()) {
@@ -662,23 +636,6 @@ public class ChangeDependency extends ScanningRecipe<ChangeDependency.Accumulato
     private boolean shouldSelectCatalogVersion(@Nullable String currentVersion) {
         return !StringUtils.isBlank(newVersion) &&
                 (currentVersion != null || Boolean.TRUE.equals(overrideManagedVersion));
-    }
-
-    private boolean isSafeVersionReference(
-            VersionCatalog catalog, String alias, DependencyMatcher dependencyMatcher) {
-        for (Map.Entry<GroupArtifact, VersionCatalog.Entry> library : catalog.getLibraryVersions().entrySet()) {
-            if (alias.equals(library.getValue().getVersionRef()) &&
-                    !dependencyMatcher.matches(
-                            library.getKey().getGroupId(), library.getKey().getArtifactId())) {
-                return false;
-            }
-        }
-        for (VersionCatalog.Entry plugin : catalog.getPluginVersions().values()) {
-            if (alias.equals(plugin.getVersionRef())) {
-                return false;
-            }
-        }
-        return true;
     }
 
     private boolean canSafelyUpdateVariable(String varName, DependencyMatcher depMatcher, Accumulator acc) {
