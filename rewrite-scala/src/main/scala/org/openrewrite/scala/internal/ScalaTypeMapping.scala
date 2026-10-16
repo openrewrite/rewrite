@@ -203,8 +203,33 @@ class ScalaTypeMapping(typeFactory: JavaTypeFactory, typedTree: tpd.Tree,
   def methodTypeOf(tree: untpd.Tree): Option[JavaType.Method] =
     typedNodes.get(tree).flatMap { node =>
       if (isIllTypedCall(tree, node)) Some(null)
-      else calledSymbol(resolved(node)).filterNot(isErrorSymbol).map(sym => try mapMethodType(sym) catch { case _: Throwable => null })
+      else {
+        val call = resolved(node)
+        calledSymbol(call).filterNot(isErrorSymbol).map(sym => try invokedMethodType(sym, call) catch { case _: Throwable => null })
+      }
     }
+
+  /**
+   * The method a call or reference invokes, with its parameter and result types instantiated
+   * for the type arguments and the prefix of the call, as `immutable.Set[Int]` for `Set(1, 2)`.
+   */
+  private def invokedMethodType(sym: Symbol, call: tpd.Tree): JavaType.Method =
+    instantiatedInfo(sym, call) match {
+      case Some(info) => mapMethodType(sym, info)
+      case None => mapMethodType(sym)
+    }
+
+  private def instantiatedInfo(sym: Symbol, tree: tpd.Tree): Option[Type] = tree match {
+    case Trees.Apply(fn, _) => instantiatedInfo(sym, fn)
+    case Trees.Block(_, expr) => instantiatedInfo(sym, expr)
+    case Trees.Typed(expr, _) => instantiatedInfo(sym, expr)
+    case _: Trees.TypeApply[?] | _: Trees.Select[?] | _: Trees.Ident[?] if tree.symbol == sym =>
+      tree.tpe.widenSingleton match {
+        case info: (MethodType | ExprType) if !info.isError => Some(info)
+        case _ => None
+      }
+    case _ => None
+  }
 
   /**
    * Whether the node refers to a method taking parameters, so that applying it calls the method
@@ -471,9 +496,9 @@ class ScalaTypeMapping(typeFactory: JavaTypeFactory, typedTree: tpd.Tree,
     val candidates =
       if (exact.nonEmpty) exact
       else spanMap.get(span.start).map(_.iterator.filter(_.span.end <= span.end).toList).getOrElse(Nil)
-    candidates.iterator.map(calledSymbol).collectFirst { case Some(sym) => sym } match {
-      case Some(sym) if !isErrorSymbol(sym) =>
-        try mapMethodType(sym) catch { case _: Throwable => null }
+    candidates.iterator.flatMap(call => calledSymbol(call).map(_ -> call)).nextOption() match {
+      case Some((sym, call)) if !isErrorSymbol(sym) =>
+        try invokedMethodType(sym, call) catch { case _: Throwable => null }
       case _ => null
     }
   }
@@ -788,19 +813,17 @@ class ScalaTypeMapping(typeFactory: JavaTypeFactory, typedTree: tpd.Tree,
 
   // --- Method and Variable type mapping ---
 
-  def mapMethodType(sym: Symbol): JavaType.Method = {
-    if (sym == null || !sym.exists) return null
+  def mapMethodType(sym: Symbol): JavaType.Method =
+    if (sym == null || !sym.exists) null else mapMethodType(sym, sym.info)
 
-    val sig = signatureBuilder.methodSignature(sym)
+  /** Map the method with the given parameter and result types, as instantiated at a call. */
+  private def mapMethodType(sym: Symbol, info: Type): JavaType.Method = {
+    val sig = signatureBuilder.methodSignature(sym, info)
     val name = if (sym.isConstructor) "<constructor>" else sym.name.toString
     val flagsBits = mapFlags(sym)
 
-    val paramNamesArr: Array[String] = sym.info match {
+    val paramNamesArr: Array[String] = info.stripPoly match {
       case mt: MethodType => mt.paramNames.iterator.map(_.toString).toArray
-      case pt: PolyType => pt.resultType match {
-        case mt: MethodType => mt.paramNames.iterator.map(_.toString).toArray
-        case _ => null
-      }
       case _ => null
     }
 
@@ -808,18 +831,11 @@ class ScalaTypeMapping(typeFactory: JavaTypeFactory, typedTree: tpd.Tree,
     typeFactory.methodFor(sig,
       () => new JavaType.Method(null, flagsBits, null, name, null, finalParamNames, null, null, null, null, null),
       (method: JavaType.Method) => {
-        val paramTypes: util.List[JavaType] = sym.info match {
+        val paramTypes: util.List[JavaType] = info.stripPoly match {
           case mt: MethodType =>
             val pts = new ArrayList[JavaType]()
             mt.paramInfos.foreach(pt => pts.add(mapType(pt)))
             pts
-          case pt: PolyType => pt.resultType match {
-            case mt: MethodType =>
-              val pts = new ArrayList[JavaType]()
-              mt.paramInfos.foreach(pt2 => pts.add(mapType(pt2)))
-              pts
-            case _ => null
-          }
           case _ => null
         }
 
@@ -828,7 +844,7 @@ class ScalaTypeMapping(typeFactory: JavaTypeFactory, typedTree: tpd.Tree,
         } catch {
           case _: Throwable => null
         }
-        val returnType = mapType(sym.info.finalResultType)
+        val returnType = mapType(info.finalResultType)
 
         method.unsafeSet(declaringType, returnType, paramTypes, null, null)
       })
