@@ -19,13 +19,23 @@ import com.fasterxml.jackson.annotation.JsonCreator;
 import lombok.EqualsAndHashCode;
 import lombok.Getter;
 import lombok.Value;
+import lombok.With;
 import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.*;
+import org.openrewrite.groovy.GroovyIsoVisitor;
+import org.openrewrite.groovy.GroovyParser;
+import org.openrewrite.internal.ListUtils;
+import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.JavaParser;
+import org.openrewrite.java.marker.OmitParentheses;
 import org.openrewrite.java.tree.J;
+import org.openrewrite.java.tree.Space;
+import org.openrewrite.marker.BuildMetadata;
+import org.openrewrite.marker.Marker;
+import org.openrewrite.marker.SearchResult;
 import org.openrewrite.test.RewriteTest;
 import org.openrewrite.test.SourceSpecs;
 import org.openrewrite.test.TypeValidation;
@@ -35,6 +45,8 @@ import org.openrewrite.text.PlainTextVisitor;
 import java.nio.file.Path;
 import java.util.Collection;
 import java.util.List;
+import java.util.Map;
+import java.util.UUID;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 import static java.util.Collections.emptyList;
@@ -42,7 +54,9 @@ import static java.util.stream.Collectors.toList;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.openrewrite.groovy.Assertions.groovy;
 import static org.openrewrite.java.Assertions.java;
+import static org.openrewrite.test.RewriteTest.toRecipe;
 import static org.openrewrite.test.SourceSpecs.text;
 
 class RewriteTestTest implements RewriteTest {
@@ -185,6 +199,206 @@ class RewriteTestTest implements RewriteTest {
     }
 
     @Nested
+    class AddedMarkers {
+
+        @Test
+        void rejectCustomMarkerAddedAlongsideChange() {
+            AssertionError e = assertThrows(AssertionError.class, () -> rewriteRun(
+              spec -> spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {
+                  @Override
+                  public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
+                      J.MethodInvocation m = super.visitMethodInvocation(method, ctx);
+                      if (!"foo".equals(m.getSimpleName())) {
+                          return m;
+                      }
+                      return m.withName(m.getName().withSimpleName("bar"))
+                        .withMarkers(m.getMarkers().add(new Visited(Tree.randomId())));
+                  }
+              })),
+              java(
+                """
+                  class A {
+                      void foo() {}
+                      void bar() {}
+                      void test() { foo(); }
+                  }
+                  """,
+                """
+                  class A {
+                      void foo() {}
+                      void bar() {}
+                      void test() { bar(); }
+                  }
+                  """
+              )
+            ));
+            assertThat(e).hasMessageContaining("The recipe added markers to the LST")
+              .hasMessageContaining("org.openrewrite.test.internal.Visited on J.MethodInvocation `bar()`");
+        }
+
+        @Test
+        void rejectCustomMarkerAddedWithoutChange() {
+            AssertionError e = assertThrows(AssertionError.class, () -> rewriteRun(
+              spec -> spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {
+                  @Override
+                  public J.ClassDeclaration visitClassDeclaration(J.ClassDeclaration classDecl, ExecutionContext ctx) {
+                      J.ClassDeclaration c = super.visitClassDeclaration(classDecl, ctx);
+                      return c.getMarkers().findFirst(Visited.class).isPresent() ? c :
+                        c.withMarkers(c.getMarkers().add(new Visited(Tree.randomId())));
+                  }
+              })),
+              java(
+                """
+                  class A {
+                  }
+                  """
+              )
+            ));
+            assertThat(e).hasMessageContaining("The recipe added markers to the LST")
+              .hasMessageContaining("A.java (the printed source is unchanged)")
+              .hasMessageContaining("org.openrewrite.test.internal.Visited on J.ClassDeclaration `class A {...`");
+        }
+
+        @Test
+        void rejectSourceFileMarkerAttachedToElement() {
+            AssertionError e = assertThrows(AssertionError.class, () -> rewriteRun(
+              spec -> spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {
+                  @Override
+                  public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
+                      J.MethodInvocation m = super.visitMethodInvocation(method, ctx);
+                      return m.getMarkers().findFirst(BuildMetadata.class).isPresent() ? m :
+                        m.withMarkers(m.getMarkers().add(new BuildMetadata(Tree.randomId(), Map.of("origin", "foo"))));
+                  }
+              })),
+              java(
+                """
+                  class A {
+                      void foo() {}
+                      void test() { foo(); }
+                  }
+                  """,
+                spec -> spec.markers(new BuildMetadata(Tree.randomId(), Map.of("team", "a")))
+              )
+            ));
+            assertThat(e).hasMessageContaining("org.openrewrite.marker.BuildMetadata on J.MethodInvocation `foo()`");
+        }
+
+        @Test
+        void notTurnedOffWithoutTypeValidation() {
+            assertThrows(AssertionError.class, () -> rewriteRun(
+              spec -> spec.typeValidationOptions(TypeValidation.none())
+                .recipe(toRecipe(() -> new JavaIsoVisitor<>() {
+                    @Override
+                    public J.ClassDeclaration visitClassDeclaration(J.ClassDeclaration classDecl, ExecutionContext ctx) {
+                        J.ClassDeclaration c = super.visitClassDeclaration(classDecl, ctx);
+                        return c.getMarkers().findFirst(Visited.class).isPresent() ? c :
+                          c.withMarkers(c.getMarkers().add(new Visited(Tree.randomId())));
+                    }
+                })),
+              java(
+                """
+                  class A {
+                  }
+                  """
+              )
+            ));
+        }
+
+        @Test
+        void turnedOff() {
+            rewriteRun(
+              spec -> spec.typeValidationOptions(TypeValidation.builder().addedMarkers(false).build())
+                .expectedCyclesThatMakeChanges(1)
+                .recipe(toRecipe(() -> new JavaIsoVisitor<>() {
+                    @Override
+                    public J.ClassDeclaration visitClassDeclaration(J.ClassDeclaration classDecl, ExecutionContext ctx) {
+                        J.ClassDeclaration c = super.visitClassDeclaration(classDecl, ctx);
+                        return c.getMarkers().findFirst(Visited.class).isPresent() ? c :
+                          c.withMarkers(c.getMarkers().add(new Visited(Tree.randomId())));
+                    }
+                })),
+              java(
+                """
+                  class A {
+                  }
+                  """
+              )
+            );
+        }
+
+        @Test
+        void acceptSearchResult() {
+            rewriteRun(
+              spec -> spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {
+                  @Override
+                  public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
+                      return SearchResult.found(super.visitMethodInvocation(method, ctx));
+                  }
+              })),
+              java(
+                """
+                  class A {
+                      void foo() {}
+                      void test() { foo(); }
+                  }
+                  """,
+                """
+                  class A {
+                      void foo() {}
+                      void test() { /*~~>*/foo(); }
+                  }
+                  """
+              )
+            );
+        }
+
+        @Test
+        void acceptSyntaxMarkerTheParserProduces() {
+            rewriteRun(
+              spec -> spec.recipe(toRecipe(() -> new GroovyIsoVisitor<>() {
+                  @Override
+                  public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
+                      J.MethodInvocation m = super.visitMethodInvocation(method, ctx);
+                      return m.withArguments(ListUtils.map(m.getArguments(), arg ->
+                        arg.getMarkers().findFirst(OmitParentheses.class).isPresent() ? arg :
+                          arg.withPrefix(Space.SINGLE_SPACE)
+                            .withMarkers(arg.getMarkers().add(new OmitParentheses(Tree.randomId())))));
+                  }
+              })),
+              groovy(
+                """
+                  println("hello")
+                  """,
+                """
+                  println "hello"
+                  """
+              )
+            );
+        }
+
+        @Test
+        void acceptSyntaxMarkersOfTheLanguageASourceIsConvertedTo() {
+            rewriteRun(
+              spec -> spec.parser(GroovyParser.builder())
+                .expectedCyclesThatMakeChanges(1)
+                .recipe(toRecipe(() -> new TreeVisitor<Tree, ExecutionContext>() {
+                    @Override
+                    public @Nullable Tree visit(@Nullable Tree tree, ExecutionContext ctx) {
+                        if (!(tree instanceof PlainText text)) {
+                            return tree;
+                        }
+                        return GroovyParser.builder().build().parse(text.getText())
+                          .findFirst()
+                          .<Tree>map(g -> ((SourceFile) g.withId(text.getId())).withSourcePath(text.getSourcePath()))
+                          .orElse(text);
+                    }
+                })),
+              text("println \"hello\"")
+            );
+        }
+    }
+
+    @Nested
     class RecipeValidation {
 
         @Test
@@ -236,6 +450,12 @@ class RewriteTestTest implements RewriteTest {
               ));
         }
     }
+}
+
+@Value
+@With
+class Visited implements Marker {
+    UUID id;
 }
 
 @EqualsAndHashCode(callSuper = false)

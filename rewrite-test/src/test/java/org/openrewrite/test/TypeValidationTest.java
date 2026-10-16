@@ -29,13 +29,19 @@ class TypeValidationTest {
         TypeValidation all = TypeValidation.all();
         TypeValidation none = TypeValidation.none();
         for (Field field : TypeValidation.class.getDeclaredFields()) {
-            if (field.getType() == boolean.class && !Modifier.isStatic(field.getModifiers()) && !field.isSynthetic()) {
+            if (field.getType() == boolean.class && !Modifier.isStatic(field.getModifiers()) && !field.isSynthetic() &&
+                !"addedMarkers".equals(field.getName())) {
                 field.setAccessible(true);
                 assertThat(field.getBoolean(none))
                   .as("%s is not skipped by none()", field.getName())
                   .isNotEqualTo(field.getBoolean(all));
             }
         }
+    }
+
+    @Test
+    void noneStillChecksAddedMarkers() {
+        assertThat(TypeValidation.none().addedMarkers()).isTrue();
     }
 
     @Test

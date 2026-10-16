@@ -284,6 +284,8 @@ public interface RewriteTest extends SourceSpecs {
             // ----- default parsers for each SourceFile type -------------------------
             sourceSpecsByParser.computeIfAbsent(sourceSpec.getParser().clone(), p -> new ArrayList<>()).add(sourceSpec);
         }
+        Map<SourceSpec<?>, Parser.Builder> parserBySourceSpec = new HashMap<>();
+        sourceSpecsByParser.forEach((parser, specs) -> specs.forEach(s -> parserBySourceSpec.put(s, parser)));
 
         Map<SourceFile, SourceSpec<?>> specBySourceFile = new LinkedHashMap<>(sourceSpecs.length);
         for (Map.Entry<Parser.Builder, List<SourceSpec<?>>> sourceSpecsForParser : sourceSpecsByParser.entrySet()) {
@@ -432,13 +434,25 @@ public interface RewriteTest extends SourceSpecs {
             }
         }
 
+        AddedMarkers addedMarkers = null;
+        if (TypeValidation.after(testMethodSpec, testClassSpec).addedMarkers()) {
+            List<Parser.Builder> specParsers = new ArrayList<>(methodSpecParsers);
+            specParsers.addAll(testClassSpecParsers);
+            addedMarkers = new AddedMarkers(
+                    beforeSourceFiles,
+                    after -> RewriteTestUtils.parsersFor(after, specBySourceFile, parserBySourceSpec, sourceSpecs, specParsers),
+                    testMethodSpec.relativeTo == null ? testClassSpec.relativeTo : testMethodSpec.relativeTo,
+                    ctx
+            );
+        }
+
         LargeSourceSet lss;
         if (testMethodSpec.getSourceSet() != null) {
             lss = testMethodSpec.getSourceSet().apply(runnableSourceFiles);
         } else if (testClassSpec.getSourceSet() != null) {
             lss = testClassSpec.getSourceSet().apply(runnableSourceFiles);
         } else {
-            lss = new LargeSourceSetCheckingExpectedCycles(expectedCyclesThatMakeChanges, runnableSourceFiles);
+            lss = new LargeSourceSetCheckingExpectedCycles(expectedCyclesThatMakeChanges, runnableSourceFiles, addedMarkers);
         }
 
         recipeCtx = CursorValidatingExecutionContextView.view(recipeCtx)
@@ -451,6 +465,9 @@ public interface RewriteTest extends SourceSpecs {
                 lss, runnableSourceFiles, recipeCtx, cycles, expectedCyclesThatMakeChanges,
                 Arrays.asList(sourceSpecs), testClassSpec, testMethodSpec);
         RecipeRun recipeRun = runner.run(recipe, runnerContext);
+        if (addedMarkers != null) {
+            addedMarkers.assertNoneAdded(recipeRun.getChangeset().getAllResults());
+        }
 
         for (Consumer<RecipeRun> afterRecipe : testClassSpec.afterRecipes) {
             afterRecipe.accept(recipeRun);
@@ -792,6 +809,38 @@ class RewriteTestUtils {
             }
         }
         return false;
+    }
+
+    /**
+     * The parsers that might parse a source the recipe returned, the one that parsed it or that its source spec
+     * names first.
+     */
+    static List<Parser.Builder> parsersFor(SourceFile after,
+                                           Map<SourceFile, SourceSpec<?>> specBySourceFile,
+                                           Map<SourceSpec<?>, Parser.Builder> parserBySourceSpec,
+                                           SourceSpec<?>[] sourceSpecs,
+                                           List<Parser.Builder> specParsers) {
+        Set<Parser.Builder> parsers = new LinkedHashSet<>();
+        for (Map.Entry<SourceFile, SourceSpec<?>> entry : specBySourceFile.entrySet()) {
+            if (entry.getKey().getId().equals(after.getId())) {
+                parsers.add(parserBySourceSpec.get(entry.getValue()));
+            }
+        }
+        for (SourceSpec<?> sourceSpec : sourceSpecs) {
+            if (sourceSpec.before == null && after.getSourcePath().equals(sourceSpec.getSourcePath())) {
+                parsers.add(parserBySourceSpec.get(sourceSpec));
+            }
+        }
+        // The recipe may have turned the source into another language, as when converting Java to Kotlin
+        List<Parser.Builder> candidates = new ArrayList<>(parserBySourceSpec.values());
+        candidates.addAll(specParsers);
+        for (Parser.Builder candidate : candidates) {
+            if (candidate.getSourceFileType().isInstance(after)) {
+                parsers.add(candidate);
+            }
+        }
+        parsers.remove(null);
+        return new ArrayList<>(parsers);
     }
 
     static boolean groupSourceSpecsByParser(List<Parser.Builder> parserBuilders, Map<Parser.Builder, List<SourceSpec<?>>> sourceSpecsByParser, SourceSpec<?> sourceSpec) {

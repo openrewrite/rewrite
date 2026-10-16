@@ -140,6 +140,13 @@ public class TypeValidation {
     private boolean parseAndPrintEquality = true;
 
     /**
+     * Controls whether the recipe is validated not to add markers other than search results and markup.
+     * Not turned off by {@link #none()}.
+     */
+    @Builder.Default
+    private boolean addedMarkers = true;
+
+    /**
      * Enable all invariant validation checks.
      */
     public static TypeValidation all() {
@@ -147,7 +154,7 @@ public class TypeValidation {
     }
 
     /**
-     * Skip all invariant validation checks.
+     * Skip all invariant validation checks except {@link #addedMarkers}.
      */
     public static TypeValidation none() {
         return builder()
