@@ -226,24 +226,26 @@ public interface VersionCatalog extends Trait<Tree> {
 
         VersionCatalog catalog = this;
         Set<String> changedAliases = new HashSet<>();
-        for (Map.Entry<String, String> update : newVersions.entrySet()) {
-            Entry plugin = plugins.get(update.getKey());
+        for (Map.Entry<String, String> entry : newVersions.entrySet()) {
+            String pluginId = entry.getKey();
+            String newVersion = entry.getValue();
+            Entry plugin = plugins.get(pluginId);
             if (plugin == null) {
                 continue;
             }
             String alias = plugin.getVersionRef();
             if (alias == null) {
-                catalog = catalog.withPluginVersion(update.getKey(), update.getValue());
-            } else if (!update.getValue().equals(declarations.get(alias)) && !changedAliases.contains(alias)) {
+                catalog = catalog.withPluginVersion(pluginId, newVersion);
+            } else if (!newVersion.equals(declarations.get(alias)) && !changedAliases.contains(alias)) {
                 boolean movingTogether = !libraryAliases.contains(alias);
-                for (String pluginId : pluginIdsByAlias.getOrDefault(alias, emptyList())) {
-                    if (!update.getValue().equals(newVersions.get(pluginId))) {
+                for (String referrer : pluginIdsByAlias.getOrDefault(alias, emptyList())) {
+                    if (!newVersion.equals(newVersions.get(referrer))) {
                         movingTogether = false;
                         break;
                     }
                 }
                 if (movingTogether) {
-                    catalog = catalog.withVersionDeclarationValue(alias, update.getValue());
+                    catalog = catalog.withVersionDeclarationValue(alias, newVersion);
                     changedAliases.add(alias);
                 }
             }

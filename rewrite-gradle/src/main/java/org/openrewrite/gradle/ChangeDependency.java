@@ -515,7 +515,8 @@ public class ChangeDependency extends ScanningRecipe<ChangeDependency.Accumulato
         DependencyMatcher propsMatcher = requireNonNull(DependencyMatcher.build(oldGroupId + ":" + oldArtifactId).getValue());
         DependencyMatcher catalogDependencyMatcher = new DependencyMatcher(oldGroupId, oldArtifactId, null);
         TreeVisitor<?, ExecutionContext> updateVersionCatalog = new VersionCatalog.Matcher().asVisitor((catalog, ctx) ->
-                changeVersionCatalog(catalog, catalogDependencyMatcher, acc.gradleProject.get(), ctx));
+                changeVersionCatalog(catalog, catalogDependencyMatcher,
+                        new DependencyVersionSelector(metadataFailures, acc.gradleProject.get(), null), ctx));
         return new TreeVisitor<Tree, ExecutionContext>() {
             @Override
             public boolean isAcceptable(SourceFile sourceFile, ExecutionContext ctx) {
@@ -565,7 +566,7 @@ public class ChangeDependency extends ScanningRecipe<ChangeDependency.Accumulato
     }
 
     private Tree changeVersionCatalog(VersionCatalog catalog, DependencyMatcher dependencyMatcher,
-                                      @Nullable GradleProject gradleProject, ExecutionContext ctx) {
+                                      DependencyVersionSelector versionSelector, ExecutionContext ctx) {
         Map<GroupArtifact, VersionCatalog.Entry> libraries = catalog.getLibraryVersions();
         Map<String, String> declarations = catalog.getVersionDeclarations();
         Map<GroupArtifact, GroupArtifact> coordinateChanges = new LinkedHashMap<>();
@@ -574,7 +575,6 @@ public class ChangeDependency extends ScanningRecipe<ChangeDependency.Accumulato
         Map<String, String> selectedVersionsByAlias = new HashMap<>();
         Set<String> blockedAliases = new HashSet<>();
         List<MavenDownloadingException> failures = new ArrayList<>();
-        DependencyVersionSelector versionSelector = new DependencyVersionSelector(metadataFailures, gradleProject, null);
 
         for (Map.Entry<GroupArtifact, VersionCatalog.Entry> library : libraries.entrySet()) {
             GroupArtifact oldCoordinates = library.getKey();
@@ -597,8 +597,17 @@ public class ChangeDependency extends ScanningRecipe<ChangeDependency.Accumulato
                     StringUtils.isBlank(newArtifactId) ? oldCoordinates.getArtifactId() : newArtifactId);
             boolean coordinatesChanged = !oldCoordinates.equals(newCoordinates);
             String currentVersion = entry.getResolvedVersion(declarations);
-            String selectedVersion = selectCatalogVersion(
-                    versionSelector, newCoordinates, currentVersion, alias, blockedAliases, failures, ctx);
+            String selectedVersion = null;
+            if (shouldSelectCatalogVersion(currentVersion)) {
+                try {
+                    selectedVersion = selectCatalogVersion(versionSelector, newCoordinates, currentVersion, ctx);
+                } catch (MavenDownloadingException e) {
+                    failures.add(e);
+                }
+            }
+            if (selectedVersion == null && alias != null && !StringUtils.isBlank(newVersion)) {
+                blockedAliases.add(alias);
+            }
             if (selectedVersion == null && shouldSelectCatalogVersion(currentVersion) && !coordinatesChanged) {
                 continue;
             }
@@ -619,8 +628,7 @@ public class ChangeDependency extends ScanningRecipe<ChangeDependency.Accumulato
             String alias = aliasesByLibrary.get(change.getKey());
             return alias != null && blockedAliases.contains(alias);
         });
-        selectedVersions.entrySet().removeIf(version -> coordinateChanges.values().stream()
-                .noneMatch(coordinates -> coordinates.equals(version.getKey())));
+        selectedVersions.keySet().retainAll(coordinateChanges.values());
 
         VersionCatalog updated = catalog;
         for (Map.Entry<GroupArtifact, GroupArtifact> change : coordinateChanges.entrySet()) {
@@ -641,41 +649,14 @@ public class ChangeDependency extends ScanningRecipe<ChangeDependency.Accumulato
             DependencyVersionSelector versionSelector,
             GroupArtifact newCoordinates,
             @Nullable String currentVersion,
-            @Nullable String alias,
-            Set<String> blockedAliases,
-            List<MavenDownloadingException> failures,
-            ExecutionContext ctx) {
-        if (StringUtils.isBlank(newVersion)) {
-            return null;
+            ExecutionContext ctx) throws MavenDownloadingException {
+        if (currentVersion == null) {
+            return versionSelector.select(newCoordinates, null, newVersion, versionPattern, ctx);
         }
-        if (currentVersion == null && !Boolean.TRUE.equals(overrideManagedVersion)) {
-            if (alias != null) {
-                blockedAliases.add(alias);
-            }
-            return null;
-        }
-        try {
-            String selectedVersion;
-            if (currentVersion == null) {
-                selectedVersion = versionSelector.select(
-                        newCoordinates, null, newVersion, versionPattern, ctx);
-            } else {
-                selectedVersion = versionSelector.select(
-                        new GroupArtifactVersion(
-                                newCoordinates.getGroupId(), newCoordinates.getArtifactId(), currentVersion),
-                        null, newVersion, versionPattern, ctx);
-            }
-            if (selectedVersion == null && alias != null) {
-                blockedAliases.add(alias);
-            }
-            return selectedVersion;
-        } catch (MavenDownloadingException e) {
-            failures.add(e);
-            if (alias != null) {
-                blockedAliases.add(alias);
-            }
-            return null;
-        }
+        return versionSelector.select(
+                new GroupArtifactVersion(
+                        newCoordinates.getGroupId(), newCoordinates.getArtifactId(), currentVersion),
+                null, newVersion, versionPattern, ctx);
     }
 
     private boolean shouldSelectCatalogVersion(@Nullable String currentVersion) {

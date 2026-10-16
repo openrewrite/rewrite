@@ -269,7 +269,7 @@ class SettingsVersionCatalog implements VersionCatalog {
         Cursor cursor;
 
         private @Nullable GroupArtifact getGroupArtifact() {
-            J.MethodInvocation library = entryCall(Trait.super.getTree(), "library");
+            J.MethodInvocation library = entryCall(getTree(), "library");
             if (library.getArguments().size() == 3) {
                 String groupId = literalArgument(library, 1);
                 String artifactId = literalArgument(library, 2);
@@ -281,49 +281,49 @@ class SettingsVersionCatalog implements VersionCatalog {
 
         @Override
         public @Nullable String getVersionRef() {
-            return isChained(Trait.super.getTree(), "versionRef") ?
-                    literalArgument(Trait.super.getTree(), 0) : null;
+            J.MethodInvocation tree = getTree();
+            return isChained(tree, "versionRef") ? literalArgument(tree, 0) : null;
         }
 
         @Override
         public @Nullable String getVersion() {
-            if (isChained(Trait.super.getTree(), "version")) {
-                J.MethodInvocation versionConstraint = versionConstraint(Trait.super.getTree());
-                return literalArgument(
-                        versionConstraint == null ? Trait.super.getTree() : versionConstraint, 0);
+            J.MethodInvocation tree = getTree();
+            if (isChained(tree, "version")) {
+                J.MethodInvocation versionConstraint = versionConstraint(tree);
+                return literalArgument(versionConstraint == null ? tree : versionConstraint, 0);
             }
-            Dependency dependency = coordinates(Trait.super.getTree());
+            Dependency dependency = coordinates(tree);
             return dependency == null ? null : dependency.getVersion();
         }
 
         @Override
         public @Nullable String getVersionVariable() {
-            return isChained(getTree(), "version") ? identifierArgument(getTree(), 0) : null;
+            J.MethodInvocation tree = getTree();
+            return isChained(tree, "version") ? identifierArgument(tree, 0) : null;
         }
 
         private Library withVersion(String newVersion) {
-            if (isChained(Trait.super.getTree(), "withoutVersion")) {
-                J.MethodInvocation tree = Trait.super.getTree();
+            J.MethodInvocation tree = getTree();
+            if (isChained(tree, "withoutVersion")) {
                 return withTree(withLiteralArgument(
                         tree.withName(tree.getName().withSimpleName("version")), 0, newVersion));
             }
-            if (isChained(Trait.super.getTree(), "version")) {
-                J.MethodInvocation tree = Trait.super.getTree();
+            if (isChained(tree, "version")) {
                 J.MethodInvocation updated = versionBlock(tree) == null ?
                         withLiteralArgument(tree, 0, newVersion) :
                         withVersionConstraint(tree, newVersion);
                 return withTree(updated);
             }
-            Dependency dependency = coordinates(Trait.super.getTree());
+            Dependency dependency = coordinates(tree);
             if (dependency == null) {
                 return this;
             }
             String notation = DependencyNotation.toStringNotation(dependency.withGav(dependency.getGav().withVersion(newVersion)));
-            return withTree(withLiteralArgument(Trait.super.getTree(), 1, notation));
+            return withTree(withLiteralArgument(tree, 1, notation));
         }
 
         private Library withCoordinates(String newGroupId, String newArtifactId) {
-            J.MethodInvocation tree = Trait.super.getTree();
+            J.MethodInvocation tree = getTree();
             J.MethodInvocation library = entryCall(tree, "library");
             J.MethodInvocation updatedLibrary;
             if (library.getArguments().size() == 3) {
@@ -345,16 +345,16 @@ class SettingsVersionCatalog implements VersionCatalog {
          * Replaces the chained {@code .versionRef(...)} with {@code .version(newVersion)}.
          */
         private Library withDetachedVersion(String newVersion) {
-            if (!isChained(Trait.super.getTree(), "versionRef")) {
+            J.MethodInvocation tree = getTree();
+            if (!isChained(tree, "versionRef")) {
                 return this;
             }
-            J.MethodInvocation tree = Trait.super.getTree();
             J.MethodInvocation renamed = tree.withName(tree.getName().withSimpleName("version"));
             return withTree(withLiteralArgument(renamed, 0, newVersion));
         }
 
         private Library withTree(J.MethodInvocation tree) {
-            return tree == Trait.super.getTree() ? this : new Library(new Cursor(cursor.getParent(), tree));
+            return tree == getTree() ? this : new Library(new Cursor(cursor.getParent(), tree));
         }
 
         /**
@@ -403,19 +403,19 @@ class SettingsVersionCatalog implements VersionCatalog {
         Cursor cursor;
 
         private @Nullable String getPluginId() {
-            return literalArgument(entryCall(Trait.super.getTree(), "plugin"), 1);
+            return literalArgument(entryCall(getTree(), "plugin"), 1);
         }
 
         @Override
         public @Nullable String getVersion() {
-            return isChained(Trait.super.getTree(), "version") ?
-                    literalArgument(Trait.super.getTree(), 0) : null;
+            J.MethodInvocation tree = getTree();
+            return isChained(tree, "version") ? literalArgument(tree, 0) : null;
         }
 
         @Override
         public @Nullable String getVersionRef() {
-            return isChained(Trait.super.getTree(), "versionRef") ?
-                    literalArgument(Trait.super.getTree(), 0) : null;
+            J.MethodInvocation tree = getTree();
+            return isChained(tree, "versionRef") ? literalArgument(tree, 0) : null;
         }
 
         private static class Matcher extends GradleTraitMatcher<Plugin> {
@@ -432,11 +432,12 @@ class SettingsVersionCatalog implements VersionCatalog {
         }
 
         private Plugin withVersion(String newVersion) {
-            if (!isChained(Trait.super.getTree(), "version")) {
+            J.MethodInvocation tree = getTree();
+            if (!isChained(tree, "version")) {
                 return this;
             }
-            J.MethodInvocation updated = withLiteralArgument(Trait.super.getTree(), 0, newVersion);
-            return updated == Trait.super.getTree() ? this : new Plugin(new Cursor(cursor.getParent(), updated));
+            J.MethodInvocation updated = withLiteralArgument(tree, 0, newVersion);
+            return updated == tree ? this : new Plugin(new Cursor(cursor.getParent(), updated));
         }
     }
 
@@ -448,13 +449,14 @@ class SettingsVersionCatalog implements VersionCatalog {
         Cursor cursor;
 
         private @Nullable String getAlias() {
-            return literalArgument(Trait.super.getTree(), 0);
+            return literalArgument(getTree(), 0);
         }
 
         private @Nullable String getVersion() {
-            J.MethodInvocation versionConstraint = versionConstraint(Trait.super.getTree());
+            J.MethodInvocation tree = getTree();
+            J.MethodInvocation versionConstraint = versionConstraint(tree);
             return versionConstraint == null ?
-                    literalArgument(Trait.super.getTree(), 1) : literalArgument(versionConstraint, 0);
+                    literalArgument(tree, 1) : literalArgument(versionConstraint, 0);
         }
 
         private @Nullable String getVariable() {
@@ -462,7 +464,7 @@ class SettingsVersionCatalog implements VersionCatalog {
         }
 
         private Version withVersion(String newVersion) {
-            J.MethodInvocation tree = Trait.super.getTree();
+            J.MethodInvocation tree = getTree();
             J.MethodInvocation updated = versionBlock(tree) == null ?
                     withLiteralArgument(tree, 1, newVersion) :
                     withVersionConstraint(tree, newVersion);

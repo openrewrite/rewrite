@@ -214,7 +214,8 @@ public class UpgradePluginVersion extends ScanningRecipe<UpgradePluginVersion.De
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor(DependencyVersionState acc) {
         TreeVisitor<?, ExecutionContext> updateVersionCatalog = new VersionCatalog.Matcher().asVisitor((catalog, ctx) ->
-                upgradeVersionCatalog(catalog, acc.gradleProject.get(), acc.gradleSettings.get(), ctx));
+                upgradeVersionCatalog(catalog,
+                        new DependencyVersionSelector(metadataFailures, acc.gradleProject.get(), acc.gradleSettings.get()), ctx));
         PropertiesVisitor<ExecutionContext> propertiesVisitor = new PropertiesVisitor<ExecutionContext>() {
             @Override
             public boolean isAcceptable(SourceFile sourceFile, ExecutionContext ctx) {
@@ -361,32 +362,31 @@ public class UpgradePluginVersion extends ScanningRecipe<UpgradePluginVersion.De
             }
 
             @Override
-            public @Nullable Tree visit(@Nullable Tree tree, ExecutionContext ctx) {
-                if (tree instanceof Properties.File && propertiesVisitor.isAcceptable((SourceFile) tree, ctx)) {
-                    return propertiesVisitor.visit(tree, ctx);
+            public @Nullable Tree preVisit(@Nullable Tree tree, ExecutionContext ctx) {
+                stopAfterPreVisit();
+                Tree t = tree;
+                if (t instanceof SourceFile) {
+                    SourceFile sourceFile = (SourceFile) t;
+                    if (propertiesVisitor.isAcceptable(sourceFile, ctx)) {
+                        t = propertiesVisitor.visitNonNull(t, ctx);
+                    }
+                    if (updateVersionCatalog.isAcceptable(sourceFile, ctx)) {
+                        t = updateVersionCatalog.visitNonNull(t, ctx);
+                    }
+                    if (gradleVisitor.isAcceptable(sourceFile, ctx)) {
+                        t = gradleVisitor.visitNonNull(t, ctx);
+                    }
                 }
-                if (!(tree instanceof SourceFile)) {
-                    return tree;
-                }
-                SourceFile sourceFile = (SourceFile) tree;
-                if (updateVersionCatalog.isAcceptable(sourceFile, ctx)) {
-                    tree = updateVersionCatalog.visitNonNull(tree, ctx);
-                }
-                if (tree instanceof SourceFile && gradleVisitor.isAcceptable((SourceFile) tree, ctx)) {
-                    tree = gradleVisitor.visitNonNull(tree, ctx);
-                }
-                return tree;
+                return t;
             }
         };
     }
 
-    private Tree upgradeVersionCatalog(VersionCatalog catalog, @Nullable GradleProject gradleProject,
-                                       @Nullable GradleSettings gradleSettings, ExecutionContext ctx) {
+    private Tree upgradeVersionCatalog(VersionCatalog catalog, DependencyVersionSelector versionSelector,
+                                       ExecutionContext ctx) {
         Map<String, String> declarations = catalog.getVersionDeclarations();
         Map<String, String> selectedVersions = new LinkedHashMap<>();
         List<MavenDownloadingException> failures = new ArrayList<>();
-        DependencyVersionSelector versionSelector =
-                new DependencyVersionSelector(metadataFailures, gradleProject, gradleSettings);
 
         for (Map.Entry<String, VersionCatalog.Entry> plugin : catalog.getPluginVersions().entrySet()) {
             if (!StringUtils.matchesGlob(plugin.getKey(), pluginIdPattern)) {
