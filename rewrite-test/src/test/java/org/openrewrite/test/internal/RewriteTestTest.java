@@ -51,6 +51,8 @@ import org.openrewrite.test.SourceSpecs;
 import org.openrewrite.test.TypeValidation;
 import org.openrewrite.text.PlainText;
 import org.openrewrite.text.PlainTextVisitor;
+import org.openrewrite.yaml.YamlIsoVisitor;
+import org.openrewrite.yaml.tree.Yaml;
 
 import java.nio.file.Path;
 import java.util.Collection;
@@ -69,6 +71,7 @@ import static org.openrewrite.groovy.Assertions.groovy;
 import static org.openrewrite.java.Assertions.java;
 import static org.openrewrite.test.RewriteTest.toRecipe;
 import static org.openrewrite.test.SourceSpecs.text;
+import static org.openrewrite.yaml.Assertions.yaml;
 
 class RewriteTestTest implements RewriteTest {
 
@@ -1366,6 +1369,108 @@ class RewriteTestTest implements RewriteTest {
     }
 
     @Nested
+    class EmptySources {
+
+        @Test
+        void rejectRecipeThatThrowsOnAnEmptyFile() {
+            AssertionError e = assertThrows(AssertionError.class, () -> rewriteRun(
+              spec -> spec.recipe(new ChangeFirstValue("rejected", null)),
+              yaml(
+                "key: value",
+                "key: rejected",
+                spec -> spec.path("application.yml").markers(new BuildMetadata(Tree.randomId(), Map.of("team", "a")))
+              )
+            ));
+            assertThat(e).hasMessageStartingWith("Check for the structure the recipe edits before using it")
+              .hasMessageContaining("org.openrewrite.test.internal.ChangeFirstValue threw when run on an empty " +
+                                    "Yaml.Documents at application.yml with the markers of the test's source (BuildMetadata):\n" +
+                                    "    java.lang.IndexOutOfBoundsException")
+              .hasMessageContaining("at org.openrewrite.test.internal.ChangeFirstValue$1.visitDocument(RewriteTestTest.java:")
+              .hasMessageContaining("TypeValidation.builder().emptySources(false)")
+              .hasRootCauseInstanceOf(IndexOutOfBoundsException.class);
+        }
+
+        @Test
+        void acceptRecipeThatChecksTheStructure() {
+            rewriteRun(
+              spec -> spec.recipe(new ChangeFirstValue("checked", true)),
+              yaml(
+                "key: value",
+                "key: checked"
+              )
+            );
+        }
+
+        @Test
+        void skipAdHocRecipe() {
+            rewriteRun(
+              spec -> spec.recipe(toRecipe(() -> new YamlIsoVisitor<>() {
+                  @Override
+                  public Yaml.Document visitDocument(Yaml.Document document, ExecutionContext ctx) {
+                      Yaml.Mapping mapping = (Yaml.Mapping) document.getBlock();
+                      Yaml.Scalar scalar = (Yaml.Scalar) mapping.getEntries().get(0).getValue();
+                      return document.withBlock(mapping.withEntries(ListUtils.mapFirst(mapping.getEntries(),
+                        entry -> entry.withValue(scalar.withValue("adhoc")))));
+                  }
+              })),
+              yaml(
+                "key: value",
+                "key: adhoc"
+              )
+            );
+        }
+
+        @Test
+        void notTurnedOffWithoutTypeValidation() {
+            assertThrows(AssertionError.class, () -> rewriteRun(
+              spec -> spec.typeValidationOptions(TypeValidation.none())
+                .recipe(new ChangeFirstValue("none", null)),
+              yaml(
+                "key: value",
+                "key: none"
+              )
+            ));
+        }
+
+        @Test
+        void turnedOff() {
+            rewriteRun(
+              spec -> spec.typeValidationOptions(TypeValidation.builder().emptySources(false).build())
+                .recipe(new ChangeFirstValue("off", null)),
+              yaml(
+                "key: value",
+                "key: off"
+              )
+            );
+        }
+
+        @Test
+        void toleratedByTheTestsErrorHandler() {
+            rewriteRun(
+              spec -> spec.executionContext(new InMemoryExecutionContext())
+                .recipe(new ChangeFirstValue("tolerated", null)),
+              yaml(
+                "key: value",
+                "key: tolerated"
+              )
+            );
+        }
+
+        @Test
+        void emptyFileHasTheMarkersHooksGaveTheSource() {
+            rewriteRun(
+              spec -> spec.recipe(new RequiresBuildMetadata())
+                .beforeRecipe(sources -> sources.replaceAll(source ->
+                  source.withMarkers(source.getMarkers().add(new BuildMetadata(Tree.randomId(), Map.of("team", "a")))))),
+              text(
+                "original",
+                "changed"
+              )
+            );
+        }
+    }
+
+    @Nested
     class RecipeValidation {
 
         @Test
@@ -1423,6 +1528,68 @@ class RewriteTestTest implements RewriteTest {
 @With
 class Visited implements Marker {
     UUID id;
+}
+
+@EqualsAndHashCode(callSuper = false)
+@NullMarked
+@Value
+class ChangeFirstValue extends Recipe {
+
+    @Option(displayName = "Value",
+      description = "The value to set.",
+      example = "changed")
+    String value;
+
+    @Option(displayName = "Check the document",
+      description = "Leave a document unchanged unless its first entry has a scalar value.",
+      required = false)
+    @Nullable
+    Boolean checked;
+
+    String displayName = "Change the first value";
+
+    String description = "Sets the value of the first entry of each YAML document.";
+
+    @Override
+    public TreeVisitor<?, ExecutionContext> getVisitor() {
+        return new YamlIsoVisitor<>() {
+            @Override
+            public Yaml.Document visitDocument(Yaml.Document document, ExecutionContext ctx) {
+                if (Boolean.TRUE.equals(checked) && !(document.getBlock() instanceof Yaml.Mapping m &&
+                                                      !m.getEntries().isEmpty() &&
+                                                      m.getEntries().getFirst().getValue() instanceof Yaml.Scalar)) {
+                    return document;
+                }
+                Yaml.Mapping mapping = (Yaml.Mapping) document.getBlock();
+                Yaml.Scalar scalar = (Yaml.Scalar) mapping.getEntries().get(0).getValue();
+                return document.withBlock(mapping.withEntries(ListUtils.mapFirst(mapping.getEntries(),
+                  entry -> entry.withValue(scalar.withValue(value)))));
+            }
+        };
+    }
+}
+
+@EqualsAndHashCode(callSuper = false)
+@NullMarked
+@Value
+class RequiresBuildMetadata extends Recipe {
+
+    String displayName = "Require build metadata";
+
+    String description = "Changes text, and throws on a source without build metadata as recipes that need a project marker do.";
+
+    @Override
+    public TreeVisitor<?, ExecutionContext> getVisitor() {
+        return new PlainTextVisitor<>() {
+            @Override
+            public PlainText visitText(PlainText text, ExecutionContext ctx) {
+                if (!text.getMarkers().findFirst(BuildMetadata.class).isPresent()) {
+                    throw new IllegalStateException("Unable to find BuildMetadata marker.");
+                }
+                return text.withText("changed");
+            }
+        };
+    }
 }
 
 @EqualsAndHashCode(callSuper = false)

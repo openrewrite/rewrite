@@ -470,6 +470,10 @@ public interface RewriteTest extends SourceSpecs {
         if (addedMarkers != null) {
             addedMarkers.assertNoneAdded(recipeRun.getChangeset().getAllResults());
         }
+        EmptySources emptySources = TypeValidation.after(testMethodSpec, testClassSpec).emptySources() &&
+                                    runner == RewriteRunner.IN_PROCESS &&
+                                    lss instanceof LargeSourceSetCheckingExpectedCycles ?
+                new EmptySources(recipe, recipeRun.getChangeset().getAllResults()) : null;
 
         for (Consumer<RecipeRun> afterRecipe : testClassSpec.afterRecipes) {
             afterRecipe.accept(recipeRun);
@@ -708,6 +712,10 @@ public interface RewriteTest extends SourceSpecs {
 
         if (nameMatching != null) {
             nameMatching.assertMatchedByType(recipeRun.getChangeset().getAllResults());
+        }
+
+        if (emptySources != null) {
+            emptySources.assertNoneThrow(specBySourceFile, parserBySourceSpec::get, relativeTo, ctx, recipeCtx, cycles);
         }
     }
 

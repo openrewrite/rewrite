@@ -168,6 +168,13 @@ public class TypeValidation {
     private boolean typeAttributedMatching = false;
 
     /**
+     * Controls whether the recipe is run on an empty file of each kind it changed, to check that it doesn't throw.
+     * Not turned off by {@link #none()}.
+     */
+    @Builder.Default
+    private boolean emptySources = true;
+
+    /**
      * Enable all invariant validation checks.
      */
     public static TypeValidation all() {
@@ -175,7 +182,8 @@ public class TypeValidation {
     }
 
     /**
-     * Skip all invariant validation checks except {@link #addedMarkers} and {@link #formattingScope}.
+     * Skip all invariant validation checks except {@link #addedMarkers}, {@link #formattingScope} and
+     * {@link #emptySources}.
      */
     public static TypeValidation none() {
         return builder()
