@@ -450,6 +450,29 @@ class RemoveDuplicateDependenciesTest implements RewriteTest {
     }
 
     @Test
+    void keepDependenciesWhoseArgumentsCallMethods() {
+        rewriteRun(
+          buildGradle(
+            """
+              plugins {
+                  id 'java-library'
+              }
+
+              repositories {
+                  mavenCentral()
+              }
+
+              def deps = ['com.google.guava:guava:29.0-jre', 'junit:junit:4.13'].iterator()
+              dependencies {
+                  implementation deps.next()
+                  implementation deps.next()
+              }
+              """
+          )
+        );
+    }
+
+    @Test
     void keepDependenciesWhoseStringsDifferOnlyInWhitespace() {
         rewriteRun(
           buildGradle(

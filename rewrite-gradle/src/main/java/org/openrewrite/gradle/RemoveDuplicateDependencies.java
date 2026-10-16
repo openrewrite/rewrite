@@ -37,6 +37,7 @@ import org.openrewrite.maven.tree.DependencyNotation;
 
 import java.time.Duration;
 import java.util.*;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 import static java.util.Collections.singletonList;
 import static java.util.stream.Collectors.joining;
@@ -122,13 +123,31 @@ public class RemoveDuplicateDependencies extends Recipe {
                     return null;
                 }
                 J.MethodInvocation dependency = cursor.getValue();
-                if (dependency.getArguments().isEmpty() || dependency.getArguments().get(0) instanceof J.Empty) {
+                if (dependency.getArguments().isEmpty() || dependency.getArguments().get(0) instanceof J.Empty ||
+                        callsMethodOnReceiver(dependency.getArguments())) {
                     return null;
                 }
                 return (dependency.getSelect() == null ? "" : canonical(dependency.getSelect(), cursor) + ".") +
                         dependency.getSimpleName() + canonical(dependency.getArguments(), cursor);
             }
         });
+    }
+
+    /**
+     * A call such as `iterator.next()` may return something else each time, so identical looking
+     * declarations containing it are not necessarily duplicates.
+     */
+    private static boolean callsMethodOnReceiver(List<Expression> arguments) {
+        return new JavaIsoVisitor<AtomicBoolean>() {
+            @Override
+            public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, AtomicBoolean found) {
+                if (method.getSelect() != null) {
+                    found.set(true);
+                    return method;
+                }
+                return super.visitMethodInvocation(method, found);
+            }
+        }.reduce(arguments, new AtomicBoolean()).get();
     }
 
     /**
