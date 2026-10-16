@@ -125,7 +125,7 @@ class Py2ParserVisitor:
         # the file's terminal whitespace recovered from the endmarker.
         trailing = self._trailing_whitespace()
         if end_ws is not Space.EMPTY:
-            trailing = Space([], end_ws.whitespace + trailing.whitespace)
+            trailing = self._concat_space(end_ws, trailing)
 
         # Build CompilationUnit
         cu = py.CompilationUnit(
@@ -179,7 +179,9 @@ class Py2ParserVisitor:
             ctype = getattr(child, 'type', None)
             if isinstance(child, parso_tree.PythonLeaf):
                 if ctype in ('newline', 'indent', 'dedent'):
-                    pending_prefix += getattr(child, 'value', '')
+                    # A suite's leading newline carries the comment after
+                    # its ``:`` (``if x:  # c``) in its prefix.
+                    pending_prefix += child.prefix + child.value
                     continue
                 if ctype == 'endmarker':
                     # endmarker.prefix is captured by _trailing_whitespace.
@@ -212,24 +214,34 @@ class Py2ParserVisitor:
                 # convention — this is how the file's terminal ``\n``
                 # normally round-trips).
                 statements[-1] = last.replace(
-                    after=Space([], last.after.whitespace + pending_prefix),
+                    after=self._concat_space(last.after, self._parse_space(pending_prefix)),
                 )
                 return statements, Space.EMPTY
-        return statements, Space([], pending_prefix)
+        return statements, self._parse_space(pending_prefix)
 
-    @staticmethod
-    def _prepend_prefix(stmt, leading: str):
-        """Prepend a whitespace string to a node's prefix, preserving
-        any comments already attached.
+    def _prepend_prefix(self, stmt, leading: str):
+        """Prepend whitespace (and any comments in it) to a node's prefix,
+        preserving any comments already attached.
         """
         if not hasattr(stmt, 'prefix'):
             return stmt
         existing = stmt.prefix if stmt.prefix is not None else Space.EMPTY
-        new_prefix = Space(existing.comments, leading + existing.whitespace)
+        new_prefix = self._concat_space(self._parse_space(leading), existing)
         try:
             return stmt.replace(prefix=new_prefix)
         except (TypeError, AttributeError):
             return stmt
+
+    @staticmethod
+    def _concat_space(first: Space, second: Space) -> Space:
+        """The :class:`Space` that prints as ``first`` followed by ``second``."""
+        if not first.comments:
+            return Space(second.comments, first.whitespace + second.whitespace)
+        last = first.comments[-1]
+        comments = (first.comments[:-1] +
+                    [last.replace(suffix=last.suffix + second.whitespace)] +
+                    second.comments)
+        return Space(comments, first.whitespace)
 
     def _convert_node(self, node) -> Optional[j.J]:
         """Convert a parso node to an LST node.
@@ -290,6 +302,7 @@ class Py2ParserVisitor:
             'factor': self._convert_factor,
             'lambdef': self._convert_lambdef,
             'old_lambdef': self._convert_lambdef,
+            'fpdef': self._convert_fpdef,
             'strings': self._convert_strings,
         }
 
@@ -1019,21 +1032,121 @@ class Py2ParserVisitor:
             empty = j.Empty(random_id(), self._parse_space(close_paren.prefix), Markers.EMPTY)
             return JContainer(leading, [JRightPadded(empty, Space.EMPTY, Markers.EMPTY)], Markers.EMPTY)
 
-        padded_params = []
-        for i, p in enumerate(param_nodes):
-            converted = self._convert_param(p)
+        padded_params = self._convert_param_nodes(param_nodes, self._parse_space(close_paren.prefix))
+        if padded_params is None:
+            return None
+        return JContainer(leading, padded_params, Markers.EMPTY)
+
+    def _convert_param_nodes(self, nodes, before_close: Space) -> Optional[list]:
+        """Convert the parso children of a ``def`` or ``lambda`` parameter
+        list to padded parameters.
+
+        parso wraps named parameters in ``param`` nodes that carry their own
+        trailing comma, but leaves Py2 tuple parameters (``fpdef``) and their
+        ``=`` default and ``,`` as siblings in the parameter list.
+        """
+        padded = []
+        i = 0
+        while i < len(nodes):
+            node = nodes[i]
+            ntype = getattr(node, 'type', None)
+            if ntype == 'param':
+                converted = self._convert_param(node)
+                after = self._extract_param_trailing_space(node)
+                has_comma = getattr(node.children[-1], 'value', None) == ','
+                i += 1
+            elif ntype == 'fpdef':
+                converted, i = self._convert_tuple_param(nodes, i)
+                after = Space.EMPTY
+                has_comma = False
+            elif ntype == 'name':
+                ident = j.Identifier(random_id(), Space.EMPTY, Markers.EMPTY, [], node.value, None, None)
+                named = j.VariableDeclarations.NamedVariable(
+                    random_id(), Space.EMPTY, Markers.EMPTY, ident, [], None, None,
+                )
+                converted = j.VariableDeclarations(
+                    random_id(), self._parse_space(node.prefix), Markers.EMPTY,
+                    [], [], None, None, [],
+                    [JRightPadded(named, Space.EMPTY, Markers.EMPTY)],
+                )
+                after = Space.EMPTY
+                has_comma = False
+                i += 1
+            else:
+                return None
             if converted is None:
                 return None
-            is_last = (i == len(param_nodes) - 1)
-            # parso `param` nodes carry their own trailing comma when not the
-            # last; use it for the JRightPadded.after. For the final param,
-            # use the space before `)`.
-            after = self._extract_param_trailing_space(p)
-            if is_last and after == Space.EMPTY:
-                after = self._parse_space(close_paren.prefix)
-            padded_params.append(JRightPadded(converted, after, Markers.EMPTY))
+            if i < len(nodes) and getattr(nodes[i], 'value', None) == ',':
+                after = self._parse_space(nodes[i].prefix)
+                has_comma = True
+                i += 1
+            markers = Markers.EMPTY
+            if i >= len(nodes):
+                if has_comma:
+                    markers = Markers.build(random_id(), [TrailingComma(random_id(), before_close)])
+                else:
+                    after = before_close
+            padded.append(JRightPadded(converted, after, markers))
+        return padded
 
-        return JContainer(leading, padded_params, Markers.EMPTY)
+    def _convert_tuple_param(self, nodes, i) -> tuple:
+        """Convert the Py2 tuple parameter at ``nodes[i]`` together with its
+        optional ``= default``. Returns the parameter and the index of the
+        first sibling after it.
+
+        The parameter is a :class:`py.ExpressionStatement` around the
+        ``TUPLE`` :class:`py.CollectionLiteral` for ``(a, b)``, or around a
+        :class:`j.Assignment` of the default to that tuple for ``(a, b)=t``.
+        """
+        target = self._convert_fpdef(nodes[i])
+        i += 1
+        if target is None:
+            return None, i
+        if i + 1 < len(nodes) and getattr(nodes[i], 'value', None) == '=':
+            default = self._convert_node(nodes[i + 1])
+            if default is None:
+                return None, i
+            target = j.Assignment(
+                random_id(), target.prefix, Markers.EMPTY,
+                target.replace(_prefix=Space.EMPTY),
+                JLeftPadded(self._parse_space(nodes[i].prefix), default, Markers.EMPTY),
+                None,
+            )
+            i += 2
+        return py.ExpressionStatement(random_id(), target), i
+
+    def _convert_fpdef(self, node) -> Optional[j.J]:
+        """Convert a Py2 tuple-parameter pattern.
+
+        Grammar:
+            fpdef:  NAME | '(' fplist ')'
+            fplist: fpdef (',' fpdef)* [',']
+        A parenthesized ``fplist`` becomes a ``TUPLE``
+        :class:`py.CollectionLiteral`; a single parenthesized ``fpdef``
+        such as ``(a)`` becomes :class:`j.Parentheses`.
+        """
+        if not hasattr(node, 'children'):
+            return self._convert_node(node)
+        open_paren, inner, close_paren = node.children
+        leading = self._parse_space(open_paren.prefix)
+        before_close = self._parse_space(close_paren.prefix)
+        if getattr(inner, 'type', None) == 'fplist':
+            items = self._pad_comma_list(inner.children, before_close)
+            if items is None:
+                return None
+            return py.CollectionLiteral(
+                random_id(), leading, Markers.EMPTY,
+                py.CollectionLiteral.Kind.TUPLE,
+                JContainer(Space.EMPTY, items, Markers.EMPTY),
+                None,
+            )
+        inner_expr = self._convert_fpdef(inner)
+        if inner_expr is None:
+            return None
+        return j.Parentheses(
+            random_id(), leading, Markers.EMPTY,
+            JRightPadded(inner_expr, before_close, Markers.EMPTY),
+        )
 
     @staticmethod
     def _extract_param_trailing_space(param_node) -> Space:
@@ -1301,14 +1414,14 @@ class Py2ParserVisitor:
                 nested = self._build_if_chain(children, idx)
                 if nested is None:
                     return None
-                # Inner If's prefix already holds the space before 'elif'; we
-                # wrap it bare and keep j.If.Else.prefix as Space.EMPTY so the
-                # printer doesn't double-print the gap.
+                # The printer emits ``el`` between the Else prefix and the
+                # nested If's prefix, so the space before 'elif' must live on
+                # the Else (matching the Py3 visitor).
                 elze = j.If.Else(
                     random_id(),
-                    Space.EMPTY,
+                    nested.prefix,
                     Markers.EMPTY,
-                    JRightPadded(nested, Space.EMPTY, Markers.EMPTY),
+                    JRightPadded(nested.replace(_prefix=Space.EMPTY), Space.EMPTY, Markers.EMPTY),
                 )
             elif tail_val == 'else':
                 else_colon = children[idx + 1]
@@ -1364,15 +1477,7 @@ class Py2ParserVisitor:
 
         prefix = self._parse_space(for_kw.prefix)
         if getattr(target_node, 'type', None) == 'exprlist':
-            items = self._pad_comma_list(target_node.children, Space.EMPTY)
-            if items is None:
-                return self._convert_generic(node)
-            target = py.CollectionLiteral(
-                random_id(), Space.EMPTY, Markers.EMPTY,
-                py.CollectionLiteral.Kind.TUPLE,
-                JContainer(Space.EMPTY, items, Markers.EMPTY),
-                None,
-            )
+            target = self._convert_bare_tuple(target_node.children)
         else:
             target = self._convert_node(target_node)
         iterable = self._convert_node(iter_node)
@@ -2303,15 +2408,7 @@ class Py2ParserVisitor:
 
         def stash_clause(for_kw, target_node, in_kw, iterable_node):
             if getattr(target_node, 'type', None) == 'exprlist':
-                tuple_items = self._pad_comma_list(target_node.children, Space.EMPTY)
-                if tuple_items is None:
-                    return False
-                target = py.CollectionLiteral(
-                    random_id(), Space.EMPTY, Markers.EMPTY,
-                    py.CollectionLiteral.Kind.TUPLE,
-                    JContainer(Space.EMPTY, tuple_items, Markers.EMPTY),
-                    None,
-                )
+                target = self._convert_bare_tuple(target_node.children)
             else:
                 target = self._convert_node(target_node)
             iterable = self._convert_node(iterable_node)
@@ -2588,15 +2685,7 @@ class Py2ParserVisitor:
                 index = self._convert_slice(inner)
             elif getattr(inner, 'type', None) == 'subscriptlist':
                 # Multi-element subscript ``a[i, j]`` — render as a tuple.
-                items = self._pad_comma_list(inner.children, Space.EMPTY)
-                if items is None:
-                    return None
-                index = py.CollectionLiteral(
-                    random_id(), Space.EMPTY, Markers.EMPTY,
-                    py.CollectionLiteral.Kind.TUPLE,
-                    JContainer(Space.EMPTY, items, Markers.EMPTY),
-                    None,
-                )
+                index = self._convert_bare_tuple(inner.children)
             else:
                 index = self._convert_node(inner)
             if index is None:
@@ -2786,10 +2875,13 @@ class Py2ParserVisitor:
             result_expr = self._convert_node(children[0])
             if result_expr is None:
                 return None
-            return self._build_comprehension(
+            genexp = self._build_comprehension(
                 py.ComprehensionExpression.Kind.GENERATOR,
                 result_expr, children[1], Space.EMPTY, Space.EMPTY,
             )
+            if genexp is None:
+                return None
+            return genexp.replace(_markers=Markers.build(random_id(), [OmitParentheses(random_id())]))
         return None
 
     def _convert_testlist(self, node) -> Optional[j.J]:
@@ -2804,9 +2896,18 @@ class Py2ParserVisitor:
         """
         if len(node.children) == 1:
             return self._convert_node(node.children[0])
-        items = self._pad_comma_list(node.children, Space.EMPTY)
-        if items is None:
+        tuple_lit = self._convert_bare_tuple(node.children)
+        if tuple_lit is None:
             return self._convert_generic(node)
+        return tuple_lit
+
+    def _convert_bare_tuple(self, children) -> Optional[py.CollectionLiteral]:
+        """Convert a comma-separated parso list written without parentheses
+        (``testlist``, ``exprlist``, ``subscriptlist``) to a ``TUPLE``
+        :class:`py.CollectionLiteral` marked with ``OmitParentheses``."""
+        items = self._pad_comma_list(children, Space.EMPTY)
+        if items is None:
+            return None
         return py.CollectionLiteral(
             random_id(), Space.EMPTY, Markers.EMPTY,
             py.CollectionLiteral.Kind.TUPLE,
@@ -2941,37 +3042,13 @@ class Py2ParserVisitor:
             return self._convert_generic(node)
 
         param_nodes = children[1:colon_idx]
-        params_padded = []
         if not param_nodes:
             empty = j.Empty(random_id(), Space.EMPTY, Markers.EMPTY)
             params_padded = [JRightPadded(empty, Space.EMPTY, Markers.EMPTY)]
         else:
-            for i, p in enumerate(param_nodes):
-                if getattr(p, 'value', None) == ',':
-                    continue
-                if getattr(p, 'type', None) == 'param':
-                    converted = self._convert_param(p)
-                    after = self._extract_param_trailing_space(p)
-                else:
-                    # Lone NAME leaf (parso sometimes emits this form in
-                    # old_lambdef contexts).
-                    if not hasattr(p, 'value'):
-                        return self._convert_generic(node)
-                    ident = j.Identifier(random_id(),
-                                         self._parse_space(p.prefix),
-                                         Markers.EMPTY, [], p.value, None, None)
-                    named = j.VariableDeclarations.NamedVariable(
-                        random_id(), Space.EMPTY, Markers.EMPTY, ident, [], None, None,
-                    )
-                    converted = j.VariableDeclarations(
-                        random_id(), Space.EMPTY, Markers.EMPTY,
-                        [], [], None, None, [],
-                        [JRightPadded(named, Space.EMPTY, Markers.EMPTY)],
-                    )
-                    after = Space.EMPTY
-                if converted is None:
-                    return self._convert_generic(node)
-                params_padded.append(JRightPadded(converted, after, Markers.EMPTY))
+            params_padded = self._convert_param_nodes(param_nodes, Space.EMPTY)
+            if params_padded is None:
+                return self._convert_generic(node)
 
         body = self._convert_node(body_node)
         if body is None:
