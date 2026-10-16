@@ -846,12 +846,19 @@ public class SemanticallyEqual {
                 }
 
                 J.InstanceOf compareTo = (J.InstanceOf) j;
-                if (!isOfType(instanceOf.getType(), compareTo.getType())) {
+                if (!isOfType(instanceOf.getType(), compareTo.getType()) ||
+                    nullMissMatch(instanceOf.getClazz(), compareTo.getClazz()) ||
+                    nullMissMatch(instanceOf.getPattern(), compareTo.getPattern())) {
                     isEqual.set(false);
                     return instanceOf;
                 }
                 visit(instanceOf.getClazz(), compareTo.getClazz());
                 visit(instanceOf.getExpression(), compareTo.getExpression());
+                if (instanceOf.getPattern() instanceof J.DeconstructionPattern) {
+                    variableScope.push(new HashMap<>());
+                    visit(instanceOf.getPattern(), compareTo.getPattern());
+                    variableScope.pop();
+                }
             }
             return instanceOf;
         }
