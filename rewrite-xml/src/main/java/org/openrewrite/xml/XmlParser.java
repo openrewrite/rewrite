@@ -104,6 +104,7 @@ public class XmlParser implements Parser {
                 String sourceStr = is.readFully();
 
                 XMLLexer lexer = new XMLLexer(CharStreams.fromString(sourceStr));
+                lexer.jspMode = isJsp(path);
                 ForwardingErrorListener errors = new ForwardingErrorListener(input.getPath(), ctx);
                 lexer.removeErrorListeners();
                 lexer.addErrorListener(errors);

@@ -163,6 +163,65 @@ class JspDocumentTest {
           .isInstanceOf(ParseError.class);
     }
 
+    @Test
+    void customTagAttributesRetainLiteralMarkupAndElWithoutXmlEscaping() {
+        String source = "<h:outputText id=\"friendlyOutput\" escape=\"false\" " +
+                        "value=\"<input type='hidden' id='coords_#{question.sequence}' value='#{answer.text}' />\"/>";
+        Xml.JspDocument document = jsp(source);
+        Xml.Tag tag = (Xml.Tag) document.getContent().get(0);
+        assertThat(tag.getAttributes().get(2).getValueAsString())
+          .isEqualTo("<input type='hidden' id='coords_#{question.sequence}' value='#{answer.text}' />");
+        Xml.JspDocument changed = (Xml.JspDocument) new XmlIsoVisitor<Integer>() {
+            @Override
+            public Xml.Attribute visitAttribute(Xml.Attribute attribute, Integer p) {
+                Xml.Attribute visited = super.visitAttribute(attribute, p);
+                return "id".equals(visited.getKeyAsString()) ?
+                  visited.withValue(visited.getValue().withValue("newFriendlyOutput")) : visited;
+            }
+        }.visitNonNull(document, 0);
+        assertThat(changed.printAll()).isEqualTo(source.replace("friendlyOutput", "newFriendlyOutput"));
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {
+      "<h:outputText value=\"<span class=\\\"name\\\">#{author.name}</span>\"/>",
+      "<h:outputText value='<span class=\\'name\\'>#{author.name}</span>'/>",
+      "<h:outputText value=\"path\\\\name\"/>",
+      "<h:outputText value=\"<%= \\\"hi!\\\" %>\"/>",
+      "<h:outputText value='<%= \"hi!\" %>'/>",
+      "<body onload=\"<%= request.getAttribute(\"html.body.onload\") %>\"></body>",
+      "<input value='<%= request.getAttribute(\"value\") %>'>",
+      "<h:outputText value='<h:inputText value=\"literal data for the handler\"/>'/>"
+    })
+    void quotedJspAttributeValuesRoundTripExactly(String source) {
+        jsp(source);
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"page.xml", "page.jspx", "page.html"})
+    void jspQuotingDoesNotRelaxOtherParserModes(String path) {
+        assertThat(parse(XmlParser.builder().build(), path,
+          "<root value=\"<input type='hidden'/>\"/>"))
+          .isInstanceOf(ParseError.class);
+        assertThat(parse(XmlParser.builder().build(), path,
+          "<root value=\"say \\\"hello\\\"\"/>"))
+          .isInstanceOf(ParseError.class);
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {
+      "<img src='<h:outputText value=\"#{image.url}\"/>'>",
+      "<a href=\"/tool/</f:verbatim><h:outputText value='#{id}'/><f:verbatim>\">Open</a>",
+      "<h:outputText value=\"<input type='hidden'/>",
+      "<body onload=\"<%= request.getAttribute('onload')\"></body>",
+      "<h:outputText value=\"<%= \"hi!\" %>\"/>",
+      "<h:outputText value='<%= 'x' %>'/>"
+    })
+    void neverHidesEmbeddedActionsOrUnterminatedAttributeSyntax(String source) {
+        assertThat(parse(JspParser.builder().build(), "page.jsp", source))
+          .isInstanceOf(ParseError.class);
+    }
+
     private Xml.JspDocument jsp(String source) {
         List<Throwable> errors = new ArrayList<>();
         SourceFile result;
