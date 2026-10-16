@@ -1680,6 +1680,64 @@ class MergeYamlTest implements RewriteTest {
     }
 
     @Test
+    void addSequenceUnderMissingKey() {
+        rewriteRun(
+          spec -> spec
+            .recipe(new MergeYaml("$.groups",
+              // language=yaml
+              """
+                - name: newName
+                  jobs:
+                    - newJob
+                """,
+              false, "name",
+              null,
+              null,
+              null,
+              null
+            )),
+          yaml(
+            """
+              other: 1
+              """,
+            """
+              other: 1
+              groups:
+                - name: newName
+                  jobs:
+                    - newJob
+              """
+          ),
+          yaml(
+            "",
+            """
+              groups:
+                - name: newName
+                  jobs:
+                    - newJob
+              """
+          )
+        );
+    }
+
+    @Test
+    void addFlowSequenceUnderMissingKey() {
+        rewriteRun(
+          spec -> spec
+            .recipe(new MergeYaml("$.groups", "[a, b]", false, null, null, null, null, null)),
+          yaml(
+            """
+              other: 1
+              """,
+            """
+              other: 1
+              groups: [a, b]
+              """
+          )
+        );
+    }
+
+    @Test
     // Mimics `org.openrewrite.java.micronaut.UpdateSecurityYamlIfNeeded`
     void mergeEmptyStructureFollowedByCopyValue() {
         rewriteRun(
