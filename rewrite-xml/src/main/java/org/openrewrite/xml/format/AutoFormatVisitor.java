@@ -17,6 +17,7 @@ package org.openrewrite.xml.format;
 
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.Cursor;
+import org.openrewrite.SourceFile;
 import org.openrewrite.Tree;
 import org.openrewrite.style.GeneralFormatStyle;
 import org.openrewrite.style.Style;
@@ -43,9 +44,8 @@ public class AutoFormatVisitor<P> extends XmlVisitor<P> {
 
     @Override
     public Xml visit(@Nullable Tree tree, P p, Cursor cursor) {
-        Xml.Document doc = (tree instanceof Xml.Document) ?
-                (Xml.Document) tree :
-                cursor.firstEnclosingOrThrow(Xml.Document.class);
+        SourceFile doc = tree instanceof SourceFile ?
+                (SourceFile) tree : cursor.firstEnclosingOrThrow(SourceFile.class);
 
         Xml t = new NormalizeFormatVisitor<>(stopAfter).visit(tree, p, cursor.fork());
 
@@ -67,6 +67,11 @@ public class AutoFormatVisitor<P> extends XmlVisitor<P> {
         return new NormalizeLineBreaksVisitor<>(Optional.ofNullable(Style.from(GeneralFormatStyle.class, doc))
                 .orElse(autodetectGeneralFormatStyle(doc)), stopAfter)
                 .visit(t, p, cursor.fork());
+    }
+
+    @Override
+    public Xml.JspDocument visitJspDocument(Xml.JspDocument document, P p) {
+        return (Xml.JspDocument) visit(document, p, getCursor().getParentOrThrow());
     }
 
     @Override

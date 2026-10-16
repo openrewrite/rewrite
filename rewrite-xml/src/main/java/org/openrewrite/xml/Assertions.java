@@ -27,6 +27,27 @@ public class Assertions {
     private Assertions() {
     }
 
+    public static SourceSpecs jsp(@Nullable String before) {
+        return jsp(before, s -> { });
+    }
+
+    public static SourceSpecs jsp(@Nullable String before, Consumer<SourceSpec<Xml.JspDocument>> spec) {
+        SourceSpec<Xml.JspDocument> jsp = new SourceSpec<>(Xml.JspDocument.class, null, JspParser.builder(), before, null);
+        spec.accept(jsp);
+        return jsp;
+    }
+
+    public static SourceSpecs jsp(@Nullable String before, @Nullable String after) {
+        return jsp(before, after, s -> { });
+    }
+
+    public static SourceSpecs jsp(@Nullable String before, @Nullable String after,
+                                  Consumer<SourceSpec<Xml.JspDocument>> spec) {
+        SourceSpec<Xml.JspDocument> jsp = new SourceSpec<>(Xml.JspDocument.class, null, JspParser.builder(), before, s -> after);
+        spec.accept(jsp);
+        return jsp;
+    }
+
     public static SourceSpecs xml(@Language("xml") @Nullable String before) {
         return xml(before, s -> {
         });

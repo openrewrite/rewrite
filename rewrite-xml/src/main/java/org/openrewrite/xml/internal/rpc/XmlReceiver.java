@@ -65,6 +65,17 @@ public class XmlReceiver extends XmlVisitor<RpcReceiveQueue> {
     }
 
     @Override
+    public Xml visitJspDocument(Xml.JspDocument document, RpcReceiveQueue q) {
+        Xml.JspDocument d = document.withSourcePath(q.<Path, String>receiveAndGet(document.getSourcePath(), Paths::get));
+        d = d.withCharset(q.<Charset, String>receiveAndGet(d.getCharset(), Charset::forName));
+        d = d.withCharsetBomMarked(q.receive(d.isCharsetBomMarked()));
+        d = d.withChecksum(q.receive(d.getChecksum()));
+        d = d.withFileAttributes(q.receive(d.getFileAttributes()));
+        d = d.withContent(q.receiveList(d.getContent(), node -> visitNonNull(node, q)));
+        return d.withEof(q.receive(d.getEof()));
+    }
+
+    @Override
     public Xml visitProlog(Xml.Prolog prolog, RpcReceiveQueue q) {
         return prolog
                 .withXmlDecl(q.receive(prolog.getXmlDecl(), d -> (Xml.XmlDecl) visitNonNull(d, q)))

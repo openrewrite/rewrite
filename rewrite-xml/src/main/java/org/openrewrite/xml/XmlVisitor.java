@@ -27,7 +27,7 @@ public class XmlVisitor<P> extends TreeVisitor<Xml, P> {
 
     @Override
     public boolean isAcceptable(SourceFile sourceFile, P p) {
-        return sourceFile instanceof Xml.Document;
+        return sourceFile instanceof Xml.Document || sourceFile instanceof Xml.JspDocument;
     }
 
     @Override
@@ -69,6 +69,11 @@ public class XmlVisitor<P> extends TreeVisitor<Xml, P> {
         d = d.withMarkers(visitMarkers(d.getMarkers(), p));
         d = d.withProlog(visitAndCast(d.getProlog(), p));
         return d.withRoot(visitAndCast(d.getRoot(), p));
+    }
+
+    public Xml visitJspDocument(Xml.JspDocument document, P p) {
+        Xml.JspDocument d = document.withMarkers(visitMarkers(document.getMarkers(), p));
+        return d.withContent(ListUtils.map(d.getContent(), node -> visitAndCast(node, p)));
     }
 
     public Xml visitXmlDecl(Xml.XmlDecl xmlDecl, P p) {

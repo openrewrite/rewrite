@@ -184,6 +184,58 @@ public interface Xml extends Tree {
         }
     }
 
+    /**
+     * A JSP page or include fragment. Top-level nodes retain their original order;
+     * unlike XML, a JSP translation unit need not have exactly one root element.
+     */
+    @Value
+    @With
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    class JspDocument implements Xml, SourceFile {
+        @EqualsAndHashCode.Include
+        UUID id;
+        Path sourcePath;
+        String prefixUnsafe;
+        Markers markers;
+        String charsetName;
+        boolean charsetBomMarked;
+        @Nullable Checksum checksum;
+        @Nullable FileAttributes fileAttributes;
+        List<Xml> content;
+        String eof;
+
+        @Override
+        public String getPrefix() {
+            return prefixUnsafe;
+        }
+
+        @Override
+        public JspDocument withPrefix(String prefix) {
+            return WithPrefix.onlyIfNotEqual(this, prefix);
+        }
+
+        @Override
+        public Charset getCharset() {
+            return charsetName == null ? StandardCharsets.UTF_8 : Charset.forName(charsetName);
+        }
+
+        @SuppressWarnings("unchecked")
+        @Override
+        public JspDocument withCharset(Charset charset) {
+            return withCharsetName(charset.name());
+        }
+
+        @Override
+        public <P> Xml acceptXml(XmlVisitor<P> v, P p) {
+            return v.visitJspDocument(this, p);
+        }
+
+        @Override
+        public <P> TreeVisitor<?, PrintOutputCapture<P>> printer(Cursor cursor) {
+            return new XmlPrinter<>();
+        }
+    }
+
     @Value
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @With
@@ -682,7 +734,7 @@ public interface Xml extends Tree {
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @AllArgsConstructor(onConstructor_ = {@JsonCreator})
     @With
-    class DocTypeDecl implements Xml, Misc {
+    class DocTypeDecl implements Xml, Misc, Content {
         @EqualsAndHashCode.Include
         UUID id;
 

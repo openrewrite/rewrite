@@ -27,6 +27,18 @@ import java.util.function.UnaryOperator;
 public class XmlPrinter<P> extends XmlVisitor<PrintOutputCapture<P>> {
 
     @Override
+    public Xml visitJspDocument(Xml.JspDocument document, PrintOutputCapture<P> p) {
+        if (document.isCharsetBomMarked()) {
+            p.append('\uFEFF');
+        }
+        beforeSyntax(document, p);
+        super.visitJspDocument(document, p);
+        afterSyntax(document, p);
+        p.append(document.getEof());
+        return document;
+    }
+
+    @Override
     public Xml visitDocument(Xml.Document document, PrintOutputCapture<P> p) {
         if (document.isCharsetBomMarked()) {
             p.append('\uFEFF');

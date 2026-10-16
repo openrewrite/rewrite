@@ -88,6 +88,15 @@ public class XmlParserVisitor extends XMLParserBaseVisitor<Xml> {
     }
 
     @Override
+    public Xml.JspDocument visitJspdocument(XMLParser.JspdocumentContext ctx) {
+        return convert(ctx, (c, prefix) -> {
+            List<Xml> content = c.jspcontent().stream().map(this::visit).collect(toList());
+            return new Xml.JspDocument(randomId(), path, prefix, Markers.EMPTY, charset.name(),
+                    charsetBomMarked, null, fileAttributes, content, source.substring(cursor));
+        });
+    }
+
+    @Override
     public Xml.Prolog visitProlog(XMLParser.PrologContext ctx) {
         return convert(ctx, (c, prefix) -> new Xml.Prolog(
                 randomId(),

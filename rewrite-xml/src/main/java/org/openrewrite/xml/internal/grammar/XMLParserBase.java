@@ -38,6 +38,9 @@ public abstract class XMLParserBase extends Parser {
      */
     public boolean htmlMode = false;
 
+    /** JSP allows directives and output DOCTYPEs inside template content. */
+    public boolean jspMode = false;
+
     private static final Set<String> VOID_ELEMENTS = new HashSet<>(Arrays.asList(
             "area", "base", "br", "col", "embed", "hr", "img", "input", "link", "meta", "param", "source", "track", "wbr"));
 

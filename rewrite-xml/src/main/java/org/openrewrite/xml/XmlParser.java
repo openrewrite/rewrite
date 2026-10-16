@@ -50,6 +50,8 @@ public class XmlParser implements Parser {
             "jxb",
             "xjb",
             "jsp",
+            "jspf",
+            "jspx",
             // WebSphere/Rational Application Developer object-relational mapping for CMP entity beans
             "mapxmi",
             "tblxmi",
@@ -102,21 +104,27 @@ public class XmlParser implements Parser {
                 String sourceStr = is.readFully();
 
                 XMLLexer lexer = new XMLLexer(CharStreams.fromString(sourceStr));
+                ForwardingErrorListener errors = new ForwardingErrorListener(input.getPath(), ctx);
                 lexer.removeErrorListeners();
-                lexer.addErrorListener(new ForwardingErrorListener(input.getPath(), ctx));
+                lexer.addErrorListener(errors);
 
                 XMLParser parser = new XMLParser(new CommonTokenStream(lexer));
                 parser.htmlMode = isHtmlLike(path);
+                parser.jspMode = isJsp(path);
                 parser.removeErrorListeners();
-                parser.addErrorListener(new ForwardingErrorListener(input.getPath(), ctx));
+                parser.addErrorListener(errors);
 
-                Xml.Document document = new XmlParserVisitor(
+                ParserRuleContext parsed = parser.jspMode ? parser.jspdocument() : parser.document();
+                SourceFile document = (SourceFile) new XmlParserVisitor(
                         path,
                         input.getFileAttributes(),
                         sourceStr,
                         is.getCharset(),
                         is.isCharsetBomMarked()
-                ).visitDocument(parser.document());
+                ).visit(parsed);
+                if (errors.firstError != null) {
+                    throw new IllegalStateException(errors.firstError);
+                }
                 parsingListener.parsed(input, document);
                 return requirePrintEqualsInput(document, input, relativeTo, ctx);
             } catch (Throwable t) {
@@ -135,12 +143,20 @@ public class XmlParser implements Parser {
      * Whether unclosed HTML void elements (e.g. {@code <br>}) should be tolerated for the given path.
      * Enabled for HTML-like sources where void elements are idiomatically written without a slash.
      */
-    private static boolean isHtmlLike(@Nullable Path path) {
+    private boolean isHtmlLike(@Nullable Path path) {
         if (path == null) {
             return false;
         }
         String p = path.toString().toLowerCase();
-        return p.endsWith(".jsp") || p.endsWith(".jspx") || p.endsWith(".html") || p.endsWith(".htm");
+        return isJsp(path) || p.endsWith(".jspx") || p.endsWith(".html") || p.endsWith(".htm");
+    }
+
+    protected boolean isJsp(@Nullable Path path) {
+        if (path == null) {
+            return false;
+        }
+        String p = path.toString().toLowerCase(java.util.Locale.ROOT);
+        return p.endsWith(".jsp") || p.endsWith(".jspf");
     }
 
     @Override
@@ -166,6 +182,7 @@ public class XmlParser implements Parser {
     }
 
     private static class ForwardingErrorListener extends BaseErrorListener {
+        private @Nullable String firstError;
         private final Path sourcePath;
         private final ExecutionContext ctx;
 
@@ -177,8 +194,11 @@ public class XmlParser implements Parser {
         @Override
         public void syntaxError(Recognizer<?, ?> recognizer, Object offendingSymbol,
                                 int line, int charPositionInLine, String msg, RecognitionException e) {
-            ctx.getOnError().accept(new XmlParsingException(sourcePath,
-                    String.format("Syntax error in %s at line %d:%d %s.", sourcePath, line, charPositionInLine, msg), e));
+            String message = String.format("Syntax error in %s at line %d:%d %s.", sourcePath, line, charPositionInLine, msg);
+            if (firstError == null) {
+                firstError = message;
+            }
+            ctx.getOnError().accept(new XmlParsingException(sourcePath, message, e));
         }
     }
 
@@ -189,7 +209,11 @@ public class XmlParser implements Parser {
     public static class Builder extends org.openrewrite.Parser.Builder {
 
         public Builder() {
-            super(Xml.Document.class);
+            this(Xml.Document.class);
+        }
+
+        protected Builder(Class<? extends SourceFile> documentType) {
+            super(documentType);
         }
 
         @Override

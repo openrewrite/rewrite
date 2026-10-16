@@ -19,6 +19,11 @@ import org.openrewrite.xml.tree.Xml;
 
 public class XmlIsoVisitor<P> extends XmlVisitor<P> {
     @Override
+    public Xml.JspDocument visitJspDocument(Xml.JspDocument document, P p) {
+        return (Xml.JspDocument) super.visitJspDocument(document, p);
+    }
+
+    @Override
     public Xml.Document visitDocument(Xml.Document document, P p) {
         return (Xml.Document) super.visitDocument(document, p);
     }

@@ -16,6 +16,7 @@
 package org.openrewrite.xml.format;
 
 import org.jspecify.annotations.Nullable;
+import org.openrewrite.SourceFile;
 import org.openrewrite.Tree;
 import org.openrewrite.style.GeneralFormatStyle;
 import org.openrewrite.xml.XmlVisitor;
@@ -28,6 +29,10 @@ public class AutodetectGeneralFormatStyle extends XmlVisitor<LineEndingsCount> {
      * more common in the supplied AST.
      */
     public static GeneralFormatStyle autodetectGeneralFormatStyle(Xml.Document x) {
+        return autodetectGeneralFormatStyle((SourceFile) x);
+    }
+
+    public static GeneralFormatStyle autodetectGeneralFormatStyle(SourceFile x) {
         LineEndingsCount count = new LineEndingsCount();
         new AutodetectGeneralFormatStyle().visit(x, count);
         if(count.lf >= count.crlf) {

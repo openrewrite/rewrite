@@ -32,6 +32,18 @@ public interface XMLParserVisitor<T> extends ParseTreeVisitor<T> {
 	 */
 	T visitDocument(XMLParser.DocumentContext ctx);
 	/**
+	 * Visit a parse tree produced by {@link XMLParser#jspdocument}.
+	 * @param ctx the parse tree
+	 * @return the visitor result
+	 */
+	T visitJspdocument(XMLParser.JspdocumentContext ctx);
+	/**
+	 * Visit a parse tree produced by {@link XMLParser#jspcontent}.
+	 * @param ctx the parse tree
+	 * @return the visitor result
+	 */
+	T visitJspcontent(XMLParser.JspcontentContext ctx);
+	/**
 	 * Visit a parse tree produced by {@link XMLParser#prolog}.
 	 * @param ctx the parse tree
 	 * @return the visitor result
