@@ -230,7 +230,7 @@ public class MergeYaml extends Recipe {
                 if (getCursor().getMessage(REMOVE_PREFIX, false)) {
                     m = MergeYamlVisitor.removeInlineCommentFromLastEntry(m);
                 }
-                return m;
+                return MergeYamlVisitor.removeCopiedEntryComments(m, getCursor());
             }
 
             @Override

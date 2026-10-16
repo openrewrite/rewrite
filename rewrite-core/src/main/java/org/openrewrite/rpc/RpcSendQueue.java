@@ -162,11 +162,17 @@ public class RpcSendQueue {
                 int beforePos = positions == null ? ADDED_LIST_ITEM : positions[i++];
                 Runnable onChangeRun = onChange == null ? null : () -> onChange.accept(anAfter);
                 if (beforePos == ADDED_LIST_ITEM) {
-                    add(asRef ? Reference.asRef(anAfter) : anAfter, onChangeRun);
+                    if (anAfter == null) {
+                        put(new RpcObjectData(DELETE, null, null, null, trace));
+                    } else {
+                        add(asRef ? Reference.asRef(anAfter) : anAfter, onChangeRun);
+                    }
                 } else {
                     T aBefore = requireNonNull(before).get(beforePos);
                     if (aBefore == anAfter) {
                         put(new RpcObjectData(NO_CHANGE, null, null, null, trace));
+                    } else if (anAfter == null) {
+                        put(new RpcObjectData(DELETE, null, null, null, trace));
                     } else if (asRef || aBefore == null || anAfter.getClass() != aBefore.getClass()) {
                         // Type changed - treat as ADD. Ref-deduplicated items are also always
                         // re-added rather than CHANGEd (see send()).

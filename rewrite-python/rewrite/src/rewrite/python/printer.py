@@ -17,7 +17,7 @@
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
-from typing import TYPE_CHECKING, Callable, List, Optional, TypeVar, Union, cast
+from typing import TYPE_CHECKING, Callable, List, Optional, TypeVar, Union
 
 from rewrite import Cursor, Marker, Markers, Tree
 from rewrite.java import (
@@ -72,12 +72,8 @@ class DefaultMarkerPrinter(MarkerPrinter):
         return ""
 
     def before_syntax(self, marker: Marker, cursor: Cursor, comment_wrapper: Callable[[str], str]) -> str:
-        # Handle SearchResult and Markup markers
-        kind = getattr(marker, 'kind', '') if hasattr(marker, 'kind') else type(marker).__name__
-        if kind == 'SearchResult' or (isinstance(kind, str) and kind.startswith('org.openrewrite.marker.Markup$')):
-            desc = getattr(marker, 'description', None)
-            return comment_wrapper("" if desc is None else f"({desc})")
-        return ""
+        # a marker of a type this side has no class for is held as a plain mapping
+        return marker.print(cursor, comment_wrapper, False) if isinstance(marker, Marker) else ""
 
     def after_syntax(self, marker: Marker, cursor: Cursor, comment_wrapper: Callable[[str], str]) -> str:
         return ""
@@ -115,6 +111,23 @@ class PrintOutputCapture:
         return None
 
 
+def _enclosing_tree(cursor: Cursor) -> Optional[Tree]:
+    """The nearest tree above ``cursor``; a caller's cursor may hold padding in between."""
+    c = cursor.parent
+    while c is not None:
+        if isinstance(c.value, Tree):
+            return c.value
+        c = c.parent
+    return None
+
+
+def _separate_keyword_from_operand(p: PrintOutputCapture, operand_start: int) -> None:
+    chunks = p._out
+    first = next((c[0] for c in chunks[operand_start:] if c), '')
+    if first.isalnum() or first == '_':
+        chunks.insert(operand_start, ' ')
+
+
 def _quotes_around(tree: Union[Py, J]) -> Optional[str]:
     """The quotes to print around ``tree``, or None when its own text carries them.
 
@@ -150,11 +163,11 @@ class PythonPrinter:
         self._cursor = cursor
         self._delegate.set_cursor(cursor)
 
-    def print(self, tree: Tree, p: Optional[PrintOutputCapture] = None) -> str:
-        """Print a tree to source code."""
+    def print(self, tree: Tree, p: Optional[PrintOutputCapture] = None, cursor: Optional[Cursor] = None) -> str:
+        """Print a tree to source code, as it reads under ``cursor`` when it is a subtree."""
         if p is None:
             p = PrintOutputCapture()
-        self.set_cursor(Cursor(None, Cursor.ROOT_VALUE))
+        self.set_cursor(cursor or Cursor(None, Cursor.ROOT_VALUE))
         self.visit(tree, p)
         return p.out
 
@@ -323,16 +336,15 @@ class PythonPrinter:
 
     def _visit_comment(self, comment: Comment, p: PrintOutputCapture) -> None:
         """Visit a comment."""
-        if isinstance(comment, TextComment):
-            if comment.multiline:
-                # Multi-line comment (docstring)
-                p.append('"""')
-                p.append(comment.text)
-                p.append('"""')
-            else:
-                # Single-line comment
-                p.append('#')
-                p.append(comment.text)
+        if comment.multiline:
+            # Multi-line comment (docstring)
+            p.append('"""')
+            p.append(comment.text)
+            p.append('"""')
+        else:
+            # Single-line comment
+            p.append('#')
+            p.append(comment.text)
 
         # Print suffix (whitespace after comment)
         if comment.suffix:
@@ -416,9 +428,13 @@ class PythonPrinter:
 
         # Handle SuppressNewline marker
         if cu.markers.find_first(SuppressNewline):
-            if p.last_char() == '\n':
+            # the capture a caller of print_all() supplies has no last_char(), only the same chunks
+            chunks = p._out
+            while chunks and not chunks[-1]:
+                chunks.pop()
+            if chunks and chunks[-1].endswith('\n'):
                 # Remove trailing newline
-                p._out[-1] = p._out[-1][:-1]
+                chunks[-1] = chunks[-1][:-1]
 
         self._after_syntax(cu, p)
         return cu
@@ -441,7 +457,9 @@ class PythonPrinter:
         """Visit an await expression."""
         self._before_syntax(await_, p)
         p.append("await")
+        operand_start = len(p._out)
         self.visit(await_.expression, p)
+        _separate_keyword_from_operand(p, operand_start)
         return await_
 
     def visit_binary(self, binary: 'py.Binary', p: PrintOutputCapture) -> J:
@@ -642,15 +660,17 @@ class PythonPrinter:
         if value.padding.debug is not None:
             p.append('=')
             self._visit_space(value.padding.debug.after, p)
-        if value.conversion is not None:
+        conversion = value.padding.conversion
+        if conversion is not None:
             p.append('!')
-            conv = value.conversion
+            conv = conversion.element
             if conv == FormattedString.Value.Conversion.STR:
                 p.append('s')
             elif conv == FormattedString.Value.Conversion.REPR:
                 p.append('r')
             elif conv == FormattedString.Value.Conversion.ASCII:
                 p.append('a')
+            self._visit_space(conversion.after, p)
         if value.format is not None:
             p.append(':')
             self.visit(value.format, p)
@@ -812,7 +832,6 @@ class PythonPrinter:
         (like yield, assignment expressions, etc.). It doesn't need its own prefix/suffix
         handling since the contained statement already has the correct spacing.
         """
-        self._visit_markers(stmt.markers, p)
         self.visit(stmt.statement, p)
         return stmt
 
@@ -843,8 +862,7 @@ class PythonPrinter:
         """Visit a type hint."""
         from rewrite.java.tree import MethodDeclaration
         self._before_syntax(hint, p)
-        parent = self.get_cursor().parent
-        if parent and isinstance(parent.value, MethodDeclaration):
+        if isinstance(_enclosing_tree(self.get_cursor()), MethodDeclaration):
             p.append("->")
         else:
             p.append(':')
@@ -984,6 +1002,8 @@ class PythonJavaPrinter:
             return self.visit_import(tree, p)
         elif isinstance(tree, j.Lambda):
             return self.visit_lambda(tree, p)
+        elif isinstance(tree, j.Lambda.Parameters):
+            return self.visit_lambda_parameters(tree, p)
         elif isinstance(tree, j.Literal):
             return self.visit_literal(tree, p)
         elif isinstance(tree, j.MethodDeclaration):
@@ -1008,6 +1028,8 @@ class PythonJavaPrinter:
             return self.visit_throw(tree, p)
         elif isinstance(tree, j.TypeParameter):
             return self.visit_type_parameter(tree, p)
+        elif isinstance(tree, j.TypeParameters):
+            return self.visit_type_parameters(tree, p)
         elif isinstance(tree, j.Try):
             return self.visit_try(tree, p)
         elif isinstance(tree, j.Try.Resource):
@@ -1022,6 +1044,10 @@ class PythonJavaPrinter:
             return self.visit_while_loop(tree, p)
         elif isinstance(tree, j.Yield):
             return self.visit_yield(tree, p)
+        elif isinstance(tree, j.Unknown):
+            return self.visit_unknown(tree, p)
+        elif isinstance(tree, j.Unknown.Source):
+            return self.visit_unknown_source(tree, p)
         else:
             raise ValueError(f"Unknown Java node type: {type(tree)}")
 
@@ -1091,16 +1117,15 @@ class PythonJavaPrinter:
 
     def _visit_comment(self, comment: Comment, p: PrintOutputCapture) -> None:
         """Visit a comment."""
-        if isinstance(comment, TextComment):
-            if comment.multiline:
-                # Multi-line comment (docstring)
-                p.append('"""')
-                p.append(comment.text)
-                p.append('"""')
-            else:
-                # Single-line comment
-                p.append('#')
-                p.append(comment.text)
+        if comment.multiline:
+            # Multi-line comment (docstring)
+            p.append('"""')
+            p.append(comment.text)
+            p.append('"""')
+        else:
+            # Single-line comment
+            p.append('#')
+            p.append(comment.text)
 
         # Print suffix (whitespace after comment)
         if comment.suffix:
@@ -1167,13 +1192,8 @@ class PythonJavaPrinter:
         if after:
             p.append(after)
 
-    def _visit_type_parameters(self, type_parameters, p: PrintOutputCapture) -> None:
+    def visit_type_parameters(self, type_parameters: 'j.TypeParameters', p: PrintOutputCapture) -> J:
         """Visit a TypeParameters AST node (Python 3.12+ type params using [])."""
-        if type_parameters is None:
-            return
-        from rewrite.java.tree import TypeParameters
-        if not isinstance(type_parameters, TypeParameters):
-            return
         # TypeParameters has annotations, prefix, markers, and right-padded type params
         for annotation in type_parameters.annotations:
             self.visit(annotation, p)
@@ -1182,6 +1202,7 @@ class PythonJavaPrinter:
         p.append("[")
         self._visit_right_padded_list(type_parameters.padding.type_parameters, ",", p)
         p.append("]")
+        return type_parameters
 
     def _visit_statements(self, statements: List[JRightPadded], p: PrintOutputCapture) -> None:
         """Visit a list of statements."""
@@ -1237,8 +1258,7 @@ class PythonJavaPrinter:
         from rewrite.java import tree as j
 
         # Determine if this is a walrus operator (:=) or regular assignment (=)
-        parent = self.get_cursor().parent
-        parent_value = parent.value if parent else None
+        parent_value = _enclosing_tree(self.get_cursor())
 
         is_regular_assignment = (
             isinstance(parent_value, j.Block) or
@@ -1445,8 +1465,7 @@ class PythonJavaPrinter:
         from rewrite.java import tree as j
 
         self._before_syntax(else_, p)
-        parent = self.get_cursor().parent
-        parent_value = parent.value if parent else None
+        parent_value = _enclosing_tree(self.get_cursor())
 
         # Check if this is an elif (else with If body, where parent is also If)
         is_elif = isinstance(parent_value, j.If) and isinstance(else_.body, j.If)
@@ -1494,7 +1513,7 @@ class PythonJavaPrinter:
         self._before_syntax(for_loop, p)
         p.append("for")
         self.visit(for_loop.control, p)
-        self.visit(for_loop.body, p)
+        self._visit_loop_body(for_loop.body, p)
         self._after_syntax(for_loop, p)
         return for_loop
 
@@ -1550,14 +1569,19 @@ class PythonJavaPrinter:
         """Visit a lambda expression."""
         self._before_syntax(lambda_, p)
         p.append("lambda")
-        self._visit_space(lambda_.parameters.prefix, p)
-        self._visit_markers(lambda_.parameters.markers, p)
-        self._visit_right_padded_list(lambda_.parameters.padding.parameters, ",", p)
+        self.visit(lambda_.parameters, p)
         self._visit_space(lambda_.arrow, p)
         p.append(":")
         self.visit(lambda_.body, p)
         self._after_syntax(lambda_, p)
         return lambda_
+
+    def visit_lambda_parameters(self, parameters: 'j.Lambda.Parameters', p: PrintOutputCapture) -> J:
+        """Visit the parameters of a lambda expression."""
+        self._visit_space(parameters.prefix, p)
+        self._visit_markers(parameters.markers, p)
+        self._visit_right_padded_list(parameters.padding.parameters, ",", p)
+        return parameters
 
     def visit_literal(self, literal: 'j.Literal', p: PrintOutputCapture) -> J:
         """Visit a literal."""
@@ -1604,7 +1628,7 @@ class PythonJavaPrinter:
 
         self.visit(method.name, p)
         # Visit type parameters (Python 3.12+)
-        self._visit_type_parameters(method.padding.type_parameters, p)
+        self.visit(method.padding.type_parameters, p)
         self._visit_container("(", method.padding.parameters, ",", ")", p)
         self.visit(method.return_type_expression, p)
         self.visit(method.body, p)
@@ -1845,8 +1869,8 @@ class PythonJavaPrinter:
                 p.append(")")
 
         try_body = try_.body
-        parent = self.get_cursor().parent
-        else_wrapper = parent.value if parent and isinstance(parent.value, py.TrailingElseWrapper) else None
+        parent_value = _enclosing_tree(self.get_cursor())
+        else_wrapper = parent_value if isinstance(parent_value, py.TrailingElseWrapper) else None
 
         self.visit(try_body, p)
 
@@ -1889,7 +1913,10 @@ class PythonJavaPrinter:
         elif unary.operator == Unary.Type.Complement:
             p.append("~")
 
+        operand_start = len(p._out)
         self.visit(unary.expression, p)
+        if unary.operator == Unary.Type.Not:
+            _separate_keyword_from_operand(p, operand_start)
         self._after_syntax(unary, p)
         return unary
 
@@ -1900,9 +1927,8 @@ class PythonJavaPrinter:
 
         self._before_syntax(variable, p)
 
-        parent_cursor = self.get_cursor().parent
-        vd = cast(j.VariableDeclarations, parent_cursor.parent.value) if parent_cursor and parent_cursor.parent else None
-        padding = cast(j.JRightPadded, parent_cursor.value) if parent_cursor else None
+        parent_value = _enclosing_tree(self.get_cursor())
+        vd = parent_value if isinstance(parent_value, j.VariableDeclarations) else None
 
         type_expr = vd.type_expression if vd else None
 
@@ -1923,8 +1949,14 @@ class PythonJavaPrinter:
             if vd and vd.markers.find_first(KeywordArguments):
                 p.append("**")
             self.visit(variable.name, p)
-            if type_expr is not None and padding:
-                self._visit_space(padding.after, p)
+            if isinstance(type_expr, py.TypeHint):
+                # a special parameter's hint prints its own colon
+                self.visit(type_expr, p)
+            elif vd and type_expr is not None:
+                # the space ahead of the type hint is the padding after this variable
+                for padded in vd.padding.variables:
+                    if padded.element == variable:
+                        self._visit_space(padded.after, p)
                 p.append(':')
                 self.visit(type_expr, p)
             if variable.padding.initializer:
@@ -1954,8 +1986,6 @@ class PythonJavaPrinter:
         nodes = multi_variable.padding.variables
         is_kwonly_marker = multi_variable.markers.find_first(KeywordOnlyArguments) is not None
         for i, node in enumerate(nodes):
-            # Set cursor for context in visit_variable
-            self.set_cursor(Cursor(self.get_cursor(), node))
             self.visit(node.element, p)
             self._visit_markers(node.markers, p)
             # For keyword-only args marker (bare *), print the after space before comma
@@ -1963,9 +1993,6 @@ class PythonJavaPrinter:
                 self._visit_space(node.after, p)
             if i < len(nodes) - 1:
                 p.append(",")
-            # Restore cursor
-            parent = self.get_cursor().parent
-            self.set_cursor(parent)
 
         self._after_syntax(multi_variable, p)
         return multi_variable
@@ -1975,9 +2002,30 @@ class PythonJavaPrinter:
         self._before_syntax(while_loop, p)
         p.append("while")
         self.visit(while_loop.condition, p)
-        self.visit(while_loop.body, p)
+        self._visit_loop_body(while_loop.body, p)
         self._after_syntax(while_loop, p)
         return while_loop
+
+    def _visit_loop_body(self, body: Statement, p: PrintOutputCapture) -> None:
+        from rewrite.java import tree as j
+        # a block prints its own colon
+        if not isinstance(body, j.Block):
+            p.append(":")
+        self.visit(body, p)
+
+    def visit_unknown(self, unknown: 'j.Unknown', p: PrintOutputCapture) -> J:
+        """Visit source the host could not map to a tree."""
+        self._before_syntax(unknown, p)
+        self.visit(unknown.source, p)
+        self._after_syntax(unknown, p)
+        return unknown
+
+    def visit_unknown_source(self, source: 'j.Unknown.Source', p: PrintOutputCapture) -> J:
+        """Visit the text of unknown source."""
+        self._before_syntax(source, p)
+        p.append(source.text)
+        self._after_syntax(source, p)
+        return source
 
     def visit_yield(self, yield_: 'j.Yield', p: PrintOutputCapture) -> J:
         """Visit a yield statement."""

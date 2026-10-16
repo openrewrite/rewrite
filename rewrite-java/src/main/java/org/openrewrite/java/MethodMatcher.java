@@ -804,6 +804,9 @@ public class MethodMatcher {
 
         @Override
         public boolean matches(JavaType type) {
+            if (type instanceof JavaType.MultiCatch) {
+                return everyMemberButNull((JavaType.MultiCatch) type);
+            }
             type = unwrapArrays(type, arrayDimensions, false);
             if (type == null) {
                 return false;
@@ -818,6 +821,23 @@ public class MethodMatcher {
                 return true;
             }
             return matches(type);
+        }
+
+        /**
+         * A union parameter type, like Python's {@code str | None}, comes as a {@link JavaType.MultiCatch}.
+         * Patterns have no union syntax, so {@code String} names a parameter that may also be null.
+         */
+        private boolean everyMemberButNull(JavaType.MultiCatch union) {
+            boolean any = false;
+            for (JavaType member : union.getThrowableTypes()) {
+                if (member != JavaType.Primitive.Null) {
+                    if (!matches(member)) {
+                        return false;
+                    }
+                    any = true;
+                }
+            }
+            return any;
         }
 
         @Override

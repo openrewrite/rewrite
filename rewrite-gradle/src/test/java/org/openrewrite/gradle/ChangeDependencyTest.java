@@ -1374,6 +1374,94 @@ class ChangeDependencyTest implements RewriteTest {
     }
 
     @Test
+    void sharedMapNotationVersionVariableCollapsesToLiteral() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeDependency("commons-lang", "commons-lang", "org.apache.commons", "commons-lang3", "3.11.x", null, null, true)),
+          buildGradle(
+            """
+              plugins {
+                  id "java-library"
+              }
+
+              repositories {
+                  mavenCentral()
+              }
+
+              def sharedVersion = '2.6'
+              dependencies {
+                  implementation group: 'commons-lang', name: 'commons-lang', version: sharedVersion
+                  testImplementation([group: 'commons-lang', name: 'commons-lang', version: sharedVersion])
+                  compileOnly transitive: false, group: 'commons-lang', name: 'commons-lang', version: sharedVersion
+                  runtimeOnly group: 'commons-lang', version: sharedVersion, name: 'commons-lang'
+                  testRuntimeOnly group: "commons-lang", name: "commons-lang", version: sharedVersion
+                  implementation group: 'com.google.guava', name: 'guava', version: sharedVersion
+              }
+              """,
+            """
+              plugins {
+                  id "java-library"
+              }
+
+              repositories {
+                  mavenCentral()
+              }
+
+              def sharedVersion = '2.6'
+              dependencies {
+                  implementation group: 'org.apache.commons', name: 'commons-lang3', version: '3.11'
+                  testImplementation([group: 'org.apache.commons', name: 'commons-lang3', version: '3.11'])
+                  compileOnly transitive: false, group: 'org.apache.commons', name: 'commons-lang3', version: '3.11'
+                  runtimeOnly group: 'org.apache.commons', version: '3.11', name: 'commons-lang3'
+                  testRuntimeOnly group: "org.apache.commons", name: "commons-lang3", version: "3.11"
+                  implementation group: 'com.google.guava', name: 'guava', version: sharedVersion
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void sharedKotlinDslNamedArgumentsVersionVariableCollapsesToLiteral() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeDependency("commons-lang", "commons-lang", "org.apache.commons", "commons-lang3", "3.11.x", null, null, true)),
+          buildGradleKts(
+            """
+              plugins {
+                  `java-library`
+              }
+
+              repositories {
+                  mavenCentral()
+              }
+
+              dependencies {
+                  val sharedVersion = "2.6"
+                  implementation(group = "commons-lang", name = "commons-lang", version = sharedVersion)
+                  testImplementation(group = "commons-lang", version = sharedVersion, name = "commons-lang")
+                  implementation(group = "com.google.guava", name = "guava", version = sharedVersion)
+              }
+              """,
+            """
+              plugins {
+                  `java-library`
+              }
+
+              repositories {
+                  mavenCentral()
+              }
+
+              dependencies {
+                  val sharedVersion = "2.6"
+                  implementation(group = "org.apache.commons", name = "commons-lang3", version = "3.11")
+                  testImplementation(group = "org.apache.commons", version = "3.11", name = "commons-lang3")
+                  implementation(group = "com.google.guava", name = "guava", version = sharedVersion)
+              }
+              """
+          )
+        );
+    }
+
+    @Test
     void isAcceptable() {
         var recipe = new ChangeDependency(
                 "org.old", "artifact", "org.new", "artifact", null, null, null

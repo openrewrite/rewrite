@@ -85,6 +85,9 @@ public class DeclarativeRecipe extends ScanningRecipe<DeclarativeRecipe.Accumula
     @JsonIgnore
     private Validated<Object> initValidation = Validated.none();
 
+    @JsonIgnore
+    private volatile boolean initialized;
+
     @Override
     public Duration getEstimatedEffortPerOccurrence() {
         return estimatedEffortPerOccurrence == null ? Duration.ofMinutes(0) :
@@ -94,9 +97,7 @@ public class DeclarativeRecipe extends ScanningRecipe<DeclarativeRecipe.Accumula
     public void initialize(Collection<Recipe> availableRecipes) {
         Map<String, Recipe> recipeMap = new HashMap<>();
         availableRecipes.forEach(r -> recipeMap.putIfAbsent(r.getName(), r));
-        Set<String> initializingRecipes = new HashSet<>();
-        recipeList = initialize(uninitializedRecipes, recipeMap::get, initializingRecipes);
-        preconditions = initialize(uninitializedPreconditions, recipeMap::get, initializingRecipes);
+        initialize(recipeMap::get);
     }
 
     @Deprecated
@@ -106,9 +107,7 @@ public class DeclarativeRecipe extends ScanningRecipe<DeclarativeRecipe.Accumula
     }
 
     public void initialize(Function<String, @Nullable Recipe> availableRecipes) {
-        Set<String> initializingRecipes = new HashSet<>();
-        recipeList = initialize(uninitializedRecipes, availableRecipes, initializingRecipes);
-        preconditions = initialize(uninitializedPreconditions, availableRecipes, initializingRecipes);
+        initialize(availableRecipes, new LinkedHashSet<>());
     }
 
     @Deprecated
@@ -117,49 +116,43 @@ public class DeclarativeRecipe extends ScanningRecipe<DeclarativeRecipe.Accumula
         this.initialize(availableRecipes);
     }
 
-    private List<Recipe> initialize(List<Recipe> uninitialized, Function<String, @Nullable Recipe> availableRecipes, Set<String> initializingRecipes) {
+    private void initialize(Function<String, @Nullable Recipe> availableRecipes, Set<String> initializingRecipes) {
+        if (initialized) {
+            return;
+        }
+        if (!initializingRecipes.add(name)) {
+            throw new RecipeIntrospectionException("Recipe '" + name + "' creates a cycle: " +
+                                                   String.join(" -> ", initializingRecipes) + " -> " + name);
+        }
+        recipeList = resolve(uninitializedRecipes, "recipeList", availableRecipes, initializingRecipes);
+        preconditions = resolve(uninitializedPreconditions, "preconditions", availableRecipes, initializingRecipes);
+        initialized = true;
+        initializingRecipes.remove(name);
+    }
+
+    private List<Recipe> resolve(List<Recipe> uninitialized, String property,
+                                 Function<String, @Nullable Recipe> availableRecipes, Set<String> initializingRecipes) {
         List<Recipe> result = new ArrayList<>();
         for (int i = 0; i < uninitialized.size(); i++) {
             Recipe recipe = uninitialized.get(i);
             if (recipe instanceof LazyLoadedRecipe) {
                 String recipeFqn = ((LazyLoadedRecipe) recipe).getRecipeFqn();
-                Recipe subRecipe = availableRecipes.apply(recipeFqn);
-                if (subRecipe != null) {
-                    if (subRecipe instanceof DeclarativeRecipe) {
-                        initializeDeclarativeRecipe((DeclarativeRecipe) subRecipe, recipeFqn, availableRecipes, initializingRecipes);
-                    }
-                    result.add(subRecipe);
-                } else {
+                recipe = availableRecipes.apply(recipeFqn);
+                if (recipe == null) {
                     initValidation = initValidation.and(
-                            invalid(name + ".recipeList[" + i + "] (in " + source + ")",
+                            invalid(name + "." + property + "[" + i + "] (in " + source + ")",
                                     recipeFqn,
                                     "refers to a recipe that doesn't exist.",
                                     null));
+                    continue;
                 }
-            } else {
-                if (recipe instanceof DeclarativeRecipe) {
-                    initializeDeclarativeRecipe((DeclarativeRecipe) recipe, recipe.getName(), availableRecipes, initializingRecipes);
-                }
-                result.add(recipe);
             }
+            if (recipe instanceof DeclarativeRecipe) {
+                ((DeclarativeRecipe) recipe).initialize(availableRecipes, initializingRecipes);
+            }
+            result.add(recipe);
         }
         return unmodifiableList(result);
-    }
-
-    private void initializeDeclarativeRecipe(DeclarativeRecipe declarativeRecipe, String recipeIdentifier,
-                                             Function<String, @Nullable Recipe> availableRecipes, Set<String> initializingRecipes) {
-        String recipeName = declarativeRecipe.getName();
-        if (initializingRecipes.contains(recipeName)) {
-            // Cycle detected - throw exception to fail fast
-            String cycle = String.join(" -> ", initializingRecipes) + " -> " + recipeName;
-            throw new RecipeIntrospectionException(
-                    "Recipe '" + recipeIdentifier + "' creates a cycle: " + cycle);
-        } else {
-            initializingRecipes.add(recipeName);
-            declarativeRecipe.recipeList = initialize(declarativeRecipe.uninitializedRecipes, availableRecipes, initializingRecipes);
-            declarativeRecipe.preconditions = initialize(declarativeRecipe.uninitializedPreconditions, availableRecipes, initializingRecipes);
-            initializingRecipes.remove(recipeName);
-        }
     }
 
     @Override
@@ -578,6 +571,7 @@ public class DeclarativeRecipe extends ScanningRecipe<DeclarativeRecipe.Accumula
         copy.preconditions = source.preconditions;
         copy.validation = source.validation;
         copy.initValidation = source.initValidation;
+        copy.initialized = source.initialized;
         return copy;
     }
 
@@ -667,16 +661,33 @@ public class DeclarativeRecipe extends ScanningRecipe<DeclarativeRecipe.Accumula
     @Override
     public Validated<Object> validate() {
         Validated<Object> validated = Validated.none();
-
-        if (!uninitializedRecipes.isEmpty() && uninitializedRecipes.size() != recipeList.size()) {
-            validated = validated.and(Validated.invalid("initialization", recipeList, "DeclarativeRecipe must not contain uninitialized recipes. Be sure to call .initialize() on DeclarativeRecipe."));
+        if (!initialized) {
+            validated = validated
+                    .and(requireInitialized(uninitializedRecipes, recipeList, "recipeList"))
+                    .and(requireInitialized(uninitializedPreconditions, preconditions, "preconditions"));
         }
-        if (!uninitializedPreconditions.isEmpty() && uninitializedPreconditions.size() != preconditions.size()) {
-            validated = validated.and(Validated.invalid("initialization", preconditions, "DeclarativeRecipe must not contain uninitialized preconditions. Be sure to call .initialize() on DeclarativeRecipe."));
-        }
+        return validated.and(validation).and(initValidation);
+    }
 
-        return validated.and(validation)
-                .and(initValidation == null ? Validated.none() : initValidation);
+    @Override
+    public Collection<Validated<Object>> validateAll(ExecutionContext ctx, Collection<Validated<Object>> acc) {
+        super.validateAll(ctx, acc);
+        for (Recipe precondition : preconditions) {
+            precondition.validateAll(ctx, acc);
+        }
+        return acc;
+    }
+
+    private Validated<Object> requireInitialized(List<Recipe> uninitialized, List<Recipe> resolved, String property) {
+        if (uninitialized.isEmpty() || uninitialized.size() == resolved.size()) {
+            return Validated.none();
+        }
+        List<String> declared = new ArrayList<>(uninitialized.size());
+        for (Recipe recipe : uninitialized) {
+            declared.add(recipe instanceof LazyLoadedRecipe ? ((LazyLoadedRecipe) recipe).getRecipeFqn() : recipe.getName());
+        }
+        return invalid(name + "." + property + " (in " + source + ")", declared,
+                "has not been initialized; call initialize() on the DeclarativeRecipe before using it.");
     }
 
     @Value

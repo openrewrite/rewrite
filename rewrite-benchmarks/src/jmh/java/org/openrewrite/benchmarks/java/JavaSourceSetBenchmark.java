@@ -2,7 +2,6 @@ package org.openrewrite.benchmarks.java;
 
 import org.openjdk.jmh.annotations.*;
 import org.openrewrite.java.JavaParser;
-import org.openrewrite.java.internal.JavaTypeCache;
 import org.openrewrite.java.marker.JavaSourceSet;
 
 import java.nio.file.Path;
@@ -28,11 +27,5 @@ public class JavaSourceSetBenchmark {
     @Benchmark
     public void jarIOBenchmark() {
         JavaSourceSet.build("main", classpath);
-    }
-
-    @Benchmark
-    public void classgraphBenchmark() {
-        //noinspection deprecation
-        JavaSourceSet.build("main", classpath, new JavaTypeCache(), false);
     }
 }

@@ -36,10 +36,13 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
+import static java.util.Collections.emptyMap;
+
 /**
- * A Gradle version catalog, declared either in {@code settings.gradle(.kts)} or in a
- * {@code gradle/libs.versions.toml} file. {@link Matcher} finds either, and is the way to one:
- * the implementations are not public.
+ * A Gradle version catalog, declared in {@code settings.gradle(.kts)}, in a
+ * {@code gradle/libs.versions.toml} file, or in the {@code catalog { versionCatalog { ... } } }
+ * block of a producer using the {@code version-catalog} plugin. {@link Matcher} finds any of them,
+ * and is the way to one: the implementations are not public.
  */
 public interface VersionCatalog extends Trait<Tree> {
 
@@ -51,6 +54,24 @@ public interface VersionCatalog extends Trait<Tree> {
         @Nullable String getVersion();
 
         @Nullable String getVersionRef();
+
+        /** @return the script variable this entry's version is written as, or {@code null}. */
+        default @Nullable String getVersionVariable() {
+            return null;
+        }
+
+        /**
+         * @return the script variable this comes to given the catalog's declarations, or
+         * {@code null} if neither it nor the declaration it refers to is written as one.
+         */
+        default @Nullable String getResolvedVersionVariable(Map<String, String> declarationVariables) {
+            String variable = getVersionVariable();
+            if (variable != null) {
+                return variable;
+            }
+            String versionRef = getVersionRef();
+            return versionRef == null ? null : declarationVariables.get(versionRef);
+        }
 
         /**
          * @return the version this comes to given the catalog's declarations, or {@code null} if
@@ -77,9 +98,17 @@ public interface VersionCatalog extends Trait<Tree> {
     Map<String, ? extends Entry> getPluginVersions();
 
     /**
-     * @return the value of each named version declaration, by alias.
+     * @return the value of each named version declaration, by alias. One written as a script
+     * variable is in {@link #getVersionDeclarationVariables()} instead.
      */
     Map<String, String> getVersionDeclarations();
+
+    /**
+     * @return the script variable each named version declaration takes its value from, by alias.
+     */
+    default Map<String, String> getVersionDeclarationVariables() {
+        return emptyMap();
+    }
 
     VersionCatalog withLibraryVersion(GroupArtifact ga, String newVersion);
 
@@ -158,8 +187,8 @@ public interface VersionCatalog extends Trait<Tree> {
     }
 
     /**
-     * Matches a settings catalog at its {@code libs { ... } } call, or a TOML catalog at the
-     * document of a {@code *.versions.toml} file.
+     * Matches a script catalog at its {@code libs { ... } } or {@code catalog { ... } }
+     * call, or a TOML catalog at the document of a {@code *.versions.toml} file.
      */
     class Matcher extends SimpleTraitMatcher<VersionCatalog> {
         private final SettingsVersionCatalog.Matcher settings = new SettingsVersionCatalog.Matcher();

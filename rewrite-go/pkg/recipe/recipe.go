@@ -80,6 +80,13 @@ func (Base) Maintainers() []Maintainer                   { return nil }
 func (Base) Contributors() []Contributor                 { return nil }
 func (Base) Examples() []Example                         { return nil }
 
+// CausesAnotherCycle is optionally implemented by a recipe whose changes should
+// trigger another recipe cycle, mirroring Java's Recipe.causesAnotherCycle().
+// Kept off Recipe so existing implementations don't have to add it.
+type CausesAnotherCycle interface {
+	CausesAnotherCycle() bool
+}
+
 // DelegatesTo marks a recipe that delegates entirely to a Java-side recipe.
 // When the Java host calls PrepareRecipe, the Go server includes the
 // delegation info in the response, and Java loads the recipe locally

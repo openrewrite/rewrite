@@ -15,20 +15,25 @@
  */
 package org.openrewrite.golang.rpc;
 
+import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
 import org.junit.jupiter.api.io.TempDir;
+import org.openrewrite.golang.GolangVisitor;
 import org.openrewrite.golang.tree.Go;
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.tree.J;
+import org.openrewrite.java.tree.Space;
 import org.openrewrite.test.RewriteTest;
 import static org.assertj.core.api.Assertions.assertThat;
 import org.openrewrite.test.TypeValidation;
 
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
 
@@ -64,8 +69,78 @@ class GolangParserIntegTest implements RewriteTest {
     @Override
     public void defaults(org.openrewrite.test.RecipeSpec spec) {
         spec.typeValidationOptions(TypeValidation.builder()
-                .allowNonWhitespaceInWhitespace(true)
                 .build());
+    }
+
+    @Test
+    void noNullSpaces() {
+        rewriteRun(
+                go(
+                        """
+                                package main
+
+                                import (
+                                	"fmt"
+                                	"os"
+                                )
+
+                                func main() {
+                                	if y := 1; y > 0 {
+                                		fmt.Println(y)
+                                	} else {
+                                		os.Exit(1)
+                                	}
+                                	for i := 0; i < 3; i++ {
+                                	}
+                                	var a, b = 1, 2
+                                	_ = a + b
+                                }
+                                """,
+                        spec -> spec.afterRecipe(cu -> {
+                            List<String> nullSpaces = new ArrayList<>();
+                            new GolangVisitor<Integer>() {
+                                @Override
+                                public Space visitSpace(@Nullable Space space, Space.Location loc, Integer p) {
+                                    if (space == null) {
+                                        nullSpaces.add(loc.name());
+                                    }
+                                    return space;
+                                }
+                            }.visit(cu, 0);
+                            assertThat(nullSpaces).isEmpty();
+                        })
+                )
+        );
+    }
+
+    @Test
+    void noNullMarkers() {
+        rewriteRun(
+                go(
+                        """
+                                package main
+
+                                import "github.com/gin-gonic/gin"
+
+                                func main() {
+                                	_ = gin.Default()
+                                }
+                                """,
+                        spec -> spec.afterRecipe(cu -> {
+                            List<String> nullMarkers = new ArrayList<>();
+                            new GolangVisitor<Integer>() {
+                                @Override
+                                public J preVisit(J tree, Integer p) {
+                                    if (tree.getMarkers() == null) {
+                                        nullMarkers.add(tree.getClass().getSimpleName());
+                                    }
+                                    return tree;
+                                }
+                            }.visit(cu, 0);
+                            assertThat(nullMarkers).isEmpty();
+                        })
+                )
+        );
     }
 
     @Test

@@ -242,7 +242,9 @@ public class GoModParser implements Parser {
                 retracts,
                 resolved,
                 new ArrayList<>(),
-                GoResolutionResult.ResolutionStatus.GO_SUM_ONLY
+                GoResolutionResult.ResolutionStatus.GO_SUM_ONLY,
+                new ArrayList<>(),
+                null
         );
     }
 

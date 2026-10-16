@@ -830,7 +830,7 @@ class JavaTemplateTest implements RewriteTest {
                   public enum Type {
                       One;
 
-                      public Type(String t) {
+                      Type() {
                       }
 
                       String t;
@@ -853,7 +853,7 @@ class JavaTemplateTest implements RewriteTest {
                   public enum Type {
                       One;
 
-                      public Type(String t) {
+                      Type() {
                       }
 
                       String t;

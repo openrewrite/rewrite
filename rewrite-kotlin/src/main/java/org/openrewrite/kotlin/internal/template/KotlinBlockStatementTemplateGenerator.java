@@ -19,7 +19,9 @@ import org.openrewrite.Cursor;
 import org.openrewrite.java.internal.template.BlockStatementTemplateGenerator;
 import org.openrewrite.java.tree.Expression;
 import org.openrewrite.java.tree.J;
+import org.openrewrite.java.tree.JavaCoordinates;
 import org.openrewrite.java.tree.JavaType;
+import org.openrewrite.java.tree.Space;
 import org.openrewrite.java.tree.Statement;
 import org.openrewrite.java.tree.TypeUtils;
 import org.openrewrite.kotlin.tree.K;
@@ -34,9 +36,10 @@ public class KotlinBlockStatementTemplateGenerator extends BlockStatementTemplat
     }
 
     @Override
-    protected void contextFreeTemplate(Cursor cursor, J j, Collection<JavaType.GenericTypeVariable> typeVariables, StringBuilder before, StringBuilder after) {
+    protected void contextFreeTemplate(Cursor cursor, J j, Collection<JavaType.GenericTypeVariable> typeVariables, StringBuilder before, StringBuilder after,
+                                       Space.Location location, JavaCoordinates.Mode mode) {
         String classDeclaration = "class Template" + kotlinTypeParameters(typeVariables);
-        if (j instanceof Expression && !(j instanceof J.Assignment)) {
+        if (j instanceof Expression && !(j instanceof J.Assignment) && !insertsBesideStatement(location, mode)) {
             before.insert(0, classDeclaration + " {\n");
             before.append("var o : Any = ");
             after.append(";\n}");

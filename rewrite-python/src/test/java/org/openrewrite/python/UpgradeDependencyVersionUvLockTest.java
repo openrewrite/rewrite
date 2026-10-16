@@ -123,6 +123,41 @@ class UpgradeDependencyVersionUvLockTest implements RewriteTest {
         );
     }
 
+    @Test
+    @Timeout(120)
+    void indexUrlCredentialsAreNotWrittenToTheLock() {
+        PythonExecutionContextView.view(ctx).setPackageIndexes(List.of());
+        String pyproject = """
+          [project]
+          name = "fixture-i"
+          version = "0.1.0"
+          requires-python = ">=3.12"
+          dependencies = [
+              "six==%s",
+              "iniconfig>=2.0",
+          ]
+
+          [tool.uv]
+
+          [[tool.uv.index]]
+          name = "pypi"
+          url = "https://alice:hunter2@pypi.org/simple"
+          default = true
+          """;
+        rewriteRun(
+          spec -> spec.recipe(new UpgradeDependencyVersion("six", "==1.17.0", null, null))
+            .executionContext(ctx),
+          pyproject(pyproject.formatted("1.16.0"), pyproject.formatted("1.17.0")),
+          uvLock(
+            resource("i-minimal-update/uv.lock.v1"),
+            s -> s.noTrim().after(actual -> {
+                assertThat(actual).doesNotContain("hunter2");
+                return resource("i-minimal-update/uv.lock.v2");
+            })
+          )
+        );
+    }
+
     private static String resource(String name) {
         try (InputStream is = UpgradeDependencyVersionUvLockTest.class.getResourceAsStream("/uvlock/" + name)) {
             assertThat(is).as(name).isNotNull();

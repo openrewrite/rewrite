@@ -659,7 +659,7 @@ export function createNodeResolutionResultMarker(
         resolvedDependencies,
         packageManager,
         engines: normalizeEngines(packageJsonContent.engines),
-        npmrcConfigs,
+        npmrcConfigs: npmrcConfigs?.length ? npmrcConfigs : undefined,
     } as NodeResolutionResult;
 }
 
@@ -1022,7 +1022,8 @@ RpcCodecs.registerCodec(NodeResolutionResultKind, {
             resolvedDependencies: (await q.receiveList(before.resolvedDependencies)) || [],
             packageManager: await q.receive(before.packageManager),
             engines: await q.receive(before.engines),
-            npmrcConfigs: (await q.receiveList(before.npmrcConfigs)) || undefined,
+            // an empty list is how having none is sent
+            npmrcConfigs: await q.receiveList(before.npmrcConfigs).then(configs => configs?.length ? configs : undefined),
         });
     },
 

@@ -76,18 +76,21 @@ class ReloadableJava8Parser implements JavaParser {
     private final ResettableLog compilerLog;
     private final Collection<NamedStyles> styles;
     private final List<Processor> annotationProcessors;
+    private final boolean typeAttribution;
 
     ReloadableJava8Parser(@Nullable Collection<Path> classpath,
                           Collection<byte[]> classBytesClasspath,
                           @Nullable Collection<Input> dependsOn,
                           Charset charset,
                           boolean logCompilationWarningsAndErrors,
+                          boolean typeAttribution,
                           Collection<NamedStyles> styles,
                           JavaTypeCache typeCache,
                           @Nullable JavaTypeFactory typeFactory) {
         this.classpath = classpath;
         this.dependsOn = dependsOn;
         this.styles = styles;
+        this.typeAttribution = typeAttribution;
         this.typeCache = typeCache;
         this.typeFactory = typeFactory != null ? typeFactory : new DefaultJavaTypeFactory(typeCache);
 
@@ -224,6 +227,9 @@ class ReloadableJava8Parser implements JavaParser {
             try {
                 enterAll(cus.values());
                 JavaCompiler delegate = annotationProcessors.isEmpty() ? compiler : compiler.processAnnotations(jcCompilationUnits, nil());
+                if (!typeAttribution) {
+                    delegate.todo.clear();
+                }
                 while (!delegate.todo.isEmpty()) {
                     try {
                         delegate.attribute(delegate.todo);

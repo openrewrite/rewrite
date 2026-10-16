@@ -35,11 +35,22 @@ export type CaptureStorageValue = J | J.RightPadded<J> | J[] | J.RightPadded<J>[
  */
 export const WRAPPERS_MAP_SYMBOL = Symbol('wrappersMap');
 
+/** Symbol to access a match's pattern prefixes without exposing them as public API */
+export const PATTERN_PREFIXES_SYMBOL = Symbol('patternPrefixes');
+
 /**
  * Shared wrapper function name used by both patterns and templates.
  * Using the same name allows cache sharing when pattern and template code is identical.
  */
 export const WRAPPER_FUNCTION_NAME = '__WRAPPER__';
+
+/** The module of the file every template and pattern parses as. */
+export const TEMPLATE_MODULE = 'template';
+
+/** Template or pattern code as the body of the wrapper function, parenthesized to parse as an expression. */
+export function wrapCode(code: string, expression: boolean): string {
+    return `function ${WRAPPER_FUNCTION_NAME}() { ${expression ? `(${code})` : code} }`;
+}
 
 /**
  * Simple LRU (Least Recently Used) cache implementation using Map's insertion order.
@@ -329,6 +340,15 @@ export class PlaceholderUtils {
         return undefined;
     }
 
+    /** The name of a shorthand property, which is what a placeholder written as `{${x}}` parses to. */
+    static shorthandPropertyName(node: J): J | undefined {
+        if (node.kind === JS.Kind.PropertyAssignment) {
+            const property = node as JS.PropertyAssignment;
+            return property.initializer === undefined ? property.name.element : undefined;
+        }
+        return undefined;
+    }
+
     /**
      * Extracts the relevant AST node from a wrapper function.
      * Used by both pattern and template processors to intelligently extract
@@ -336,9 +356,10 @@ export class PlaceholderUtils {
      *
      * @param lastStatement The last statement from the compilation unit
      * @param contextName Context name for error messages (e.g., 'Pattern', 'Template')
+     * @param expression Whether {@link wrapCode} parenthesized the code
      * @returns The extracted AST node
      */
-    static extractFromWrapper(lastStatement: J, contextName: string): J {
+    static extractFromWrapper(lastStatement: J, contextName: string, expression: boolean = false): J {
         let extracted: J;
 
         // Since we always wrap in function __WRAPPER__() { code }, look for it
@@ -378,6 +399,7 @@ export class PlaceholderUtils {
             extracted = lastStatement;
         }
 
-        return extracted;
+        return expression && extracted.kind === J.Kind.Parentheses ?
+            (extracted as J.Parentheses<J>).tree.element : extracted;
     }
 }

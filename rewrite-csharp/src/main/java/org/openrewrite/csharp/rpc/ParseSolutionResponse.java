@@ -62,8 +62,9 @@ class ParseSolutionResponse {
         String sourceFileType;
 
         /**
-         * The relative source path; populated only for Quark items, from which the
-         * Java side builds the Quark locally. Null for normal items.
+         * The relative source path. Quark items are built from it locally, and it names the
+         * file in the {@link org.openrewrite.tree.ParseError} substituted for an item that
+         * could not be fetched. Null from a C# peer that predates populating it for every item.
          */
         @Nullable
         String sourcePath;

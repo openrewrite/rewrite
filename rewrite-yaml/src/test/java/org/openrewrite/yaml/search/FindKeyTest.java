@@ -110,6 +110,60 @@ class FindKeyTest implements RewriteTest {
     }
 
     @Test
+    void findKeyWithFilterPathEndingAtMapping() {
+        rewriteRun(
+          spec -> spec.recipe(new FindKey("$..steps[?(@.uses =~ '.*setup-java.*')]")),
+          yaml(
+                """
+              jobs:
+                build:
+                  steps:
+                    - name: Checkout
+                      uses: actions/checkout@v4
+                    - name: Setup Java
+                      id: setup-java
+                      uses: actions/setup-java@v5
+                    - run: ./gradlew build
+              """,
+            """
+              jobs:
+                build:
+                  steps:
+                    - name: Checkout
+                      uses: actions/checkout@v4
+                    ~~>- name: Setup Java
+                      id: setup-java
+                      uses: actions/setup-java@v5
+                    - run: ./gradlew build
+              """
+          )
+        );
+    }
+
+    @Test
+    void findKeyWithFilterPathEndingAtMappingUsesFirst() {
+        rewriteRun(
+          spec -> spec.recipe(new FindKey("$..steps[?(@.uses =~ '.*setup-java.*')]")),
+          yaml(
+                """
+              jobs:
+                build:
+                  steps:
+                    - uses: actions/setup-java@v5
+                      name: Setup Java
+              """,
+            """
+              jobs:
+                build:
+                  steps:
+                    ~~>- uses: actions/setup-java@v5
+                      name: Setup Java
+              """
+          )
+        );
+    }
+
+    @Test
     void invalidJsonPathFailsValidation() {
         assertThat(new FindKey("$[invalid syntax").validate().isInvalid()).isTrue();
         assertThat(new FindKey("$[invalid syntax").validate().failures().iterator().next().getMessage())

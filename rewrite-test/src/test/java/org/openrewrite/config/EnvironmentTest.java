@@ -521,6 +521,67 @@ class EnvironmentTest implements RewriteTest {
     }
 
     @Test
+    void dependencyRecipeNestedTwoLevelsDeepResolvesARecipeFromThisEnvironment() {
+        var env = Environment.builder()
+          .load(new YamlResourceLoader(
+              //language=yaml
+              new ByteArrayInputStream(
+                """
+                  type: specs.openrewrite.org/v1beta/recipe
+                  name: test.Main
+                  displayName: Main
+                  description: Test.
+                  recipeList:
+                    - test.dependency.Outer
+                  ---
+                  type: specs.openrewrite.org/v1beta/recipe
+                  name: test.Local
+                  displayName: Local
+                  description: Test.
+                  recipeList:
+                    - org.openrewrite.text.ChangeText:
+                        toText: Hello
+                  """.getBytes()
+              ),
+              URI.create("rewrite.yml"),
+              new Properties()
+            ),
+            List.of(new YamlResourceLoader(
+              //language=yaml
+              new ByteArrayInputStream(
+                """
+                  type: specs.openrewrite.org/v1beta/recipe
+                  name: test.dependency.Outer
+                  displayName: Outer
+                  description: Test.
+                  recipeList:
+                    - test.dependency.Inner
+                  ---
+                  type: specs.openrewrite.org/v1beta/recipe
+                  name: test.dependency.Inner
+                  displayName: Inner
+                  description: Test.
+                  recipeList:
+                    - test.Local
+                  """.getBytes()
+              ),
+              URI.create("dependency.yml"),
+              new Properties()
+            ))).build();
+
+        Recipe main = env.listRecipes().stream()
+          .filter(r -> "test.Main".equals(r.getName()))
+          .findFirst()
+          .orElseThrow();
+        Recipe inner = main.getRecipeList().getFirst().getRecipeList().getFirst();
+        assertThat(inner.getRecipeList())
+          .extracting(Recipe::getName)
+          .containsExactly("test.Local");
+        assertThat(main.validateAll())
+          .allSatisfy(validated -> assertThat(validated.isValid()).isTrue());
+    }
+
+    @Test
     void recipeReferencedMultipleTimesShouldNotBeReInitialized() {
         // This test reproduces the issue where a child recipe referenced by multiple parents
         // gets re-initialized each time, losing its recipe list

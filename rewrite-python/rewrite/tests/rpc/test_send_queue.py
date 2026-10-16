@@ -17,17 +17,51 @@ def test_changed_ref_slot_is_re_added_instead_of_changed():
     assert q.q[2] == {'state': 'ADD', 'ref': 2}
 
 
-def test_complex_value_serializes_as_paren_free_string():
-    # given
+def test_complex_value_has_no_wire_form():
     q = RpcSendQueue()
 
-    # when
-    value = q._get_primitive_value(1j)
-    value_type = q._get_value_type(1j)
+    assert q._get_primitive_value(1j) is None
+    assert q._get_value_type(1j) is None
 
-    # then
-    assert value == "1j"
-    assert value_type is None
+
+def test_value_without_a_wire_form_is_sent_as_null():
+    # an ADD or CHANGE that carries nothing is, to the peer, a broken message or no change at all
+    q = RpcSendQueue()
+
+    q.send(1j, None)
+    q.send(2j, 1j)
+    q.send(float('inf'), 1.5)
+    q.send_list([3j], [1j], lambda x: 0)
+
+    assert q.q == [{'state': 'DELETE'}, {'state': 'DELETE'}, {'state': 'DELETE'},
+                   {'state': 'CHANGE'}, {'state': 'CHANGE', 'value': [0]}, {'state': 'DELETE'}]
+
+
+def test_change_to_a_padded_space_is_sent():
+    # read through the padding of each side, so that the space is not compared with itself
+    from rewrite import Markers
+    from rewrite.java import JLeftPadded, JRightPadded, Space
+    from rewrite.rpc.python_sender import PythonRpcSender
+
+    sender = PythonRpcSender()
+    for visit, padded in [
+        (sender._visit_left_padded, lambda space: JLeftPadded(Space.EMPTY, space, Markers.EMPTY)),
+        (sender._visit_right_padded, lambda space: JRightPadded(space, Space.EMPTY, Markers.EMPTY)),
+    ]:
+        before, after = padded(Space([], ' ')), padded(Space([], '  '))
+        q = RpcSendQueue()
+
+        q.send(after, before, lambda: visit(after, q))
+
+        assert {'state': 'CHANGE', 'valueType': None, 'value': '  '} in q.q
+
+
+def test_int_value_serializes_as_a_number_at_any_magnitude():
+    q = RpcSendQueue()
+
+    assert q._get_primitive_value(2 ** 63) == 2 ** 63
+    # Past Jackson's 1000-character cap on a JSON number there is no wire form.
+    assert q._get_primitive_value(10 ** 1000) is None
 
 
 def test_changed_ref_list_item_is_re_added_instead_of_changed():

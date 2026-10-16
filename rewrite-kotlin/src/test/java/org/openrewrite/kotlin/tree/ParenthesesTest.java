@@ -115,4 +115,18 @@ class ParenthesesTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void spaceBeforeClosingParenthesisOfNullableType() {
+        rewriteRun(
+          kotlin(
+            """
+              class Foo
+              class Outer { class Inner }
+              val a: ( /*c*/ Foo )? = null
+              val b: (  Outer.Inner  )? = null
+              """
+          )
+        );
+    }
 }

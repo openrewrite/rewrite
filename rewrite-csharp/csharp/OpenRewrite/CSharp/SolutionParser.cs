@@ -376,6 +376,18 @@ public class SolutionParser
     /// </summary>
     public IReadOnlyDictionary<string, string> UnevaluatedProjects => _unevaluatedProjects;
 
+    private readonly HashSet<string> _projectsNotParsed = new(StringComparer.OrdinalIgnoreCase);
+
+    private readonly HashSet<ProjectId> _unsupportedVariants = new();
+
+    /// <summary>
+    /// Absolute paths of the C# projects the most recent <see cref="LoadAsync"/> could not
+    /// attribute because the installed .NET SDK can build none of their target frameworks: each
+    /// needs a .NET workload that is not installed or a newer SDK. Their sources must not be
+    /// parsed; the reason has already been logged as an error.
+    /// </summary>
+    public IReadOnlyCollection<string> ProjectsNotParsed => _projectsNotParsed;
+
     /// <summary>
     /// Load a solution or project via MSBuildWorkspace.
     /// Detects .sln/.slnx vs .csproj by extension and calls the appropriate method.
@@ -424,9 +436,12 @@ public class SolutionParser
         // otherwise fail evaluation with NETSDK1100 on Linux/macOS, and one failing project
         // reference takes the reference metadata of everything that depends on it with it.
         NuGetResolver.ApplyWindowsTargetingDefault(msbuildProperties);
+        NuGetResolver.ApplyAndroidDesignTimeDefault(msbuildProperties);
+        NuGetResolver.ApplyOutOfSupportWorkloadsDefault(msbuildProperties);
 
         _restoredLockFiles = await SolutionRestore.RunAsync(path, hasPackagesConfig, msbuildProperties, ct);
 
+        MSBuildEnvironment.EnsureWorkingDirectory();
         var sw = Stopwatch.StartNew();
         Log.Debug("MSBuildWorkspace: creating workspace");
         var workspace = msbuildProperties.Count > 0
@@ -438,6 +453,8 @@ public class SolutionParser
         });
 
         _unevaluatedProjects.Clear();
+        _projectsNotParsed.Clear();
+        _unsupportedVariants.Clear();
 
         // The C# projects the entry path declares, so a project MSBuild drops entirely (or
         // strips of its documents) can still be recognized and recovered from disk.
@@ -496,7 +513,10 @@ public class SolutionParser
         var docCount = projects.Sum(p => p.Documents.Count());
         Log.Debug("LoadAsync: loaded {ProjectCount} projects, {DocCount} documents", projects.Count, docCount);
 
-        var unreferenced = projects.Where(p => !p.MetadataReferences.Any()).ToList();
+        ReportUnsupportedTargetFrameworks(path, projects, msbuildProperties);
+        var unreferenced = projects
+            .Where(p => !p.MetadataReferences.Any() && !_unsupportedVariants.Contains(p.Id))
+            .ToList();
         if (unreferenced.Count > 0)
             Log.Warning("{UnreferencedCount} of {ProjectCount} projects in {FileName} resolved no reference " +
                         "metadata; their source parses without type attestation: {Projects}. Cause(s): {Reasons}",
@@ -506,6 +526,89 @@ public class SolutionParser
                     .Select(FailureReason).Distinct(), limit: 3));
 
         return solution;
+    }
+
+    private void ReportUnsupportedTargetFrameworks(
+        string path,
+        IReadOnlyList<Project> projects,
+        IDictionary<string, string> msbuildProperties)
+    {
+        var baseDir = Path.GetDirectoryName(Path.GetFullPath(path))!;
+        foreach (var variants in projects.Where(p => p.FilePath != null)
+                     .GroupBy(p => Path.GetFullPath(p.FilePath!), StringComparer.OrdinalIgnoreCase))
+        {
+            var unresolved = NuGetResolver.UnresolvedPlatformTargetFrameworks(variants.Key);
+            var missingWorkloads = new List<NuGetResolver.MissingWorkloads>();
+            var needingNewerSdk = new List<NuGetResolver.UnsupportedTargetFramework>();
+            foreach (var variant in variants)
+            {
+                var targetFramework = TargetFrameworkOf(variant) ??
+                                      (variants.Count() == 1 && unresolved.Count == 1 ? unresolved.Single() : null);
+                if (!variant.MetadataReferences.Any() &&
+                    NuGetResolver.FindTargetFrameworkNeedingNewerSdk(variants.Key, targetFramework, msbuildProperties)
+                        is { } unsupported)
+                {
+                    _unsupportedVariants.Add(variant.Id);
+                    needingNewerSdk.Add(unsupported);
+                }
+                else if (targetFramework != null && unresolved.Contains(targetFramework) &&
+                         NuGetResolver.FindMissingWorkloads(variants.Key, targetFramework, msbuildProperties) is { } workloads)
+                {
+                    _unsupportedVariants.Add(variant.Id);
+                    missingWorkloads.Add(workloads);
+                }
+            }
+            if (missingWorkloads.Count == 0 && needingNewerSdk.Count == 0)
+                continue;
+
+            var causes = new List<string>();
+            var remedies = new List<string>();
+            if (missingWorkloads.Count > 0)
+            {
+                causes.Add($"{string.Join(", ", missingWorkloads.Select(m => m.TargetFramework).Distinct())}, " +
+                           "which need .NET workloads that are not installed");
+                var workloads = missingWorkloads.SelectMany(m => m.Workloads)
+                    .Distinct(StringComparer.OrdinalIgnoreCase).ToList();
+                var unavailablePacks = missingWorkloads.Where(m => m.Workloads.Count == 0)
+                    .SelectMany(m => m.Packs).Distinct(StringComparer.OrdinalIgnoreCase).ToList();
+                if (workloads.Count > 0)
+                    remedies.Add($"Install them with `dotnet workload install {string.Join(" ", workloads)}` " +
+                                 "(https://learn.microsoft.com/dotnet/core/tools/dotnet-workload-install).");
+                if (unavailablePacks.Count > 0)
+                    remedies.Add($"No workload for this operating system and .NET SDK provides {string.Join(", ", unavailablePacks)}; " +
+                                 "iOS, Mac Catalyst and tvOS workloads install only on macOS and Windows, and a target " +
+                                 "framework the SDK no longer supports needs an older SDK.");
+            }
+            if (needingNewerSdk.Count > 0)
+            {
+                causes.Add($"{string.Join(", ", needingNewerSdk.Select(u => u.TargetFramework).Distinct())}, " +
+                           $"which need a newer .NET SDK than the installed {needingNewerSdk[0].SdkVersion}");
+                remedies.Add("Install a .NET SDK that supports them (https://dotnet.microsoft.com/download).");
+            }
+
+            var project = Path.GetRelativePath(baseDir, variants.Key);
+            var parsedAs = variants.FirstOrDefault(p =>
+                p.MetadataReferences.Any() && !_unsupportedVariants.Contains(p.Id));
+            if (parsedAs == null)
+            {
+                _projectsNotParsed.Add(variants.Key);
+                Log.Error("{Project:l} is not parsed: it targets {Causes:l}. {Remedy:l}",
+                    project, string.Join("; and ", causes), string.Join(" ", remedies));
+            }
+            else
+            {
+                Log.Error("{Project:l} is parsed for {ParsedAs:l} only: it also targets {Causes:l}, so code compiled " +
+                          "only for those is not parsed. {Remedy:l}",
+                    project, TargetFrameworkOf(parsedAs) ?? parsedAs.Name, string.Join("; and ", causes),
+                    string.Join(" ", remedies));
+            }
+        }
+    }
+
+    private static string? TargetFrameworkOf(Project project)
+    {
+        var open = project.Name.LastIndexOf('(');
+        return open > 0 && project.Name.EndsWith(')') ? project.Name[(open + 1)..^1] : null;
     }
 
     private static string Summarize(IEnumerable<string> items, int limit = 5)
@@ -588,8 +691,11 @@ public class SolutionParser
         var projectName = Path.GetFileNameWithoutExtension(projectPath);
         Log.Debug("ParseProject: starting {ProjectName}", projectName);
 
-        var project = solution.Projects.FirstOrDefault(p =>
-            string.Equals(p.FilePath, projectPath, StringComparison.OrdinalIgnoreCase));
+        var project = solution.Projects
+            .Where(p => string.Equals(p.FilePath, projectPath, StringComparison.OrdinalIgnoreCase) &&
+                        !_unsupportedVariants.Contains(p.Id))
+            .OrderByDescending(p => p.MetadataReferences.Any())
+            .FirstOrDefault();
 
         if (project == null)
             throw new ArgumentException($"Project not found in solution: {projectPath}");
@@ -602,7 +708,7 @@ public class SolutionParser
         Log.Debug("<< GetCompilation ({ProjectName}) ({Elapsed})", projectName, compileSw.Elapsed);
 
         // Get preprocessor symbols from all solution configurations
-        var configSymbolSets = GetConfigurationSymbolSets(solution, projectPath);
+        var configSymbolSets = GetConfigurationSymbolSets(solution, projectPath, _unsupportedVariants);
 
         var userDocs = project.Documents
             .Where(d => d.FilePath != null && IsUserSource(d, project))
@@ -653,7 +759,7 @@ public class SolutionParser
         var filePaths = EnumerateProjectSourceFiles(projectPath);
         if (alreadyParsed is { Count: > 0 })
             filePaths = filePaths
-                .Where(p => !alreadyParsed.Contains(Path.GetRelativePath(rootDir, p).Replace('\\', '/')))
+                .Where(p => !alreadyParsed.Contains(Path.GetRelativePath(rootDir, p)))
                 .ToList();
 
         var ignoredPaths = GetGitIgnoredPaths(rootDir, filePaths);
@@ -725,7 +831,7 @@ public class SolutionParser
             try { docSize = new FileInfo(unit.FilePath).Length; } catch { docSize = 0; }
             if (docSize > MaxParseableSizeBytes)
             {
-                LastOversizePaths.Add(Path.GetRelativePath(rootDir, unit.FilePath).Replace('\\', '/'));
+                LastOversizePaths.Add(Path.GetRelativePath(rootDir, unit.FilePath));
                 continue;
             }
 
@@ -733,8 +839,6 @@ public class SolutionParser
             if (source == null) continue;
 
             var relativePath = Path.GetRelativePath(rootDir, unit.FilePath);
-            // Normalize path separators to forward slashes for cross-platform consistency
-            relativePath = relativePath.Replace('\\', '/');
 
             // Detect UTF-8 BOM — Roslyn's SourceText.ToString() strips the BOM character,
             // so we check the raw file bytes to preserve the flag for patch fidelity.
@@ -865,13 +969,15 @@ public class SolutionParser
     /// For each configuration (Debug, Release, etc.), gets the preprocessor symbols
     /// defined for the project under that configuration.
     /// </summary>
-    private static List<HashSet<string>> GetConfigurationSymbolSets(Solution solution, string projectPath)
+    private static List<HashSet<string>> GetConfigurationSymbolSets(
+        Solution solution, string projectPath, IReadOnlySet<ProjectId> excluded)
     {
         var symbolSets = new List<HashSet<string>>();
         var seen = new HashSet<string>(); // dedup by joining symbols
 
         foreach (var project in solution.Projects.Where(p =>
-                     string.Equals(p.FilePath, projectPath, StringComparison.OrdinalIgnoreCase)))
+                     string.Equals(p.FilePath, projectPath, StringComparison.OrdinalIgnoreCase) &&
+                     !excluded.Contains(p.Id)))
         {
             if (project.ParseOptions is Microsoft.CodeAnalysis.CSharp.CSharpParseOptions parseOptions)
             {

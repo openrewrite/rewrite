@@ -229,6 +229,19 @@ class MethodMatcherTest implements RewriteTest {
     }
 
     @Test
+    void typedArgumentMatchesAUnionWhoseMembersBesidesNullAllMatch() {
+        var optionalString = new JavaType.MultiCatch(List.of(JavaType.Primitive.String, JavaType.Primitive.Null));
+        assertTrue(new MethodMatcher("com.example.Foo bar(String)").matches(
+          new JavaType.Method(null, 1L, build("com.example.Foo"), "bar",
+            null, null, List.of(optionalString), emptyList(), emptyList(), emptyList(), null)));
+
+        var stringOrInt = new JavaType.MultiCatch(List.of(JavaType.Primitive.String, JavaType.Primitive.Int));
+        assertFalse(new MethodMatcher("com.example.Foo bar(String)").matches(
+          new JavaType.Method(null, 1L, build("com.example.Foo"), "bar",
+            null, null, List.of(stringOrInt), emptyList(), emptyList(), emptyList(), null)));
+    }
+
+    @Test
     void siteExample() {
         rewriteRun(
           java(
@@ -760,7 +773,7 @@ class MethodMatcherTest implements RewriteTest {
                       // simpler logging
                   }
               
-                  void log(int code, String level, String message, Object... params) {
+                  void log(Integer code, String level, String message, Object... params) {
                       // with error code
                   }
               }
@@ -796,7 +809,7 @@ class MethodMatcherTest implements RewriteTest {
                       // simpler logging
                   }
               
-                  void log(int code, String level, String message, Object... params) {
+                  void log(Integer code, String level, String message, Object... params) {
                       // with error code
                   }
               }

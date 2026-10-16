@@ -22,6 +22,8 @@ import org.openrewrite.Issue;
 import org.openrewrite.test.RewriteTest;
 import org.openrewrite.toml.tree.Toml;
 
+import java.nio.file.Paths;
+
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.toml.Assertions.toml;
 
@@ -523,5 +525,17 @@ class TomlParserTest implements RewriteTest {
             """
           )
         );
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"config.toml", "uv.lock", "poetry.lock", "pdm.lock", "Pipfile", ".xmake.cfg"})
+    void acceptsTomlFiles(String fileName) {
+        assertThat(new TomlParser().accept(Paths.get("project", fileName))).isTrue();
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"Pipfile.lock", "yarn.lock", "package-lock.json"})
+    void rejectsNonTomlFiles(String fileName) {
+        assertThat(new TomlParser().accept(Paths.get("project", fileName))).isFalse();
     }
 }

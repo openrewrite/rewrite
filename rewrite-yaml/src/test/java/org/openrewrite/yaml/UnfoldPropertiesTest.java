@@ -16,13 +16,18 @@
 package org.openrewrite.yaml;
 
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 import org.junitpioneer.jupiter.ExpectedToFail;
 import org.openrewrite.DocumentExample;
+import org.openrewrite.Issue;
 import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
+import org.yaml.snakeyaml.LoaderOptions;
 
 import java.util.List;
 
+import static java.util.Objects.requireNonNull;
 import static org.openrewrite.yaml.Assertions.yaml;
 
 class UnfoldPropertiesTest implements RewriteTest {
@@ -336,6 +341,120 @@ class UnfoldPropertiesTest implements RewriteTest {
               some:
                 thing: else
               other: thing
+              """
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/8838")
+    @Test
+    void unfoldRelocatedPropertiesUnderExistingMapping() {
+        rewriteRun(
+          spec -> spec.recipeFromYaml(
+            """
+              type: specs.openrewrite.org/v1beta/recipe
+              name: org.openrewrite.yaml.RelocateJwtProperties
+              displayName: Relocate JWT properties
+              description: Relocate legacy JWT properties into Spring Security.
+              recipeList:
+                - org.openrewrite.yaml.ChangePropertyKey:
+                    oldPropertyKey: legacy.jwks.url
+                    newPropertyKey: spring.security.oauth2.resourceserver.jwt.jwk-set-uri
+                    relaxedBinding: true
+                - org.openrewrite.yaml.ChangePropertyKey:
+                    oldPropertyKey: legacy.jwt.issuer
+                    newPropertyKey: spring.security.oauth2.resourceserver.jwt.issuer-uri
+                    relaxedBinding: true
+                - org.openrewrite.yaml.ChangePropertyKey:
+                    oldPropertyKey: legacy.jwt.audience
+                    newPropertyKey: spring.security.oauth2.resourceserver.jwt.audiences
+                    relaxedBinding: true
+                - org.openrewrite.yaml.UnfoldProperties:
+                    applyTo:
+                      - $..[security.oauth2.resourceserver.jwt]
+              """,
+            "org.openrewrite.yaml.RelocateJwtProperties"
+          ).afterRecipe(run -> {
+              LoaderOptions options = new LoaderOptions();
+              options.setAllowDuplicateKeys(false);
+              for (var result : run.getChangeset().getAllResults()) {
+                  new org.yaml.snakeyaml.Yaml(options).load(requireNonNull(result.getAfter()).printAll());
+              }
+          }),
+          yaml(
+            """
+              spring:
+                application:
+                  name: my-service
+              legacy:
+                jwks:
+                  url: https://auth.example.com/jwks
+                jwt:
+                  issuer: https://auth.example.com
+                  audience: my-audience
+              """,
+            """
+              spring:
+                application:
+                  name: my-service
+                security:
+                  oauth2:
+                    resourceserver:
+                      jwt:
+                        jwk-set-uri: https://auth.example.com/jwks
+                        issuer-uri: https://auth.example.com
+                        audiences: my-audience
+              """
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/8838")
+    @ParameterizedTest
+    @CsvSource({"2, false", "4, false", "2, true", "4, true"})
+    void mergeDuplicatedNestedSections(int indent, boolean crlf) {
+        String before = """
+          spring:
+            application.name: my-service
+            security.jwt.issuer: https://auth.example.com
+            security.jwt.audience: my-audience
+          """;
+        String after = """
+          spring:
+            application:
+              name: my-service
+            security:
+              jwt:
+                issuer: https://auth.example.com
+                audience: my-audience
+          """;
+        rewriteRun(
+          yaml(
+            before.replace("  ", " ".repeat(indent)).replace("\n", crlf ? "\r\n" : "\n"),
+            after.replace("  ", " ".repeat(indent)).replace("\n", crlf ? "\r\n" : "\n")
+          )
+        );
+    }
+
+    @Test
+    void preserveCommentsOnDuplicatedNestedSections() {
+        rewriteRun(
+          yaml(
+            """
+              spring:
+                security.jwt.issuer: https://auth.example.com
+                # Keep this comment with the audience
+                security.jwt.audience: my-audience
+              """,
+            """
+              spring:
+                security:
+                  jwt:
+                    issuer: https://auth.example.com
+                # Keep this comment with the audience
+                security:
+                  jwt:
+                    audience: my-audience
               """
           )
         );

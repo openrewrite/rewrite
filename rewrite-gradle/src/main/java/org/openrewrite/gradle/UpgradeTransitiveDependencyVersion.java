@@ -1289,7 +1289,6 @@ public class UpgradeTransitiveDependencyVersion extends ScanningRecipe<UpgradeTr
 
         @Override
         public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
-            J.MethodInvocation m = super.visitMethodInvocation(method, ctx);
             J.Lambda becauseArg;
             if (!isKotlinDsl) {
                 becauseArg = parseAsGradle(INDIVIDUAL_CONSTRAINT_BECAUSE_SNIPPET_GROOVY, false, ctx)
@@ -1297,12 +1296,10 @@ public class UpgradeTransitiveDependencyVersion extends ScanningRecipe<UpgradeTr
                         .map(cu -> (J.MethodInvocation) cu.getStatements().get(1))
                         .map(dependencies -> (J.Lambda) dependencies.getArguments().get(0))
                         .map(dependenciesClosure -> ((J.Block) dependenciesClosure.getBody()).getStatements().get(0))
-                        .map(J.Return.class::cast)
-                        .map(returnConstraints -> ((J.MethodInvocation) requireNonNull(returnConstraints.getExpression())).getArguments().get(0))
+                        .map(constraints -> withoutImplicitReturn(constraints).getArguments().get(0))
                         .map(J.Lambda.class::cast)
                         .map(constraintsClosure -> ((J.Block) constraintsClosure.getBody()).getStatements().get(0))
-                        .map(J.Return.class::cast)
-                        .map(returnImplementation -> ((J.MethodInvocation) requireNonNull(returnImplementation.getExpression())).getArguments().get(1))
+                        .map(implementation -> withoutImplicitReturn(implementation).getArguments().get(1))
                         .map(J.Lambda.class::cast)
                         .map(it -> (J.Lambda) new GroovyIsoVisitor<Integer>() {
                             @Override
@@ -1319,12 +1316,10 @@ public class UpgradeTransitiveDependencyVersion extends ScanningRecipe<UpgradeTr
                         .map(block -> (J.MethodInvocation) block.getStatements().get(1))
                         .map(dependencies -> (J.Lambda) dependencies.getArguments().get(0))
                         .map(dependenciesClosure -> ((J.Block) dependenciesClosure.getBody()).getStatements().get(0))
-                        .map(J.Return.class::cast)
-                        .map(returnConstraints -> ((J.MethodInvocation) requireNonNull(returnConstraints.getExpression())).getArguments().get(0))
+                        .map(constraints -> withoutImplicitReturn(constraints).getArguments().get(0))
                         .map(J.Lambda.class::cast)
                         .map(constraintsClosure -> ((J.Block) constraintsClosure.getBody()).getStatements().get(0))
-                        .map(J.Return.class::cast)
-                        .map(returnImplementation -> ((J.MethodInvocation) requireNonNull(returnImplementation.getExpression())).getArguments().get(1))
+                        .map(implementation -> withoutImplicitReturn(implementation).getArguments().get(1))
                         .map(J.Lambda.class::cast)
                         .map(it -> (J.Lambda) new KotlinIsoVisitor<Integer>() {
                             @Override
@@ -1335,9 +1330,27 @@ public class UpgradeTransitiveDependencyVersion extends ScanningRecipe<UpgradeTr
                         }.visitNonNull(it, 0))
                         .orElseThrow(() -> new IllegalStateException("Unable to parse because text"));
             }
-            m = m.withArguments(ListUtils.concat(m.getArguments().subList(0, 1), becauseArg));
-            return autoFormat(m, ctx, getCursor().getParentOrThrow());
+            return autoFormat(method.withArguments(addBecause(method.getArguments(), becauseArg)), ctx, getCursor().getParentOrThrow());
         }
+
+        private static List<Expression> addBecause(List<Expression> arguments, J.Lambda becauseArg) {
+            Expression last = arguments.get(arguments.size() - 1);
+            if (!(last instanceof J.Lambda) || !(((J.Lambda) last).getBody() instanceof J.Block)) {
+                return ListUtils.concat(ListUtils.filter(arguments, arg -> !(arg instanceof J.Empty)), becauseArg);
+            }
+            J.Lambda configuration = (J.Lambda) last;
+            J.Block body = (J.Block) configuration.getBody();
+            Statement becauseStatement = ((J.Block) becauseArg.getBody()).getStatements().get(0);
+            List<Statement> statements = ListUtils.mapLast(body.getStatements(), statement ->
+                    statement instanceof J.Return && ((J.Return) statement).getExpression() instanceof Statement ?
+                            ((Statement) requireNonNull(((J.Return) statement).getExpression())).withPrefix(statement.getPrefix()) :
+                            statement);
+            return ListUtils.mapLast(arguments, arg -> configuration.withBody(body.withStatements(ListUtils.concat(statements, becauseStatement))));
+        }
+    }
+
+    private static J.MethodInvocation withoutImplicitReturn(Statement statement) {
+        return (J.MethodInvocation) (statement instanceof J.Return ? requireNonNull(((J.Return) statement).getExpression()) : statement);
     }
 
     private static boolean withinBlock(Cursor cursor, String name) {

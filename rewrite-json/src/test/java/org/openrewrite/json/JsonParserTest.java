@@ -16,6 +16,8 @@
 package org.openrewrite.json;
 
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.openrewrite.*;
 import org.openrewrite.json.tree.Json;
 import org.openrewrite.json.tree.JsonValue;
@@ -25,6 +27,7 @@ import org.openrewrite.tree.ParseError;
 
 import java.nio.charset.Charset;
 import java.nio.file.Paths;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.stream.Stream;
 
@@ -271,6 +274,34 @@ class JsonParserTest implements RewriteTest {
         assertThat(results)
           .singleElement()
           .isInstanceOf(ParseError.class);
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {
+      "{\"test\"}",
+      "username: \"{{ key }}\"",
+      "---\n{ \"a\": 1 }",
+      "---\nkind: Template\nparameters:\n- name: A\n",
+      "{ \"value\": <Placeholder> }",
+      "{ \"command\": [ {{command}} ], \"cpu\": 0 }",
+      "{\n      \"vm-driver\": \"kvm2\"\n",
+      "invalid json file :)",
+      "This is garbage {{ .Foo }} bar"
+    })
+    void syntaxErrorsProduceClearParseError(String source) {
+        List<Throwable> errors = new ArrayList<>();
+        InMemoryExecutionContext ctx = new InMemoryExecutionContext(errors::add);
+        SourceFile result = new JsonParser().parse(ctx, source).findFirst().orElseThrow();
+        assertThat(result).isInstanceOf(ParseError.class);
+        String message = result.getMarkers().findFirst(ParseExceptionResult.class).orElseThrow().getMessage();
+        assertThat(message).contains("Syntax error").containsPattern("at line \\d+:\\d+");
+        assertThat(message).doesNotContain("not print idempotent");
+        assertThat(errors).isNotEmpty().allSatisfy(e -> assertThat(e).isInstanceOf(JsonParsingException.class));
+    }
+
+    @Test
+    void emptyFileStillParses() {
+        assertThat(new JsonParser().parse("")).singleElement().isNotInstanceOf(ParseError.class);
     }
 
     @Issue("https://github.com/openrewrite/rewrite/pull/6631")

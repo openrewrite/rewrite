@@ -244,12 +244,36 @@ public class SolutionParserTests : IDisposable
     }
 
     [Fact]
+    public void AndroidDesignTimeBuildsUseTheManagedResourceGenerator()
+    {
+        var properties = new Dictionary<string, string>();
+
+        NuGetResolver.ApplyAndroidDesignTimeDefault(properties);
+
+        if (OperatingSystem.IsWindows())
+            Assert.DoesNotContain("AndroidUseManagedDesignTimeResourceGenerator", properties.Keys);
+        else
+            Assert.Equal("true", properties["AndroidUseManagedDesignTimeResourceGenerator"]);
+    }
+
+    [Fact]
+    public void OutOfSupportWorkloadsDoNotFailEvaluation()
+    {
+        var properties = new Dictionary<string, string>();
+
+        NuGetResolver.ApplyOutOfSupportWorkloadsDefault(properties);
+
+        Assert.Equal("false", properties["CheckEolWorkloads"]);
+    }
+
+    [Fact]
     public async Task ProjectsThatResolveNoReferencesAreWarnedAboutOnce()
     {
         WriteFile("Unsupported.csproj", """
             <Project Sdk="Microsoft.NET.Sdk">
               <PropertyGroup>
-                <TargetFramework>net99.0</TargetFramework>
+                <TargetFramework>net10.0</TargetFramework>
+                <DisableImplicitFrameworkReferences>true</DisableImplicitFrameworkReferences>
               </PropertyGroup>
             </Project>
             """);
@@ -291,6 +315,196 @@ public class SolutionParserTests : IDisposable
 
         Assert.NotNull(dgSpec);
         Assert.NotEmpty(dgSpec.Projects);
+    }
+
+    [Fact]
+    public async Task OnlyTargetFrameworksTheSdkSupportsAreParsed()
+    {
+        var csproj = WriteFile("Multi.csproj", """
+            <Project Sdk="Microsoft.NET.Sdk">
+              <PropertyGroup>
+                <TargetFrameworks>net99.0;net10.0</TargetFrameworks>
+              </PropertyGroup>
+              <ItemGroup>
+                <PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
+              </ItemGroup>
+            </Project>
+            """);
+        WriteFile("Widget.cs", "class Widget : Newtonsoft.Json.JsonException { }\n");
+
+        var parser = new SolutionParser();
+        Microsoft.CodeAnalysis.Solution? solution = null;
+        var errors = await CaptureErrors(async () => solution = await parser.LoadAsync(csproj));
+
+        Assert.Empty(parser.ProjectsNotParsed);
+        var error = Assert.Single(errors, e => e.Contains("Multi.csproj"));
+        Assert.Contains("is parsed for net10.0 only", error);
+        Assert.Contains("net99.0", error);
+        Assert.Contains("newer .NET SDK", error);
+
+        var results = parser.ParseProject(solution!, csproj, _tempDir);
+        AssertWidgetExtends("Newtonsoft.Json.JsonException", Assert.IsType<CompilationUnit>(Assert.Single(results)));
+    }
+
+    [Theory]
+    [InlineData("TargetFramework", "net99.0")]
+    [InlineData("TargetFrameworks", "net99.0")]
+    [InlineData("TargetFramework", "netstandard9.0")]
+    [InlineData("TargetFramework", "net99.0-ios")]
+    [InlineData("TargetFrameworks", "net99.0-android;net99.0-ios")]
+    public async Task ProjectNeedingANewerSdkIsNotParsed(string property, string targetFramework)
+    {
+        var csproj = WriteFile("Future.csproj", $"""
+            <Project Sdk="Microsoft.NET.Sdk">
+              <PropertyGroup>
+                <{property}>{targetFramework}</{property}>
+              </PropertyGroup>
+            </Project>
+            """);
+        WriteFile("Widget.cs", "class Widget : System.Exception { }\n");
+
+        var parser = new SolutionParser();
+        var errors = await CaptureErrors(() => parser.LoadAsync(csproj));
+
+        Assert.Contains(parser.ProjectsNotParsed, p => p.EndsWith("Future.csproj"));
+        var error = Assert.Single(errors, e => e.Contains("Future.csproj"));
+        Assert.Contains("is not parsed", error);
+        Assert.Contains(targetFramework.Replace(";", ", "), error);
+        Assert.Contains("newer .NET SDK", error);
+        Assert.DoesNotContain("workload", error);
+    }
+
+    [Theory]
+    [InlineData("TargetFramework")]
+    [InlineData("TargetFrameworks")]
+    public async Task ProjectWithoutItsWorkloadIsNotParsed(string property)
+    {
+        var csproj = WriteFile("Handset.csproj", $"""
+            <Project Sdk="Microsoft.NET.Sdk">
+              <PropertyGroup>
+                <{property}>net10.0-ios</{property}>
+              </PropertyGroup>
+            </Project>
+            """);
+        WriteFile("Widget.cs", "class Widget : System.Exception { }\n");
+
+        var parser = new SolutionParser();
+        var errors = await CaptureErrors(() => parser.LoadAsync(csproj));
+
+        Assert.Contains(parser.ProjectsNotParsed, p => p.EndsWith("Handset.csproj"));
+        var error = Assert.Single(errors, e => e.Contains("Handset.csproj"));
+        Assert.Contains("is not parsed", error);
+        Assert.Contains("net10.0-ios", error);
+    }
+
+    [Fact]
+    public async Task OnlyTargetFrameworksWithTheirWorkloadAreParsed()
+    {
+        var csproj = WriteFile("Tablet.csproj", """
+            <Project Sdk="Microsoft.NET.Sdk">
+              <PropertyGroup>
+                <TargetFrameworks>net10.0-ios;net9.0</TargetFrameworks>
+              </PropertyGroup>
+              <ItemGroup>
+                <PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
+              </ItemGroup>
+            </Project>
+            """);
+        WriteFile("Widget.cs", "class Widget : Newtonsoft.Json.JsonException { }\n");
+
+        var parser = new SolutionParser();
+        Microsoft.CodeAnalysis.Solution? solution = null;
+        var errors = await CaptureErrors(async () => solution = await parser.LoadAsync(csproj));
+
+        Assert.Empty(parser.ProjectsNotParsed);
+        Assert.Contains(parser.RestoredLockFiles.Keys, k => k.EndsWith("Tablet.csproj"));
+        var error = Assert.Single(errors, e => e.Contains("Tablet.csproj"));
+        Assert.Contains("is parsed for net9.0 only", error);
+        Assert.Contains("net10.0-ios", error);
+
+        var results = parser.ParseProject(solution!, csproj, _tempDir);
+        AssertWidgetExtends("Newtonsoft.Json.JsonException", Assert.IsType<CompilationUnit>(Assert.Single(results)));
+    }
+
+    [Fact]
+    public async Task ProjectWithoutItsWorkloadDoesNotStopTheRestOfTheSolution()
+    {
+        WriteFile("Phone/Phone.csproj", """
+            <Project Sdk="Microsoft.NET.Sdk">
+              <PropertyGroup>
+                <TargetFramework>net10.0-ios</TargetFramework>
+              </PropertyGroup>
+            </Project>
+            """);
+        WriteFile("Phone/PhoneWidget.cs", "class PhoneWidget { }\n");
+        var library = WriteFile("Library/Library.csproj", """
+            <Project Sdk="Microsoft.NET.Sdk">
+              <PropertyGroup>
+                <TargetFramework>net10.0</TargetFramework>
+              </PropertyGroup>
+            </Project>
+            """);
+        WriteFile("Library/Widget.cs", "class Widget : System.Exception { }\n");
+        var slnx = WriteFile("Devices.slnx", """
+            <Solution>
+              <Project Path="Phone/Phone.csproj" />
+              <Project Path="Library/Library.csproj" />
+            </Solution>
+            """);
+
+        var parser = new SolutionParser();
+        var solution = await parser.LoadAsync(slnx);
+
+        Assert.Contains(parser.ProjectsNotParsed, p => p.EndsWith("Phone.csproj"));
+        var results = parser.ParseProject(solution, library, _tempDir);
+        AssertWidgetExtendsException(Assert.IsType<CompilationUnit>(Assert.Single(results)));
+    }
+
+    [Fact]
+    public void RestoreGraphLeavesOutTargetFrameworksWithoutTheirWorkload()
+    {
+        var csproj = WriteFile("Watch.csproj", """
+            <Project Sdk="Microsoft.NET.Sdk">
+              <PropertyGroup>
+                <TargetFrameworks>net10.0;net10.0-ios</TargetFrameworks>
+              </PropertyGroup>
+            </Project>
+            """);
+
+        var dgSpec = NuGetResolver.CreateDependencyGraphSpec(csproj);
+
+        Assert.NotNull(dgSpec);
+        var framework = Assert.Single(dgSpec.Projects.Single().TargetFrameworks);
+        Assert.Equal("net10.0", framework.TargetAlias);
+    }
+
+    private static async Task<List<string>> CaptureErrors(Func<Task> action)
+    {
+        var errors = new List<string>();
+        var previousLogger = Log.Logger;
+        Log.Logger = new LoggerConfiguration()
+            .MinimumLevel.Error()
+            .WriteTo.Sink(new CollectingSink(errors))
+            .CreateLogger();
+        try
+        {
+            await action();
+        }
+        finally
+        {
+            Log.Logger = previousLogger;
+        }
+        return errors;
+    }
+
+    private static void AssertWidgetExtendsException(CompilationUnit cu) =>
+        AssertWidgetExtends("System.Exception", cu);
+
+    private static void AssertWidgetExtends(string supertype, CompilationUnit cu)
+    {
+        var widget = Assert.IsType<OpenRewrite.Java.ClassDeclaration>(cu.Members[0].Element);
+        var type = Assert.IsType<OpenRewrite.Java.JavaType.Class>(widget.Type);
+        Assert.Equal(supertype, Assert.IsType<OpenRewrite.Java.JavaType.Class>(type.Supertype).FullyQualifiedName);
     }
 
     [Fact]

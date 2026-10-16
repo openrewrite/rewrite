@@ -30,6 +30,7 @@ import org.openrewrite.test.RewriteTest;
 import java.util.Objects;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.openrewrite.java.Assertions.java;
 import static org.openrewrite.test.RewriteTest.toRecipe;
 
@@ -381,5 +382,129 @@ class JavaTemplateContextFreeTest implements RewriteTest {
               """
           )
         );
+    }
+
+    @Test
+    void insertBeforeNonVoidExpressionStatements() {
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {
+              @Override
+              public J.Block visitBlock(J.Block block, ExecutionContext ctx) {
+                  J.Block b = super.visitBlock(block, ctx);
+                  if (!(getCursor().getParentTreeCursor().getValue() instanceof J.MethodDeclaration) ||
+                      b.getStatements().size() != 3) {
+                      return b;
+                  }
+                  for (int i = 0; i < block.getStatements().size(); i++) {
+                      b = JavaTemplate.apply("int before#{} = 0;", new Cursor(getCursor().getParentOrThrow(), b),
+                        block.getStatements().get(i).getCoordinates().before(), i);
+                  }
+                  return b;
+              }
+          })),
+          java(
+            """
+              import java.util.List;
+
+              class Test {
+                  int i;
+                  void m(List<String> list) {
+                      list.add("a");
+                      new StringBuilder();
+                      i++;
+                  }
+              }
+              """,
+            """
+              import java.util.List;
+
+              class Test {
+                  int i;
+                  void m(List<String> list) {
+                      int before0 = 0;
+                      list.add("a");
+                      int before1 = 0;
+                      new StringBuilder();
+                      int before2 = 0;
+                      i++;
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void insertAfterExplicitConstructorInvocation() {
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {
+              @Override
+              public J.Block visitBlock(J.Block block, ExecutionContext ctx) {
+                  J.Block b = super.visitBlock(block, ctx);
+                  if (b.getStatements().size() == 1 && b.getStatements().getFirst() instanceof J.MethodInvocation superCall &&
+                      "super".equals(superCall.getSimpleName())) {
+                      return JavaTemplate.apply("String copy = #{any(java.lang.String)};", getCursor(),
+                        superCall.getCoordinates().after(), superCall.getArguments().getFirst());
+                  }
+                  return b;
+              }
+          })),
+          java(
+            """
+              class Parent {
+                  Parent(String s) {
+                  }
+              }
+              class Child extends Parent {
+                  Child(String s) {
+                      super(s);
+                  }
+              }
+              """,
+            """
+              class Parent {
+                  Parent(String s) {
+                  }
+              }
+              class Child extends Parent {
+                  Child(String s) {
+                      super(s);
+                      String copy = s;
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void insertingTemplateThatGeneratesNoStatementFailsLoudly() {
+        J.CompilationUnit cu = JavaParser.fromJavaVersion().build()
+          .parse(
+            """
+              class Test {
+                  void m() {
+                      System.out.println();
+                  }
+              }
+              """
+          )
+          .map(J.CompilationUnit.class::cast)
+          .findFirst()
+          .orElseThrow();
+
+        assertThatThrownBy(() -> new JavaIsoVisitor<Integer>() {
+            @Override
+            public J.Block visitBlock(J.Block block, Integer p) {
+                if (getCursor().getParentTreeCursor().getValue() instanceof J.MethodDeclaration) {
+                    return JavaTemplate.apply("/* not a statement */", getCursor(),
+                      block.getStatements().getFirst().getCoordinates().before());
+                }
+                return super.visitBlock(block, p);
+            }
+        }.visit(cu, 0))
+          .rootCause()
+          .isInstanceOf(IllegalArgumentException.class)
+          .hasMessageContaining("generated none");
     }
 }

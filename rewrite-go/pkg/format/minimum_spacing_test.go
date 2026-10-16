@@ -65,7 +65,7 @@ func stripAllSpaces(v reflect.Value) reflect.Value {
 		return v
 	}
 	if d.isSpace {
-		return reflect.ValueOf(java.Space{})
+		return reflect.ValueOf(java.EmptySpace)
 	}
 	if d.isMarkers {
 		return v

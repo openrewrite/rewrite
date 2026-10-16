@@ -51,6 +51,17 @@ public class CSharpUnwrapParenthesesTests
     }
 
     [Fact]
+    public void IsUnwrappable_InstanceOfInsideUnary_False()
+    {
+        var parens = MakeParens(MakeInstanceOf(MakeId("x")));
+        var parent = MakeUnary(Unary.OperatorType.Not, parens);
+        var root = new Cursor(null, "root");
+        var parentCursor = new Cursor(root, parent);
+        var parensCursor = new Cursor(parentCursor, parens);
+        Assert.False(CSharpUnwrapParentheses<int>.IsUnwrappable(parensCursor));
+    }
+
+    [Fact]
     public void IsUnwrappable_LowPrecInsideHighPrec_False()
     {
         // (a + b) * c => cannot unwrap, lower precedence inside higher

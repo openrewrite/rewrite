@@ -4,7 +4,7 @@ from typing import Any
 import pytest
 
 from rewrite import ExecutionContext, Recipe, TreeVisitor
-from rewrite.java.support_types import JavaType
+from rewrite.java.support_types import JavaType, NameTree
 from rewrite.java.tree import Identifier, Literal as JLiteral, ParameterizedType, VariableDeclarations
 from rewrite.python._parser_visitor import _EmbeddedTypeMapping
 from rewrite.python.markers import Quoted
@@ -14,6 +14,32 @@ from rewrite.test import RecipeSpec, python
 
 
 Parameterized = JavaType.Parameterized
+
+
+def test_parameterized_type_names_what_it_parameterizes():
+    parameterized = []
+
+    def collect(cu):
+        class Collector(PythonVisitor):
+            def visit_parameterized_type(self, parameterized_type, p):
+                parameterized.append(parameterized_type)
+                return super().visit_parameterized_type(parameterized_type, p)
+
+        Collector().visit(cu, None)
+
+    # language=python
+    RecipeSpec().rewrite_run(python(
+        """\
+        class C(List[T][U][V]): ...
+        x: f()[int] = 1
+        y: (A)[int]
+        """,
+        after_recipe=collect
+    ))
+
+    # the host's model takes a subscripted subscript, a call or a parenthesized name only inside a type tree
+    assert len(parameterized) == 3
+    assert all(isinstance(p.clazz, NameTree) for p in parameterized)
 
 
 def test_primitive_type_hint():

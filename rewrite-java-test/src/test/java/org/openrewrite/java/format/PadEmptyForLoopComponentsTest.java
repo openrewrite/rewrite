@@ -117,7 +117,7 @@ class PadEmptyForLoopComponentsTest implements RewriteTest {
             """
               public class A {
                   {
-                      int i = 0;
+                      int j = 0;
                       for (int i = 0; i < 10;) { i++; }
                   }
               }
@@ -135,7 +135,7 @@ class PadEmptyForLoopComponentsTest implements RewriteTest {
             """
               public class A {
                   {
-                      int i = 0;
+                      int j = 0;
                       for (int i = 0; i < 10; ) { i++; }
                   }
               }

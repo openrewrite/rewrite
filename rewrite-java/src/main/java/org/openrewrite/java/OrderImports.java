@@ -22,6 +22,7 @@ import org.openrewrite.*;
 import org.openrewrite.config.YamlResourceLoader;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.java.internal.FormatFirstClassPrefix;
+import org.openrewrite.java.internal.ImportComments;
 import org.openrewrite.java.marker.JavaSourceSet;
 import org.openrewrite.java.style.ImportLayoutStyle;
 import org.openrewrite.java.style.IntelliJ;
@@ -92,13 +93,38 @@ public class OrderImports extends Recipe {
         List<NamedStyles> namedStyles = styleFromYaml(style);
         return new JavaIsoVisitor<ExecutionContext>() {
             @Override
+            public @Nullable J visit(@Nullable Tree tree, ExecutionContext ctx) {
+                if (!(tree instanceof J.CompilationUnit) || ((J.CompilationUnit) tree).getImports().isEmpty()) {
+                    return super.visit(tree, ctx);
+                }
+                ImportComments comments = new ImportComments((J.CompilationUnit) tree);
+                // The parent cursor is shared with after-visitors. Limit the message to this source-file visit.
+                Cursor parent = getCursor();
+                ImportComments previous = parent.getMessage(ImportComments.CURSOR_MESSAGE_KEY);
+                parent.putMessage(ImportComments.CURSOR_MESSAGE_KEY, comments);
+                try {
+                    J result = super.visit(comments.getPrepared(), ctx);
+                    if (result == comments.getPrepared()) {
+                        return (J.CompilationUnit) tree;
+                    }
+                    return result instanceof J.CompilationUnit ? comments.restore((J.CompilationUnit) result) : result;
+                } finally {
+                    if (previous == null) {
+                        parent.pollMessage(ImportComments.CURSOR_MESSAGE_KEY);
+                    } else {
+                        parent.putMessage(ImportComments.CURSOR_MESSAGE_KEY, previous);
+                    }
+                }
+            }
+
+            @Override
             public J.CompilationUnit visitCompilationUnit(J.CompilationUnit cu, ExecutionContext ctx) {
                 Optional<JavaSourceSet> sourceSet = cu.getMarkers().findFirst(JavaSourceSet.class);
                 List<JavaType.FullyQualified> classpath = sourceSet.map(JavaSourceSet::getClasspath).orElse(emptyList());
                 boolean classpathDirty = JavaSourceSet.isDirty(ctx, cu);
 
                 ImportLayoutStyle importLayoutStyle = importLayoutStyle(cu, namedStyles);
-                List<JRightPadded<J.Import>> orderedImports = importLayoutStyle.orderImports(cu.getPadding().getImports(), classpath, classpathDirty);
+                List<JRightPadded<J.Import>> orderedImports = importLayoutStyle.orderImports(cu.getPadding().getImports(), classpath, classpathDirty, getCursor());
 
                 boolean changed = false;
                 if (orderedImports.size() != cu.getImports().size()) {
@@ -115,7 +141,13 @@ public class OrderImports extends Recipe {
                 }
 
                 if (Boolean.TRUE.equals(removeUnused)) {
-                    doAfterVisit(new RemoveUnusedImports().getVisitor());
+                    doAfterVisit(new TreeVisitor<Tree, ExecutionContext>() {
+                        @Override
+                        public @Nullable Tree visit(@Nullable Tree tree, ExecutionContext ctx) {
+                            // Pass the cursor through the precondition wrapper to the cleanup visitor.
+                            return new RemoveUnusedImports().getVisitor().visit(tree, ctx, getCursor());
+                        }
+                    });
                 } else if (changed) {
                     doAfterVisit(new FormatFirstClassPrefix<>());
                 }

@@ -349,6 +349,59 @@ class SemanticallyEqualTest {
         );
     }
 
+    @Test
+    void instanceOfDeconstructionPatternBindingNames() {
+        assertExpressionsEqual(
+          """
+            class T {
+                record R(String s) {}
+                Object o;
+                boolean a = o instanceof R(String s1);
+                boolean b = o instanceof R(String s2);
+            }
+            """
+        );
+    }
+
+    @Test
+    void instanceOfDifferentDeconstructionPatterns() {
+        assertExpressionsNotEqual(
+          """
+            class T {
+                record R(String s) {}
+                record Q(int n) {}
+                Object o;
+                boolean a = o instanceof R(String s);
+                boolean b = o instanceof Q(int n);
+            }
+            """
+        );
+    }
+
+    @Test
+    void instanceOfDeconstructionPatternAndTypePattern() {
+        assertExpressionsNotEqual(
+          """
+            class T {
+                record R(String s) {}
+                Object o;
+                boolean a = o instanceof R(String s);
+                boolean b = o instanceof R r;
+            }
+            """
+        );
+        assertExpressionsNotEqual(
+          """
+            class T {
+                record R(String s) {}
+                Object o;
+                boolean a = o instanceof R r;
+                boolean b = o instanceof R(String s);
+            }
+            """
+        );
+    }
+
     @SuppressWarnings({"DataFlowIssue", "OptionalGetWithoutIsPresent", "Convert2Diamond"})
     @Nested
     class Generics {

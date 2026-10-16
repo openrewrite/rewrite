@@ -108,16 +108,20 @@ Most recipe debugging is one question: what type did this expression get, and if
 ```
 $ REWRITE_PYTHON_DUMP_TYPES=1 pytest tests/recipes/test_my_recipe.py -s
 
---- type attribution: my_recipe.py ---
-line:col  kind                   source            type
-4:1       MethodDeclaration      def f(arr)        my_recipe f(..) -> <none>
-4:7       NamedVariable          arr               ⚠ <unknown>
-5:5       MethodInvocation       socket.getfqdn()  socket getfqdn(..) -> str
-6:12      MethodInvocation       arr.tostring()    ⚠ <unknown> tostring(..) -> <unknown>
-6:12        └ select:Identifier  arr               <unknown>
+--- type attribution: my_recipe.py (ty: on) ---
+line:col  kind                   source                      type
+4:1       MethodDeclaration      def f(arr, host)            my_recipe f(..) -> <none>
+4:7       NamedVariable          arr                         ⚠ <unknown>
+4:12      NamedVariable          host                        ⚠ <unknown>
+5:5       MethodInvocation       socket.gethostbyname(host)  _socket gethostbyname(*) -> str
+5:26        └ arg0:Identifier    host                        <unknown> (Unknown)
+6:12      MethodInvocation       arr.tostring()              ⚠ <unknown> tostring(..) -> <unknown>
+6:12        └ select:Identifier  arr                         <unknown>
 ```
 
-The text before `->` is a pattern you can paste into `MethodMatcher.create(...)` or `uses_method(...)`. `socket.getfqdn()` resolves from the file's own imports, so it carries a declaring type; `arr.tostring()` does not, and the indented `select` line names the receiver that lost it. `<none>` is a slot the parser left empty and `<unknown>` is a `JavaType.Unknown` — worth keeping apart, since a `MethodInvocation` always carries *some* method type.
+The text before `->` is the most specific pattern `MethodMatcher.create(...)` or `uses_method(...)` accepts for that call. It names each argument's type as the matcher compares it, with `*` for an argument that has none. Each pattern is checked against the matcher, and a call whose pattern does not match it carries a note saying so. The `arg` rows give each argument's type and its kind, which is what a capture constraint over that argument reads.
+
+The header says whether ty attributed the parse, and if not, why: `type_attribution=False`, or ty-types failing to start. `socket.gethostbyname(host)` is declared on `_socket`, the module that defines it. `arr.tostring()` has no declaring type, and the indented `select` line names the receiver that lost it. `<none>` is a slot the parser left empty and `<unknown>` is a `JavaType.Unknown` — worth keeping apart, since a `MethodInvocation` always carries *some* method type.
 
 The variable accepts comma-separated flags: `missing` lists only unattributed nodes, `all` widens beyond calls and declarations, and `supertypes` shows each declaring type's ancestry — which bounds how general a pattern can be, since a type recording no supertype can only be matched by its own name or a wildcard.
 
@@ -128,9 +132,11 @@ Expected recipe to produce a change for:
 def f(arr):
     return arr.tostring()
 
-Nodes with no type attribution (a recipe gated on one of these cannot fire):
-  1:7  NamedVariable  arr  -> <unknown>
-  2:12  MethodInvocation  arr.tostring()  -> <unknown> tostring(..) -> <unknown>
+Nodes with no type attribution, ty: on (a recipe gated on one of these cannot fire):
+  line:col  kind                   source          type
+  1:7       NamedVariable          arr             ⚠ <unknown>
+  2:12      MethodInvocation       arr.tostring()  ⚠ <unknown> tostring(..) -> <unknown>
+  2:12        └ select:Identifier  arr             <unknown>
 ```
 
 ### Against a file on disk
@@ -154,13 +160,14 @@ $ rewrite-python-types --diff-ty probe.py
 line:col  kind               source            without ty                          with ty
 4:1       MethodDeclaration  def probe(arr)    ⚠ <none> probe(..) -> <none>        probe probe(..) -> <none>
 4:11      NamedVariable      arr               ⚠ <none>                            ⚠ <unknown>
-5:5       MethodInvocation   socket.getfqdn()  socket getfqdn(..) -> <none>        socket getfqdn(..) -> str
+          return type only
+5:5       MethodInvocation   socket.getfqdn()  socket getfqdn() -> <none>          socket getfqdn() -> str
 6:12      MethodInvocation   arr.tostring()    ⚠ <unknown> tostring(..) -> <none>  ⚠ <unknown> tostring(..) -> <unknown>
 
-4 of 4 nodes differ
+4 of 4 nodes differ, 2 of them before `->`
 ```
 
-An unannotated parameter leaves `arr.tostring()` unresolved even under ty.
+Rows whose pattern, the part before `->`, changed come first. A change below `return type only` matters only to a recipe that checks return types. An unannotated parameter leaves `arr.tostring()` unresolved even under ty.
 
 From a test or a REPL, `print_types(source_file)` writes the same listing and `build_type_report(source_file)` returns it as data. Both are read-only, and the in-process parse behind the command is for diagnostics only.
 

@@ -93,7 +93,7 @@ class AssertionsTest implements RewriteTest {
           }
 
           """;
-        GradleWrapper gradleWrapper = GradleWrapper.create(URI.create("https://downloads.gradle.org/distributions/gradle-8.6-bin.zip"), null);
+        GradleWrapper gradleWrapper = GradleWrapper.create(URI.create("https://services.gradle.org/distributions/gradle-8.6-bin.zip"), null);
         rewriteRun(
           spec -> spec.beforeRecipe(Assertions.withToolingApi(gradleWrapper, alternateInit)),
           //language=groovy
@@ -222,7 +222,7 @@ class AssertionsTest implements RewriteTest {
     @Test
     void multimoduleSubprojectGetsItsOwnGradleProjectOnGradle9() {
         rewriteRun(
-          spec -> spec.beforeRecipe(Assertions.withToolingApi(URI.create("https://downloads.gradle.org/distributions/gradle-9.5.1-bin.zip"))),
+          spec -> spec.beforeRecipe(Assertions.withToolingApi(URI.create("https://services.gradle.org/distributions/gradle-9.5.1-bin.zip"))),
           //language=groovy
           settingsGradle(
             """
@@ -273,7 +273,7 @@ class AssertionsTest implements RewriteTest {
     @Test
     void multimoduleResolvesAgainstBuildRoot() {
         rewriteRun(
-          spec -> spec.beforeRecipe(Assertions.withToolingApi(URI.create("https://downloads.gradle.org/distributions/gradle-9.5.1-bin.zip"))),
+          spec -> spec.beforeRecipe(Assertions.withToolingApi(URI.create("https://services.gradle.org/distributions/gradle-9.5.1-bin.zip"))),
           //language=groovy
           settingsGradle(
             """

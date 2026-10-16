@@ -15,15 +15,18 @@
  */
 package org.openrewrite.config;
 
+import org.intellij.lang.annotations.Language;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.*;
+import org.openrewrite.marketplace.RecipeMarketplace;
 import org.openrewrite.test.RewriteTest;
 
 import java.io.ByteArrayInputStream;
 import java.net.URI;
 import java.util.*;
 
+import static java.util.Collections.emptyList;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.openrewrite.test.SourceSpecs.text;
@@ -362,6 +365,100 @@ class YamlResourceLoaderTest implements RewriteTest {
             .build().listRecipes().iterator().next()),
           text("hello", "/bin/java")
         );
+    }
+
+    @Test
+    void loadRecipeReturnsNullWhenMarketplaceDoesNotListTheRecipe() {
+        YamlResourceLoader userYaml = marketplaceBackedLoader(
+          //language=yml
+          """
+            type: specs.openrewrite.org/v1beta/recipe
+            name: user.BestPractices
+            displayName: User best practices
+            description: Test.
+            recipeList:
+              - org.openrewrite.text.ChangeText:
+                  toText: Hello!
+            """);
+
+        assertThat(userYaml.loadRecipe("user.BestPractices"))
+          .as("a recipe this loader defines is returned")
+          .isNotNull();
+        assertThat(userYaml.loadRecipe("org.example.NotInThisYaml"))
+          .as("a recipe neither defined here nor listed in the marketplace is reported as absent")
+          .isNull();
+    }
+
+    @Test
+    void marketplaceBackedLoaderDoesNotAbortResolutionOfATransitiveRecipe() {
+        // Loader order is load bearing: the marketplace-backed loader, which can supply neither
+        // recipe, must be consulted between the loader defining Outer and the one defining Inner.
+        Environment env = Environment.builder()
+          .load(declarativeLoader("org.example.Outer", "org.example.Inner", "outer.yml"))
+          .load(marketplaceBackedLoader(
+            //language=yml
+            """
+              type: specs.openrewrite.org/v1beta/recipe
+              name: user.Unrelated
+              displayName: Unrelated
+              description: Test.
+              recipeList:
+                - org.openrewrite.text.ChangeText:
+                    toText: Hello!
+              """))
+          .load(declarativeLoader("org.example.Inner", "org.openrewrite.text.ChangeText:\n        toText: Hello!", "inner.yml"))
+          .build();
+
+        Recipe outer = env.activateRecipes("org.example.Outer");
+
+        assertThat(outer.getRecipeList()).singleElement()
+          .extracting(Recipe::getName).isEqualTo("org.example.Inner");
+        assertThat(outer.validate().isValid()).isTrue();
+    }
+
+    @Test
+    void unresolvableTransitiveRecipeIsReportedAsValidationErrorRatherThanThrowing() {
+        Environment env = Environment.builder()
+          .load(declarativeLoader("org.example.Outer", "org.example.Missing", "outer.yml"))
+          .load(marketplaceBackedLoader(
+            //language=yml
+            """
+              type: specs.openrewrite.org/v1beta/recipe
+              name: user.Unrelated
+              displayName: Unrelated
+              description: Test.
+              recipeList:
+                - org.openrewrite.text.ChangeText:
+                    toText: Hello!
+              """))
+          .build();
+
+        Recipe outer = env.activateRecipes("org.example.Outer");
+
+        assertThat(outer.validate().failures())
+          .anySatisfy(f -> {
+              assertThat(f.getProperty()).startsWith("org.example.Outer.recipeList[0]");
+              assertThat(f.getInvalidValue()).isEqualTo("org.example.Missing");
+              assertThat(f.getMessage()).isEqualTo("refers to a recipe that doesn't exist.");
+          });
+    }
+
+    private static YamlResourceLoader declarativeLoader(String name, @Language("yml") String subRecipe, String source) {
+        return new YamlResourceLoader(new ByteArrayInputStream((
+          //language=yml
+          """
+            type: specs.openrewrite.org/v1beta/recipe
+            name: %s
+            displayName: %s
+            description: Test.
+            recipeList:
+              - %s
+            """.formatted(name, name, subRecipe)).getBytes()), URI.create(source), new Properties());
+    }
+
+    private static YamlResourceLoader marketplaceBackedLoader(@Language("yml") String yaml) {
+        return new YamlResourceLoader(new ByteArrayInputStream(yaml.getBytes()),
+          URI.create("file:///user.yaml"), new Properties(), new RecipeMarketplace(), emptyList());
     }
 
     private static class RecipeFailingOnFirstLoad extends Recipe {

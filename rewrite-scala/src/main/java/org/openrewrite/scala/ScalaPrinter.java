@@ -48,6 +48,7 @@ import org.openrewrite.scala.marker.TypeAscription;
 import org.openrewrite.scala.marker.PartialFunctionLiteral;
 import org.openrewrite.scala.marker.ContextFunctionArrow;
 import org.openrewrite.scala.marker.UnderscorePlaceholderLambda;
+import org.openrewrite.scala.marker.UnicodeArrow;
 import org.openrewrite.scala.marker.ValVarKeyword;
 import org.openrewrite.scala.marker.PackageSemicolon;
 import org.openrewrite.scala.tree.S;
@@ -123,6 +124,13 @@ public class ScalaPrinter<P> extends JavaPrinter<P> {
                 p.append(',');
             }
         }
+    }
+
+    private static String arrow(Tree tree, String asciiArrow) {
+        if (!tree.getMarkers().findFirst(UnicodeArrow.class).isPresent()) {
+            return asciiArrow;
+        }
+        return "<-".equals(asciiArrow) ? "\u2190" : "\u21D2";
     }
 
     @Override
@@ -326,7 +334,7 @@ public class ScalaPrinter<P> extends JavaPrinter<P> {
                     visit(varDecl.getTypeExpression(), p);
                 }
                 visitSpace(paramPadded.getAfter(), Space.Location.CONTROL_PARENTHESES_PREFIX, p);
-                p.append("=>");
+                p.append(arrow(aCatch, "=>"));
                 // Catch case body is a J.Block with OmitBraces — delegate to visitBlock
                 // so the block prefix, inter-statement padding (incl. Semicolon markers),
                 // and end space are all printed correctly.
@@ -435,7 +443,7 @@ public class ScalaPrinter<P> extends JavaPrinter<P> {
             visit(case_.getGuard(), p);
             visitSpace(case_.getPadding().getStatements().getBefore(), Space.Location.CASE, p);
         }
-        p.append("=>");
+        p.append(arrow(case_, "=>"));
         if (case_.getPadding().getBody() != null) {
             visit(case_.getPadding().getBody().getElement(), p);
         }
@@ -1144,7 +1152,7 @@ public class ScalaPrinter<P> extends JavaPrinter<P> {
 
             // Print "<-" with spaces from the padding
             visitSpace(variable.getAfter(), JRightPadded.Location.FOREACH_VARIABLE.getAfterLocation(), p);
-            p.append("<-");
+            p.append(arrow(forEachLoop, "<-"));
 
             // Print the iterable
             JRightPadded<Expression> iterable = ctrl.getPadding().getIterable();
@@ -1575,7 +1583,7 @@ public class ScalaPrinter<P> extends JavaPrinter<P> {
         if (method.getMarkers().findFirst(org.openrewrite.scala.marker.FunctionApplication.class).isPresent()) {
             beforeSyntax(method, Space.Location.METHOD_INVOCATION_PREFIX, p);
 
-            // Print the select (e.g., "arr" or "println")
+            // Print the select (e.g., "arr" or "f")
             visitRightPadded(method.getPadding().getSelect(), JRightPadded.Location.METHOD_SELECT, "", p);
 
             // Print arguments directly with parentheses (no ".apply")
@@ -1715,7 +1723,7 @@ public class ScalaPrinter<P> extends JavaPrinter<P> {
         if (lambda.getMarkers().findFirst(ContextFunctionArrow.class).isPresent()) {
             p.append("?=>");
         } else {
-            p.append("=>");
+            p.append(arrow(lambda, "=>"));
         }
 
         // Print lambda body
@@ -1811,7 +1819,7 @@ public class ScalaPrinter<P> extends JavaPrinter<P> {
             JLeftPadded<J.Identifier> alias = selector.getPadding().getAlias();
             if (alias != null) {
                 visitSpace(alias.getBefore(), Space.Location.LANGUAGE_EXTENSION, p);
-                p.append(selector.isUseAsKeyword() ? "as" : "=>");
+                p.append(selector.isUseAsKeyword() ? "as" : arrow(selector, "=>"));
                 visit(alias.getElement(), p);
             }
         }
@@ -1994,7 +2002,7 @@ public class ScalaPrinter<P> extends JavaPrinter<P> {
         if (functionType.getMarkers().findFirst(ContextFunctionArrow.class).isPresent()) {
             p.append("?=>");
         } else {
-            p.append("=>");
+            p.append(arrow(functionType, "=>"));
         }
         visit(rt.getElement(), p);
         afterSyntax(functionType, p);
@@ -2143,7 +2151,7 @@ public class ScalaPrinter<P> extends JavaPrinter<P> {
             case Generator:
                 if (enumerator.getLhs() != null) visit(enumerator.getLhs(), p);
                 visitSpace(enumerator.getBeforeOp(), Space.Location.LANGUAGE_EXTENSION, p);
-                p.append("<-");
+                p.append(arrow(enumerator, "<-"));
                 visit(enumerator.getRhs(), p);
                 break;
             case Guard:

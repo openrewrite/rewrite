@@ -186,13 +186,31 @@ describe('call mapping', () => {
              `)
         ));
 
-    // perhaps a bug in a Node parser
-    // node.getChildren() skips token '/*a*/<'
-    test.skip('call expression with sequential <<', () =>
+    test('call expression with sequential <<', () =>
+        spec.rewriteRun({
+            //language=typescript
+            ...typescript(`
+                 expectTypeOf(o.get).toMatchTypeOf/*a*/<<K extends keyof EmberObject>(key: K) => EmberObject[K]>();
+             `),
+            afterRecipe: (cu: JS.CompilationUnit) => {
+                const call = cu.statements[0].element as J.MethodInvocation;
+                expect(call.typeParameters!.elements.map(e => e.element.kind)).toEqual([JS.Kind.FunctionType]);
+                expect((call.typeParameters!.before.comments[0] as TextComment).text).toEqual("a");
+            }
+        }));
+
+    test.for([
+        "f<<T>() => void, number>(1);",
+        "a?.b /*c*/ <<T>() => void>();",
+        "f?. /*c*/ <<T>() => void>();",
+        "new Foo /*a*/ <<T>(x: T) => T>();",
+        "tag /*a*/ <<T>() => void>`x`;",
+        "const x = f /*a*/ <<T>() => void>;",
+        "let x: Foo /*a*/ <<T>(x: T) => T>;",
+        "let z: import('x').Foo /*a*/ <<T>(x: T) => T>;",
+    ])('type arguments that start with `<`: %s', (code) =>
         spec.rewriteRun(
             //language=typescript
-            typescript(`
-                 expectTypeOf(o.get).toMatchTypeOf/*a*/<<K extends keyof EmberObject>(key: K) => EmberObject[K]>();
-             `)
+            typescript(code)
         ));
 });

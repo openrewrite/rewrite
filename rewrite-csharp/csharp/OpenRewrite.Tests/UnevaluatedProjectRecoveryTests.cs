@@ -103,7 +103,7 @@ public class UnevaluatedProjectRecoveryTests : IDisposable
 
         var recovered = parser.ParseProjectWithoutMSBuild(projectPath, _tempDir);
 
-        Assert.Equal(new[] { "A.cs", "nested/B.cs" },
+        Assert.Equal(new[] { "A.cs", Path.Combine("nested", "B.cs") },
             recovered.Select(sf => sf.SourcePath).OrderBy(p => p, StringComparer.Ordinal));
         foreach (var sourceFile in recovered)
         {
@@ -211,9 +211,9 @@ public class UnevaluatedProjectRecoveryTests : IDisposable
         Assert.Equal(Path.Combine(_tempDir, "Broken", "Broken.csproj"), flagged.Key);
 
         var good = solution.Projects.Single(p => p.FilePath!.EndsWith("Good.csproj", StringComparison.Ordinal));
-        Assert.Equal("Good/C.cs", Assert.Single(parser.ParseProject(solution, good.FilePath!, _tempDir)).SourcePath);
+        Assert.Equal(Path.Combine("Good", "C.cs"), Assert.Single(parser.ParseProject(solution, good.FilePath!, _tempDir)).SourcePath);
 
         var recovered = parser.ParseProjectWithoutMSBuild(flagged.Key, _tempDir);
-        Assert.Equal("Broken/A.cs", Assert.Single(recovered).SourcePath);
+        Assert.Equal(Path.Combine("Broken", "A.cs"), Assert.Single(recovered).SourcePath);
     }
 }

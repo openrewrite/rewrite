@@ -108,14 +108,14 @@ func TestStructTag_MultipleKeysParseIntoMultipleAnnotations(t *testing.T) {
 		t.Errorf("[1] Source: got %q, want %q", lit.Source, `"email_address"`)
 	}
 	// Inter-pair whitespace lives on the second annotation's Prefix.
-	assert.Equalf(t, " ", second.Prefix.Whitespace, "[1] Prefix.Whitespace: got %q, want %q", second.Prefix.Whitespace, " ")
+	assert.Equalf(t, " ", second.Prefix.Whitespace(), "[1] Prefix.Whitespace: got %q, want %q", second.Prefix.Whitespace(), " ")
 }
 
 func TestStructTag_NoMarkerLeftBehind(t *testing.T) {
 	src := "package main\n\ntype User struct {\n\tName string `json:\"name\"`\n}\n"
 	vd := parseStructAndFindField(t, src, "Name")
 
-	for _, m := range vd.Markers.Entries {
+	for _, m := range vd.Markers.Entries() {
 		if _, ok := m.(golang.StructTag); ok {
 			t.Errorf("StructTag marker should no longer be emitted; LeadingAnnotations is the canonical pathway")
 		}
@@ -208,6 +208,20 @@ func TestStructTag_RawWithoutKeyValuePairsRoundtrip(t *testing.T) {
 	if got := printer.Print(cu); got != src {
 		t.Errorf("roundtrip mismatch\nexpected: %q\nactual:   %q", src, got)
 	}
+}
+
+// An interpreted string may spell a character with an escape that quoting
+// its content anew would not choose.
+func TestStructTag_InterpretedStringKeepsItsEscapes(t *testing.T) {
+	src := "package main\n\ntype X struct {\n\tField int \"json:\\\"\\u00e9\\x41\\\"\"\n}\n"
+	cu, err := parser.NewGoParser().Parse("test.go", src)
+	require.NoError(t, err)
+	assert.Equal(t, src, printer.Print(cu))
+
+	// once the tag says something else, it is quoted anew
+	vd := parseStructAndFindField(t, src, "Field")
+	vd.LeadingAnnotations[0].AnnotationType.(*java.Identifier).Name = "yaml"
+	assert.Equal(t, " \"yaml:\\\"éA\\\"\"", printer.Print(vd)[len("\n\tField int"):])
 }
 
 func TestStructTag_InterpretedStringWithControlEscapeRoundtrip(t *testing.T) {

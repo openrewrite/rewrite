@@ -909,7 +909,7 @@ func (v *GoVisitor) VisitImport(imp *java.Import, p any) java.J {
 			alias = &c
 		}
 	}
-	qualid := visitExpression(v, imp.Qualid, p)
+	qualid := visitAndCast[*java.FieldAccess](v, imp.Qualid, p)
 	if java.SpaceEqual(prefix, imp.Prefix) && java.MarkersEqual(markers, imp.Markers) &&
 		alias == imp.Alias && qualid == imp.Qualid {
 		return imp
@@ -984,10 +984,11 @@ func (v *GoVisitor) VisitCase(cse *java.Case, p any) java.J {
 	markers := v.visitMarkers(cse.Markers, p)
 	exprsBefore := v.self().VisitSpace(cse.Expressions.Before, p)
 	exprsElems := visitRightPaddedExpressionList(v, cse.Expressions.Elements, p)
-	body := visitRightPaddedList(v, cse.Body, p)
+	bodyBefore := v.self().VisitSpace(cse.Body.Before, p)
+	body := visitRightPaddedList(v, cse.Body.Elements, p)
 	if java.SpaceEqual(prefix, cse.Prefix) && java.MarkersEqual(markers, cse.Markers) &&
 		java.SpaceEqual(exprsBefore, cse.Expressions.Before) && java.SameSlice(exprsElems, cse.Expressions.Elements) &&
-		java.SameSlice(body, cse.Body) {
+		java.SpaceEqual(bodyBefore, cse.Body.Before) && java.SameSlice(body, cse.Body.Elements) {
 		return cse
 	}
 	c := *cse
@@ -995,7 +996,8 @@ func (v *GoVisitor) VisitCase(cse *java.Case, p any) java.J {
 	c.Markers = markers
 	c.Expressions.Before = exprsBefore
 	c.Expressions.Elements = exprsElems
-	c.Body = body
+	c.Body.Before = bodyBefore
+	c.Body.Elements = body
 	return &c
 }
 
@@ -1007,9 +1009,11 @@ func (v *GoVisitor) VisitForLoop(forLoop *java.ForLoop, p any) java.J {
 		// Control is a value field, so a pruned control has no deleted form.
 		ctrl = &forLoop.Control
 	}
-	body := visitAndCast[*java.Block](v, forLoop.Body, p)
+	body := forLoop.Body
+	body.Element = visitAndCast[java.Statement](v, forLoop.Body.Element, p)
+	body.After = v.self().VisitSpace(forLoop.Body.After, p)
 	if java.SpaceEqual(prefix, forLoop.Prefix) && java.MarkersEqual(markers, forLoop.Markers) &&
-		ctrl == &forLoop.Control && body == forLoop.Body {
+		ctrl == &forLoop.Control && java.RightPaddedEqual(body, forLoop.Body) {
 		return forLoop
 	}
 	c := *forLoop
@@ -1076,9 +1080,11 @@ func (v *GoVisitor) VisitForEachLoop(forEach *java.ForEachLoop, p any) java.J {
 	if ctrl == nil {
 		ctrl = &forEach.Control
 	}
-	body := visitAndCast[*java.Block](v, forEach.Body, p)
+	body := forEach.Body
+	body.Element = visitAndCast[java.Statement](v, forEach.Body.Element, p)
+	body.After = v.self().VisitSpace(forEach.Body.After, p)
 	if java.SpaceEqual(prefix, forEach.Prefix) && java.MarkersEqual(markers, forEach.Markers) &&
-		ctrl == &forEach.Control && body == forEach.Body {
+		ctrl == &forEach.Control && java.RightPaddedEqual(body, forEach.Body) {
 		return forEach
 	}
 	c := *forEach
@@ -1966,18 +1972,19 @@ func (v *GoVisitor) VisitMarker(marker java.Marker, p any) java.Marker {
 // sameMarker rather than ==, since marker types may hold slices or maps and
 // == panics on those.
 func (v *GoVisitor) visitMarkers(markers java.Markers, p any) java.Markers {
-	if len(markers.Entries) == 0 {
+	existing := markers.Entries()
+	if len(existing) == 0 {
 		return markers
 	}
 	// Preserve identity: return the same Markers (same entries slice) when no
 	// entry changed, so the enclosing withX guard (java.MarkersEqual) reports
 	// no change. Only allocate once VisitMarker actually rewrites an entry.
 	var entries []java.Marker
-	for i, m := range markers.Entries {
+	for i, m := range existing {
 		visited := v.self().VisitMarker(m, p)
 		if entries == nil && !sameMarker(visited, m) {
-			entries = make([]java.Marker, len(markers.Entries))
-			copy(entries, markers.Entries[:i])
+			entries = make([]java.Marker, len(existing))
+			copy(entries, existing[:i])
 		}
 		if entries != nil {
 			entries[i] = visited
@@ -1986,7 +1993,7 @@ func (v *GoVisitor) visitMarkers(markers java.Markers, p any) java.Markers {
 	if entries == nil {
 		return markers
 	}
-	return java.Markers{ID: markers.ID, Entries: entries}
+	return java.MakeMarkers(markers.GetID(), entries)
 }
 
 // sameMarker reports whether VisitMarker left an entry unchanged, without an

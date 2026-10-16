@@ -29,6 +29,7 @@ import org.jetbrains.kotlin.fir.resolve.getContainingClassSymbol
 import org.jetbrains.kotlin.fir.declarations.*
 import org.jetbrains.kotlin.fir.declarations.DirectDeclarationsAccess
 import org.jetbrains.kotlin.fir.declarations.impl.FirPrimaryConstructor
+import org.jetbrains.kotlin.fir.declarations.utils.isScriptTopLevelDeclaration
 import org.jetbrains.kotlin.fir.declarations.utils.isStatic
 import org.jetbrains.kotlin.fir.declarations.utils.modality
 import org.jetbrains.kotlin.fir.declarations.utils.visibility
@@ -56,7 +57,6 @@ import org.jetbrains.kotlin.load.kotlin.JvmPackagePartSource
 import org.jetbrains.kotlin.name.ClassId
 import org.jetbrains.kotlin.name.FqNameUnsafe
 import org.jetbrains.kotlin.name.isOneSegmentFQN
-import org.jetbrains.kotlin.resolve.jvm.JvmClassName
 import org.jetbrains.kotlin.types.ConstantValueKind
 import org.jetbrains.kotlin.types.Variance
 import org.openrewrite.java.JavaTypeMapping
@@ -68,6 +68,10 @@ import org.openrewrite.java.tree.JavaType.*
 import org.openrewrite.java.tree.JavaType.Array
 import org.openrewrite.java.tree.TypeUtils
 import org.openrewrite.kotlin.internal.JavaThrownExceptions
+import org.openrewrite.kotlin.internal.expandedAliasType
+import org.openrewrite.kotlin.internal.facadeFqn
+import org.openrewrite.kotlin.internal.isFromLibrary
+import org.openrewrite.kotlin.internal.namedClassSymbol
 import org.openrewrite.kotlin.KotlinTypeSignatureBuilder.Companion.convertClassIdToFqn
 import org.openrewrite.kotlin.KotlinTypeSignatureBuilder.Companion.methodName
 import org.openrewrite.kotlin.KotlinTypeSignatureBuilder.Companion.variableName
@@ -140,6 +144,10 @@ class KotlinTypeMapping(
 
             is ConeFlexibleType -> {
                 type(type.lowerBound, signature)
+            }
+
+            is ConeIntegerLiteralType -> {
+                type(type.getApproximatedType(), parent, signature)
             }
 
             is ConeTypeProjection -> {
@@ -402,14 +410,11 @@ class KotlinTypeMapping(
         val firClass = when (type) {
             is FirClass -> type
             is FirResolvedQualifier -> {
-                val ref = type.resolvedType.toRegularClassSymbol(firSession)
+                type.expandedAliasType(firSession)?.let { return classType(it, parent, signature) }
                 if (type.typeArguments.isNotEmpty()) {
                     params = type.typeArguments
                 }
-                if (ref == null) {
-                    return Unknown.getInstance()
-                }
-                ref.fir
+                (type.namedClassSymbol(firSession) ?: return Unknown.getInstance()).fir
             }
 
             is ConeClassLikeType -> {
@@ -620,7 +625,7 @@ class KotlinTypeMapping(
         val paramNamesArr: kotlin.Array<String>? = if (function.valueParameters.isNotEmpty()) {
             kotlin.Array(function.valueParameters.size) { function.valueParameters[it].name.asString() }
         } else null
-        var methodFlags = mapToFlagsBitmap(function.visibility, function.modality, function.isStatic)
+        var methodFlags = mapToFlagsBitmap(function.visibility, function.modality, function.isStatic || isFileFacadeMember(function.symbol))
         if (function.symbol is FirConstructorSymbol) {
             methodFlags = methodFlags and (1L shl 4).inv()
         }
@@ -828,7 +833,7 @@ class KotlinTypeMapping(
         } else null
         var invocationFlags = when (sym) {
             is FirConstructorSymbol -> mapToFlagsBitmap(sym.visibility, sym.modality, sym.isStatic)
-            is FirNamedFunctionSymbol -> mapToFlagsBitmap(sym.visibility, sym.modality, sym.isStatic)
+            is FirNamedFunctionSymbol -> mapToFlagsBitmap(sym.visibility, sym.modality, sym.isStatic || isFileFacadeMember(sym))
             else -> {
                 throw UnsupportedOperationException("Unsupported method symbol: ${sym.javaClass.name}")
             }
@@ -874,22 +879,15 @@ class KotlinTypeMapping(
                             resolvedSymbol.containingClassLookupTag()!!.toRegularClassSymbol(firSession)!!.fir
                         )
                     )
-                } else if (resolvedSymbol.origin == FirDeclarationOrigin.Library) {
-                    if (resolvedSymbol.fir.containerSource is JvmPackagePartSource) {
-                        val source: JvmPackagePartSource? = resolvedSymbol.fir.containerSource as JvmPackagePartSource?
-                        if (source != null) {
-                            // JvmPackagePartSource carries only the JVM facade class name
-                            // string — no FIR class to route through. Synthesize a
-                            // canonical Class for the facade so MethodMatcher works;
-                            // we can't enumerate its members from FIR.
-                            val facadeFqn = if (source.facadeClassName != null) {
-                                (source.facadeClassName as JvmClassName).fqNameForTopLevelClassMaybeWithDollars.asString()
-                            } else {
-                                source.className.fqNameForTopLevelClassMaybeWithDollars.asString()
-                            }
-                            declaringType = typeFactory.computeClass(facadeFqn, Flag.Public.getBitMask(), FullyQualified.Kind.Class) {
-                                // Synthetic library facade — body is not enumerable from FIR.
-                            }
+                } else if (resolvedSymbol.isFromLibrary) {
+                    val source = resolvedSymbol.fir.containerSource
+                    if (source is JvmPackagePartSource) {
+                        // JvmPackagePartSource carries only the JVM facade class name
+                        // string — no FIR class to route through. Synthesize a
+                        // canonical Class for the facade so MethodMatcher works;
+                        // we can't enumerate its members from FIR.
+                        declaringType = typeFactory.computeClass(source.facadeFqn, Flag.Public.getBitMask(), FullyQualified.Kind.Class) {
+                            // Synthetic library facade — body is not enumerable from FIR.
                         }
                     } else if (!resolvedSymbol.fir.origin.generated &&
                         !resolvedSymbol.fir.origin.fromSupertypes &&
@@ -1277,7 +1275,7 @@ class KotlinTypeMapping(
 
     @OptIn(SymbolInternals::class)
     fun variableType(variable: FirVariable, parent: Any?, signature: String): Variable {
-        var variableFlags = mapToFlagsBitmap(variable.visibility, variable.modality, variable.isStatic)
+        var variableFlags = mapToFlagsBitmap(variable.visibility, variable.modality, variable.isStatic || isFileFacadeMember(variable.symbol))
         if (variable is FirEnumEntry) {
             variableFlags = variableFlags or (1L shl 14) // Enum
         }
@@ -1701,6 +1699,17 @@ class KotlinTypeMapping(
             else -> FullyQualified.Kind.Class
         }
     }
+
+    /**
+     * Top-level functions and properties compile to static members of the file's JVM facade class.
+     */
+    @OptIn(SymbolInternals::class)
+    private fun isFileFacadeMember(symbol: FirCallableSymbol<*>): Boolean =
+        (symbol is FirNamedFunctionSymbol && symbol.origin != FirDeclarationOrigin.SamConstructor || symbol is FirPropertySymbol) &&
+                symbol.callableId?.isLocal == false &&
+                symbol.dispatchReceiverType == null &&
+                symbol.containingClassLookupTag() == null &&
+                symbol.fir.isScriptTopLevelDeclaration != true
 
     private fun mapToFlagsBitmap(visibility: Visibility, modality: Modality?, isStatic: Boolean): Long {
         var bitMask: Long = 0

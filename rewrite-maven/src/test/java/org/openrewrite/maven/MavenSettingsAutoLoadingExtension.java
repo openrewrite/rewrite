@@ -20,6 +20,9 @@ import org.junit.jupiter.api.extension.ExtensionContext;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.test.RewriteTest;
 
+import static java.util.Collections.singletonList;
+import static org.openrewrite.internal.StringUtils.isNullOrEmpty;
+import static org.openrewrite.maven.tree.MavenRepository.MAVEN_CENTRAL;
 import static org.openrewrite.maven.tree.MavenRepository.MAVEN_LOCAL_DEFAULT;
 
 /**
@@ -31,6 +34,8 @@ import static org.openrewrite.maven.tree.MavenRepository.MAVEN_LOCAL_DEFAULT;
  * should opt in explicitly via {@link MavenSettings#readMavenSettingsFromDisk(ExecutionContext)}.
  */
 public class MavenSettingsAutoLoadingExtension implements BeforeAllCallback {
+
+    private static final String MIRROR_ID = "rewrite-mirror";
 
     @Override
     public void beforeAll(ExtensionContext context) {
@@ -48,6 +53,23 @@ public class MavenSettingsAutoLoadingExtension implements BeforeAllCallback {
                                     mctx.getMirrors().isEmpty();
         if (nothingConfigured) {
             mctx.setMavenSettings(MavenSettings.readMavenSettingsFromDisk(mctx));
+            addMirrorFromEnvironment(mctx);
         }
+    }
+
+    // Without a settings.xml mirror, use the one the build passes as REWRITE_GRADLE_MIRROR_* (local runs)
+    private static void addMirrorFromEnvironment(MavenExecutionContextView mctx) {
+        String url = System.getenv("REWRITE_GRADLE_MIRROR_URL");
+        String username = System.getenv("REWRITE_GRADLE_MIRROR_USERNAME");
+        String password = System.getenv("REWRITE_GRADLE_MIRROR_PASSWORD");
+        if (isNullOrEmpty(url) || isNullOrEmpty(username) || isNullOrEmpty(password) ||
+            mctx.getMirrors().stream().anyMatch(mirror -> mirror.matches(MAVEN_CENTRAL))) {
+            return;
+        }
+        MavenSettings mirror = new MavenSettings(null, null, null,
+                new MavenSettings.Mirrors(singletonList(new MavenSettings.Mirror(MIRROR_ID, url, "central", null, null))),
+                new MavenSettings.Servers(singletonList(new MavenSettings.Server(MIRROR_ID, username, password, null))));
+        MavenSettings settings = mctx.getSettings();
+        mctx.setMavenSettings(settings == null ? mirror : settings.merge(mirror));
     }
 }

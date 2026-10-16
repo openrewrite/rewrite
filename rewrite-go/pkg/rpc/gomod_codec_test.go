@@ -23,6 +23,7 @@ import (
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/parser"
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/printer"
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/tree/golang"
+	"github.com/openrewrite/rewrite/rewrite-go/pkg/tree/java"
 )
 
 // TestGoModRPCRoundTrip parses go.mod into a GoMod, ships it Go→wire→Go through
@@ -67,17 +68,56 @@ func TestGoModRPCPreservesResolutionMarker(t *testing.T) {
 	require.NoError(t, err, "parse error")
 	mrr, err := parser.ParseGoMod("go.mod", content)
 	require.NoError(t, err, "marker parse error")
-	before.Markers.Entries = append(before.Markers.Entries, *mrr)
+	before.Markers = java.AddMarker(before.Markers, *mrr)
 
 	seed := &golang.GoMod{Ident: before.Ident}
 	got := roundTripNode(t, before, seed).(*golang.GoMod)
 
 	var found *golang.GoResolutionResult
-	for i := range got.Markers.Entries {
-		if r, ok := got.Markers.Entries[i].(golang.GoResolutionResult); ok {
+	for i := range got.Markers.Entries() {
+		if r, ok := got.Markers.Entries()[i].(golang.GoResolutionResult); ok {
 			found = &r
 		}
 	}
-	require.NotNilf(t, found, "GoResolutionResult marker lost in round-trip; markers=%#v", got.Markers.Entries)
+	require.NotNilf(t, found, "GoResolutionResult marker lost in round-trip; markers=%#v", got.Markers.Entries())
 	require.False(t, found.ModulePath != "example.com/foo" || len(found.Requires) != 1, "marker fields not preserved")
+}
+
+// A peer that prints or visits part of a go.mod names that node by id, so the
+// node travels without the file around it.
+func TestGoModNodesRoundTripOnTheirOwn(t *testing.T) {
+	gm, err := parser.ParseGoModFile("go.mod",
+		"module example.com/foo\n\nrequire (\n\tgithub.com/a/b v1.0.0 // indirect\n)\n")
+	require.NoError(t, err)
+	directive := gm.Statements[0].Element.(*golang.GoModDirective)
+	block := gm.Statements[1].Element.(*golang.GoModBlock)
+
+	cases := []struct {
+		node, seed java.Tree
+		printed    string
+	}{
+		{directive, &golang.GoModDirective{}, "module example.com/foo"},
+		{block, &golang.GoModBlock{}, "\nrequire (\n\tgithub.com/a/b v1.0.0 // indirect\n)"},
+		{directive.Values[0], &golang.GoModValue{}, " example.com/foo"},
+	}
+	for _, c := range cases {
+		got, ok := roundTripNode(t, c.node, c.seed).(java.Tree)
+		require.Truef(t, ok, "%T did not come back as a tree", c.node)
+		require.Equal(t, c.printed, printer.PrintWithCursor(got, nil, nil))
+	}
+}
+
+func TestEmptyRequireBlockSendsAnEmptyEntriesList(t *testing.T) {
+	// given
+	gm, err := parser.ParseGoModFile("go.mod", "module example.com/foo\n\nrequire ()\n")
+	require.NoError(t, err)
+
+	// when
+	got := roundTripNode(t, gm, &golang.GoMod{Ident: gm.Ident}).(*golang.GoMod)
+
+	// then
+	block, ok := got.Statements[1].Element.(*golang.GoModBlock)
+	require.True(t, ok)
+	require.NotNil(t, block.Entries)
+	require.Empty(t, block.Entries)
 }
