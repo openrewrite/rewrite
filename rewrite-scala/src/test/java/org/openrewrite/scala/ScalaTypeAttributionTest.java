@@ -788,6 +788,27 @@ class ScalaTypeAttributionTest implements RewriteTest {
     }
 
     @Test
+    void etaExpandedInitializerOfInferredValIsMarked() {
+        rewriteRun(
+          scala(
+            """
+            class Foo {
+              def inc(i: Int): Int = i + 1
+              val f = inc
+            }
+            """,
+            spec -> spec.afterRecipe(cu -> {
+                J.Identifier inc = findAll(cu, J.Identifier.class, i -> i.getSimpleName().equals("inc")).getLast();
+                assertThat(inc.getType()).isEqualTo(JavaType.Primitive.Int);
+                EtaExpansion eta = inc.getMarkers().findFirst(EtaExpansion.class).orElseThrow();
+                assertThat(eta.getMethod().getName()).isEqualTo("inc");
+                assertThat(TypeUtils.asParameterized(eta.getType()).getFullyQualifiedName()).isEqualTo("scala.Function1");
+            })
+          )
+        );
+    }
+
+    @Test
     void explicitEtaExpansionHasFunctionType() {
         rewriteRun(
           scala(
@@ -830,6 +851,37 @@ class ScalaTypeAttributionTest implements RewriteTest {
                 assertThat(wrongArity.getMethodType()).isNull();
                 J.NewClass newPerson = find(cu, J.NewClass.class, n -> true);
                 assertThat(newPerson.getConstructorType()).isNull();
+            })
+          )
+        );
+    }
+
+    @Test
+    void callsWithNonConformingTypeArgumentsHaveNoMethodType() {
+        rewriteRun(
+          spec -> spec.typeValidationOptions(org.openrewrite.test.TypeValidation.none()),
+          scala(
+            """
+            class Foo {
+              def num[T <: Number](t: T): T = t
+              val xs = List(1, 2)
+              val wrongKind = xs.to[Vector]
+              val outOfBounds = num[String]("a")
+              val conforming = num[Integer](1)
+              val inferred = List.empty[Int]
+            }
+            """,
+            spec -> spec.afterRecipe(cu -> {
+                J.MethodInvocation wrongKind = method(cu, "to");
+                List<J.MethodInvocation> ofNum = findAll(cu, J.MethodInvocation.class, m -> m.getSimpleName().equals("num"));
+                assertThat(wrongKind.getMethodType()).isNull();
+                assertThat(wrongKind.getType()).isNull();
+                assertThat(ofNum).hasSize(2);
+                assertThat(ofNum.getFirst().getMethodType()).isNull();
+                assertThat(ofNum.getLast().getMethodType()).isNotNull()
+                  .satisfies(m -> assertThat(m.getName()).isEqualTo("num"));
+                assertThat(method(cu, "empty").getMethodType()).isNotNull()
+                  .satisfies(m -> assertThat(m.getName()).isEqualTo("empty"));
             })
           )
         );
