@@ -285,7 +285,7 @@ class ChangeDependencyTest implements RewriteTest {
     }
 
     @Test
-    void doesNotPartiallyRelocateSharedTomlVersionReference() {
+    void relocatesAndDetachesSharedTomlVersionReference() {
         rewriteRun(
           spec -> spec.recipe(new ChangeDependency(
             "org.testcontainers",
@@ -304,6 +304,14 @@ class ChangeDependencyTest implements RewriteTest {
 
               [libraries]
               target = { module = "org.testcontainers:mongodb", version.ref = "shared" }
+              other = { module = "org.example:other", version.ref = "shared" }
+              """,
+            """
+              [versions]
+              shared = "1.0.0"
+
+              [libraries]
+              target = { module = "org.testcontainers:testcontainers-mongodb", version = "2.0.5" }
               other = { module = "org.example:other", version.ref = "shared" }
               """,
             spec -> spec.path("gradle/libs.versions.toml")
