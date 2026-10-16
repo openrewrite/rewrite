@@ -33,7 +33,8 @@ import java.nio.file.Path;
 import java.util.*;
 import java.util.function.Function;
 
-import static java.util.Collections.singletonList;
+import static java.util.Collections.emptyList;
+import static java.util.stream.Collectors.toList;
 import static org.assertj.core.api.Assertions.fail;
 
 /**
@@ -120,7 +121,7 @@ final class AddedMarkers {
             }
             if (!unexplained.isEmpty()) {
                 // A recipe that writes code may bring along syntax markers that only a parser knows to produce
-                SourceFile reparsed = reparse(after);
+                SourceFile reparsed = reparse(after, emptyList(), parsersFor, relativeTo, ctx);
                 if (reparsed != null) {
                     Set<Placement> fromParser = placements(reparsed).keySet();
                     unexplained.removeIf(occurrence -> fromParser.contains(occurrence.getPlacement()));
@@ -147,9 +148,12 @@ final class AddedMarkers {
     }
 
     /**
-     * A fresh parse of the source's printed output by the first parser that turns it into the same kind of source.
+     * A fresh parse of the source's printed output by the first parser that turns it into the same kind of source,
+     * parsed together with {@code others} so that it can refer to the types they declare.
      */
-    private @Nullable SourceFile reparse(SourceFile after) {
+    static @Nullable SourceFile reparse(SourceFile after, Collection<SourceFile> others,
+                                        Function<SourceFile, List<Parser.Builder>> parsersFor,
+                                        @Nullable Path relativeTo, ExecutionContext ctx) {
         if (after instanceof Quark || after instanceof Binary || after instanceof Remote || after instanceof ParseError) {
             return null;
         }
@@ -160,13 +164,17 @@ final class AddedMarkers {
                 ctx.getMessages().forEach(reparseCtx::putMessage);
                 reparseCtx.putMessage(ExecutionContext.REQUIRE_PRINT_EQUALS_INPUT, false);
 
-                Charset charset = after.getCharset() == null ? StandardCharsets.UTF_8 : after.getCharset();
-                String printed = after.printAll(new PrintOutputCapture<>(0, PrintOutputCapture.MarkerPrinter.SANITIZED));
-                Path sourcePath = relativeTo == null ? after.getSourcePath() : relativeTo.resolve(after.getSourcePath());
-                SourceFile reparsed = builder.clone().build()
-                        .parseInputs(singletonList(Parser.Input.fromString(sourcePath, printed, charset)), relativeTo, reparseCtx)
-                        .findFirst()
-                        .orElse(null);
+                List<Parser.Input> inputs = new ArrayList<>(others.size() + 1);
+                inputs.add(printed(after, relativeTo));
+                for (SourceFile other : others) {
+                    inputs.add(printed(other, relativeTo));
+                }
+                SourceFile reparsed = null;
+                for (SourceFile parsed : builder.clone().build().parseInputs(inputs, relativeTo, reparseCtx).collect(toList())) {
+                    if (reparsed == null || parsed.getSourcePath().equals(after.getSourcePath())) {
+                        reparsed = parsed;
+                    }
+                }
                 if (reparsed != null && reparsed.getClass() == after.getClass()) {
                     return reparsed;
                 }
@@ -175,6 +183,13 @@ final class AddedMarkers {
             }
         }
         return null;
+    }
+
+    private static Parser.Input printed(SourceFile sourceFile, @Nullable Path relativeTo) {
+        Charset charset = sourceFile.getCharset() == null ? StandardCharsets.UTF_8 : sourceFile.getCharset();
+        String printed = sourceFile.printAll(new PrintOutputCapture<>(0, PrintOutputCapture.MarkerPrinter.SANITIZED));
+        Path sourcePath = relativeTo == null ? sourceFile.getSourcePath() : relativeTo.resolve(sourceFile.getSourcePath());
+        return Parser.Input.fromString(sourcePath, printed, charset);
     }
 
     private static Map<Placement, Occurrence> placements(SourceFile sourceFile) {

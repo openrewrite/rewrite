@@ -30,13 +30,19 @@ import org.openrewrite.groovy.GroovyParser;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.JavaParser;
+import org.openrewrite.java.MethodMatcher;
+import org.openrewrite.java.NoStaticImport;
+import org.openrewrite.java.RemoveUnusedImports;
+import org.openrewrite.java.UseStaticImport;
 import org.openrewrite.java.marker.OmitParentheses;
+import org.openrewrite.java.search.FindAnnotations;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.Space;
 import org.openrewrite.marker.BuildMetadata;
 import org.openrewrite.marker.Marker;
 import org.openrewrite.marker.SearchResult;
 import org.openrewrite.test.RewriteTest;
+import org.openrewrite.test.SourceSpec;
 import org.openrewrite.test.SourceSpecs;
 import org.openrewrite.test.TypeValidation;
 import org.openrewrite.text.PlainText;
@@ -399,6 +405,487 @@ class RewriteTestTest implements RewriteTest {
     }
 
     @Nested
+    class MatchesByType {
+
+        @Test
+        void rejectRecipeThatMissesStaticallyImportedCall() {
+            AssertionError e = assertThrows(AssertionError.class, () -> rewriteRun(
+              spec -> spec.recipe(new FindQualifiedCallsByName("Collections", "emptyList")),
+              java(
+                """
+                  import java.util.Collections;
+                  import java.util.List;
+
+                  class A {
+                      List<String> list = Collections.emptyList();
+                  }
+                  """,
+                """
+                  import java.util.Collections;
+                  import java.util.List;
+
+                  class A {
+                      List<String> list = /*~~>*/Collections.emptyList();
+                  }
+                  """
+              )
+            ));
+            assertThat(e).hasMessageStartingWith("Match the code the recipe changes by its type attribution")
+              .hasMessageContaining("A.java (changed by org.openrewrite.test.internal.FindQualifiedCallsByName): " +
+                                    "`Collections.emptyList()` written `emptyList()`")
+              .hasMessageContaining("equivalentSpellings(false)");
+        }
+
+        @Test
+        void rejectRecipeThatMissesQualifiedCall() {
+            AssertionError e = assertThrows(AssertionError.class, () -> rewriteRun(
+              spec -> spec.recipe(new FindUnqualifiedCallsByName("emptyList")),
+              java(
+                """
+                  import java.util.List;
+
+                  import static java.util.Collections.emptyList;
+
+                  class A {
+                      List<String> list = emptyList();
+                  }
+                  """,
+                """
+                  import java.util.List;
+
+                  import static java.util.Collections.emptyList;
+
+                  class A {
+                      List<String> list = /*~~>*/emptyList();
+                  }
+                  """
+              )
+            ));
+            assertThat(e).hasMessageContaining("`emptyList()` written `Collections.emptyList()`");
+        }
+
+        @Test
+        void importCleanupDoesNotCountAsTheChange() {
+            AssertionError e = assertThrows(AssertionError.class, () -> rewriteRun(
+              spec -> spec.recipes(new FindQualifiedCallsByName("Collections", "emptyList"), new RemoveUnusedImports()),
+              java(
+                """
+                  import java.util.Collections;
+                  import java.util.List;
+
+                  class A {
+                      List<String> list = Collections.emptyList();
+                  }
+                  """,
+                """
+                  import java.util.Collections;
+                  import java.util.List;
+
+                  class A {
+                      List<String> list = /*~~>*/Collections.emptyList();
+                  }
+                  """
+              )
+            ));
+            assertThat(e).hasMessageContaining("`Collections.emptyList()` written `emptyList()`");
+        }
+
+        @Test
+        void rejectRecipeThatMissesFullyQualifiedType() {
+            AssertionError e = assertThrows(AssertionError.class, () -> rewriteRun(
+              spec -> spec.recipe(new FindAnnotationsByPrintedType("Deprecated")),
+              java(
+                """
+                  class A {
+                      @Deprecated
+                      void old() {
+                      }
+                  }
+                  """,
+                """
+                  class A {
+                      /*~~>*/@Deprecated
+                      void old() {
+                      }
+                  }
+                  """
+              )
+            ));
+            assertThat(e).hasMessageContaining("`Deprecated` written `java.lang.Deprecated`");
+        }
+
+        @Test
+        void acceptRecipeThatMatchesAnnotationsByType() {
+            rewriteRun(
+              spec -> spec.recipe(new FindAnnotations("@java.lang.Deprecated", null)),
+              java(
+                """
+                  class A {
+                      @Deprecated
+                      void old() {
+                      }
+                  }
+                  """,
+                """
+                  class A {
+                      /*~~>*/@Deprecated
+                      void old() {
+                      }
+                  }
+                  """
+              )
+            );
+        }
+
+        @Test
+        void acceptTypesDeclaredInSkippedSources() {
+            rewriteRun(
+              spec -> spec.recipe(new FindAnnotations("@org.example.Foo", null)),
+              java(
+                """
+                  package org.example;
+                  public @interface Foo {
+                  }
+                  """,
+                SourceSpec::skip
+              ),
+              java(
+                """
+                  import org.example.Foo;
+
+                  @Foo
+                  class A {
+                  }
+                  """,
+                """
+                  import org.example.Foo;
+
+                  /*~~>*/@Foo
+                  class A {
+                  }
+                  """
+              )
+            );
+        }
+
+        @Test
+        void acceptRecipeThatMatchesCallsByType() {
+            rewriteRun(
+              spec -> spec.recipe(new FindCallsByType("java.util.Collections emptyList()"))
+                .typeValidationOptions(TypeValidation.all().typeAttributedMatching(true)),
+              java(
+                """
+                  import java.util.Collections;
+                  import java.util.List;
+
+                  class A {
+                      List<String> list = Collections.emptyList();
+                  }
+                  """,
+                """
+                  import java.util.Collections;
+                  import java.util.List;
+
+                  class A {
+                      List<String> list = /*~~>*/Collections.emptyList();
+                  }
+                  """
+              ),
+              java(
+                """
+                  import java.util.List;
+
+                  import static java.util.Collections.emptyList;
+
+                  class B {
+                      List<String> list = emptyList();
+                  }
+                  """,
+                """
+                  import java.util.List;
+
+                  import static java.util.Collections.emptyList;
+
+                  class B {
+                      List<String> list = /*~~>*/emptyList();
+                  }
+                  """
+              )
+            );
+        }
+
+        @Test
+        void acceptRecipeWhoseChangeIsTheRespelling() {
+            rewriteRun(
+              spec -> spec.recipe(new UseStaticImport("java.util.Collections emptyList()")),
+              java(
+                """
+                  import java.util.Collections;
+                  import java.util.List;
+
+                  class A {
+                      List<String> list = Collections.emptyList();
+                  }
+                  """,
+                """
+                  import java.util.List;
+
+                  import static java.util.Collections.emptyList;
+
+                  class A {
+                      List<String> list = emptyList();
+                  }
+                  """
+              )
+            );
+            rewriteRun(
+              spec -> spec.recipe(new NoStaticImport("java.util.Collections emptyList()")),
+              java(
+                """
+                  import java.util.List;
+
+                  import static java.util.Collections.emptyList;
+
+                  class A {
+                      List<String> list = emptyList();
+                  }
+                  """,
+                """
+                  import java.util.Collections;
+                  import java.util.List;
+
+                  class A {
+                      List<String> list = Collections.emptyList();
+                  }
+                  """
+              )
+            );
+        }
+
+        @Test
+        void equivalentSpellingsTurnedOff() {
+            rewriteRun(
+              spec -> spec.recipe(new FindQualifiedCallsByName("Collections", "emptyList"))
+                .typeValidationOptions(TypeValidation.all().equivalentSpellings(false)),
+              java(
+                """
+                  import java.util.Collections;
+                  import java.util.List;
+
+                  class A {
+                      List<String> list = Collections.emptyList();
+                  }
+                  """,
+                """
+                  import java.util.Collections;
+                  import java.util.List;
+
+                  class A {
+                      List<String> list = /*~~>*/Collections.emptyList();
+                  }
+                  """
+              )
+            );
+        }
+
+        @Test
+        void notCheckedWithoutTypeValidation() {
+            rewriteRun(
+              spec -> spec.recipe(new FindQualifiedCallsByName("Collections", "emptyList"))
+                .typeValidationOptions(TypeValidation.none()),
+              java(
+                """
+                  import java.util.Collections;
+                  import java.util.List;
+
+                  class A {
+                      List<String> list = Collections.emptyList();
+                  }
+                  """,
+                """
+                  import java.util.Collections;
+                  import java.util.List;
+
+                  class A {
+                      List<String> list = /*~~>*/Collections.emptyList();
+                  }
+                  """
+              )
+            );
+        }
+
+        @Test
+        void adHocRecipesAreNotChecked() {
+            rewriteRun(
+              spec -> spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {
+                  @Override
+                  public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
+                      J.MethodInvocation m = super.visitMethodInvocation(method, ctx);
+                      return m.getSelect() != null && "emptyList".equals(m.getSimpleName()) ? SearchResult.found(m) : m;
+                  }
+              })),
+              java(
+                """
+                  import java.util.Collections;
+                  import java.util.List;
+
+                  class A {
+                      List<String> list = Collections.emptyList();
+                  }
+                  """,
+                """
+                  import java.util.Collections;
+                  import java.util.List;
+
+                  class A {
+                      List<String> list = /*~~>*/Collections.emptyList();
+                  }
+                  """
+              )
+            );
+        }
+
+        @Test
+        void rejectRecipeThatMakesTheSameChangeWithoutTypes() {
+            AssertionError e = assertThrows(AssertionError.class, () -> rewriteRun(
+              spec -> spec.recipe(new FindCallsByName("emptyList"))
+                .typeValidationOptions(TypeValidation.all().typeAttributedMatching(true)),
+              java(
+                """
+                  import java.util.Collections;
+                  import java.util.List;
+
+                  class A {
+                      List<String> list = Collections.emptyList();
+                  }
+                  """,
+                """
+                  import java.util.Collections;
+                  import java.util.List;
+
+                  class A {
+                      List<String> list = /*~~>*/Collections.emptyList();
+                  }
+                  """
+              )
+            ));
+            assertThat(e).hasMessageStartingWith("Identify the code to change through type attribution")
+              .hasMessageContaining("A.java (changed by org.openrewrite.test.internal.FindCallsByName): " +
+                                    "`Collections.emptyList()` (java.util.Collections emptyList())")
+              .hasMessageContaining("typeAttributedMatching(false)");
+        }
+
+        @Test
+        void rejectRecipeThatRemovesDeclarationsByAnnotationName() {
+            AssertionError e = assertThrows(AssertionError.class, () -> rewriteRun(
+              spec -> spec.recipe(new RemoveMethodsAnnotatedByName("Deprecated"))
+                .typeValidationOptions(TypeValidation.all().typeAttributedMatching(true)),
+              java(
+                """
+                  class A {
+                      @Deprecated
+                      void old() {
+                      }
+
+                      void current() {
+                      }
+                  }
+                  """,
+                """
+                  class A {
+
+                      void current() {
+                      }
+                  }
+                  """
+              )
+            ));
+            assertThat(e).hasMessageContaining("`@Deprecated` (java.lang.Deprecated)");
+        }
+
+        @Test
+        void acceptFormattingWithoutTypes() {
+            rewriteRun(
+              spec -> spec.recipe(new RemoveSpaceBeforeArguments())
+                .typeValidationOptions(TypeValidation.all().typeAttributedMatching(true)),
+              java(
+                """
+                  import java.util.Collections;
+                  import java.util.List;
+
+                  class A {
+                      List<String> list = Collections.emptyList ();
+                  }
+                  """,
+                """
+                  import java.util.Collections;
+                  import java.util.List;
+
+                  class A {
+                      List<String> list = Collections.emptyList();
+                  }
+                  """
+              )
+            );
+        }
+
+        @Test
+        void withoutTypesNotCheckedByDefault() {
+            rewriteRun(
+              spec -> spec.recipe(new FindCallsByName("emptyList")),
+              java(
+                """
+                  import java.util.Collections;
+                  import java.util.List;
+
+                  class A {
+                      List<String> list = Collections.emptyList();
+                  }
+                  """,
+                """
+                  import java.util.Collections;
+                  import java.util.List;
+
+                  class A {
+                      List<String> list = /*~~>*/Collections.emptyList();
+                  }
+                  """
+              )
+            );
+        }
+
+        @Test
+        void acceptNameMatchingOfTypesTheTestDeclares() {
+            rewriteRun(
+              spec -> spec.recipe(new FindCallsByName("foo"))
+                .typeValidationOptions(TypeValidation.all().typeAttributedMatching(true)),
+              java(
+                """
+                  class A {
+                      static void foo() {
+                      }
+
+                      void bar() {
+                          foo();
+                      }
+                  }
+                  """,
+                """
+                  class A {
+                      static void foo() {
+                      }
+
+                      void bar() {
+                          /*~~>*/foo();
+                      }
+                  }
+                  """
+              )
+            );
+        }
+    }
+
+    @Nested
     class RecipeValidation {
 
         @Test
@@ -456,6 +943,194 @@ class RewriteTestTest implements RewriteTest {
 @With
 class Visited implements Marker {
     UUID id;
+}
+
+@EqualsAndHashCode(callSuper = false)
+@NullMarked
+@Value
+class FindCallsByName extends Recipe {
+
+    @Option(displayName = "Method name",
+      description = "The name of the method to find.",
+      example = "emptyList")
+    String methodName;
+
+    String displayName = "Find calls by method name";
+
+    String description = "Finds calls by name alone, whatever type declares the method.";
+
+    @Override
+    public TreeVisitor<?, ExecutionContext> getVisitor() {
+        return new JavaIsoVisitor<>() {
+            @Override
+            public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
+                J.MethodInvocation m = super.visitMethodInvocation(method, ctx);
+                return methodName.equals(m.getSimpleName()) ? SearchResult.found(m) : m;
+            }
+        };
+    }
+}
+
+@EqualsAndHashCode(callSuper = false)
+@NullMarked
+@Value
+class FindQualifiedCallsByName extends Recipe {
+
+    @Option(displayName = "Select",
+      description = "How the select of the call prints.",
+      example = "Collections")
+    String select;
+
+    @Option(displayName = "Method name",
+      description = "The name of the method to find.",
+      example = "emptyList")
+    String methodName;
+
+    String displayName = "Find qualified calls by name";
+
+    String description = "Finds calls by name and by how their select prints, so it misses statically imported calls.";
+
+    @Override
+    public TreeVisitor<?, ExecutionContext> getVisitor() {
+        return new JavaIsoVisitor<>() {
+            @Override
+            public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
+                J.MethodInvocation m = super.visitMethodInvocation(method, ctx);
+                return methodName.equals(m.getSimpleName()) && m.getSelect() != null &&
+                       select.equals(m.getSelect().toString()) ? SearchResult.found(m) : m;
+            }
+        };
+    }
+}
+
+@EqualsAndHashCode(callSuper = false)
+@NullMarked
+@Value
+class FindUnqualifiedCallsByName extends Recipe {
+
+    @Option(displayName = "Method name",
+      description = "The name of the method to find.",
+      example = "emptyList")
+    String methodName;
+
+    String displayName = "Find unqualified calls by name";
+
+    String description = "Finds calls by name that have no select, so it misses qualified calls.";
+
+    @Override
+    public TreeVisitor<?, ExecutionContext> getVisitor() {
+        return new JavaIsoVisitor<>() {
+            @Override
+            public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
+                J.MethodInvocation m = super.visitMethodInvocation(method, ctx);
+                return methodName.equals(m.getSimpleName()) && m.getSelect() == null ? SearchResult.found(m) : m;
+            }
+        };
+    }
+}
+
+@EqualsAndHashCode(callSuper = false)
+@NullMarked
+@Value
+class FindAnnotationsByPrintedType extends Recipe {
+
+    @Option(displayName = "Annotation type",
+      description = "How the annotation's type prints.",
+      example = "Deprecated")
+    String annotationType;
+
+    String displayName = "Find annotations by printed type";
+
+    String description = "Finds annotations by how their type prints, so it misses fully qualified ones.";
+
+    @Override
+    public TreeVisitor<?, ExecutionContext> getVisitor() {
+        return new JavaIsoVisitor<>() {
+            @Override
+            public J.Annotation visitAnnotation(J.Annotation annotation, ExecutionContext ctx) {
+                J.Annotation a = super.visitAnnotation(annotation, ctx);
+                return annotationType.equals(a.getAnnotationType().toString()) ? SearchResult.found(a) : a;
+            }
+        };
+    }
+}
+
+@EqualsAndHashCode(callSuper = false)
+@NullMarked
+@Value
+class RemoveMethodsAnnotatedByName extends Recipe {
+
+    @Option(displayName = "Annotation name",
+      description = "The simple name of the annotation.",
+      example = "Deprecated")
+    String annotationName;
+
+    String displayName = "Remove methods annotated by name";
+
+    String description = "Removes methods with an annotation of this simple name, whatever its type.";
+
+    @Override
+    public TreeVisitor<?, ExecutionContext> getVisitor() {
+        return new JavaIsoVisitor<>() {
+            @Override
+            public J.@Nullable MethodDeclaration visitMethodDeclaration(J.MethodDeclaration method, ExecutionContext ctx) {
+                for (J.Annotation annotation : method.getLeadingAnnotations()) {
+                    if (annotationName.equals(annotation.getSimpleName())) {
+                        return null;
+                    }
+                }
+                return super.visitMethodDeclaration(method, ctx);
+            }
+        };
+    }
+}
+
+@EqualsAndHashCode(callSuper = false)
+@NullMarked
+@Value
+class RemoveSpaceBeforeArguments extends Recipe {
+
+    String displayName = "Remove space before arguments";
+
+    String description = "Formats every call the same way, whatever it calls.";
+
+    @Override
+    public TreeVisitor<?, ExecutionContext> getVisitor() {
+        return new JavaIsoVisitor<>() {
+            @Override
+            public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
+                J.MethodInvocation m = super.visitMethodInvocation(method, ctx);
+                return m.getPadding().withArguments(m.getPadding().getArguments().withBefore(Space.EMPTY));
+            }
+        };
+    }
+}
+
+@EqualsAndHashCode(callSuper = false)
+@NullMarked
+@Value
+class FindCallsByType extends Recipe {
+
+    @Option(displayName = "Method pattern",
+      description = "A method pattern to match calls against.",
+      example = "java.util.Collections emptyList()")
+    String methodPattern;
+
+    String displayName = "Find calls by method type";
+
+    String description = "Finds calls whose method type matches the pattern, however they are spelled.";
+
+    @Override
+    public TreeVisitor<?, ExecutionContext> getVisitor() {
+        MethodMatcher matcher = new MethodMatcher(methodPattern);
+        return new JavaIsoVisitor<>() {
+            @Override
+            public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
+                J.MethodInvocation m = super.visitMethodInvocation(method, ctx);
+                return matcher.matches(m) ? SearchResult.found(m) : m;
+            }
+        };
+    }
 }
 
 @EqualsAndHashCode(callSuper = false)

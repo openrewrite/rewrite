@@ -147,6 +147,20 @@ public class TypeValidation {
     private boolean addedMarkers = true;
 
     /**
+     * Controls whether the recipe is rerun with the code it changed respelled to mean the same (a static import for a
+     * qualified call or the reverse, a fully qualified name for an imported type), and must still change it.
+     */
+    @Builder.Default
+    private boolean equivalentSpellings = true;
+
+    /**
+     * Controls whether the recipe is rerun on its sources without type attribution, and must not make the same change
+     * to code that refers to types the test doesn't declare. Off by default until its false positives are measured.
+     */
+    @Builder.Default
+    private boolean typeAttributedMatching = false;
+
+    /**
      * Enable all invariant validation checks.
      */
     public static TypeValidation all() {
@@ -172,6 +186,8 @@ public class TypeValidation {
                 .immutableScanning(false)
                 .allowNonWhitespaceInWhitespace(true)
                 .parseAndPrintEquality(false)
+                .equivalentSpellings(false)
+                .typeAttributedMatching(false)
                 .build();
     }
 

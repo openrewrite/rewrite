@@ -30,7 +30,7 @@ class TypeValidationTest {
         TypeValidation none = TypeValidation.none();
         for (Field field : TypeValidation.class.getDeclaredFields()) {
             if (field.getType() == boolean.class && !Modifier.isStatic(field.getModifiers()) && !field.isSynthetic() &&
-                !"addedMarkers".equals(field.getName())) {
+                !"addedMarkers".equals(field.getName()) && !"typeAttributedMatching".equals(field.getName())) {
                 field.setAccessible(true);
                 assertThat(field.getBoolean(none))
                   .as("%s is not skipped by none()", field.getName())
@@ -42,6 +42,14 @@ class TypeValidationTest {
     @Test
     void noneStillChecksAddedMarkers() {
         assertThat(TypeValidation.none().addedMarkers()).isTrue();
+    }
+
+    @Test
+    void noneSkipsChecksThatNeedTypeAttribution() {
+        assertThat(TypeValidation.none().equivalentSpellings()).isFalse();
+        assertThat(TypeValidation.none().typeAttributedMatching()).isFalse();
+        // until its false positives are measured
+        assertThat(TypeValidation.all().typeAttributedMatching()).isFalse();
     }
 
     @Test

@@ -434,16 +434,14 @@ public interface RewriteTest extends SourceSpecs {
             }
         }
 
+        List<Parser.Builder> specParsers = new ArrayList<>(methodSpecParsers);
+        specParsers.addAll(testClassSpecParsers);
+        Function<SourceFile, List<Parser.Builder>> parsersFor = after ->
+                RewriteTestUtils.parsersFor(after, specBySourceFile, parserBySourceSpec, sourceSpecs, specParsers);
+        Path relativeTo = testMethodSpec.relativeTo == null ? testClassSpec.relativeTo : testMethodSpec.relativeTo;
         AddedMarkers addedMarkers = null;
         if (TypeValidation.after(testMethodSpec, testClassSpec).addedMarkers()) {
-            List<Parser.Builder> specParsers = new ArrayList<>(methodSpecParsers);
-            specParsers.addAll(testClassSpecParsers);
-            addedMarkers = new AddedMarkers(
-                    beforeSourceFiles,
-                    after -> RewriteTestUtils.parsersFor(after, specBySourceFile, parserBySourceSpec, sourceSpecs, specParsers),
-                    testMethodSpec.relativeTo == null ? testClassSpec.relativeTo : testMethodSpec.relativeTo,
-                    ctx
-            );
+            addedMarkers = new AddedMarkers(beforeSourceFiles, parsersFor, relativeTo, ctx);
         }
 
         LargeSourceSet lss;
@@ -464,6 +462,7 @@ public interface RewriteTest extends SourceSpecs {
         RewriteRunner.Context runnerContext = new RewriteRunner.Context(
                 lss, runnableSourceFiles, recipeCtx, cycles, expectedCyclesThatMakeChanges,
                 Arrays.asList(sourceSpecs), testClassSpec, testMethodSpec);
+        NameMatching nameMatching = NameMatching.of(recipe, runner, runnerContext, beforeSourceFiles, parsersFor, relativeTo, ctx);
         RecipeRun recipeRun = runner.run(recipe, runnerContext);
         if (addedMarkers != null) {
             addedMarkers.assertNoneAdded(recipeRun.getChangeset().getAllResults());
@@ -701,6 +700,10 @@ public interface RewriteTest extends SourceSpecs {
             fail("The recipe generated source files the test did not expect.\n" +
                  "Source file paths before recipe, after recipe, and whether the test expected that result:\n" +
                  "    before | after | expected\n" + paths);
+        }
+
+        if (nameMatching != null) {
+            nameMatching.assertMatchedByType(recipeRun.getChangeset().getAllResults());
         }
     }
 
