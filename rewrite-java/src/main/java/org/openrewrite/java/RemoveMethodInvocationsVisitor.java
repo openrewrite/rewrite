@@ -21,6 +21,7 @@ import org.jspecify.annotations.Nullable;
 import org.openrewrite.Cursor;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.InMemoryExecutionContext;
+import org.openrewrite.Tree;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.java.tree.*;
 import org.openrewrite.marker.Marker;
@@ -40,6 +41,8 @@ import static org.openrewrite.Tree.randomId;
 public class RemoveMethodInvocationsVisitor extends JavaVisitor<ExecutionContext> {
     private final Map<MethodMatcher, Predicate<List<Expression>>> matchers;
 
+    private int depth;
+
     public RemoveMethodInvocationsVisitor(Map<MethodMatcher, Predicate<List<Expression>>> matchers) {
         this.matchers = matchers;
     }
@@ -49,6 +52,18 @@ public class RemoveMethodInvocationsVisitor extends JavaVisitor<ExecutionContext
             MethodMatcher::new,
             signature -> args -> true
         )));
+    }
+
+    @Override
+    public @Nullable J visit(@Nullable Tree tree, ExecutionContext ctx) {
+        depth++;
+        try {
+            J j = super.visit(tree, ctx);
+            // Elements whose parent doesn't remove them, like an emptied method body, still carry the marker
+            return depth == 1 && j != null ? ToBeRemoved.removeAll(j) : j;
+        } finally {
+            depth--;
+        }
     }
 
     @Override
@@ -266,6 +281,14 @@ public class RemoveMethodInvocationsVisitor extends JavaVisitor<ExecutionContext
         }
         static boolean hasMarker(J j) {
             return j.getMarkers().findFirst(ToBeRemoved.class).isPresent();
+        }
+        static J removeAll(J j) {
+            return new JavaVisitor<Integer>() {
+                @Override
+                public J preVisit(J tree, Integer p) {
+                    return hasMarker(tree) ? removeMarker(tree) : tree;
+                }
+            }.visitNonNull(j, 0);
         }
     }
 }

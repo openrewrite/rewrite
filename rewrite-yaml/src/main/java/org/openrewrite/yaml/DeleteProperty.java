@@ -83,7 +83,7 @@ public class DeleteProperty extends Recipe {
                 if (documents != new ReplaceAliasWithAnchorValueVisitor<ExecutionContext>().visit(documents, ctx)) {
                     return documents;
                 }
-                return super.visitDocuments(documents, ctx);
+                return ToBeRemoved.removeAll(super.visitDocuments(documents, ctx));
             }
 
             @Override
@@ -333,6 +333,18 @@ public class DeleteProperty extends Recipe {
         }
         static boolean hasMarker(Yaml y) {
             return y.getMarkers().findFirst(ToBeRemoved.class).isPresent();
+        }
+
+        /**
+         * Removes the markers left on elements whose parent doesn't delete them, like a document's emptied mapping.
+         */
+        static Yaml.Documents removeAll(Yaml.Documents documents) {
+            return (Yaml.Documents) new YamlVisitor<Integer>() {
+                @Override
+                public Yaml preVisit(Yaml tree, Integer p) {
+                    return hasMarker(tree) ? tree.withMarkers(tree.getMarkers().removeByType(ToBeRemoved.class)) : tree;
+                }
+            }.visitNonNull(documents, 0);
         }
     }
 }
