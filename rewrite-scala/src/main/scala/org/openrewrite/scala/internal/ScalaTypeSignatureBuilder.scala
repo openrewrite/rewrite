@@ -140,10 +140,13 @@ class ScalaTypeSignatureBuilder(using ctx: Context) {
     }
   }
 
-  def methodSignature(sym: Symbols.Symbol): String = {
+  def methodSignature(sym: Symbols.Symbol): String = methodSignature(sym, sym.info)
+
+  /** The signature of the method with the given parameter and result types, as instantiated at a call. */
+  def methodSignature(sym: Symbols.Symbol, info: Type): String = {
     val owner = sym.owner.fullName.toString
     val name = if (sym.isConstructor) "<constructor>" else sym.name.toString
-    val returnType = sym.info.finalResultType match {
+    val returnType = info.finalResultType match {
       case NoType => "void"
       case rt => signature(rt)
     }
@@ -153,15 +156,9 @@ class ScalaTypeSignatureBuilder(using ctx: Context) {
     sb.append(",return=").append(returnType)
 
     val paramTypes = new StringJoiner(",", "[", "]")
-    sym.info match {
+    info.stripPoly match {
       case mt: MethodType =>
         mt.paramInfos.foreach(pt => paramTypes.add(signature(pt)))
-      case pt: PolyType =>
-        pt.resultType match {
-          case mt: MethodType =>
-            mt.paramInfos.foreach(pt => paramTypes.add(signature(pt)))
-          case _ =>
-        }
       case _ =>
     }
     sb.append(",parameters=").append(paramTypes)

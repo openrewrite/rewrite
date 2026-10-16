@@ -255,6 +255,30 @@ class ScalaTypeAttributionTest implements RewriteTest {
     }
 
     @Test
+    void companionApplyHasInstantiatedMethodType() {
+        rewriteRun(
+          scala(
+            """
+            class Foo {
+              val s = Set(1, 2)
+              val xs = List("a")
+            }
+            """,
+            spec -> spec.afterRecipe(cu -> {
+                List<J.MethodInvocation> applies = findAll(cu, J.MethodInvocation.class, m -> m.getSimpleName().equals("apply"));
+                JavaType.Method setApply = applies.get(0).getMethodType();
+                JavaType.Method listApply = applies.get(1).getMethodType();
+                assertThat(TypeUtils.toString(setApply.getReturnType())).isEqualTo("scala.collection.immutable.Set<int>");
+                assertThat(setApply.getParameterTypes()).singleElement()
+                  .satisfies(elems -> assertThat(((JavaType.Parameterized) elems).getTypeParameters()).containsExactly(JavaType.Primitive.Int));
+                assertThat(TypeUtils.toString(listApply.getReturnType())).isEqualTo("scala.collection.immutable.List<java.lang.String>");
+                assertThat(setApply.getDeclaringType().getFullyQualifiedName()).isEqualTo("scala.collection.IterableFactory");
+            })
+          )
+        );
+    }
+
+    @Test
     void unqualifiedMethodCallIsNamedAfterTheMethod() {
         rewriteRun(
           scala(
