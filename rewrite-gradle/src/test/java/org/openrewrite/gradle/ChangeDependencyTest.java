@@ -214,6 +214,33 @@ class ChangeDependencyTest implements RewriteTest {
     }
 
     @Test
+    void relocatesTomlVersionCatalogLibraryToVersionLowerThanOldArtifactVersion() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeDependency(
+            "com.google.code.findbugs",
+            "jsr305",
+            "jakarta.annotation",
+            "jakarta.annotation-api",
+            "2.1.1",
+            null,
+            null,
+            true
+          )),
+          toml(
+            """
+              [libraries]
+              jsr305 = "com.google.code.findbugs:jsr305:3.0.2"
+              """,
+            """
+              [libraries]
+              jsr305 = "jakarta.annotation:jakarta.annotation-api:2.1.1"
+              """,
+            spec -> spec.path("gradle/libs.versions.toml")
+          )
+        );
+    }
+
+    @Test
     void doesNotPartiallyRelocateSharedTomlVersionReference() {
         rewriteRun(
           spec -> spec.recipe(new ChangeDependency(
