@@ -241,6 +241,50 @@ class ChangeDependencyTest implements RewriteTest {
     }
 
     @Test
+    void relocatesTomlVersionCatalogLibraryVersionReferenceWhenNoVersionIsSelected() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeDependency(
+            "org.testcontainers",
+            "mongodb",
+            null,
+            "testcontainers-mongodb",
+            "999.x",
+            null,
+            null,
+            true
+          )),
+          buildGradle(
+            """
+              plugins {
+                  id 'java'
+              }
+
+              repositories {
+                  mavenCentral()
+              }
+              """
+          ),
+          toml(
+            """
+              [versions]
+              testcontainers = "1.0.0"
+
+              [libraries]
+              testcontainers = { module = "org.testcontainers:mongodb", version.ref = "testcontainers" }
+              """,
+            """
+              [versions]
+              testcontainers = "1.0.0"
+
+              [libraries]
+              testcontainers = { module = "org.testcontainers:testcontainers-mongodb", version.ref = "testcontainers" }
+              """,
+            spec -> spec.path("gradle/libs.versions.toml")
+          )
+        );
+    }
+
+    @Test
     void doesNotPartiallyRelocateSharedTomlVersionReference() {
         rewriteRun(
           spec -> spec.recipe(new ChangeDependency(
