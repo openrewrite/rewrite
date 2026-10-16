@@ -265,4 +265,98 @@ class RemoveExtraPropertyTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void kotlinDelegatedProperty() {
+        rewriteRun(
+          buildGradleKts(
+            """
+              val foo by extra("bar")
+              val baz by extra("qux")
+              val quux by extra { "corge" }
+              val foo2: String by extra
+              """,
+            """
+              val baz by extra("qux")
+              val quux by extra { "corge" }
+              val foo2: String by extra
+              """
+          )
+        );
+    }
+
+    @Test
+    void kotlinDelegatedPropertyWithInitialValueProvider() {
+        rewriteRun(
+          spec -> spec.recipe(new RemoveExtraProperty("quux")),
+          buildGradleKts(
+            """
+              val baz by extra("qux")
+              val quux by extra { "corge" }
+              """,
+            """
+              val baz by extra("qux")
+              """
+          )
+        );
+    }
+
+    @Test
+    void leavesKotlinDelegatedReadAlone() {
+        rewriteRun(
+          buildGradleKts(
+            """
+              val foo: String by extra
+              """
+          )
+        );
+    }
+
+    @Test
+    void kotlinExtraApply() {
+        rewriteRun(
+          buildGradleKts(
+            """
+              extra.apply {
+                  set("foo", "bar")
+                  set("baz", "qux")
+              }
+              with(extra) {
+                  set("foo", "bar")
+                  set("baz", "qux")
+              }
+              """,
+            """
+              extra.apply {
+                  set("baz", "qux")
+              }
+              with(extra) {
+                  set("baz", "qux")
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void removesKotlinExtraApplyLeftEmpty() {
+        rewriteRun(
+          buildGradleKts(
+            """
+              group = "com.example"
+              extra.apply {
+                  set("foo", "bar")
+              }
+              with(extra) {
+                  set("foo", "bar")
+              }
+              version = "1.0"
+              """,
+            """
+              group = "com.example"
+              version = "1.0"
+              """
+          )
+        );
+    }
 }

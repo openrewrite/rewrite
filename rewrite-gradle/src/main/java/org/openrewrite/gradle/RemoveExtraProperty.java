@@ -20,6 +20,7 @@ import lombok.Value;
 import org.openrewrite.*;
 import org.openrewrite.gradle.internal.RemoveStatementsVisitor;
 import org.openrewrite.gradle.trait.ExtraProperty;
+import org.openrewrite.java.tree.Expression;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.Statement;
 
@@ -33,7 +34,7 @@ public class RemoveExtraProperty extends Recipe {
             "is a commonly used mechanism for setting arbitrary key/value pairs on a project. " +
             "This recipe removes every assignment of the property with the given key, whatever its value, " +
             "such as `ext.foo = 'bar'`, `ext['foo'] = 'bar'`, `ext.set('foo', 'bar')`, an assignment in an `ext { }` block, " +
-            "or Kotlin's `extra[\"foo\"] = \"bar\"`. An `ext { }` block left empty is removed as well. " +
+            "or Kotlin's `extra[\"foo\"] = \"bar\"` and `val foo by extra(\"bar\")`. An `ext { }` block left empty is removed as well. " +
             "Reads of the property are left as they are.";
 
     @Option(displayName = "Key",
@@ -46,8 +47,7 @@ public class RemoveExtraProperty extends Recipe {
         return Preconditions.check(new IsBuildGradle<>(), new RemoveStatementsVisitor<ExecutionContext>() {
             @Override
             public Statement visitStatement(Statement statement, ExecutionContext ctx) {
-                if ((statement instanceof J.Assignment || statement instanceof J.MethodInvocation) &&
-                    key.equals(ExtraProperty.Matcher.assignedProperty(getCursor()))) {
+                if (key.equals(ExtraProperty.Matcher.assignedProperty(getCursor()))) {
                     remove(statement);
                     return statement;
                 }
@@ -64,10 +64,10 @@ public class RemoveExtraProperty extends Recipe {
             }
 
             private boolean isEmptyExtBlock(J.MethodInvocation method) {
-                return "ext".equals(method.getSimpleName()) && method.getArguments().size() == 1 &&
-                       method.getArguments().get(0) instanceof J.Lambda &&
-                       ((J.Lambda) method.getArguments().get(0)).getBody() instanceof J.Block &&
-                       ((J.Block) ((J.Lambda) method.getArguments().get(0)).getBody()).getStatements().isEmpty();
+                Expression body = method.getArguments().get(method.getArguments().size() - 1);
+                return ExtraProperty.Matcher.isExtBlock(method) && body instanceof J.Lambda &&
+                       ((J.Lambda) body).getBody() instanceof J.Block &&
+                       ((J.Block) ((J.Lambda) body).getBody()).getStatements().isEmpty();
             }
         });
     }
