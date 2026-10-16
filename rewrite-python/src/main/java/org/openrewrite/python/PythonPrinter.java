@@ -102,8 +102,19 @@ public class PythonPrinter<P> extends PythonVisitor<PrintOutputCapture<P>> {
     public J visitAwait(Py.Await await, PrintOutputCapture<P> p) {
         beforeSyntax(await, p);
         p.append("await");
+        int operandStart = p.out.length();
         visit(await.getExpression(), p);
+        separateKeywordFromOperand(p, operandStart);
         return await;
+    }
+
+    private static void separateKeywordFromOperand(PrintOutputCapture<?> p, int operandStart) {
+        if (p.out.length() > operandStart) {
+            char first = p.out.charAt(operandStart);
+            if (Character.isLetterOrDigit(first) || first == '_') {
+                p.out.insert(operandStart, ' ');
+            }
+        }
     }
 
     @Override
@@ -1442,7 +1453,11 @@ public class PythonPrinter<P> extends PythonVisitor<PrintOutputCapture<P>> {
                 default:
                     break;
             }
+            int operandStart = p.out.length();
             visit(unary.getExpression(), p);
+            if (unary.getOperator() == J.Unary.Type.Not) {
+                separateKeywordFromOperand(p, operandStart);
+            }
             afterSyntax(unary, p);
             return unary;
         }
