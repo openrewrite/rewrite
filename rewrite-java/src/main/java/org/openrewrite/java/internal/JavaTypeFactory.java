@@ -108,11 +108,8 @@ public interface JavaTypeFactory {
      * constructed with {@code flags} and {@code kind}, registered in the
      * cache, and the initializer runs to populate the remaining fields
      * (typically via {@link JavaType.Class#unsafeSet}).
-     * <p>
-     * {@code flags} and {@code kind} are what the caller knows without loading
-     * the class, which for a type javac has not completed yet is nothing. The
-     * initializer applies the final values once it has loaded the class, so an
-     * implementation must not treat the parameters as authoritative on a miss.
+     * {@code flags} and {@code kind} are the caller's best knowledge before
+     * loading the class, and the initializer may overwrite them.
      *
      * @param fqn the fully-qualified name of the class, in the form
      *            {@link JavaType.FullyQualified#getFullyQualifiedName()} returns.

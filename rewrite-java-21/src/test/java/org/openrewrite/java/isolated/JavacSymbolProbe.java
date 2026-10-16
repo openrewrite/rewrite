@@ -23,16 +23,9 @@ import org.jspecify.annotations.Nullable;
 
 import java.lang.reflect.Field;
 
-/**
- * Reads javac symbol state out of a {@link ReloadableJava21Parser}. Tests load this class by name through the
- * parser's class loader, the only loader that can link against javac's internals.
- */
+// Loaded through the parser's class loader, the only one that links against javac's internals.
 public class JavacSymbolProbe {
 
-    /**
-     * @return whether javac has completed the class symbol for {@code fqn}, or {@code null} when the parser's
-     * symbol table has no symbol for it.
-     */
     public static @Nullable Boolean isCompleted(Object parser, String fqn) throws ReflectiveOperationException {
         Field contextField = ReloadableJava21Parser.class.getDeclaredField("context");
         contextField.setAccessible(true);

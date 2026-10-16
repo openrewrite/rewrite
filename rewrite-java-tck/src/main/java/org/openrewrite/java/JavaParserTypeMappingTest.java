@@ -573,11 +573,13 @@ class JavaParserTypeMappingTest implements JavaTypeMappingTest, RewriteTest {
               public Iface iface() { return null; }
               public Enm enm() { return null; }
               public Cls cls() { return null; }
+              public Outer<String>.Inner inner() { return null; }
           }
           @interface Ann {}
           interface Iface {}
           enum Enm {}
           class Cls {}
+          class Outer<T> { class Inner {} }
           """);
 
         assertThat(returnTypeOf(holder, "ann").getKind()).isEqualTo(JavaType.FullyQualified.Kind.Annotation);
@@ -585,6 +587,10 @@ class JavaParserTypeMappingTest implements JavaTypeMappingTest, RewriteTest {
         assertThat(returnTypeOf(holder, "enm").getKind()).isEqualTo(JavaType.FullyQualified.Kind.Enum);
         assertThat(returnTypeOf(holder, "cls").getKind()).isEqualTo(JavaType.FullyQualified.Kind.Class);
         assertThat(returnTypeOf(holder, "iface").getFlags()).contains(Flag.Interface, Flag.Abstract);
+
+        JavaType.FullyQualified innerOwner = returnTypeOf(holder, "inner").getOwningClass();
+        assertThat(innerOwner).isInstanceOf(JavaType.Parameterized.class);
+        assertThat(innerOwner.getFullyQualifiedName()).isEqualTo("fixture.Outer");
     }
 
     @MinimumJava17
@@ -601,10 +607,6 @@ class JavaParserTypeMappingTest implements JavaTypeMappingTest, RewriteTest {
         assertThat(returnTypeOf(holder, "rec").getKind()).isEqualTo(JavaType.FullyQualified.Kind.Record);
     }
 
-    /**
-     * Compiles {@code fixture} to class files and parses a source whose only use of them is a field of type
-     * {@code fixture.Holder}, so the other fixture types are reached through Holder's member signatures.
-     */
     private JavaType.Class parseClasspathHolder(@Language("java") String fixture) throws Exception {
         Path source = fixtureClasses.resolve("Holder.java");
         Files.write(source, fixture.getBytes(StandardCharsets.UTF_8));
@@ -612,6 +614,7 @@ class JavaParserTypeMappingTest implements JavaTypeMappingTest, RewriteTest {
           "-d", fixtureClasses.toString(), source.toString());
         assertThat(exit).isZero();
 
+        // The source uses only Holder, so the other fixture types are reached through Holder's member signatures.
         J.CompilationUnit cu = JavaParser.fromJavaVersion().classpath(singletonList(fixtureClasses)).build()
           .parse("class A { fixture.Holder h; }")
           .findFirst()
