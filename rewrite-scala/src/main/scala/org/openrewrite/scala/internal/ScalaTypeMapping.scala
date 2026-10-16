@@ -24,6 +24,7 @@ import dotty.tools.dotc.core.Contexts.*
 import dotty.tools.dotc.core.Flags
 import dotty.tools.dotc.core.Symbols
 import dotty.tools.dotc.core.Symbols.Symbol
+import dotty.tools.dotc.core.TypeOps
 import dotty.tools.dotc.core.Types.*
 import dotty.tools.dotc.util.Spans
 
@@ -348,6 +349,7 @@ class ScalaTypeMapping(typeFactory: JavaTypeFactory, typedTree: tpd.Tree,
     val arguments: List[untpd.Tree] = tree match {
       case app: untpd.Apply => app.args
       case infix: untpd.InfixOp => List(infix.right)
+      case _: untpd.TypeApply => Nil
       case _ => return false
     }
     def flatten(arg: untpd.Tree): List[untpd.Tree] = arg match {
@@ -358,7 +360,30 @@ class ScalaTypeMapping(typeFactory: JavaTypeFactory, typedTree: tpd.Tree,
     }
     val typedArguments = arguments.flatMap(flatten).flatMap(typedNodes.get)
     if (typedArguments.exists(a => isErrorType(a.own))) false
-    else isErrorType(node.own) || typedArguments.exists(a => isErrorType(a.adapted))
+    else isErrorType(node.own) || typedArguments.exists(a => isErrorType(a.adapted)) ||
+      hasNonConformingTypeArguments(node.own)
+  }
+
+  /**
+   * Whether a type argument of the call is of the wrong kind or out of the bounds of its type
+   * parameter. The typer leaves these checks to a later phase, so they are repeated here.
+   */
+  private def hasNonConformingTypeArguments(call: tpd.Tree): Boolean =
+    typeApplication(application(call)).exists { case Trees.TypeApply(fn, args) =>
+      try fn.tpe.widen match {
+        case poly: PolyType if args.size == poly.paramInfos.size && !args.exists(isErrorType) =>
+          args.lazyZip(poly.paramInfos).exists((arg, bounds) => !bounds.isLambdaSub && !arg.tpe.hasSimpleKind) ||
+            TypeOps.boundsViolations(args, poly.paramInfos, _.substParams(poly, _), NoType).nonEmpty
+        case _ => false
+      } catch {
+        case _: Throwable => false
+      }
+    }
+
+  private def typeApplication(tree: tpd.Tree): Option[tpd.TypeApply] = tree match {
+    case ta: Trees.TypeApply[?] => Some(ta.asInstanceOf[tpd.TypeApply])
+    case Trees.Apply(fn, _) => typeApplication(fn)
+    case _ => None
   }
 
   private def isErrorType(tree: tpd.Tree): Boolean =

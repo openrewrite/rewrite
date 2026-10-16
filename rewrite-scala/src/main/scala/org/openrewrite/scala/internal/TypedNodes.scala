@@ -123,7 +123,7 @@ private[internal] final class TyperRecorder {
   def track(index: UntypedNodeIndex): Unit = index.foreach((_, trees) => trees.foreach(sources.add))
 
   def recordTyped(tree: untpd.Tree, result: tpd.Tree): Unit =
-    if (sources.contains(tree)) {
+    if (sources.contains(tree) && !isCachedAdaptation(tree, result)) {
       val previous = typed.put(tree, result)
       if (previous ne result) {
         if (previous != null) release(previous)
@@ -131,6 +131,15 @@ private[internal] final class TyperRecorder {
         typings.put(result, if (count == null) 1 else count + 1)
       }
     }
+
+  /**
+   * A tree typed ahead, such as the right-hand side of a definition whose type is inferred,
+   * is typed again as the adapted tree the typer cached the first time around.
+   */
+  private def isCachedAdaptation(tree: untpd.Tree, result: tpd.Tree): Boolean = {
+    val previous = typed.get(tree)
+    previous != null && (previous ne result) && (adapted.get(previous) eq result)
+  }
 
   private def release(typing: tpd.Tree): Unit = {
     val count = typings.get(typing)
