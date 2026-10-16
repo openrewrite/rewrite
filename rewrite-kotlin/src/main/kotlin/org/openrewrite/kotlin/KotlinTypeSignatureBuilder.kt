@@ -566,7 +566,7 @@ class KotlinTypeSignatureBuilder(private val firSession: FirSession, private val
                 else -> signature(classifier)
             }
 
-            is BinaryJavaAnnotation -> signature(type.classId.toSymbol(firSession)?.fir)
+            is BinaryJavaAnnotation -> convertClassIdToFqn(type.classId)
             is BinaryJavaClass -> if (type.typeParameters.isNotEmpty()) javaParameterizedSignature(type) else javaClassSignature(
                 type
             )
