@@ -221,7 +221,8 @@ class ReloadableJava11TypeMapping implements JavaTypeMapping<Tree> {
         String fqn = sym.flatName().toString();
 
         // Taken before the initializer may complete the symbol, matching the signature built from the same state.
-        // A generic class reached before completion therefore maps raw.
+        // A generic class arrives through its own symbol type only once javac has completed it, since javac
+        // completes an owner before its nested classes and a class before any of its members.
         boolean parameterized = classType.typarams_field != null && classType.typarams_field.length() > 0;
         // flags_field is empty until javac completes the symbol, so the initializer sets flags and kind again.
         JavaType.Class clazz = typeFactory.computeClass(fqn, sym.flags_field, getKind(sym), c -> {
