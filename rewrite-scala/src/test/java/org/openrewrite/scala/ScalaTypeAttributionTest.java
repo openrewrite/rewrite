@@ -17,7 +17,11 @@ package org.openrewrite.scala;
 
 import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.Test;
+import org.openrewrite.ExecutionContext;
+import org.openrewrite.InMemoryExecutionContext;
+import org.openrewrite.SourceFile;
 import org.openrewrite.java.JavaParser;
+import org.openrewrite.java.internal.JavaTypeCache;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.java.tree.TypeUtils;
@@ -1061,6 +1065,126 @@ class ScalaTypeAttributionTest implements RewriteTest {
             })
           )
         );
+    }
+
+    @Test
+    void libraryClassHasItsSupertypes() {
+        rewriteRun(
+          scala(
+            """
+            class LibraryClassHolder {
+              val xs: java.util.ArrayList[String] = new java.util.ArrayList[String]()
+            }
+            """,
+            spec -> spec.afterRecipe(cu -> {
+                J.VariableDeclarations.NamedVariable xs = find(cu, J.VariableDeclarations.NamedVariable.class, v -> v.getSimpleName().equals("xs"));
+                JavaType.FullyQualified arrayList = TypeUtils.asFullyQualified(xs.getType());
+                assertThat(arrayList.getFullyQualifiedName()).isEqualTo("java.util.ArrayList");
+                assertThat(arrayList.getKind()).isEqualTo(JavaType.FullyQualified.Kind.Class);
+                assertThat(arrayList.getSupertype().getFullyQualifiedName()).isEqualTo("java.util.AbstractList");
+                assertThat(TypeUtils.isAssignableTo("java.util.Collection", arrayList)).isTrue();
+                assertThat(TypeUtils.isAssignableTo("java.lang.Iterable", arrayList)).isTrue();
+            })
+          )
+        );
+    }
+
+    @Test
+    void libraryInterfaceHasInterfaceKind() {
+        rewriteRun(
+          scala(
+            """
+            class LibraryInterfaceHolder {
+              val xs: java.util.List[String] = new java.util.ArrayList[String]()
+            }
+            """,
+            spec -> spec.afterRecipe(cu -> {
+                J.VariableDeclarations.NamedVariable xs = find(cu, J.VariableDeclarations.NamedVariable.class, v -> v.getSimpleName().equals("xs"));
+                JavaType.FullyQualified list = TypeUtils.asFullyQualified(xs.getType());
+                assertThat(list.getKind()).isEqualTo(JavaType.FullyQualified.Kind.Interface);
+                assertThat(TypeUtils.isAssignableTo("java.util.Collection", list)).isTrue();
+            })
+          )
+        );
+    }
+
+    @Test
+    void sourceClassExtendingLibraryClassIsAssignableToLibrarySupertypes() {
+        rewriteRun(
+          scala(
+            """
+            class Names extends java.util.ArrayList[String]
+            """,
+            spec -> spec.afterRecipe(cu -> {
+                J.ClassDeclaration names = find(cu, J.ClassDeclaration.class, c -> c.getSimpleName().equals("Names"));
+                assertThat(TypeUtils.isAssignableTo("java.util.List", names.getType())).isTrue();
+            })
+          )
+        );
+    }
+
+    @Test
+    void classTypeParameterInSupertypeIsTypeVariable() {
+        rewriteRun(
+          scala(
+            """
+            class Box[T] extends java.util.ArrayList[T]
+            """,
+            spec -> spec.afterRecipe(cu -> {
+                J.ClassDeclaration box = find(cu, J.ClassDeclaration.class, c -> c.getSimpleName().equals("Box"));
+                JavaType.Parameterized supertype = (JavaType.Parameterized) box.getType().getSupertype();
+                assertThat(supertype.getTypeParameters()).singleElement()
+                  .isInstanceOfSatisfying(JavaType.GenericTypeVariable.class, t -> assertThat(t.getName()).isEqualTo("T"));
+            })
+          )
+        );
+    }
+
+    @Test
+    void stringTypeIsIndependentOfParseOrder() {
+        // given
+        ScalaParser parser = ScalaParser.builder().build();
+        String declaresStringType = """
+          class DeclaresStringType {
+            def size(s: String): Int = s.length
+          }
+          """;
+        String usesStringLiteral = """
+          class UsesStringLiteral {
+            val s = "b"
+          }
+          """;
+
+        // when
+        List<SourceFile> parsed = parser.parse(new InMemoryExecutionContext(), declaresStringType, usesStringLiteral).toList();
+
+        // then
+        J.VariableDeclarations.NamedVariable s = find((J) parsed.get(1), J.VariableDeclarations.NamedVariable.class, v -> v.getSimpleName().equals("s"));
+        assertThat(TypeUtils.isAssignableTo("java.lang.CharSequence", s.getType())).isTrue();
+        assertThat(TypeUtils.isAssignableTo("java.lang.Comparable", s.getType())).isTrue();
+    }
+
+    @Test
+    void scalaParserDoesNotLeaveShallowClassesInCacheSharedWithJavaParser() {
+        // given
+        JavaTypeCache typeCache = new JavaTypeCache();
+        ExecutionContext ctx = new InMemoryExecutionContext();
+        ScalaParser.builder().typeCache(typeCache).build().parse(ctx, """
+          class ScalaArrayListHolder {
+            val xs: java.util.ArrayList[String] = new java.util.ArrayList[String]()
+          }
+          """).toList();
+
+        // when
+        J.CompilationUnit cu = (J.CompilationUnit) JavaParser.fromJavaVersion().typeCache(typeCache).build().parse(ctx, """
+          class JavaArrayListHolder {
+              java.util.ArrayList<String> xs;
+          }
+          """).findFirst().orElseThrow();
+
+        // then
+        J.VariableDeclarations xs = (J.VariableDeclarations) cu.getClasses().getFirst().getBody().getStatements().getFirst();
+        assertThat(TypeUtils.isAssignableTo("java.util.List", xs.getType())).isTrue();
     }
 
     private static J.Identifier lambdaParameter(J cu, String name) {
