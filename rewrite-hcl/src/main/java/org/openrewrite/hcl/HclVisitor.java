@@ -17,6 +17,7 @@ package org.openrewrite.hcl;
 
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.Cursor;
+import org.openrewrite.FormattingListener;
 import org.openrewrite.SourceFile;
 import org.openrewrite.TreeVisitor;
 import org.openrewrite.hcl.format.AutoFormatVisitor;
@@ -38,6 +39,7 @@ public class HclVisitor<P> extends TreeVisitor<Hcl, P> {
 
     @SuppressWarnings({"ConstantConditions", "unchecked"})
     public <H extends Hcl> H autoFormat(H h, @Nullable Hcl stopAfter, P p, Cursor cursor) {
+        FormattingListener.beforeFormat(h, stopAfter, cursor);
         return (H) new AutoFormatVisitor<>(stopAfter).visit(h, p, cursor);
     }
 

@@ -17,6 +17,7 @@ package org.openrewrite.json;
 
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.Cursor;
+import org.openrewrite.FormattingListener;
 import org.openrewrite.SourceFile;
 import org.openrewrite.TreeVisitor;
 import org.openrewrite.internal.ListUtils;
@@ -49,6 +50,7 @@ public class JsonVisitor<P> extends TreeVisitor<Json, P> {
     @SuppressWarnings({"unchecked", "ConstantConditions"})
     public <Y2 extends Json> Y2 maybeAutoFormat(Y2 before, Y2 after, @Nullable Json stopAfter, P p, Cursor cursor) {
         if (before != after) {
+            FormattingListener.beforeFormat(after, stopAfter, cursor);
             return (Y2) new AutoFormatVisitor<>(stopAfter).visit(after, p, cursor);
         }
         return after;
@@ -64,6 +66,7 @@ public class JsonVisitor<P> extends TreeVisitor<Json, P> {
 
     @SuppressWarnings({"ConstantConditions", "unchecked"})
     public <Y2 extends Json> Y2 autoFormat(Y2 y, @Nullable Json stopAfter, P p, Cursor cursor) {
+        FormattingListener.beforeFormat(y, stopAfter, cursor);
         return (Y2) new AutoFormatVisitor<>(stopAfter).visit(y, p, cursor);
     }
 

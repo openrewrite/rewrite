@@ -88,6 +88,7 @@ public class JavaVisitor<P> extends TreeVisitor<J, P> {
 
     @SuppressWarnings({"ConstantConditions", "unchecked"})
     public <J2 extends J> J2 autoFormat(J2 j, @Nullable J stopAfter, P p, Cursor parent) {
+        FormattingListener.beforeFormat(j, stopAfter, parent);
         JavaSourceFile cu = (j instanceof JavaSourceFile) ?
                 (JavaSourceFile) j :
                 getCursor().firstEnclosingOrThrow(JavaSourceFile.class);
