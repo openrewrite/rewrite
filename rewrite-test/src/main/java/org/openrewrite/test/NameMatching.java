@@ -39,7 +39,8 @@ final class NameMatching {
     private static final Duration SOURCE_FILE_TIMEOUT = Duration.ofSeconds(5);
 
     /**
-     * Recipes that match type names as text on purpose, because the types they rename may be missing from the classpath.
+     * Recipes that match type names as text on purpose, because the types they rename may be missing from the
+     * classpath.
      */
     private static final Set<String> MATCH_TYPE_NAMES = new HashSet<>(Arrays.asList(
             "org.openrewrite.java.ChangeType",
@@ -80,9 +81,10 @@ final class NameMatching {
      */
     private @Nullable Map<UUID, @Nullable SourceFile> control;
 
-    private NameMatching(byte[] recipe, RewriteRunner.Context context, List<SourceFile> parsed, boolean equivalentSpellings,
-                         boolean typeAttributedMatching, Function<SourceFile, List<Parser.Builder>> parsersFor,
-                         @Nullable Path relativeTo, ExecutionContext parseCtx) {
+    private NameMatching(byte[] recipe, RewriteRunner.Context context, List<SourceFile> parsed,
+                         boolean equivalentSpellings, boolean typeAttributedMatching,
+                         Function<SourceFile, List<Parser.Builder>> parsersFor, @Nullable Path relativeTo,
+                         ExecutionContext parseCtx) {
         this.recipe = recipe;
         this.sources = context.getParsedSources();
         this.parsed = parsed;
@@ -109,10 +111,12 @@ final class NameMatching {
         TypeValidation after = TypeValidation.after(methodSpec, classSpec);
         boolean equivalentSpellings = before.equivalentSpellings() && after.equivalentSpellings();
         boolean typeAttributedMatching = before.typeAttributedMatching() && after.typeAttributedMatching();
-        boolean typesValidated = before.classDeclarations() && before.identifiers() && before.methodDeclarations() &&
-                                 before.variableDeclarations() && before.methodInvocations() && before.constructorInvocations();
+        boolean typesValidated = before.classDeclarations() && before.identifiers() &&
+                                 before.methodDeclarations() && before.variableDeclarations() &&
+                                 before.methodInvocations() && before.constructorInvocations();
         if (!equivalentSpellings && !typeAttributedMatching || !typesValidated || recipe.equals(Recipe.noop()) ||
-            runner != RewriteRunner.IN_PROCESS || methodSpec.getSourceSet() != null || classSpec.getSourceSet() != null ||
+            runner != RewriteRunner.IN_PROCESS ||
+            methodSpec.getSourceSet() != null || classSpec.getSourceSet() != null ||
             !methodSpec.getBeforeRecipes().isEmpty() || !classSpec.getBeforeRecipes().isEmpty() ||
             isTestScaffolding(recipe)) {
             return null;
@@ -208,7 +212,8 @@ final class NameMatching {
             try {
                 respellings = index < 0 ? Collections.emptyList() :
                         service.respell(before, after, respelled -> {
-                            SourceFile reparsed = AddedMarkers.reparse(respelled, others, parsersFor, relativeTo, parseCtx);
+                            SourceFile reparsed = AddedMarkers.reparse(respelled, others, parsersFor,
+                                    relativeTo, parseCtx);
                             if (reparsed == null) {
                                 return null;
                             }
@@ -238,12 +243,13 @@ final class NameMatching {
             return null;
         }
         return "Match the code the recipe changes by its type attribution, with MethodMatcher, " +
-               "J.MethodInvocation#getMethodType() or TypeUtils, not by names, by whether a call has a select, or by " +
-               "how code prints. The recipe changed these sources but left them unchanged once that code was respelled " +
-               "to mean the same:\n" + found +
-               "A static import and a qualified call name the same method, and an imported and a fully qualified name " +
-               "the same type, so a recipe that changes one spelling must change the other. If only one spelling is " +
-               "meant to change, add spec.typeValidationOptions(TypeValidation.all().equivalentSpellings(false)).";
+               "J.MethodInvocation#getMethodType() or TypeUtils, not by names, by whether a call has a select, " +
+               "or by how code prints. The recipe changed these sources but left them unchanged once that code " +
+               "was respelled to mean the same:\n" + found +
+               "A static import and a qualified call name the same method, and an imported and a fully qualified " +
+               "name the same type, so a recipe that changes one spelling must change the other. If only one " +
+               "spelling is meant to change, add " +
+               "spec.typeValidationOptions(TypeValidation.all().equivalentSpellings(false)).";
     }
 
     private @Nullable String withoutTypesFailures(List<Result> changed) {
@@ -288,8 +294,8 @@ final class NameMatching {
         if (found.length() == 0) {
             return null;
         }
-        return "Identify the code to change through type attribution, not by name or printed text. The recipe made the " +
-               "same change to these sources after all type attribution was removed from them:\n" + found +
+        return "Identify the code to change through type attribution, not by name or printed text. The recipe " +
+               "made the same change to these sources after all type attribution was removed from them:\n" + found +
                "A recipe that matches names also changes look-alike code, such as same-named methods or types from " +
                "other packages, and shadowed names. Use:\n" +
                "  - method calls: MethodMatcher, plus TypeUtils.isAssignableTo for the receiver\n" +
@@ -310,7 +316,8 @@ final class NameMatching {
             Map<UUID, @Nullable SourceFile> rerun = rerun(sources);
             control = rerun == null ? Collections.emptyMap() : rerun;
         }
-        return printsLike(Objects.requireNonNull(result.getAfter()), control, Objects.requireNonNull(result.getBefore()).getId());
+        return printsLike(Objects.requireNonNull(result.getAfter()), control,
+                Objects.requireNonNull(result.getBefore()).getId());
     }
 
     private static boolean printsLike(SourceFile after, Map<UUID, @Nullable SourceFile> rerun, UUID id) {

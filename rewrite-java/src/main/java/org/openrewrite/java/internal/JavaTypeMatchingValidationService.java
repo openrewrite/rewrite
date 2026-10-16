@@ -18,6 +18,7 @@ package org.openrewrite.java.internal;
 import lombok.Value;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
+import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.TypeMatchingValidationService;
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.JavaVisitor;
@@ -46,7 +47,8 @@ public class JavaTypeMatchingValidationService implements TypeMatchingValidation
     private static final int SNIPPET_LENGTH = 60;
 
     /**
-     * The withers that clear each element's type attribution. Literals and primitives keep their types, which are syntax.
+     * The withers that clear each element's type attribution. Literals and primitives keep their types, which are
+     * syntax.
      */
     private static final ClassValue<List<Method>> TYPE_WITHERS = new ClassValue<List<Method>>() {
         @Override
@@ -60,7 +62,8 @@ public class JavaTypeMatchingValidationService implements TypeMatchingValidation
                     if (Modifier.isStatic(field.getModifiers()) || !JavaType.class.isAssignableFrom(field.getType())) {
                         continue;
                     }
-                    String name = "with" + Character.toUpperCase(field.getName().charAt(0)) + field.getName().substring(1);
+                    String name = "with" + Character.toUpperCase(field.getName().charAt(0)) +
+                                  field.getName().substring(1);
                     for (Method method : type.getMethods()) {
                         if (method.getName().equals(name) && method.getParameterCount() == 1 &&
                             method.getParameterTypes()[0].isAssignableFrom(field.getType())) {
@@ -101,8 +104,10 @@ public class JavaTypeMatchingValidationService implements TypeMatchingValidation
     }
 
     @Override
-    public List<String> referencesToOtherTypes(SourceFile before, SourceFile after, Collection<? extends SourceFile> sources) {
-        if (!(before instanceof J.CompilationUnit) || !(after instanceof J.CompilationUnit)) {
+    public List<String> referencesToOtherTypes(SourceFile before, SourceFile after,
+                                               Collection<? extends SourceFile> sources) {
+        if (!(before instanceof J.CompilationUnit) || !(after instanceof J.CompilationUnit) ||
+            !changesCode(before, after)) {
             return emptyList();
         }
         Set<String> declared = new HashSet<>();
@@ -110,7 +115,8 @@ public class JavaTypeMatchingValidationService implements TypeMatchingValidation
             if (source instanceof J.CompilationUnit) {
                 new JavaIsoVisitor<Set<String>>() {
                     @Override
-                    public J.ClassDeclaration visitClassDeclaration(J.ClassDeclaration classDecl, Set<String> declared) {
+                    public J.ClassDeclaration visitClassDeclaration(J.ClassDeclaration classDecl,
+                                                                    Set<String> declared) {
                         if (classDecl.getType() != null) {
                             declared.add(classDecl.getType().getFullyQualifiedName());
                         }
@@ -127,7 +133,8 @@ public class JavaTypeMatchingValidationService implements TypeMatchingValidation
         }
         for (Cursor removed : change.removed) {
             // what a removed declaration was annotated with is often why it was removed, unlike the code inside it
-            if (removed.getValue() instanceof J.Annotation && anchors.contains(removed.getParentTreeCursor().getValue())) {
+            if (removed.getValue() instanceof J.Annotation &&
+                anchors.contains(removed.getParentTreeCursor().getValue())) {
                 changed.add(removed);
             }
         }
@@ -146,8 +153,11 @@ public class JavaTypeMatchingValidationService implements TypeMatchingValidation
     }
 
     @Override
-    public List<Respelling> respell(SourceFile before, SourceFile after, Function<SourceFile, @Nullable SourceFile> reparse) {
-        if (!(before instanceof J.CompilationUnit) || !(after instanceof J.CompilationUnit)) {
+    public List<Respelling> respell(SourceFile before, SourceFile after,
+                                    Function<SourceFile, @Nullable SourceFile> reparse) {
+        // a change only to imports names nothing by type
+        if (!(before instanceof J.CompilationUnit) || !(after instanceof J.CompilationUnit) ||
+            !changesCode(before, after)) {
             return emptyList();
         }
         J.CompilationUnit cu = (J.CompilationUnit) before;
@@ -155,12 +165,13 @@ public class JavaTypeMatchingValidationService implements TypeMatchingValidation
         if (inChange.isEmpty()) {
             return emptyList();
         }
+        String afterCode = printedWithoutImports((J.CompilationUnit) after);
         List<Respelling> respellings = new ArrayList<>(3);
         for (Respell respell : new Respell[]{new RespellStaticCalls(inChange, true),
                 new RespellStaticCalls(inChange, false), new QualifyTypeNames(inChange)}) {
             J.CompilationUnit respelled = (J.CompilationUnit) respell.visitNonNull(cu, new InMemoryExecutionContext());
             // nothing to respell, or the recipe's own change is this respelling
-            if (respell.description == null || printedWithoutImports(respelled).equals(printedWithoutImports((J.CompilationUnit) after))) {
+            if (respell.description == null || printedWithoutImports(respelled).equals(afterCode)) {
                 continue;
             }
             SourceFile reparsed = reparse.apply(respelled);
@@ -177,7 +188,8 @@ public class JavaTypeMatchingValidationService implements TypeMatchingValidation
         if (!(before instanceof J.CompilationUnit) || !(after instanceof J.CompilationUnit)) {
             return after == null || !before.printAll().equals(after.printAll());
         }
-        return !printedWithoutImports((J.CompilationUnit) before).equals(printedWithoutImports((J.CompilationUnit) after));
+        return !printedWithoutImports((J.CompilationUnit) before)
+                .equals(printedWithoutImports((J.CompilationUnit) after));
     }
 
     /**
@@ -212,7 +224,8 @@ public class JavaTypeMatchingValidationService implements TypeMatchingValidation
      */
     private static boolean sameMeaning(J.CompilationUnit original, J.CompilationUnit respelled) {
         return calls(original).equals(calls(respelled)) && unknownTypes(respelled) <= unknownTypes(original) &&
-               FindMissingTypes.findMissingTypes(respelled, false).size() <= FindMissingTypes.findMissingTypes(original, false).size();
+               FindMissingTypes.findMissingTypes(respelled, false).size() <=
+               FindMissingTypes.findMissingTypes(original, false).size();
     }
 
     private static int unknownTypes(J.CompilationUnit cu) {
@@ -227,8 +240,9 @@ public class JavaTypeMatchingValidationService implements TypeMatchingValidation
             @Override
             public J.FieldAccess visitFieldAccess(J.FieldAccess fieldAccess, AtomicInteger unknown) {
                 // the package of a fully qualified type name has no type, but the name does
-                return fieldAccess.getName().getFieldType() == null && TypeUtils.asFullyQualified(fieldAccess.getType()) != null ?
-                        fieldAccess : super.visitFieldAccess(fieldAccess, unknown);
+                boolean typeName = fieldAccess.getName().getFieldType() == null &&
+                                   TypeUtils.asFullyQualified(fieldAccess.getType()) != null;
+                return typeName ? fieldAccess : super.visitFieldAccess(fieldAccess, unknown);
             }
 
             @Override
@@ -253,7 +267,8 @@ public class JavaTypeMatchingValidationService implements TypeMatchingValidation
 
             @Override
             public J.NewClass visitNewClass(J.NewClass newClass, List<String> calls) {
-                calls.add(newClass.getConstructorType() == null ? "?" : MethodMatcher.methodPattern(newClass.getConstructorType()));
+                JavaType.Method constructor = newClass.getConstructorType();
+                calls.add(constructor == null ? "?" : MethodMatcher.methodPattern(constructor));
                 return super.visitNewClass(newClass, calls);
             }
         }.visit(cu, calls);
@@ -261,8 +276,32 @@ public class JavaTypeMatchingValidationService implements TypeMatchingValidation
         return calls;
     }
 
+    /**
+     * Without imports, or the comments on the line of the package declaration or last import, which stay behind
+     * when imports move.
+     */
     private static String printedWithoutImports(J.CompilationUnit cu) {
-        return normalized(cu.withImports(emptyList()).printAll());
+        J.CompilationUnit code = cu.withImports(emptyList());
+        if (cu.getPackageDeclaration() != null || !cu.getImports().isEmpty()) {
+            code = code.getClasses().isEmpty() ? code.withEof(withoutTrailingComments(code.getEof())) :
+                    code.withClasses(ListUtils.mapFirst(code.getClasses(),
+                            c -> c.withPrefix(withoutTrailingComments(c.getPrefix()))));
+        }
+        return normalized(code.printAll());
+    }
+
+    private static Space withoutTrailingComments(Space space) {
+        String before = space.getWhitespace();
+        int trailing = 0;
+        for (Comment comment : space.getComments()) {
+            if (before.contains("\n")) {
+                break;
+            }
+            before = comment.getSuffix();
+            trailing++;
+        }
+        return trailing == 0 ? space :
+                space.withComments(space.getComments().subList(trailing, space.getComments().size()));
     }
 
     /**
@@ -280,8 +319,8 @@ public class JavaTypeMatchingValidationService implements TypeMatchingValidation
         } else if (tree instanceof J.NewClass) {
             J.NewClass newClass = (J.NewClass) tree;
             JavaType.Method constructor = newClass.getConstructorType();
-            return constructor == null ? reference(newClass.getType()) :
-                    new Reference(constructor.getDeclaringType().getFullyQualifiedName(), MethodMatcher.methodPattern(constructor));
+            return constructor == null ? reference(newClass.getType()) : new Reference(
+                    constructor.getDeclaringType().getFullyQualifiedName(), MethodMatcher.methodPattern(constructor));
         } else if (tree instanceof J.Annotation) {
             return reference(((J.Annotation) tree).getType());
         } else if (tree instanceof J.ParameterizedType) {
@@ -289,9 +328,10 @@ public class JavaTypeMatchingValidationService implements TypeMatchingValidation
         } else if (tree instanceof J.Identifier) {
             J.Identifier identifier = (J.Identifier) tree;
             Cursor parent = cursor.getParentTreeCursor();
-            if (parent.getValue() instanceof J.MethodInvocation && ((J.MethodInvocation) parent.getValue()).getName() == identifier ||
-                parent.getValue() instanceof J.MemberReference && ((J.MemberReference) parent.getValue()).getReference() == identifier) {
-                return reference(parent.getValue(), parent);
+            Object p = parent.getValue();
+            if (p instanceof J.MethodInvocation && ((J.MethodInvocation) p).getName() == identifier ||
+                p instanceof J.MemberReference && ((J.MemberReference) p).getReference() == identifier) {
+                return reference(p, parent);
             }
             // a type name, not a variable
             if (identifier.getFieldType() == null && identifier.getType() instanceof JavaType.FullyQualified &&
@@ -396,7 +436,8 @@ public class JavaTypeMatchingValidationService implements TypeMatchingValidation
                     boolean changedBefore = changed;
                     changed = false;
                     super.visit(tree, p);
-                    if (!changed && !printed(tree, getCursor()).equals(printed(afterCursor.getValue(), afterCursor.getParentOrThrow()))) {
+                    if (!changed && !printed(tree, getCursor())
+                            .equals(printed(afterCursor.getValue(), afterCursor.getParentOrThrow()))) {
                         change.anchors.add(new Cursor(getCursor(), tree));
                         changed = true;
                     }
@@ -409,7 +450,8 @@ public class JavaTypeMatchingValidationService implements TypeMatchingValidation
 
         private static String printed(Tree tree, Cursor parent) {
             try {
-                return normalized(tree instanceof SourceFile ? ((SourceFile) tree).printAll() : tree.printTrimmed(parent));
+                return normalized(tree instanceof SourceFile ?
+                        ((SourceFile) tree).printAll() : tree.printTrimmed(parent));
             } catch (Exception e) {
                 return "";
             }
@@ -454,27 +496,32 @@ public class JavaTypeMatchingValidationService implements TypeMatchingValidation
         public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
             J.MethodInvocation m = super.visitMethodInvocation(method, ctx);
             JavaType.Method type = m.getMethodType();
-            if (!inChange.contains(m.getId()) || type == null || !type.hasFlags(Flag.Static) || m.getTypeParameters() != null) {
+            if (!inChange.contains(m.getId()) || type == null || !type.hasFlags(Flag.Static) ||
+                m.getTypeParameters() != null) {
                 return m;
             }
             String args = m.getArguments().stream().allMatch(J.Empty.class::isInstance) ? "()" : "(..)";
             if (qualify && m.getSelect() == null) {
-                JavaType.FullyQualified importedFrom = staticallyImportedFrom(m.getSimpleName(), type.getDeclaringType());
+                JavaType.FullyQualified importedFrom =
+                        staticallyImportedFrom(m.getSimpleName(), type.getDeclaringType());
                 if (importedFrom != null) {
                     maybeAddImport(importedFrom.getFullyQualifiedName());
                     respelled(m.getSimpleName() + args, importedFrom.getClassName() + "." + m.getSimpleName() + args);
                     return m.withSelect(new J.Identifier(Tree.randomId(), Space.EMPTY, Markers.EMPTY, emptyList(),
                             importedFrom.getClassName(), importedFrom, null));
                 }
-            } else if (!qualify && m.getSelect() != null && namesDeclaringType(m.getSelect(), type.getDeclaringType())) {
+            } else if (!qualify && m.getSelect() != null &&
+                       namesDeclaringType(m.getSelect(), type.getDeclaringType())) {
                 maybeAddImport(type.getDeclaringType().getFullyQualifiedName(), m.getSimpleName(), false);
-                respelled(m.getSelect().printTrimmed(getCursor()) + "." + m.getSimpleName() + args, m.getSimpleName() + args);
+                respelled(m.getSelect().printTrimmed(getCursor()) + "." + m.getSimpleName() + args,
+                        m.getSimpleName() + args);
                 return m.withSelect(null).withName(m.getName().withPrefix(m.getSelect().getPrefix()));
             }
             return m;
         }
 
-        private JavaType.@Nullable FullyQualified staticallyImportedFrom(String name, JavaType.FullyQualified declaringType) {
+        private JavaType.@Nullable FullyQualified staticallyImportedFrom(String name,
+                                                                         JavaType.FullyQualified declaringType) {
             J.CompilationUnit cu = getCursor().firstEnclosingOrThrow(J.CompilationUnit.class);
             for (J.Import anImport : cu.getImports()) {
                 String imported = anImport.getQualid().getSimpleName();
@@ -494,10 +541,12 @@ public class JavaTypeMatchingValidationService implements TypeMatchingValidation
             boolean typeName = select instanceof J.Identifier && ((J.Identifier) select).getFieldType() == null &&
                                !"this".equals(((J.Identifier) select).getSimpleName()) &&
                                !"super".equals(((J.Identifier) select).getSimpleName()) ||
-                               select instanceof J.FieldAccess && ((J.FieldAccess) select).getName().getFieldType() == null;
+                               select instanceof J.FieldAccess &&
+                               ((J.FieldAccess) select).getName().getFieldType() == null;
             JavaType.FullyQualified type = TypeUtils.asFullyQualified(select.getType());
             return typeName && type != null &&
-                   TypeUtils.fullyQualifiedNamesAreEqual(type.getFullyQualifiedName(), declaringType.getFullyQualifiedName());
+                   TypeUtils.fullyQualifiedNamesAreEqual(type.getFullyQualifiedName(),
+                           declaringType.getFullyQualifiedName());
         }
     }
 
@@ -513,7 +562,8 @@ public class JavaTypeMatchingValidationService implements TypeMatchingValidation
         public J.Identifier visitIdentifier(J.Identifier identifier, ExecutionContext ctx) {
             J.Identifier i = super.visitIdentifier(identifier, ctx);
             JavaType.FullyQualified type = TypeUtils.asFullyQualified(i.getType());
-            if (!inChange.contains(i.getId()) || type == null || i.getFieldType() != null || !i.getAnnotations().isEmpty() ||
+            if (!inChange.contains(i.getId()) || type == null || i.getFieldType() != null ||
+                !i.getAnnotations().isEmpty() ||
                 type.getPackageName().isEmpty() || !type.getClassName().endsWith(i.getSimpleName()) ||
                 LOCAL_CLASS.matcher(type.getFullyQualifiedName()).matches() || !standsForItsType(getCursor())) {
                 return i;

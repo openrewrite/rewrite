@@ -32,6 +32,7 @@ import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.JavaParser;
 import org.openrewrite.java.MethodMatcher;
 import org.openrewrite.java.NoStaticImport;
+import org.openrewrite.java.OrderImports;
 import org.openrewrite.java.RemoveUnusedImports;
 import org.openrewrite.java.UseStaticImport;
 import org.openrewrite.java.marker.OmitParentheses;
@@ -663,6 +664,63 @@ class RewriteTestTest implements RewriteTest {
         }
 
         @Test
+        void acceptImportOnlyChanges() {
+            rewriteRun(
+              spec -> spec.recipe(new OrderImports(false, null)),
+              java(
+                """
+                  import java.util.List;
+                  import java.util.ArrayList;
+
+                  import static java.util.Collections.emptyList;
+
+                  class A {
+                      List<String> list = emptyList();
+                      List<String> other = new ArrayList<>();
+                  }
+                  """,
+                """
+                  import java.util.ArrayList;
+                  import java.util.List;
+
+                  import static java.util.Collections.emptyList;
+
+                  class A {
+                      List<String> list = emptyList();
+                      List<String> other = new ArrayList<>();
+                  }
+                  """
+              )
+            );
+        }
+
+        @Test
+        void acceptImportChangesThatMoveComments() {
+            rewriteRun(
+              spec -> spec.recipe(new OrderImports(true, null)),
+              java(
+                """
+                  import static java.util.Collections.*; // helpers
+                  import java.util.List;
+
+                  class A {
+                      List<String> empty = emptyList();
+                  }
+                  """,
+                """
+                  import java.util.List;
+
+                  import static java.util.Collections.emptyList; // helpers
+
+                  class A {
+                      List<String> empty = emptyList();
+                  }
+                  """
+              )
+            );
+        }
+
+        @Test
         void equivalentSpellingsTurnedOff() {
             rewriteRun(
               spec -> spec.recipe(new FindQualifiedCallsByName("Collections", "emptyList"))
@@ -1073,7 +1131,8 @@ class RemoveMethodsAnnotatedByName extends Recipe {
     public TreeVisitor<?, ExecutionContext> getVisitor() {
         return new JavaIsoVisitor<>() {
             @Override
-            public J.@Nullable MethodDeclaration visitMethodDeclaration(J.MethodDeclaration method, ExecutionContext ctx) {
+            public J.@Nullable MethodDeclaration visitMethodDeclaration(J.MethodDeclaration method,
+                                                                        ExecutionContext ctx) {
                 for (J.Annotation annotation : method.getLeadingAnnotations()) {
                     if (annotationName.equals(annotation.getSimpleName())) {
                         return null;

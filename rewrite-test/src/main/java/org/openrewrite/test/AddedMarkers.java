@@ -170,7 +170,9 @@ final class AddedMarkers {
                     inputs.add(printed(other, relativeTo));
                 }
                 SourceFile reparsed = null;
-                for (SourceFile parsed : builder.clone().build().parseInputs(inputs, relativeTo, reparseCtx).collect(toList())) {
+                List<SourceFile> parsedInputs = builder.clone().build()
+                        .parseInputs(inputs, relativeTo, reparseCtx).collect(toList());
+                for (SourceFile parsed : parsedInputs) {
                     if (reparsed == null || parsed.getSourcePath().equals(after.getSourcePath())) {
                         reparsed = parsed;
                     }
@@ -185,10 +187,10 @@ final class AddedMarkers {
         return null;
     }
 
-    private static Parser.Input printed(SourceFile sourceFile, @Nullable Path relativeTo) {
-        Charset charset = sourceFile.getCharset() == null ? StandardCharsets.UTF_8 : sourceFile.getCharset();
-        String printed = sourceFile.printAll(new PrintOutputCapture<>(0, PrintOutputCapture.MarkerPrinter.SANITIZED));
-        Path sourcePath = relativeTo == null ? sourceFile.getSourcePath() : relativeTo.resolve(sourceFile.getSourcePath());
+    private static Parser.Input printed(SourceFile source, @Nullable Path relativeTo) {
+        Charset charset = source.getCharset() == null ? StandardCharsets.UTF_8 : source.getCharset();
+        String printed = source.printAll(new PrintOutputCapture<>(0, PrintOutputCapture.MarkerPrinter.SANITIZED));
+        Path sourcePath = relativeTo == null ? source.getSourcePath() : relativeTo.resolve(source.getSourcePath());
         return Parser.Input.fromString(sourcePath, printed, charset);
     }
 

@@ -462,7 +462,8 @@ public interface RewriteTest extends SourceSpecs {
         RewriteRunner.Context runnerContext = new RewriteRunner.Context(
                 lss, runnableSourceFiles, recipeCtx, cycles, expectedCyclesThatMakeChanges,
                 Arrays.asList(sourceSpecs), testClassSpec, testMethodSpec);
-        NameMatching nameMatching = NameMatching.of(recipe, runner, runnerContext, beforeSourceFiles, parsersFor, relativeTo, ctx);
+        NameMatching nameMatching = NameMatching.of(recipe, runner, runnerContext, beforeSourceFiles,
+                parsersFor, relativeTo, ctx);
         RecipeRun recipeRun = runner.run(recipe, runnerContext);
         if (addedMarkers != null) {
             addedMarkers.assertNoneAdded(recipeRun.getChangeset().getAllResults());
