@@ -86,6 +86,7 @@ class ScalaTypeSignatureBuilder(using ctx: Context) {
   private def typeRefSignature(tr: TypeRef): String = {
     val sym = tr.symbol
     if (!sym.exists) return tr.show
+    if (sym.isTypeParam) return typeVariableSignature(sym.name.toString, tr.underlying)
 
     val fqn = sym.fullName.toString
     mapScalaFqnToJava(fqn)
@@ -106,9 +107,10 @@ class ScalaTypeSignatureBuilder(using ctx: Context) {
     base + tj.toString
   }
 
-  private def genericSignature(tp: TypeParamRef): String = {
-    val name = tp.paramName.toString
+  private def genericSignature(tp: TypeParamRef): String =
+    typeVariableSignature(tp.paramName.toString, tp.underlying)
 
+  private def typeVariableSignature(name: String, bounds: Type): String = {
     if (typeVariableNameStack == null)
       typeVariableNameStack = new HashSet[String]()
 
@@ -119,7 +121,7 @@ class ScalaTypeSignatureBuilder(using ctx: Context) {
 
     val sb = new StringBuilder("Generic{" + name)
 
-    tp.underlying match {
+    bounds match {
       case tb: TypeBounds if !(tb.hi =:= ctx.definitions.AnyType) =>
         sb.append(" extends ")
         sb.append(signature(tb.hi))
