@@ -86,6 +86,13 @@ public class AddOrUpdateAnnotationAttribute extends Recipe {
     @Nullable
     Boolean appendArray;
 
+    @Option(displayName = "Append annotation attribute last, only if added",
+            description = "When the attribute is added, if `true`, appends it in last position. " +
+                    "If omitted or `false`. appends the attribute in first position.",
+            required = false)
+    @Nullable
+    Boolean addLast;
+
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
         return Preconditions.check(new UsesType<>(annotationType, false), new JavaIsoVisitor<ExecutionContext>() {
@@ -147,7 +154,13 @@ public class AddOrUpdateAnnotationAttribute extends Recipe {
                     if (args.size() == 1 && !(args.get(0) instanceof J.Assignment)) {
                         args = singletonList(createAnnotationAssignment(a, "value", a.getArguments().get(0)));
                     }
-                    a = a.withArguments(ListUtils.concat(as, args));
+                    if (TRUE.equals(addLast)) {
+                        // add last
+                        a = a.withArguments(ListUtils.concat(args, as));
+                    } else {
+                        // add first
+                        a = a.withArguments(ListUtils.concat(as, args));
+                    }
                 }
 
                 if (original != a) {
