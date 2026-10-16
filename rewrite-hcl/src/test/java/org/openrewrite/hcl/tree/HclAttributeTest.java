@@ -21,6 +21,9 @@ import org.openrewrite.ExecutionContext;
 import org.openrewrite.hcl.HclVisitor;
 import org.openrewrite.test.RewriteTest;
 
+import java.util.ArrayList;
+import java.util.List;
+
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.hcl.Assertions.hcl;
 
@@ -96,6 +99,43 @@ class HclAttributeTest implements RewriteTest {
               }
               """
           )
+        );
+    }
+
+    @Test
+    void simpleNameOfObjectKeys() {
+        List<String> names = new ArrayList<>();
+        rewriteRun(
+          spec -> spec.recipe(RewriteTest.toRecipe(() -> new HclVisitor<ExecutionContext>() {
+              @Override
+              public Hcl visitAttribute(Hcl.Attribute attribute, ExecutionContext ctx) {
+                  names.add(attribute.getSimpleName());
+                  return super.visitAttribute(attribute, ctx);
+              }
+          })),
+          hcl(
+            """
+              locals {
+                  objectvalue = {
+                    simple_attr = "value1"
+                    "quoted-attr" = "value2"
+                    (template_attr) = "value3"
+                    "${local.simple_str}quoted_template" = "value4"
+                    (local.a) = "value5"
+                    "" = "value6"
+                  }
+              }
+              """
+          )
+        );
+        assertThat(names).containsExactly(
+          "objectvalue",
+          "simple_attr",
+          "quoted-attr",
+          "template_attr",
+          "\"${local.simple_str}quoted_template\"",
+          "(local.a)",
+          ""
         );
     }
 }
