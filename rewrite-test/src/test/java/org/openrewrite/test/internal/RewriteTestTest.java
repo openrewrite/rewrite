@@ -30,11 +30,14 @@ import org.openrewrite.groovy.GroovyParser;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.JavaParser;
+import org.openrewrite.java.JavaTemplate;
 import org.openrewrite.java.MethodMatcher;
 import org.openrewrite.java.NoStaticImport;
 import org.openrewrite.java.OrderImports;
 import org.openrewrite.java.RemoveUnusedImports;
 import org.openrewrite.java.UseStaticImport;
+import org.openrewrite.java.format.AutoFormat;
+import org.openrewrite.java.format.AutoFormatVisitor;
 import org.openrewrite.java.marker.OmitParentheses;
 import org.openrewrite.java.search.FindAnnotations;
 import org.openrewrite.java.tree.J;
@@ -57,6 +60,7 @@ import java.util.UUID;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 import static java.util.Collections.emptyList;
+import static java.util.Comparator.comparing;
 import static java.util.stream.Collectors.toList;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -402,6 +406,424 @@ class RewriteTestTest implements RewriteTest {
                 })),
               text("println \"hello\"")
             );
+        }
+    }
+
+    @Nested
+    class FormattingScope {
+
+        // Formatted, except for one line away from the call the recipes rename
+        private static final String BEFORE = """
+          class A {
+              void foo() {
+              }
+
+              void bar() {
+              }
+
+              void test() {
+                  foo();
+              }
+
+              void other() {
+                    int unrelated = 1;
+              }
+          }
+          """;
+
+        @Test
+        void rejectFormattingTheWholeFileAfterOneLineEdit() {
+            AssertionError e = assertThrows(AssertionError.class, () -> rewriteRun(
+              spec -> spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {
+                  @Override
+                  public J.CompilationUnit visitCompilationUnit(J.CompilationUnit cu, ExecutionContext ctx) {
+                      return maybeAutoFormat(cu, super.visitCompilationUnit(cu, ctx), ctx);
+                  }
+
+                  @Override
+                  public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
+                      return renameFooToBar(super.visitMethodInvocation(method, ctx));
+                  }
+              })),
+              java(
+                BEFORE,
+                """
+                  class A {
+                      void foo() {
+                      }
+
+                      void bar() {
+                      }
+
+                      void test() {
+                          bar();
+                      }
+
+                      void other() {
+                          int unrelated = 1;
+                      }
+                  }
+                  """
+              )
+            ));
+            assertThat(e).hasMessageStartingWith("Format only what the recipe changed")
+              .hasMessageContaining("$1.visitCompilationUnit(RewriteTestTest.java:")
+              .hasMessageContaining("called maybeAutoFormat on\n    all of A.java");
+        }
+
+        @Test
+        void acceptFormattingOnlyTheChangedElement() {
+            rewriteRun(
+              spec -> spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {
+                  @Override
+                  public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
+                      J.MethodInvocation m = super.visitMethodInvocation(method, ctx);
+                      return maybeAutoFormat(m, renameFooToBar(m), ctx);
+                  }
+              })),
+              java(
+                BEFORE,
+                """
+                  class A {
+                      void foo() {
+                      }
+
+                      void bar() {
+                      }
+
+                      void test() {
+                          bar();
+                      }
+
+                      void other() {
+                            int unrelated = 1;
+                      }
+                  }
+                  """
+              )
+            );
+        }
+
+        @Test
+        void rejectFormattingTheWholeClassAfterAddingAnAnnotation() {
+            AssertionError e = assertThrows(AssertionError.class, () -> rewriteRun(
+              spec -> spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {
+                  @Override
+                  public J.ClassDeclaration visitClassDeclaration(J.ClassDeclaration classDecl, ExecutionContext ctx) {
+                      J.ClassDeclaration c = super.visitClassDeclaration(classDecl, ctx);
+                      return maybeAutoFormat(c, deprecate(c, getCursor()), ctx);
+                  }
+              })),
+              java(
+                BEFORE,
+                """
+                  @Deprecated
+                  class A {
+                      void foo() {
+                      }
+
+                      void bar() {
+                      }
+
+                      void test() {
+                          foo();
+                      }
+
+                      void other() {
+                          int unrelated = 1;
+                      }
+                  }
+                  """
+              )
+            ));
+            assertThat(e).hasMessageContaining("called maybeAutoFormat on\n    class `A` of A.java")
+              .hasMessageContaining("JavaTemplate and its coordinates (addAnnotation, addStatement) already format");
+        }
+
+        @Test
+        void rejectFormattingTheWholeClassEvenWhenTheTestsClassIsEmpty() {
+            assertThrows(AssertionError.class, () -> rewriteRun(
+              spec -> spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {
+                  @Override
+                  public J.ClassDeclaration visitClassDeclaration(J.ClassDeclaration classDecl, ExecutionContext ctx) {
+                      J.ClassDeclaration c = super.visitClassDeclaration(classDecl, ctx);
+                      return maybeAutoFormat(c, deprecate(c, getCursor()), ctx);
+                  }
+              })),
+              java(
+                """
+                  class A {
+                  }
+                  """,
+                """
+                  @Deprecated
+                  class A {
+                  }
+                  """
+              )
+            ));
+        }
+
+        @Test
+        void acceptFormattingOnlyTheClassHeader() {
+            rewriteRun(
+              spec -> spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {
+                  @Override
+                  public J.ClassDeclaration visitClassDeclaration(J.ClassDeclaration classDecl, ExecutionContext ctx) {
+                      J.ClassDeclaration c = super.visitClassDeclaration(classDecl, ctx);
+                      J.ClassDeclaration deprecated = deprecate(c, getCursor());
+                      return maybeAutoFormat(c, deprecated, deprecated.getName(), ctx,
+                        getCursor().getParentTreeCursor());
+                  }
+              })),
+              java(
+                BEFORE,
+                """
+                  @Deprecated
+                  class A {
+                      void foo() {
+                      }
+
+                      void bar() {
+                      }
+
+                      void test() {
+                          foo();
+                      }
+
+                      void other() {
+                            int unrelated = 1;
+                      }
+                  }
+                  """
+              )
+            );
+        }
+
+        @Test
+        void acceptFormattingTheClassWithItsBodySetAside() {
+            rewriteRun(
+              spec -> spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {
+                  @Override
+                  public J.ClassDeclaration visitClassDeclaration(J.ClassDeclaration classDecl, ExecutionContext ctx) {
+                      J.ClassDeclaration c = super.visitClassDeclaration(classDecl, ctx);
+                      J.ClassDeclaration deprecated = deprecate(c, getCursor());
+                      if (deprecated == c) {
+                          return c;
+                      }
+                      J.Block body = deprecated.getBody();
+                      return maybeAutoFormat(c, deprecated.withBody(body.withStatements(emptyList())), ctx)
+                        .withBody(body);
+                  }
+              })),
+              java(
+                BEFORE,
+                """
+                  @Deprecated
+                  class A {
+                      void foo() {
+                      }
+
+                      void bar() {
+                      }
+
+                      void test() {
+                          foo();
+                      }
+
+                      void other() {
+                            int unrelated = 1;
+                      }
+                  }
+                  """
+              )
+            );
+        }
+
+        @Test
+        void rejectAutoFormatVisitorRunAfterTheVisit() {
+            AssertionError e = assertThrows(AssertionError.class, () -> rewriteRun(
+              spec -> spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {
+                  @Override
+                  public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
+                      J.MethodInvocation m = super.visitMethodInvocation(method, ctx);
+                      J.MethodInvocation renamed = renameFooToBar(m);
+                      if (renamed != m) {
+                          doAfterVisit(new AutoFormatVisitor<>());
+                      }
+                      return renamed;
+                  }
+              })),
+              java(
+                BEFORE,
+                """
+                  class A {
+                      void foo() {
+                      }
+
+                      void bar() {
+                      }
+
+                      void test() {
+                          bar();
+                      }
+
+                      void other() {
+                          int unrelated = 1;
+                      }
+                  }
+                  """
+              )
+            ));
+            assertThat(e)
+              .hasMessageContaining("A visitor's doAfterVisit(new AutoFormatVisitor<>()) ran on\n    all of A.java");
+        }
+
+        @Test
+        void acceptFormattingRecipe() {
+            rewriteRun(
+              spec -> spec.recipe(new AutoFormat(null)),
+              java(
+                BEFORE,
+                """
+                  class A {
+                      void foo() {
+                      }
+
+                      void bar() {
+                      }
+
+                      void test() {
+                          foo();
+                      }
+
+                      void other() {
+                          int unrelated = 1;
+                      }
+                  }
+                  """
+              )
+            );
+        }
+
+        @Test
+        void acceptFormattingThatOnlyChangesWhitespace() {
+            rewriteRun(
+              spec -> spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {
+                  @Override
+                  public J.CompilationUnit visitCompilationUnit(J.CompilationUnit cu, ExecutionContext ctx) {
+                      return autoFormat(cu, ctx);
+                  }
+              })),
+              java(
+                BEFORE,
+                """
+                  class A {
+                      void foo() {
+                      }
+
+                      void bar() {
+                      }
+
+                      void test() {
+                          foo();
+                      }
+
+                      void other() {
+                          int unrelated = 1;
+                      }
+                  }
+                  """
+              )
+            );
+        }
+
+        @Test
+        void notTurnedOffWithoutTypeValidation() {
+            assertThrows(AssertionError.class, () -> rewriteRun(
+              spec -> spec.typeValidationOptions(TypeValidation.none())
+                .recipe(formatWholeClassAfterRename()),
+              java(
+                BEFORE,
+                """
+                  class A {
+                      void foo() {
+                      }
+
+                      void bar() {
+                      }
+
+                      void test() {
+                          bar();
+                      }
+
+                      void other() {
+                          int unrelated = 1;
+                      }
+                  }
+                  """
+              )
+            ));
+        }
+
+        @Test
+        void turnedOff() {
+            rewriteRun(
+              spec -> spec.typeValidationOptions(TypeValidation.builder().formattingScope(false).build())
+                .recipe(formatWholeClassAfterRename()),
+              java(
+                BEFORE,
+                """
+                  class A {
+                      void foo() {
+                      }
+
+                      void bar() {
+                      }
+
+                      void test() {
+                          bar();
+                      }
+
+                      void other() {
+                          int unrelated = 1;
+                      }
+                  }
+                  """
+              )
+            );
+        }
+
+        private Recipe formatWholeClassAfterRename() {
+            return toRecipe(() -> new JavaIsoVisitor<>() {
+                @Override
+                public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
+                    J.MethodInvocation m = super.visitMethodInvocation(method, ctx);
+                    J.MethodInvocation renamed = renameFooToBar(m);
+                    if (renamed != m) {
+                        getCursor().putMessageOnFirstEnclosing(J.ClassDeclaration.class, "renamed", true);
+                    }
+                    return renamed;
+                }
+
+                @Override
+                public J.ClassDeclaration visitClassDeclaration(J.ClassDeclaration classDecl, ExecutionContext ctx) {
+                    J.ClassDeclaration c = super.visitClassDeclaration(classDecl, ctx);
+                    return getCursor().getMessage("renamed", false) ? autoFormat(c, ctx) : c;
+                }
+            });
+        }
+
+        private J.MethodInvocation renameFooToBar(J.MethodInvocation m) {
+            return "foo".equals(m.getSimpleName()) ? m.withName(m.getName().withSimpleName("bar")) : m;
+        }
+
+        private J.ClassDeclaration deprecate(J.ClassDeclaration c, Cursor cursor) {
+            if (!c.getLeadingAnnotations().isEmpty()) {
+                return c;
+            }
+            return JavaTemplate.apply("@Deprecated", cursor,
+              c.getCoordinates().addAnnotation(comparing(J.Annotation::getSimpleName)));
         }
     }
 

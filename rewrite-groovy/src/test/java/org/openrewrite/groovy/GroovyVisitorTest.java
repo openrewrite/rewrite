@@ -20,6 +20,7 @@ import org.openrewrite.*;
 import org.openrewrite.groovy.tree.G;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.test.RewriteTest;
+import org.openrewrite.test.TypeValidation;
 
 import static org.openrewrite.groovy.Assertions.groovy;
 
@@ -30,6 +31,8 @@ class GroovyVisitorTest implements RewriteTest {
     void autoFormatIncludesOmitParentheses() {
         rewriteRun(
           spec -> spec
+            // the formatter under test removes the parentheses itself
+            .afterTypeValidationOptions(TypeValidation.builder().formattingScope(false).build())
             .recipeExecutionContext(new InMemoryExecutionContext().addObserver(new TreeObserver.Subscription(new TreeObserver() {
                 @Override
                 public Tree treeChanged(Cursor cursor, Tree newTree) {

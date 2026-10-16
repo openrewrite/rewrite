@@ -464,7 +464,9 @@ public interface RewriteTest extends SourceSpecs {
                 Arrays.asList(sourceSpecs), testClassSpec, testMethodSpec);
         NameMatching nameMatching = NameMatching.of(recipe, runner, runnerContext, beforeSourceFiles,
                 parsersFor, relativeTo, ctx);
-        RecipeRun recipeRun = runner.run(recipe, runnerContext);
+        FormattingScope formattingScope = new FormattingScope(recipe,
+                TypeValidation.after(testMethodSpec, testClassSpec).formattingScope());
+        RecipeRun recipeRun = formattingScope.record(() -> runner.run(recipe, runnerContext));
         if (addedMarkers != null) {
             addedMarkers.assertNoneAdded(recipeRun.getChangeset().getAllResults());
         }
@@ -702,6 +704,7 @@ public interface RewriteTest extends SourceSpecs {
                  "Source file paths before recipe, after recipe, and whether the test expected that result:\n" +
                  "    before | after | expected\n" + paths);
         }
+        formattingScope.assertFormattedOnlyWhatChanged(recipeRun.getChangeset().getAllResults());
 
         if (nameMatching != null) {
             nameMatching.assertMatchedByType(recipeRun.getChangeset().getAllResults());

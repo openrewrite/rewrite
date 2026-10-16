@@ -147,6 +147,13 @@ public class TypeValidation {
     private boolean addedMarkers = true;
 
     /**
+     * Controls whether the recipe is validated not to auto-format a whole source file, class or document root that
+     * existed before the run. Not turned off by {@link #none()}.
+     */
+    @Builder.Default
+    private boolean formattingScope = true;
+
+    /**
      * Controls whether the recipe is rerun with the code it changed respelled to mean the same (a static import for a
      * qualified call or the reverse, a fully qualified name for an imported type), and must still change it.
      */
@@ -168,7 +175,7 @@ public class TypeValidation {
     }
 
     /**
-     * Skip all invariant validation checks except {@link #addedMarkers}.
+     * Skip all invariant validation checks except {@link #addedMarkers} and {@link #formattingScope}.
      */
     public static TypeValidation none() {
         return builder()
