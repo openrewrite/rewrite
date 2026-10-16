@@ -25,7 +25,6 @@ recipeList:
   - org.openrewrite.gradle.ChangeTaskToTasksRegister
   - org.openrewrite.gradle.RemoveRedundantDependencyVersions
   - org.openrewrite.gradle.RemoveRedundantSecurityResolutionRules
-  - org.openrewrite.gradle.RemoveDuplicateDependencies
   - org.openrewrite.gradle.SortDependencies
   - org.openrewrite.gradle.security.UseHttpsForRepositories
   - org.openrewrite.gradle.UsePropertyAssignmentSyntax:
