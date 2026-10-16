@@ -178,7 +178,6 @@ class RemoveDuplicateDependenciesTest implements RewriteTest {
               dependencies {
                   implementation("com.google.guava:guava:29.0-jre")
                   testImplementation("junit:junit:4.13")
-                  testImplementation(group = "junit", name = "junit", version = "4.13")
               }
               """
           )
@@ -542,6 +541,237 @@ class RemoveDuplicateDependenciesTest implements RewriteTest {
 
               dependencies {
                   implementation "com.google.guava:guava:29.0-jre"
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void removeDuplicateAcrossStringAndMapNotation() {
+        rewriteRun(
+          buildGradle(
+            """
+              plugins {
+                  id 'java-library'
+              }
+
+              repositories {
+                  mavenCentral()
+              }
+
+              dependencies {
+                  implementation 'com.google.guava:guava:29.0-jre'
+                  implementation group: 'com.google.guava', name: 'guava', version: '29.0-jre'
+                  implementation([group: 'com.google.guava', name: 'guava', version: '29.0-jre'])
+                  implementation 'group': 'com.google.guava', 'version': '29.0-jre', 'name': 'guava'
+              }
+              """,
+            """
+              plugins {
+                  id 'java-library'
+              }
+
+              repositories {
+                  mavenCentral()
+              }
+
+              dependencies {
+                  implementation 'com.google.guava:guava:29.0-jre'
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void removeDuplicateAcrossNotationsWithClassifierAndExtension() {
+        rewriteRun(
+          buildGradle(
+            """
+              plugins {
+                  id 'java-library'
+              }
+
+              repositories {
+                  mavenCentral()
+              }
+
+              dependencies {
+                  implementation group: 'io.netty', name: 'netty-transport-native-epoll', version: '4.1.100.Final', classifier: 'linux-x86_64', ext: 'jar'
+                  implementation 'io.netty:netty-transport-native-epoll:4.1.100.Final:linux-x86_64@jar'
+              }
+              """,
+            """
+              plugins {
+                  id 'java-library'
+              }
+
+              repositories {
+                  mavenCentral()
+              }
+
+              dependencies {
+                  implementation group: 'io.netty', name: 'netty-transport-native-epoll', version: '4.1.100.Final', classifier: 'linux-x86_64', ext: 'jar'
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void removeDuplicatePlatformAcrossNotations() {
+        rewriteRun(
+          buildGradle(
+            """
+              plugins {
+                  id 'java-library'
+              }
+
+              repositories {
+                  mavenCentral()
+              }
+
+              dependencies {
+                  implementation platform('org.springframework.boot:spring-boot-dependencies:2.7.18')
+                  implementation platform(group: 'org.springframework.boot', name: 'spring-boot-dependencies', version: '2.7.18')
+              }
+              """,
+            """
+              plugins {
+                  id 'java-library'
+              }
+
+              repositories {
+                  mavenCentral()
+              }
+
+              dependencies {
+                  implementation platform('org.springframework.boot:spring-boot-dependencies:2.7.18')
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void removeDuplicateAcrossNotationsKotlinDsl() {
+        rewriteRun(
+          buildGradleKts(
+            """
+              plugins {
+                  `java-library`
+              }
+
+              repositories {
+                  mavenCentral()
+              }
+
+              dependencies {
+                  implementation("com.google.guava:guava:29.0-jre")
+                  implementation(group = "com.google.guava", name = "guava", version = "29.0-jre")
+              }
+              """,
+            """
+              plugins {
+                  `java-library`
+              }
+
+              repositories {
+                  mavenCentral()
+              }
+
+              dependencies {
+                  implementation("com.google.guava:guava:29.0-jre")
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void keepMapNotationWithClassifierAndStringNotationWithout() {
+        rewriteRun(
+          buildGradle(
+            """
+              plugins {
+                  id 'java-library'
+              }
+
+              repositories {
+                  mavenCentral()
+              }
+
+              dependencies {
+                  implementation 'io.netty:netty-transport-native-epoll:4.1.100.Final'
+                  implementation group: 'io.netty', name: 'netty-transport-native-epoll', version: '4.1.100.Final', classifier: 'linux-x86_64'
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void keepMapNotationWithAdditionalKeys() {
+        rewriteRun(
+          buildGradle(
+            """
+              plugins {
+                  id 'java-library'
+              }
+
+              repositories {
+                  mavenCentral()
+              }
+
+              dependencies {
+                  implementation 'com.google.guava:guava:29.0-jre'
+                  implementation group: 'com.google.guava', name: 'guava', version: '29.0-jre', transitive: false
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void keepMapNotationWithVariableValue() {
+        rewriteRun(
+          buildGradle(
+            """
+              plugins {
+                  id 'java-library'
+              }
+
+              repositories {
+                  mavenCentral()
+              }
+
+              def guavaVersion = '30.1-jre'
+              dependencies {
+                  implementation 'com.google.guava:guava:29.0-jre'
+                  implementation group: 'com.google.guava', name: 'guava', version: guavaVersion
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void keepMapNotationWhoseValueContainsSeparator() {
+        rewriteRun(
+          buildGradle(
+            """
+              plugins {
+                  id 'java-library'
+              }
+
+              repositories {
+                  mavenCentral()
+              }
+
+              dependencies {
+                  implementation 'com.google.guava:guava:29.0-jre:tests'
+                  implementation group: 'com.google.guava', name: 'guava:29.0-jre', version: 'tests'
               }
               """
           )
