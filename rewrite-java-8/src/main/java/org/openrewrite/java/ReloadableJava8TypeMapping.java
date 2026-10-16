@@ -227,7 +227,6 @@ class ReloadableJava8TypeMapping implements JavaTypeMapping<Tree> {
         // which is why the initializer re-reads them once completion has run.
         JavaType.Class clazz = typeFactory.computeClass(fqn, sym.flags_field, getKind(sym), c -> {
             completeClassSymbol(sym);
-            c.unsafeSet(sym.flags_field, getKind(sym));
             JavaType.FullyQualified supertype = TypeUtils.asFullyQualified(type(symType.supertype_field));
 
             JavaType.FullyQualified owner = null;
@@ -285,7 +284,8 @@ class ReloadableJava8TypeMapping implements JavaTypeMapping<Tree> {
                     typeParameters.add(type(tParam));
                 }
             }
-            c.unsafeSet(typeParameters, supertype, owner, listAnnotations(sym), interfaces, fields, methods);
+            c.unsafeSet(sym.flags_field, getKind(sym), fqn, typeParameters, supertype, owner, listAnnotations(sym),
+                    interfaces, fields, methods);
         });
 
         if (parameterized) {

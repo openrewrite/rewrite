@@ -228,7 +228,6 @@ class ReloadableJava21TypeMapping implements JavaTypeMapping<Tree> {
             if (!sym.completer.isTerminal()) {
                 completeClassSymbol(sym);
             }
-            stub.unsafeSet(sym.flags_field, getKind(sym));
             JavaType.FullyQualified supertype = TypeUtils.asFullyQualified(type(symType.supertype_field));
 
             JavaType.FullyQualified owner = null;
@@ -283,7 +282,8 @@ class ReloadableJava21TypeMapping implements JavaTypeMapping<Tree> {
                     typeParameters.add(type(tParam));
                 }
             }
-            stub.unsafeSet(typeParameters, supertype, owner, listAnnotations(sym), interfaces, fields, methods);
+            stub.unsafeSet(sym.flags_field, getKind(sym), fqn, typeParameters, supertype, owner, listAnnotations(sym),
+                    interfaces, fields, methods);
         });
 
         if (parameterized) {
