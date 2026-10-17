@@ -113,7 +113,8 @@ public class RemoveMethodInvocationsVisitor extends JavaVisitor<ExecutionContext
 
             if (m.getSelect() == null) {
                 return null;
-            } else if (m.getSelect() instanceof J.Identifier || m.getSelect() instanceof J.NewClass) {
+            } else if (m.getSelect() instanceof J.Identifier || m.getSelect() instanceof J.FieldAccess ||
+                       m.getSelect() instanceof J.NewClass) {
                 boolean keepSelect = depth != 0;
                 if (keepSelect) {
                     selectAfter.add(getSelectAfter(m));
