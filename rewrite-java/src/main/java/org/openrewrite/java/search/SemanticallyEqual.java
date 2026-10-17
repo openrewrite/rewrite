@@ -734,7 +734,8 @@ public class SemanticallyEqual {
                             isEqual.set(false);
                             return identifier;
                         }
-                        visit(identifier, field.getName());
+                        // compared in place, since the cursor already points to the identifier
+                        visitIdentifier(identifier, field.getName());
                         return identifier;
                     }
 

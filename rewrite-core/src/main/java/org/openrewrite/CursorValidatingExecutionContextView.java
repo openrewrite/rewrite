@@ -35,10 +35,18 @@ public class CursorValidatingExecutionContextView extends DelegatingExecutionCon
         return new CursorValidatingExecutionContextView(ctx);
     }
 
+    /**
+     * @deprecated A cursor whose parent points to the same element always fails, so this has no effect.
+     */
+    @Deprecated
     public boolean getValidateCursorAcyclic() {
         return getMessage(VALIDATE_CURSOR_ACYCLIC, false);
     }
 
+    /**
+     * @deprecated A cursor whose parent points to the same element always fails, so this has no effect.
+     */
+    @Deprecated
     @SuppressWarnings("UnusedReturnValue")
     public CursorValidatingExecutionContextView setValidateCursorAcyclic(boolean validateCursorAcyclic) {
         putMessage(VALIDATE_CURSOR_ACYCLIC, validateCursorAcyclic);

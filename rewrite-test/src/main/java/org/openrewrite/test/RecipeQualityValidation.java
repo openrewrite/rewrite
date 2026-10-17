@@ -39,13 +39,6 @@ public class RecipeQualityValidation {
     private @Nullable TypeValidation types;
 
     /**
-     * Controls whether the recipe's cursors are validated to be acyclic. A cursor whose element is its own parent is a
-     * mistake by the recipe author, which in some circumstances causes problems.
-     */
-    @Builder.Default
-    private boolean cursorAcyclic = true;
-
-    /**
      * Controls whether the recipe is validated to leave the execution context, which every recipe and source file in
      * a run shares, unchanged. State across source files belongs in a ScanningRecipe's accumulator, and state within
      * one source file in Cursor messages.
@@ -102,7 +95,6 @@ public class RecipeQualityValidation {
         TypeValidation before = TypeValidation.before(testMethodSpec, testClassSpec);
         return builder()
                 .types(quality.types())
-                .cursorAcyclic(quality.cursorAcyclic() && before.cursorAcyclic())
                 .executionContextUnchanged(quality.executionContextUnchanged() && before.immutableExecutionContext())
                 .noEditsInScanningPhase(quality.noEditsInScanningPhase() && before.immutableScanning())
                 .reportingMarkersOnly(quality.reportingMarkersOnly())

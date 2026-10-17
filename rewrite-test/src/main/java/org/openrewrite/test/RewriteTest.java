@@ -459,7 +459,6 @@ public interface RewriteTest extends SourceSpecs {
         }
 
         recipeCtx = CursorValidatingExecutionContextView.view(recipeCtx)
-                .setValidateCursorAcyclic(quality.cursorAcyclic())
                 .setValidateImmutableExecutionContext(quality.executionContextUnchanged());
         RewriteRunner runner = testMethodSpec.getRunner() != null ? testMethodSpec.getRunner() :
                 testClassSpec.getRunner() != null ? testClassSpec.getRunner() :

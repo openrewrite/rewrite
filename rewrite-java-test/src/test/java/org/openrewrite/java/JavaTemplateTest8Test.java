@@ -506,8 +506,9 @@ class JavaTemplateTest8Test implements RewriteTest {
           spec -> spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {
               @Override
               public <N extends NameTree> N visitTypeName(N nameTree, ExecutionContext ctx) {
-                  // the cursor points at the parent when `visitTypeName()` is called
-                  if (template.matches(new Cursor(getCursor(), nameTree))) {
+                  // visitFieldAccess() calls visitTypeName() on the field access itself, the others on a child
+                  Cursor cursor = getCursor().getValue() == nameTree ? getCursor() : new Cursor(getCursor(), nameTree);
+                  if (template.matches(cursor)) {
                       return SearchResult.found(nameTree);
                   }
                   return super.visitTypeName(nameTree, ctx);
@@ -600,8 +601,9 @@ class JavaTemplateTest8Test implements RewriteTest {
           spec -> spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {
               @Override
               public <N extends NameTree> N visitTypeName(N nameTree, ExecutionContext ctx) {
-                  // the cursor points at the parent when `visitTypeName()` is called
-                  if (template.matches(new Cursor(getCursor(), nameTree))) {
+                  // visitFieldAccess() calls visitTypeName() on the field access itself, the others on a child
+                  Cursor cursor = getCursor().getValue() == nameTree ? getCursor() : new Cursor(getCursor(), nameTree);
+                  if (template.matches(cursor)) {
                       return SearchResult.found(nameTree);
                   }
                   return super.visitTypeName(nameTree, ctx);

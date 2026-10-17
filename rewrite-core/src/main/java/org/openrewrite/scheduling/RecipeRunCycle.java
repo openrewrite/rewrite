@@ -987,7 +987,7 @@ public class RecipeRunCycle<LSS extends LargeSourceSet> {
                         ctx.add(new SearchResults.Row(
                                 (before == null) ? "" : PathUtils.separatorsToUnix(before.getSourcePath().toString()),
                                 PathUtils.separatorsToUnix(after.getSourcePath().toString()),
-                                StringUtils.trimIndent(((Tree) cursor.getValue()).print(getCursor(), new PrintOutputCapture<>(0, PrintOutputCapture.MarkerPrinter.SANITIZED))),
+                                StringUtils.trimIndent(((Tree) cursor.getValue()).print(cursor.getParentOrThrow(), new PrintOutputCapture<>(0, PrintOutputCapture.MarkerPrinter.SANITIZED))),
                                 sr.getDescription(),
                                 recipeName));
                     }

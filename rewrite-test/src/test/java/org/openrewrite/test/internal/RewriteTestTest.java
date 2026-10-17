@@ -140,19 +140,14 @@ class RewriteTestTest implements RewriteTest {
 
     @Test
     void cursorValidation() {
-        assertThrows(AssertionError.class, () ->
+        AssertionError e = assertThrows(AssertionError.class, () ->
           rewriteRun(
             spec -> spec.recipe(new ImproperCursorUsage()),
             text("")
           )
         );
-
-        rewriteRun(
-          spec -> spec.recipe(new ImproperCursorUsage()).recipeQualityValidation(RecipeQualityValidation.builder()
-            .cursorAcyclic(false)
-            .build()),
-          text("")
-        );
+        assertThat(e).hasStackTraceContaining("is a cursor on the same PlainText")
+          .hasStackTraceContaining("getCursor().getParentOrThrow()");
     }
 
 

@@ -24,7 +24,6 @@ class RecipeQualityValidationTest {
     @Test
     void allChecksAreOn() {
         RecipeQualityValidation all = RecipeQualityValidation.all();
-        assertThat(all.cursorAcyclic()).isTrue();
         assertThat(all.executionContextUnchanged()).isTrue();
         assertThat(all.noEditsInScanningPhase()).isTrue();
         assertThat(all.reportingMarkersOnly()).isTrue();
@@ -36,7 +35,6 @@ class RecipeQualityValidationTest {
     void deprecatedTypeValidationOptionsStillTurnChecksOff() {
         RecipeQualityValidation quality = RecipeQualityValidation.of(
           RecipeSpec.defaults().typeValidationOptions(TypeValidation.none()), RecipeSpec.defaults());
-        assertThat(quality.cursorAcyclic()).isFalse();
         assertThat(quality.executionContextUnchanged()).isFalse();
         assertThat(quality.noEditsInScanningPhase()).isFalse();
         assertThat(quality.reportingMarkersOnly()).isTrue();
