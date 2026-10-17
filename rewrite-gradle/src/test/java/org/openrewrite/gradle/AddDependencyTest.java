@@ -21,6 +21,7 @@ import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
+import org.junit.jupiter.params.provider.NullSource;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.openrewrite.Issue;
 import org.openrewrite.gradle.marker.GradleDependencyConfiguration;
@@ -448,6 +449,50 @@ class AddDependencyTest implements RewriteTest {
                 """
             )
           )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/6411")
+    @ParameterizedTest
+    @CsvSource({"false, false", "false, true", "true, false", "true, true", ", false", ", true"})
+    void honorsAcceptTransitive(@Nullable Boolean acceptTransitive, boolean kotlinDsl) {
+        String before = """
+          plugins {
+              id("java")
+          }
+
+          repositories {
+              mavenCentral()
+          }
+
+          dependencies {
+              implementation("org.springframework.boot:spring-boot-starter-data-jpa:2.7.18")
+          }
+          """;
+        String after = """
+          plugins {
+              id("java")
+          }
+
+          repositories {
+              mavenCentral()
+          }
+
+          dependencies {
+              %s
+              implementation("org.springframework.boot:spring-boot-starter-data-jpa:2.7.18")
+          }
+          """.formatted(kotlinDsl ?
+          "implementation(\"jakarta.persistence:jakarta.persistence-api:3.0.0\")" :
+          "implementation \"jakarta.persistence:jakarta.persistence-api:3.0.0\"");
+        var build = kotlinDsl ? buildGradleKts(before, after) : buildGradle(before, after);
+        if (Boolean.TRUE.equals(acceptTransitive)) {
+            build = kotlinDsl ? buildGradleKts(before) : buildGradle(before);
+        }
+        rewriteRun(
+          spec -> spec.recipe(new AddDependency("jakarta.persistence", "jakarta.persistence-api", "3.0.0",
+            null, "implementation", null, null, null, null, acceptTransitive)),
+          mavenProject("project", build)
         );
     }
 
@@ -990,10 +1035,13 @@ class AddDependencyTest implements RewriteTest {
         );
     }
 
-    @Test
-    void addDependencyDoesntAddWhenExistingDependency() {
+    @ParameterizedTest
+    @NullSource
+    @ValueSource(booleans = {false, true})
+    void addDependencyDoesntAddWhenExistingDependency(@Nullable Boolean acceptTransitive) {
         rewriteRun(
-          spec -> spec.recipe(addDependency("com.google.guava:guava:29.0-jre", "com.google.common.math.IntMath")),
+          spec -> spec.recipe(new AddDependency("com.google.guava", "guava", "29.0-jre", null, null,
+            "com.google.common.math.IntMath", null, null, null, acceptTransitive)),
           mavenProject("project",
             srcMainJava(
               java(usingGuavaIntMath)
