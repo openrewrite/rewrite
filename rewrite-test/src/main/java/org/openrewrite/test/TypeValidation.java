@@ -20,6 +20,7 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 import lombok.experimental.Accessors;
+import org.jspecify.annotations.Nullable;
 
 import java.util.function.Function;
 
@@ -28,6 +29,7 @@ import java.util.function.Function;
  * after the recipe run. Originally this applied only to validating the well-formedness of type metadata in Java LSTs
  * (hence the name TypeValidation), but has since expanded to include concepts relevant to other types of sources.
  * "InvariantValidation" would be a more accurate name, but "TypeValidation" is kept for backwards compatibility.
+ * Checks of how a recipe behaves are in {@link RecipeQualityValidation}.
  */
 @Data
 @NoArgsConstructor
@@ -86,7 +88,10 @@ public class TypeValidation {
      * The cursor indicates a position within a tree which has no cycles. So if a cursor ever shows that an element is
      * its own parent the recipe author has made a mistake. In some circumstances this mistake causes problems, in others
      * it is benign.
+     *
+     * @deprecated Use {@link RecipeQualityValidation#cursorAcyclic}.
      */
+    @Deprecated
     @Builder.Default
     private boolean cursorAcyclic = true;
 
@@ -113,7 +118,10 @@ public class TypeValidation {
      * Adding messages to execution context is a side effect which makes the recipe run itself stateful.
      * Potentially allows recipes to interfere with each other in surprising and hard to debug ways.
      * Problematic for all the same reasons mutable global variables or singletons are.
+     *
+     * @deprecated Use {@link RecipeQualityValidation#immutableExecutionContext}.
      */
+    @Deprecated
     @Builder.Default
     private boolean immutableExecutionContext = true;
 
@@ -123,7 +131,10 @@ public class TypeValidation {
      * scanning and editing phases of the recipe lifecycle.
      * This validation raises an error if a scanner attempts an edit. You can disable this validation if your recipe
      * deliberately attempts an edit during scanning, and you don't care that this edit is ultimately ignored.
+     *
+     * @deprecated Use {@link RecipeQualityValidation#immutableScanning}.
      */
+    @Deprecated
     @Builder.Default
     private boolean immutableScanning = true;
 
@@ -140,34 +151,6 @@ public class TypeValidation {
     private boolean parseAndPrintEquality = true;
 
     /**
-     * Controls whether the recipe is validated not to add markers other than search results and markup.
-     * Not turned off by {@link #none()}.
-     */
-    @Builder.Default
-    private boolean addedMarkers = true;
-
-    /**
-     * Controls whether the recipe is validated to format only what it changed, not a whole source file, class or
-     * document root that existed before the run. Not turned off by {@link #none()}.
-     */
-    @Builder.Default
-    private boolean minimalFormatting = true;
-
-    /**
-     * Controls whether the recipe is rerun with the code it changed respelled to mean the same (a static import for a
-     * qualified call or the reverse, a fully qualified name for an imported type), and must still change it.
-     */
-    @Builder.Default
-    private boolean matchByTypeNotName = true;
-
-    /**
-     * Controls whether the recipe is rerun on its sources without type attribution, and must not make the same change
-     * to code that refers to types the test doesn't declare. Off by default until its false positives are measured.
-     */
-    @Builder.Default
-    private boolean typeAttributedMatching = false;
-
-    /**
      * Enable all invariant validation checks.
      */
     public static TypeValidation all() {
@@ -175,8 +158,9 @@ public class TypeValidation {
     }
 
     /**
-     * Skip all invariant validation checks except {@link #addedMarkers} and {@link #minimalFormatting}.
+     * Skip all invariant validation checks.
      */
+    @SuppressWarnings("deprecation")
     public static TypeValidation none() {
         return builder()
                 .classDeclarations(false)
@@ -193,8 +177,6 @@ public class TypeValidation {
                 .immutableScanning(false)
                 .allowNonWhitespaceInWhitespace(true)
                 .parseAndPrintEquality(false)
-                .matchByTypeNotName(false)
-                .typeAttributedMatching(false)
                 .build();
     }
 
@@ -205,9 +187,18 @@ public class TypeValidation {
     }
 
     static TypeValidation after(RecipeSpec testMethodSpec, RecipeSpec testClassSpec) {
-        TypeValidation typeValidation = testMethodSpec.getAfterTypeValidation() != null ?
-                testMethodSpec.getAfterTypeValidation() : testClassSpec.getAfterTypeValidation();
+        TypeValidation typeValidation = afterOf(testMethodSpec);
+        if (typeValidation == null) {
+            typeValidation = afterOf(testClassSpec);
+        }
         // after type validation defaults to before type validation; possibly this will become stricter in the future
         return typeValidation != null ? typeValidation : before(testMethodSpec, testClassSpec);
+    }
+
+    @SuppressWarnings("deprecation")
+    private static @Nullable TypeValidation afterOf(RecipeSpec spec) {
+        RecipeQualityValidation quality = spec.getRecipeQualityValidation();
+        return quality != null && quality.typeValidationOptions() != null ?
+                quality.typeValidationOptions() : spec.getAfterTypeValidation();
     }
 }

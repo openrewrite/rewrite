@@ -351,7 +351,8 @@ public interface RewriteTest extends SourceSpecs {
                 // Validate before source
                 TypeValidation beforeValidations = TypeValidation.before(testMethodSpec, testClassSpec);
                 nextSpec.validateSource.accept(sourceFile, beforeValidations);
-                ctx.putMessage(SCANNING_MUTATION_VALIDATION, beforeValidations.immutableScanning());
+                ctx.putMessage(SCANNING_MUTATION_VALIDATION,
+                        RecipeQualityValidation.of(testMethodSpec, testClassSpec).immutableScanning());
 
                 // Validate that printing the LST yields the same source text
                 // Validate that the LST whitespace do not contain any non-whitespace characters
@@ -440,8 +441,9 @@ public interface RewriteTest extends SourceSpecs {
         Function<SourceFile, List<Parser.Builder>> parsersFor = after ->
                 RewriteTestUtils.parsersFor(after, specBySourceFile, parserBySourceSpec, sourceSpecs, specParsers);
         Path relativeTo = testMethodSpec.relativeTo == null ? testClassSpec.relativeTo : testMethodSpec.relativeTo;
+        RecipeQualityValidation quality = RecipeQualityValidation.of(testMethodSpec, testClassSpec);
         AddedMarkers addedMarkers = null;
-        if (TypeValidation.after(testMethodSpec, testClassSpec).addedMarkers()) {
+        if (quality.addedMarkers()) {
             addedMarkers = new AddedMarkers(beforeSourceFiles, parsersFor, relativeTo, ctx);
         }
         UnchangedTreeIdentity unchangedTreeIdentity = new UnchangedTreeIdentity();
@@ -457,8 +459,8 @@ public interface RewriteTest extends SourceSpecs {
         }
 
         recipeCtx = CursorValidatingExecutionContextView.view(recipeCtx)
-                .setValidateCursorAcyclic(TypeValidation.before(testMethodSpec, testClassSpec).cursorAcyclic())
-                .setValidateImmutableExecutionContext(TypeValidation.before(testMethodSpec, testClassSpec).immutableExecutionContext());
+                .setValidateCursorAcyclic(quality.cursorAcyclic())
+                .setValidateImmutableExecutionContext(quality.immutableExecutionContext());
         RewriteRunner runner = testMethodSpec.getRunner() != null ? testMethodSpec.getRunner() :
                 testClassSpec.getRunner() != null ? testClassSpec.getRunner() :
                         runner();
@@ -467,8 +469,7 @@ public interface RewriteTest extends SourceSpecs {
                 Arrays.asList(sourceSpecs), testClassSpec, testMethodSpec);
         NameMatching nameMatching = NameMatching.of(recipe, runner, runnerContext, beforeSourceFiles,
                 parsersFor, relativeTo, ctx);
-        FormattingScope formattingScope = new FormattingScope(recipe,
-                TypeValidation.after(testMethodSpec, testClassSpec).minimalFormatting());
+        FormattingScope formattingScope = new FormattingScope(recipe, quality.minimalFormatting());
         long runStart = System.nanoTime();
         RecipeRun recipeRun = formattingScope.record(() -> runner.run(recipe, runnerContext));
         Duration runTime = Duration.ofNanos(System.nanoTime() - runStart);

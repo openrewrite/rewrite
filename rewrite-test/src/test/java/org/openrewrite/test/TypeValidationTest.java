@@ -19,7 +19,6 @@ import org.junit.jupiter.api.Test;
 
 import java.lang.reflect.Field;
 import java.lang.reflect.Modifier;
-import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -27,34 +26,16 @@ class TypeValidationTest {
 
     @Test
     void noneInvertsEveryFlagFromAll() throws IllegalAccessException {
-        // the checks none() keeps, and one that all() leaves off
-        Set<String> exempt = Set.of("addedMarkers", "minimalFormatting", "typeAttributedMatching");
         TypeValidation all = TypeValidation.all();
         TypeValidation none = TypeValidation.none();
         for (Field field : TypeValidation.class.getDeclaredFields()) {
-            if (field.getType() == boolean.class && !Modifier.isStatic(field.getModifiers()) && !field.isSynthetic() &&
-                !exempt.contains(field.getName())) {
+            if (field.getType() == boolean.class && !Modifier.isStatic(field.getModifiers()) && !field.isSynthetic()) {
                 field.setAccessible(true);
                 assertThat(field.getBoolean(none))
                   .as("%s is not skipped by none()", field.getName())
                   .isNotEqualTo(field.getBoolean(all));
             }
         }
-    }
-
-    @Test
-    void noneKeepsChecksThatDoNotNeedTypeAttribution() {
-        TypeValidation none = TypeValidation.none();
-        assertThat(none.addedMarkers()).isTrue();
-        assertThat(none.minimalFormatting()).isTrue();
-    }
-
-    @Test
-    void noneSkipsChecksThatNeedTypeAttribution() {
-        assertThat(TypeValidation.none().matchByTypeNotName()).isFalse();
-        assertThat(TypeValidation.none().typeAttributedMatching()).isFalse();
-        // until its false positives are measured
-        assertThat(TypeValidation.all().typeAttributedMatching()).isFalse();
     }
 
     @Test

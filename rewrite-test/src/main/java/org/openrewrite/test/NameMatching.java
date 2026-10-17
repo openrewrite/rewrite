@@ -106,6 +106,12 @@ final class NameMatching {
         this.parseCtx = parseCtx;
     }
 
+    private static boolean validatesTypes(TypeValidation validation) {
+        return validation.classDeclarations() && validation.identifiers() && validation.methodDeclarations() &&
+               validation.variableDeclarations() && validation.methodInvocations() &&
+               validation.constructorInvocations();
+    }
+
     /**
      * @return null when the test turned these checks off or its run can't be repeated faithfully.
      */
@@ -114,13 +120,12 @@ final class NameMatching {
                                      @Nullable Path relativeTo, ExecutionContext parseCtx) {
         RecipeSpec methodSpec = context.getTestMethodSpec();
         RecipeSpec classSpec = context.getTestClassSpec();
-        TypeValidation before = TypeValidation.before(methodSpec, classSpec);
-        TypeValidation after = TypeValidation.after(methodSpec, classSpec);
-        boolean matchByTypeNotName = before.matchByTypeNotName() && after.matchByTypeNotName();
-        boolean typeAttributedMatching = before.typeAttributedMatching() && after.typeAttributedMatching();
-        boolean typesValidated = before.classDeclarations() && before.identifiers() &&
-                                 before.methodDeclarations() && before.variableDeclarations() &&
-                                 before.methodInvocations() && before.constructorInvocations();
+        RecipeQualityValidation quality = RecipeQualityValidation.of(methodSpec, classSpec);
+        boolean matchByTypeNotName = quality.matchByTypeNotName();
+        boolean typeAttributedMatching = quality.typeAttributedMatching();
+        // both rerun the recipe on type attributed code, so the test has to attribute what the recipe gets and makes
+        boolean typesValidated = validatesTypes(TypeValidation.before(methodSpec, classSpec)) &&
+                                 validatesTypes(TypeValidation.after(methodSpec, classSpec));
         if (!matchByTypeNotName && !typeAttributedMatching || !typesValidated || recipe.equals(Recipe.noop()) ||
             runner != RewriteRunner.IN_PROCESS ||
             methodSpec.getSourceSet() != null || classSpec.getSourceSet() != null ||
@@ -250,7 +255,7 @@ final class NameMatching {
                "A static import and a qualified call name the same method, and an imported and a fully qualified " +
                "name the same type, so a recipe that changes one spelling must change the other. If only one " +
                "spelling is meant to change, add " +
-               "spec.typeValidationOptions(TypeValidation.all().matchByTypeNotName(false)).";
+               "spec.recipeQualityValidation(RecipeQualityValidation.builder().matchByTypeNotName(false).build()).";
     }
 
     /**
@@ -333,7 +338,7 @@ final class NameMatching {
                "  - expressions: SemanticallyEqual\n" +
                "Don't compare getSimpleName(), toString() or print() output with strings. If the recipe targets no " +
                "particular type (formatting, control flow, literals) or must work without types, add " +
-               "spec.typeValidationOptions(TypeValidation.all().typeAttributedMatching(false)).";
+               "spec.recipeQualityValidation(RecipeQualityValidation.builder().typeAttributedMatching(false).build()).";
     }
 
     /**

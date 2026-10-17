@@ -46,6 +46,7 @@ import org.openrewrite.java.tree.Space;
 import org.openrewrite.marker.BuildMetadata;
 import org.openrewrite.marker.Marker;
 import org.openrewrite.marker.SearchResult;
+import org.openrewrite.test.RecipeQualityValidation;
 import org.openrewrite.test.RewriteTest;
 import org.openrewrite.test.SourceSpec;
 import org.openrewrite.test.SourceSpecs;
@@ -147,7 +148,7 @@ class RewriteTestTest implements RewriteTest {
         );
 
         rewriteRun(
-          spec -> spec.recipe(new ImproperCursorUsage()).typeValidationOptions(TypeValidation.builder()
+          spec -> spec.recipe(new ImproperCursorUsage()).recipeQualityValidation(RecipeQualityValidation.builder()
             .cursorAcyclic(false)
             .build()),
           text("")
@@ -208,7 +209,7 @@ class RewriteTestTest implements RewriteTest {
     void allowScannerEdit() {
         rewriteRun(
           spec -> spec
-            .typeValidationOptions(TypeValidation.builder().immutableScanning(false).build())
+            .recipeQualityValidation(RecipeQualityValidation.builder().immutableScanning(false).build())
             .recipe(new ScannerEdit()),
           text("foo")
         );
@@ -323,7 +324,7 @@ class RewriteTestTest implements RewriteTest {
         @Test
         void turnedOff() {
             rewriteRun(
-              spec -> spec.typeValidationOptions(TypeValidation.builder().addedMarkers(false).build())
+              spec -> spec.recipeQualityValidation(RecipeQualityValidation.builder().addedMarkers(false).build())
                 .expectedCyclesThatMakeChanges(1)
                 .recipe(toRecipe(() -> new JavaIsoVisitor<>() {
                     @Override
@@ -930,7 +931,7 @@ class RewriteTestTest implements RewriteTest {
         @Test
         void turnedOff() {
             rewriteRun(
-              spec -> spec.typeValidationOptions(TypeValidation.builder().minimalFormatting(false).build())
+              spec -> spec.recipeQualityValidation(RecipeQualityValidation.builder().minimalFormatting(false).build())
                 .recipe(formatWholeClassAfterRename()),
               java(
                 BEFORE,
@@ -1183,7 +1184,7 @@ class RewriteTestTest implements RewriteTest {
         void acceptRecipeThatMatchesCallsByType() {
             rewriteRun(
               spec -> spec.recipe(new FindCallsByType("java.util.Collections emptyList()"))
-                .typeValidationOptions(TypeValidation.all().typeAttributedMatching(true)),
+                .recipeQualityValidation(RecipeQualityValidation.builder().typeAttributedMatching(true).build()),
               java(
                 """
                   import java.util.Collections;
@@ -1360,7 +1361,7 @@ class RewriteTestTest implements RewriteTest {
         void matchByTypeNotNameTurnedOff() {
             rewriteRun(
               spec -> spec.recipe(new FindQualifiedCallsByName("Collections", "emptyList"))
-                .typeValidationOptions(TypeValidation.all().matchByTypeNotName(false)),
+                .recipeQualityValidation(RecipeQualityValidation.builder().matchByTypeNotName(false).build()),
               java(
                 """
                   import java.util.Collections;
@@ -1443,7 +1444,7 @@ class RewriteTestTest implements RewriteTest {
         void rejectRecipeThatMakesTheSameChangeWithoutTypes() {
             AssertionError e = assertThrows(AssertionError.class, () -> rewriteRun(
               spec -> spec.recipe(new FindCallsByName("emptyList"))
-                .typeValidationOptions(TypeValidation.all().typeAttributedMatching(true)),
+                .recipeQualityValidation(RecipeQualityValidation.builder().typeAttributedMatching(true).build()),
               java(
                 """
                   import java.util.Collections;
@@ -1473,7 +1474,7 @@ class RewriteTestTest implements RewriteTest {
         void rejectRecipeThatRemovesDeclarationsByAnnotationName() {
             AssertionError e = assertThrows(AssertionError.class, () -> rewriteRun(
               spec -> spec.recipe(new RemoveMethodsAnnotatedByName("Deprecated"))
-                .typeValidationOptions(TypeValidation.all().typeAttributedMatching(true)),
+                .recipeQualityValidation(RecipeQualityValidation.builder().typeAttributedMatching(true).build()),
               java(
                 """
                   class A {
@@ -1501,7 +1502,7 @@ class RewriteTestTest implements RewriteTest {
         void acceptFormattingWithoutTypes() {
             rewriteRun(
               spec -> spec.recipe(new RemoveSpaceBeforeArguments())
-                .typeValidationOptions(TypeValidation.all().typeAttributedMatching(true)),
+                .recipeQualityValidation(RecipeQualityValidation.builder().typeAttributedMatching(true).build()),
               java(
                 """
                   import java.util.Collections;
@@ -1552,7 +1553,7 @@ class RewriteTestTest implements RewriteTest {
         void acceptNameMatchingOfTypesTheTestDeclares() {
             rewriteRun(
               spec -> spec.recipe(new FindCallsByName("foo"))
-                .typeValidationOptions(TypeValidation.all().typeAttributedMatching(true)),
+                .recipeQualityValidation(RecipeQualityValidation.builder().typeAttributedMatching(true).build()),
               java(
                 """
                   class A {

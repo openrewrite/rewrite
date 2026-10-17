@@ -21,9 +21,9 @@ import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.DocumentExample;
 import org.openrewrite.Issue;
+import org.openrewrite.test.RecipeQualityValidation;
 import org.openrewrite.test.RewriteTest;
 import org.openrewrite.test.SourceSpec;
-import org.openrewrite.test.TypeValidation;
 
 import static org.openrewrite.java.Assertions.java;
 
@@ -1568,7 +1568,7 @@ class AddOrUpdateAnnotationAttributeTest implements RewriteTest {
             rewriteRun(
               spec -> spec.recipe(new AddOrUpdateAnnotationAttribute("org.example.Foo", null, "hi", "Const.A.B.HI", false, null))
                 // the old value is matched as written, so it misses `org.example.Const.A.B.HI`
-                .typeValidationOptions(TypeValidation.all().matchByTypeNotName(false)),
+                .recipeQualityValidation(RecipeQualityValidation.builder().matchByTypeNotName(false).build()),
               java(
                 """
                   package org.example;
@@ -1865,7 +1865,7 @@ class AddOrUpdateAnnotationAttributeTest implements RewriteTest {
             rewriteRun(
               spec -> spec.recipe(new AddOrUpdateAnnotationAttribute("org.example.Foo", null, "Integer.class", "Long.class", null, null))
                 // the old value is matched as written, so it misses `java.lang.Long.class`
-                .typeValidationOptions(TypeValidation.all().matchByTypeNotName(false)),
+                .recipeQualityValidation(RecipeQualityValidation.builder().matchByTypeNotName(false).build()),
               java(
                 """
                   package org.example;
