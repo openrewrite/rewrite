@@ -24,6 +24,7 @@ import org.openrewrite.InMemoryExecutionContext;
 import org.openrewrite.Issue;
 import org.openrewrite.Parser;
 import org.openrewrite.internal.StringUtils;
+import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.MethodMatcher;
 import org.openrewrite.java.tree.*;
 import org.openrewrite.kotlin.tree.K;
@@ -45,6 +46,7 @@ import static java.util.Collections.singletonList;
 import static java.util.Objects.requireNonNull;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.ExecutionContext.REQUIRE_PRINT_EQUALS_INPUT;
+import static org.openrewrite.java.Assertions.java;
 import static org.openrewrite.java.tree.JavaType.GenericTypeVariable.Variance.*;
 import static org.openrewrite.kotlin.Assertions.kotlin;
 import static org.openrewrite.kotlin.Assertions.kotlinScript;
@@ -384,7 +386,7 @@ class KotlinTypeMappingTest {
                             @Override
                             public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, AtomicBoolean found) {
                                 if (methodMatcher.matches(method)) {
-                                    assertThat(method.getMethodType().toString()).isEqualTo("kotlin.collections.MutableList<kotlin.String>{name=addAll,return=boolean,parameters=[kotlin.collections.Collection<kotlin.String>]}");
+                                    assertThat(method.getMethodType().toString()).isEqualTo("kotlin.collections.MutableList<Generic{E}>{name=addAll,return=boolean,parameters=[kotlin.collections.Collection<kotlin.String>]}");
                                     found.set(true);
                                 }
                                 return super.visitMethodInvocation(method, found);
@@ -468,7 +470,7 @@ class KotlinTypeMappingTest {
                             @Override
                             public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, AtomicBoolean atomicBoolean) {
                                 if (matcher.matches(method)) {
-                                    assertThat(method.getMethodType().toString()).isEqualTo("kotlin.Function1<kotlin.collections.Collection<kotlin.Any>, void>{name=block,return=void,parameters=[kotlin.collections.Collection<kotlin.Any>]}");
+                                    assertThat(method.getMethodType().toString()).isEqualTo("kotlin.Function1<Generic{P1}, Generic{R}>{name=block,return=void,parameters=[kotlin.collections.Collection<kotlin.Any>]}");
                                     found.set(true);
                                 }
                                 return super.visitMethodInvocation(method, atomicBoolean);
@@ -2126,6 +2128,62 @@ class KotlinTypeMappingTest {
                 })
               )
             );
+        }
+
+        @Test
+        void inheritedJavaMethodIsDeclaredWhereJavaDeclaresIt() {
+            // `get` is inherited from the generic `ForkJoinTask<V>`. `isEmpty` is inherited from both
+            // `AbstractCollection` and the `List` interface, and javac picks the concrete one.
+            Map<String, JavaType.Method> fromJava = new HashMap<>();
+            Map<String, JavaType.Method> fromKotlin = new HashMap<>();
+            rewriteRun(
+              java(
+                """
+                  import java.util.AbstractList;
+                  import java.util.concurrent.RecursiveTask;
+
+                  class Test {
+                      void test(AbstractList<String> list, RecursiveTask<String> task) throws Exception {
+                          list.isEmpty();
+                          task.get();
+                      }
+                  }
+                  """,
+                spec -> spec.afterRecipe(cu -> new JavaIsoVisitor<Integer>() {
+                    @Override
+                    public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, Integer p) {
+                        fromJava.put(method.getSimpleName(), method.getMethodType());
+                        return method;
+                    }
+                }.visit(cu, 0))
+              ),
+              kotlin(
+                """
+                  import java.util.AbstractList
+                  import java.util.concurrent.RecursiveTask
+
+                  fun test(list: AbstractList<String>, task: RecursiveTask<String>) {
+                      list.isEmpty()
+                      task.get()
+                  }
+                  """,
+                spec -> spec.afterRecipe(cu -> new KotlinIsoVisitor<Integer>() {
+                    @Override
+                    public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, Integer p) {
+                        fromKotlin.put(method.getSimpleName(), method.getMethodType());
+                        return method;
+                    }
+                }.visit(cu, 0))
+              )
+            );
+            assertThat(fromJava.get("get").getDeclaringType().getFullyQualifiedName()).isEqualTo("java.util.concurrent.ForkJoinTask");
+            assertThat(fromKotlin.get("get").getDeclaringType().getFullyQualifiedName()).isEqualTo("java.util.concurrent.ForkJoinTask");
+            assertThat(fromJava.get("isEmpty").getDeclaringType().getFullyQualifiedName()).isEqualTo("java.util.AbstractCollection");
+            assertThat(fromKotlin.get("isEmpty").getDeclaringType().getFullyQualifiedName()).isEqualTo("java.util.AbstractCollection");
+            // The `throws` clause is read from the declaring class, so it needs the right one.
+            assertThat(fromKotlin.get("get").getThrownExceptions())
+              .extracting(t -> ((JavaType.FullyQualified) t).getFullyQualifiedName())
+              .containsExactly("java.lang.InterruptedException", "java.util.concurrent.ExecutionException");
         }
 
         @Issue("https://github.com/openrewrite/rewrite-kotlin/issues/590")

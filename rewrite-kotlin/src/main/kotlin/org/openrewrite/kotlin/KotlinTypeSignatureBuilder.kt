@@ -35,6 +35,7 @@ import org.jetbrains.kotlin.fir.symbols.impl.*
 import org.jetbrains.kotlin.fir.types.*
 import org.jetbrains.kotlin.fir.types.impl.FirImplicitNullableAnyTypeRef
 import org.jetbrains.kotlin.fir.types.jvm.FirJavaTypeRef
+import org.jetbrains.kotlin.fir.unwrapFakeOverrides
 import org.jetbrains.kotlin.load.java.structure.*
 import org.jetbrains.kotlin.load.java.structure.impl.classFiles.BinaryJavaAnnotation
 import org.jetbrains.kotlin.load.java.structure.impl.classFiles.BinaryJavaClass
@@ -340,9 +341,10 @@ class KotlinTypeSignatureBuilder(private val firSession: FirSession, private val
 
     @OptIn(SymbolInternals::class)
     fun methodSignature(
-        function: FirFunction,
+        fir: FirFunction,
         parent: Any?
     ): String {
+        val function = fir.unwrapFakeOverrides()
         val clazz = when {
             function.symbol is FirConstructorSymbol -> classSignature(function.returnTypeRef)
             function.dispatchReceiverType != null -> classSignature(function.dispatchReceiverType!!)
@@ -382,7 +384,8 @@ class KotlinTypeSignatureBuilder(private val firSession: FirSession, private val
             (function.calleeReference as FirResolvedNamedReference).resolvedSymbol is FirNamedFunctionSymbol
         ) {
             val resolvedSymbol =
-                (function.calleeReference as FirResolvedNamedReference).resolvedSymbol as FirNamedFunctionSymbol
+                ((function.calleeReference as FirResolvedNamedReference).resolvedSymbol as FirNamedFunctionSymbol)
+                    .unwrapFakeOverrides()
             if (resolvedSymbol.dispatchReceiverType is ConeClassLikeType) {
                 declaringSig = signature(resolvedSymbol.dispatchReceiverType)
             } else if (resolvedSymbol.containingClassLookupTag() != null &&

@@ -51,12 +51,15 @@ import org.jetbrains.kotlin.fir.symbols.impl.*
 import org.jetbrains.kotlin.fir.types.*
 import org.jetbrains.kotlin.fir.types.impl.FirImplicitNullableAnyTypeRef
 import org.jetbrains.kotlin.fir.types.jvm.FirJavaTypeRef
+import org.jetbrains.kotlin.fir.unwrapFakeOverrides
 import org.jetbrains.kotlin.load.java.structure.*
 import org.jetbrains.kotlin.load.java.structure.impl.classFiles.*
 import org.jetbrains.kotlin.load.kotlin.JvmPackagePartSource
 import org.jetbrains.kotlin.name.ClassId
 import org.jetbrains.kotlin.name.FqNameUnsafe
+import org.jetbrains.kotlin.name.StandardClassIds
 import org.jetbrains.kotlin.name.isOneSegmentFQN
+import org.jetbrains.kotlin.resolve.jvm.JvmPrimitiveType
 import org.jetbrains.kotlin.types.ConstantValueKind
 import org.jetbrains.kotlin.types.Variance
 import org.openrewrite.java.JavaTypeMapping
@@ -77,6 +80,11 @@ import org.openrewrite.kotlin.KotlinTypeSignatureBuilder.Companion.methodName
 import org.openrewrite.kotlin.KotlinTypeSignatureBuilder.Companion.variableName
 
 @Suppress("DuplicatedCode")
+/** The JVM array type each Kotlin array class stands for. */
+private val KOTLIN_ARRAY_ERASURES: Map<String, String> =
+    PrimitiveType.entries.associate { it.arrayTypeFqName.asString() to JvmPrimitiveType.get(it).javaKeywordName + "[]" } +
+        (StandardClassIds.Array.asFqNameString() to "java.lang.Object[]")
+
 class KotlinTypeMapping(
     val firSession: FirSession,
     private val firFile: FirFile,
@@ -621,7 +629,9 @@ class KotlinTypeMapping(
     }
 
     @OptIn(SymbolInternals::class)
-    private fun methodDeclarationType(function: FirFunction, parent: Any?, signature: String): Method {
+    private fun methodDeclarationType(fir: FirFunction, parent: Any?, signature: String): Method {
+        // A fake override's type is its declaration's, as in methodInvocationType.
+        val function = fir.unwrapFakeOverrides()
         val paramNamesArr: kotlin.Array<String>? = if (function.valueParameters.isNotEmpty()) {
             kotlin.Array(function.valueParameters.size) { function.valueParameters[it].name.asString() }
         } else null
@@ -813,6 +823,13 @@ class KotlinTypeMapping(
     @OptIn(SymbolInternals::class)
     fun methodInvocationType(function: FirFunctionCall, signature: String): Method? {
         val sym = function.calleeReference.toResolvedBaseSymbol() ?: return null
+        if (sym !is FirCallableSymbol<*>) {
+            throw UnsupportedOperationException("Unsupported method symbol: ${sym.javaClass.name}")
+        }
+        // A member reached through a subtype resolves to a fake override whose dispatch receiver is the
+        // subtype. The declaring class, flags, descriptor and `throws` clause belong to the declaration
+        // it stands in for, as they do in Java.
+        val declaration = sym.unwrapFakeOverrides()
         val receiver = if (sym is FirFunctionSymbol<*>) sym.receiverParameterSymbol else null
         val totalParams = if (sym is FirFunctionSymbol<*>) {
             sym.valueParameterSymbols.size + (if (receiver != null) 1 else 0)
@@ -831,20 +848,20 @@ class KotlinTypeMapping(
             // Trim if not all slots were filled (when arguments empty but valueParameters present)
             if (idx < totalParams) arr.copyOf(idx).requireNoNulls() else arr
         } else null
-        var invocationFlags = when (sym) {
-            is FirConstructorSymbol -> mapToFlagsBitmap(sym.visibility, sym.modality, sym.isStatic)
-            is FirNamedFunctionSymbol -> mapToFlagsBitmap(sym.visibility, sym.modality, sym.isStatic || isFileFacadeMember(sym))
+        var invocationFlags = when (declaration) {
+            is FirConstructorSymbol -> mapToFlagsBitmap(declaration.visibility, declaration.modality, declaration.isStatic)
+            is FirNamedFunctionSymbol -> mapToFlagsBitmap(declaration.visibility, declaration.modality, declaration.isStatic || isFileFacadeMember(declaration))
             else -> {
-                throw UnsupportedOperationException("Unsupported method symbol: ${sym.javaClass.name}")
+                throw UnsupportedOperationException("Unsupported method symbol: ${declaration.javaClass.name}")
             }
         }
-        if (sym is FirNamedFunctionSymbol) {
-            val invocationContainer = sym.containingClassLookupTag()?.toRegularClassSymbol(firSession)?.fir
+        if (declaration is FirNamedFunctionSymbol) {
+            val invocationContainer = declaration.containingClassLookupTag()?.toRegularClassSymbol(firSession)?.fir
             if (invocationContainer != null &&
                 invocationContainer.classKind == ClassKind.INTERFACE &&
-                !sym.isStatic) {
+                !declaration.isStatic) {
                 invocationFlags = invocationFlags or (1L shl 10) // Abstract
-                if (sym.modality != Modality.ABSTRACT) {
+                if (declaration.modality != Modality.ABSTRACT) {
                     invocationFlags = invocationFlags or (1L shl 43) // Default
                 }
             }
@@ -864,23 +881,19 @@ class KotlinTypeMapping(
         }) { method ->
             var paramTypes: MutableList<JavaType>? = if (paramNamesArr != null) ArrayList(paramNamesArr.size) else null
             var declaringType: FullyQualified? = null
-            if (function.calleeReference is FirResolvedNamedReference &&
-                (function.calleeReference as FirResolvedNamedReference).resolvedSymbol is FirNamedFunctionSymbol
-            ) {
-                val resolvedSymbol =
-                    (function.calleeReference as FirResolvedNamedReference).resolvedSymbol as FirNamedFunctionSymbol
-                if (resolvedSymbol.dispatchReceiverType is ConeClassLikeType) {
-                    declaringType = asDeclaringType(resolvedSymbol.dispatchReceiverType as ConeClassLikeType)
-                } else if (resolvedSymbol.containingClassLookupTag() != null &&
-                    resolvedSymbol.containingClassLookupTag()!!.toRegularClassSymbol(firSession)?.fir != null
+            if (declaration is FirNamedFunctionSymbol) {
+                if (declaration.dispatchReceiverType is ConeClassLikeType) {
+                    declaringType = asDeclaringType(declaration.dispatchReceiverType as ConeClassLikeType)
+                } else if (declaration.containingClassLookupTag() != null &&
+                    declaration.containingClassLookupTag()!!.toRegularClassSymbol(firSession)?.fir != null
                 ) {
                     declaringType = TypeUtils.asFullyQualified(
                         type(
-                            resolvedSymbol.containingClassLookupTag()!!.toRegularClassSymbol(firSession)!!.fir
+                            declaration.containingClassLookupTag()!!.toRegularClassSymbol(firSession)!!.fir
                         )
                     )
-                } else if (resolvedSymbol.isFromLibrary) {
-                    val source = resolvedSymbol.fir.containerSource
+                } else if (declaration.isFromLibrary) {
+                    val source = declaration.fir.containerSource
                     if (source is JvmPackagePartSource) {
                         // JvmPackagePartSource carries only the JVM facade class name
                         // string — no FIR class to route through. Synthesize a
@@ -889,22 +902,22 @@ class KotlinTypeMapping(
                         declaringType = typeFactory.computeClass(source.facadeFqn, Flag.Public.getBitMask(), FullyQualified.Kind.Class) {
                             // Synthetic library facade — body is not enumerable from FIR.
                         }
-                    } else if (!resolvedSymbol.fir.origin.generated &&
-                        !resolvedSymbol.fir.origin.fromSupertypes &&
-                        !resolvedSymbol.fir.origin.fromSource
+                    } else if (!declaration.fir.origin.generated &&
+                        !declaration.fir.origin.fromSupertypes &&
+                        !declaration.fir.origin.fromSource
                     ) {
                         // No real declaring class — `kotlin.Library` was just a placeholder
                         // string, not an actual class.
                         declaringType = Unknown.getInstance()
                     }
-                } else if (resolvedSymbol.origin == FirDeclarationOrigin.SamConstructor) {
+                } else if (declaration.origin == FirDeclarationOrigin.SamConstructor) {
                     declaringType = when(val type = type(function.resolvedType)) {
                         is Class -> type
                         is Parameterized -> type.type
                         else -> Unknown.getInstance()
                     }
                 } else {
-                    declaringType = TypeUtils.asFullyQualified(type(resolvedSymbol.getContainingFile()))
+                    declaringType = TypeUtils.asFullyQualified(type(declaration.getContainingFile()))
                 }
             } else {
                 declaringType = TypeUtils.asFullyQualified(type(function.resolvedType))
@@ -916,11 +929,8 @@ class KotlinTypeMapping(
             // signatures (e.g. `kotlin.io.ConsoleKt.println(kotlin.Any)`) are preserved.
             // The discriminator is the containing class FIR — Java-origin classes (third-party
             // Java libraries on the classpath) are loaded as FirJavaClass even when the
-            // synthesized member FIR is FirConstructorImpl with an Enhancement origin. JDK
-            // classes are special-cased by Kotlin's classfile loader and aren't FirJavaClass —
-            // recipes targeting JDK signatures need a Kotlin-aware matcher instead.
-            val javaOwner = (sym as? FirCallableSymbol<*>)
-                ?.containingClassLookupTag()?.toRegularClassSymbol(firSession)?.fir as? FirJavaClass
+            // synthesized member FIR is FirConstructorImpl with an Enhancement origin.
+            val javaOwner = declaration.containingClassLookupTag()?.toRegularClassSymbol(firSession)?.fir as? FirJavaClass
             val javaOrigin = javaOwner != null
             val returnType = if (javaOrigin) remapKotlinBuiltin(type(function.resolvedType)) else type(function.resolvedType)
 
@@ -935,14 +945,13 @@ class KotlinTypeMapping(
 
             val callee = function.toResolvedCallableSymbol()?.fir as FirFunction
             val valueParams = callee.valueParameters
-            // A `throws` lookup keys off the descriptor, so it takes the declared parameter types.
-            val declaredParamTypes = ArrayList<JavaType>(valueParams.size)
-            for ((_, p) in valueParams.withIndex()) {
+            val calleeParamTypes = ArrayList<JavaType>(valueParams.size)
+            for (p in valueParams) {
                 if (paramTypes == null) {
                     paramTypes = ArrayList()
                 }
                 val t = type(p.returnTypeRef)
-                declaredParamTypes.add(t)
+                calleeParamTypes.add(t)
                 if (t is GenericTypeVariable) {
                     val arg = paramToArg?.get(p.name.asString())
                     if (arg != null) {
@@ -956,6 +965,10 @@ class KotlinTypeMapping(
                 }
             }
             val thrownExceptions = if (javaOrigin) {
+                // A `throws` lookup keys off the descriptor, so it takes the parameter types as declared,
+                // before the substitution a fake override applies to them.
+                val declaredParamTypes = if (declaration === sym) calleeParamTypes
+                    else (declaration.fir as FirFunction).valueParameters.map { type(it.returnTypeRef) }
                 javaThrownExceptions(javaOwner, name, declaredParamTypes)
             } else {
                 throwsAnnotationExceptions(callee.annotations)
@@ -1162,7 +1175,13 @@ class KotlinTypeMapping(
     private fun erasedParameterName(type: JavaType?): String? = when (type) {
         is Primitive -> if (type == Primitive.None || type == Primitive.Null) null else type.keyword
         is Array -> erasedParameterName(type.elemType)?.plus("[]")
-        is Parameterized -> erasedParameterName(type.type)
+        is Parameterized -> if (type.type.fullyQualifiedName == "kotlin.Array") {
+            // FIR renders a Java array parameter, a vararg's included, as `kotlin.Array<T>`.
+            erasedParameterName(type.typeParameters.firstOrNull())?.plus("[]")
+        } else {
+            erasedParameterName(type.type)
+        }
+
         is GenericTypeVariable -> type.bounds?.firstOrNull()
             ?.let { erasedParameterName(it) } ?: "java.lang.Object"
 
@@ -1170,9 +1189,11 @@ class KotlinTypeMapping(
             // FIR renders a Java parameter in Kotlin's vocabulary (`java.util.List` as
             // `kotlin.collections.MutableList`), while the descriptor holds the JVM name.
             val fqn = type.fullyQualifiedName
-            val javaFqn = JavaToKotlinClassMap.mapKotlinToJava(FqNameUnsafe(fqn))
-                ?.asSingleFqName()?.asString() ?: fqn
-            JavaThrownExceptions.normalize(javaFqn)
+            KOTLIN_ARRAY_ERASURES[fqn] ?: run {
+                val javaFqn = JavaToKotlinClassMap.mapKotlinToJava(FqNameUnsafe(fqn))
+                    ?.asSingleFqName()?.asString() ?: fqn
+                JavaThrownExceptions.normalize(javaFqn)
+            }
         }
 
         else -> null
