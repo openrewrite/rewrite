@@ -15,6 +15,8 @@
  */
 package org.openrewrite.internal;
 
+import lombok.EqualsAndHashCode;
+import lombok.ToString;
 import lombok.Value;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.SourceFile;
@@ -22,6 +24,7 @@ import org.openrewrite.SourceFile;
 import java.util.Collection;
 import java.util.List;
 import java.util.function.Function;
+import java.util.function.Supplier;
 
 /**
  * Lets the test framework check that a recipe finds the code it changes through type attribution, not by name or
@@ -61,5 +64,12 @@ public interface TypeMatchingValidationService {
          * What was respelled, e.g. "`doNothing()` written `Mockito.doNothing()`".
          */
         String description;
+
+        /**
+         * Each of several respelled places on its own, to tell which of them a recipe misses.
+         */
+        @EqualsAndHashCode.Exclude
+        @ToString.Exclude
+        Supplier<List<Respelling>> eachPlace;
     }
 }

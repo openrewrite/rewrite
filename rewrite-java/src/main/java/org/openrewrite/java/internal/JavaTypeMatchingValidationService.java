@@ -36,6 +36,7 @@ import java.util.function.Function;
 import java.util.regex.Pattern;
 
 import static java.util.Collections.emptyList;
+import static java.util.Collections.singleton;
 
 /**
  * Removes type attribution from Java sources, names the types a change refers to, and respells changed code without
@@ -45,6 +46,11 @@ public class JavaTypeMatchingValidationService implements TypeMatchingValidation
     private static final Pattern WHITESPACE = Pattern.compile("\\s+");
     private static final Pattern LOCAL_CLASS = Pattern.compile(".*\\$\\d.*");
     private static final int SNIPPET_LENGTH = 60;
+
+    /**
+     * The most places of a respelling tried one at a time, to tell which of them a recipe misses.
+     */
+    private static final int MAX_PLACES = 10;
 
     /**
      * The withers that clear each element's type attribution. Literals and primitives keep their types, which are
@@ -169,18 +175,38 @@ public class JavaTypeMatchingValidationService implements TypeMatchingValidation
         List<Respelling> respellings = new ArrayList<>(3);
         for (Respell respell : new Respell[]{new RespellStaticCalls(inChange, true),
                 new RespellStaticCalls(inChange, false), new QualifyTypeNames(inChange)}) {
-            J.CompilationUnit respelled = (J.CompilationUnit) respell.visitNonNull(cu, new InMemoryExecutionContext());
-            // nothing to respell, or the recipe's own change is this respelling
-            if (respell.description == null || printedWithoutImports(respelled).equals(afterCode)) {
-                continue;
-            }
-            SourceFile reparsed = reparse.apply(respelled);
-            if (reparsed instanceof J.CompilationUnit && sameMeaning(cu, (J.CompilationUnit) reparsed)) {
-                respellings.add(new Respelling(reparsed, respell.description +
-                        (respell.count > 1 ? " and " + (respell.count - 1) + " more like it" : "")));
+            Respelling respelling = respelling(cu, respell, afterCode, reparse);
+            if (respelling != null) {
+                respellings.add(respelling);
             }
         }
         return respellings;
+    }
+
+    private static @Nullable Respelling respelling(J.CompilationUnit cu, Respell respell, String afterCode,
+                                                   Function<SourceFile, @Nullable SourceFile> reparse) {
+        J.CompilationUnit respelled = (J.CompilationUnit) respell.visitNonNull(cu, new InMemoryExecutionContext());
+        // nothing to respell, or the recipe's own change is this respelling
+        if (respell.description == null || printedWithoutImports(respelled).equals(afterCode)) {
+            return null;
+        }
+        SourceFile reparsed = reparse.apply(respelled);
+        if (!(reparsed instanceof J.CompilationUnit) || !sameMeaning(cu, (J.CompilationUnit) reparsed)) {
+            return null;
+        }
+        List<UUID> places = respell.places;
+        return new Respelling(reparsed, respell.description +
+                                        (places.size() > 1 ? " and " + (places.size() - 1) + " more like it" : ""),
+                () -> {
+                    List<Respelling> each = new ArrayList<>();
+                    for (int i = 0; places.size() > 1 && i < Math.min(places.size(), MAX_PLACES); i++) {
+                        Respelling one = respelling(cu, respell.only(places.get(i)), afterCode, reparse);
+                        if (one != null) {
+                            each.add(one);
+                        }
+                    }
+                    return each;
+                });
     }
 
     @Override
@@ -188,8 +214,10 @@ public class JavaTypeMatchingValidationService implements TypeMatchingValidation
         if (!(before instanceof J.CompilationUnit) || !(after instanceof J.CompilationUnit)) {
             return after == null || !before.printAll().equals(after.printAll());
         }
-        return !printedWithoutImports((J.CompilationUnit) before)
-                .equals(printedWithoutImports((J.CompilationUnit) after));
+        J.CompilationUnit b = (J.CompilationUnit) before;
+        J.CompilationUnit a = (J.CompilationUnit) after;
+        // a statically imported call or field changes type in its import, not where it is used
+        return !printedWithoutImports(b).equals(printedWithoutImports(a)) || !references(b).equals(references(a));
     }
 
     /**
@@ -274,6 +302,31 @@ public class JavaTypeMatchingValidationService implements TypeMatchingValidation
         }.visit(cu, calls);
         Collections.sort(calls);
         return calls;
+    }
+
+    /**
+     * The methods the code calls and the fields it reads, outside its imports.
+     */
+    private static List<String> references(J.CompilationUnit cu) {
+        List<String> references = calls(cu);
+        new JavaIsoVisitor<List<String>>() {
+            @Override
+            public J.Import visitImport(J.Import anImport, List<String> references) {
+                return anImport;
+            }
+
+            @Override
+            public J.Identifier visitIdentifier(J.Identifier identifier, List<String> references) {
+                JavaType.Variable field = identifier.getFieldType();
+                if (field != null && field.getOwner() instanceof JavaType.FullyQualified) {
+                    references.add(((JavaType.FullyQualified) field.getOwner()).getFullyQualifiedName() + "#" +
+                                   field.getName());
+                }
+                return identifier;
+            }
+        }.visit(cu, references);
+        Collections.sort(references);
+        return references;
     }
 
     /**
@@ -467,17 +520,22 @@ public class JavaTypeMatchingValidationService implements TypeMatchingValidation
         @Nullable
         String description;
 
-        int count;
+        final List<UUID> places = new ArrayList<>();
 
         Respell(Set<UUID> inChange) {
             this.inChange = inChange;
         }
 
-        void respelled(String from, String to) {
+        /**
+         * The same respelling of only the given place.
+         */
+        abstract Respell only(UUID place);
+
+        void respelled(UUID place, String from, String to) {
             if (description == null) {
                 description = "`" + from + "` written `" + to + "`";
             }
-            count++;
+            places.add(place);
         }
     }
 
@@ -490,6 +548,11 @@ public class JavaTypeMatchingValidationService implements TypeMatchingValidation
         RespellStaticCalls(Set<UUID> inChange, boolean qualify) {
             super(inChange);
             this.qualify = qualify;
+        }
+
+        @Override
+        Respell only(UUID place) {
+            return new RespellStaticCalls(singleton(place), qualify);
         }
 
         @Override
@@ -506,14 +569,15 @@ public class JavaTypeMatchingValidationService implements TypeMatchingValidation
                         staticallyImportedFrom(m.getSimpleName(), type.getDeclaringType());
                 if (importedFrom != null) {
                     maybeAddImport(importedFrom.getFullyQualifiedName());
-                    respelled(m.getSimpleName() + args, importedFrom.getClassName() + "." + m.getSimpleName() + args);
+                    respelled(m.getId(), m.getSimpleName() + args,
+                            importedFrom.getClassName() + "." + m.getSimpleName() + args);
                     return m.withSelect(new J.Identifier(Tree.randomId(), Space.EMPTY, Markers.EMPTY, emptyList(),
                             importedFrom.getClassName(), importedFrom, null));
                 }
             } else if (!qualify && m.getSelect() != null &&
                        namesDeclaringType(m.getSelect(), type.getDeclaringType())) {
                 maybeAddImport(type.getDeclaringType().getFullyQualifiedName(), m.getSimpleName(), false);
-                respelled(m.getSelect().printTrimmed(getCursor()) + "." + m.getSimpleName() + args,
+                respelled(m.getId(), m.getSelect().printTrimmed(getCursor()) + "." + m.getSimpleName() + args,
                         m.getSimpleName() + args);
                 return m.withSelect(null).withName(m.getName().withPrefix(m.getSelect().getPrefix()));
             }
@@ -559,6 +623,11 @@ public class JavaTypeMatchingValidationService implements TypeMatchingValidation
         }
 
         @Override
+        Respell only(UUID place) {
+            return new QualifyTypeNames(singleton(place));
+        }
+
+        @Override
         public J.Identifier visitIdentifier(J.Identifier identifier, ExecutionContext ctx) {
             J.Identifier i = super.visitIdentifier(identifier, ctx);
             JavaType.FullyQualified type = TypeUtils.asFullyQualified(i.getType());
@@ -569,7 +638,7 @@ public class JavaTypeMatchingValidationService implements TypeMatchingValidation
                 return i;
             }
             String qualified = type.getFullyQualifiedName().replace('$', '.');
-            respelled(i.getSimpleName(), qualified);
+            respelled(i.getId(), i.getSimpleName(), qualified);
             // printed and parsed again, so the name doesn't need to be a tree of its own
             return i.withSimpleName(qualified);
         }

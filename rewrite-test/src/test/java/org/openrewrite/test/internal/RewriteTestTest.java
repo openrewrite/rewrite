@@ -28,6 +28,7 @@ import org.openrewrite.*;
 import org.openrewrite.groovy.GroovyIsoVisitor;
 import org.openrewrite.groovy.GroovyParser;
 import org.openrewrite.internal.ListUtils;
+import org.openrewrite.java.ChangeType;
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.JavaParser;
 import org.openrewrite.java.JavaTemplate;
@@ -1113,6 +1114,33 @@ class RewriteTestTest implements RewriteTest {
         }
 
         @Test
+        void nameTheRespellingTheRecipeMisses() {
+            AssertionError e = assertThrows(AssertionError.class, () -> rewriteRun(
+              spec -> spec.recipe(new FindCallsWithPrintedArgument("Boolean.TRUE")),
+              java(
+                """
+                  import java.util.Collections;
+                  import java.util.List;
+
+                  class A {
+                      List<Boolean> list = Collections.singletonList(Boolean.TRUE);
+                  }
+                  """,
+                """
+                  import java.util.Collections;
+                  import java.util.List;
+
+                  class A {
+                      List<Boolean> list = /*~~>*/Collections.singletonList(Boolean.TRUE);
+                  }
+                  """
+              )
+            ));
+            assertThat(e).hasMessageContaining("A.java (changed by org.openrewrite.test.internal." +
+                                               "FindCallsWithPrintedArgument): `Boolean` written `java.lang.Boolean`\n");
+        }
+
+        @Test
         void acceptRecipeThatMatchesAnnotationsByType() {
             rewriteRun(
               spec -> spec.recipe(new FindAnnotations("@java.lang.Deprecated", null)),
@@ -1285,6 +1313,32 @@ class RewriteTestTest implements RewriteTest {
                   class A {
                       List<String> list = emptyList();
                       List<String> other = new ArrayList<>();
+                  }
+                  """
+              )
+            );
+        }
+
+        @Test
+        void acceptChangeToTheTypeOfAStaticallyImportedCall() {
+            rewriteRun(
+              spec -> spec.recipe(new ChangeType("java.util.Collections", "com.example.Lists", true)),
+              java(
+                """
+                  import java.util.Collections;
+                  import java.util.List;
+
+                  class A {
+                      List<String> list = Collections.emptyList();
+                  }
+                  """,
+                """
+                  import com.example.Lists;
+
+                  import java.util.List;
+
+                  class A {
+                      List<String> list = Lists.emptyList();
                   }
                   """
               )
@@ -1785,6 +1839,33 @@ class FindCallsByName extends Recipe {
             public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
                 J.MethodInvocation m = super.visitMethodInvocation(method, ctx);
                 return methodName.equals(m.getSimpleName()) ? SearchResult.found(m) : m;
+            }
+        };
+    }
+}
+
+@EqualsAndHashCode(callSuper = false)
+@NullMarked
+@Value
+class FindCallsWithPrintedArgument extends Recipe {
+
+    @Option(displayName = "Argument",
+      description = "How an argument of the call prints.",
+      example = "Boolean.TRUE")
+    String argument;
+
+    String displayName = "Find calls with a printed argument";
+
+    String description = "Finds calls by how one of their arguments prints, so it misses other spellings of it.";
+
+    @Override
+    public TreeVisitor<?, ExecutionContext> getVisitor() {
+        return new JavaIsoVisitor<>() {
+            @Override
+            public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
+                J.MethodInvocation m = super.visitMethodInvocation(method, ctx);
+                return m.getArguments().stream().anyMatch(arg -> argument.equals(arg.toString())) ?
+                  SearchResult.found(m) : m;
             }
         };
     }

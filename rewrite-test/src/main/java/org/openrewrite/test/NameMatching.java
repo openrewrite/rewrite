@@ -225,16 +225,9 @@ final class NameMatching {
                 continue;
             }
             for (Respelling respelling : respellings) {
-                SourceFile respelled = respelling.getSourceFile();
-                List<SourceFile> respelledSources = new ArrayList<>(sources);
-                respelledSources.set(index, respelled);
-                Map<UUID, @Nullable SourceFile> rerun = rerun(respelledSources);
-                // a respelling can leave an import unused, so a change to imports or formatting alone doesn't count
-                boolean changedCode = rerun != null && rerun.containsKey(before.getId()) &&
-                                      service.changesCode(respelled, rerun.get(before.getId()));
-                if (rerun != null && !changedCode && reproducible(result)) {
+                if (misses(respelling, before, index, service) && reproducible(result)) {
                     found.append("  ").append(before.getSourcePath()).append(changedBy(result))
-                            .append(": ").append(respelling.getDescription()).append('\n');
+                            .append(": ").append(missedPlaces(respelling, before, index, service)).append('\n');
                     break;
                 }
             }
@@ -250,6 +243,34 @@ final class NameMatching {
                "name the same type, so a recipe that changes one spelling must change the other. If only one " +
                "spelling is meant to change, add " +
                "spec.typeValidationOptions(TypeValidation.all().equivalentSpellings(false)).";
+    }
+
+    /**
+     * Whether the recipe, run again with the respelled source in place of {@code before}, leaves its code unchanged.
+     */
+    private boolean misses(Respelling respelling, SourceFile before, int index, TypeMatchingValidationService service) {
+        SourceFile respelled = respelling.getSourceFile();
+        List<SourceFile> respelledSources = new ArrayList<>(sources);
+        respelledSources.set(index, respelled);
+        Map<UUID, @Nullable SourceFile> rerun = rerun(respelledSources);
+        // a respelling can leave an import unused, so a change to imports or formatting alone doesn't count
+        return rerun != null && !(rerun.containsKey(before.getId()) &&
+                                  service.changesCode(respelled, rerun.get(before.getId())));
+    }
+
+    /**
+     * The places of a respelling that the recipe misses on their own, or the whole respelling when it misses none
+     * of them alone.
+     */
+    private String missedPlaces(Respelling respelling, SourceFile before, int index,
+                                TypeMatchingValidationService service) {
+        List<String> missed = new ArrayList<>();
+        for (Respelling place : respelling.getEachPlace().get()) {
+            if (misses(place, before, index, service)) {
+                missed.add(place.getDescription());
+            }
+        }
+        return missed.isEmpty() ? respelling.getDescription() : String.join(", ", missed);
     }
 
     private @Nullable String withoutTypesFailures(List<Result> changed) {
