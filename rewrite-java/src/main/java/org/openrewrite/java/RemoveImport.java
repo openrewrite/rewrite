@@ -67,9 +67,15 @@ public class RemoveImport<P> extends JavaIsoVisitor<P> {
             Set<String> methodsAndFieldsUsed = new HashSet<>();
             Set<String> otherMethodsAndFieldsInTypeUsed = new TreeSet<>();
             Set<String> originalImports = new HashSet<>();
+            Set<String> ownerAndSupertypes = new HashSet<>();
             for (J.Import cuImport : cu.getImports()) {
-                if (cuImport.getQualid().getType() != null) {
-                    originalImports.add(((JavaType.FullyQualified) cuImport.getQualid().getType()).getFullyQualifiedName().replace("$", "."));
+                JavaType.FullyQualified qualidType = TypeUtils.asFullyQualified(cuImport.getQualid().getType());
+                if (qualidType != null) {
+                    originalImports.add(qualidType.getFullyQualifiedName().replace("$", "."));
+                    if (TypeUtils.fullyQualifiedNamesAreEqual(qualidType.getFullyQualifiedName(), type) &&
+                            qualidType.getOwningClass() != null) {
+                        collectSupertypeNames(qualidType.getOwningClass(), ownerAndSupertypes);
+                    }
                 }
             }
 
@@ -81,8 +87,16 @@ public class RemoveImport<P> extends JavaIsoVisitor<P> {
                 }
             }
 
+            String importedName = type.substring(type.lastIndexOf('.') + 1);
             for (JavaType.Method method : cu.getTypesInUse().getUsedMethods()) {
-                if (method.hasFlags(Flag.Static)) {
+                JavaType.FullyQualified methodDeclaringType = method.getDeclaringType();
+                if (methodDeclaringType != null &&
+                        TypeUtils.fullyQualifiedNamesAreEqual(packageQualifiedName(methodDeclaringType, method.getName()), type)) {
+                    methodsAndFieldsUsed.add(method.getName());
+                } else if (methodDeclaringType != null && method.getName().equals(importedName) &&
+                        ownerAndSupertypes.contains(TypeUtils.toFullyQualifiedName(methodDeclaringType.getFullyQualifiedName()))) {
+                    methodsAndFieldsUsed.add(method.getName());
+                } else if (method.hasFlags(Flag.Static)) {
                     String declaringType = method.getDeclaringType().getFullyQualifiedName();
                     if (TypeUtils.fullyQualifiedNamesAreEqual(declaringType, type)) {
                         methodsAndFieldsUsed.add(method.getName());
@@ -143,7 +157,8 @@ public class RemoveImport<P> extends JavaIsoVisitor<P> {
                         spaceForNextImport.set(import_.getPrefix());
                         return null;
                     }
-                } else if (!keepImport && TypeUtils.fullyQualifiedNamesAreEqual(typeName, type)) {
+                } else if (!keepImport && TypeUtils.fullyQualifiedNamesAreEqual(typeName, type) &&
+                        !methodsAndFieldsUsed.contains(import_.getQualid().getSimpleName())) {
                     spaceForNextImport.set(import_.getPrefix());
                     return null;
                 } else if (!keepImport && import_.getPackageName().equals(owner) &&
@@ -182,6 +197,23 @@ public class RemoveImport<P> extends JavaIsoVisitor<P> {
         }
 
         return j;
+    }
+
+    private static String packageQualifiedName(JavaType.FullyQualified declaringType, String name) {
+        String packageName = declaringType.getPackageName();
+        return packageName.isEmpty() ? name : packageName + "." + name;
+    }
+
+    private static void collectSupertypeNames(JavaType.FullyQualified type, Set<String> names) {
+        if (!names.add(TypeUtils.toFullyQualifiedName(type.getFullyQualifiedName()))) {
+            return;
+        }
+        for (JavaType.FullyQualified anInterface : type.getInterfaces()) {
+            collectSupertypeNames(anInterface, names);
+        }
+        if (type.getSupertype() != null) {
+            collectSupertypeNames(type.getSupertype(), names);
+        }
     }
 
     private long countTrailingLinebreaks(Space space) {
