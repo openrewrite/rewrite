@@ -19,15 +19,28 @@ import org.intellij.lang.annotations.Language;
 import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.openrewrite.DocumentExample;
+import org.openrewrite.ExecutionContext;
+import org.openrewrite.InMemoryExecutionContext;
 import org.openrewrite.Issue;
 import org.openrewrite.java.ChangePackage;
 import org.openrewrite.java.JavaParser;
+import org.openrewrite.maven.tree.MavenRepository;
+import org.openrewrite.maven.tree.MavenResolutionResult;
 import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
 
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.util.List;
+import java.util.jar.JarOutputStream;
+
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.java.Assertions.*;
 import static org.openrewrite.maven.Assertions.pomXml;
 import static org.openrewrite.test.RewriteTest.toRecipe;
@@ -2454,6 +2467,228 @@ class AddDependencyTest implements RewriteTest {
               """
           )
         );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/9207")
+    @ParameterizedTest
+    @ValueSource(strings = {"3.40.0.CR1", "3.40.0.redhat-00001", "3.40.0.Final", "3.40.0", "3.40.0-SNAPSHOT"})
+    void latestReleaseKeepsQualifiedBomVersionWhenAddingDependency(String managedVersion, @TempDir Path repository) throws IOException {
+        ExecutionContext ctx = managedVersionRepository(repository, managedVersion, "3.40.1");
+        rewriteRun(
+          spec -> spec
+            .recipe(addDependency("com.example:managed-lib:latest.release"))
+            .executionContext(ctx),
+          pomXml(
+            qualifiedBomProject(managedVersion, false),
+            qualifiedBomProject(managedVersion, true),
+            spec -> spec.beforeRecipe(pom -> assertThat(pom.getMarkers().findFirst(MavenResolutionResult.class)
+              .orElseThrow().getPom().getManagedVersion("com.example", "managed-lib", null, null)).isEqualTo(managedVersion))
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/9207")
+    @ParameterizedTest
+    @ValueSource(strings = {"3.40.0.CR1", "3.40.0.redhat-00001", "3.40.0.Final", "3.40.0", "3.40.0-SNAPSHOT"})
+    void latestReleaseKeepsQualifiedBomVersionForExistingDependency(String managedVersion, @TempDir Path repository) throws IOException {
+        ExecutionContext ctx = managedVersionRepository(repository, managedVersion, "3.40.1");
+        rewriteRun(
+          spec -> spec
+            .recipe(addDependency("com.example:managed-lib:latest.release"))
+            .executionContext(ctx),
+          pomXml(
+            qualifiedBomProject(managedVersion, true),
+            spec -> spec.beforeRecipe(pom -> assertThat(pom.getMarkers().findFirst(MavenResolutionResult.class)
+              .orElseThrow().getPom().getManagedVersion("com.example", "managed-lib", null, null)).isEqualTo(managedVersion))
+          )
+        );
+    }
+
+    @ParameterizedTest
+    @CsvSource({"3.40.1, false", "3.40.1, true", "3.40.x, false", "3.40.x, true"})
+    void requestedVersionStillOverridesQualifiedBom(String selector, boolean dependencyPresent, @TempDir Path repository) throws IOException {
+        ExecutionContext ctx = managedVersionRepository(repository, "3.40.0.CR1", "3.40.1");
+        rewriteRun(
+          spec -> spec
+            .recipe(addDependency("com.example:managed-lib:" + selector))
+            .executionContext(ctx),
+          pomXml(
+            qualifiedBomProject("3.40.0.CR1", dependencyPresent),
+            qualifiedBomProject("3.40.1", true)
+          )
+        );
+    }
+
+    @ParameterizedTest
+    @ValueSource(booleans = {false, true})
+    void latestReleaseHonorsVersionPatternForManagedVersion(boolean dependencyPresent, @TempDir Path repository) throws IOException {
+        ExecutionContext ctx = managedVersionRepository(repository, "3.40.0.CR1", "3.40.1.Final");
+        rewriteRun(
+          spec -> spec
+            .recipe(new AddDependency("com.example", "managed-lib", "latest.release", ".Final", null, true,
+              null, null, null, false, null, false))
+            .executionContext(ctx),
+          pomXml(
+            qualifiedBomProject("3.40.0.CR1", dependencyPresent),
+            qualifiedBomProject("3.40.1.Final", true)
+          )
+        );
+    }
+
+    @ParameterizedTest
+    @ValueSource(booleans = {false, true})
+    void latestReleaseKeepsManagedVersionMatchingGlob(boolean dependencyPresent, @TempDir Path repository) throws IOException {
+        String managedVersion = "3.40.0+redhat-00001";
+        String before = qualifiedBomProject(managedVersion, dependencyPresent);
+        ExecutionContext ctx = managedVersionRepository(repository, managedVersion, "3.40.1+redhat-00001");
+        rewriteRun(
+          spec -> spec
+            .recipe(new AddDependency("com.example", "managed-lib", "latest.release", "+redhat*", null, true,
+              null, null, null, false, null, false))
+            .executionContext(ctx),
+          dependencyPresent ? pomXml(before) : pomXml(before, qualifiedBomProject(managedVersion, true))
+        );
+    }
+
+    @Test
+    void latestReleaseStillSelectsReleaseWithoutBom(@TempDir Path repository) throws IOException {
+        ExecutionContext ctx = managedVersionRepository(repository, "3.41.0.CR1", "3.40.1", false);
+        rewriteRun(
+          spec -> spec
+            .recipe(new AddDependency("com.example", "managed-lib", "latest.release", null, null, false,
+              null, null, null, false, null, false))
+            .executionContext(ctx),
+          pomXml(
+            """
+              <project>
+                  <modelVersion>4.0.0</modelVersion>
+                  <groupId>com.example</groupId>
+                  <artifactId>project</artifactId>
+                  <version>1.0</version>
+              </project>
+              """,
+            """
+              <project>
+                  <modelVersion>4.0.0</modelVersion>
+                  <groupId>com.example</groupId>
+                  <artifactId>project</artifactId>
+                  <version>1.0</version>
+                  <dependencies>
+                      <dependency>
+                          <groupId>com.example</groupId>
+                          <artifactId>managed-lib</artifactId>
+                          <version>3.40.1</version>
+                      </dependency>
+                  </dependencies>
+              </project>
+              """
+          )
+        );
+    }
+
+    private static String qualifiedBomProject(String managedVersion, boolean dependencyPresent) {
+        return """
+          <project>
+              <modelVersion>4.0.0</modelVersion>
+              <groupId>com.example</groupId>
+              <artifactId>project</artifactId>
+              <version>1.0</version>
+              <properties>
+                  <bom.version>%s</bom.version>
+              </properties>
+              <dependencyManagement>
+                  <dependencies>
+                      <dependency>
+                          <groupId>com.example</groupId>
+                          <artifactId>managed-bom</artifactId>
+                          <version>${bom.version}</version>
+                          <type>pom</type>
+                          <scope>import</scope>
+                      </dependency>
+                  </dependencies>
+              </dependencyManagement>
+          %s</project>
+          """.formatted(managedVersion, dependencyPresent ? """
+              <dependencies>
+                  <dependency>
+                      <groupId>com.example</groupId>
+                      <artifactId>managed-lib</artifactId>
+                  </dependency>
+              </dependencies>
+          """ : "");
+    }
+
+    private static ExecutionContext managedVersionRepository(Path repository, String managedVersion, String releaseVersion) throws IOException {
+        return managedVersionRepository(repository, managedVersion, releaseVersion, true);
+    }
+
+    private static ExecutionContext managedVersionRepository(Path repository, String managedVersion, String releaseVersion,
+                                                            boolean includeReleaseMetadata) throws IOException {
+        for (String version : List.of(managedVersion, releaseVersion)) {
+            Path library = repository.resolve("com/example/managed-lib/" + version + "/managed-lib-" + version + ".pom");
+            Files.createDirectories(library.getParent());
+            Files.writeString(library, """
+              <project>
+                  <modelVersion>4.0.0</modelVersion>
+                  <groupId>com.example</groupId>
+                  <artifactId>managed-lib</artifactId>
+                  <version>%s</version>
+              </project>
+              """.formatted(version));
+            try (JarOutputStream jar = new JarOutputStream(Files.newOutputStream(
+              library.resolveSibling("managed-lib-" + version + ".jar")))) {
+                jar.finish();
+            }
+            Path bom = repository.resolve("com/example/managed-bom/" + version + "/managed-bom-" + version + ".pom");
+            Files.createDirectories(bom.getParent());
+            Files.writeString(bom, """
+              <project>
+                  <modelVersion>4.0.0</modelVersion>
+                  <groupId>com.example</groupId>
+                  <artifactId>managed-bom</artifactId>
+                  <version>%s</version>
+                  <packaging>pom</packaging>
+                  <dependencyManagement>
+                      <dependencies>
+                          <dependency>
+                              <groupId>com.example</groupId>
+                              <artifactId>managed-lib</artifactId>
+                              <version>%s</version>
+                          </dependency>
+                      </dependencies>
+                  </dependencyManagement>
+              </project>
+              """.formatted(version, version));
+        }
+        // A newer release must be available so the broken code actually upgrades the BOM.
+        for (String artifact : List.of("managed-lib", "managed-bom")) {
+            String releaseMetadata = includeReleaseMetadata ? "<release>" + releaseVersion + "</release>" : "";
+            Files.writeString(repository.resolve("com/example/" + artifact + "/maven-metadata-local.xml"), """
+              <metadata>
+                  <groupId>com.example</groupId>
+                  <artifactId>%s</artifactId>
+                  <versioning>
+                      <latest>%s</latest>
+                      %s
+                      <versions>
+                          <version>%s</version>
+                          <version>%s</version>
+                      </versions>
+                  </versioning>
+              </metadata>
+              """.formatted(artifact, releaseVersion, releaseMetadata, managedVersion, releaseVersion));
+        }
+        MavenRepository local = MavenRepository.builder()
+          .id("qualified-managed-version")
+          .uri(repository.toUri().toString())
+          .snapshots(true)
+          .knownToExist(true)
+          .build();
+        return MavenExecutionContextView.view(new InMemoryExecutionContext())
+          .setLocalRepository(local)
+          .setRepositories(List.of(local))
+          .setAddLocalRepository(false)
+          .setAddCentralRepository(false);
     }
 
     private AddDependency addDependency(@SuppressWarnings("SameParameterValue") String gav) {
