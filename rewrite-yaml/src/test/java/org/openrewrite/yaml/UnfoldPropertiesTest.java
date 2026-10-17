@@ -23,7 +23,6 @@ import org.openrewrite.DocumentExample;
 import org.openrewrite.Issue;
 import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
-import org.openrewrite.test.TypeValidation;
 import org.yaml.snakeyaml.LoaderOptions;
 
 import java.util.List;
@@ -381,9 +380,7 @@ class UnfoldPropertiesTest implements RewriteTest {
               for (var result : run.getChangeset().getAllResults()) {
                   new org.yaml.snakeyaml.Yaml(options).load(requireNonNull(result.getAfter()).printAll());
               }
-          })
-            // ChangePropertyKey auto-formats the whole mapping a relocated key lands in
-            .afterTypeValidationOptions(TypeValidation.builder().formattingScope(false).build()),
+          }),
           yaml(
             """
               spring:
