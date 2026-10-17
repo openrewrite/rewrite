@@ -119,7 +119,7 @@ public class TypeValidation {
      * Potentially allows recipes to interfere with each other in surprising and hard to debug ways.
      * Problematic for all the same reasons mutable global variables or singletons are.
      *
-     * @deprecated Use {@link RecipeQualityValidation#immutableExecutionContext}.
+     * @deprecated Use {@link RecipeQualityValidation#executionContextUnchanged}.
      */
     @Deprecated
     @Builder.Default
@@ -132,7 +132,7 @@ public class TypeValidation {
      * This validation raises an error if a scanner attempts an edit. You can disable this validation if your recipe
      * deliberately attempts an edit during scanning, and you don't care that this edit is ultimately ignored.
      *
-     * @deprecated Use {@link RecipeQualityValidation#immutableScanning}.
+     * @deprecated Use {@link RecipeQualityValidation#noEditsInScanningPhase}.
      */
     @Deprecated
     @Builder.Default
@@ -198,7 +198,6 @@ public class TypeValidation {
     @SuppressWarnings("deprecation")
     private static @Nullable TypeValidation afterOf(RecipeSpec spec) {
         RecipeQualityValidation quality = spec.getRecipeQualityValidation();
-        return quality != null && quality.typeValidationOptions() != null ?
-                quality.typeValidationOptions() : spec.getAfterTypeValidation();
+        return quality != null && quality.types() != null ? quality.types() : spec.getAfterTypeValidation();
     }
 }

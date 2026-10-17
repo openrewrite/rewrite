@@ -174,19 +174,24 @@ class RewriteTestTest implements RewriteTest {
 
     @Test
     void rejectExecutionContextMutation() {
-        assertThrows(AssertionError.class, () ->
+        AssertionError e = assertThrows(AssertionError.class, () ->
           rewriteRun(
             spec -> spec.recipe(new MutateExecutionContext()),
             text("irrelevant")
           ));
+        assertThat(e).hasStackTraceContaining("in a ScanningRecipe's accumulator")
+          .hasStackTraceContaining("in Cursor messages")
+          .hasStackTraceContaining("executionContextUnchanged(false)");
     }
 
     @Test
     void rejectScannerEdit() {
-        assertThrows(AssertionError.class, () -> rewriteRun(
+        AssertionError e = assertThrows(AssertionError.class, () -> rewriteRun(
           spec -> spec.recipe(new ScannerEdit()),
           text("foo")
         ));
+        assertThat(e).hasStackTraceContaining("make the edits in getVisitor(acc)")
+          .hasStackTraceContaining("noEditsInScanningPhase(false)");
     }
 
     @Test
@@ -209,7 +214,7 @@ class RewriteTestTest implements RewriteTest {
     void allowScannerEdit() {
         rewriteRun(
           spec -> spec
-            .recipeQualityValidation(RecipeQualityValidation.builder().immutableScanning(false).build())
+            .recipeQualityValidation(RecipeQualityValidation.builder().noEditsInScanningPhase(false).build())
             .recipe(new ScannerEdit()),
           text("foo")
         );
@@ -1183,8 +1188,7 @@ class RewriteTestTest implements RewriteTest {
         @Test
         void acceptRecipeThatMatchesCallsByType() {
             rewriteRun(
-              spec -> spec.recipe(new FindCallsByType("java.util.Collections emptyList()"))
-                .recipeQualityValidation(RecipeQualityValidation.builder().typeAttributedMatching(true).build()),
+              spec -> spec.recipe(new FindCallsByType("java.util.Collections emptyList()")),
               java(
                 """
                   import java.util.Collections;
@@ -1439,145 +1443,6 @@ class RewriteTestTest implements RewriteTest {
               )
             );
         }
-
-        @Test
-        void rejectRecipeThatMakesTheSameChangeWithoutTypes() {
-            AssertionError e = assertThrows(AssertionError.class, () -> rewriteRun(
-              spec -> spec.recipe(new FindCallsByName("emptyList"))
-                .recipeQualityValidation(RecipeQualityValidation.builder().typeAttributedMatching(true).build()),
-              java(
-                """
-                  import java.util.Collections;
-                  import java.util.List;
-
-                  class A {
-                      List<String> list = Collections.emptyList();
-                  }
-                  """,
-                """
-                  import java.util.Collections;
-                  import java.util.List;
-
-                  class A {
-                      List<String> list = /*~~>*/Collections.emptyList();
-                  }
-                  """
-              )
-            ));
-            assertThat(e).hasMessageStartingWith("Identify the code to change through type attribution")
-              .hasMessageContaining("A.java (changed by org.openrewrite.test.internal.FindCallsByName): " +
-                                    "`Collections.emptyList()` (java.util.Collections emptyList())")
-              .hasMessageContaining("typeAttributedMatching(false)");
-        }
-
-        @Test
-        void rejectRecipeThatRemovesDeclarationsByAnnotationName() {
-            AssertionError e = assertThrows(AssertionError.class, () -> rewriteRun(
-              spec -> spec.recipe(new RemoveMethodsAnnotatedByName("Deprecated"))
-                .recipeQualityValidation(RecipeQualityValidation.builder().typeAttributedMatching(true).build()),
-              java(
-                """
-                  class A {
-                      @Deprecated
-                      void old() {
-                      }
-
-                      void current() {
-                      }
-                  }
-                  """,
-                """
-                  class A {
-
-                      void current() {
-                      }
-                  }
-                  """
-              )
-            ));
-            assertThat(e).hasMessageContaining("`@Deprecated` (java.lang.Deprecated)");
-        }
-
-        @Test
-        void acceptFormattingWithoutTypes() {
-            rewriteRun(
-              spec -> spec.recipe(new RemoveSpaceBeforeArguments())
-                .recipeQualityValidation(RecipeQualityValidation.builder().typeAttributedMatching(true).build()),
-              java(
-                """
-                  import java.util.Collections;
-                  import java.util.List;
-
-                  class A {
-                      List<String> list = Collections.emptyList ();
-                  }
-                  """,
-                """
-                  import java.util.Collections;
-                  import java.util.List;
-
-                  class A {
-                      List<String> list = Collections.emptyList();
-                  }
-                  """
-              )
-            );
-        }
-
-        @Test
-        void withoutTypesNotCheckedByDefault() {
-            rewriteRun(
-              spec -> spec.recipe(new FindCallsByName("emptyList")),
-              java(
-                """
-                  import java.util.Collections;
-                  import java.util.List;
-
-                  class A {
-                      List<String> list = Collections.emptyList();
-                  }
-                  """,
-                """
-                  import java.util.Collections;
-                  import java.util.List;
-
-                  class A {
-                      List<String> list = /*~~>*/Collections.emptyList();
-                  }
-                  """
-              )
-            );
-        }
-
-        @Test
-        void acceptNameMatchingOfTypesTheTestDeclares() {
-            rewriteRun(
-              spec -> spec.recipe(new FindCallsByName("foo"))
-                .recipeQualityValidation(RecipeQualityValidation.builder().typeAttributedMatching(true).build()),
-              java(
-                """
-                  class A {
-                      static void foo() {
-                      }
-
-                      void bar() {
-                          foo();
-                      }
-                  }
-                  """,
-                """
-                  class A {
-                      static void foo() {
-                      }
-
-                      void bar() {
-                          /*~~>*/foo();
-                      }
-                  }
-                  """
-              )
-            );
-        }
     }
 
     @Nested
@@ -1794,32 +1659,6 @@ class RequiresBuildMetadata extends Recipe {
 @EqualsAndHashCode(callSuper = false)
 @NullMarked
 @Value
-class FindCallsByName extends Recipe {
-
-    @Option(displayName = "Method name",
-      description = "The name of the method to find.",
-      example = "emptyList")
-    String methodName;
-
-    String displayName = "Find calls by method name";
-
-    String description = "Finds calls by name alone, whatever type declares the method.";
-
-    @Override
-    public TreeVisitor<?, ExecutionContext> getVisitor() {
-        return new JavaIsoVisitor<>() {
-            @Override
-            public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
-                J.MethodInvocation m = super.visitMethodInvocation(method, ctx);
-                return methodName.equals(m.getSimpleName()) ? SearchResult.found(m) : m;
-            }
-        };
-    }
-}
-
-@EqualsAndHashCode(callSuper = false)
-@NullMarked
-@Value
 class FindCallsWithPrintedArgument extends Recipe {
 
     @Option(displayName = "Argument",
@@ -1923,58 +1762,6 @@ class FindAnnotationsByPrintedType extends Recipe {
             public J.Annotation visitAnnotation(J.Annotation annotation, ExecutionContext ctx) {
                 J.Annotation a = super.visitAnnotation(annotation, ctx);
                 return annotationType.equals(a.getAnnotationType().toString()) ? SearchResult.found(a) : a;
-            }
-        };
-    }
-}
-
-@EqualsAndHashCode(callSuper = false)
-@NullMarked
-@Value
-class RemoveMethodsAnnotatedByName extends Recipe {
-
-    @Option(displayName = "Annotation name",
-      description = "The simple name of the annotation.",
-      example = "Deprecated")
-    String annotationName;
-
-    String displayName = "Remove methods annotated by name";
-
-    String description = "Removes methods with an annotation of this simple name, whatever its type.";
-
-    @Override
-    public TreeVisitor<?, ExecutionContext> getVisitor() {
-        return new JavaIsoVisitor<>() {
-            @Override
-            public J.@Nullable MethodDeclaration visitMethodDeclaration(J.MethodDeclaration method,
-                                                                        ExecutionContext ctx) {
-                for (J.Annotation annotation : method.getLeadingAnnotations()) {
-                    if (annotationName.equals(annotation.getSimpleName())) {
-                        return null;
-                    }
-                }
-                return super.visitMethodDeclaration(method, ctx);
-            }
-        };
-    }
-}
-
-@EqualsAndHashCode(callSuper = false)
-@NullMarked
-@Value
-class RemoveSpaceBeforeArguments extends Recipe {
-
-    String displayName = "Remove space before arguments";
-
-    String description = "Formats every call the same way, whatever it calls.";
-
-    @Override
-    public TreeVisitor<?, ExecutionContext> getVisitor() {
-        return new JavaIsoVisitor<>() {
-            @Override
-            public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
-                J.MethodInvocation m = super.visitMethodInvocation(method, ctx);
-                return m.getPadding().withArguments(m.getPadding().getArguments().withBefore(Space.EMPTY));
             }
         };
     }

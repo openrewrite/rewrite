@@ -239,10 +239,11 @@ public class RecipeRunCycle<LSS extends LargeSourceSet> {
                                 if (scanner.isAcceptable(source, ctx)) {
                                     Tree maybeMutated = scanner.visit(source, ctx, rootCursor);
                                     assert maybeMutated == source || !ctx.getMessage(SCANNING_MUTATION_VALIDATION, false) :
-                                            "Edits made from within ScanningRecipe.getScanner() are discarded. " +
-                                                    "The purpose of a scanner is to aggregate information for use in subsequent phases. " +
-                                                    "Use ScanningRecipe.getVisitor() for making edits. " +
-                                                    "To disable this warning set TypeValidation.immutableScanning to false in your tests.";
+                                            scanningRecipe.getName() + "'s scanner changed " + source.getSourcePath() +
+                                            ", and the scanning phase discards edits. Record what the scanner finds " +
+                                            "in the accumulator, and make the edits in getVisitor(acc). A scanner " +
+                                            "that reuses an editing visitor opts out with " +
+                                            "RecipeQualityValidation.builder().noEditsInScanningPhase(false).";
                                 }
                                 return source;
                             });

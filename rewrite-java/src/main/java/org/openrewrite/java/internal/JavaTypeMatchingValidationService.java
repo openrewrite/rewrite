@@ -15,7 +15,6 @@
  */
 package org.openrewrite.java.internal;
 
-import lombok.Value;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
 import org.openrewrite.internal.ListUtils;
@@ -27,9 +26,6 @@ import org.openrewrite.java.search.FindMissingTypes;
 import org.openrewrite.java.tree.*;
 import org.openrewrite.marker.Markers;
 
-import java.lang.reflect.Field;
-import java.lang.reflect.Method;
-import java.lang.reflect.Modifier;
 import java.util.*;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Function;
@@ -39,124 +35,16 @@ import static java.util.Collections.emptyList;
 import static java.util.Collections.singleton;
 
 /**
- * Removes type attribution from Java sources, names the types a change refers to, and respells changed code without
- * changing what it means, for the test framework's check that recipes match by type.
+ * Respells changed Java code without changing what it means, for the test framework's check that recipes match by type.
  */
 public class JavaTypeMatchingValidationService implements TypeMatchingValidationService {
     private static final Pattern WHITESPACE = Pattern.compile("\\s+");
     private static final Pattern LOCAL_CLASS = Pattern.compile(".*\\$\\d.*");
-    private static final int SNIPPET_LENGTH = 60;
 
     /**
      * The most places of a respelling tried one at a time, to tell which of them a recipe misses.
      */
     private static final int MAX_PLACES = 10;
-
-    /**
-     * The withers that clear each element's type attribution. Literals and primitives keep their types, which are
-     * syntax.
-     */
-    private static final ClassValue<List<Method>> TYPE_WITHERS = new ClassValue<List<Method>>() {
-        @Override
-        protected List<Method> computeValue(Class<?> type) {
-            List<Method> withers = new ArrayList<>();
-            if (J.Literal.class.isAssignableFrom(type) || J.Primitive.class.isAssignableFrom(type)) {
-                return withers;
-            }
-            for (Class<?> c = type; c != null && c != Object.class; c = c.getSuperclass()) {
-                for (Field field : c.getDeclaredFields()) {
-                    if (Modifier.isStatic(field.getModifiers()) || !JavaType.class.isAssignableFrom(field.getType())) {
-                        continue;
-                    }
-                    String name = "with" + Character.toUpperCase(field.getName().charAt(0)) +
-                                  field.getName().substring(1);
-                    for (Method method : type.getMethods()) {
-                        if (method.getName().equals(name) && method.getParameterCount() == 1 &&
-                            method.getParameterTypes()[0].isAssignableFrom(field.getType())) {
-                            withers.add(method);
-                            break;
-                        }
-                    }
-                }
-            }
-            return withers;
-        }
-    };
-
-    @Override
-    public @Nullable SourceFile withoutTypes(SourceFile sourceFile) {
-        if (!(sourceFile instanceof J.CompilationUnit)) {
-            return null;
-        }
-        return (SourceFile) new JavaVisitor<Integer>() {
-            @Override
-            public J postVisit(J tree, Integer p) {
-                J j = tree;
-                for (Method wither : TYPE_WITHERS.get(j.getClass())) {
-                    try {
-                        j = (J) wither.invoke(j, (Object) null);
-                    } catch (ReflectiveOperationException | RuntimeException ignored) {
-                        // an element that won't give up a type keeps it
-                    }
-                }
-                if (j instanceof J.MethodInvocation) {
-                    // visiting the call gave its name the method type back
-                    J.MethodInvocation m = (J.MethodInvocation) j;
-                    j = m.withName(m.getName().withType(null));
-                }
-                return j;
-            }
-        }.visitNonNull(sourceFile, 0);
-    }
-
-    @Override
-    public List<String> referencesToOtherTypes(SourceFile before, SourceFile after,
-                                               Collection<? extends SourceFile> sources) {
-        if (!(before instanceof J.CompilationUnit) || !(after instanceof J.CompilationUnit) ||
-            !changesCode(before, after)) {
-            return emptyList();
-        }
-        Set<String> declared = new HashSet<>();
-        for (SourceFile source : sources) {
-            if (source instanceof J.CompilationUnit) {
-                new JavaIsoVisitor<Set<String>>() {
-                    @Override
-                    public J.ClassDeclaration visitClassDeclaration(J.ClassDeclaration classDecl,
-                                                                    Set<String> declared) {
-                        if (classDecl.getType() != null) {
-                            declared.add(classDecl.getType().getFullyQualifiedName());
-                        }
-                        return super.visitClassDeclaration(classDecl, declared);
-                    }
-                }.visit(source, declared);
-            }
-        }
-        Change change = Change.of((J.CompilationUnit) before, (J.CompilationUnit) after);
-        List<Cursor> changed = new ArrayList<>(change.anchors);
-        Set<Object> anchors = Collections.newSetFromMap(new IdentityHashMap<>());
-        for (Cursor anchor : change.anchors) {
-            anchors.add(anchor.getValue());
-        }
-        for (Cursor removed : change.removed) {
-            // what a removed declaration was annotated with is often why it was removed, unlike the code inside it
-            if (removed.getValue() instanceof J.Annotation &&
-                anchors.contains(removed.getParentTreeCursor().getValue())) {
-                changed.add(removed);
-            }
-        }
-        Map<String, String> references = new LinkedHashMap<>();
-        for (Cursor cursor : changed) {
-            if (cursor.firstEnclosing(J.Import.class) != null || cursor.firstEnclosing(J.Package.class) != null) {
-                continue;
-            }
-            Reference reference = reference(cursor.getValue(), cursor);
-            if (reference != null && !declared.contains(reference.getType()) &&
-                !LOCAL_CLASS.matcher(reference.getType()).matches()) {
-                references.putIfAbsent(reference.getType(), "`" + snippet(cursor) + "` (" + reference.getName() + ")");
-            }
-        }
-        return new ArrayList<>(references.values());
-    }
 
     @Override
     public List<Respelling> respell(SourceFile before, SourceFile after,
@@ -364,83 +252,12 @@ public class JavaTypeMatchingValidationService implements TypeMatchingValidation
         return WHITESPACE.matcher(printed).replaceAll("");
     }
 
-    private static @Nullable Reference reference(Object tree, Cursor cursor) {
-        if (tree instanceof J.MethodInvocation) {
-            return reference(((J.MethodInvocation) tree).getMethodType());
-        } else if (tree instanceof J.MemberReference) {
-            return reference(((J.MemberReference) tree).getMethodType());
-        } else if (tree instanceof J.NewClass) {
-            J.NewClass newClass = (J.NewClass) tree;
-            JavaType.Method constructor = newClass.getConstructorType();
-            return constructor == null ? reference(newClass.getType()) : new Reference(
-                    constructor.getDeclaringType().getFullyQualifiedName(), MethodMatcher.methodPattern(constructor));
-        } else if (tree instanceof J.Annotation) {
-            return reference(((J.Annotation) tree).getType());
-        } else if (tree instanceof J.ParameterizedType) {
-            return reference(((J.ParameterizedType) tree).getType());
-        } else if (tree instanceof J.Identifier) {
-            J.Identifier identifier = (J.Identifier) tree;
-            Cursor parent = cursor.getParentTreeCursor();
-            Object p = parent.getValue();
-            if (p instanceof J.MethodInvocation && ((J.MethodInvocation) p).getName() == identifier ||
-                p instanceof J.MemberReference && ((J.MemberReference) p).getReference() == identifier) {
-                return reference(p, parent);
-            }
-            // a type name, not a variable
-            if (identifier.getFieldType() == null && identifier.getType() instanceof JavaType.FullyQualified &&
-                ((JavaType.FullyQualified) identifier.getType()).getClassName().endsWith(identifier.getSimpleName())) {
-                return reference(identifier.getType());
-            }
-        } else if (tree instanceof J.FieldAccess) {
-            J.FieldAccess fieldAccess = (J.FieldAccess) tree;
-            JavaType.Variable field = fieldAccess.getName().getFieldType();
-            if ("class".equals(fieldAccess.getSimpleName())) {
-                return reference(fieldAccess.getTarget().getType());
-            }
-            return field == null ? reference(fieldAccess.getType()) : reference(field.getOwner());
-        }
-        return null;
-    }
-
-    private static @Nullable Reference reference(JavaType.@Nullable Method method) {
-        // super() and this() name no type of their own
-        return method == null || method.isConstructor() ? null :
-                new Reference(method.getDeclaringType().getFullyQualifiedName(), MethodMatcher.methodPattern(method));
-    }
-
-    private static @Nullable Reference reference(@Nullable JavaType type) {
-        JavaType.FullyQualified fq = TypeUtils.asFullyQualified(type);
-        return fq == null ? null : new Reference(fq.getFullyQualifiedName(), fq.getFullyQualifiedName());
-    }
-
-    private static String snippet(Cursor cursor) {
-        try {
-            String printed = cursor.<Tree>getValue().printTrimmed(cursor.getParentOrThrow()).trim();
-            int newline = printed.indexOf('\n');
-            boolean truncated = newline >= 0 || printed.length() > SNIPPET_LENGTH;
-            String firstLine = newline >= 0 ? printed.substring(0, newline).trim() : printed;
-            if (firstLine.length() > SNIPPET_LENGTH) {
-                firstLine = firstLine.substring(0, SNIPPET_LENGTH);
-            }
-            return truncated ? firstLine + "..." : firstLine;
-        } catch (Exception e) {
-            return cursor.getValue().getClass().getSimpleName();
-        }
-    }
-
-    @Value
-    private static class Reference {
-        String type;
-        String name;
-    }
-
     /**
      * Where a recipe changed a source: the topmost elements it removed and the smallest ones whose printed form it
-     * changed, and every element it removed.
+     * changed.
      */
     private static final class Change {
         final List<Cursor> anchors = new ArrayList<>();
-        final List<Cursor> removed = new ArrayList<>();
 
         static Change of(J.CompilationUnit before, J.CompilationUnit after) {
             Map<UUID, Cursor> inAfter = new HashMap<>();
@@ -467,22 +284,6 @@ public class JavaTypeMatchingValidationService implements TypeMatchingValidation
                     }
                     if (afterCursor == null) {
                         change.anchors.add(new Cursor(getCursor(), tree));
-                        new JavaVisitor<Integer>() {
-                            @Override
-                            public @Nullable J visit(@Nullable Tree removed, Integer p) {
-                                if (removed instanceof J && inAfter.containsKey(removed.getId())) {
-                                    // moved elsewhere, not removed
-                                    return (J) removed;
-                                }
-                                return super.visit(removed, p);
-                            }
-
-                            @Override
-                            public J preVisit(J removed, Integer p) {
-                                change.removed.add(getCursor());
-                                return removed;
-                            }
-                        }.visit(tree, p, getCursor());
                         changed = true;
                         return (J) tree;
                     }

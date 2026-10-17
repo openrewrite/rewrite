@@ -1343,7 +1343,7 @@ class JavaTemplateTest implements RewriteTest {
             }))
             // Unclear why
             .recipeQualityValidation(RecipeQualityValidation.builder()
-              .typeValidationOptions(TypeValidation.builder().constructorInvocations(false).build())
+              .types(TypeValidation.builder().constructorInvocations(false).build())
               .build())
             .parser(JavaParser.fromJavaVersion().dependsOn(
                 """

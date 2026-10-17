@@ -64,11 +64,17 @@ public class CursorValidatingExecutionContextView extends DelegatingExecutionCon
                 ExecutionContext.REQUIRE_PRINT_EQUALS_INPUT.equals(key) ||
                 key.startsWith("org.openrewrite.maven") // MavenExecutionContextView stores metrics
                 || key.startsWith("io.moderne"); // We ought to know what we're doing
-        assert mutationAllowed : "Recipe mutated execution context key \"" + key + "\". " +
-                "Recipes should not mutate the contents of the ExecutionContext as it allows mutable state to leak between " +
-                "recipes, opening the door for difficult to debug recipe composition errors. " +
-                "If you need to store state within the execution of a single recipe use Cursor messaging. " +
-                "If you want to pass state between recipes, use a ScanningRecipe instead.";
+        assert mutationAllowed : mutationMessage(key);
         super.putMessage(key, value);
+    }
+
+    private String mutationMessage(String key) {
+        Recipe recipe = getMessage(ExecutionContext.CURRENT_RECIPE);
+        return (recipe == null ? "A recipe" : recipe.getName()) + " put \"" + key + "\" on the ExecutionContext, " +
+               "which every recipe and source file in a run shares, so what it keeps there leaks into the others. " +
+               "Keep state that spans source files in a ScanningRecipe's accumulator, and state within one source " +
+               "file in Cursor messages, with getCursor().putMessage(..) or putMessageOnFirstEnclosing(..). A recipe " +
+               "that must change the ExecutionContext opts out with " +
+               "RecipeQualityValidation.builder().executionContextUnchanged(false).";
     }
 }

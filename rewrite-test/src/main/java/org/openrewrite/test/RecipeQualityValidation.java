@@ -36,7 +36,7 @@ public class RecipeQualityValidation {
      * The type attribution the recipe's output is validated to have. When not set, the output is validated as the LST
      * the recipe was given is.
      */
-    private @Nullable TypeValidation typeValidationOptions;
+    private @Nullable TypeValidation types;
 
     /**
      * Controls whether the recipe's cursors are validated to be acyclic. A cursor whose element is its own parent is a
@@ -46,17 +46,18 @@ public class RecipeQualityValidation {
     private boolean cursorAcyclic = true;
 
     /**
-     * Controls whether the recipe is validated not to put messages on the execution context, which makes a recipe run
-     * stateful and lets recipes interfere with each other.
+     * Controls whether the recipe is validated to leave the execution context, which every recipe and source file in
+     * a run shares, unchanged. State across source files belongs in a ScanningRecipe's accumulator, and state within
+     * one source file in Cursor messages.
      */
     @Builder.Default
-    private boolean immutableExecutionContext = true;
+    private boolean executionContextUnchanged = true;
 
     /**
-     * Controls whether a ScanningRecipe's scanner is validated not to edit, since an edit while scanning is ignored.
+     * Controls whether a ScanningRecipe's scanner is validated to make no edits, which the scanning phase discards.
      */
     @Builder.Default
-    private boolean immutableScanning = true;
+    private boolean noEditsInScanningPhase = true;
 
     /**
      * Controls whether the recipe is validated to add only markers that report, such as search results and markup,
@@ -81,13 +82,6 @@ public class RecipeQualityValidation {
     private boolean matchByTypeNotName = true;
 
     /**
-     * Controls whether the recipe is rerun on its sources without type attribution, and must not make the same change
-     * to code that refers to types the test doesn't declare. Off by default until its false positives are measured.
-     */
-    @Builder.Default
-    private boolean typeAttributedMatching = false;
-
-    /**
      * Enable all recipe quality checks.
      */
     public static RecipeQualityValidation all() {
@@ -107,14 +101,13 @@ public class RecipeQualityValidation {
         }
         TypeValidation before = TypeValidation.before(testMethodSpec, testClassSpec);
         return builder()
-                .typeValidationOptions(quality.typeValidationOptions())
+                .types(quality.types())
                 .cursorAcyclic(quality.cursorAcyclic() && before.cursorAcyclic())
-                .immutableExecutionContext(quality.immutableExecutionContext() && before.immutableExecutionContext())
-                .immutableScanning(quality.immutableScanning() && before.immutableScanning())
+                .executionContextUnchanged(quality.executionContextUnchanged() && before.immutableExecutionContext())
+                .noEditsInScanningPhase(quality.noEditsInScanningPhase() && before.immutableScanning())
                 .reportingMarkersOnly(quality.reportingMarkersOnly())
                 .minimalFormatting(quality.minimalFormatting())
                 .matchByTypeNotName(quality.matchByTypeNotName())
-                .typeAttributedMatching(quality.typeAttributedMatching())
                 .build();
     }
 }

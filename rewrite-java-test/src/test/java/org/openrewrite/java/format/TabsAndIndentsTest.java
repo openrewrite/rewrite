@@ -1073,7 +1073,7 @@ class TabsAndIndentsTest implements RewriteTest {
     void moreAnnotations() {
         rewriteRun(
           spec -> spec.recipeQualityValidation(RecipeQualityValidation.builder()
-            .typeValidationOptions(TypeValidation.none())
+            .types(TypeValidation.none())
             .build()),
           java(
             """

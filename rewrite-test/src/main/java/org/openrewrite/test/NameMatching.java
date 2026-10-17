@@ -30,8 +30,8 @@ import java.util.function.Function;
 import static org.assertj.core.api.Assertions.fail;
 
 /**
- * Reruns a recipe on copies of its sources to check that it finds the code it changes through type attribution:
- * copies that spell that code differently but mean the same, and copies without type attribution.
+ * Reruns a recipe on copies of its sources that spell the code it changes differently but mean the same, to check that
+ * it finds that code through type attribution.
  */
 final class NameMatching {
     private static final RecipeSerializer SERIALIZER = new RecipeSerializer();
@@ -43,15 +43,6 @@ final class NameMatching {
     private static final Duration RUN_TIMEOUT = Duration.ofSeconds(10);
     private static final Duration SOURCE_FILE_TIMEOUT = Duration.ofSeconds(5);
     private static final int TEST_RUNS_PER_RERUN = 3;
-
-    /**
-     * Recipes that match type names as text on purpose, because the types they rename may be missing from the
-     * classpath.
-     */
-    private static final Set<String> MATCH_TYPE_NAMES = new HashSet<>(Arrays.asList(
-            "org.openrewrite.java.ChangeType",
-            "org.openrewrite.java.ChangePackage"
-    ));
 
     /**
      * Messages that a recipe run puts on its execution context, which a rerun must not share.
@@ -76,8 +67,6 @@ final class NameMatching {
     private final int cycles;
     private final int minCycles;
     private Duration testRunTime = Duration.ZERO;
-    private final boolean matchByTypeNotName;
-    private final boolean typeAttributedMatching;
     private final Function<SourceFile, List<Parser.Builder>> parsersFor;
     private final @Nullable Path relativeTo;
     private final ExecutionContext parseCtx;
@@ -89,7 +78,6 @@ final class NameMatching {
     private @Nullable Map<UUID, @Nullable SourceFile> control;
 
     private NameMatching(byte[] recipe, RewriteRunner.Context context, List<SourceFile> parsed,
-                         boolean matchByTypeNotName, boolean typeAttributedMatching,
                          Function<SourceFile, List<Parser.Builder>> parsersFor, @Nullable Path relativeTo,
                          ExecutionContext parseCtx) {
         this.recipe = recipe;
@@ -99,8 +87,6 @@ final class NameMatching {
         this.messages.keySet().removeAll(RUN_STATE);
         this.cycles = context.getCycles();
         this.minCycles = context.getExpectedCyclesThatMakeChanges() + 1;
-        this.matchByTypeNotName = matchByTypeNotName;
-        this.typeAttributedMatching = typeAttributedMatching;
         this.parsersFor = parsersFor;
         this.relativeTo = relativeTo;
         this.parseCtx = parseCtx;
@@ -120,13 +106,11 @@ final class NameMatching {
                                      @Nullable Path relativeTo, ExecutionContext parseCtx) {
         RecipeSpec methodSpec = context.getTestMethodSpec();
         RecipeSpec classSpec = context.getTestClassSpec();
-        RecipeQualityValidation quality = RecipeQualityValidation.of(methodSpec, classSpec);
-        boolean matchByTypeNotName = quality.matchByTypeNotName();
-        boolean typeAttributedMatching = quality.typeAttributedMatching();
-        // both rerun the recipe on type attributed code, so the test has to attribute what the recipe gets and makes
+        // the reruns are on type attributed code, so the test has to attribute what the recipe gets and makes
         boolean typesValidated = validatesTypes(TypeValidation.before(methodSpec, classSpec)) &&
                                  validatesTypes(TypeValidation.after(methodSpec, classSpec));
-        if (!matchByTypeNotName && !typeAttributedMatching || !typesValidated || recipe.equals(Recipe.noop()) ||
+        if (!RecipeQualityValidation.of(methodSpec, classSpec).matchByTypeNotName() || !typesValidated ||
+            recipe.equals(Recipe.noop()) ||
             runner != RewriteRunner.IN_PROCESS ||
             methodSpec.getSourceSet() != null || classSpec.getSourceSet() != null ||
             !methodSpec.getBeforeRecipes().isEmpty() || !classSpec.getBeforeRecipes().isEmpty() ||
@@ -145,8 +129,7 @@ final class NameMatching {
         }
         try {
             // serialized before the run, so that every rerun starts from a recipe in its initial state
-            return new NameMatching(SERIALIZER.write(recipe), context, parsed, matchByTypeNotName,
-                    typeAttributedMatching, parsersFor, relativeTo, parseCtx);
+            return new NameMatching(SERIALIZER.write(recipe), context, parsed, parsersFor, relativeTo, parseCtx);
         } catch (Exception e) {
             return null;
         }
@@ -190,21 +173,9 @@ final class NameMatching {
         if (changed.isEmpty()) {
             return;
         }
-        List<String> failures = new ArrayList<>(2);
-        if (matchByTypeNotName) {
-            String failure = respellingFailures(changed);
-            if (failure != null) {
-                failures.add(failure);
-            }
-        }
-        if (typeAttributedMatching) {
-            String failure = withoutTypesFailures(changed);
-            if (failure != null) {
-                failures.add(failure);
-            }
-        }
-        if (!failures.isEmpty()) {
-            fail(String.join("\n\n", failures));
+        String failure = respellingFailures(changed);
+        if (failure != null) {
+            fail(failure);
         }
     }
 
@@ -284,61 +255,6 @@ final class NameMatching {
             }
         }
         return missed.isEmpty() ? respelling.getDescription() : String.join(", ", missed);
-    }
-
-    private @Nullable String withoutTypesFailures(List<Result> changed) {
-        List<SourceFile> stripped = new ArrayList<>(sources.size());
-        Set<UUID> strippedIds = new HashSet<>();
-        for (SourceFile source : sources) {
-            TypeMatchingValidationService service = service(source);
-            SourceFile withoutTypes = null;
-            try {
-                withoutTypes = service == null ? null : service.withoutTypes(source);
-            } catch (Exception ignored) {
-                // left with its types, and not judged
-            }
-            if (withoutTypes != null) {
-                strippedIds.add(source.getId());
-            }
-            stripped.add(withoutTypes == null ? source : withoutTypes);
-        }
-        Map<UUID, @Nullable SourceFile> rerun = strippedIds.isEmpty() ? null : rerun(stripped);
-        if (rerun == null) {
-            return null;
-        }
-        StringBuilder found = new StringBuilder();
-        for (Result result : changed) {
-            SourceFile before = Objects.requireNonNull(result.getBefore());
-            SourceFile after = Objects.requireNonNull(result.getAfter());
-            if (!strippedIds.contains(before.getId()) || !printsLike(after, rerun, before.getId()) ||
-                !result.getRecipes().isEmpty() && MATCH_TYPE_NAMES.containsAll(leafRecipes(result))) {
-                continue;
-            }
-            List<String> references;
-            try {
-                references = Objects.requireNonNull(service(before)).referencesToOtherTypes(before, after, parsed);
-            } catch (Exception e) {
-                continue;
-            }
-            if (!references.isEmpty()) {
-                found.append("  ").append(before.getSourcePath()).append(changedBy(result))
-                        .append(": ").append(String.join(", ", references)).append('\n');
-            }
-        }
-        if (found.length() == 0) {
-            return null;
-        }
-        return "Identify the code to change through type attribution, not by name or printed text. The recipe " +
-               "made the same change to these sources after all type attribution was removed from them:\n" + found +
-               "A recipe that matches names also changes look-alike code, such as same-named methods or types from " +
-               "other packages, and shadowed names. Use:\n" +
-               "  - method calls: MethodMatcher, plus TypeUtils.isAssignableTo for the receiver\n" +
-               "  - annotations: AnnotationMatcher or AnnotationService\n" +
-               "  - type references: TypeUtils.isOfClassType\n" +
-               "  - expressions: SemanticallyEqual\n" +
-               "Don't compare getSimpleName(), toString() or print() output with strings. If the recipe targets no " +
-               "particular type (formatting, control flow, literals) or must work without types, add " +
-               "spec.recipeQualityValidation(RecipeQualityValidation.builder().typeAttributedMatching(false).build()).";
     }
 
     /**

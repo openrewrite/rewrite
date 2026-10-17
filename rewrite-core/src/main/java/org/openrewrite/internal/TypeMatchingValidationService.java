@@ -21,7 +21,6 @@ import lombok.Value;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.SourceFile;
 
-import java.util.Collection;
 import java.util.List;
 import java.util.function.Function;
 import java.util.function.Supplier;
@@ -31,18 +30,6 @@ import java.util.function.Supplier;
  * printed text.
  */
 public interface TypeMatchingValidationService {
-
-    /**
-     * @return A copy of the source file without type attribution, or null when the language isn't supported.
-     */
-    @Nullable
-    SourceFile withoutTypes(SourceFile sourceFile);
-
-    /**
-     * @return The code that changed from {@code before} to {@code after} and refers to a type that none of
-     * {@code sources} declares, each described like "`obj.finalize()` (java.lang.Object finalize())".
-     */
-    List<String> referencesToOtherTypes(SourceFile before, SourceFile after, Collection<? extends SourceFile> sources);
 
     /**
      * @param reparse Parses a printed copy of a source file, or returns null when it can't.

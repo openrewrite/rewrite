@@ -29,7 +29,7 @@ class TaskTest implements RewriteTest {
     @Override
     public void defaults(RecipeSpec spec) {
         spec.recipeQualityValidation(RecipeQualityValidation.builder()
-          .typeValidationOptions(TypeValidation.none())
+          .types(TypeValidation.none())
           .build());
     }
 

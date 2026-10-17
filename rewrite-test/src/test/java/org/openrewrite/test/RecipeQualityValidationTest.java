@@ -22,16 +22,14 @@ import static org.assertj.core.api.Assertions.assertThat;
 class RecipeQualityValidationTest {
 
     @Test
-    void allChecksAreOnExceptTypeAttributedMatching() {
+    void allChecksAreOn() {
         RecipeQualityValidation all = RecipeQualityValidation.all();
         assertThat(all.cursorAcyclic()).isTrue();
-        assertThat(all.immutableExecutionContext()).isTrue();
-        assertThat(all.immutableScanning()).isTrue();
+        assertThat(all.executionContextUnchanged()).isTrue();
+        assertThat(all.noEditsInScanningPhase()).isTrue();
         assertThat(all.reportingMarkersOnly()).isTrue();
         assertThat(all.minimalFormatting()).isTrue();
         assertThat(all.matchByTypeNotName()).isTrue();
-        // until its false positives are measured
-        assertThat(all.typeAttributedMatching()).isFalse();
     }
 
     @Test
@@ -39,8 +37,8 @@ class RecipeQualityValidationTest {
         RecipeQualityValidation quality = RecipeQualityValidation.of(
           RecipeSpec.defaults().typeValidationOptions(TypeValidation.none()), RecipeSpec.defaults());
         assertThat(quality.cursorAcyclic()).isFalse();
-        assertThat(quality.immutableExecutionContext()).isFalse();
-        assertThat(quality.immutableScanning()).isFalse();
+        assertThat(quality.executionContextUnchanged()).isFalse();
+        assertThat(quality.noEditsInScanningPhase()).isFalse();
         assertThat(quality.reportingMarkersOnly()).isTrue();
         assertThat(quality.minimalFormatting()).isTrue();
     }
@@ -49,7 +47,7 @@ class RecipeQualityValidationTest {
     void validateTheTypesOfTheRecipeOutput() {
         TypeValidation none = TypeValidation.none();
         RecipeSpec testMethodSpec = RecipeSpec.defaults()
-          .recipeQualityValidation(RecipeQualityValidation.builder().typeValidationOptions(none).build());
+          .recipeQualityValidation(RecipeQualityValidation.builder().types(none).build());
         assertThat(TypeValidation.after(testMethodSpec, RecipeSpec.defaults())).isSameAs(none);
     }
 
@@ -65,7 +63,7 @@ class RecipeQualityValidationTest {
     void testMethodAfterTypeValidationOptionsOverrideTheTestClass() {
         TypeValidation none = TypeValidation.none();
         RecipeSpec testClassSpec = RecipeSpec.defaults().recipeQualityValidation(
-          RecipeQualityValidation.builder().typeValidationOptions(TypeValidation.all()).build());
+          RecipeQualityValidation.builder().types(TypeValidation.all()).build());
         assertThat(TypeValidation.after(RecipeSpec.defaults().afterTypeValidationOptions(none), testClassSpec))
           .isSameAs(none);
     }

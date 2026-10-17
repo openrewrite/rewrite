@@ -43,7 +43,7 @@ class ExecutionContextTest implements RewriteTest {
                   return text;
               }
           }).withCausesAnotherCycle(true))
-            .recipeQualityValidation(RecipeQualityValidation.builder().immutableExecutionContext(false).build()),
+            .recipeQualityValidation(RecipeQualityValidation.builder().executionContextUnchanged(false).build()),
           text("hello world")
         );
         assertThat(cycles.get()).isEqualTo(2);

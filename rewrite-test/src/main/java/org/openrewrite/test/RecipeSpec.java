@@ -90,7 +90,7 @@ public class RecipeSpec {
     TypeValidation typeValidation;
 
     /**
-     * @deprecated Use {@link #recipeQualityValidation}'s {@link RecipeQualityValidation#typeValidationOptions}.
+     * @deprecated Use {@link #recipeQualityValidation}'s {@link RecipeQualityValidation#types}.
      */
     @Deprecated
     @Nullable
@@ -325,7 +325,7 @@ public class RecipeSpec {
 
     /**
      * @deprecated Use {@link #recipeQualityValidation(RecipeQualityValidation)} with
-     * {@link RecipeQualityValidation#typeValidationOptions}.
+     * {@link RecipeQualityValidation#types}.
      */
     @Deprecated
     public RecipeSpec afterTypeValidationOptions(TypeValidation typeValidation) {

@@ -352,7 +352,7 @@ public interface RewriteTest extends SourceSpecs {
                 TypeValidation beforeValidations = TypeValidation.before(testMethodSpec, testClassSpec);
                 nextSpec.validateSource.accept(sourceFile, beforeValidations);
                 ctx.putMessage(SCANNING_MUTATION_VALIDATION,
-                        RecipeQualityValidation.of(testMethodSpec, testClassSpec).immutableScanning());
+                        RecipeQualityValidation.of(testMethodSpec, testClassSpec).noEditsInScanningPhase());
 
                 // Validate that printing the LST yields the same source text
                 // Validate that the LST whitespace do not contain any non-whitespace characters
@@ -460,7 +460,7 @@ public interface RewriteTest extends SourceSpecs {
 
         recipeCtx = CursorValidatingExecutionContextView.view(recipeCtx)
                 .setValidateCursorAcyclic(quality.cursorAcyclic())
-                .setValidateImmutableExecutionContext(quality.immutableExecutionContext());
+                .setValidateImmutableExecutionContext(quality.executionContextUnchanged());
         RewriteRunner runner = testMethodSpec.getRunner() != null ? testMethodSpec.getRunner() :
                 testClassSpec.getRunner() != null ? testClassSpec.getRunner() :
                         runner();

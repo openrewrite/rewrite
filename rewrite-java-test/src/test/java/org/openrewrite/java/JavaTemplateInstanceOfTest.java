@@ -70,7 +70,7 @@ class JavaTemplateInstanceOfTest implements RewriteTest {
           }))
           // custom missing type validation
           .recipeQualityValidation(RecipeQualityValidation.builder()
-            .typeValidationOptions(TypeValidation.none())
+            .types(TypeValidation.none())
             .build())
           .afterRecipe(run -> run.getChangeset().getAllResults().forEach(r -> assertTypeAttribution((J) r.getAfter())));
     }
