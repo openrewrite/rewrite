@@ -169,18 +169,18 @@ public class RemoveUnusedImports extends Recipe {
                         anImport.used = false;
                         changed = true;
                     } else if ("*".equals(qualid.getSimpleName())) {
-                        SortedSet<String> unfoldedMethodsAndFields = methodsAndFields != null ? methodsAndFields : targetMethodsAndFields;
+                        SortedSet<String> membersToUnfold = methodsAndFields != null ? methodsAndFields : targetMethodsAndFields;
                         if (isPackageAlwaysFolded(layoutStyle.getPackagesToFold(), elem)) {
                             anImport.used = true;
                             usedStaticWildcardImports.add(elem.getTypeName());
-                        } else if (((unfoldedMethodsAndFields == null ? 0 : unfoldedMethodsAndFields.size()) +
+                        } else if (((membersToUnfold == null ? 0 : membersToUnfold.size()) +
                                 (staticClasses == null ? 0 : staticClasses.size())) < layoutStyle.getNameCountToUseStarImport()) {
                             // replacing the star with a series of unfolded imports
                             anImport.imports.clear();
 
                             // add each unfolded import
-                            if (unfoldedMethodsAndFields != null) {
-                                for (String method : unfoldedMethodsAndFields) {
+                            if (membersToUnfold != null) {
+                                for (String method : membersToUnfold) {
                                     anImport.imports.add(new JRightPadded<>(elem
                                             .withId(randomId())
                                             .withQualid(qualid.withName(name.withSimpleName(method)))
@@ -197,14 +197,17 @@ public class RemoveUnusedImports extends Recipe {
                                 }
                             }
 
-                            // move whatever the original prefix of the star import was to the first unfolded import
-                            anImport.imports.set(0, anImport.imports.get(0).withElement(anImport.imports.get(0)
-                                    .getElement().withPrefix(elem.getPrefix())));
-
-                            anImport.imports.forEach(i -> checkedImports.add(i.getElement().toString()));
-                            ImportComments.unfoldComments(getCursor(), elem, anImport.imports);
-
-                            changed = true;
+                            if (!anImport.imports.isEmpty()) {
+                                // move whatever the original prefix of the star import was to the first unfolded import
+                                anImport.imports.set(0, anImport.imports.get(0).withElement(anImport.imports.get(0)
+                                        .getElement().withPrefix(elem.getPrefix())));
+                                anImport.imports.forEach(i -> checkedImports.add(i.getElement().toString()));
+                                ImportComments.unfoldComments(getCursor(), elem, anImport.imports);
+                                changed = true;
+                            } else {
+                                anImport.used = false;
+                                changed = true;
+                            }
                         } else {
                             usedStaticWildcardImports.add(elem.getTypeName());
                         }
