@@ -184,6 +184,11 @@ class EditedPackageManagerFileLockRegenTest implements RewriteTest {
         @Override
         public TreeVisitor<?, ExecutionContext> getVisitor(Accumulator acc) {
             NodeDependencyScan.linkWorkspaceMembers(acc.scan);
+            NodeDependencyScan.ProjectState root = acc.scan.projects.get(Paths.get("package.json"));
+            if (root == null || root.capturedPackageJson == null) {
+                // without the package.json there is no lock to regenerate
+                return TreeVisitor.noop();
+            }
             return new TreeVisitor<Tree, ExecutionContext>() {
                 @Override
                 public Tree preVisit(Tree tree, ExecutionContext ctx) {

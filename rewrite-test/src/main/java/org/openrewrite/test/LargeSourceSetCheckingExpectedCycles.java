@@ -31,6 +31,8 @@ import static org.assertj.core.api.Assertions.fail;
 
 class LargeSourceSetCheckingExpectedCycles extends InMemoryLargeSourceSet {
     private final int expectedCyclesThatMakeChanges;
+    private final @Nullable AddedMarkers addedMarkers;
+    private final @Nullable UnchangedTreeIdentity unchangedTreeIdentity;
     private int cyclesThatResultedInChanges = 0;
 
     private Map<SourceFile, SourceFile> lastCycleEdits = emptyMap();
@@ -38,17 +40,32 @@ class LargeSourceSetCheckingExpectedCycles extends InMemoryLargeSourceSet {
     private Set<SourceFile> lastCycleDeleted = emptySet();
 
     LargeSourceSetCheckingExpectedCycles(int expectedCyclesThatMakeChanges, List<SourceFile> ls) {
+        this(expectedCyclesThatMakeChanges, ls, null, null);
+    }
+
+    LargeSourceSetCheckingExpectedCycles(int expectedCyclesThatMakeChanges, List<SourceFile> ls,
+                                         @Nullable AddedMarkers addedMarkers,
+                                         @Nullable UnchangedTreeIdentity unchangedTreeIdentity) {
         super(ls);
         this.expectedCyclesThatMakeChanges = expectedCyclesThatMakeChanges;
+        this.addedMarkers = addedMarkers;
+        this.unchangedTreeIdentity = unchangedTreeIdentity;
     }
 
     private LargeSourceSetCheckingExpectedCycles(LargeSourceSetCheckingExpectedCycles from, @Nullable Map<SourceFile, List<Recipe>> deletions, List<SourceFile> mapped) {
         super(from.getInitialState(), deletions, mapped, null);
         this.expectedCyclesThatMakeChanges = from.expectedCyclesThatMakeChanges;
+        this.addedMarkers = from.addedMarkers;
+        this.unchangedTreeIdentity = from.unchangedTreeIdentity;
         this.cyclesThatResultedInChanges = from.cyclesThatResultedInChanges;
         this.lastCycleEdits = from.lastCycleEdits;
         this.lastCycleGenerated = from.lastCycleGenerated;
         this.lastCycleDeleted = from.lastCycleDeleted;
+    }
+
+    @Nullable
+    UnchangedTreeIdentity getUnchangedTreeIdentity() {
+        return unchangedTreeIdentity;
     }
 
     @Override
@@ -130,6 +147,16 @@ class LargeSourceSetCheckingExpectedCycles extends InMemoryLargeSourceSet {
         lastCycleGenerated = thisCycleGenerated;
         lastCycleDeleted = thisCycleDeleted;
         if (lastCycle) {
+            if (cyclesThatResultedInChanges != expectedCyclesThatMakeChanges && addedMarkers != null) {
+                // A recipe that only adds markers changes no text, which would otherwise surface below as a
+                // puzzling complaint about the number of cycles
+                addedMarkers.assertNoneAdded(getChangeset().getAllResults());
+            }
+            if (cyclesThatResultedInChanges != expectedCyclesThatMakeChanges && unchangedTreeIdentity != null) {
+                // An equal copy of a source file counts as a change, which would otherwise surface below as a
+                // complaint about the number of cycles
+                unchangedTreeIdentity.assertNoneFound();
+            }
             if (cyclesThatResultedInChanges == 0 && expectedCyclesThatMakeChanges > 0) {
                 fail("Recipe was expected to make a change but made no changes.");
             } else if (cyclesThatResultedInChanges != expectedCyclesThatMakeChanges) {

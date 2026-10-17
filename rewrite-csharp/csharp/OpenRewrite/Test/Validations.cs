@@ -53,10 +53,16 @@ public sealed class Validations
     /// </summary>
     public bool FormattingReconciliation { get; init; } = true;
 
+    /// <summary>
+    /// Whether the recipe is validated to add only markers that report, such as search results and markup:
+    /// any other marker must be one its input sources or a fresh parse of its output also carry. Default: enabled.
+    /// </summary>
+    public bool ReportingMarkersOnly { get; init; } = true;
+
     /// <summary>All validations enabled with default settings.</summary>
     public static Validations All { get; } = new();
 
-    /// <summary>All validations disabled.</summary>
+    /// <summary>All validations disabled except <see cref="ReportingMarkersOnly"/>.</summary>
     public static Validations None { get; } = new()
     {
         WhitespaceInSpaces = false,

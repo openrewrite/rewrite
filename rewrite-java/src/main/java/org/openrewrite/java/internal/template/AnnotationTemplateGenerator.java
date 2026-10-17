@@ -316,7 +316,8 @@ public class AnnotationTemplateGenerator {
                 .withPrefix(Space.EMPTY)
                 .withKind(J.ClassDeclaration.Kind.Type.Class)
                 .withPrimaryConstructor(null);
-        String printed = c.printTrimmed(cursor);
+        // a nested class is given the cursor of the class around it, and any other class its own cursor
+        String printed = c.printTrimmed(sibling ? cursor : cursor.getParentOrThrow());
         int braceIndex = printed.lastIndexOf('{');
         if (annotated) {
             after.append(braceIndex == -1 ? printed + '{' : printed.substring(0, braceIndex + 1));

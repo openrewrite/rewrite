@@ -23,6 +23,7 @@ import org.openrewrite.Recipe;
 import org.openrewrite.RenameFile;
 import org.openrewrite.marker.BuildTool;
 import org.openrewrite.test.RewriteTest;
+import org.openrewrite.test.SourceSpec;
 import org.openrewrite.text.ChangeText;
 import org.openrewrite.text.PlainText;
 import org.openrewrite.text.PlainTextVisitor;
@@ -123,7 +124,7 @@ class SourceFileResultsTest implements RewriteTest {
             .afterRecipe(run -> assertThat(run.getDataTableStore().getDataTables())
               .noneMatch(dt -> dt.getName().equals(SourcesFileResults.class.getName()))),
           // The file prints the same, so it has no diff
-          text("Hi")
+          text("Hi", SourceFileResultsTest::builtWithGradle8)
         );
     }
 
@@ -137,7 +138,8 @@ class SourceFileResultsTest implements RewriteTest {
                 .containsExactly("org.openrewrite.text.ChangeText")),
           text(
             "Hi",
-            "Hello!"
+            "Hello!",
+            SourceFileResultsTest::builtWithGradle8
           )
         );
     }
@@ -178,6 +180,10 @@ class SourceFileResultsTest implements RewriteTest {
               .afterRecipe(pt -> assertThat(pt.getSourcePath()).isEqualTo(Path.of("goodbye.txt")))
           )
         );
+    }
+
+    static void builtWithGradle8(SourceSpec<PlainText> spec) {
+        spec.markers(new BuildTool(randomId(), BuildTool.Type.Gradle, "8.14.3"));
     }
 
     /**

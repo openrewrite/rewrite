@@ -22,6 +22,7 @@ import org.openrewrite.text.CreateTextFile;
 import org.openrewrite.text.FindAndReplace;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.openrewrite.table.SourceFileResultsTest.builtWithGradle8;
 import static org.openrewrite.table.SourceFileResultsTest.recordGradleVersion;
 import static org.openrewrite.test.SourceSpecs.text;
 
@@ -35,9 +36,9 @@ class RecipeRunStatsTest implements RewriteTest {
             .recipes(recordGradleVersion("9.8.1"), new FindAndReplace("Hi", "Hello", null, null, null, null, null, null))
             .dataTable(RecipeRunStats.Row.class, rows ->
               assertThat(rows).extracting(RecipeRunStats.Row::getSourceFilesChanged).containsOnly(1)),
-          text("Hi", "Hello", spec -> spec.path("hi.txt")),
+          text("Hi", "Hello", spec -> builtWithGradle8(spec.path("hi.txt"))),
           // Only its marker changes
-          text("Bye", spec -> spec.path("bye.txt"))
+          text("Bye", spec -> builtWithGradle8(spec.path("bye.txt")))
         );
     }
 

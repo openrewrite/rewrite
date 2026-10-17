@@ -18,6 +18,7 @@ package org.openrewrite.gradle.tree;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.Issue;
 import org.openrewrite.test.RecipeSpec;
+import org.openrewrite.test.RecipeQualityValidation;
 import org.openrewrite.test.RewriteTest;
 import org.openrewrite.test.TypeValidation;
 
@@ -27,7 +28,9 @@ class TaskTest implements RewriteTest {
 
     @Override
     public void defaults(RecipeSpec spec) {
-        spec.afterTypeValidationOptions(TypeValidation.none());
+        spec.recipeQualityValidation(RecipeQualityValidation.builder()
+          .types(TypeValidation.none())
+          .build());
     }
 
     @Issue("https://github.com/openrewrite/rewrite/issues/1236")

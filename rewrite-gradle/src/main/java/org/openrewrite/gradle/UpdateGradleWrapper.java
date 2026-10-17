@@ -607,13 +607,16 @@ public class UpdateGradleWrapper extends ScanningRecipe<UpdateGradleWrapper.Grad
         @Override
         public Properties visitEntry(Properties.Entry entry, ExecutionContext ctx) {
             if ("distributionUrl".equals(entry.getKey())) {
-                Properties.Value value = entry.getValue();
-                return entry.withValue(value.withText(gradleWrapper.getPropertiesFormattedUrl()));
+                return withText(entry, gradleWrapper.getPropertiesFormattedUrl());
             }
             if (DISTRIBUTION_SHA_256_SUM_KEY.equals(entry.getKey()) && checksum != null) {
-                return entry.withValue(entry.getValue().withText(checksum));
+                return withText(entry, checksum);
             }
             return entry;
+        }
+
+        private static Properties.Entry withText(Properties.Entry entry, String text) {
+            return text.equals(entry.getValue().getSource()) ? entry : entry.withValue(entry.getValue().withText(text));
         }
     }
 }

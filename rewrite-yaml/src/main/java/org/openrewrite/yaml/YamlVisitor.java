@@ -17,6 +17,7 @@ package org.openrewrite.yaml;
 
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.Cursor;
+import org.openrewrite.FormattingListener;
 import org.openrewrite.SourceFile;
 import org.openrewrite.TreeVisitor;
 import org.openrewrite.internal.ListUtils;
@@ -48,6 +49,7 @@ public class YamlVisitor<P> extends TreeVisitor<Yaml, P> {
     @SuppressWarnings({"unchecked", "ConstantConditions"})
     public <Y2 extends Yaml> Y2 maybeAutoFormat(Y2 before, Y2 after, @Nullable Yaml stopAfter, P p, Cursor cursor) {
         if (before != after) {
+            FormattingListener.beforeFormat(after, stopAfter, cursor);
             return (Y2) new AutoFormatVisitor<>(stopAfter).visit(after, p, cursor);
         }
         return after;
@@ -63,6 +65,7 @@ public class YamlVisitor<P> extends TreeVisitor<Yaml, P> {
 
     @SuppressWarnings({"ConstantConditions", "unchecked"})
     public <Y2 extends Yaml> Y2 autoFormat(Y2 y, @Nullable Yaml stopAfter, P p, Cursor cursor) {
+        FormattingListener.beforeFormat(y, stopAfter, cursor);
         return (Y2) new AutoFormatVisitor<>(stopAfter).visit(y, p, cursor);
     }
 
