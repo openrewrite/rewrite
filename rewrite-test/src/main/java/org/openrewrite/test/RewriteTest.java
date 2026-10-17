@@ -444,8 +444,7 @@ public interface RewriteTest extends SourceSpecs {
         if (TypeValidation.after(testMethodSpec, testClassSpec).addedMarkers()) {
             addedMarkers = new AddedMarkers(beforeSourceFiles, parsersFor, relativeTo, ctx);
         }
-        UnchangedTreeIdentity unchangedTreeIdentity = TypeValidation.after(testMethodSpec, testClassSpec)
-                .identityEqualsWhenUnchanged() ? new UnchangedTreeIdentity() : null;
+        UnchangedTreeIdentity unchangedTreeIdentity = new UnchangedTreeIdentity();
 
         LargeSourceSet lss;
         if (testMethodSpec.getSourceSet() != null) {
@@ -476,9 +475,7 @@ public interface RewriteTest extends SourceSpecs {
         if (addedMarkers != null) {
             addedMarkers.assertNoneAdded(recipeRun.getChangeset().getAllResults());
         }
-        if (unchangedTreeIdentity != null) {
-            unchangedTreeIdentity.assertNoneFound();
-        }
+        unchangedTreeIdentity.assertNoneFound();
         EmptySources emptySources = runner == RewriteRunner.IN_PROCESS &&
                                     lss instanceof LargeSourceSetCheckingExpectedCycles ?
                 new EmptySources(recipe, recipeRun.getChangeset().getAllResults()) : null;

@@ -559,21 +559,6 @@ class RewriteTestTest implements RewriteTest {
             assertThat(e).hasMessageContaining("returned an equal copy of A.java in cycle 1");
         }
 
-        @Test
-        void turnedOff() {
-            rewriteRun(
-              spec -> spec.typeValidationOptions(TypeValidation.builder().identityEqualsWhenUnchanged(false).build())
-                .cycles(1)
-                .expectedCyclesThatMakeChanges(1)
-                .recipe(copiesModifiers()),
-              java(
-                """
-                  public class A {}
-                  """
-              )
-            );
-        }
-
         private Recipe copiesModifiers() {
             return toRecipe(() -> new JavaIsoVisitor<>() {
                 @Override
