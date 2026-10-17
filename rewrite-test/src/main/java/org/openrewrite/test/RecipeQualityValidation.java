@@ -75,6 +75,13 @@ public class RecipeQualityValidation {
     private boolean matchByTypeNotName = true;
 
     /**
+     * Controls whether the recipe is validated to import the types and static members the code it writes names, and
+     * its templates to declare those they name with imports and staticImports.
+     */
+    @Builder.Default
+    private boolean importReferencedTypes = true;
+
+    /**
      * Enable all recipe quality checks.
      */
     public static RecipeQualityValidation all() {
@@ -100,6 +107,7 @@ public class RecipeQualityValidation {
                 .reportingMarkersOnly(quality.reportingMarkersOnly())
                 .minimalFormatting(quality.minimalFormatting())
                 .matchByTypeNotName(quality.matchByTypeNotName())
+                .importReferencedTypes(quality.importReferencedTypes())
                 .build();
     }
 }

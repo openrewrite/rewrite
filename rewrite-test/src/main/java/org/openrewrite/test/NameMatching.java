@@ -362,7 +362,7 @@ final class NameMatching {
         return leaves;
     }
 
-    private static String changedBy(Result result) {
+    static String changedBy(Result result) {
         Set<String> leaves = leafRecipes(result);
         return leaves.isEmpty() ? "" : " (changed by " + String.join(", ", leaves) + ")";
     }

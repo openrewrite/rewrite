@@ -30,6 +30,7 @@ import org.openrewrite.groovy.GroovyParser;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.java.ChangeType;
 import org.openrewrite.java.JavaIsoVisitor;
+import org.openrewrite.java.JavaVisitor;
 import org.openrewrite.java.JavaParser;
 import org.openrewrite.java.JavaTemplate;
 import org.openrewrite.java.MethodMatcher;
@@ -1562,6 +1563,148 @@ class RewriteTestTest implements RewriteTest {
     }
 
     @Nested
+    class ImportsReferencedTypes {
+
+        @Test
+        void rejectRecipeThatNamesATypeWithoutImportingIt() {
+            AssertionError e = assertThrows(AssertionError.class, () -> rewriteRun(
+              spec -> spec.recipe(new UseObjectsIsNull(null)),
+              java(
+                """
+                  class A {
+                      boolean test(Object o) {
+                          return o == null;
+                      }
+                  }
+                  """,
+                """
+                  class A {
+                      boolean test(Object o) {
+                          return Objects.isNull(o);
+                      }
+                  }
+                  """
+              )
+            ));
+            assertThat(e).hasMessageStartingWith("Import the types and static members the code the recipe writes names")
+              .hasMessageContaining("A.java (changed by org.openrewrite.test.internal.UseObjectsIsNull): " +
+                                    "`Objects` (java.util.Objects)")
+              .hasMessageContaining("importReferencedTypes(false)");
+        }
+
+        @Test
+        void acceptRecipeThatImportsWhatItNames() {
+            rewriteRun(
+              spec -> spec.recipe(new UseObjectsIsNull(true)),
+              java(
+                """
+                  class A {
+                      boolean test(Object o) {
+                          return o == null;
+                      }
+                  }
+                  """,
+                """
+                  import java.util.Objects;
+
+                  class A {
+                      boolean test(Object o) {
+                          return Objects.isNull(o);
+                      }
+                  }
+                  """
+              )
+            );
+        }
+
+        @Test
+        void rejectTemplateThatReliesOnTheFilesImports() {
+            AssertionError e = assertThrows(AssertionError.class, () -> rewriteRun(
+              spec -> spec.recipe(new ReturnEmptyList(null)),
+              java(
+                """
+                  import java.util.Collections;
+                  import java.util.List;
+
+                  class A {
+                      List<String> list() {
+                          return null;
+                      }
+                  }
+                  """,
+                """
+                  import java.util.Collections;
+                  import java.util.List;
+
+                  class A {
+                      List<String> list() {
+                          return Collections.emptyList();
+                      }
+                  }
+                  """
+              )
+            ));
+            assertThat(e).hasMessageStartingWith("Declare the types and static members a template names with imports(..)")
+              .hasMessageContaining("`Collections` (java.util.Collections) in a template applied at " +
+                                    "org.openrewrite.test.internal.ReturnEmptyList$1.visitLiteral(RewriteTestTest.java:")
+              .hasMessageNotContaining("Import the types and static members the code the recipe writes names");
+        }
+
+        @Test
+        void acceptTemplateThatDeclaresWhatItNames() {
+            rewriteRun(
+              spec -> spec.recipe(new ReturnEmptyList(true)),
+              java(
+                """
+                  import java.util.Collections;
+                  import java.util.List;
+
+                  class A {
+                      List<String> list() {
+                          return null;
+                      }
+                  }
+                  """,
+                """
+                  import java.util.Collections;
+                  import java.util.List;
+
+                  class A {
+                      List<String> list() {
+                          return Collections.emptyList();
+                      }
+                  }
+                  """
+              )
+            );
+        }
+
+        @Test
+        void optOut() {
+            rewriteRun(
+              spec -> spec.recipe(new UseObjectsIsNull(null))
+                .recipeQualityValidation(RecipeQualityValidation.builder().importReferencedTypes(false).build()),
+              java(
+                """
+                  class A {
+                      boolean test(Object o) {
+                          return o == null;
+                      }
+                  }
+                  """,
+                """
+                  class A {
+                      boolean test(Object o) {
+                          return Objects.isNull(o);
+                      }
+                  }
+                  """
+              )
+            );
+        }
+    }
+
+    @Nested
     class UnparsedSources {
 
         @Test
@@ -1750,6 +1893,76 @@ class ChangeApplicationYml extends Recipe {
                     return tree;
                 }
                 return new ChangeFirstValue("changed", true).getVisitor().visit((Yaml.Documents) tree, ctx);
+            }
+        };
+    }
+}
+
+@EqualsAndHashCode(callSuper = false)
+@NullMarked
+@Value
+class UseObjectsIsNull extends Recipe {
+
+    @Option(displayName = "Add the import",
+      description = "Add an import of `java.util.Objects` to the file.",
+      required = false)
+    @Nullable
+    Boolean addImport;
+
+    String displayName = "Use `Objects.isNull`";
+
+    String description = "Replaces comparisons with `null` by `Objects.isNull`.";
+
+    @Override
+    public TreeVisitor<?, ExecutionContext> getVisitor() {
+        return new JavaVisitor<>() {
+            @Override
+            public J visitBinary(J.Binary binary, ExecutionContext ctx) {
+                J j = super.visitBinary(binary, ctx);
+                if (!(j instanceof J.Binary b) || b.getOperator() != J.Binary.Type.Equal ||
+                    !J.Literal.isLiteralValue(b.getRight(), null)) {
+                    return j;
+                }
+                if (Boolean.TRUE.equals(addImport)) {
+                    maybeAddImport("java.util.Objects");
+                }
+                return JavaTemplate.builder("Objects.isNull(#{any()})")
+                  .imports("java.util.Objects")
+                  .build()
+                  .apply(getCursor(), b.getCoordinates().replace(), b.getLeft());
+            }
+        };
+    }
+}
+
+@EqualsAndHashCode(callSuper = false)
+@NullMarked
+@Value
+class ReturnEmptyList extends Recipe {
+
+    @Option(displayName = "Declare the import",
+      description = "Declare the template's import of `java.util.Collections`.",
+      required = false)
+    @Nullable
+    Boolean declared;
+
+    String displayName = "Return an empty list";
+
+    String description = "Replaces `return null` by `return Collections.emptyList()`.";
+
+    @Override
+    public TreeVisitor<?, ExecutionContext> getVisitor() {
+        return new JavaVisitor<>() {
+            @Override
+            public J visitLiteral(J.Literal literal, ExecutionContext ctx) {
+                if (literal.getValue() != null || !(getCursor().getParentTreeCursor().getValue() instanceof J.Return)) {
+                    return literal;
+                }
+                JavaTemplate.Builder template = JavaTemplate.builder("Collections.emptyList()").contextSensitive();
+                if (Boolean.TRUE.equals(declared)) {
+                    template.imports("java.util.Collections");
+                }
+                return template.build().apply(getCursor(), literal.getCoordinates().replace());
             }
         };
     }

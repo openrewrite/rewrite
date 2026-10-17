@@ -469,8 +469,10 @@ public interface RewriteTest extends SourceSpecs {
         NameMatching nameMatching = NameMatching.of(recipe, runner, runnerContext, beforeSourceFiles,
                 parsersFor, relativeTo, ctx);
         FormattingScope formattingScope = new FormattingScope(recipe, quality.minimalFormatting());
+        ImportedNames importedNames = ImportedNames.of(quality.importReferencedTypes(), runnableSourceFiles);
         long runStart = System.nanoTime();
-        RecipeRun recipeRun = formattingScope.record(() -> runner.run(recipe, runnerContext));
+        RecipeRun recipeRun = formattingScope.record(() ->
+                importedNames.record(() -> runner.run(recipe, runnerContext)));
         Duration runTime = Duration.ofNanos(System.nanoTime() - runStart);
         if (addedMarkers != null) {
             addedMarkers.assertNoneAdded(recipeRun.getChangeset().getAllResults());
@@ -716,6 +718,7 @@ public interface RewriteTest extends SourceSpecs {
                  "    before | after | expected\n" + paths);
         }
         formattingScope.assertFormattedOnlyWhatChanged(recipeRun.getChangeset().getAllResults());
+        importedNames.assertImported(recipeRun.getChangeset().getAllResults());
 
         if (nameMatching != null) {
             nameMatching.assertMatchedByType(recipeRun.getChangeset().getAllResults(), runTime);

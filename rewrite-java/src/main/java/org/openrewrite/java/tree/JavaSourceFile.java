@@ -19,9 +19,11 @@ import org.jspecify.annotations.Nullable;
 import org.openrewrite.Incubating;
 import org.openrewrite.SourceFile;
 import org.openrewrite.internal.CommentService;
+import org.openrewrite.internal.ImportValidationService;
 import org.openrewrite.internal.NamingService;
 import org.openrewrite.internal.TypeMatchingValidationService;
 import org.openrewrite.internal.WhitespaceValidationService;
+import org.openrewrite.java.internal.JavaImportValidationService;
 import org.openrewrite.java.internal.JavaTypeMatchingValidationService;
 import org.openrewrite.java.internal.JavaWhitespaceValidationService;
 import org.openrewrite.java.internal.TypesInUse;
@@ -79,6 +81,8 @@ public interface JavaSourceFile extends J, SourceFile {
                 return (T) new JavaWhitespaceValidationService();
             } else if (TypeMatchingValidationService.class.getName().equals(service.getName())) {
                 return (T) new JavaTypeMatchingValidationService();
+            } else if (ImportValidationService.class.getName().equals(service.getName())) {
+                return (T) new JavaImportValidationService();
             } else if (NamingService.class.getName().equals(service.getName())) {
                 return (T) new JavaNamingService();
             } else if (CommentService.class.getName().equals(service.getName())) {
