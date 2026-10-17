@@ -17,6 +17,7 @@ package org.openrewrite.test;
 
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
+import org.openrewrite.config.CompositeRecipe;
 import org.openrewrite.internal.InMemoryLargeSourceSet;
 import org.openrewrite.internal.RecipeRunException;
 import org.openrewrite.marker.Marker;
@@ -98,7 +99,7 @@ final class EmptySources {
             }
             Parser.Builder builder = parsers.apply(spec);
             List<Object> probe = Arrays.asList(recipe.getDescriptor(), before.getClass(), spec.getDsl());
-            if (builder == null || PROBE_NANOS.getOrDefault(recipe.getName(), 0L) > TIME_CAP_NANOS ||
+            if (builder == null || PROBE_NANOS.getOrDefault(timeCapKey(recipe), 0L) > TIME_CAP_NANOS ||
                 !PROBED.add(probe)) {
                 continue;
             }
@@ -114,9 +115,23 @@ final class EmptySources {
                     PROBED.remove(probe);
                 }
             } finally {
-                PROBE_NANOS.merge(recipe.getName(), System.nanoTime() - start, Long::sum);
+                PROBE_NANOS.merge(timeCapKey(recipe), System.nanoTime() - start, Long::sum);
             }
         }
+    }
+
+    /**
+     * What a recipe's probes share a time cap by, since every composite has the same name.
+     */
+    private static String timeCapKey(Recipe recipe) {
+        if (!(recipe instanceof CompositeRecipe)) {
+            return recipe.getName();
+        }
+        StringJoiner children = new StringJoiner(",", "[", "]");
+        for (Recipe child : recipe.getRecipeList()) {
+            children.add(timeCapKey(child));
+        }
+        return children.toString();
     }
 
     private static boolean isAdHoc(Recipe recipe) {
