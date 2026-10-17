@@ -220,6 +220,11 @@ class ReloadableJava11TypeMapping implements JavaTypeMapping<Tree> {
         Type.ClassType symType = (Type.ClassType) sym.type;
         String fqn = sym.flatName().toString();
 
+        // Taken before the initializer may complete the symbol, matching the signature built from the same state.
+        // A generic class arrives through its own symbol type only once javac has completed it, since javac
+        // completes an owner before its nested classes and a class before any of its members.
+        boolean parameterized = classType.typarams_field != null && classType.typarams_field.length() > 0;
+        // flags_field is empty until javac completes the symbol, so the initializer sets flags and kind again.
         JavaType.Class clazz = typeFactory.computeClass(fqn, sym.flags_field, getKind(sym), c -> {
             if (!sym.completer.isTerminal()) {
                 completeClassSymbol(sym);
@@ -281,10 +286,11 @@ class ReloadableJava11TypeMapping implements JavaTypeMapping<Tree> {
                     typeParameters.add(type(tParam));
                 }
             }
-            c.unsafeSet(typeParameters, supertype, owner, listAnnotations(sym), interfaces, fields, methods);
+            c.unsafeSet(sym.flags_field, getKind(sym), fqn, typeParameters, supertype, owner, listAnnotations(sym),
+                    interfaces, fields, methods);
         });
 
-        if (classType.typarams_field != null && classType.typarams_field.length() > 0) {
+        if (parameterized) {
             JavaType.Class finalClazz = clazz;
             return typeFactory.computeParameterized(signature, pt -> {
                 List<JavaType> typeParameters = new ArrayList<>(classType.typarams_field.length());

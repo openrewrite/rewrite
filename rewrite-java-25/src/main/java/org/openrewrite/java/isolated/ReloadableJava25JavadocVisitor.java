@@ -30,11 +30,15 @@ import com.sun.source.util.DocTreeScanner;
 import com.sun.source.util.TreePath;
 import com.sun.source.util.TreeScanner;
 import com.sun.tools.javac.code.Symbol;
+import com.sun.tools.javac.code.Symtab;
 import com.sun.tools.javac.code.Type;
+import com.sun.tools.javac.code.Types;
 import com.sun.tools.javac.comp.Attr;
 import com.sun.tools.javac.tree.DCTree;
 import com.sun.tools.javac.tree.JCTree;
+import com.sun.tools.javac.tree.TreeInfo;
 import com.sun.tools.javac.util.Context;
+import com.sun.tools.javac.util.Name;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.Tree;
 import org.openrewrite.internal.ListUtils;
@@ -62,6 +66,8 @@ public class ReloadableJava25JavadocVisitor extends DocTreeScanner<Tree, List<Ja
     private static final char EOI = 0x1A;
 
     private final Attr attr;
+    private final Symtab syms;
+    private final Types types;
 
     private final Symbol.@Nullable TypeSymbol symbol;
 
@@ -87,6 +93,8 @@ public class ReloadableJava25JavadocVisitor extends DocTreeScanner<Tree, List<Ja
 
     public ReloadableJava25JavadocVisitor(Context context, TreePath scope, ReloadableJava25TypeMapping typeMapping, String source, JCTree tree, boolean markdown) {
         this.attr = Attr.instance(context);
+        this.syms = Symtab.instance(context);
+        this.types = Types.instance(context);
         this.typeMapping = typeMapping;
         this.source = source;
         this.markdown = markdown;
@@ -678,7 +686,7 @@ public class ReloadableJava25JavadocVisitor extends DocTreeScanner<Tree, List<Ja
         JavaType qualifierType;
         TypedTree qualifier;
 
-        if (ref.qualifierExpression != null) {
+        if (ref.qualifierExpression != null && !resolveWithoutCompleting(ref.qualifierExpression)) {
             try {
                 attr.attribType(ref.qualifierExpression, symbol);
             } catch (NullPointerException ignored) {
@@ -844,7 +852,7 @@ public class ReloadableJava25JavadocVisitor extends DocTreeScanner<Tree, List<Ja
                     for (int i = 0; i < ref.paramTypes.size(); i++) {
                         JCTree param = ref.paramTypes.get(i);
                         JavaType testParamType = parameterTypes.get(i);
-                        Type paramType = attr.attribType(param, symbol);
+                        Type paramType = resolveWithoutCompleting(param) ? param.type : attr.attribType(param, symbol);
                         if (!paramTypeMatches(testParamType, paramType)) {
                             continue nextMethod;
                         }
@@ -854,6 +862,46 @@ public class ReloadableJava25JavadocVisitor extends DocTreeScanner<Tree, List<Ja
             }
         }
         return null;
+    }
+
+    /**
+     * Resolves a {@code pkg.Name} reference to the class symbol its package lists, which needs no class file
+     * read, and types the tree with it so the type mapping can serve it from the factory. Every other shape,
+     * and a class not accessible from here, is left to attribution.
+     */
+    private boolean resolveWithoutCompleting(JCTree tree) {
+        if (!(tree instanceof JCTree.JCFieldAccess) || symbol == null) {
+            return false;
+        }
+        JCTree.JCFieldAccess select = (JCTree.JCFieldAccess) tree;
+        Name packageName = TreeInfo.fullName(select.selected);
+        if (packageName == null) {
+            return false;
+        }
+        Symbol.PackageSymbol pkg = syms.lookupPackage(symbol.packge().modle, packageName);
+        pkg.complete();
+        if (!pkg.exists()) {
+            return false;
+        }
+        Symbol.ClassSymbol cls = null;
+        for (Symbol member : pkg.members().getSymbolsByName(select.name)) {
+            if (member instanceof Symbol.ClassSymbol) {
+                cls = (Symbol.ClassSymbol) member;
+            }
+        }
+        if (cls == null) {
+            return false;
+        }
+        Type erasure = cls.erasure(types);
+        JavaType.FullyQualified mapped = TypeUtils.asFullyQualified(typeMapping.type(erasure));
+        boolean accessible = mapped != null &&
+                             (mapped.hasFlags(Flag.Public) || symbol.packge().fullname.equals(packageName));
+        if (!accessible) {
+            return false;
+        }
+        select.sym = cls;
+        select.type = erasure;
+        return true;
     }
 
     private boolean paramTypeMatches(JavaType parameterType, Type javadocType) {
