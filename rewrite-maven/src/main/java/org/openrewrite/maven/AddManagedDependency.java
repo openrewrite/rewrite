@@ -247,9 +247,8 @@ public class AddManagedDependency extends ScanningRecipe<AddManagedDependency.Sc
                     if (versionValidation.isValid()) {
                         VersionComparator versionComparator = requireNonNull(versionValidation.getValue());
                         try {
-                            // The version of the dependency currently in use (if any) might influence the version comparator
-                            // For example, "latest.patch" gives very different results depending on the version in use
-                            String currentVersion = getResolutionResult().findDependencies(convertedGroup, convertedArtifact, Scope.fromName(scope)).stream()
+                            // `scope` is the tag scope of the new entry, not a dependency search scope, so search all scopes.
+                            String currentVersion = getResolutionResult().findDependencies(convertedGroup, convertedArtifact, null).stream()
                                     .map(ResolvedDependency::getVersion)
                                     .findFirst()
                                     .orElse(existingManagedDependencyVersion());
@@ -280,18 +279,32 @@ public class AddManagedDependency extends ScanningRecipe<AddManagedDependency.Sc
             }
 
             private @Nullable String existingManagedDependencyVersion() {
-                return getResolutionResult().getPom().getDependencyManagement().stream()
+                // groupId/artifactId may be property placeholders; resolve before matching.
+                ResolvedPom pom = getResolutionResult().getPom();
+                String convertedGroup = pom.getValue(groupId);
+                String convertedArtifact = pom.getValue(artifactId);
+                String version = pom.getDependencyManagement().stream()
                         .map(resolvedManagedDep -> {
-                            if (resolvedManagedDep.matches(groupId, artifactId, type, classifier)) {
+                            if (resolvedManagedDep.matches(convertedGroup, convertedArtifact, type, classifier)) {
                                 return resolvedManagedDep.getGav().getVersion();
                             } else if (resolvedManagedDep.getRequestedBom() != null &&
-                                       resolvedManagedDep.getRequestedBom().getGroupId().equals(groupId) &&
-                                       resolvedManagedDep.getRequestedBom().getArtifactId().equals(artifactId)) {
+                                       Objects.equals(convertedGroup, resolvedManagedDep.getRequestedBom().getGroupId()) &&
+                                       Objects.equals(convertedArtifact, resolvedManagedDep.getRequestedBom().getArtifactId())) {
                                 return resolvedManagedDep.getRequestedBom().getVersion();
                             }
                             return null;
                         })
                         .filter(Objects::nonNull)
+                        .findFirst().orElse(null);
+                if (version != null) {
+                    return version;
+                }
+                // Only checks whether groupId:artifactId is already present as an import; nothing else.
+                return pom.getRequested().getDependencyManagement().stream()
+                        .filter(ManagedDependency.Imported.class::isInstance)
+                        .filter(d -> Objects.equals(convertedGroup, pom.getValue(d.getGroupId())) &&
+                                     Objects.equals(convertedArtifact, pom.getValue(d.getArtifactId())))
+                        .map(ManagedDependency::getVersion)
                         .findFirst().orElse(null);
             }
         });
