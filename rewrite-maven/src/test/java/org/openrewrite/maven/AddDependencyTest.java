@@ -17,16 +17,19 @@ package org.openrewrite.maven;
 
 import org.intellij.lang.annotations.Language;
 import org.jspecify.annotations.Nullable;
-import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.openrewrite.DocumentExample;
+import org.openrewrite.InMemoryExecutionContext;
 import org.openrewrite.Issue;
 import org.openrewrite.java.ChangePackage;
 import org.openrewrite.java.JavaParser;
+import org.openrewrite.maven.tree.MavenRepository;
 import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
+
+import java.util.List;
 
 import static org.openrewrite.java.Assertions.*;
 import static org.openrewrite.maven.Assertions.pomXml;
@@ -84,11 +87,14 @@ class AddDependencyTest implements RewriteTest {
     }
 
     @Test
-    @Disabled("2026-05-04 temporarily disabled after Artifactory introduction")
     void dontAddDuplicateIfUpdateModelOnPriorRecipeCycleFailed() {
         rewriteRun(
           spec -> spec
-            .recipe(addDependency("doesnotexist:doesnotexist:1", "com.google.common.math.IntMath")),
+            .recipe(addDependency("doesnotexist:doesnotexist:1", "com.google.common.math.IntMath"))
+            // Pin the repository so the "Tried repositories" list below is not rewritten by a
+            // mirror configured in ~/.m2/settings.xml.
+            .executionContext(centralOnly())
+            .recipeExecutionContext(centralOnly()),
           mavenProject("project",
             srcMainJava(
               java(usingGuavaIntMath)
@@ -2454,6 +2460,15 @@ class AddDependencyTest implements RewriteTest {
               """
           )
         );
+    }
+
+    private static MavenExecutionContextView centralOnly() {
+        return MavenExecutionContextView.view(new InMemoryExecutionContext())
+          .setRepositories(List.of(MavenRepository.builder()
+            .id("central")
+            .uri("https://repo.maven.apache.org/maven2")
+            .knownToExist(true)
+            .build()));
     }
 
     private AddDependency addDependency(@SuppressWarnings("SameParameterValue") String gav) {
