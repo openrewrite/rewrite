@@ -16,6 +16,7 @@
 package org.openrewrite.xml.format;
 
 import org.jspecify.annotations.Nullable;
+import org.openrewrite.SourceFile;
 import org.openrewrite.Tree;
 import org.openrewrite.xml.XmlIsoVisitor;
 import org.openrewrite.xml.tree.Xml;
@@ -43,7 +44,7 @@ public class NormalizeFormatVisitor<P> extends XmlIsoVisitor<P> {
     @Override
     public @Nullable Xml postVisit(Xml tree, P p) {
         if (stopAfter != null && stopAfter.isScope(tree)) {
-            getCursor().putMessageOnFirstEnclosing(Xml.Document.class, "stop", true);
+            getCursor().putMessageOnFirstEnclosing(SourceFile.class, "stop", true);
         }
         return super.postVisit(tree, p);
     }

@@ -29,6 +29,8 @@
 /** XML lexer derived from ANTLR v4 ref guide book example */
 lexer grammar XMLLexer;
 
+// Per-target superclass supplies jspMode; XML and JSPX keep strict XML strings.
+options { superClass=XMLLexerBase; }
 
 // Default "mode": Everything OUTSIDE of a tag
 WS                : [ \t\n\r\u000C]+ -> skip;
@@ -135,6 +137,11 @@ DIRECTIVE_CLOSE: '%';
 
 SLASH          :  '/' ;
 EQUALS         :  '=' ;
+// Standard JSP attributes may contain literal markup and backslash-quoted
+// delimiters. A Java output expression in template markup has its own quotes.
+JSP_STRING     :  {jspMode}? ( '"' (JSP_EXPRESSION | '\\' . | {isJspLiteralCharacter()}? ~["\\])* '"'
+                            | '\'' (JSP_EXPRESSION | '\\' . | {isJspLiteralCharacter()}? ~['\\])* '\'' ) -> type(STRING)
+               ;
 STRING         :  '"' ~[<"]* '"'
                |  '\'' ~[<']* '\''
                ;

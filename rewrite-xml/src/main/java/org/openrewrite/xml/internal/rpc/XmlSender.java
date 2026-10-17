@@ -48,6 +48,18 @@ public class XmlSender extends XmlVisitor<RpcSendQueue> {
     }
 
     @Override
+    public Xml visitJspDocument(Xml.JspDocument document, RpcSendQueue q) {
+        q.getAndSend(document, d -> d.getSourcePath().toString());
+        q.getAndSend(document, d -> d.getCharset().name());
+        q.getAndSend(document, Xml.JspDocument::isCharsetBomMarked);
+        q.getAndSend(document, Xml.JspDocument::getChecksum);
+        q.getAndSend(document, Xml.JspDocument::getFileAttributes);
+        q.getAndSendList(document, Xml.JspDocument::getContent, Tree::getId, node -> visit(node, q));
+        q.getAndSend(document, Xml.JspDocument::getEof);
+        return document;
+    }
+
+    @Override
     public Xml visitProlog(Xml.Prolog prolog, RpcSendQueue q) {
         q.getAndSend(prolog, Xml.Prolog::getXmlDecl, d -> visit(d, q));
         q.getAndSendList(prolog, Xml.Prolog::getMisc, m -> m.getId(),

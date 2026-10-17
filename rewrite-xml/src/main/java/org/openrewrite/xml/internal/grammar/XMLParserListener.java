@@ -33,6 +33,26 @@ public interface XMLParserListener extends ParseTreeListener {
 	 */
 	void exitDocument(XMLParser.DocumentContext ctx);
 	/**
+	 * Enter a parse tree produced by {@link XMLParser#jspdocument}.
+	 * @param ctx the parse tree
+	 */
+	void enterJspdocument(XMLParser.JspdocumentContext ctx);
+	/**
+	 * Exit a parse tree produced by {@link XMLParser#jspdocument}.
+	 * @param ctx the parse tree
+	 */
+	void exitJspdocument(XMLParser.JspdocumentContext ctx);
+	/**
+	 * Enter a parse tree produced by {@link XMLParser#jspcontent}.
+	 * @param ctx the parse tree
+	 */
+	void enterJspcontent(XMLParser.JspcontentContext ctx);
+	/**
+	 * Exit a parse tree produced by {@link XMLParser#jspcontent}.
+	 * @param ctx the parse tree
+	 */
+	void exitJspcontent(XMLParser.JspcontentContext ctx);
+	/**
 	 * Enter a parse tree produced by {@link XMLParser#prolog}.
 	 * @param ctx the parse tree
 	 */

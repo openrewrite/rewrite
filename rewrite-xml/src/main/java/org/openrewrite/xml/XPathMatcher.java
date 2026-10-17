@@ -17,6 +17,7 @@ package org.openrewrite.xml;
 
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.Cursor;
+import org.openrewrite.SourceFile;
 import org.openrewrite.xml.XPathCompiler.*;
 import org.openrewrite.xml.tree.Content;
 import org.openrewrite.xml.tree.Xml;
@@ -449,7 +450,7 @@ public class XPathMatcher {
         if (cursor == null) return null;
         Cursor parent = cursor.getParent();
         while (parent != null && !(parent.getValue() instanceof Xml.Tag)) {
-            if (parent.getValue() instanceof Xml.Document) {
+            if (parent.getValue() instanceof SourceFile) {
                 return null;
             }
             parent = parent.getParent();
@@ -1241,10 +1242,10 @@ public class XPathMatcher {
         // Check if cursor is at root (parent is Document or no parent tag)
         Cursor parentCursor = cursor.getParent();
         while (parentCursor != null && !(parentCursor.getValue() instanceof Xml.Tag) &&
-               !(parentCursor.getValue() instanceof Xml.Document)) {
+               !(parentCursor.getValue() instanceof SourceFile)) {
             parentCursor = parentCursor.getParent();
         }
-        if (parentCursor == null || !(parentCursor.getValue() instanceof Xml.Document)) {
+        if (parentCursor == null || !(parentCursor.getValue() instanceof SourceFile)) {
             return false; // Not at root element
         }
 
@@ -1393,7 +1394,7 @@ public class XPathMatcher {
      */
     private Xml.@Nullable Tag getRootTag(Cursor cursor) {
         Cursor c = cursor;
-        while (c.getParent() != null && !(c.getParent().getValue() instanceof Xml.Document)) {
+        while (c.getParent() != null && !(c.getParent().getValue() instanceof SourceFile)) {
             c = c.getParent();
         }
         return c.getValue() instanceof Xml.Tag ? (Xml.Tag) c.getValue() : null;

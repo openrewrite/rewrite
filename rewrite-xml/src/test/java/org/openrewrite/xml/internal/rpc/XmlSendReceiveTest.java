@@ -40,6 +40,7 @@ import java.io.PipedOutputStream;
 import static org.openrewrite.marketplace.RecipeBundle.runtimeClasspath;
 import static org.openrewrite.test.RewriteTest.toRecipe;
 import static org.openrewrite.xml.Assertions.xml;
+import static org.openrewrite.xml.Assertions.jsp;
 
 class XmlSendReceiveTest implements RewriteTest {
     RewriteRpc server;
@@ -80,6 +81,18 @@ class XmlSendReceiveTest implements RewriteTest {
                 return t;
             }
         }));
+    }
+
+    @Test
+    void sendReceiveJspWithMultipleRootsAndDirectives() {
+        rewriteRun(
+          jsp(
+            "<%@ taglib prefix=\"h\" uri=\"http://java.sun.com/jsf/html\" %>\n" +
+            "<child>original</child>\n<child>original</child>",
+            "<%@ taglib prefix=\"h\" uri=\"http://java.sun.com/jsf/html\" %>\n" +
+            "<child>changed</child>\n<child>changed</child>"
+          )
+        );
     }
 
     @DocumentExample

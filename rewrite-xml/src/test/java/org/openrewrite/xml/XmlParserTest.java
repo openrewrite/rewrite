@@ -42,6 +42,7 @@ import static org.assertj.core.api.AssertionsForClassTypes.assertThat;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.openrewrite.test.RewriteTest.toRecipe;
 import static org.openrewrite.xml.Assertions.xml;
+import static org.openrewrite.xml.Assertions.jsp;
 
 @SuppressWarnings({"CheckDtdRefs", "CheckTagEmptyBody"})
 class XmlParserTest implements RewriteTest {
@@ -116,9 +117,9 @@ class XmlParserTest implements RewriteTest {
     }
 
     @Test
-    void jsp() {
+    void jspPage() {
         rewriteRun(
-          xml(
+          jsp(
             //language=html
             """
               <!DOCTYPE html>
@@ -142,7 +143,7 @@ class XmlParserTest implements RewriteTest {
     @Test
     void jspScriptlet() {
         rewriteRun(
-          xml(
+          jsp(
             //language=html
             """
               <!DOCTYPE html>
@@ -166,7 +167,7 @@ class XmlParserTest implements RewriteTest {
     @Test
     void jspExpression() {
         rewriteRun(
-          xml(
+          jsp(
             //language=html
             """
               <!DOCTYPE html>
@@ -185,7 +186,7 @@ class XmlParserTest implements RewriteTest {
     @Test
     void jspDeclaration() {
         rewriteRun(
-          xml(
+          jsp(
             //language=html
             """
               <!DOCTYPE html>
@@ -210,7 +211,7 @@ class XmlParserTest implements RewriteTest {
     @Test
     void jspComment() {
         rewriteRun(
-          xml(
+          jsp(
             //language=html
             """
               <!DOCTYPE html>
@@ -233,7 +234,7 @@ class XmlParserTest implements RewriteTest {
     @Test
     void jspEmptyFile() {
         rewriteRun(
-          xml(
+          jsp(
             //language=html
             """
               """,
@@ -245,7 +246,7 @@ class XmlParserTest implements RewriteTest {
     @Test
     void jspNoHtmlContent() {
         rewriteRun(
-          xml(
+          jsp(
             //language=html
             """
               <%-- This is a JSP comment that won't appear in the HTML output --%>
@@ -258,7 +259,7 @@ class XmlParserTest implements RewriteTest {
     @Test
     void jspScriptletBeforeHtml() {
         rewriteRun(
-          xml(
+          jsp(
             //language=html
             """
               <%-- This is a JSP comment that won't appear in the HTML output --%>
@@ -273,7 +274,7 @@ class XmlParserTest implements RewriteTest {
     @Test
     void mixedJspElements() {
         rewriteRun(
-          xml(
+          jsp(
             //language=html
             """
               <!DOCTYPE html>
@@ -301,7 +302,7 @@ class XmlParserTest implements RewriteTest {
     @Test
     void lowerCaseDocType() {
         rewriteRun(
-          xml(
+          jsp(
             //language=html
             """
               <!doctype html>
@@ -318,7 +319,7 @@ class XmlParserTest implements RewriteTest {
     @Test
     void htmlVoidElementInJsp() {
         rewriteRun(
-          xml(
+          jsp(
             //language=html
             """
               <html lang="en">
@@ -337,7 +338,7 @@ class XmlParserTest implements RewriteTest {
     @Test
     void htmlVoidElementsWithAttributesInJsp() {
         rewriteRun(
-          xml(
+          jsp(
             //language=html
             """
               <html>
@@ -360,7 +361,7 @@ class XmlParserTest implements RewriteTest {
     @Test
     void springBootWelcomeJsp() {
         rewriteRun(
-          xml(
+          jsp(
             //language=html
             """
               <!DOCTYPE html>

@@ -37,7 +37,17 @@ parser grammar XMLParser;
 options { tokenVocab=XMLLexer; superClass=XMLParserBase; }
 
 document
-    :   UTF_ENCODING_BOM? prolog element?
+    :   UTF_ENCODING_BOM? prolog element? (COMMENT | processinginstruction)* EOF
+    ;
+
+// A JSP translation unit is an ordered sequence, not an XML document with one root.
+// EOF is mandatory: preserving unparsed source in a suffix is not a successful JSP parse.
+jspdocument
+    :   UTF_ENCODING_BOM? jspcontent* EOF
+    ;
+
+jspcontent
+    :   xmldecl | content
     ;
 
 prolog
@@ -79,7 +89,8 @@ processinginstruction
 
 content
     :   (element | reference | processinginstruction | CDATA | COMMENT |
-         jspscriptlet | jspexpression | jspdeclaration | jspcomment | chardata) ;
+         jspscriptlet | jspexpression | jspdeclaration | jspcomment | chardata |
+         {jspMode}? jspdirective | {jspMode}? doctypedecl) ;
 
 element
     :   OPEN name=Name attribute*

@@ -36,6 +36,7 @@ import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.function.BiFunction;
+import java.util.regex.Pattern;
 
 import static java.util.Collections.emptyList;
 import static java.util.Collections.singletonList;
@@ -44,6 +45,7 @@ import static org.openrewrite.Tree.randomId;
 
 @SuppressWarnings("ConstantConditions")
 public class XmlParserVisitor extends XMLParserBaseVisitor<Xml> {
+    private static final Pattern EMBEDDED_JSP_ACTION = Pattern.compile("</?[^\\s<>:/]+:");
     private final Path path;
 
     @Nullable
@@ -85,6 +87,15 @@ public class XmlParserVisitor extends XMLParserBaseVisitor<Xml> {
                 visitElement(ctx.element()),
                 source.substring(cursor))
         );
+    }
+
+    @Override
+    public Xml.JspDocument visitJspdocument(XMLParser.JspdocumentContext ctx) {
+        return convert(ctx, (c, prefix) -> {
+            List<Xml> content = c.jspcontent().stream().map(this::visit).collect(toList());
+            return new Xml.JspDocument(randomId(), path, prefix, Markers.EMPTY, charset.name(),
+                    charsetBomMarked, null, fileAttributes, content, source.substring(cursor));
+        });
     }
 
     @Override
@@ -416,6 +427,31 @@ public class XmlParserVisitor extends XMLParserBaseVisitor<Xml> {
             );
 
             requireWellFormedAttribute(isXmlWhitespace(beforeEquals) && isXmlWhitespace(value.getPrefix()), c);
+
+            if (c.getParent() instanceof XMLParser.ElementContext &&
+                ((XMLParser.ElementContext) c.getParent()).Name(0).getText().contains(":") &&
+                value.getValue().contains("<")) {
+                // Unlike Java expressions in template HTML, custom-tag values
+                // must quote their enclosing delimiter even inside <%= ... %>.
+                char delimiter = c.STRING().getText().charAt(0);
+                String raw = value.getValue();
+                for (int i = 0; i < raw.length(); i++) {
+                    if (raw.charAt(i) == '\\') {
+                        i++;
+                    } else {
+                        requireWellFormedAttribute(raw.charAt(i) != delimiter, c);
+                    }
+                }
+            }
+
+            // A custom-tag attribute's markup is literal data for its handler.
+            // In template HTML, a nested JSP action is executable syntax: do not
+            // hide those components inside an opaque attribute value.
+            if (c.getParent() instanceof XMLParser.ElementContext &&
+                !((XMLParser.ElementContext) c.getParent()).Name(0).getText().contains(":") &&
+                EMBEDDED_JSP_ACTION.matcher(value.getValue()).find()) {
+                throw new UnsupportedOperationException("JSP actions embedded in template attributes require structured parsing");
+            }
 
             return new Xml.Attribute(randomId(), prefix, Markers.EMPTY, key, beforeEquals, value);
         });

@@ -27,6 +27,7 @@ import static java.util.stream.Collectors.toList;
 /**
  * Recursively check the equality of XML tags and attributes.
  * Ignores comments. Ignores the order of attributes.
+ * JSP translation units are compared conservatively by their complete printed source.
  */
 public class SemanticallyEqual {
 
@@ -43,6 +44,13 @@ public class SemanticallyEqual {
     private static class SemanticallyEqualVisitor extends XmlVisitor<Xml> {
 
         boolean areEqual = true;
+
+        @Override
+        public @Nullable Xml visitJspDocument(Xml.JspDocument document, Xml other) {
+            areEqual = other instanceof Xml.JspDocument &&
+                    document.printAll().equals(((Xml.JspDocument) other).printAll());
+            return null;
+        }
 
         @Override
         public @Nullable Xml visitDocument(Xml.Document document, Xml other) {

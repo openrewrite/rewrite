@@ -17,6 +17,7 @@ package org.openrewrite.xml.format;
 
 import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
+import org.openrewrite.SourceFile;
 import org.openrewrite.Tree;
 import org.openrewrite.internal.StringUtils;
 import org.openrewrite.xml.XmlIsoVisitor;
@@ -110,7 +111,7 @@ public class NormalizeTabsOrSpacesVisitor<P> extends XmlIsoVisitor<P> {
     @Override
     public @Nullable Xml postVisit(Xml tree, P p) {
         if (stopAfter != null && stopAfter.isScope(tree)) {
-            getCursor().putMessageOnFirstEnclosing(Xml.Document.class, "stop", true);
+            getCursor().putMessageOnFirstEnclosing(SourceFile.class, "stop", true);
         }
         return super.postVisit(tree, p);
     }

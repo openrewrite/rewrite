@@ -16,6 +16,7 @@
 package org.openrewrite.xml.format;
 
 import org.jspecify.annotations.Nullable;
+import org.openrewrite.SourceFile;
 import org.openrewrite.Tree;
 import org.openrewrite.xml.XmlIsoVisitor;
 import org.openrewrite.xml.tree.Content;
@@ -76,11 +77,18 @@ public class LineBreaksVisitor<P> extends XmlIsoVisitor<P> {
 
     @Override
     public Xml.Tag visitTag(Xml.Tag tag, P p) {
-        Xml.Document doc = getCursor().firstEnclosingOrThrow(Xml.Document.class);
+        SourceFile doc = getCursor().firstEnclosingOrThrow(SourceFile.class);
+        boolean firstElement;
+        if (doc instanceof Xml.JspDocument) {
+            firstElement = !((Xml.JspDocument) doc).getContent().isEmpty() &&
+                    ((Xml.JspDocument) doc).getContent().get(0).isScope(tag);
+        } else {
+            Xml.Document xml = (Xml.Document) doc;
+            firstElement = xml.getRoot().isScope(tag) && xml.getProlog().getXmlDecl() == null &&
+                    xml.getProlog().getMisc().isEmpty();
+        }
         Xml.Tag t = keepMaximumLines(minimumLines(super.visitTag(tag, p),
-                doc.getRoot().isScope(tag) &&
-                        doc.getProlog().getXmlDecl() == null &&
-                        doc.getProlog().getMisc().isEmpty() ? 0 : 1), 2);
+                firstElement ? 0 : 1), 2);
         if (t.getClosing() != null && !t.getChildren().isEmpty()) {
             t = t.withClosing(keepMaximumLines(minimumLines(t.getClosing(), 1), 2));
         }
@@ -88,7 +96,12 @@ public class LineBreaksVisitor<P> extends XmlIsoVisitor<P> {
     }
 
     private boolean isFirstMisc(Misc misc) {
-        Xml.Document doc = getCursor().firstEnclosingOrThrow(Xml.Document.class);
+        SourceFile source = getCursor().firstEnclosingOrThrow(SourceFile.class);
+        if (source instanceof Xml.JspDocument) {
+            return !((Xml.JspDocument) source).getContent().isEmpty() &&
+                    ((Xml.JspDocument) source).getContent().get(0).isScope(misc);
+        }
+        Xml.Document doc = (Xml.Document) source;
         if (doc.getProlog().getXmlDecl() == null) {
             return !doc.getProlog().getMisc().isEmpty() &&
                     doc.getProlog().getMisc().get(0) == misc;
@@ -134,7 +147,7 @@ public class LineBreaksVisitor<P> extends XmlIsoVisitor<P> {
     @Override
     public @Nullable Xml postVisit(Xml tree, P p) {
         if (stopAfter != null && stopAfter.isScope(tree)) {
-            getCursor().putMessageOnFirstEnclosing(Xml.Document.class, "stop", true);
+            getCursor().putMessageOnFirstEnclosing(SourceFile.class, "stop", true);
         }
         return super.postVisit(tree, p);
     }
