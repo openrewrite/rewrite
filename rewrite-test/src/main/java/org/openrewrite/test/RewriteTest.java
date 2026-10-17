@@ -476,9 +476,11 @@ public interface RewriteTest extends SourceSpecs {
             addedMarkers.assertNoneAdded(recipeRun.getChangeset().getAllResults());
         }
         unchangedTreeIdentity.assertNoneFound();
-        EmptySources emptySources = runner == RewriteRunner.IN_PROCESS &&
-                                    lss instanceof LargeSourceSetCheckingExpectedCycles ?
+        boolean probed = runner == RewriteRunner.IN_PROCESS && lss instanceof LargeSourceSetCheckingExpectedCycles;
+        EmptySources emptySources = probed ?
                 new EmptySources(recipe, recipeRun.getChangeset().getAllResults()) : null;
+        UnparsedSources unparsedSources = probed ?
+                new UnparsedSources(recipe, recipeRun.getChangeset().getAllResults()) : null;
 
         for (Consumer<RecipeRun> afterRecipe : testClassSpec.afterRecipes) {
             afterRecipe.accept(recipeRun);
@@ -721,6 +723,9 @@ public interface RewriteTest extends SourceSpecs {
 
         if (emptySources != null) {
             emptySources.assertNoneThrow(specBySourceFile, parserBySourceSpec::get, relativeTo, ctx, recipeCtx, cycles);
+        }
+        if (unparsedSources != null) {
+            unparsedSources.assertNoneThrow(runnableSourceFiles, recipeCtx, cycles);
         }
     }
 

@@ -993,6 +993,38 @@ class RewriteTestTest implements RewriteTest {
     class MatchesByType {
 
         @Test
+        void rejectRecipeThatThrowsOnFullyQualifiedType() {
+            AssertionError e = assertThrows(AssertionError.class, () -> rewriteRun(
+              spec -> spec.recipe(new FindCallsOnImportedType("java.util.Collections emptyList()")),
+              java(
+                """
+                  import java.util.Collections;
+                  import java.util.List;
+
+                  class A {
+                      List<String> list = Collections.emptyList();
+                  }
+                  """,
+                """
+                  import java.util.Collections;
+                  import java.util.List;
+
+                  class A {
+                      List<String> list = /*~~(Collections)~~>*/Collections.emptyList();
+                  }
+                  """
+              )
+            ));
+            assertThat(e).hasMessageStartingWith("Check the shape of the code the recipe edits before casting it")
+              .hasMessageContaining("A.java (changed by org.openrewrite.test.internal.FindCallsOnImportedType), " +
+                                    "`Collections` written `java.util.Collections`:\n" +
+                                    "    java.lang.ClassCastException")
+              .hasMessageContaining("at org.openrewrite.test.internal.FindCallsOnImportedType$1.visitMethodInvocation(" +
+                                    "RewriteTestTest.java:")
+              .hasMessageNotContaining("Match the code the recipe changes by its type attribution");
+        }
+
+        @Test
         void rejectRecipeThatMissesStaticallyImportedCall() {
             AssertionError e = assertThrows(AssertionError.class, () -> rewriteRun(
               spec -> spec.recipe(new FindQualifiedCallsByName("Collections", "emptyList")),
@@ -1530,6 +1562,71 @@ class RewriteTestTest implements RewriteTest {
     }
 
     @Nested
+    class UnparsedSources {
+
+        @Test
+        void rejectRecipeThatThrowsOnAFileItsParserFailedOn() {
+            AssertionError e = assertThrows(AssertionError.class, () -> rewriteRun(
+              spec -> spec.recipe(new ChangeApplicationYml(null)),
+              yaml(
+                "key: value",
+                "key: changed",
+                spec -> spec.path("application.yml").markers(new BuildMetadata(Tree.randomId(), Map.of("team", "a")))
+              )
+            ));
+            assertThat(e).hasMessageStartingWith("Check the kind of source file before casting it")
+              .hasMessageContaining("org.openrewrite.test.internal.ChangeApplicationYml threw when application.yml " +
+                                    "was a ParseError (a file its parser failed on) with the markers of the test's " +
+                                    "source (BuildMetadata):\n    java.lang.ClassCastException")
+              .hasMessageContaining("at org.openrewrite.test.internal.ChangeApplicationYml$1.visit(RewriteTestTest.java:")
+              .hasRootCauseInstanceOf(ClassCastException.class);
+        }
+
+        @Test
+        void acceptRecipeThatChecksTheKindOfSourceFile() {
+            rewriteRun(
+              spec -> spec.recipe(new ChangeApplicationYml(true)),
+              yaml(
+                "key: value",
+                "key: changed",
+                spec -> spec.path("application.yml")
+              )
+            );
+        }
+
+        @Test
+        void skipAdHocRecipe() {
+            rewriteRun(
+              spec -> spec.recipe(toRecipe(() -> new TreeVisitor<Tree, ExecutionContext>() {
+                  @Override
+                  public @Nullable Tree visit(@Nullable Tree tree, ExecutionContext ctx) {
+                      return tree instanceof SourceFile sourceFile && sourceFile.getSourcePath().endsWith("adhoc.yml") ?
+                        new ChangeFirstValue("adhoc", true).getVisitor().visit((Yaml.Documents) tree, ctx) : tree;
+                  }
+              })),
+              yaml(
+                "key: value",
+                "key: adhoc",
+                spec -> spec.path("adhoc.yml")
+              )
+            );
+        }
+
+        @Test
+        void toleratedByTheTestsErrorHandler() {
+            rewriteRun(
+              spec -> spec.executionContext(new InMemoryExecutionContext())
+                .recipe(new ChangeApplicationYml(null)),
+              yaml(
+                "key: value",
+                "key: changed",
+                spec -> spec.path("application.yml")
+              )
+            );
+        }
+    }
+
+    @Nested
     class RecipeValidation {
 
         @Test
@@ -1623,6 +1720,67 @@ class ChangeFirstValue extends Recipe {
                 Yaml.Scalar scalar = (Yaml.Scalar) mapping.getEntries().get(0).getValue();
                 return document.withBlock(mapping.withEntries(ListUtils.mapFirst(mapping.getEntries(),
                   entry -> entry.withValue(scalar.withValue(value)))));
+            }
+        };
+    }
+}
+
+@EqualsAndHashCode(callSuper = false)
+@NullMarked
+@Value
+class ChangeApplicationYml extends Recipe {
+
+    @Option(displayName = "Check the kind of source file",
+      description = "Leave a source unchanged unless it is YAML.",
+      required = false)
+    @Nullable
+    Boolean checked;
+
+    String displayName = "Change the first value in application.yml";
+
+    String description = "Sets the first value of each document in application.yml, which it finds by its path.";
+
+    @Override
+    public TreeVisitor<?, ExecutionContext> getVisitor() {
+        return new TreeVisitor<Tree, ExecutionContext>() {
+            @Override
+            public @Nullable Tree visit(@Nullable Tree tree, ExecutionContext ctx) {
+                if (!(tree instanceof SourceFile sourceFile) || !sourceFile.getSourcePath().endsWith("application.yml") ||
+                    Boolean.TRUE.equals(checked) && !(tree instanceof Yaml.Documents)) {
+                    return tree;
+                }
+                return new ChangeFirstValue("changed", true).getVisitor().visit((Yaml.Documents) tree, ctx);
+            }
+        };
+    }
+}
+
+@EqualsAndHashCode(callSuper = false)
+@NullMarked
+@Value
+class FindCallsOnImportedType extends Recipe {
+
+    @Option(displayName = "Method pattern",
+      description = "A method pattern to match calls against.",
+      example = "java.util.Collections emptyList()")
+    String methodPattern;
+
+    String displayName = "Find calls on an imported type";
+
+    String description = "Finds calls by method type, but takes the select of a qualified call to be a name.";
+
+    @Override
+    public TreeVisitor<?, ExecutionContext> getVisitor() {
+        MethodMatcher matcher = new MethodMatcher(methodPattern);
+        return new JavaIsoVisitor<>() {
+            @Override
+            public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
+                J.MethodInvocation m = super.visitMethodInvocation(method, ctx);
+                if (!matcher.matches(m)) {
+                    return m;
+                }
+                String on = m.getSelect() == null ? null : ((J.Identifier) m.getSelect()).getSimpleName();
+                return SearchResult.found(m, on);
             }
         };
     }
