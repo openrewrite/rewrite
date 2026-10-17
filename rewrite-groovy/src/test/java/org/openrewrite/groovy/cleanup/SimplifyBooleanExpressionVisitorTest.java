@@ -356,6 +356,29 @@ class SimplifyBooleanExpressionVisitorTest implements RewriteTest {
     }
 
     @Test
+    void retainPropertyReadThatMayCallAGetter() {
+        rewriteRun(
+          groovy(
+            """
+              class A {
+                  boolean getFlag() {
+                      println("effect")
+                      true
+                  }
+              }
+              class B {
+                  def m(A a) {
+                      boolean b = a.flag && false
+                      boolean c = a.flag || true
+                      boolean d = a.flag && a.flag
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
     void simplifyNotEqualsFalse() {
         rewriteRun(
           groovy(
