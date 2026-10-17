@@ -443,7 +443,7 @@ public interface RewriteTest extends SourceSpecs {
         Path relativeTo = testMethodSpec.relativeTo == null ? testClassSpec.relativeTo : testMethodSpec.relativeTo;
         RecipeQualityValidation quality = RecipeQualityValidation.of(testMethodSpec, testClassSpec);
         AddedMarkers addedMarkers = null;
-        if (quality.addedMarkers()) {
+        if (quality.reportingMarkersOnly()) {
             addedMarkers = new AddedMarkers(beforeSourceFiles, parsersFor, relativeTo, ctx);
         }
         UnchangedTreeIdentity unchangedTreeIdentity = new UnchangedTreeIdentity();

@@ -43,7 +43,7 @@ export interface SourceSpec<T extends SourceFile> {
 interface RecipeSpecConfiguration {
     checkParsePrintIdempotence: boolean;
     allowEmptyDiff: boolean;
-    checkAddedMarkers: boolean;
+    checkReportingMarkersOnly: boolean;
     recipe: Recipe;
     recipeExecutionContext: ExecutionContext;
     dataTableAssertions: { [key: string]: (rows: any[]) => void };
@@ -57,7 +57,7 @@ export class RecipeSpec {
      * Fails a run whose recipe leaves markers on the LST that neither its sources nor a fresh parse of
      * its output carry.
      */
-    checkAddedMarkers: boolean = true
+    checkReportingMarkersOnly: boolean = true
 
     recipe: Recipe = new NoopRecipe()
 
@@ -93,7 +93,7 @@ export class RecipeSpec {
         return {
             checkParsePrintIdempotence: this.checkParsePrintIdempotence,
             allowEmptyDiff: this.allowEmptyDiff,
-            checkAddedMarkers: this.checkAddedMarkers,
+            checkReportingMarkersOnly: this.checkReportingMarkersOnly,
             recipe: this.recipe,
             recipeExecutionContext: this.recipeExecutionContext,
             dataTableAssertions: {...this.dataTableAssertions}
@@ -198,7 +198,7 @@ export class RecipeSpec {
             allParsed.map(([_, sourceFile]) => sourceFile),
             this.recipeExecutionContext)).changeset;
 
-        this.checkAddedMarkers && await this.expectNoAddedMarkers(flattenedSpecs, allParsed, changeset);
+        this.checkReportingMarkersOnly && await this.expectNoAddedMarkers(flattenedSpecs, allParsed, changeset);
         await this.expectResultsToMatchAfter(flattenedSpecs, changeset, allParsed);
         await this.expectGeneratedFiles(flattenedSpecs, changeset);
 

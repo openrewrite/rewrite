@@ -158,7 +158,7 @@ public class AddedMarkersTests : RewriteTest
         RewriteRun(
             spec => spec
                 .SetRecipe(new ChangeFooCalls(call => Tag(RenameToBar(call))))
-                .SetValidations(new Validations { AddedMarkers = false }),
+                .SetValidations(new Validations { ReportingMarkersOnly = false }),
             CSharp(CallsFoo, CallsBar)
         );
     }

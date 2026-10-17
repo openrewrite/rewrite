@@ -159,7 +159,7 @@ class RecipeSpec:
 
     # Whether to fail a recipe that leaves markers on the LST that neither its inputs
     # nor a fresh parse of its output carry
-    check_added_markers: bool = True
+    check_reporting_markers_only: bool = True
 
     # Whether to enable type attribution via ty-types.
     # Set to False for pure parse/print tests to avoid the ty-types subprocess overhead.
@@ -224,7 +224,7 @@ class RecipeSpec:
         source_files = [sf for _, sf in all_parsed]
         lss = InMemoryLargeSourceSet(source_files)
         results = self.recipe.run(lss, self.execution_context)
-        if self.check_added_markers:
+        if self.check_reporting_markers_only:
             assert_no_added_markers(source_files, results, self._reparse)
 
         # Build result map: source_file.id -> after_source_file

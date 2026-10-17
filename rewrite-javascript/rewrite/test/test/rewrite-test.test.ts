@@ -135,13 +135,13 @@ describe("rewrite test", () => {
         sut.recipe = new ChangeText({text: "a test's own recipe"});
         sut.allowEmptyDiff = false;
         sut.checkParsePrintIdempotence = false;
-        sut.checkAddedMarkers = false;
+        sut.checkReportingMarkersOnly = false;
         RecipeSpec.restoreSuiteConfiguration();
 
         expect(sut.recipe).toBe(suiteRecipe);
         expect(sut.allowEmptyDiff).toBe(true);
         expect(sut.checkParsePrintIdempotence).toBe(true);
-        expect(sut.checkAddedMarkers).toBe(true);
+        expect(sut.checkReportingMarkersOnly).toBe(true);
     });
 
     describe("added markers", () => {
@@ -234,10 +234,10 @@ describe("rewrite test", () => {
             return sut.rewriteRun(typescript(`foo()`, `foo();`));
         });
 
-        test("checkAddedMarkers turns the check off", () => {
+        test("checkReportingMarkersOnly turns the check off", () => {
             const sut = new RecipeSpec();
             sut.recipe = renameAndTag();
-            sut.checkAddedMarkers = false;
+            sut.checkReportingMarkersOnly = false;
             return sut.rewriteRun(typescript(`foo()`, `bar()`));
         });
     });

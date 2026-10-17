@@ -676,5 +676,5 @@ class TestAddedMarkers:
             _id: int | UUID
 
         spec = RecipeSpec(recipe=_marking_calls(lambda: Visited(random_id()), rename="bar"),
-                          check_added_markers=False, type_attribution=False)
+                          check_reporting_markers_only=False, type_attribution=False)
         spec.rewrite_run(python("foo()\n", "bar()\n"))

@@ -219,7 +219,7 @@ func TestSyntaxMarkerOfWrittenCodeIsNotAnAddedMarker(t *testing.T) {
 func TestAddedMarkersCheckCanBeTurnedOff(t *testing.T) {
 	// given a recipe that tags the calls it renames, with the check turned off
 	spec := NewRecipeSpec().WithRecipe(&markCalls{marker: visitedMarker, rename: "bar"})
-	spec.CheckAddedMarkers = false
+	spec.CheckReportingMarkersOnly = false
 
 	// when it runs, then it passes
 	spec.RewriteRun(t, Golang(callsFoo, `

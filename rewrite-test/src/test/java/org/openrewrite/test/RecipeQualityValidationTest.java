@@ -27,7 +27,7 @@ class RecipeQualityValidationTest {
         assertThat(all.cursorAcyclic()).isTrue();
         assertThat(all.immutableExecutionContext()).isTrue();
         assertThat(all.immutableScanning()).isTrue();
-        assertThat(all.addedMarkers()).isTrue();
+        assertThat(all.reportingMarkersOnly()).isTrue();
         assertThat(all.minimalFormatting()).isTrue();
         assertThat(all.matchByTypeNotName()).isTrue();
         // until its false positives are measured
@@ -41,7 +41,7 @@ class RecipeQualityValidationTest {
         assertThat(quality.cursorAcyclic()).isFalse();
         assertThat(quality.immutableExecutionContext()).isFalse();
         assertThat(quality.immutableScanning()).isFalse();
-        assertThat(quality.addedMarkers()).isTrue();
+        assertThat(quality.reportingMarkersOnly()).isTrue();
         assertThat(quality.minimalFormatting()).isTrue();
     }
 

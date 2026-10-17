@@ -59,10 +59,11 @@ public class RecipeQualityValidation {
     private boolean immutableScanning = true;
 
     /**
-     * Controls whether the recipe is validated not to add markers other than search results and markup.
+     * Controls whether the recipe is validated to add only markers that report, such as search results and markup,
+     * and none that it keeps information in.
      */
     @Builder.Default
-    private boolean addedMarkers = true;
+    private boolean reportingMarkersOnly = true;
 
     /**
      * Controls whether the recipe is validated to format only what it changed, not a whole source file, class or
@@ -110,7 +111,7 @@ public class RecipeQualityValidation {
                 .cursorAcyclic(quality.cursorAcyclic() && before.cursorAcyclic())
                 .immutableExecutionContext(quality.immutableExecutionContext() && before.immutableExecutionContext())
                 .immutableScanning(quality.immutableScanning() && before.immutableScanning())
-                .addedMarkers(quality.addedMarkers())
+                .reportingMarkersOnly(quality.reportingMarkersOnly())
                 .minimalFormatting(quality.minimalFormatting())
                 .matchByTypeNotName(quality.matchByTypeNotName())
                 .typeAttributedMatching(quality.typeAttributedMatching())

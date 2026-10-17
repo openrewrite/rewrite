@@ -475,10 +475,11 @@ type JavaRecipeConfig struct {
 
 type RecipeSpec struct {
 	CheckParsePrintIdempotence bool
-	// CheckAddedMarkers asserts that a recipe leaves no markers on the LST for its
-	// own use: a marker type turning up where neither the sources it was given nor
-	// a fresh parse of its output have one fails the run.
-	CheckAddedMarkers bool
+	// CheckReportingMarkersOnly asserts that a recipe adds only markers that
+	// report, such as search results and markup: a marker type turning up where
+	// neither the sources it was given nor a fresh parse of its output have one
+	// fails the run.
+	CheckReportingMarkersOnly bool
 	// CheckUnchangedTreeIdentity asserts that a source whose printed output is
 	// unchanged comes back as the same tree pointer. Turn it off for fixtures that
 	// deliberately rebuild nodes into printed-identical replacements.
@@ -492,7 +493,7 @@ type RecipeSpec struct {
 func NewRecipeSpec() *RecipeSpec {
 	return &RecipeSpec{
 		CheckParsePrintIdempotence: true,
-		CheckAddedMarkers:          true,
+		CheckReportingMarkersOnly:  true,
 		CheckUnchangedTreeIdentity: true,
 	}
 }
@@ -613,7 +614,7 @@ func (spec *RecipeSpec) parseAndApply(t *testing.T, sources []Sources) ([]parsed
 // would otherwise put down to a needless rebuild.
 func (spec *RecipeSpec) verify(t testing.TB, parsed []parsedSource, genSpecs []SourceSpec, generated []java.Tree) {
 	t.Helper()
-	if spec.CheckAddedMarkers {
+	if spec.CheckReportingMarkersOnly {
 		if failure := addedMarkersFailure(parsed, generated); failure != "" {
 			t.Error(failure)
 			return

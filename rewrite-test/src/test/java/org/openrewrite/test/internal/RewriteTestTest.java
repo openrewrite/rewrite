@@ -324,7 +324,7 @@ class RewriteTestTest implements RewriteTest {
         @Test
         void turnedOff() {
             rewriteRun(
-              spec -> spec.recipeQualityValidation(RecipeQualityValidation.builder().addedMarkers(false).build())
+              spec -> spec.recipeQualityValidation(RecipeQualityValidation.builder().reportingMarkersOnly(false).build())
                 .expectedCyclesThatMakeChanges(1)
                 .recipe(toRecipe(() -> new JavaIsoVisitor<>() {
                     @Override
