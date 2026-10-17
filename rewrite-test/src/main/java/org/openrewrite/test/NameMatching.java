@@ -35,8 +35,14 @@ import static org.assertj.core.api.Assertions.fail;
  */
 final class NameMatching {
     private static final RecipeSerializer SERIALIZER = new RecipeSerializer();
+
+    /**
+     * The least time a rerun gets. It also gets three times as long as the test's own run, so that how fast the
+     * machine is doesn't decide whether a slow recipe is checked.
+     */
     private static final Duration RUN_TIMEOUT = Duration.ofSeconds(10);
     private static final Duration SOURCE_FILE_TIMEOUT = Duration.ofSeconds(5);
+    private static final int TEST_RUNS_PER_RERUN = 3;
 
     /**
      * Recipes that match type names as text on purpose, because the types they rename may be missing from the
@@ -69,6 +75,7 @@ final class NameMatching {
     private final Map<String, @Nullable Object> messages;
     private final int cycles;
     private final int minCycles;
+    private Duration testRunTime = Duration.ZERO;
     private final boolean equivalentSpellings;
     private final boolean typeAttributedMatching;
     private final Function<SourceFile, List<Parser.Builder>> parsersFor;
@@ -166,7 +173,8 @@ final class NameMatching {
         return false;
     }
 
-    void assertMatchedByType(List<Result> results) {
+    void assertMatchedByType(List<Result> results, Duration testRunTime) {
+        this.testRunTime = testRunTime;
         List<Result> changed = new ArrayList<>();
         for (Result result : results) {
             if (result.getBefore() != null && result.getAfter() != null && service(result.getBefore()) != null &&
@@ -352,12 +360,17 @@ final class NameMatching {
      * @return What the rerun makes of each source it changes (null when it deletes one), by the source's id, or null
      * if it failed or timed out.
      */
+    private static Duration longer(Duration a, Duration b) {
+        return a.compareTo(b) >= 0 ? a : b;
+    }
+
     private @Nullable Map<UUID, @Nullable SourceFile> rerun(List<SourceFile> sources) {
         List<Throwable> errors = new ArrayList<>();
         InMemoryExecutionContext ctx = new InMemoryExecutionContext(errors::add);
         messages.forEach(ctx::putMessage);
-        ctx.putMessage(ExecutionContext.RUN_TIMEOUT, RUN_TIMEOUT);
-        ctx.putMessage(ExecutionContext.SOURCE_FILE_TIMEOUT, SOURCE_FILE_TIMEOUT);
+        Duration asLongAsTheTest = testRunTime.multipliedBy(TEST_RUNS_PER_RERUN);
+        ctx.putMessage(ExecutionContext.RUN_TIMEOUT, longer(RUN_TIMEOUT, asLongAsTheTest));
+        ctx.putMessage(ExecutionContext.SOURCE_FILE_TIMEOUT, longer(SOURCE_FILE_TIMEOUT, asLongAsTheTest));
         DataTableExecutionContextView.view(ctx).setDataTableStore(DataTableStore.noop());
         try {
             RecipeRun run = SERIALIZER.read(recipe).run(new InMemoryLargeSourceSet(sources), ctx, cycles, minCycles);

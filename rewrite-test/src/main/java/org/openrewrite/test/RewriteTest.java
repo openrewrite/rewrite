@@ -34,6 +34,7 @@ import java.lang.annotation.Annotation;
 import java.lang.reflect.Field;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
+import java.time.Duration;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArrayList;
@@ -469,7 +470,9 @@ public interface RewriteTest extends SourceSpecs {
                 parsersFor, relativeTo, ctx);
         FormattingScope formattingScope = new FormattingScope(recipe,
                 TypeValidation.after(testMethodSpec, testClassSpec).formattingScope());
+        long runStart = System.nanoTime();
         RecipeRun recipeRun = formattingScope.record(() -> runner.run(recipe, runnerContext));
+        Duration runTime = Duration.ofNanos(System.nanoTime() - runStart);
         if (addedMarkers != null) {
             addedMarkers.assertNoneAdded(recipeRun.getChangeset().getAllResults());
         }
@@ -717,7 +720,7 @@ public interface RewriteTest extends SourceSpecs {
         formattingScope.assertFormattedOnlyWhatChanged(recipeRun.getChangeset().getAllResults());
 
         if (nameMatching != null) {
-            nameMatching.assertMatchedByType(recipeRun.getChangeset().getAllResults());
+            nameMatching.assertMatchedByType(recipeRun.getChangeset().getAllResults(), runTime);
         }
 
         if (emptySources != null) {
