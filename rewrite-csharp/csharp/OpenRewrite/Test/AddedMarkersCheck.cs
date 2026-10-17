@@ -42,6 +42,15 @@ internal static class AddedMarkersCheck
 
     private static readonly ConcurrentDictionary<Type, Shape> Shapes = new();
 
+    /// <summary>Markers that rewrite's own Java recipes still leave for themselves, as the Java harness allows.</summary>
+    private static readonly HashSet<string> RewriteRecipeMarkers =
+    [
+        "org.openrewrite.marker.AlreadyReplaced",
+        "org.openrewrite.maven.marker.AlreadyIncremented",
+        "org.openrewrite.yaml.MultilineScalarChanged",
+        "org.openrewrite.java.search.UsesMethod$MethodMatch"
+    ];
+
     public static HashSet<Placement> Placements(IEnumerable<SourceFile> sources) =>
         sources.SelectMany(source => PlacementsIn(source).Select(found => found.Placement)).ToHashSet();
 
@@ -112,7 +121,8 @@ internal static class AddedMarkersCheck
 
             foreach (var marker in MarkersOf(node)?.MarkerList ?? [])
             {
-                if (marker is SearchResult or Markup or RecipesThatMadeChanges)
+                if (marker is SearchResult or Markup or RecipesThatMadeChanges ||
+                    RewriteRecipeMarkers.Contains(MarkerType(marker)))
                 {
                     continue;
                 }

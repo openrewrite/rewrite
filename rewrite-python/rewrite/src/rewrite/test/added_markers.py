@@ -36,6 +36,14 @@ Placement = Tuple[bool, str]
 
 # How a recipe reports what it found, and the run's own record of which recipes changed a file.
 _ALLOWED = (SearchResult, Markup, RecipesThatMadeChanges)
+
+# Markers that rewrite's own Java recipes still leave for themselves, as the Java harness allows.
+_REWRITE_RECIPE_MARKERS = frozenset({
+    "org.openrewrite.marker.AlreadyReplaced",
+    "org.openrewrite.maven.marker.AlreadyIncremented",
+    "org.openrewrite.yaml.MultilineScalarChanged",
+    "org.openrewrite.java.search.UsesMethod$MethodMatch",
+})
 _FIELDS: Dict[type, Tuple[str, ...]] = {}
 
 _GUIDANCE = (
@@ -103,7 +111,9 @@ def placements(source_file: SourceFile) -> Dict[Placement, Any]:
                     for marker in child.markers:
                         # A recipe that formats with a style it was given passes the style on to later formatting
                         if not isinstance(marker, _ALLOWED) and not (value is source_file and isinstance(marker, NamedStyles)):
-                            found.setdefault((value is source_file, _marker_type(marker)), value)
+                            marker_type = _marker_type(marker)
+                            if marker_type not in _REWRITE_RECIPE_MARKERS:
+                                found.setdefault((value is source_file, marker_type), value)
                 else:
                     children.append(child)
             pending.extend(reversed(children))

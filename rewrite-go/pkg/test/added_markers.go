@@ -237,7 +237,7 @@ func (w *placementWalker) walk(v reflect.Value, root bool) {
 				continue
 			}
 			for _, m := range f.Interface().(java.Markers).Entries() {
-				if m == nil || isFinding(m) {
+				if m == nil || isFinding(m) || rewriteRecipeMarkers[markerTypeName(m)] {
 					continue
 				}
 				p := placement{onSourceFile: root, markerType: markerTypeName(m)}
@@ -248,6 +248,15 @@ func (w *placementWalker) walk(v reflect.Value, root bool) {
 			}
 		}
 	}
+}
+
+// rewriteRecipeMarkers are markers that rewrite's own Java recipes still leave
+// for themselves, as the Java harness allows.
+var rewriteRecipeMarkers = map[string]bool{
+	"org.openrewrite.marker.AlreadyReplaced":             true,
+	"org.openrewrite.maven.marker.AlreadyIncremented":    true,
+	"org.openrewrite.yaml.MultilineScalarChanged":        true,
+	"org.openrewrite.java.search.UsesMethod$MethodMatch": true,
 }
 
 // isFinding reports whether m is one of the markers a recipe adds to tell of
