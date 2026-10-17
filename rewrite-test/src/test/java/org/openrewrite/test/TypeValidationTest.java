@@ -28,7 +28,7 @@ class TypeValidationTest {
     @Test
     void noneInvertsEveryFlagFromAll() throws IllegalAccessException {
         // the checks none() keeps, and one that all() leaves off
-        Set<String> exempt = Set.of("addedMarkers", "unchangedTreeIdentity", "formattingScope", "emptySources",
+        Set<String> exempt = Set.of("addedMarkers", "identityEqualsWhenUnchanged", "minimalFormatting",
           "typeAttributedMatching");
         TypeValidation all = TypeValidation.all();
         TypeValidation none = TypeValidation.none();
@@ -47,14 +47,13 @@ class TypeValidationTest {
     void noneKeepsChecksThatDoNotNeedTypeAttribution() {
         TypeValidation none = TypeValidation.none();
         assertThat(none.addedMarkers()).isTrue();
-        assertThat(none.unchangedTreeIdentity()).isTrue();
-        assertThat(none.formattingScope()).isTrue();
-        assertThat(none.emptySources()).isTrue();
+        assertThat(none.identityEqualsWhenUnchanged()).isTrue();
+        assertThat(none.minimalFormatting()).isTrue();
     }
 
     @Test
     void noneSkipsChecksThatNeedTypeAttribution() {
-        assertThat(TypeValidation.none().equivalentSpellings()).isFalse();
+        assertThat(TypeValidation.none().matchByTypeNotName()).isFalse();
         assertThat(TypeValidation.none().typeAttributedMatching()).isFalse();
         // until its false positives are measured
         assertThat(TypeValidation.all().typeAttributedMatching()).isFalse();

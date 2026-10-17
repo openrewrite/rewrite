@@ -151,28 +151,21 @@ public class TypeValidation {
      * rather than an equal copy. Not turned off by {@link #none()}.
      */
     @Builder.Default
-    private boolean unchangedTreeIdentity = true;
+    private boolean identityEqualsWhenUnchanged = true;
 
     /**
-     * Controls whether the recipe is validated not to auto-format a whole source file, class or document root that
-     * existed before the run. Not turned off by {@link #none()}.
+     * Controls whether the recipe is validated to format only what it changed, not a whole source file, class or
+     * document root that existed before the run. Not turned off by {@link #none()}.
      */
     @Builder.Default
-    private boolean formattingScope = true;
-
-    /**
-     * Controls whether the recipe is run on an empty file of each kind it changed, to check that it doesn't throw.
-     * Not turned off by {@link #none()}.
-     */
-    @Builder.Default
-    private boolean emptySources = true;
+    private boolean minimalFormatting = true;
 
     /**
      * Controls whether the recipe is rerun with the code it changed respelled to mean the same (a static import for a
      * qualified call or the reverse, a fully qualified name for an imported type), and must still change it.
      */
     @Builder.Default
-    private boolean equivalentSpellings = true;
+    private boolean matchByTypeNotName = true;
 
     /**
      * Controls whether the recipe is rerun on its sources without type attribution, and must not make the same change
@@ -189,8 +182,8 @@ public class TypeValidation {
     }
 
     /**
-     * Skip all invariant validation checks except {@link #addedMarkers}, {@link #unchangedTreeIdentity},
-     * {@link #formattingScope} and {@link #emptySources}.
+     * Skip all invariant validation checks except {@link #addedMarkers}, {@link #identityEqualsWhenUnchanged} and
+     * {@link #minimalFormatting}.
      */
     public static TypeValidation none() {
         return builder()
@@ -208,7 +201,7 @@ public class TypeValidation {
                 .immutableScanning(false)
                 .allowNonWhitespaceInWhitespace(true)
                 .parseAndPrintEquality(false)
-                .equivalentSpellings(false)
+                .matchByTypeNotName(false)
                 .typeAttributedMatching(false)
                 .build();
     }

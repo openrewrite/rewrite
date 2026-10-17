@@ -280,8 +280,7 @@ final class EmptySources {
                 .append("  - if the recipe adds what is missing, build that content correctly for an empty file too\n")
                 .append("  - don't catch the exception to make this pass\n")
                 .append("Then add a test with an empty source, such as yaml(\"\"), java(\"\") or buildGradle(\"\"), ")
-                .append("that states the intended result. A recipe that should throw here can turn this check off ")
-                .append("with spec.typeValidationOptions(TypeValidation.builder().emptySources(false).build()).")
+                .append("that states the intended result.")
                 .toString();
     }
 

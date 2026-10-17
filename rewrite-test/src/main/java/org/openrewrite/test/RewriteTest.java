@@ -445,7 +445,7 @@ public interface RewriteTest extends SourceSpecs {
             addedMarkers = new AddedMarkers(beforeSourceFiles, parsersFor, relativeTo, ctx);
         }
         UnchangedTreeIdentity unchangedTreeIdentity = TypeValidation.after(testMethodSpec, testClassSpec)
-                .unchangedTreeIdentity() ? new UnchangedTreeIdentity() : null;
+                .identityEqualsWhenUnchanged() ? new UnchangedTreeIdentity() : null;
 
         LargeSourceSet lss;
         if (testMethodSpec.getSourceSet() != null) {
@@ -469,7 +469,7 @@ public interface RewriteTest extends SourceSpecs {
         NameMatching nameMatching = NameMatching.of(recipe, runner, runnerContext, beforeSourceFiles,
                 parsersFor, relativeTo, ctx);
         FormattingScope formattingScope = new FormattingScope(recipe,
-                TypeValidation.after(testMethodSpec, testClassSpec).formattingScope());
+                TypeValidation.after(testMethodSpec, testClassSpec).minimalFormatting());
         long runStart = System.nanoTime();
         RecipeRun recipeRun = formattingScope.record(() -> runner.run(recipe, runnerContext));
         Duration runTime = Duration.ofNanos(System.nanoTime() - runStart);
@@ -479,8 +479,7 @@ public interface RewriteTest extends SourceSpecs {
         if (unchangedTreeIdentity != null) {
             unchangedTreeIdentity.assertNoneFound();
         }
-        EmptySources emptySources = TypeValidation.after(testMethodSpec, testClassSpec).emptySources() &&
-                                    runner == RewriteRunner.IN_PROCESS &&
+        EmptySources emptySources = runner == RewriteRunner.IN_PROCESS &&
                                     lss instanceof LargeSourceSetCheckingExpectedCycles ?
                 new EmptySources(recipe, recipeRun.getChangeset().getAllResults()) : null;
 

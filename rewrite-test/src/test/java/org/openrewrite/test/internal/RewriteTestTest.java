@@ -562,7 +562,7 @@ class RewriteTestTest implements RewriteTest {
         @Test
         void turnedOff() {
             rewriteRun(
-              spec -> spec.typeValidationOptions(TypeValidation.builder().unchangedTreeIdentity(false).build())
+              spec -> spec.typeValidationOptions(TypeValidation.builder().identityEqualsWhenUnchanged(false).build())
                 .cycles(1)
                 .expectedCyclesThatMakeChanges(1)
                 .recipe(copiesModifiers()),
@@ -945,7 +945,7 @@ class RewriteTestTest implements RewriteTest {
         @Test
         void turnedOff() {
             rewriteRun(
-              spec -> spec.typeValidationOptions(TypeValidation.builder().formattingScope(false).build())
+              spec -> spec.typeValidationOptions(TypeValidation.builder().minimalFormatting(false).build())
                 .recipe(formatWholeClassAfterRename()),
               java(
                 BEFORE,
@@ -1032,7 +1032,7 @@ class RewriteTestTest implements RewriteTest {
             assertThat(e).hasMessageStartingWith("Match the code the recipe changes by its type attribution")
               .hasMessageContaining("A.java (changed by org.openrewrite.test.internal.FindQualifiedCallsByName): " +
                                     "`Collections.emptyList()` written `emptyList()`")
-              .hasMessageContaining("equivalentSpellings(false)");
+              .hasMessageContaining("matchByTypeNotName(false)");
         }
 
         @Test
@@ -1372,10 +1372,10 @@ class RewriteTestTest implements RewriteTest {
         }
 
         @Test
-        void equivalentSpellingsTurnedOff() {
+        void matchByTypeNotNameTurnedOff() {
             rewriteRun(
               spec -> spec.recipe(new FindQualifiedCallsByName("Collections", "emptyList"))
-                .typeValidationOptions(TypeValidation.all().equivalentSpellings(false)),
+                .typeValidationOptions(TypeValidation.all().matchByTypeNotName(false)),
               java(
                 """
                   import java.util.Collections;
@@ -1612,7 +1612,6 @@ class RewriteTestTest implements RewriteTest {
                                     "Yaml.Documents at application.yml with the markers of the test's source (BuildMetadata):\n" +
                                     "    java.lang.IndexOutOfBoundsException")
               .hasMessageContaining("at org.openrewrite.test.internal.ChangeFirstValue$1.visitDocument(RewriteTestTest.java:")
-              .hasMessageContaining("TypeValidation.builder().emptySources(false)")
               .hasRootCauseInstanceOf(IndexOutOfBoundsException.class);
         }
 
@@ -1656,18 +1655,6 @@ class RewriteTestTest implements RewriteTest {
                 "key: none"
               )
             ));
-        }
-
-        @Test
-        void turnedOff() {
-            rewriteRun(
-              spec -> spec.typeValidationOptions(TypeValidation.builder().emptySources(false).build())
-                .recipe(new ChangeFirstValue("off", null)),
-              yaml(
-                "key: value",
-                "key: off"
-              )
-            );
         }
 
         @Test

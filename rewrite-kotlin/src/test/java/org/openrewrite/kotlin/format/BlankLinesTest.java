@@ -62,7 +62,7 @@ class BlankLinesTest implements RewriteTest {
      */
     private static Consumer<RecipeSpec> rebuildsFormattedDeclarations() {
         return spec -> spec.expectedCyclesThatMakeChanges(2)
-          .typeValidationOptions(TypeValidation.builder().unchangedTreeIdentity(false).build());
+          .typeValidationOptions(TypeValidation.builder().identityEqualsWhenUnchanged(false).build());
     }
 
     @Nested

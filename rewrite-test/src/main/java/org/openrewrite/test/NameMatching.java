@@ -76,7 +76,7 @@ final class NameMatching {
     private final int cycles;
     private final int minCycles;
     private Duration testRunTime = Duration.ZERO;
-    private final boolean equivalentSpellings;
+    private final boolean matchByTypeNotName;
     private final boolean typeAttributedMatching;
     private final Function<SourceFile, List<Parser.Builder>> parsersFor;
     private final @Nullable Path relativeTo;
@@ -89,7 +89,7 @@ final class NameMatching {
     private @Nullable Map<UUID, @Nullable SourceFile> control;
 
     private NameMatching(byte[] recipe, RewriteRunner.Context context, List<SourceFile> parsed,
-                         boolean equivalentSpellings, boolean typeAttributedMatching,
+                         boolean matchByTypeNotName, boolean typeAttributedMatching,
                          Function<SourceFile, List<Parser.Builder>> parsersFor, @Nullable Path relativeTo,
                          ExecutionContext parseCtx) {
         this.recipe = recipe;
@@ -99,7 +99,7 @@ final class NameMatching {
         this.messages.keySet().removeAll(RUN_STATE);
         this.cycles = context.getCycles();
         this.minCycles = context.getExpectedCyclesThatMakeChanges() + 1;
-        this.equivalentSpellings = equivalentSpellings;
+        this.matchByTypeNotName = matchByTypeNotName;
         this.typeAttributedMatching = typeAttributedMatching;
         this.parsersFor = parsersFor;
         this.relativeTo = relativeTo;
@@ -116,12 +116,12 @@ final class NameMatching {
         RecipeSpec classSpec = context.getTestClassSpec();
         TypeValidation before = TypeValidation.before(methodSpec, classSpec);
         TypeValidation after = TypeValidation.after(methodSpec, classSpec);
-        boolean equivalentSpellings = before.equivalentSpellings() && after.equivalentSpellings();
+        boolean matchByTypeNotName = before.matchByTypeNotName() && after.matchByTypeNotName();
         boolean typeAttributedMatching = before.typeAttributedMatching() && after.typeAttributedMatching();
         boolean typesValidated = before.classDeclarations() && before.identifiers() &&
                                  before.methodDeclarations() && before.variableDeclarations() &&
                                  before.methodInvocations() && before.constructorInvocations();
-        if (!equivalentSpellings && !typeAttributedMatching || !typesValidated || recipe.equals(Recipe.noop()) ||
+        if (!matchByTypeNotName && !typeAttributedMatching || !typesValidated || recipe.equals(Recipe.noop()) ||
             runner != RewriteRunner.IN_PROCESS ||
             methodSpec.getSourceSet() != null || classSpec.getSourceSet() != null ||
             !methodSpec.getBeforeRecipes().isEmpty() || !classSpec.getBeforeRecipes().isEmpty() ||
@@ -140,7 +140,7 @@ final class NameMatching {
         }
         try {
             // serialized before the run, so that every rerun starts from a recipe in its initial state
-            return new NameMatching(SERIALIZER.write(recipe), context, parsed, equivalentSpellings,
+            return new NameMatching(SERIALIZER.write(recipe), context, parsed, matchByTypeNotName,
                     typeAttributedMatching, parsersFor, relativeTo, parseCtx);
         } catch (Exception e) {
             return null;
@@ -186,7 +186,7 @@ final class NameMatching {
             return;
         }
         List<String> failures = new ArrayList<>(2);
-        if (equivalentSpellings) {
+        if (matchByTypeNotName) {
             String failure = respellingFailures(changed);
             if (failure != null) {
                 failures.add(failure);
@@ -250,7 +250,7 @@ final class NameMatching {
                "A static import and a qualified call name the same method, and an imported and a fully qualified " +
                "name the same type, so a recipe that changes one spelling must change the other. If only one " +
                "spelling is meant to change, add " +
-               "spec.typeValidationOptions(TypeValidation.all().equivalentSpellings(false)).";
+               "spec.typeValidationOptions(TypeValidation.all().matchByTypeNotName(false)).";
     }
 
     /**
