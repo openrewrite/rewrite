@@ -61,6 +61,10 @@ rewrite-python/rewrite/
 │   │   ├── recipes/                      # Built-in recipes
 │   │   ├── format/                       # Formatting visitors (auto_format, blank_lines, etc.)
 │   │   └── template/                     # Template engine (coordinates, patterns, etc.)
+│   ├── toml/                             # TOML LST (pyproject.toml, Pipfile, ...); parsed on the Java side, no parser here
+│   │   ├── tree.py, support_types.py     # Toml nodes, Space, TomlRightPadded
+│   │   ├── visitor.py, printer.py        # TomlVisitor, TomlPrinter
+│   │   └── rpc.py                        # TOML RPC codecs (mirror rewrite-toml's TomlSender/TomlReceiver)
 │   ├── rpc/                              # RPC bridge (Java ↔ Python)
 │   │   ├── python_sender.py              # Serialize tree, send to Java
 │   │   ├── python_receiver.py            # Receive from Java, rebuild tree
