@@ -411,11 +411,11 @@ class KotlinTypeMapping(
         }
     }
 
-    @OptIn(SymbolInternals::class, DirectDeclarationsAccess::class)
+    @OptIn(SymbolInternals::class, DirectDeclarationsAccess::class, LookupTagInternals::class)
     private fun classType(type: Any, parent: Any?, signature: String): FullyQualified {
         val fqn = signatureBuilder.classSignature(type)
         var params: List<*>? = null
-        val firClass = when (type) {
+        val knownClass: FirClass? = when (type) {
             is FirClass -> type
             is FirResolvedQualifier -> {
                 type.expandedAliasType(firSession)?.let { return classType(it, parent, signature) }
@@ -425,72 +425,69 @@ class KotlinTypeMapping(
                 (type.namedClassSymbol(firSession) ?: return Unknown.getInstance()).fir
             }
 
+            is ConeErrorType -> return Unknown.getInstance()
             is ConeClassLikeType -> {
-                if (type.toSymbol(firSession) is FirTypeAliasSymbol) {
-                    return classType(
-                        (type.toSymbol(firSession) as FirTypeAliasSymbol).resolvedExpandedTypeRef.coneType,
-                        parent,
-                        signature
-                    )
-                }
-                var sym: Any? = type.toRegularClassSymbol(firSession)
                 if (type.typeArguments.isNotEmpty()) {
                     params = type.typeArguments.toList()
                 }
-
-                if (sym is FirRegularClassSymbol) {
-                    sym.fir
-                } else {
-                    sym = type.toSymbol(firSession)
-                    if (sym is FirClassLikeSymbol<*>) {
-                        sym.fir as FirClass
-                    } else {
-                        return Unknown.getInstance()
-                    }
+                when (val symbol = type.lookupTag.boundSymbol()) {
+                    is FirTypeAliasSymbol ->
+                        return classType(symbol.resolvedExpandedTypeRef.coneType, parent, signature)
+                    is FirClassSymbol<*> -> symbol.fir
+                    else -> null
                 }
             }
 
             else -> throw UnsupportedOperationException("Unexpected classType: ${type.javaClass}")
         }
-        var flags = mapToFlagsBitmap(firClass.visibility, firClass.modality(), firClass.isStatic)
-        when (firClass.classKind) {
-            ClassKind.INTERFACE, ClassKind.ANNOTATION_CLASS -> {
-                flags = flags or (1L shl 9)  // Interface
-                flags = flags or (1L shl 10) // Abstract
-                flags = flags and (1L shl 4).inv() // not Final
-            }
-            ClassKind.ENUM_CLASS -> {
-                flags = flags or (1L shl 14) // Enum
-            }
-            else -> {}
-        }
-        if (firClass.symbol.classId.isNestedClass &&
-            (firClass.classKind == ClassKind.INTERFACE || firClass.classKind == ClassKind.ANNOTATION_CLASS)) {
-            flags = flags or (1L shl 3) // Static
-        }
-        val clazz: Class = typeFactory.computeClass(fqn, flags, mapKind(firClass.classKind)) { c ->
-                var superTypeRef: FirTypeRef? = null
-                var interfaceTypeRefs: MutableList<FirTypeRef>? = null
+        val clazz: Class = typeFactory.computeClass(
+            fqn,
+            knownClass?.let { classFlags(it) } ?: 0,
+            knownClass?.let { mapKind(it.classKind) } ?: FullyQualified.Kind.Class
+        ) { c ->
+                val firClass = knownClass ?: run {
+                    val loaded = (type as ConeClassLikeType).loadedClass() ?: return@computeClass
+                    // Set before the members, which may lead back to this class and read its kind.
+                    c.unsafeSet(classFlags(loaded), mapKind(loaded.classKind), fqn,
+                        null, null, null, null, null, null, null)
+                    loaded
+                }
+                var interfaces: MutableList<FullyQualified>? = null
+                val superclassCandidates = ArrayList<Pair<FirTypeRef, FullyQualified>>(1)
                 for (t in firClass.superTypeRefs) {
-                    val sym = t.coneType.toRegularClassSymbol(firSession)
-                    when (sym?.fir?.classKind) {
-                        ClassKind.CLASS -> superTypeRef = t
-                        ClassKind.INTERFACE -> {
-                            if (interfaceTypeRefs == null) {
-                                interfaceTypeRefs = ArrayList()
+                    val superType = TypeUtils.asFullyQualified(type(t)) ?: continue
+                    when (superType.kind) {
+                        FullyQualified.Kind.Interface -> {
+                            if (interfaces == null) {
+                                interfaces = ArrayList()
                             }
-                            interfaceTypeRefs!!.add(t)
+                            interfaces!!.add(remapKotlinBuiltin(superType))
+                        }
+
+                        FullyQualified.Kind.Class -> if ("java.lang.Object" != signature) {
+                            superclassCandidates.add(t to remapKotlinBuiltin(superType))
                         }
 
                         else -> {}
                     }
                 }
-                var supertype =
-                    if (superTypeRef == null || "java.lang.Object" == signature) null else TypeUtils.asFullyQualified(
-                        type(superTypeRef)
-                    )
-                if (supertype != null) {
-                    supertype = remapKotlinBuiltin(supertype)
+                var supertype: FullyQualified? = null
+                for ((ref, candidate) in superclassCandidates) {
+                    // A stub of kind Class may stand for an interface, so the compiler decides. A class it
+                    // cannot load could be either, and is left out.
+                    val kind = if (superclassCandidates.size == 1 && !candidate.isBareStub()) ClassKind.CLASS
+                    else (ref.coneType as? ConeClassLikeType)?.loadedClass()?.classKind
+                    when (kind) {
+                        ClassKind.CLASS -> supertype = candidate
+                        ClassKind.INTERFACE -> {
+                            if (interfaces == null) {
+                                interfaces = ArrayList()
+                            }
+                            interfaces!!.add(candidate)
+                        }
+
+                        else -> {}
+                    }
                 }
                 var declaringType: FullyQualified? = null
                 if (!firClass.isLocal && firClass.symbol.classId.isNestedClass) {
@@ -560,17 +557,6 @@ class KotlinTypeMapping(
                         methods.add(mt)
                     }
                 }
-                var interfaces: MutableList<FullyQualified>? = null
-                if (!interfaceTypeRefs.isNullOrEmpty()) {
-                    interfaces = ArrayList(interfaceTypeRefs!!.size)
-                    for (iParam: FirTypeRef? in interfaceTypeRefs!!) {
-                        var javaType = TypeUtils.asFullyQualified(type(iParam))
-                        if (javaType != null) {
-                            javaType = remapKotlinBuiltin(javaType)
-                            interfaces.add(javaType)
-                        }
-                    }
-                }
                 var typeParameters: MutableList<JavaType>? = null
                 if (firClass.typeParameters.isNotEmpty()) {
                     typeParameters = ArrayList(firClass.typeParameters.size)
@@ -589,21 +575,60 @@ class KotlinTypeMapping(
         }
 
         // The signature for a ConeClassLikeType may be aliases without type parameters.
-        if (firClass.typeParameters.isNotEmpty() && signature.contains("<")) {
+        val typeArguments = params ?: knownClass?.typeParameters?.takeIf { it.isNotEmpty() }
+        if (typeArguments != null && signature.contains("<")) {
             return typeFactory.computeParameterized(signature) { pt ->
                 // Seed the Parameterized with its raw class before recursive lookups so
                 // recursive resolution during typeParameter resolution observes a usable
                 // base type rather than the all-null stub.
                 pt.unsafeSet(clazz, null as List<JavaType>?)
-                val typeParameters: MutableList<JavaType> = ArrayList(firClass.typeParameters.size)
-                val resolvedParams = params ?: firClass.typeParameters
-                for (tp in resolvedParams) {
+                val typeParameters: MutableList<JavaType> = ArrayList(typeArguments.size)
+                for (tp in typeArguments) {
                     typeParameters.add(type(tp))
                 }
                 pt.unsafeSet(clazz, typeParameters)
             }
         }
         return clazz
+    }
+
+    private fun classFlags(firClass: FirClass): Long {
+        var flags = mapToFlagsBitmap(firClass.visibility, firClass.modality(), firClass.isStatic)
+        when (firClass.classKind) {
+            ClassKind.INTERFACE, ClassKind.ANNOTATION_CLASS -> {
+                flags = flags or (1L shl 9)  // Interface
+                flags = flags or (1L shl 10) // Abstract
+                flags = flags and (1L shl 4).inv() // not Final
+            }
+            ClassKind.ENUM_CLASS -> {
+                flags = flags or (1L shl 14) // Enum
+            }
+            else -> {}
+        }
+        if (firClass.symbol.classId.isNestedClass &&
+            (firClass.classKind == ClassKind.INTERFACE || firClass.classKind == ClassKind.ANNOTATION_CLASS)) {
+            flags = flags or (1L shl 3) // Static
+        }
+        return flags
+    }
+
+    // Null for a tag the compiler never resolved, which came out of binary metadata. That stores types
+    // alias-expanded, so only a bound tag can name a typealias.
+    @OptIn(LookupTagInternals::class)
+    private fun ConeClassLikeLookupTag.boundSymbol(): FirClassLikeSymbol<*>? = when (this) {
+        is ConeClassLikeLookupTagWithFixedSymbol -> symbol
+        is ConeClassLikeLookupTagImpl -> boundSymbol?.takeIf { it.first === firSession }?.second
+        else -> null
+    }
+
+    private fun FullyQualified.isBareStub(): Boolean =
+        supertype == null && interfaces.isEmpty() && members.isEmpty() && methods.isEmpty()
+
+    @OptIn(SymbolInternals::class)
+    private fun ConeClassLikeType.loadedClass(): FirClass? = when (val symbol = toSymbol(firSession)) {
+        is FirClassSymbol<*> -> symbol.fir
+        is FirTypeAliasSymbol -> symbol.resolvedExpandedTypeRef.coneType.toRegularClassSymbol(firSession)?.fir
+        else -> null
     }
 
     @OptIn(SymbolInternals::class, DirectDeclarationsAccess::class)
@@ -717,7 +742,7 @@ class KotlinTypeMapping(
                 }
             }
             val thrownExceptions = if (javaOrigin) {
-                javaThrownExceptions(javaOwner, name, parameterTypes)
+                javaThrownExceptions(method, resolvedDeclaringType, javaOwner, name, parameterTypes)
             } else {
                 throwsAnnotationExceptions(function.annotations)
             }
@@ -803,7 +828,7 @@ class KotlinTypeMapping(
                 }
             }
             val exceptionTypes = javaThrownExceptions(
-                javaMethod.containingClass, javaMethod.name.asString(), parameterTypes
+                method, resolvedDeclaringType, javaMethod.containingClass, javaMethod.name.asString(), parameterTypes
             )
             method.unsafeSet(resolvedDeclaringType,
                 returnType,
@@ -969,7 +994,7 @@ class KotlinTypeMapping(
                 // before the substitution a fake override applies to them.
                 val declaredParamTypes = if (declaration === sym) calleeParamTypes
                     else (declaration.fir as FirFunction).valueParameters.map { type(it.returnTypeRef) }
-                javaThrownExceptions(javaOwner, name, declaredParamTypes)
+                javaThrownExceptions(method, declaringType, javaOwner, name, declaredParamTypes)
             } else {
                 throwsAnnotationExceptions(callee.annotations)
             }
@@ -1137,16 +1162,23 @@ class KotlinTypeMapping(
         }
     }
 
-    /**
-     * The `throws` clause of a Java method or constructor, keyed by the erasure of [parameterTypes]
-     * so the right overload is read out of [declaringClass]'s bytecode.
-     */
+    /** The `throws` clause of a Java method or constructor, keyed by the erasure of [parameterTypes]. */
     private fun javaThrownExceptions(
+        method: Method,
+        declaringType: FullyQualified?,
         declaringClass: Any?,
         name: String,
         parameterTypes: List<JavaType>?
     ): MutableList<JavaType>? {
         val erased = parameterTypes?.map { erasedParameterName(it) } ?: emptyList()
+        if (erased.any { it == null }) {
+            return null
+        }
+        val listed = declaredMethod(declaringType, name, erased)
+        // The class walk that builds the declaring type can list this method's own unfinished stub.
+        if (listed != null && listed !== method) {
+            return listed.thrownExceptions.toMutableList().ifEmpty { null }
+        }
         val bytecodeName = if (name == "<constructor>") "<init>" else name
         val declared = when (declaringClass) {
             is JavaClass -> JavaThrownExceptions.of(declaringClass, bytecodeName, erased)
@@ -1155,9 +1187,7 @@ class KotlinTypeMapping(
         } ?: return null
         var types: MutableList<JavaType>? = null
         for (internalName in declared) {
-            // An exception class off the parse classpath resolves to Unknown, which is a
-            // FullyQualified whose name is the literal `<unknown>`; leave it out of the list.
-            val exception = type(ClassId.fromString(internalName.replace('$', '.')), firFile)
+            val exception = type(ClassId.fromString(internalName.replace('$', '.')).constructClassLikeType())
             if (exception is Class) {
                 if (types == null) {
                     types = ArrayList(declared.size)
@@ -1166,6 +1196,21 @@ class KotlinTypeMapping(
             }
         }
         return types
+    }
+
+    private fun declaredMethod(declaringType: FullyQualified?, name: String, erased: List<String?>): Method? {
+        val clazz = (declaringType as? Parameterized)?.type ?: declaringType as? Class ?: return null
+        var match: Method? = null
+        for (method in clazz.methods) {
+            if (method.name == name && method.parameterTypes.size == erased.size &&
+                method.parameterTypes.map { erasedParameterName(it) } == erased) {
+                if (match != null) {
+                    return null
+                }
+                match = method
+            }
+        }
+        return match
     }
 
     /**
@@ -1349,7 +1394,7 @@ class KotlinTypeMapping(
             is JavaArrayType -> javaArrayType(type, signature)
             is JavaPrimitiveType -> javaPrimitiveType(type)
             is JavaClassifierType -> javaClassType(type, signature)
-            is BinaryJavaAnnotation -> type(type.classId.toSymbol(firSession)?.fir, signature)
+            is BinaryJavaAnnotation -> type(type.classId.constructClassLikeType(), firFile, signature)
             is BinaryJavaClass -> javaClassType(type, signature)
             is BinaryJavaTypeParameter -> javaTypeParameter(type, signature)
             is JavaWildcardType -> javaWildCardType(type, signature)
@@ -1579,7 +1624,10 @@ class KotlinTypeMapping(
                     parameterTypes.add(javaType)
                 }
             }
-            val exceptionTypes = javaThrownExceptions(constructor.containingClass, "<init>", parameterTypes)
+            val exceptionTypes =
+                javaThrownExceptions(
+                    method, finalDeclaringType, constructor.containingClass, "<constructor>", parameterTypes
+                )
             method.unsafeSet(finalDeclaringType,
                 finalDeclaringType,
                 parameterTypes, exceptionTypes, listAnnotations(constructor.annotations)
@@ -1661,53 +1709,52 @@ class KotlinTypeMapping(
         }
     }
 
-    @OptIn(SymbolInternals::class)
     private fun listAnnotations(firAnnotations: List<FirAnnotation>): MutableList<FullyQualified>? {
         var annotations: MutableList<FullyQualified>? = null
         for (firAnnotation in firAnnotations) {
-            val fir = firAnnotation.annotationTypeRef.toRegularClassSymbol(firSession)?.fir
-            if (fir != null && isNotSourceRetention(fir.annotations)) {
+            // A plain FirAnnotation was read from a class file, so it survived compilation.
+            if (firAnnotation is FirAnnotationCall && isSourceRetention(firAnnotation)) {
+                continue
+            }
+            val fq = TypeUtils.asFullyQualified(type(firAnnotation))
+            if (fq != null) {
                 if (annotations == null) {
                     annotations = ArrayList()
                 }
-                val fq = TypeUtils.asFullyQualified(type(firAnnotation))
-                if (fq != null) {
-                    annotations.add(remapKotlinBuiltin(fq))
+                annotations.add(remapKotlinBuiltin(fq))
+            }
+        }
+        return annotations
+    }
+
+    private fun listAnnotations(javaAnnotations: Collection<JavaAnnotation>): List<FullyQualified>? {
+        var annotations: MutableList<FullyQualified>? = null
+        for (javaAnnotation: JavaAnnotation in javaAnnotations) {
+            val fq = TypeUtils.asFullyQualified(type(javaAnnotation))
+            if (fq != null) {
+                if (annotations == null) {
+                    annotations = ArrayList()
                 }
+                annotations.add(remapKotlinBuiltin(fq))
             }
         }
         return annotations
     }
 
     @OptIn(SymbolInternals::class)
-    private fun listAnnotations(javaAnnotations: Collection<JavaAnnotation>): List<FullyQualified>? {
-        var annotations: MutableList<FullyQualified>? = null
-        for (javaAnnotation: JavaAnnotation in javaAnnotations) {
-            val fir = javaAnnotation.classId?.toSymbol(firSession)?.fir
-            if (fir != null && isNotSourceRetention(fir.annotations)) {
-                if (annotations == null) {
-                    annotations = ArrayList()
-                }
-                val fq = TypeUtils.asFullyQualified(type(javaAnnotation))
-                if (fq != null) {
-                    annotations.add(remapKotlinBuiltin(fq))
-                }
-            }
-        }
-        return annotations
-    }
-
-    private fun isNotSourceRetention(annotations: List<FirAnnotation>): Boolean {
-        for (ann in annotations) {
+    private fun isSourceRetention(annotation: FirAnnotationCall): Boolean {
+        // An annotation whose class cannot be resolved is left out too.
+        val fir = annotation.annotationTypeRef.toRegularClassSymbol(firSession)?.fir ?: return true
+        for (ann in fir.annotations) {
             if ("kotlin.annotation.Retention" == convertClassIdToFqn(ann.annotationTypeRef.coneType.classId)) {
                 for (v in ann.argumentMapping.mapping.values) {
                     if (v is FirQualifiedAccessExpression && v.calleeReference is FirResolvedNamedReference && (v.calleeReference as FirResolvedNamedReference).name.asString() == "SOURCE") {
-                        return false
+                        return true
                     }
                 }
             }
         }
-        return true
+        return false
     }
 
     private fun mapKind(kind: ClassKind): FullyQualified.Kind {

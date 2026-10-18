@@ -74,10 +74,13 @@ public class BlockStatementTemplateGenerator {
                         after.append('}');
                     }
 
+                    // at the end of a block or as an if's else, the template goes inside what the cursor points to
+                    Cursor scope = location == Space.Location.BLOCK_END || location == Space.Location.ELSE_PREFIX ?
+                            cursor : next(cursor);
                     if (contextSensitive) {
-                        contextTemplate(next(cursor), cursor.getValue(), before, after, cursor.getValue(), mode);
+                        contextTemplate(scope, cursor.getValue(), before, after, cursor.getValue(), mode);
                     } else {
-                        contextFreeTemplate(next(cursor), cursor.getValue(), typeVariables, before, after, location, mode);
+                        contextFreeTemplate(scope, cursor.getValue(), typeVariables, before, after, location, mode);
                     }
 
                     return before.toString().trim() +
@@ -380,7 +383,7 @@ public class BlockStatementTemplateGenerator {
         } else if (j instanceof J.NewArray) {
             J.NewArray n = (J.NewArray) j;
             if (n.getInitializer() != null && n.getInitializer().stream().anyMatch(arg -> referToSameElement(prior, arg))) {
-                before.insert(0, n.withInitializer(null).printTrimmed(cursor) + "{\n");
+                before.insert(0, n.withInitializer(null).printTrimmed(cursor.getParentOrThrow()) + "{\n");
                 after.append("\n}");
             } else {
                 // no initializer
@@ -453,7 +456,7 @@ public class BlockStatementTemplateGenerator {
                 insertControlWithBlock(f.getBody(), before, after, () -> before.insert(0,
                         f.withBody(null).withPrefix(Space.EMPTY)
                                 .withControl(f.getControl().withCondition(null).withUpdate(emptyList()))
-                                .printTrimmed(cursor).trim()));
+                                .printTrimmed(cursor.getParentOrThrow()).trim()));
             }
         } else if (j instanceof J.ForEachLoop.Control) {
             J.ForEachLoop.Control c = (J.ForEachLoop.Control) j;
@@ -467,7 +470,7 @@ public class BlockStatementTemplateGenerator {
             J.ForEachLoop f = (J.ForEachLoop) j;
             if (!referToSameElement(prior, f.getControl())) {
                 insertControlWithBlock(f.getBody(), before, after, () -> before.insert(0,
-                        f.withBody(null).withPrefix(Space.EMPTY).printTrimmed(cursor).trim()));
+                        f.withBody(null).withPrefix(Space.EMPTY).printTrimmed(cursor.getParentOrThrow()).trim()));
             }
         } else if (j instanceof J.Try) {
             J.Try t = (J.Try) j;

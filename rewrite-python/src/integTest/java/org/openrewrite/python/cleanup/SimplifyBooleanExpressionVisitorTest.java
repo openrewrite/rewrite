@@ -84,4 +84,75 @@ class SimplifyBooleanExpressionVisitorTest implements RewriteTest {
                 )
         );
     }
+
+    @Test
+    void negateMethodCallOnFieldAccess() {
+        rewriteRun(
+                python(
+                        """
+                        import os
+                        def test(p):
+                            assert False == os.path.islink(p)
+                        """,
+                        """
+                        import os
+                        def test(p):
+                            assert not os.path.islink(p)
+                        """
+                )
+        );
+    }
+
+    @Test
+    void negateIdentifier() {
+        rewriteRun(
+                python(
+                        """
+                        def test(x: bool):
+                            if x == False:
+                                return x
+                        """,
+                        """
+                        def test(x: bool):
+                            if not x:
+                                return x
+                        """
+                )
+        );
+    }
+
+    @Test
+    void negateFieldAccess() {
+        rewriteRun(
+                python(
+                        """
+                        class C:
+                            flag: bool = True
+                        def test(obj: C):
+                            if obj.flag != True:
+                                return obj
+                        """,
+                        """
+                        class C:
+                            flag: bool = True
+                        def test(obj: C):
+                            if not obj.flag:
+                                return obj
+                        """
+                )
+        );
+    }
+
+    @Test
+    void keepNotGluedToBracketedOperand() {
+        rewriteRun(
+                python(
+                        """
+                        def test(x):
+                            if not(x):
+                                return not[x]
+                        """
+                )
+        );
+    }
 }

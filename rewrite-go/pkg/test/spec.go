@@ -475,6 +475,11 @@ type JavaRecipeConfig struct {
 
 type RecipeSpec struct {
 	CheckParsePrintIdempotence bool
+	// CheckReportingMarkersOnly asserts that a recipe adds only markers that
+	// report, such as search results and markup: a marker type turning up where
+	// neither the sources it was given nor a fresh parse of its output have one
+	// fails the run.
+	CheckReportingMarkersOnly bool
 	// CheckUnchangedTreeIdentity asserts that a source whose printed output is
 	// unchanged comes back as the same tree pointer. Turn it off for fixtures that
 	// deliberately rebuild nodes into printed-identical replacements.
@@ -488,6 +493,7 @@ type RecipeSpec struct {
 func NewRecipeSpec() *RecipeSpec {
 	return &RecipeSpec{
 		CheckParsePrintIdempotence: true,
+		CheckReportingMarkersOnly:  true,
 		CheckUnchangedTreeIdentity: true,
 	}
 }
@@ -534,6 +540,14 @@ type parsedSource struct {
 // SourceSpec values and project wrappers like GoProject — they both
 // implement Sources.
 func (spec *RecipeSpec) RewriteRun(t *testing.T, sources ...Sources) {
+	t.Helper()
+	parsed, genSpecs, generated := spec.parseAndApply(t, sources)
+	spec.verify(t, parsed, genSpecs, generated)
+}
+
+// parseAndApply parses every source and applies the recipe (Passes 1 and 2),
+// returning the generated-file specs alongside the files the recipe generated.
+func (spec *RecipeSpec) parseAndApply(t *testing.T, sources []Sources) ([]parsedSource, []SourceSpec, []java.Tree) {
 	t.Helper()
 
 	// Flatten any project wrappers into a flat list of SourceSpecs, with
@@ -590,6 +604,20 @@ func (spec *RecipeSpec) RewriteRun(t *testing.T, sources ...Sources) {
 					parsed[i].result = runRecipe(spec.Recipe, parsed[i].tree)
 				}
 			}
+		}
+	}
+	return parsed, genSpecs, generated
+}
+
+// verify checks what the recipe produced. Markers come first, since a recipe that
+// only added some returns a new tree printing the same as the old one, which Pass 3
+// would otherwise put down to a needless rebuild.
+func (spec *RecipeSpec) verify(t testing.TB, parsed []parsedSource, genSpecs []SourceSpec, generated []java.Tree) {
+	t.Helper()
+	if spec.CheckReportingMarkersOnly {
+		if failure := addedMarkersFailure(parsed, generated); failure != "" {
+			t.Error(failure)
+			return
 		}
 	}
 
@@ -693,7 +721,7 @@ func (spec *RecipeSpec) parseGoSum(t *testing.T, src SourceSpec) *golang.GoSum {
 	return gs
 }
 
-func (spec *RecipeSpec) compareSource(t *testing.T, ps parsedSource) {
+func (spec *RecipeSpec) compareSource(t testing.TB, ps parsedSource) {
 	t.Helper()
 	src := ps.spec
 
@@ -734,7 +762,7 @@ func (spec *RecipeSpec) compareSource(t *testing.T, ps parsedSource) {
 	}
 }
 
-func (spec *RecipeSpec) compareGenerated(t *testing.T, specs []SourceSpec, generated []java.Tree) {
+func (spec *RecipeSpec) compareGenerated(t testing.TB, specs []SourceSpec, generated []java.Tree) {
 	t.Helper()
 	if len(specs) == 0 && len(generated) == 0 {
 		return
@@ -883,7 +911,7 @@ func runRecipe(r recipe.Recipe, t java.Tree) java.Tree {
 	return t
 }
 
-func showDiff(t *testing.T, expected, actual string) {
+func showDiff(t testing.TB, expected, actual string) {
 	t.Helper()
 	minLen := len(expected)
 	if len(actual) < minLen {

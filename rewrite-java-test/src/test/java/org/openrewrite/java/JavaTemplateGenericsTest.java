@@ -616,4 +616,102 @@ class JavaTemplateGenericsTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void templateGenericDoesNotClobberCallSiteTypeVariable() {
+        //noinspection unchecked
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new JavaVisitor<>() {
+              final JavaTemplate before = JavaTemplate.builder("#{optional:any(java.util.Optional<T>)}.get()")
+                .bindType("T")
+                .genericTypes("T")
+                .build();
+              final JavaTemplate after = JavaTemplate.builder("#{optional:any(java.util.Optional<T>)}.orElseThrow()")
+                .bindType("T")
+                .genericTypes("T")
+                .build();
+
+              @Override
+              public J visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
+                  JavaTemplate.Matcher matcher = before.matcher(getCursor());
+                  if (matcher.find()) {
+                      return after.apply(getCursor(), method.getCoordinates().replace(), matcher.parameter(0));
+                  }
+                  return super.visitMethodInvocation(method, ctx);
+              }
+          })),
+          //language=java
+          java(
+            """
+              import java.util.Optional;
+
+              abstract class TreeNode<T extends TreeNode<T>> {
+                  abstract Optional<T> getParent();
+
+                  abstract Optional<Integer> getIndexOfChild(T childNode);
+
+                  int getPositionInParent() {
+                      return getParent().orElseThrow().getIndexOfChild((T) this).get();
+                  }
+              }
+              """,
+            """
+              import java.util.Optional;
+
+              abstract class TreeNode<T extends TreeNode<T>> {
+                  abstract Optional<T> getParent();
+
+                  abstract Optional<Integer> getIndexOfChild(T childNode);
+
+                  int getPositionInParent() {
+                      return getParent().orElseThrow().getIndexOfChild((T) this).orElseThrow();
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void untypedParameterKeepsCallSiteTypeVariable() {
+        //noinspection unchecked
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new JavaVisitor<>() {
+              final JavaTemplate after = JavaTemplate.builder("#{any()}.orElseThrow()").build();
+
+              @Override
+              public J visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
+                  if ("get".equals(method.getSimpleName()) && method.getSelect() != null) {
+                      return after.apply(getCursor(), method.getCoordinates().replace(), method.getSelect());
+                  }
+                  return super.visitMethodInvocation(method, ctx);
+              }
+          })),
+          //language=java
+          java(
+            """
+              import java.util.Optional;
+
+              abstract class TreeNode<U extends TreeNode<U>> {
+                  abstract Optional<U> getChild(U childNode);
+
+                  U child() {
+                      return getChild((U) this).get();
+                  }
+              }
+              """,
+            """
+              import java.util.Optional;
+
+              abstract class TreeNode<U extends TreeNode<U>> {
+                  abstract Optional<U> getChild(U childNode);
+
+                  U child() {
+                      return getChild((U) this).orElseThrow();
+                  }
+              }
+              """
+          )
+        );
+    }
 }

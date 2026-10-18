@@ -105,9 +105,11 @@ public interface JavaTypeFactory {
      * <p>
      * If a Class is already cached for {@code fqn}, the cached instance is
      * returned and {@code initializer} does not run. Otherwise a stub is
-     * constructed with {@code flags} and {@code kind} populated, registered in
-     * the cache, and the initializer runs to populate the remaining fields
+     * constructed with {@code flags} and {@code kind}, registered in the
+     * cache, and the initializer runs to populate the remaining fields
      * (typically via {@link JavaType.Class#unsafeSet}).
+     * {@code flags} and {@code kind} are the caller's best knowledge before
+     * loading the class, and the initializer may overwrite them.
      *
      * @param fqn the fully-qualified name of the class, in the form
      *            {@link JavaType.FullyQualified#getFullyQualifiedName()} returns.

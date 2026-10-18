@@ -121,6 +121,13 @@ def _enclosing_tree(cursor: Cursor) -> Optional[Tree]:
     return None
 
 
+def _separate_keyword_from_operand(p: PrintOutputCapture, operand_start: int) -> None:
+    chunks = p._out
+    first = next((c[0] for c in chunks[operand_start:] if c), '')
+    if first.isalnum() or first == '_':
+        chunks.insert(operand_start, ' ')
+
+
 def _quotes_around(tree: Union[Py, J]) -> Optional[str]:
     """The quotes to print around ``tree``, or None when its own text carries them.
 
@@ -450,7 +457,9 @@ class PythonPrinter:
         """Visit an await expression."""
         self._before_syntax(await_, p)
         p.append("await")
+        operand_start = len(p._out)
         self.visit(await_.expression, p)
+        _separate_keyword_from_operand(p, operand_start)
         return await_
 
     def visit_binary(self, binary: 'py.Binary', p: PrintOutputCapture) -> J:
@@ -1904,7 +1913,10 @@ class PythonJavaPrinter:
         elif unary.operator == Unary.Type.Complement:
             p.append("~")
 
+        operand_start = len(p._out)
         self.visit(unary.expression, p)
+        if unary.operator == Unary.Type.Not:
+            _separate_keyword_from_operand(p, operand_start)
         self._after_syntax(unary, p)
         return unary
 

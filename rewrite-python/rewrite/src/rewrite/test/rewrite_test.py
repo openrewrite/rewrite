@@ -24,9 +24,11 @@ from typing import Any, Dict, List, Optional, Tuple, TYPE_CHECKING
 from uuid import uuid4
 
 from rewrite import (
+    Cursor,
     ExecutionContext,
     InMemoryExecutionContext,
     InMemoryLargeSourceSet,
+    PrintOutputCapture,
     Recipe,
     TreeVisitor,
 )
@@ -34,6 +36,7 @@ from rewrite.execution import Result
 from rewrite.parser import ParseError
 from rewrite.markers import ParseExceptionResult
 
+from .added_markers import assert_no_added_markers
 from .spec import SourceSpec, AfterRecipeText, dedent
 from .well_formed import assert_well_formed
 
@@ -154,6 +157,10 @@ class RecipeSpec:
     # Whether to allow empty diffs (recipe modifies AST but printed output unchanged)
     allow_empty_diff: bool = False
 
+    # Whether to fail a recipe that leaves markers on the LST that neither its inputs
+    # nor a fresh parse of its output carry
+    check_reporting_markers_only: bool = True
+
     # Whether to enable type attribution via ty-types.
     # Set to False for pure parse/print tests to avoid the ty-types subprocess overhead.
     type_attribution: bool = True
@@ -178,7 +185,8 @@ class RecipeSpec:
         2. Parses them using appropriate parsers
         3. Validates parse/print idempotence if enabled
         4. Runs the recipe
-        5. Compares results with expected "after" states
+        5. Checks that the recipe added no markers for its own use, if enabled
+        6. Compares results with expected "after" states
 
         Setting ``REWRITE_PYTHON_DUMP_TYPES`` prints each parsed file's type
         attribution, and a recipe that produces no change names the nodes that
@@ -216,6 +224,8 @@ class RecipeSpec:
         source_files = [sf for _, sf in all_parsed]
         lss = InMemoryLargeSourceSet(source_files)
         results = self.recipe.run(lss, self.execution_context)
+        if self.check_reporting_markers_only:
+            assert_no_added_markers(source_files, results, self._reparse)
 
         # Build result map: source_file.id -> after_source_file
         result_map: Dict[Any, Optional[SourceFile]] = {}
@@ -365,6 +375,16 @@ class RecipeSpec:
         tree = ast.parse(source_for_ast)
         cu = visitor.visit_Module(tree)
         return cu.replace(source_path=source_path)
+
+    def _reparse(self, source_file: SourceFile) -> Optional[SourceFile]:
+        """Parse what ``source_file`` prints, or return None for a source this harness cannot parse."""
+        from rewrite.python.tree import CompilationUnit
+        if not isinstance(source_file, CompilationUnit):
+            return None
+        # Printed without search markers, which print as comments that are not Python.
+        printed = source_file.print(Cursor(None, Cursor.ROOT_VALUE),
+                                    PrintOutputCapture(0, PrintOutputCapture.MarkerPrinter.SANITIZED))
+        return self._parse_python(printed, source_file.source_path, None, None)
 
     def _expect_no_parse_failures(
         self, parsed: List[Tuple[SourceSpec, SourceFile]]

@@ -17,7 +17,11 @@ package org.openrewrite.scala;
 
 import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.Test;
+import org.openrewrite.ExecutionContext;
+import org.openrewrite.InMemoryExecutionContext;
+import org.openrewrite.SourceFile;
 import org.openrewrite.java.JavaParser;
+import org.openrewrite.java.internal.JavaTypeCache;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.java.tree.TypeUtils;
@@ -249,6 +253,30 @@ class ScalaTypeAttributionTest implements RewriteTest {
                 assertThat(method(cu, "->").getMethodType()).isNotNull();
                 assertThat(method(cu, "->").getMethodType().getDeclaringType().getFullyQualifiedName())
                   .isEqualTo("scala.Predef");
+            })
+          )
+        );
+    }
+
+    @Test
+    void companionApplyHasInstantiatedMethodType() {
+        rewriteRun(
+          scala(
+            """
+            class Foo {
+              val s = Set(1, 2)
+              val xs = List("a")
+            }
+            """,
+            spec -> spec.afterRecipe(cu -> {
+                List<J.MethodInvocation> applies = findAll(cu, J.MethodInvocation.class, m -> m.getSimpleName().equals("apply"));
+                JavaType.Method setApply = applies.get(0).getMethodType();
+                JavaType.Method listApply = applies.get(1).getMethodType();
+                assertThat(TypeUtils.toString(setApply.getReturnType())).isEqualTo("scala.collection.immutable.Set<int>");
+                assertThat(setApply.getParameterTypes()).singleElement()
+                  .satisfies(elems -> assertThat(((JavaType.Parameterized) elems).getTypeParameters()).containsExactly(JavaType.Primitive.Int));
+                assertThat(TypeUtils.toString(listApply.getReturnType())).isEqualTo("scala.collection.immutable.List<java.lang.String>");
+                assertThat(setApply.getDeclaringType().getFullyQualifiedName()).isEqualTo("scala.collection.IterableFactory");
             })
           )
         );
@@ -760,6 +788,27 @@ class ScalaTypeAttributionTest implements RewriteTest {
     }
 
     @Test
+    void etaExpandedInitializerOfInferredValIsMarked() {
+        rewriteRun(
+          scala(
+            """
+            class Foo {
+              def inc(i: Int): Int = i + 1
+              val f = inc
+            }
+            """,
+            spec -> spec.afterRecipe(cu -> {
+                J.Identifier inc = findAll(cu, J.Identifier.class, i -> i.getSimpleName().equals("inc")).getLast();
+                assertThat(inc.getType()).isEqualTo(JavaType.Primitive.Int);
+                EtaExpansion eta = inc.getMarkers().findFirst(EtaExpansion.class).orElseThrow();
+                assertThat(eta.getMethod().getName()).isEqualTo("inc");
+                assertThat(TypeUtils.asParameterized(eta.getType()).getFullyQualifiedName()).isEqualTo("scala.Function1");
+            })
+          )
+        );
+    }
+
+    @Test
     void explicitEtaExpansionHasFunctionType() {
         rewriteRun(
           scala(
@@ -802,6 +851,37 @@ class ScalaTypeAttributionTest implements RewriteTest {
                 assertThat(wrongArity.getMethodType()).isNull();
                 J.NewClass newPerson = find(cu, J.NewClass.class, n -> true);
                 assertThat(newPerson.getConstructorType()).isNull();
+            })
+          )
+        );
+    }
+
+    @Test
+    void callsWithNonConformingTypeArgumentsHaveNoMethodType() {
+        rewriteRun(
+          spec -> spec.typeValidationOptions(org.openrewrite.test.TypeValidation.none()),
+          scala(
+            """
+            class Foo {
+              def num[T <: Number](t: T): T = t
+              val xs = List(1, 2)
+              val wrongKind = xs.to[Vector]
+              val outOfBounds = num[String]("a")
+              val conforming = num[Integer](1)
+              val inferred = List.empty[Int]
+            }
+            """,
+            spec -> spec.afterRecipe(cu -> {
+                J.MethodInvocation wrongKind = method(cu, "to");
+                List<J.MethodInvocation> ofNum = findAll(cu, J.MethodInvocation.class, m -> m.getSimpleName().equals("num"));
+                assertThat(wrongKind.getMethodType()).isNull();
+                assertThat(wrongKind.getType()).isNull();
+                assertThat(ofNum).hasSize(2);
+                assertThat(ofNum.getFirst().getMethodType()).isNull();
+                assertThat(ofNum.getLast().getMethodType()).isNotNull()
+                  .satisfies(m -> assertThat(m.getName()).isEqualTo("num"));
+                assertThat(method(cu, "empty").getMethodType()).isNotNull()
+                  .satisfies(m -> assertThat(m.getName()).isEqualTo("empty"));
             })
           )
         );
@@ -1061,6 +1141,126 @@ class ScalaTypeAttributionTest implements RewriteTest {
             })
           )
         );
+    }
+
+    @Test
+    void libraryClassHasItsSupertypes() {
+        rewriteRun(
+          scala(
+            """
+            class LibraryClassHolder {
+              val xs: java.util.ArrayList[String] = new java.util.ArrayList[String]()
+            }
+            """,
+            spec -> spec.afterRecipe(cu -> {
+                J.VariableDeclarations.NamedVariable xs = find(cu, J.VariableDeclarations.NamedVariable.class, v -> v.getSimpleName().equals("xs"));
+                JavaType.FullyQualified arrayList = TypeUtils.asFullyQualified(xs.getType());
+                assertThat(arrayList.getFullyQualifiedName()).isEqualTo("java.util.ArrayList");
+                assertThat(arrayList.getKind()).isEqualTo(JavaType.FullyQualified.Kind.Class);
+                assertThat(arrayList.getSupertype().getFullyQualifiedName()).isEqualTo("java.util.AbstractList");
+                assertThat(TypeUtils.isAssignableTo("java.util.Collection", arrayList)).isTrue();
+                assertThat(TypeUtils.isAssignableTo("java.lang.Iterable", arrayList)).isTrue();
+            })
+          )
+        );
+    }
+
+    @Test
+    void libraryInterfaceHasInterfaceKind() {
+        rewriteRun(
+          scala(
+            """
+            class LibraryInterfaceHolder {
+              val xs: java.util.List[String] = new java.util.ArrayList[String]()
+            }
+            """,
+            spec -> spec.afterRecipe(cu -> {
+                J.VariableDeclarations.NamedVariable xs = find(cu, J.VariableDeclarations.NamedVariable.class, v -> v.getSimpleName().equals("xs"));
+                JavaType.FullyQualified list = TypeUtils.asFullyQualified(xs.getType());
+                assertThat(list.getKind()).isEqualTo(JavaType.FullyQualified.Kind.Interface);
+                assertThat(TypeUtils.isAssignableTo("java.util.Collection", list)).isTrue();
+            })
+          )
+        );
+    }
+
+    @Test
+    void sourceClassExtendingLibraryClassIsAssignableToLibrarySupertypes() {
+        rewriteRun(
+          scala(
+            """
+            class Names extends java.util.ArrayList[String]
+            """,
+            spec -> spec.afterRecipe(cu -> {
+                J.ClassDeclaration names = find(cu, J.ClassDeclaration.class, c -> c.getSimpleName().equals("Names"));
+                assertThat(TypeUtils.isAssignableTo("java.util.List", names.getType())).isTrue();
+            })
+          )
+        );
+    }
+
+    @Test
+    void classTypeParameterInSupertypeIsTypeVariable() {
+        rewriteRun(
+          scala(
+            """
+            class Box[T] extends java.util.ArrayList[T]
+            """,
+            spec -> spec.afterRecipe(cu -> {
+                J.ClassDeclaration box = find(cu, J.ClassDeclaration.class, c -> c.getSimpleName().equals("Box"));
+                JavaType.Parameterized supertype = (JavaType.Parameterized) box.getType().getSupertype();
+                assertThat(supertype.getTypeParameters()).singleElement()
+                  .isInstanceOfSatisfying(JavaType.GenericTypeVariable.class, t -> assertThat(t.getName()).isEqualTo("T"));
+            })
+          )
+        );
+    }
+
+    @Test
+    void stringTypeIsIndependentOfParseOrder() {
+        // given
+        ScalaParser parser = ScalaParser.builder().build();
+        String declaresStringType = """
+          class DeclaresStringType {
+            def size(s: String): Int = s.length
+          }
+          """;
+        String usesStringLiteral = """
+          class UsesStringLiteral {
+            val s = "b"
+          }
+          """;
+
+        // when
+        List<SourceFile> parsed = parser.parse(new InMemoryExecutionContext(), declaresStringType, usesStringLiteral).toList();
+
+        // then
+        J.VariableDeclarations.NamedVariable s = find((J) parsed.get(1), J.VariableDeclarations.NamedVariable.class, v -> v.getSimpleName().equals("s"));
+        assertThat(TypeUtils.isAssignableTo("java.lang.CharSequence", s.getType())).isTrue();
+        assertThat(TypeUtils.isAssignableTo("java.lang.Comparable", s.getType())).isTrue();
+    }
+
+    @Test
+    void scalaParserDoesNotLeaveShallowClassesInCacheSharedWithJavaParser() {
+        // given
+        JavaTypeCache typeCache = new JavaTypeCache();
+        ExecutionContext ctx = new InMemoryExecutionContext();
+        ScalaParser.builder().typeCache(typeCache).build().parse(ctx, """
+          class ScalaArrayListHolder {
+            val xs: java.util.ArrayList[String] = new java.util.ArrayList[String]()
+          }
+          """).toList();
+
+        // when
+        J.CompilationUnit cu = (J.CompilationUnit) JavaParser.fromJavaVersion().typeCache(typeCache).build().parse(ctx, """
+          class JavaArrayListHolder {
+              java.util.ArrayList<String> xs;
+          }
+          """).findFirst().orElseThrow();
+
+        // then
+        J.VariableDeclarations xs = (J.VariableDeclarations) cu.getClasses().getFirst().getBody().getStatements().getFirst();
+        assertThat(TypeUtils.isAssignableTo("java.util.List", xs.getType())).isTrue();
     }
 
     private static J.Identifier lambdaParameter(J cu, String name) {

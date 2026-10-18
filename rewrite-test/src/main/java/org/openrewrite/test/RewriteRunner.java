@@ -27,8 +27,8 @@ import java.util.List;
 
 /**
  * Strategy used by {@link RewriteTest#rewriteRun} to execute a recipe over a set of
- * source files. The default {@link #IN_PROCESS} runner invokes
- * {@link Recipe#run(LargeSourceSet, ExecutionContext, int, int)} in the test JVM.
+ * source files. The default {@link #IN_PROCESS} runner schedules the recipe in the test JVM,
+ * as {@link Recipe#run(LargeSourceSet, ExecutionContext, int, int)} does.
  * Alternative runners can stand up an out-of-process backend (e.g. the moderne-cli
  * via the {@code active.recipe} hook) and translate its output back into a
  * {@link RecipeRun}, letting the same test source exercise multiple execution paths.
@@ -45,11 +45,12 @@ public interface RewriteRunner {
     RewriteRunner IN_PROCESS = new RewriteRunner() {};
 
     /**
-     * Default in-JVM behavior. Out-of-process runners override this.
+     * Default in-JVM behavior, which lets the test harness see each recipe's edits.
+     * Out-of-process runners override this.
      */
     default RecipeRun run(Recipe recipe, Context context) {
-        return recipe.run(context.getSources(), context.getExecutionContext(),
-                context.getCycles(), context.getExpectedCyclesThatMakeChanges() + 1);
+        return UnchangedTreeIdentity.schedulerFor(context.getSources()).scheduleRun(recipe, context.getSources(),
+                context.getExecutionContext(), context.getCycles(), context.getExpectedCyclesThatMakeChanges() + 1);
     }
 
     /**
