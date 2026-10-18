@@ -23,6 +23,7 @@ import org.openrewrite.ExecutionContext;
 import org.openrewrite.java.tree.Expression;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaSourceFile;
+import org.openrewrite.test.RecipeQualityValidation;
 import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
 import org.openrewrite.test.SourceSpecs;
@@ -37,6 +38,8 @@ class ParenthesizeVisitorTest implements RewriteTest {
     public void defaults(RecipeSpec spec) {
         spec
           .recipe(toRecipe(Reparenthesize::new))
+          // the visitor reparenthesizes trees with their parentheses stripped, which no parser makes
+          .recipeQualityValidation(RecipeQualityValidation.builder().parserShapedTrees(false).build())
           .cycles(1)
           .expectedCyclesThatMakeChanges(1);
     }

@@ -43,9 +43,11 @@ import org.openrewrite.java.format.AutoFormatVisitor;
 import org.openrewrite.java.marker.OmitParentheses;
 import org.openrewrite.java.search.FindAnnotations;
 import org.openrewrite.java.tree.J;
+import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.java.tree.Space;
 import org.openrewrite.marker.BuildMetadata;
 import org.openrewrite.marker.Marker;
+import org.openrewrite.marker.Markers;
 import org.openrewrite.marker.SearchResult;
 import org.openrewrite.test.RecipeQualityValidation;
 import org.openrewrite.test.RewriteTest;
@@ -1705,6 +1707,100 @@ class RewriteTestTest implements RewriteTest {
     }
 
     @Nested
+    class ParserShapedTrees {
+
+        @Test
+        void rejectNodeTheParserBuildsDifferently() {
+            AssertionError e = assertThrows(AssertionError.class, () -> rewriteRun(
+              spec -> spec.recipe(new ReturnNullByHand(null)),
+              java(
+                """
+                  class A {
+                      Object f() {
+                          return 0;
+                      }
+                  }
+                  """,
+                """
+                  class A {
+                      Object f() {
+                          return null;
+                      }
+                  }
+                  """
+              )
+            ));
+            assertThat(e).hasMessageStartingWith("Write code with a template or the format's own parser")
+              .hasMessageContaining("A.java (changed by org.openrewrite.test.internal.ReturnNullByHand):\n" +
+                                    "    `null` has the String value \"null\" of type null where the parser makes the " +
+                                    "value null of type null")
+              .hasMessageContaining("parserShapedTrees(false)");
+        }
+
+        @Test
+        void acceptNodeTheParserBuildsTheSame() {
+            rewriteRun(
+              spec -> spec.recipe(new ReturnNullByHand(true)),
+              java(
+                """
+                  class A {
+                      Object f() {
+                          return 0;
+                      }
+                  }
+                  """,
+                """
+                  class A {
+                      Object f() {
+                          return null;
+                      }
+                  }
+                  """
+              )
+            );
+        }
+
+        @Test
+        void rejectDuplicateKey() {
+            AssertionError e = assertThrows(AssertionError.class, () -> rewriteRun(
+              spec -> spec.recipe(new RepeatFirstEntry()),
+              yaml(
+                "key: value",
+                """
+                  key: value
+                  key: value
+                  """
+              )
+            ));
+            assertThat(e).hasMessageContaining("the key `key` appears twice in one mapping, which YAML doesn't allow");
+        }
+
+        @Test
+        void optOut() {
+            rewriteRun(
+              spec -> spec.recipe(new ReturnNullByHand(null))
+                .recipeQualityValidation(RecipeQualityValidation.builder().parserShapedTrees(false).build()),
+              java(
+                """
+                  class A {
+                      Object f() {
+                          return 0;
+                      }
+                  }
+                  """,
+                """
+                  class A {
+                      Object f() {
+                          return null;
+                      }
+                  }
+                  """
+              )
+            );
+        }
+    }
+
+    @Nested
     class UnparsedSources {
 
         @Test
@@ -1963,6 +2059,61 @@ class ReturnEmptyList extends Recipe {
                     template.imports("java.util.Collections");
                 }
                 return template.build().apply(getCursor(), literal.getCoordinates().replace());
+            }
+        };
+    }
+}
+
+@EqualsAndHashCode(callSuper = false)
+@NullMarked
+@Value
+class ReturnNullByHand extends Recipe {
+
+    @Option(displayName = "Build the literal as the parser does",
+      description = "Give the literal the value null, as parsing `null` does.",
+      required = false)
+    @Nullable
+    Boolean parserShaped;
+
+    String displayName = "Return null";
+
+    String description = "Replaces `return 0` by `return null`, building the literal by hand.";
+
+    @Override
+    public TreeVisitor<?, ExecutionContext> getVisitor() {
+        return new JavaVisitor<>() {
+            @Override
+            public J visitLiteral(J.Literal literal, ExecutionContext ctx) {
+                if (!Integer.valueOf(0).equals(literal.getValue()) ||
+                    !(getCursor().getParentTreeCursor().getValue() instanceof J.Return)) {
+                    return literal;
+                }
+                return new J.Literal(Tree.randomId(), literal.getPrefix(), Markers.EMPTY,
+                  Boolean.TRUE.equals(parserShaped) ? null : "null", "null", null, JavaType.Primitive.Null);
+            }
+        };
+    }
+}
+
+@EqualsAndHashCode(callSuper = false)
+@NullMarked
+@Value
+class RepeatFirstEntry extends Recipe {
+
+    String displayName = "Repeat the first entry";
+
+    String description = "Adds a copy of the first entry of a mapping that has one entry.";
+
+    @Override
+    public TreeVisitor<?, ExecutionContext> getVisitor() {
+        return new YamlIsoVisitor<>() {
+            @Override
+            public Yaml.Mapping visitMapping(Yaml.Mapping mapping, ExecutionContext ctx) {
+                Yaml.Mapping m = super.visitMapping(mapping, ctx);
+                if (m.getEntries().size() != 1) {
+                    return m;
+                }
+                return m.withEntries(ListUtils.concat(m.getEntries(), m.getEntries().getFirst().copyPaste().withPrefix("\n")));
             }
         };
     }

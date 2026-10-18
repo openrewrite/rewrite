@@ -82,6 +82,13 @@ public class RecipeQualityValidation {
     private boolean importReferencedTypes = true;
 
     /**
+     * Controls whether the recipe is validated to produce the tree that the source's parser makes of the text the
+     * recipe's output prints, such as a J.Primitive and not a J.Identifier for {@code int}.
+     */
+    @Builder.Default
+    private boolean parserShapedTrees = true;
+
+    /**
      * Enable all recipe quality checks.
      */
     public static RecipeQualityValidation all() {
@@ -108,6 +115,7 @@ public class RecipeQualityValidation {
                 .minimalFormatting(quality.minimalFormatting())
                 .matchByTypeNotName(quality.matchByTypeNotName())
                 .importReferencedTypes(quality.importReferencedTypes())
+                .parserShapedTrees(quality.parserShapedTrees())
                 .build();
     }
 }
