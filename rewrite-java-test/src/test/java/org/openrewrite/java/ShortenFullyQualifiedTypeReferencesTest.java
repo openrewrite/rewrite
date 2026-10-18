@@ -408,6 +408,52 @@ class ShortenFullyQualifiedTypeReferencesTest implements RewriteTest {
     }
 
     @Test
+    void importJavaLangSubpackageTypes() {
+        rewriteRun(
+          //language=java
+          java(
+            """
+              class T {
+                  java.lang.ref.WeakReference<Object> reference;
+                  java.lang.reflect.Method method;
+              }
+              """,
+            """
+              import java.lang.ref.WeakReference;
+              import java.lang.reflect.Method;
+
+              class T {
+                  WeakReference<Object> reference;
+                  Method method;
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void importJavaLangSubpackageAnnotation() {
+        rewriteRun(
+          //language=java
+          java(
+            """
+              @java.lang.annotation.Retention(java.lang.annotation.RetentionPolicy.RUNTIME)
+              @interface A {
+              }
+              """,
+            """
+              import java.lang.annotation.Retention;
+              import java.lang.annotation.RetentionPolicy;
+
+              @Retention(RetentionPolicy.RUNTIME)
+              @interface A {
+              }
+              """
+          )
+        );
+    }
+
+    @Test
     void conflictExistingImport() {
         rewriteRun(
           //language=java
