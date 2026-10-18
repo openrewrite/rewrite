@@ -33,6 +33,8 @@ from rewrite import (
     TreeVisitor,
 )
 from rewrite.marketplace import Python
+from rewrite.python.visitor import PythonVisitor
+from rewrite.toml import TomlVisitor
 
 
 class _Identity(TreeVisitor[Tree, Any]):
@@ -40,7 +42,7 @@ class _Identity(TreeVisitor[Tree, Any]):
         return tree
 
 
-class _BareEditor(TreeVisitor[Tree, Any]):
+class _BareEditor(PythonVisitor[Any]):
     """Sentinel editor; identity is what we assert in tests."""
 
     sentinel = "bare-editor-sentinel"
@@ -375,3 +377,71 @@ class TestPrepareRecipeWithPreconditions:
         assert len(resp["editPreconditions"]) == 1
         # No override cached — the wrapper still runs Python-side as a fallback.
         assert prepared_id not in server._prepared_editor_overrides
+
+
+def _recipe_with_editor(name: str, editor: TreeVisitor) -> type:
+    class _Recipe(Recipe):
+        @property
+        def name(self):
+            return name
+
+        @property
+        def display_name(self):
+            return name
+
+        @property
+        def description(self):
+            return "Editor of a given visitor type."
+
+        def editor(self):
+            return editor
+
+    return _Recipe
+
+
+class TestLanguageGate:
+    def test_python_editor_is_gated_to_python_sources(self, isolated_server):
+        # given
+        _install(isolated_server, _recipe_with_editor("test.gate.Python", PythonVisitor()))
+
+        # when
+        response = isolated_server.handle_prepare_recipe({"id": "test.gate.Python"})
+
+        # then
+        assert response["editPreconditions"] == [{
+            "visitorName": "org.openrewrite.rpc.internal.FindTreesOfType",
+            "visitorOptions": {"type": "org.openrewrite.python.tree.Py"},
+        }]
+
+    def test_toml_editor_is_gated_to_toml_documents(self, isolated_server):
+        # given
+        _install(isolated_server, _recipe_with_editor("test.gate.Toml", TomlVisitor()))
+
+        # when
+        response = isolated_server.handle_prepare_recipe({"id": "test.gate.Toml"})
+
+        # then
+        assert response["editPreconditions"] == [{
+            "visitorName": "org.openrewrite.rpc.internal.FindTreesOfType",
+            "visitorOptions": {"type": "org.openrewrite.toml.tree.Toml"},
+        }]
+
+    def test_plain_tree_visitor_editor_is_not_gated(self, isolated_server):
+        # given
+        _install(isolated_server, _recipe_with_editor("test.gate.Any", _Identity()))
+
+        # when
+        response = isolated_server.handle_prepare_recipe({"id": "test.gate.Any"})
+
+        # then
+        assert response["editPreconditions"] == []
+
+    def test_noop_editor_of_a_composite_keeps_to_python_sources(self, isolated_server):
+        # given
+        _install(isolated_server, _recipe_with_editor("test.gate.Noop", TreeVisitor.noop()))
+
+        # when
+        response = isolated_server.handle_prepare_recipe({"id": "test.gate.Noop"})
+
+        # then
+        assert response["editPreconditions"][0]["visitorOptions"] == {"type": "org.openrewrite.python.tree.Py"}
