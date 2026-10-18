@@ -31,9 +31,12 @@ class ScalaTypeSignatureBuilder(using ctx: Context) {
 
   private var typeVariableNameStack: HashSet[String] = null
 
+  private var depth = 0
+
   def signature(tpe: Type): String = {
     if (tpe == null) return "{undefined}"
 
+    depth += 1
     try {
       tpe.dealias match {
         case ct: ConstantType =>
@@ -62,7 +65,12 @@ class ScalaTypeSignatureBuilder(using ctx: Context) {
           tpe.show
       }
     } catch {
+      // A type too deep to describe is undefined as a whole. Answering at the level that ran out
+      // of stack would let the caller go on to its next argument and descend just as deep again.
+      case e: VirtualMachineError if depth > 1 => throw e
       case _: Throwable => "{undefined}"
+    } finally {
+      depth -= 1
     }
   }
 
@@ -114,22 +122,26 @@ class ScalaTypeSignatureBuilder(using ctx: Context) {
     if (typeVariableNameStack == null)
       typeVariableNameStack = new HashSet[String]()
 
+    // Already being described further out: only the frame that added the name takes it off,
+    // or a second mention of it in the same bound would describe the bound all over again.
     if (!typeVariableNameStack.add(name)) {
-      typeVariableNameStack.remove(name)
       return "Generic{" + name + "}"
     }
 
-    val sb = new StringBuilder("Generic{" + name)
+    try {
+      val sb = new StringBuilder("Generic{" + name)
 
-    bounds match {
-      case tb: TypeBounds if !(tb.hi =:= ctx.definitions.AnyType) =>
-        sb.append(" extends ")
-        sb.append(signature(tb.hi))
-      case _ =>
+      bounds match {
+        case tb: TypeBounds if !(tb.hi =:= ctx.definitions.AnyType) =>
+          sb.append(" extends ")
+          sb.append(signature(tb.hi))
+        case _ =>
+      }
+
+      sb.append("}").toString()
+    } finally {
+      typeVariableNameStack.remove(name)
     }
-
-    typeVariableNameStack.remove(name)
-    sb.append("}").toString()
   }
 
   private def boundsSignature(tb: TypeBounds): String = {
