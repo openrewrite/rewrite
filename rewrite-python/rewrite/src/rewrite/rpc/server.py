@@ -956,10 +956,15 @@ def _enumerate_artifact(artifact: str, root: str, client, by_fqn: Dict[str, Any]
         # classes are ones no consumer can reference.
         if fp.endswith('.py') and os.path.exists(fp + 'i'):
             continue
+        # A distribution's own test suite is no API of it, and inferring its test
+        # bodies is most of what some packages cost: numpy's took 54 of 56 seconds.
+        if 'tests' in own_module.split('.'):
+            continue
         try:
             with open(fp, 'r', encoding='utf-8') as fh:
                 source = fh.read()
-        except OSError:
+        except (OSError, UnicodeDecodeError):
+            # A file in another encoding costs its own types, not the package's.
             continue
         try:
             mapping = PythonTypeMapping(source, file_path=fp, ty_client=client)
