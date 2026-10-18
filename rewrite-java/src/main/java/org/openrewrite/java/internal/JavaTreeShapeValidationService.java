@@ -16,9 +16,12 @@
 package org.openrewrite.java.internal;
 
 import org.jspecify.annotations.Nullable;
+import org.openrewrite.Parser;
+import org.openrewrite.SourceFile;
 import org.openrewrite.Tree;
 import org.openrewrite.TreeVisitor;
 import org.openrewrite.internal.TreeShapeValidationService;
+import org.openrewrite.java.marker.JavaVersion;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.java.tree.Javadoc;
@@ -26,8 +29,11 @@ import org.openrewrite.java.tree.Javadoc;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 public class JavaTreeShapeValidationService implements TreeShapeValidationService {
+    private static final Pattern PARSER_VERSION = Pattern.compile("\\.Java(\\d+)Parser\\b");
 
     @Override
     public @Nullable Object value(Tree tree) {
@@ -70,6 +76,15 @@ public class JavaTreeShapeValidationService implements TreeShapeValidationServic
     public boolean skip(Tree tree) {
         // the parser adds empty elements where recipes often leave none, and documentation comments aren't code
         return tree instanceof J.Empty || tree instanceof Javadoc;
+    }
+
+    @Override
+    public boolean reads(Parser.Builder parser, SourceFile sourceFile) {
+        // a test can mark its sources with a newer Java than the JDK parser it parses them with
+        Matcher parserVersion = PARSER_VERSION.matcher(parser.getClass().getName());
+        JavaVersion version = sourceFile.getMarkers().findFirst(JavaVersion.class).orElse(null);
+        return version == null || !parserVersion.find() ||
+               version.getMajorVersion() <= Integer.parseInt(parserVersion.group(1));
     }
 
     @Override

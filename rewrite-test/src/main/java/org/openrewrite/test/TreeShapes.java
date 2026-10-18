@@ -78,12 +78,13 @@ final class TreeShapes {
         for (Result result : results) {
             SourceFile after = result.getAfter();
             SourceFile before = result.getBefore();
-            if (after == null || service(after) == null || printed(after).trim().isEmpty() ||
+            TreeShapeValidationService service = after == null ? null : service(after);
+            if (after == null || service == null || printed(after).trim().isEmpty() ||
                 before != null && printed(before).equals(printed(after))) {
                 continue;
             }
             List<Parser.Builder> parsers = parsersFor.apply(after);
-            if (!parsers.isEmpty()) {
+            if (!parsers.isEmpty() && service.reads(parsers.get(0), after)) {
                 byParser.computeIfAbsent(parsers.get(0), p -> new ArrayList<>()).add(result);
             }
         }

@@ -75,6 +75,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.openrewrite.groovy.Assertions.groovy;
 import static org.openrewrite.java.Assertions.java;
+import static org.openrewrite.java.Assertions.javaVersion;
 import static org.openrewrite.test.RewriteTest.toRecipe;
 import static org.openrewrite.test.SourceSpecs.text;
 import static org.openrewrite.yaml.Assertions.yaml;
@@ -1761,6 +1762,35 @@ class RewriteTestTest implements RewriteTest {
         }
 
         @Test
+        void skipCodeNewerThanTheParser() {
+            // the Java 21 parser this module tests with reads `_` as an error, which Java 25 code can declare
+            rewriteRun(
+              spec -> spec.recipe(new NameUnusedLoopVariable()),
+              java(
+                """
+                  import java.util.List;
+                  class A {
+                      void f(List<String> names) {
+                          for (String unused : names) {
+                          }
+                      }
+                  }
+                  """,
+                """
+                  import java.util.List;
+                  class A {
+                      void f(List<String> names) {
+                          for (String _ : names) {
+                          }
+                      }
+                  }
+                  """,
+                spec -> spec.markers(javaVersion(25))
+              )
+            );
+        }
+
+        @Test
         void rejectDuplicateKey() {
             AssertionError e = assertThrows(AssertionError.class, () -> rewriteRun(
               spec -> spec.recipe(new RepeatFirstEntry()),
@@ -1840,6 +1870,34 @@ class RewriteTestTest implements RewriteTest {
                                     "ChangePackage `a` to `x` (step 1 of org.openrewrite.test.MovePackagesBroadFirst) " +
                                     "renamed `a.b` to `x.b` first, so code that named it ends up as `x.b`, not `y`")
               .hasMessageContaining("orderStepsForEarlierChanges(false)");
+
+            // every test that runs the composite fails, not just the first
+            assertThrows(AssertionError.class, () -> rewriteRun(
+              spec -> spec.recipeFromYaml(RECURSIVE_FIRST, "org.openrewrite.test.MovePackagesBroadFirst")
+            ));
+        }
+
+        @Test
+        void acceptStepWhoseRenamedNameALaterStepRenames() {
+            rewriteRun(
+              spec -> spec.recipeFromYaml(
+                """
+                  type: specs.openrewrite.org/v1beta/recipe
+                  name: org.openrewrite.test.MovePackageThenRenameEitherWay
+                  displayName: Move a package and rename a type in it
+                  description: Renames the type under its old package and under its new one.
+                  recipeList:
+                    - org.openrewrite.java.ChangePackage:
+                        oldPackageName: a
+                        newPackageName: x
+                    - org.openrewrite.java.ChangeType:
+                        oldFullyQualifiedTypeName: a.C
+                        newFullyQualifiedTypeName: a.D
+                    - org.openrewrite.java.ChangeType:
+                        oldFullyQualifiedTypeName: x.C
+                        newFullyQualifiedTypeName: x.D
+                  """, "org.openrewrite.test.MovePackageThenRenameEitherWay")
+            );
         }
 
         @Test
@@ -2187,6 +2245,32 @@ class ReturnNullByHand extends Recipe {
                 }
                 return new J.Literal(Tree.randomId(), literal.getPrefix(), Markers.EMPTY,
                   Boolean.TRUE.equals(parserShaped) ? null : "null", "null", null, JavaType.Primitive.Null);
+            }
+        };
+    }
+}
+
+@EqualsAndHashCode(callSuper = false)
+@NullMarked
+@Value
+class NameUnusedLoopVariable extends Recipe {
+
+    String displayName = "Name an unused variable `_`";
+
+    String description = "Renames a variable named `unused` to `_`, as Java 22 allows.";
+
+    @Override
+    public TreeVisitor<?, ExecutionContext> getVisitor() {
+        return new JavaIsoVisitor<>() {
+            @Override
+            public J.VariableDeclarations.NamedVariable visitVariable(J.VariableDeclarations.NamedVariable variable,
+                                                                     ExecutionContext ctx) {
+                J.VariableDeclarations.NamedVariable v = super.visitVariable(variable, ctx);
+                if (!"unused".equals(v.getSimpleName())) {
+                    return v;
+                }
+                JavaType.Variable type = v.getVariableType() == null ? null : v.getVariableType().withName("_");
+                return v.withName(v.getName().withSimpleName("_").withFieldType(type)).withVariableType(type);
             }
         };
     }

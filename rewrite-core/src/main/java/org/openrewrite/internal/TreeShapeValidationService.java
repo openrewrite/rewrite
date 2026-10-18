@@ -67,4 +67,12 @@ public interface TreeShapeValidationService {
     default Parser.@Nullable Builder syntaxParser() {
         return null;
     }
+
+    /**
+     * @return Whether {@code parser} reads the version of the language that {@code sourceFile} is written in, which
+     * a parser for an older version doesn't.
+     */
+    default boolean reads(Parser.Builder parser, SourceFile sourceFile) {
+        return true;
+    }
 }

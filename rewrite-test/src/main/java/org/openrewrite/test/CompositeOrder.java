@@ -33,7 +33,8 @@ import static org.assertj.core.api.Assertions.fail;
  * what it was written for.
  */
 final class CompositeOrder {
-    private static final Set<String> CHECKED = ConcurrentHashMap.newKeySet();
+    // What each composite was found to misorder, so that every test that runs it fails the same way
+    private static final Map<String, String> CHECKED = new ConcurrentHashMap<>();
 
     private CompositeOrder() {
     }
@@ -41,43 +42,15 @@ final class CompositeOrder {
     static void assertOrdered(Recipe recipe) {
         List<Step> steps = new ArrayList<>();
         flatten(recipe, null, 0, Collections.emptySet(), steps, Collections.newSetFromMap(new IdentityHashMap<>()));
+        if (steps.size() < 2) {
+            return;
+        }
         StringJoiner signature = new StringJoiner(",", recipe.getName() + "[", "]");
         for (Step step : steps) {
             signature.add(step.toString());
         }
-        if (steps.size() < 2 || !CHECKED.add(signature.toString())) {
-            return;
-        }
-        StringBuilder found = new StringBuilder();
-        for (int i = 0; i < steps.size(); i++) {
-            Step step = steps.get(i);
-            String looksFor = step.renaming.oldName();
-            String renamed = looksFor;
-            Step renamedBy = null;
-            for (int j = 0; j < i; j++) {
-                Step earlier = steps.get(j);
-                if (earlier.applies(step)) {
-                    String next = earlier.renaming.rename(renamed);
-                    if (!same(next, renamed)) {
-                        renamed = next;
-                        if (renamedBy == null) {
-                            renamedBy = earlier;
-                        }
-                    }
-                }
-            }
-            if (renamedBy == null || !step.ownerUnderTest()) {
-                continue;
-            }
-            String endsUp = after(steps, i, step, renamed);
-            String meant = after(steps, i, step, step.renaming.rename(looksFor));
-            if (!same(endsUp, meant)) {
-                found.append("  ").append(step).append(": ").append(renamedBy).append(" renamed `").append(looksFor)
-                        .append("` to `").append(renamed).append("` first, so code that named it ends up as `")
-                        .append(endsUp).append("`, not `").append(meant).append("`\n");
-            }
-        }
-        if (found.length() > 0) {
+        String found = CHECKED.computeIfAbsent(signature.toString(), s -> misordered(steps));
+        if (!found.isEmpty()) {
             fail("Order the steps of a composite so that a step runs before the steps that rename what it looks for. " +
                  "In " + recipe.getName() + ", these steps look for names that steps before them already renamed, " +
                  "so they never change what they were written for:\n" + found +
@@ -87,12 +60,49 @@ final class CompositeOrder {
         }
     }
 
+    private static String misordered(List<Step> steps) {
+        StringBuilder found = new StringBuilder();
+        for (int i = 0; i < steps.size(); i++) {
+            Step step = steps.get(i);
+            String looksFor = step.renaming.oldName();
+            String renamed = looksFor;
+            int renamedBy = -1;
+            for (int j = 0; j < i; j++) {
+                Step earlier = steps.get(j);
+                if (earlier.applies(step)) {
+                    String next = earlier.renaming.rename(renamed);
+                    if (!same(next, renamed)) {
+                        renamed = next;
+                        if (renamedBy < 0) {
+                            renamedBy = j;
+                        }
+                    }
+                }
+            }
+            if (renamedBy < 0 || !step.ownerUnderTest()) {
+                continue;
+            }
+            String endsUp = through(steps, i + 1, steps.size(), step, renamed);
+            // had the step run just before the step that renamed what it looks for, that step and the ones after it
+            // would have renamed what it wrote
+            String meant = through(steps, i + 1, steps.size(), step,
+                    through(steps, renamedBy, i, step, step.renaming.rename(looksFor)));
+            if (!same(endsUp, meant)) {
+                found.append("  ").append(step).append(": ").append(steps.get(renamedBy)).append(" renamed `")
+                        .append(looksFor).append("` to `").append(renamed)
+                        .append("` first, so code that named it ends up as `").append(endsUp).append("`, not `")
+                        .append(meant).append("`\n");
+            }
+        }
+        return found.toString();
+    }
+
     /**
-     * What {@code name} becomes once the steps after the one at {@code index} have run.
+     * What {@code name} becomes once the steps from {@code from} up to {@code to} have run.
      */
-    private static String after(List<Step> steps, int index, Step step, String name) {
+    private static String through(List<Step> steps, int from, int to, Step step, String name) {
         String renamed = name;
-        for (int j = index + 1; j < steps.size(); j++) {
+        for (int j = from; j < to; j++) {
             if (steps.get(j).applies(step)) {
                 renamed = steps.get(j).renaming.rename(renamed);
             }
@@ -163,6 +173,7 @@ final class CompositeOrder {
          * Whether the composite that lists this step comes from the module under test, not from a dependency or from
          * the recipes a test lists itself.
          */
+        @SuppressWarnings("deprecation") // only the descriptor knows which file a declarative recipe came from
         boolean ownerUnderTest() {
             if (owner instanceof CompositeRecipe) {
                 return false;
