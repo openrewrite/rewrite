@@ -55,35 +55,57 @@ export function trimIndent(str: string | null | undefined): string {
  * object literal. V8 sizes a literal's in-object storage to the properties it names, so the merged
  * node keeps its fields inline; the `{...original, ...updates}` spread of a shared, megamorphic
  * function instead lands in an out-of-object `system / PropertyArray` (millions of them across an
- * RPC-received LST forest). Builders are keyed and cached by the pair of property-name lists so a
+ * RPC-received LST forest). Builders are cached in a trie over the two property-name lists, so a
  * given shape compiles once.
  */
 type MergeBuilder = (original: any, updates: any) => any;
 
-const mergeBuilders = new Map<string, MergeBuilder>();
+interface ShapeNode {
+    children: Map<string, ShapeNode>;
+    // Where the update keys start, so original keys [a] + updates [b, c] and [a, b] + [c] stay apart
+    updates?: ShapeNode;
+    builder?: MergeBuilder;
+}
 
-function mergeBuilderFor(originalKeys: string[], updateKeys: string[]): MergeBuilder | undefined {
-    const cacheKey = JSON.stringify(originalKeys) + JSON.stringify(updateKeys);
-    let builder = mergeBuilders.get(cacheKey);
-    if (builder === undefined) {
-        const fromUpdates = new Set(updateKeys);
-        const names = originalKeys.slice();
-        for (const key of updateKeys) {
-            if (!names.includes(key)) {
-                names.push(key);
-            }
-        }
-        const body = "return {" + names
-            .map(name => `${JSON.stringify(name)}:(${fromUpdates.has(name) ? "u" : "o"})[${JSON.stringify(name)}]`)
-            .join(",") + "};";
-        try {
-            builder = new Function("o", "u", body) as MergeBuilder;
-        } catch {
-            builder = (o, u) => ({...o, ...u});
-        }
-        mergeBuilders.set(cacheKey, builder);
+const mergeBuilders: ShapeNode = {children: new Map()};
+
+function shapeChild(node: ShapeNode, key: string): ShapeNode {
+    let child = node.children.get(key);
+    if (child === undefined) {
+        child = {children: new Map()};
+        node.children.set(key, child);
     }
-    return builder;
+    return child;
+}
+
+function mergeBuilderFor(originalKeys: string[], updateKeys: string[]): MergeBuilder {
+    let node = mergeBuilders;
+    for (const key of originalKeys) {
+        node = shapeChild(node, key);
+    }
+    node = node.updates ??= {children: new Map()};
+    for (const key of updateKeys) {
+        node = shapeChild(node, key);
+    }
+    return node.builder ??= compileMergeBuilder(originalKeys, updateKeys);
+}
+
+function compileMergeBuilder(originalKeys: string[], updateKeys: string[]): MergeBuilder {
+    const fromUpdates = new Set(updateKeys);
+    const names = originalKeys.slice();
+    for (const key of updateKeys) {
+        if (!names.includes(key)) {
+            names.push(key);
+        }
+    }
+    const body = "return {" + names
+        .map(name => `${JSON.stringify(name)}:(${fromUpdates.has(name) ? "u" : "o"})[${JSON.stringify(name)}]`)
+        .join(",") + "};";
+    try {
+        return new Function("o", "u", body) as MergeBuilder;
+    } catch {
+        return (o, u) => ({...o, ...u});
+    }
 }
 
 /**
@@ -106,10 +128,7 @@ export function updateIfChanged<O extends object>(original: O, updates: Partial<
     // literal builder keeps its fields inline. Symbol-keyed originals fall back to the spread,
     // since only string keys survive the JSON-serialized builder body.
     if (typeof original === "object" && Object.getOwnPropertySymbols(original).length === 0) {
-        const builder = mergeBuilderFor(Object.keys(original), Object.keys(updates as object));
-        if (builder !== undefined) {
-            return builder(original, updates);
-        }
+        return mergeBuilderFor(Object.keys(original), Object.keys(updates as object))(original, updates);
     }
     return {...original, ...updates};
 }
