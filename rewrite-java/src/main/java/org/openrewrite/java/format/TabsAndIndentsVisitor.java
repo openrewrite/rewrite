@@ -562,7 +562,8 @@ public class TabsAndIndentsVisitor<P> extends JavaIsoVisitor<P> {
                             builder.append(line);
                         }
                     }
-                    literal = literal.withValueSource(builder.toString()).withValue(content);
+                    // every line moves by the same amount, which leaves the text block's value as it was
+                    literal = literal.withValueSource(builder.toString());
                 }
             }
         }

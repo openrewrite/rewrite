@@ -75,6 +75,27 @@ public class RecipeQualityValidation {
     private boolean matchByTypeNotName = true;
 
     /**
+     * Controls whether the recipe is validated to import the types and static members the code it writes names, and
+     * its templates to declare those they name with imports and staticImports.
+     */
+    @Builder.Default
+    private boolean importReferencedTypes = true;
+
+    /**
+     * Controls whether the recipe is validated to produce the tree that the source's parser makes of the text the
+     * recipe's output prints, such as a J.Primitive and not a J.Identifier for {@code int}.
+     */
+    @Builder.Default
+    private boolean parserShapedTrees = true;
+
+    /**
+     * Controls whether a composite recipe is validated to run each step before the steps that rename what it looks
+     * for, such as a ChangeType of a type in a package before a ChangePackage of that package.
+     */
+    @Builder.Default
+    private boolean orderStepsForEarlierChanges = true;
+
+    /**
      * Enable all recipe quality checks.
      */
     public static RecipeQualityValidation all() {
@@ -100,6 +121,9 @@ public class RecipeQualityValidation {
                 .reportingMarkersOnly(quality.reportingMarkersOnly())
                 .minimalFormatting(quality.minimalFormatting())
                 .matchByTypeNotName(quality.matchByTypeNotName())
+                .importReferencedTypes(quality.importReferencedTypes())
+                .parserShapedTrees(quality.parserShapedTrees())
+                .orderStepsForEarlierChanges(quality.orderStepsForEarlierChanges())
                 .build();
     }
 }

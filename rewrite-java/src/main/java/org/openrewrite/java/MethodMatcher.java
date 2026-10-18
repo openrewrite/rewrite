@@ -438,10 +438,28 @@ public class MethodMatcher {
             if (!typeMatcher.matchesSimpleName(select.getSimpleName())) {
                 return false;
             }
+        } else if (method.getSelect() instanceof J.FieldAccess) {
+            J.FieldAccess select = (J.FieldAccess) method.getSelect();
+            // A fully qualified type name, as in `java.util.Collections.emptyList()`, is checked like a simple one
+            if (select.getType() instanceof JavaType.Class &&
+                ((JavaType.Class) select.getType()).getFullyQualifiedName().replace('$', '.').equals(dottedName(select)) &&
+                !typeMatcher.matchesSimpleName(select.getSimpleName())) {
+                return false;
+            }
         }
 
         // For unknown types, we need to be more lenient with argument matching
         return matchesArgumentsAllowingUnknownTypes(method);
+    }
+
+    private static @Nullable String dottedName(Expression expression) {
+        if (expression instanceof J.Identifier) {
+            return ((J.Identifier) expression).getSimpleName();
+        } else if (expression instanceof J.FieldAccess) {
+            String target = dottedName(((J.FieldAccess) expression).getTarget());
+            return target == null ? null : target + "." + ((J.FieldAccess) expression).getSimpleName();
+        }
+        return null;
     }
 
     private boolean matchesArgumentsAllowingUnknownTypes(J.MethodInvocation method) {

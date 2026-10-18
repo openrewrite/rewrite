@@ -64,6 +64,12 @@ final class NameMatching {
     private final List<SourceFile> parsed;
 
     private final Map<String, @Nullable Object> messages;
+
+    /**
+     * The test's own execution context, whose error handler decides whether an error in a rerun fails the test.
+     */
+    private final ExecutionContext recipeCtx;
+
     private final int cycles;
     private final int minCycles;
     private Duration testRunTime = Duration.ZERO;
@@ -85,6 +91,7 @@ final class NameMatching {
         this.parsed = parsed;
         this.messages = new HashMap<>(context.getExecutionContext().getMessages());
         this.messages.keySet().removeAll(RUN_STATE);
+        this.recipeCtx = context.getExecutionContext();
         this.cycles = context.getCycles();
         this.minCycles = context.getExpectedCyclesThatMakeChanges() + 1;
         this.parsersFor = parsersFor;
@@ -138,7 +145,7 @@ final class NameMatching {
     /**
      * Ad hoc recipes and recipes declared inside a test class are scaffolding for the test, not recipes under test.
      */
-    private static boolean isTestScaffolding(Recipe recipe) {
+    static boolean isTestScaffolding(Recipe recipe) {
         Class<?> recipeClass = recipe.getClass();
         if (recipe instanceof AdHocRecipe || recipe instanceof AdHocScanningRecipe ||
             recipeClass.isAnonymousClass() || recipeClass.isLocalClass()) {
@@ -181,6 +188,7 @@ final class NameMatching {
 
     private @Nullable String respellingFailures(List<Result> changed) {
         StringBuilder found = new StringBuilder();
+        StringBuilder threw = new StringBuilder();
         for (Result result : changed) {
             SourceFile before = Objects.requireNonNull(result.getBefore());
             SourceFile after = Objects.requireNonNull(result.getAfter());
@@ -209,37 +217,58 @@ final class NameMatching {
                 continue;
             }
             for (Respelling respelling : respellings) {
-                if (misses(respelling, before, index, service) && reproducible(result)) {
+                Rerun rerun = rerun(respelledSources(respelling, index));
+                if (rerun.thrown != null && reproducible(result) && Probes.rejects(recipeCtx, rerun.thrown)) {
+                    threw.append("  ").append(before.getSourcePath()).append(changedBy(result)).append(", ")
+                            .append(respelling.getDescription()).append(":\n")
+                            .append(Probes.describe(rerun.thrown, "    ", SERIALIZER.read(recipe))).append('\n');
+                    break;
+                }
+                if (misses(rerun, respelling, before, service) && reproducible(result)) {
                     found.append("  ").append(before.getSourcePath()).append(changedBy(result))
                             .append(": ").append(missedPlaces(respelling, before, index, service)).append('\n');
                     break;
                 }
             }
         }
-        if (found.length() == 0) {
-            return null;
+        List<String> failures = new ArrayList<>(2);
+        if (threw.length() > 0) {
+            failures.add("Check the shape of the code the recipe edits before casting it, so that code written " +
+                         "another way is changed or left as it is instead of throwing. The recipe threw on these " +
+                         "sources once the code it changed was respelled to mean the same:\n" + threw +
+                         "A statically imported call has no select, and a fully qualified type name is a " +
+                         "J.FieldAccess, not a J.Identifier. Check `instanceof` before a cast and null before a " +
+                         "dereference, and don't catch the exception to make this pass.");
         }
-        return "Match the code the recipe changes by its type attribution, with MethodMatcher, " +
-               "J.MethodInvocation#getMethodType() or TypeUtils, not by names, by whether a call has a select, " +
-               "or by how code prints. The recipe changed these sources but left them unchanged once that code " +
-               "was respelled to mean the same:\n" + found +
-               "A static import and a qualified call name the same method, and an imported and a fully qualified " +
-               "name the same type, so a recipe that changes one spelling must change the other. If only one " +
-               "spelling is meant to change, add " +
-               "spec.recipeQualityValidation(RecipeQualityValidation.builder().matchByTypeNotName(false).build()).";
+        if (found.length() > 0) {
+            failures.add("Match the code the recipe changes by its type attribution, with MethodMatcher, " +
+                         "J.MethodInvocation#getMethodType() or TypeUtils, not by names, by whether a call has a " +
+                         "select, or by how code prints. The recipe changed these sources but left them unchanged " +
+                         "once that code was respelled to mean the same:\n" + found +
+                         "A static import and a qualified call name the same method, and an imported and a fully " +
+                         "qualified name the same type, so a recipe that changes one spelling must change the other. " +
+                         "If only one spelling is meant to change, add " +
+                         "spec.recipeQualityValidation(RecipeQualityValidation.builder().matchByTypeNotName(false)" +
+                         ".build()).");
+        }
+        return failures.isEmpty() ? null : String.join("\n\n", failures);
+    }
+
+    private List<SourceFile> respelledSources(Respelling respelling, int index) {
+        List<SourceFile> respelledSources = new ArrayList<>(sources);
+        respelledSources.set(index, respelling.getSourceFile());
+        return respelledSources;
     }
 
     /**
      * Whether the recipe, run again with the respelled source in place of {@code before}, leaves its code unchanged.
      */
-    private boolean misses(Respelling respelling, SourceFile before, int index, TypeMatchingValidationService service) {
-        SourceFile respelled = respelling.getSourceFile();
-        List<SourceFile> respelledSources = new ArrayList<>(sources);
-        respelledSources.set(index, respelled);
-        Map<UUID, @Nullable SourceFile> rerun = rerun(respelledSources);
+    private boolean misses(Rerun rerun, Respelling respelling, SourceFile before,
+                           TypeMatchingValidationService service) {
         // a respelling can leave an import unused, so a change to imports or formatting alone doesn't count
-        return rerun != null && !(rerun.containsKey(before.getId()) &&
-                                  service.changesCode(respelled, rerun.get(before.getId())));
+        return rerun.changed != null && !(rerun.changed.containsKey(before.getId()) &&
+                                          service.changesCode(respelling.getSourceFile(),
+                                                  rerun.changed.get(before.getId())));
     }
 
     /**
@@ -250,7 +279,7 @@ final class NameMatching {
                                 TypeMatchingValidationService service) {
         List<String> missed = new ArrayList<>();
         for (Respelling place : respelling.getEachPlace().get()) {
-            if (misses(place, before, index, service)) {
+            if (misses(rerun(respelledSources(place, index)), place, before, service)) {
                 missed.add(place.getDescription());
             }
         }
@@ -263,7 +292,7 @@ final class NameMatching {
      */
     private boolean reproducible(Result result) {
         if (control == null) {
-            Map<UUID, @Nullable SourceFile> rerun = rerun(sources);
+            Map<UUID, @Nullable SourceFile> rerun = rerun(sources).changed;
             control = rerun == null ? Collections.emptyMap() : rerun;
         }
         return printsLike(Objects.requireNonNull(result.getAfter()), control,
@@ -275,17 +304,14 @@ final class NameMatching {
         return rerunAfter != null && after.printAll().equals(rerunAfter.printAll());
     }
 
-    /**
-     * Runs a fresh copy of the recipe in a fresh execution context with a time limit.
-     *
-     * @return What the rerun makes of each source it changes (null when it deletes one), by the source's id, or null
-     * if it failed or timed out.
-     */
     private static Duration longer(Duration a, Duration b) {
         return a.compareTo(b) >= 0 ? a : b;
     }
 
-    private @Nullable Map<UUID, @Nullable SourceFile> rerun(List<SourceFile> sources) {
+    /**
+     * Runs a fresh copy of the recipe in a fresh execution context with a time limit.
+     */
+    private Rerun rerun(List<SourceFile> sources) {
         List<Throwable> errors = new ArrayList<>();
         InMemoryExecutionContext ctx = new InMemoryExecutionContext(errors::add);
         messages.forEach(ctx::putMessage);
@@ -303,9 +329,26 @@ final class NameMatching {
                     changed.put(before.getId(), after);
                 }
             }
-            return errors.isEmpty() ? changed : null;
-        } catch (Exception | LinkageError | StackOverflowError | AssertionError e) {
-            return null;
+            return errors.isEmpty() ? new Rerun(changed, null) : new Rerun(null, Probes.firstError(errors));
+        } catch (Exception | StackOverflowError | AssertionError e) {
+            errors.add(e);
+            return new Rerun(null, Probes.firstError(errors));
+        } catch (LinkageError e) {
+            return new Rerun(null, null);
+        }
+    }
+
+    /**
+     * What a rerun makes of each source it changes (null when it deletes one) by the source's id, or what it threw.
+     * Neither is known when it ran out of time.
+     */
+    private static final class Rerun {
+        final @Nullable Map<UUID, @Nullable SourceFile> changed;
+        final @Nullable Throwable thrown;
+
+        Rerun(@Nullable Map<UUID, @Nullable SourceFile> changed, @Nullable Throwable thrown) {
+            this.changed = changed;
+            this.thrown = thrown;
         }
     }
 
@@ -319,7 +362,7 @@ final class NameMatching {
         return leaves;
     }
 
-    private static String changedBy(Result result) {
+    static String changedBy(Result result) {
         Set<String> leaves = leafRecipes(result);
         return leaves.isEmpty() ? "" : " (changed by " + String.join(", ", leaves) + ")";
     }

@@ -2616,6 +2616,42 @@ class AddOrUpdateAnnotationAttributeTest implements RewriteTest {
     }
 
     @Test
+    void replaceIntArrayValues() {
+        rewriteRun(
+          spec -> spec.recipe(new AddOrUpdateAnnotationAttribute(
+            "org.example.Foo",
+            "versions",
+            "17, 21",
+            null,
+            false,
+            false
+          )),
+          java(
+            """
+              package org.example;
+              public @interface Foo {
+                  int[] versions();
+              }
+              """
+          ),
+          java(
+            """
+              import org.example.Foo;
+
+              @Foo(versions = {11, 17})
+              public class A {}
+              """,
+            """
+              import org.example.Foo;
+
+              @Foo(versions = {17, 21})
+              public class A {}
+              """
+          )
+        );
+    }
+
+    @Test
     void addStringValueToExistingValueArrayWithoutAppend() {
         rewriteRun(
           spec -> spec.recipe(new AddOrUpdateAnnotationAttribute(

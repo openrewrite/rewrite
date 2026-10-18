@@ -469,16 +469,20 @@ public interface RewriteTest extends SourceSpecs {
         NameMatching nameMatching = NameMatching.of(recipe, runner, runnerContext, beforeSourceFiles,
                 parsersFor, relativeTo, ctx);
         FormattingScope formattingScope = new FormattingScope(recipe, quality.minimalFormatting());
+        ImportedNames importedNames = ImportedNames.of(quality.importReferencedTypes(), runnableSourceFiles);
         long runStart = System.nanoTime();
-        RecipeRun recipeRun = formattingScope.record(() -> runner.run(recipe, runnerContext));
+        RecipeRun recipeRun = formattingScope.record(() ->
+                importedNames.record(() -> runner.run(recipe, runnerContext)));
         Duration runTime = Duration.ofNanos(System.nanoTime() - runStart);
         if (addedMarkers != null) {
             addedMarkers.assertNoneAdded(recipeRun.getChangeset().getAllResults());
         }
         unchangedTreeIdentity.assertNoneFound();
-        EmptySources emptySources = runner == RewriteRunner.IN_PROCESS &&
-                                    lss instanceof LargeSourceSetCheckingExpectedCycles ?
+        boolean probed = runner == RewriteRunner.IN_PROCESS && lss instanceof LargeSourceSetCheckingExpectedCycles;
+        EmptySources emptySources = probed ?
                 new EmptySources(recipe, recipeRun.getChangeset().getAllResults()) : null;
+        UnparsedSources unparsedSources = probed ?
+                new UnparsedSources(recipe, recipeRun.getChangeset().getAllResults()) : null;
 
         for (Consumer<RecipeRun> afterRecipe : testClassSpec.afterRecipes) {
             afterRecipe.accept(recipeRun);
@@ -714,6 +718,12 @@ public interface RewriteTest extends SourceSpecs {
                  "    before | after | expected\n" + paths);
         }
         formattingScope.assertFormattedOnlyWhatChanged(recipeRun.getChangeset().getAllResults());
+        importedNames.assertImported(recipeRun.getChangeset().getAllResults());
+        new TreeShapes(quality.parserShapedTrees(), parsersFor, relativeTo, ctx)
+                .assertParserShaped(recipeRun.getChangeset().getAllResults(), runnableSourceFiles);
+        if (quality.orderStepsForEarlierChanges()) {
+            CompositeOrder.assertOrdered(recipe);
+        }
 
         if (nameMatching != null) {
             nameMatching.assertMatchedByType(recipeRun.getChangeset().getAllResults(), runTime);
@@ -721,6 +731,9 @@ public interface RewriteTest extends SourceSpecs {
 
         if (emptySources != null) {
             emptySources.assertNoneThrow(specBySourceFile, parserBySourceSpec::get, relativeTo, ctx, recipeCtx, cycles);
+        }
+        if (unparsedSources != null) {
+            unparsedSources.assertNoneThrow(runnableSourceFiles, recipeCtx, cycles);
         }
     }
 

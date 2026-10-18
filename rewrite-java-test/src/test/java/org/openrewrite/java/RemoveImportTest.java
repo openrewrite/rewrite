@@ -22,6 +22,7 @@ import org.openrewrite.Recipe;
 import org.openrewrite.java.style.ImportLayoutStyle;
 import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.style.NamedStyles;
+import org.openrewrite.test.RecipeQualityValidation;
 import org.openrewrite.test.RewriteTest;
 
 import static java.util.Collections.emptySet;
@@ -178,7 +179,9 @@ class RemoveImportTest implements RewriteTest {
     @Test
     void removeStarImportEvenIfReferredTo() {
         rewriteRun(
-          spec -> spec.recipe(removeImport("java.util.List", true)),
+          spec -> spec.recipe(removeImport("java.util.List", true))
+            // forced removal leaves List named without an import
+            .recipeQualityValidation(RecipeQualityValidation.builder().importReferencedTypes(false).build()),
           java(
             """
               import java.util.List;

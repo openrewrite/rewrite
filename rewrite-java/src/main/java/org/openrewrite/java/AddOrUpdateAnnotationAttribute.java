@@ -29,6 +29,7 @@ import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.java.tree.TypeUtils;
 
 import java.util.*;
+import java.util.function.Function;
 
 import static java.lang.Boolean.TRUE;
 import static java.util.Collections.*;
@@ -172,7 +173,8 @@ public class AddOrUpdateAnnotationAttribute extends Recipe {
                 if (exp instanceof J.NewArray) {
                     List<Expression> initializerList = requireNonNull(((J.NewArray) exp).getInitializer());
                     return as.withAssignment(((J.NewArray) exp)
-                            .withInitializer(updateInitializer(annotation, initializerList, getAttributeValues(annotation))));
+                            .withInitializer(updateInitializer(annotation, initializerList, getAttributeValues(annotation),
+                                    value -> newElement(annotation, value))));
                 }
                 if (exp instanceof J.Literal) {
                     if (!valueMatches(exp, oldAttributeValue) || newAttributeValue.equals(((J.Literal) exp).getValueSource())) {
@@ -273,7 +275,22 @@ public class AddOrUpdateAnnotationAttribute extends Recipe {
                 if (attributeName != null && !"value".equals(attributeName)) {
                     return isAnnotationWithOnlyValueMethod(annotation) ? arrayValue : createAnnotationAssignment(annotation, "value", arrayValue);
                 }
-                return arrayValue.withInitializer(updateInitializer(annotation, requireNonNull(arrayValue.getInitializer()), getAttributeValues(annotation)));
+                return arrayValue.withInitializer(updateInitializer(annotation, requireNonNull(arrayValue.getInitializer()), getAttributeValues(annotation),
+                        value -> newElement(annotation, value)));
+            }
+
+            /**
+             * A new array element, which is a string literal when the attribute holds strings, and otherwise what the
+             * parser makes of its text, such as an int literal or an enum constant.
+             */
+            private Expression newElement(J.Annotation annotation, String value) {
+                String source = requireNonNull(maybeQuoteStringArgument(annotation, value));
+                if (source.startsWith("\"")) {
+                    return new J.Literal(randomId(), SINGLE_SPACE, EMPTY, value, source, null, JavaType.Primitive.String);
+                }
+                //noinspection ConstantConditions
+                return getJavaTemplate("#{}").<J.Annotation>apply(getCursor(), annotation.getCoordinates().replaceArguments(), source)
+                        .getArguments().get(0).withPrefix(SINGLE_SPACE);
             }
 
             private Expression createAnnotationLiteral(J.Annotation annotation, String newAttributeValue) {
@@ -296,7 +313,7 @@ public class AddOrUpdateAnnotationAttribute extends Recipe {
                 // Add new values, skipping duplicates
                 for (String attribute : newValues) {
                     if (!attributeNameOrValIsAlreadyPresent(initializer, singleton(attribute))) {
-                        initializer.add(new J.Literal(randomId(), SINGLE_SPACE, EMPTY, attribute, maybeQuoteStringArgument(annotation, attribute), null, JavaType.Primitive.String));
+                        initializer.add(newElement(annotation, attribute));
                     }
                 }
                 // Use a template to create the array structure, then replace the initializer
@@ -379,15 +396,15 @@ public class AddOrUpdateAnnotationAttribute extends Recipe {
         return attributeName == null ? "value" : attributeName;
     }
 
-    private List<Expression> updateInitializer(J.Annotation annotation, List<Expression> initializerList, List<String> attributeList) {
+    private List<Expression> updateInitializer(J.Annotation annotation, List<Expression> initializerList, List<String> attributeList,
+                                               Function<String, Expression> newElement) {
         // If `oldAttributeValue` is defined, replace the old value with the new value(s). Ignore the `appendArray` option in this case.
         if (oldAttributeValue != null) {
             return ListUtils.flatMap(initializerList, it -> {
                 if (it instanceof J.Literal && oldAttributeValue.equals(((J.Literal) it).getValue())) {
                     List<Expression> newItemsList = new ArrayList<>();
                     for (String attribute : attributeList) {
-                        J.Literal newLiteral = new J.Literal(randomId(), SINGLE_SPACE, EMPTY, attribute, maybeQuoteStringArgument(annotation, attribute), null, JavaType.Primitive.String);
-                        newItemsList.add(newLiteral);
+                        newItemsList.add(newElement.apply(attribute));
                     }
                     return newItemsList;
                 }
@@ -402,7 +419,7 @@ public class AddOrUpdateAnnotationAttribute extends Recipe {
                 if (attributeNameOrValIsAlreadyPresent(initializerList, singleton(attribute))) {
                     continue;
                 }
-                newItemsList.add(new J.Literal(randomId(), SINGLE_SPACE, EMPTY, attribute, maybeQuoteStringArgument(annotation, attribute), null, JavaType.Primitive.String));
+                newItemsList.add(newElement.apply(attribute));
             }
             // Filter out empty elements (e.g., from an empty array initializer `{}`)
             List<Expression> nonEmptyInitializer = ListUtils.filter(initializerList, it -> !(it instanceof J.Empty));
@@ -417,11 +434,11 @@ public class AddOrUpdateAnnotationAttribute extends Recipe {
             if (attributeNameOrValIsAlreadyPresent(it, singleton(attributeList.get(i)))) {
                 return it;
             }
-            return new J.Literal(randomId(), it.getPrefix(), EMPTY, attributeList.get(i), maybeQuoteStringArgument(annotation, attributeList.get(i)), null, JavaType.Primitive.String);
+            return newElement.apply(attributeList.get(i)).withPrefix(it.getPrefix());
         });
         // and add extra new items if needed
         for (int i = initializerList.size(); i < attributeList.size(); i++) {
-            list.add(new J.Literal(randomId(), SINGLE_SPACE, EMPTY, attributeList.get(i), maybeQuoteStringArgument(annotation, attributeList.get(i)), null, JavaType.Primitive.String));
+            list.add(newElement.apply(attributeList.get(i)));
         }
         return list;
     }

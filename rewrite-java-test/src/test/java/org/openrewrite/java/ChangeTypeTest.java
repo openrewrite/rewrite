@@ -1024,6 +1024,25 @@ class ChangeTypeTest implements RewriteTest {
         );
     }
 
+    @Test
+    void classToStringKeyword() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeType("java.lang.CharSequence", "String", true)),
+          java(
+            """
+              class A {
+                  CharSequence foo = "";
+              }
+              """,
+            """
+              class A {
+                  String foo = "";
+              }
+              """
+          )
+        );
+    }
+
     @Issue("https://github.com/openrewrite/rewrite/issues/698")
     @Test
     void importOrdering() {
