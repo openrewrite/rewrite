@@ -50,7 +50,7 @@ final class UnparsedSources {
     }
 
     void assertNoneThrow(List<SourceFile> sources, ExecutionContext recipeCtx, int cycles) {
-        if (changed.isEmpty() || Recipe.noop().equals(recipe) || Probes.isAdHoc(recipe)) {
+        if (changed.isEmpty() || Recipe.noop().equals(recipe) || NameMatching.isTestScaffolding(recipe)) {
             return;
         }
         Set<Class<?>> probedClasses = new HashSet<>();
@@ -98,8 +98,9 @@ final class UnparsedSources {
     private static @Nullable SourceFile unparsed(SourceFile before, Kind kind) {
         Markers markers = before.getMarkers();
         for (Marker marker : before.getMarkers().getMarkers()) {
-            // a resolution result comes from parsing the file itself
-            if (marker.getClass().getSimpleName().endsWith("ResolutionResult")) {
+            // these come from parsing the file itself
+            if (marker instanceof ParseWarning || marker instanceof ParseExceptionResult ||
+                marker.getClass().getSimpleName().endsWith("ResolutionResult")) {
                 markers = markers.removeByType(marker.getClass());
             }
         }
@@ -140,14 +141,17 @@ final class UnparsedSources {
         if (!markers.isEmpty()) {
             message.append(" with the markers of the test's source (").append(String.join(", ", markers)).append(')');
         }
-        return message.append(":\n").append(Probes.describe(thrown, "    "))
+        return message.append(":\n").append(Probes.describe(thrown, "    ", recipe))
                 .append("\nBesides the files the test gives it, a repository holds files their parser failed on, ")
                 .append("files left unparsed and files read as plain text, at the same paths and with the same ")
                 .append("markers as files the recipe edits.\n")
                 .append("  - visit with the visitor of the language the recipe edits, such as JavaIsoVisitor or ")
                 .append("YamlIsoVisitor, whose isAcceptable skips other kinds of source file\n")
                 .append("  - in a TreeVisitor<Tree, ExecutionContext>, check `instanceof` before a cast ")
-                .append("(`tree instanceof G.CompilationUnit`), not the file's path or markers\n")
+                .append("(`tree instanceof G.CompilationUnit`), not the file's path or markers, and don't ask a ")
+                .append("Quark or Binary for its charset\n")
+                .append("  - when the scanner found no file of the kind the recipe edits, generate and change ")
+                .append("nothing, instead of reading an empty accumulator\n")
                 .append("  - don't catch the exception to make this pass")
                 .toString();
     }

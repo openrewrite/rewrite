@@ -145,7 +145,7 @@ final class NameMatching {
     /**
      * Ad hoc recipes and recipes declared inside a test class are scaffolding for the test, not recipes under test.
      */
-    private static boolean isTestScaffolding(Recipe recipe) {
+    static boolean isTestScaffolding(Recipe recipe) {
         Class<?> recipeClass = recipe.getClass();
         if (recipe instanceof AdHocRecipe || recipe instanceof AdHocScanningRecipe ||
             recipeClass.isAnonymousClass() || recipeClass.isLocalClass()) {
@@ -221,7 +221,7 @@ final class NameMatching {
                 if (rerun.thrown != null && reproducible(result) && Probes.rejects(recipeCtx, rerun.thrown)) {
                     threw.append("  ").append(before.getSourcePath()).append(changedBy(result)).append(", ")
                             .append(respelling.getDescription()).append(":\n")
-                            .append(Probes.describe(rerun.thrown, "    ")).append('\n');
+                            .append(Probes.describe(rerun.thrown, "    ", SERIALIZER.read(recipe))).append('\n');
                     break;
                 }
                 if (misses(rerun, respelling, before, service) && reproducible(result)) {

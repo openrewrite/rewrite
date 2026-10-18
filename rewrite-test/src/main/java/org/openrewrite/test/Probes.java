@@ -151,9 +151,10 @@ final class Probes {
     }
 
     /**
-     * The exception the recipe threw, with the first line of its message and the first frame outside the JDK.
+     * The exception the recipe threw, with the first line of its message, the first frame outside the JDK and, when
+     * that frame isn't the recipe's, the first frame that is.
      */
-    static String describe(Throwable thrown, String indent) {
+    static String describe(Throwable thrown, String indent, Recipe recipe) {
         Throwable cause = thrown instanceof RecipeRunException && thrown.getCause() != null ?
                 thrown.getCause() : thrown;
         StringBuilder description = new StringBuilder(indent).append(cause.getClass().getName());
@@ -163,14 +164,39 @@ final class Probes {
             description.append(": ")
                     .append(firstLine.length() > 200 ? firstLine.substring(0, 200) + "..." : firstLine);
         }
+        Set<String> recipeClasses = new HashSet<>();
+        addClasses(recipe, recipeClasses);
+        boolean outsideJdk = false;
         for (StackTraceElement frame : cause.getStackTrace()) {
             String className = frame.getClassName();
-            if (!className.startsWith("java.") && !className.startsWith("jdk.") && !className.startsWith("sun.")) {
+            int nested = className.indexOf('$');
+            boolean ofRecipe = recipeClasses.contains(nested < 0 ? className : className.substring(0, nested));
+            if (!outsideJdk && !className.startsWith("java.") && !className.startsWith("jdk.") &&
+                !className.startsWith("sun.")) {
+                outsideJdk = true;
+                description.append('\n').append(indent).append("    at ").append(frame);
+                if (ofRecipe) {
+                    break;
+                }
+            } else if (outsideJdk && ofRecipe) {
                 description.append('\n').append(indent).append("    at ").append(frame);
                 break;
             }
         }
         return description.toString();
+    }
+
+    private static void addClasses(Recipe recipe, Set<String> classes) {
+        if (!classes.add(recipe.getClass().getName())) {
+            return;
+        }
+        try {
+            for (Recipe child : recipe.getRecipeList()) {
+                addClasses(child, classes);
+            }
+        } catch (Exception ignored) {
+            // a recipe that can't list its children is still named
+        }
     }
 
     static String typeName(Class<?> type) {

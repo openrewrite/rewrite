@@ -149,7 +149,7 @@ final class EmptySources {
         if (!markers.isEmpty()) {
             message.append(" with the markers of the test's source (").append(String.join(", ", markers)).append(')');
         }
-        return message.append(":\n").append(Probes.describe(thrown, "    "))
+        return message.append(":\n").append(Probes.describe(thrown, "    ", recipe))
                 .append("\nThe test gives the recipe only files that contain what it edits, but repositories ")
                 .append("also hold empty files and files without that block, such as a placeholder application.yml, ")
                 .append("a package-info.java or a subproject's empty build.gradle.\n")
