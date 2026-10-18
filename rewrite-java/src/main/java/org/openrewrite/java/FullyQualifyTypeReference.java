@@ -16,13 +16,32 @@
 package org.openrewrite.java;
 
 import lombok.AllArgsConstructor;
-import org.openrewrite.java.tree.J;
-import org.openrewrite.java.tree.JavaType;
-import org.openrewrite.java.tree.TypeUtils;
+import org.openrewrite.Tree;
+import org.openrewrite.java.tree.*;
+import org.openrewrite.marker.Markers;
+
+import java.util.List;
+
+import static java.util.Collections.emptyList;
 
 @AllArgsConstructor
 public class FullyQualifyTypeReference<P> extends JavaVisitor<P> {
     private final JavaType.FullyQualified typeToFullyQualify;
+
+    /**
+     * The fully qualified name of a type as the parser makes it of that text: a field access on each package and
+     * outer type, with the type on the last name.
+     */
+    static Expression qualifiedName(JavaType.FullyQualified type, Space prefix, List<J.Annotation> annotations) {
+        String name = type.getFullyQualifiedName();
+        if (name.indexOf('.') < 0 && name.indexOf('$') < 0) {
+            return new J.Identifier(Tree.randomId(), prefix, Markers.EMPTY, annotations, name, type, null);
+        }
+        J.FieldAccess qualified = TypeTree.build(name);
+        return qualified.withPrefix(prefix)
+                .withType(type)
+                .withName(qualified.getName().withAnnotations(annotations).withType(type));
+    }
 
     @Override
     public J visitFieldAccess(J.FieldAccess fieldAccess, P p) {
@@ -39,7 +58,7 @@ public class FullyQualifyTypeReference<P> extends JavaVisitor<P> {
         }
         JavaType.FullyQualified fullyQualified = TypeUtils.asFullyQualified(identifier.getType());
         if (fullyQualified != null && typeToFullyQualify.getFullyQualifiedName().equals(fullyQualified.getFullyQualifiedName())) {
-            return identifier.withSimpleName(typeToFullyQualify.getFullyQualifiedName());
+            return qualifiedName(fullyQualified, identifier.getPrefix(), identifier.getAnnotations());
         }
         return super.visitIdentifier(identifier, p);
     }

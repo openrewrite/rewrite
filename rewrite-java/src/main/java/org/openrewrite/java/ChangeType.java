@@ -34,6 +34,7 @@ import java.nio.file.Paths;
 import java.util.*;
 import java.util.concurrent.atomic.AtomicBoolean;
 
+import static java.util.Collections.emptyList;
 import static java.util.Objects.requireNonNull;
 
 @Value
@@ -378,6 +379,14 @@ public class ChangeType extends Recipe {
                 }
 
                 JavaSourceFile sf = getCursor().firstEnclosing(JavaSourceFile.class);
+                // a declaration's own name stays an identifier, while elsewhere the parser makes a qualified name
+                // into field accesses and a keyword into a primitive type
+                Object parent = getCursor().getParentTreeCursor().getValue();
+                boolean nameOnly = !ident.getAnnotations().isEmpty() ||
+                                   parent instanceof J.ClassDeclaration &&
+                                   ((J.ClassDeclaration) parent).getName().getId().equals(ident.getId()) ||
+                                   parent instanceof J.MethodDeclaration &&
+                                   ((J.MethodDeclaration) parent).getName().getId().equals(ident.getId());
                 if (ident.getSimpleName().equals(className)) {
                     if (targetType instanceof JavaType.FullyQualified) {
                         if (((JavaType.FullyQualified) targetType).getOwningClass() != null) {
@@ -387,11 +396,18 @@ public class ChangeType extends Recipe {
                         } else {
                             if (hasNoConflictingImport(sf)) {
                                 ident = ident.withSimpleName(((JavaType.FullyQualified) targetType).getClassName());
-                            } else {
+                            } else if (nameOnly) {
                                 ident = ident.withSimpleName(((JavaType.FullyQualified) targetType).getFullyQualifiedName());
+                            } else {
+                                return FullyQualifyTypeReference.qualifiedName((JavaType.FullyQualified) targetType,
+                                        ident.getPrefix(), emptyList());
                             }
                         }
                     } else if (targetType instanceof JavaType.Primitive) {
+                        if (!nameOnly) {
+                            return new J.Primitive(ident.getId(), ident.getPrefix(), ident.getMarkers(),
+                                    (JavaType.Primitive) targetType);
+                        }
                         ident = ident.withSimpleName(((JavaType.Primitive) targetType).getKeyword());
                     }
                 }
