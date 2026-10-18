@@ -177,7 +177,8 @@ public final class UnimportedReferences {
                     return identifier;
                 }
                 String typePackage = type.getPackageName();
-                if (!"java.lang".equals(typePackage) && !typePackage.equals(packageName) &&
+                // a type in the default package can't be imported at all
+                if (!typePackage.isEmpty() && !"java.lang".equals(typePackage) && !typePackage.equals(packageName) &&
                     !typePackage.equals(TEMPLATE_PACKAGE) && !declared.contains(identifier.getSimpleName()) &&
                     !imports.declaresType(type.getFullyQualifiedName(), typePackage)) {
                     f.add("`" + identifier.getSimpleName() + "` (" + type.getFullyQualifiedName() + ")");
@@ -190,7 +191,8 @@ public final class UnimportedReferences {
             }
 
             private boolean declaresStatic(JavaType.FullyQualified declaringType, String member, Cursor cursor) {
-                return name(declaringType).startsWith(TEMPLATE_PACKAGE + ".") ||
+                return declaringType.getPackageName().isEmpty() ||
+                       name(declaringType).startsWith(TEMPLATE_PACKAGE + ".") ||
                        inLexicalScope(declaringType, cursor) || imports.declaresStatic(declaringType, member);
             }
         }.visit(cu, found);
