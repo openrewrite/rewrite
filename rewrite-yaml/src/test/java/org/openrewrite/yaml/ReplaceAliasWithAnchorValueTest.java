@@ -85,10 +85,10 @@ class ReplaceAliasWithAnchorValueTest implements RewriteTest {
                 branches:
                   develop:
                     - step:
-                      name: Build and test
+                        name: Build and test
                   master:
                     - step:
-                      name: Build and Deploy
+                        name: Build and Deploy
               environments:
                 branches:
                   test:
