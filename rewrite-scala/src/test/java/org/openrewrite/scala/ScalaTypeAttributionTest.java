@@ -17,6 +17,7 @@ package org.openrewrite.scala;
 
 import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.Timeout;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.InMemoryExecutionContext;
 import org.openrewrite.SourceFile;
@@ -35,6 +36,7 @@ import org.openrewrite.test.RewriteTest;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Predicate;
 
@@ -1214,6 +1216,79 @@ class ScalaTypeAttributionTest implements RewriteTest {
             })
           )
         );
+    }
+
+    @Test
+    @Timeout(value = 60, unit = TimeUnit.SECONDS, threadMode = Timeout.ThreadMode.SEPARATE_THREAD)
+    void methodTypeParameterRepeatedInItsBound() {
+        rewriteRun(
+          scala(
+            """
+            trait Pair[A, B]
+            object Pairs {
+              def same[T <: Pair[T, T]](t: T): T = t
+            }
+            """,
+            spec -> spec.afterRecipe(cu -> {
+                J.MethodDeclaration same = find(cu, J.MethodDeclaration.class, m -> m.getSimpleName().equals("same"));
+                assertBoundIsPairOfItself(same.getMethodType().getParameterTypes().getFirst(), "T");
+            })
+          )
+        );
+    }
+
+    @Test
+    @Timeout(value = 60, unit = TimeUnit.SECONDS, threadMode = Timeout.ThreadMode.SEPARATE_THREAD)
+    void classTypeParameterRepeatedInItsBound() {
+        rewriteRun(
+          scala(
+            """
+            trait Pair[A, B]
+            class Node[T <: Pair[T, T]](val t: T)
+            """,
+            spec -> spec.afterRecipe(cu -> {
+                J.VariableDeclarations.NamedVariable t = find(cu, J.VariableDeclarations.NamedVariable.class, v -> v.getSimpleName().equals("t"));
+                assertBoundIsPairOfItself(t.getType(), "T");
+            })
+          )
+        );
+    }
+
+    @Test
+    @Timeout(value = 60, unit = TimeUnit.SECONDS, threadMode = Timeout.ThreadMode.SEPARATE_THREAD)
+    void typeParametersBoundingEachOther() {
+        rewriteRun(
+          scala(
+            """
+            trait Pair[A, B]
+            object Pairs {
+              def swap[T <: Pair[U, U], U <: Pair[T, T]](t: T, u: U): T = t
+            }
+            """,
+            spec -> spec.afterRecipe(cu -> {
+                J.MethodDeclaration swap = find(cu, J.MethodDeclaration.class, m -> m.getSimpleName().equals("swap"));
+                List<JavaType> parameterTypes = swap.getMethodType().getParameterTypes();
+                assertBoundIsPairOf(parameterTypes.get(0), "T", "U");
+                assertBoundIsPairOf(parameterTypes.get(1), "U", "T");
+            })
+          )
+        );
+    }
+
+    private static void assertBoundIsPairOfItself(JavaType type, String name) {
+        assertBoundIsPairOf(type, name, name);
+    }
+
+    private static void assertBoundIsPairOf(JavaType type, String name, String argumentName) {
+        assertThat(type).isInstanceOfSatisfying(JavaType.GenericTypeVariable.class, t -> {
+            assertThat(t.getName()).isEqualTo(name);
+            assertThat(t.getBounds()).singleElement().isInstanceOfSatisfying(JavaType.Parameterized.class, bound -> {
+                assertThat(bound.getFullyQualifiedName()).isEqualTo("Pair");
+                assertThat(bound.getTypeParameters()).hasSize(2).allSatisfy(argument ->
+                  assertThat(argument).isInstanceOfSatisfying(JavaType.GenericTypeVariable.class,
+                    a -> assertThat(a.getName()).isEqualTo(argumentName)));
+            });
+        });
     }
 
     @Test
