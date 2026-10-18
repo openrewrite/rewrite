@@ -1277,156 +1277,94 @@ export class JavaVisitor<P> extends TreeVisitor<J, P> {
         return finishDraft() as J2;
     }
 
+    // Built on first use, since the kinds come from a module that imports this one.
+    private static javaDispatch?: Map<string, (v: JavaVisitor<any>, t: J, p: any) => Promise<J | undefined>>;
+
+    private static createJavaDispatch(): Map<string, (v: JavaVisitor<any>, t: J, p: any) => Promise<J | undefined>> {
+        return new Map<string, (v: JavaVisitor<any>, t: J, p: any) => Promise<J | undefined>>([
+            [J.Kind.AnnotatedType, (v, t, p) => v.visitAnnotatedType(t as J.AnnotatedType, p)],
+            [J.Kind.Annotation, (v, t, p) => v.visitAnnotation(t as J.Annotation, p)],
+            [J.Kind.ArrayAccess, (v, t, p) => v.visitArrayAccess(t as J.ArrayAccess, p)],
+            [J.Kind.ArrayDimension, (v, t, p) => v.visitArrayDimension(t as J.ArrayDimension, p)],
+            [J.Kind.ArrayType, (v, t, p) => v.visitArrayType(t as J.ArrayType, p)],
+            [J.Kind.Assert, (v, t, p) => v.visitAssert(t as J.Assert, p)],
+            [J.Kind.Assignment, (v, t, p) => v.visitAssignment(t as J.Assignment, p)],
+            [J.Kind.AssignmentOperation, (v, t, p) => v.visitAssignmentOperation(t as J.AssignmentOperation, p)],
+            [J.Kind.Binary, (v, t, p) => v.visitBinary(t as J.Binary, p)],
+            [J.Kind.Block, (v, t, p) => v.visitBlock(t as J.Block, p)],
+            [J.Kind.Break, (v, t, p) => v.visitBreak(t as J.Break, p)],
+            [J.Kind.Case, (v, t, p) => v.visitCase(t as J.Case, p)],
+            [J.Kind.ClassDeclaration, (v, t, p) => v.visitClassDeclaration(t as J.ClassDeclaration, p)],
+            [J.Kind.ClassDeclarationKind, (v, t, p) => v.visitClassDeclarationKind(t as J.ClassDeclaration.Kind, p)],
+            [J.Kind.CompilationUnit, (v, t, p) => v.visitCompilationUnit(t as J.CompilationUnit, p)],
+            [J.Kind.Continue, (v, t, p) => v.visitContinue(t as J.Continue, p)],
+            [J.Kind.ControlParentheses, (v, t, p) => v.visitControlParentheses(t as J.ControlParentheses<J>, p)],
+            [J.Kind.DeconstructionPattern, (v, t, p) => v.visitDeconstructionPattern(t as J.DeconstructionPattern, p)],
+            [J.Kind.DoWhileLoop, (v, t, p) => v.visitDoWhileLoop(t as J.DoWhileLoop, p)],
+            [J.Kind.Empty, (v, t, p) => v.visitEmpty(t as J.Empty, p)],
+            [J.Kind.EnumValue, (v, t, p) => v.visitEnumValue(t as J.EnumValue, p)],
+            [J.Kind.EnumValueSet, (v, t, p) => v.visitEnumValueSet(t as J.EnumValueSet, p)],
+            [J.Kind.Erroneous, (v, t, p) => v.visitErroneous(t as J.Erroneous, p)],
+            [J.Kind.FieldAccess, (v, t, p) => v.visitFieldAccess(t as J.FieldAccess, p)],
+            [J.Kind.ForEachLoop, (v, t, p) => v.visitForEachLoop(t as J.ForEachLoop, p)],
+            [J.Kind.ForEachLoopControl, (v, t, p) => v.visitForEachLoopControl(t as J.ForEachLoop.Control, p)],
+            [J.Kind.ForLoop, (v, t, p) => v.visitForLoop(t as J.ForLoop, p)],
+            [J.Kind.ForLoopControl, (v, t, p) => v.visitForLoopControl(t as J.ForLoop.Control, p)],
+            [J.Kind.Identifier, (v, t, p) => v.visitIdentifier(t as J.Identifier, p)],
+            [J.Kind.If, (v, t, p) => v.visitIf(t as J.If, p)],
+            [J.Kind.IfElse, (v, t, p) => v.visitElse(t as J.If.Else, p)],
+            [J.Kind.Import, (v, t, p) => v.visitImport(t as J.Import, p)],
+            [J.Kind.InstanceOf, (v, t, p) => v.visitInstanceOf(t as J.InstanceOf, p)],
+            [J.Kind.IntersectionType, (v, t, p) => v.visitIntersectionType(t as J.IntersectionType, p)],
+            [J.Kind.Label, (v, t, p) => v.visitLabel(t as J.Label, p)],
+            [J.Kind.Lambda, (v, t, p) => v.visitLambda(t as J.Lambda, p)],
+            [J.Kind.LambdaParameters, (v, t, p) => v.visitLambdaParameters(t as J.Lambda.Parameters, p)],
+            [J.Kind.Literal, (v, t, p) => v.visitLiteral(t as J.Literal, p)],
+            [J.Kind.MemberReference, (v, t, p) => v.visitMemberReference(t as J.MemberReference, p)],
+            [J.Kind.MethodDeclaration, (v, t, p) => v.visitMethodDeclaration(t as J.MethodDeclaration, p)],
+            [J.Kind.MethodInvocation, (v, t, p) => v.visitMethodInvocation(t as J.MethodInvocation, p)],
+            [J.Kind.Modifier, (v, t, p) => v.visitModifier(t as J.Modifier, p)],
+            [J.Kind.MultiCatch, (v, t, p) => v.visitMultiCatch(t as J.MultiCatch, p)],
+            [J.Kind.NewArray, (v, t, p) => v.visitNewArray(t as J.NewArray, p)],
+            [J.Kind.NewClass, (v, t, p) => v.visitNewClass(t as J.NewClass, p)],
+            [J.Kind.NullableType, (v, t, p) => v.visitNullableType(t as J.NullableType, p)],
+            [J.Kind.Package, (v, t, p) => v.visitPackage(t as J.Package, p)],
+            [J.Kind.ParameterizedType, (v, t, p) => v.visitParameterizedType(t as J.ParameterizedType, p)],
+            [J.Kind.Parentheses, (v, t, p) => v.visitParentheses(t as J.Parentheses<J>, p)],
+            [J.Kind.ParenthesizedTypeTree, (v, t, p) => v.visitParenthesizedTypeTree(t as J.ParenthesizedTypeTree, p)],
+            [J.Kind.Primitive, (v, t, p) => v.visitPrimitive(t as J.Primitive, p)],
+            [J.Kind.Return, (v, t, p) => v.visitReturn(t as J.Return, p)],
+            [J.Kind.Switch, (v, t, p) => v.visitSwitch(t as J.Switch, p)],
+            [J.Kind.SwitchExpression, (v, t, p) => v.visitSwitchExpression(t as J.SwitchExpression, p)],
+            [J.Kind.Synchronized, (v, t, p) => v.visitSynchronized(t as J.Synchronized, p)],
+            [J.Kind.Ternary, (v, t, p) => v.visitTernary(t as J.Ternary, p)],
+            [J.Kind.Throw, (v, t, p) => v.visitThrow(t as J.Throw, p)],
+            [J.Kind.Try, (v, t, p) => v.visitTry(t as J.Try, p)],
+            [J.Kind.TryResource, (v, t, p) => v.visitTryResource(t as J.Try.Resource, p)],
+            [J.Kind.TryCatch, (v, t, p) => v.visitTryCatch(t as J.Try.Catch, p)],
+            [J.Kind.TypeCast, (v, t, p) => v.visitTypeCast(t as J.TypeCast, p)],
+            [J.Kind.TypeParameter, (v, t, p) => v.visitTypeParameter(t as J.TypeParameter, p)],
+            [J.Kind.TypeParameters, (v, t, p) => v.visitTypeParameters(t as J.TypeParameters, p)],
+            [J.Kind.Unary, (v, t, p) => v.visitUnary(t as J.Unary, p)],
+            [J.Kind.Unknown, (v, t, p) => v.visitUnknown(t as J.Unknown, p)],
+            [J.Kind.UnknownSource, (v, t, p) => v.visitUnknownSource(t as J.UnknownSource, p)],
+            [J.Kind.VariableDeclarations, (v, t, p) => v.visitVariableDeclarations(t as J.VariableDeclarations, p)],
+            [J.Kind.NamedVariable, (v, t, p) => v.visitVariable(t as J.VariableDeclarations.NamedVariable, p)],
+            [J.Kind.WhileLoop, (v, t, p) => v.visitWhileLoop(t as J.WhileLoop, p)],
+            [J.Kind.Wildcard, (v, t, p) => v.visitWildcard(t as J.Wildcard, p)],
+            [J.Kind.Yield, (v, t, p) => v.visitYield(t as J.Yield, p)],
+        ]);
+    }
+
     protected accept(t: J, p: P): Promise<J | undefined> {
-        switch (t.kind) {
-            case J.Kind.AnnotatedType:
-                return this.visitAnnotatedType(t as J.AnnotatedType, p);
-            case J.Kind.Annotation:
-                return this.visitAnnotation(t as J.Annotation, p);
-            case J.Kind.ArrayAccess:
-                return this.visitArrayAccess(t as J.ArrayAccess, p);
-            case J.Kind.ArrayDimension:
-                return this.visitArrayDimension(t as J.ArrayDimension, p);
-            case J.Kind.ArrayType:
-                return this.visitArrayType(t as J.ArrayType, p);
-            case J.Kind.Assert:
-                return this.visitAssert(t as J.Assert, p);
-            case J.Kind.Assignment:
-                return this.visitAssignment(t as J.Assignment, p);
-            case J.Kind.AssignmentOperation:
-                return this.visitAssignmentOperation(t as J.AssignmentOperation, p);
-            case J.Kind.Binary:
-                return this.visitBinary(t as J.Binary, p);
-            case J.Kind.Block:
-                return this.visitBlock(t as J.Block, p);
-            case J.Kind.Break:
-                return this.visitBreak(t as J.Break, p);
-            case J.Kind.Case:
-                return this.visitCase(t as J.Case, p);
-            case J.Kind.ClassDeclaration:
-                return this.visitClassDeclaration(t as J.ClassDeclaration, p);
-            case J.Kind.ClassDeclarationKind:
-                return this.visitClassDeclarationKind(t as J.ClassDeclaration.Kind, p);
-            case J.Kind.CompilationUnit:
-                return this.visitCompilationUnit(t as J.CompilationUnit, p);
-            case J.Kind.Continue:
-                return this.visitContinue(t as J.Continue, p);
-            case J.Kind.ControlParentheses:
-                return this.visitControlParentheses(t as J.ControlParentheses<J>, p);
-            case J.Kind.DeconstructionPattern:
-                return this.visitDeconstructionPattern(t as J.DeconstructionPattern, p);
-            case J.Kind.DoWhileLoop:
-                return this.visitDoWhileLoop(t as J.DoWhileLoop, p);
-            case J.Kind.Empty:
-                return this.visitEmpty(t as J.Empty, p);
-            case J.Kind.EnumValue:
-                return this.visitEnumValue(t as J.EnumValue, p);
-            case J.Kind.EnumValueSet:
-                return this.visitEnumValueSet(t as J.EnumValueSet, p);
-            case J.Kind.Erroneous:
-                return this.visitErroneous(t as J.Erroneous, p);
-            case J.Kind.FieldAccess:
-                return this.visitFieldAccess(t as J.FieldAccess, p);
-            case J.Kind.ForEachLoop:
-                return this.visitForEachLoop(t as J.ForEachLoop, p);
-            case J.Kind.ForEachLoopControl:
-                return this.visitForEachLoopControl(t as J.ForEachLoop.Control, p);
-            case J.Kind.ForLoop:
-                return this.visitForLoop(t as J.ForLoop, p);
-            case J.Kind.ForLoopControl:
-                return this.visitForLoopControl(t as J.ForLoop.Control, p);
-            case J.Kind.Identifier:
-                return this.visitIdentifier(t as J.Identifier, p);
-            case J.Kind.If:
-                return this.visitIf(t as J.If, p);
-            case J.Kind.IfElse:
-                return this.visitElse(t as J.If.Else, p);
-            case J.Kind.Import:
-                return this.visitImport(t as J.Import, p);
-            case J.Kind.InstanceOf:
-                return this.visitInstanceOf(t as J.InstanceOf, p);
-            case J.Kind.IntersectionType:
-                return this.visitIntersectionType(t as J.IntersectionType, p);
-            case J.Kind.Label:
-                return this.visitLabel(t as J.Label, p);
-            case J.Kind.Lambda:
-                return this.visitLambda(t as J.Lambda, p);
-            case J.Kind.LambdaParameters:
-                return this.visitLambdaParameters(t as J.Lambda.Parameters, p);
-            case J.Kind.Literal:
-                return this.visitLiteral(t as J.Literal, p);
-            case J.Kind.MemberReference:
-                return this.visitMemberReference(t as J.MemberReference, p);
-            case J.Kind.MethodDeclaration:
-                return this.visitMethodDeclaration(t as J.MethodDeclaration, p);
-            case J.Kind.MethodInvocation:
-                return this.visitMethodInvocation(t as J.MethodInvocation, p);
-            case J.Kind.Modifier:
-                return this.visitModifier(t as J.Modifier, p);
-            case J.Kind.MultiCatch:
-                return this.visitMultiCatch(t as J.MultiCatch, p);
-            case J.Kind.NewArray:
-                return this.visitNewArray(t as J.NewArray, p);
-            case J.Kind.NewClass:
-                return this.visitNewClass(t as J.NewClass, p);
-            case J.Kind.NullableType:
-                return this.visitNullableType(t as J.NullableType, p);
-            case J.Kind.Package:
-                return this.visitPackage(t as J.Package, p);
-            case J.Kind.ParameterizedType:
-                return this.visitParameterizedType(t as J.ParameterizedType, p);
-            case J.Kind.Parentheses:
-                return this.visitParentheses(t as J.Parentheses<J>, p);
-            case J.Kind.ParenthesizedTypeTree:
-                return this.visitParenthesizedTypeTree(t as J.ParenthesizedTypeTree, p);
-            case J.Kind.Primitive:
-                return this.visitPrimitive(t as J.Primitive, p);
-            case J.Kind.Return:
-                return this.visitReturn(t as J.Return, p);
-            case J.Kind.Switch:
-                return this.visitSwitch(t as J.Switch, p);
-            case J.Kind.SwitchExpression:
-                return this.visitSwitchExpression(t as J.SwitchExpression, p);
-            case J.Kind.Synchronized:
-                return this.visitSynchronized(t as J.Synchronized, p);
-            case J.Kind.Ternary:
-                return this.visitTernary(t as J.Ternary, p);
-            case J.Kind.Throw:
-                return this.visitThrow(t as J.Throw, p);
-            case J.Kind.Try:
-                return this.visitTry(t as J.Try, p);
-            case J.Kind.TryResource:
-                return this.visitTryResource(t as J.Try.Resource, p);
-            case J.Kind.TryCatch:
-                return this.visitTryCatch(t as J.Try.Catch, p);
-            case J.Kind.TypeCast:
-                return this.visitTypeCast(t as J.TypeCast, p);
-            case J.Kind.TypeParameter:
-                return this.visitTypeParameter(t as J.TypeParameter, p);
-            case J.Kind.TypeParameters:
-                return this.visitTypeParameters(t as J.TypeParameters, p);
-            case J.Kind.Unary:
-                return this.visitUnary(t as J.Unary, p);
-            case J.Kind.Unknown:
-                return this.visitUnknown(t as J.Unknown, p);
-            case J.Kind.UnknownSource:
-                return this.visitUnknownSource(t as J.UnknownSource, p);
-            case J.Kind.VariableDeclarations:
-                return this.visitVariableDeclarations(t as J.VariableDeclarations, p);
-            case J.Kind.NamedVariable:
-                return this.visitVariable(t as J.VariableDeclarations.NamedVariable, p);
-            case J.Kind.WhileLoop:
-                return this.visitWhileLoop(t as J.WhileLoop, p);
-            case J.Kind.Wildcard:
-                return this.visitWildcard(t as J.Wildcard, p);
-            case J.Kind.Yield:
-                return this.visitYield(t as J.Yield, p);
-            default:
-                const adapter = extendedJavaKinds.get(t.kind)
-                if (adapter) {
-                    return adapter(this).visit(t, p);
-                }
-                return Promise.resolve(t);
+        const visit = (JavaVisitor.javaDispatch ??= JavaVisitor.createJavaDispatch()).get(t.kind);
+        if (visit) {
+            return visit(this, t, p);
         }
+        const adapter = extendedJavaKinds.get(t.kind);
+        if (adapter) {
+            return adapter(this).visit(t, p);
+        }
+        return Promise.resolve(t);
     }
 }
