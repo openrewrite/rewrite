@@ -312,6 +312,24 @@ class MethodMatcherTest implements RewriteTest {
         }
 
         @Test
+        void matchUnknownTypesRejectsQualifiedCallOnAnotherType() {
+            var mi = asMethodInvocation("com.example.Assertions.assertTrue(true);", """
+              package com.example;
+              public class Assertions {
+                  public static void assertTrue(boolean condition) {
+                  }
+              }
+              """);
+            assertFalse(new MethodMatcher("org.junit.Assert assertTrue(boolean)").matches(mi, true));
+        }
+
+        @Test
+        void matchUnknownTypesOnAField() {
+            var mi = asMethodInvocation("this.helper.doSomething(true);");
+            assertTrue(new MethodMatcher("com.foo.MyHelper doSomething(boolean)").matches(mi, true));
+        }
+
+        @Test
         void matchUnknownTypesRejectsTooManyArguments() {
             var mi = asMethodInvocation("Assert.assertTrue(Foo.bar(), \"message\");");
             assertFalse(new MethodMatcher("org.junit.Assert assertTrue(boolean)").matches(mi, true));
