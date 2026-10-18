@@ -961,7 +961,9 @@ def _enumerate_artifact(artifact: str, root: str, client, by_fqn: Dict[str, Any]
         if 'tests' in own_module.split('.'):
             continue
         try:
-            with open(fp, 'r', encoding='utf-8') as fh:
+            # Line endings as ty reads them: translated, every line of a CRLF file would put
+            # the module-level bindings below one byte further from ty's nodes.
+            with open(fp, 'r', encoding='utf-8', newline='') as fh:
                 source = fh.read()
         except (OSError, UnicodeDecodeError):
             # A file in another encoding costs its own types, not the package's.

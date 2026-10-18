@@ -484,6 +484,25 @@ class TestExportedTypes:
         assert "suitelib.core.Engine" in by_fqn
         assert [fqn for fqn in by_fqn if "tests" in fqn.split(".")] == []
 
+    def test_module_level_api_of_a_file_with_crlf_line_endings(self, tmp_path):
+        pkg = tmp_path / "crlflib"
+        pkg.mkdir()
+        (pkg / "__init__.py").write_bytes(
+            b"import os\r\n"
+            b"\r\n"
+            b"GREETING = \"hello\"\r\n"
+            b"\r\n"
+            b"def shout(text: str) -> str:\r\n"
+            b"    return text.upper()\r\n")
+
+        by_fqn = self._enumerate(tmp_path, pkg)
+
+        module_type = by_fqn.get("crlflib")
+        assert isinstance(module_type, JavaType.Class)
+        assert {m._name for m in (module_type._methods or [])} == {"shout"}
+        greeting = next(v for v in module_type._members or [] if v._name == "GREETING")
+        assert greeting._type == JavaType.Primitive.String
+
     def test_a_file_in_another_encoding_costs_only_its_own_types(self, tmp_path):
         pkg = tmp_path / "latinlib"
         pkg.mkdir()
