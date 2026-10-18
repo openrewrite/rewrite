@@ -128,6 +128,36 @@ class ChangeValueTest implements RewriteTest {
     }
 
     @Test
+    void flowSequenceValue() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeValue("$.jobs.build.runs-on", "[ubuntu-latest, macos-latest]", null)),
+          yaml(
+            """
+              jobs:
+                build:
+                  runs-on: ubuntu-latest
+              """,
+            """
+              jobs:
+                build:
+                  runs-on: [ubuntu-latest, macos-latest]
+              """
+          )
+        );
+    }
+
+    @Test
+    void quotedValue() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeValue("$.include", "\"*\"", null)),
+          yaml(
+            "include: info",
+            "include: \"*\""
+          )
+        );
+    }
+
+    @Test
     void changeRelativeKey() {
         rewriteRun(
           spec -> spec.recipe(new ChangeValue(
