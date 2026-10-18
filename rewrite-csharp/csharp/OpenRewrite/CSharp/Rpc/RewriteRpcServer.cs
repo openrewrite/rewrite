@@ -1155,10 +1155,11 @@ public class RewriteRpcServer
         return declaration + Environment.NewLine + doc.Root!.ToString();
     }
 
-    private static void RunDotnet(string arguments)
+    private static void RunDotnet(string workingDirectory, string arguments)
     {
         var psi = new ProcessStartInfo("dotnet", arguments)
         {
+            WorkingDirectory = workingDirectory,
             RedirectStandardOutput = true,
             RedirectStandardError = true,
             UseShellExecute = false,
@@ -1191,7 +1192,7 @@ public class RewriteRpcServer
         var addArgs = $"add \"{stagingCsproj}\" package {packageName}";
         if (!string.IsNullOrWhiteSpace(requestedVersion))
             addArgs += $" --version {requestedVersion}";
-        RunDotnet(addArgs);
+        RunDotnet(Path.GetDirectoryName(stagingCsproj)!, addArgs);
 
         // dotnet add package preserves the requested constraint verbatim in the csproj;
         // the resolved concrete version lives in obj/project.assets.json.
@@ -1213,7 +1214,8 @@ public class RewriteRpcServer
         // isn't there yet. --no-restore reuses the staging project's restore.
         if (!File.Exists(Path.Combine(publishDir, "Recipes.dll")))
         {
-            RunDotnet($"publish \"{stagingCsproj}\" --no-restore -c Release -o \"{publishDir}\"");
+            RunDotnet(Path.GetDirectoryName(stagingCsproj)!,
+                $"publish \"{stagingCsproj}\" --no-restore -c Release -o \"{publishDir}\"");
         }
         return publishDir;
     }

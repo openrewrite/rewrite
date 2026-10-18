@@ -85,6 +85,7 @@ public class RpcFixture : IDisposable
         var classpath = File.ReadAllText(cpFile).Trim();
         var psi = new ProcessStartInfo("java", "org.openrewrite.maven.rpc.JavaRewriteRpc")
         {
+            WorkingDirectory = AppContext.BaseDirectory,
             RedirectStandardInput = true,
             RedirectStandardOutput = true,
             RedirectStandardError = true,
