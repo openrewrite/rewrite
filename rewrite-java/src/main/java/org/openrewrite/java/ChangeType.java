@@ -432,7 +432,8 @@ public class ChangeType extends Recipe implements RenamingRecipe {
                             }
                         }
                     } else if (targetType instanceof JavaType.Primitive) {
-                        if (!nameOnly) {
+                        // the parser makes `String` an identifier, not a primitive
+                        if (!nameOnly && targetType != JavaType.Primitive.String) {
                             return new J.Primitive(ident.getId(), ident.getPrefix(), ident.getMarkers(),
                                     (JavaType.Primitive) targetType);
                         }
