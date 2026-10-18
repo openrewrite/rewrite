@@ -39,7 +39,12 @@ import static java.util.Objects.requireNonNull;
 
 @Value
 @EqualsAndHashCode(callSuper = false)
-public class ChangeType extends Recipe {
+public class ChangeType extends Recipe implements RenamingRecipe {
+
+    /**
+     * The kind of name ChangeType and ChangePackage rename, which shares one namespace of dotted names.
+     */
+    static final String JAVA_TYPES_AND_PACKAGES = "Java type or package";
 
     @Option(displayName = "Old fully-qualified type name",
             description = "Fully-qualified class name of the original type.",
@@ -59,6 +64,29 @@ public class ChangeType extends Recipe {
     Boolean ignoreDefinition;
 
     String displayName = "Change type";
+
+    @Override
+    public String kindOfName() {
+        return JAVA_TYPES_AND_PACKAGES;
+    }
+
+    @Override
+    public String oldName() {
+        return oldFullyQualifiedTypeName;
+    }
+
+    @Override
+    public String rename(String name) {
+        // the types nested in the old type move with it
+        String oldName = oldFullyQualifiedTypeName.replace('$', '.');
+        String dotted = name.replace('$', '.');
+        if (dotted.equals(oldName)) {
+            return newFullyQualifiedTypeName;
+        } else if (dotted.startsWith(oldName + ".")) {
+            return newFullyQualifiedTypeName.replace('$', '.') + dotted.substring(oldName.length());
+        }
+        return name;
+    }
 
     @Override
     public String getInstanceNameSuffix() {

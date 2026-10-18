@@ -721,6 +721,9 @@ public interface RewriteTest extends SourceSpecs {
         importedNames.assertImported(recipeRun.getChangeset().getAllResults());
         new TreeShapes(quality.parserShapedTrees(), parsersFor, relativeTo, ctx)
                 .assertParserShaped(recipeRun.getChangeset().getAllResults(), runnableSourceFiles);
+        if (quality.orderStepsForEarlierChanges()) {
+            CompositeOrder.assertOrdered(recipe);
+        }
 
         if (nameMatching != null) {
             nameMatching.assertMatchedByType(recipeRun.getChangeset().getAllResults(), runTime);

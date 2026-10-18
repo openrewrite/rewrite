@@ -1801,6 +1801,103 @@ class RewriteTestTest implements RewriteTest {
     }
 
     @Nested
+    class OrderStepsForEarlierChanges {
+        private static final String RECURSIVE_FIRST = """
+          type: specs.openrewrite.org/v1beta/recipe
+          name: org.openrewrite.test.MovePackagesBroadFirst
+          displayName: Move packages
+          description: Moves a package and one of its subpackages.
+          recipeList:
+            - org.openrewrite.java.ChangePackage:
+                oldPackageName: a
+                newPackageName: x
+                recursive: true
+            - org.openrewrite.java.ChangePackage:
+                oldPackageName: a.b
+                newPackageName: y
+          """;
+
+        @Test
+        void rejectStepThatAnEarlierRenameShadows() {
+            AssertionError e = assertThrows(AssertionError.class, () -> rewriteRun(
+              spec -> spec.recipeFromYaml(RECURSIVE_FIRST, "org.openrewrite.test.MovePackagesBroadFirst"),
+              java(
+                """
+                  package a.b;
+                  class C {
+                  }
+                  """,
+                """
+                  package x.b;
+                  class C {
+                  }
+                  """
+              )
+            ));
+            assertThat(e).hasMessageStartingWith("Order the steps of a composite so that a step runs before the steps " +
+                                                 "that rename what it looks for")
+              .hasMessageContaining("ChangePackage `a.b` to `y` (step 2 of org.openrewrite.test.MovePackagesBroadFirst): " +
+                                    "ChangePackage `a` to `x` (step 1 of org.openrewrite.test.MovePackagesBroadFirst) " +
+                                    "renamed `a.b` to `x.b` first, so code that named it ends up as `x.b`, not `y`")
+              .hasMessageContaining("orderStepsForEarlierChanges(false)");
+        }
+
+        @Test
+        void acceptNarrowRenameFirst() {
+            rewriteRun(
+              spec -> spec.recipeFromYaml(
+                """
+                  type: specs.openrewrite.org/v1beta/recipe
+                  name: org.openrewrite.test.MovePackagesNarrowFirst
+                  displayName: Move packages
+                  description: Moves a subpackage and then the package it was in.
+                  recipeList:
+                    - org.openrewrite.java.ChangePackage:
+                        oldPackageName: a.b
+                        newPackageName: y
+                    - org.openrewrite.java.ChangePackage:
+                        oldPackageName: a
+                        newPackageName: x
+                        recursive: true
+                  """, "org.openrewrite.test.MovePackagesNarrowFirst"),
+              java(
+                """
+                  package a.b;
+                  class C {
+                  }
+                  """,
+                """
+                  package y;
+                  class C {
+                  }
+                  """
+              )
+            );
+        }
+
+        @Test
+        void optOut() {
+            rewriteRun(
+              spec -> spec.recipeFromYaml(RECURSIVE_FIRST.replace("MovePackagesBroadFirst", "MovePackagesOptOut"),
+                  "org.openrewrite.test.MovePackagesOptOut")
+                .recipeQualityValidation(RecipeQualityValidation.builder().orderStepsForEarlierChanges(false).build()),
+              java(
+                """
+                  package a.b;
+                  class C {
+                  }
+                  """,
+                """
+                  package x.b;
+                  class C {
+                  }
+                  """
+              )
+            );
+        }
+    }
+
+    @Nested
     class UnparsedSources {
 
         @Test

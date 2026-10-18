@@ -89,6 +89,13 @@ public class RecipeQualityValidation {
     private boolean parserShapedTrees = true;
 
     /**
+     * Controls whether a composite recipe is validated to run each step before the steps that rename what it looks
+     * for, such as a ChangeType of a type in a package before a ChangePackage of that package.
+     */
+    @Builder.Default
+    private boolean orderStepsForEarlierChanges = true;
+
+    /**
      * Enable all recipe quality checks.
      */
     public static RecipeQualityValidation all() {
@@ -116,6 +123,7 @@ public class RecipeQualityValidation {
                 .matchByTypeNotName(quality.matchByTypeNotName())
                 .importReferencedTypes(quality.importReferencedTypes())
                 .parserShapedTrees(quality.parserShapedTrees())
+                .orderStepsForEarlierChanges(quality.orderStepsForEarlierChanges())
                 .build();
     }
 }
