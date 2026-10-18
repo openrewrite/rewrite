@@ -42,6 +42,21 @@ class ChangePropertyValueTest implements RewriteTest {
     }
 
     @Test
+    void quotedNewValue() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangePropertyValue("management.endpoints.web.exposure.include", "\"*\"", null, null, null, null)),
+          yaml(
+            """
+              management.endpoints.web.exposure.include: info,health
+              """,
+            """
+              management.endpoints.web.exposure.include: "*"
+              """
+          )
+        );
+    }
+
+    @Test
     void simpleIndented() {
         rewriteRun(
           spec -> spec.recipe(new ChangePropertyValue("my.prop", "bar", null, null, null, null)),
