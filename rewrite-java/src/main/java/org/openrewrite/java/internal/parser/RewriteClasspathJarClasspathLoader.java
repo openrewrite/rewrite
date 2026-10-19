@@ -98,17 +98,7 @@ public class RewriteClasspathJarClasspathLoader implements JavaParserClasspathLo
 
     @Override
     public @Nullable Path load(String artifactName) {
-        return load(artifactName, false);
-    }
-
-    /// Like [#load(String)], but without falling back to an artifact whose artifactId merely starts with
-    /// the name, such as `netty-transport-classes-epoll` for `netty-transport`.
-    public @Nullable Path loadExactArtifact(String artifactName) {
-        return load(artifactName, true);
-    }
-
-    private @Nullable Path load(String artifactName, boolean coveredOnly) {
-        String resourcePath = selectJar(artifactName, resourcePaths, coveredOnly);
+        String resourcePath = selectJar(artifactName, resourcePaths);
         if (resourcePath == null) {
             return null;
         }
@@ -132,10 +122,10 @@ public class RewriteClasspathJarClasspathLoader implements JavaParserClasspathLo
     }
 
     /// Jar file names carry no separate artifactId, so it is taken to end before the first `-` followed by a digit.
-    static @Nullable String selectJar(String artifactName, List<String> resourcePaths, boolean coveredOnly) {
+    static @Nullable String selectJar(String artifactName, List<String> resourcePaths) {
         return new ArtifactNameMatcher(artifactName).select(resourcePaths,
                 path -> ARTIFACT_VERSION_SEPARATOR.split(artifactIdAndVersion(path), 2)[0],
-                RewriteClasspathJarClasspathLoader::artifactIdAndVersion, coveredOnly);
+                RewriteClasspathJarClasspathLoader::artifactIdAndVersion, false);
     }
 
     private static String artifactIdAndVersion(String resourcePath) {
@@ -151,10 +141,7 @@ public class RewriteClasspathJarClasspathLoader implements JavaParserClasspathLo
     public Collection<String> availableArtifacts() {
         List<String> available = new ArrayList<>(resourcePaths.size());
         for (String resourcePath : resourcePaths) {
-            String fileName = Paths.get(resourcePath).getFileName().toString();
-            if (fileName.endsWith(".jar")) {
-                available.add(fileName.substring(0, fileName.length() - 4));
-            }
+            available.add(artifactIdAndVersion(resourcePath));
         }
         sort(available);
         return available;

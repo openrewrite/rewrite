@@ -45,6 +45,8 @@ import java.util.zip.InflaterInputStream;
 import java.util.zip.ZipException;
 
 import static java.util.Collections.emptyList;
+import static java.util.Collections.enumeration;
+import static java.util.Collections.singletonList;
 import static java.util.Collections.sort;
 import static java.util.Objects.requireNonNull;
 import static java.util.stream.Collectors.toList;
@@ -130,8 +132,7 @@ public class TypeTable implements JavaParserClasspathLoader {
     }
 
     TypeTable(ExecutionContext ctx, URL url, Collection<String> artifactNames) {
-        read(url, artifactNames, ctx);
-        searchedArtifactNames.addAll(artifactNames);
+        this(ctx, enumeration(singletonList(url)), artifactNames);
     }
 
     TypeTable(ExecutionContext ctx, Enumeration<URL> resources, Collection<String> artifactNames) {
@@ -170,17 +171,17 @@ public class TypeTable implements JavaParserClasspathLoader {
         Collection<String> notWritten = new ArrayList<>(artifactNames.size());
         for (String artifactName : artifactNames) {
             boolean coveredOnly = !searchedArtifactNames.contains(artifactName);
-            if (select(artifactName, jarByArtifact.keySet(), coveredOnly) == null) {
+            if (select(artifactName, coveredOnly) == null) {
                 notWritten.add(artifactName);
             }
         }
         return notWritten;
     }
 
-    private static @Nullable GroupArtifactVersion select(String artifactName, Iterable<GroupArtifactVersion> gavs,
-                                                         boolean coveredOnly) {
-        return new ArtifactNameMatcher(artifactName).select(gavs, GroupArtifactVersion::getArtifactId,
-                gav -> gav.getArtifactId() + "-" + gav.getVersion(), coveredOnly);
+    private static Map.@Nullable Entry<GroupArtifactVersion, CompletableFuture<Path>> select(String artifactName,
+                                                                                           boolean coveredOnly) {
+        return new ArtifactNameMatcher(artifactName).select(jarByArtifact.entrySet(),
+                jar -> jar.getKey().getArtifactId(), jar -> jar.getKey().artifactIdAndVersion(), coveredOnly);
     }
 
     /**
@@ -301,10 +302,8 @@ public class TypeTable implements JavaParserClasspathLoader {
                         nestedTypesByOwner.clear();
                         resourcesByPath.clear();
 
-                        String artifactVersion = row.getArtifactId() + "-" + row.getVersion();
-
                         // Check if this artifact matches our predicate
-                        if (options.getArtifactMatcher().test(artifactVersion)) {
+                        if (options.getArtifactMatcher().test(rowGav.artifactIdAndVersion())) {
                             matchedGav = rowGav;
                         }
                     }
@@ -690,7 +689,7 @@ public class TypeTable implements JavaParserClasspathLoader {
             throw new UncheckedIOException(new IOException("Failed to create directory " + artifactDir));
         }
 
-        return artifactDir.resolve(gav.getArtifactId() + "-" + gav.getVersion() + ".jar");
+        return artifactDir.resolve(gav.artifactIdAndVersion() + ".jar");
     }
 
     public static Writer newWriter(OutputStream out) {
@@ -703,26 +702,15 @@ public class TypeTable implements JavaParserClasspathLoader {
 
     @Override
     public @Nullable Path load(String artifactName) {
-        return load(artifactName, false);
-    }
-
-    /// Like [#load(String)], but without falling back to an artifact whose artifactId merely starts with
-    /// the name, such as `netty-transport-classes-epoll` for `netty-transport`.
-    public @Nullable Path loadExactArtifact(String artifactName) {
-        return load(artifactName, true);
-    }
-
-    private @Nullable Path load(String artifactName, boolean coveredOnly) {
-        GroupArtifactVersion gav = select(artifactName, jarByArtifact.keySet(), coveredOnly);
-        CompletableFuture<Path> jar = gav == null ? null : jarByArtifact.get(gav);
-        return jar == null ? null : jar.join();
+        Map.Entry<GroupArtifactVersion, CompletableFuture<Path>> jar = select(artifactName, false);
+        return jar == null ? null : jar.getValue().join();
     }
 
     @Override
     public Collection<String> availableArtifacts() {
         List<String> available = new ArrayList<>(jarByArtifact.size());
         for (GroupArtifactVersion gav : jarByArtifact.keySet()) {
-            available.add(gav.getArtifactId() + "-" + gav.getVersion());
+            available.add(gav.artifactIdAndVersion());
         }
         sort(available);
         return available;
@@ -1172,6 +1160,10 @@ public class TypeTable implements JavaParserClasspathLoader {
         String groupId;
         String artifactId;
         String version;
+
+        String artifactIdAndVersion() {
+            return artifactId + "-" + version;
+        }
     }
 
     @Value

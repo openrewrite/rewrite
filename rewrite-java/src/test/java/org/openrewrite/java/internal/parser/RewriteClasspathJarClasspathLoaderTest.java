@@ -38,14 +38,13 @@ class RewriteClasspathJarClasspathLoaderTest {
       "netty-transport-classes-epoll-4, " + EPOLL
     })
     void prefersJarOfTheNamedArtifact(String artifactName, String expected) {
-        assertThat(selectJar(artifactName, List.of(EPOLL, TRANSPORT), false)).isEqualTo(expected);
-        assertThat(selectJar(artifactName, List.of(TRANSPORT, EPOLL), false)).isEqualTo(expected);
+        assertThat(selectJar(artifactName, List.of(EPOLL, TRANSPORT))).isEqualTo(expected);
+        assertThat(selectJar(artifactName, List.of(TRANSPORT, EPOLL))).isEqualTo(expected);
     }
 
     @Test
-    void fallsBackToPrefixOfArtifactIdOnlyWhenAllowed() {
-        assertThat(selectJar("netty-transport", List.of(EPOLL), false)).isEqualTo(EPOLL);
-        assertThat(selectJar("netty-transport", List.of(EPOLL), true)).isNull();
+    void fallsBackToPrefixOfArtifactId() {
+        assertThat(selectJar("netty-transport", List.of(EPOLL))).isEqualTo(EPOLL);
     }
 
     @Test
@@ -53,14 +52,14 @@ class RewriteClasspathJarClasspathLoaderTest {
         String log4j12Api = "META-INF/rewrite/classpath/log4j-1.2-api-2.20.0.jar";
         String log4j = "META-INF/rewrite/classpath/log4j-1.2.17.jar";
 
-        assertThat(selectJar("log4j-1.2-api", List.of(log4j, log4j12Api), false)).isEqualTo(log4j12Api);
-        assertThat(selectJar("log4j-1.2.17", List.of(log4j12Api, log4j), false)).isEqualTo(log4j);
+        assertThat(selectJar("log4j-1.2-api", List.of(log4j, log4j12Api))).isEqualTo(log4j12Api);
+        assertThat(selectJar("log4j-1.2.17", List.of(log4j12Api, log4j))).isEqualTo(log4j);
     }
 
     @Test
     void jarWithoutVersion() {
         String guava = "META-INF/rewrite/classpath/guava.jar";
 
-        assertThat(selectJar("guava", List.of(guava), true)).isEqualTo(guava);
+        assertThat(selectJar("guava", List.of(guava))).isEqualTo(guava);
     }
 }

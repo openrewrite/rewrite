@@ -139,30 +139,29 @@ public interface JavaParser extends Parser {
 
         TypeTable typeTable = TypeTable.fromClasspath(ctx, missingArtifactNames);
         if (typeTable != null) {
-            missingArtifactNames.removeIf(name -> {
-                Path located = typeTable.loadExactArtifact(name);
-                return located != null && artifacts.add(located);
-            });
+            for (Iterator<String> it = missingArtifactNames.iterator(); it.hasNext(); ) {
+                String missingArtifactName = it.next();
+                Path located = typeTable.load(missingArtifactName);
+                if (located != null) {
+                    artifacts.add(located);
+                    it.remove();
+                }
+            }
+            if (!missingArtifactNames.isEmpty()) {
+                availableArtifacts.addAll(typeTable.availableArtifacts());
+            }
         }
 
         if (!missingArtifactNames.isEmpty()) {
             try (RewriteClasspathJarClasspathLoader classpathLoader = new RewriteClasspathJarClasspathLoader(ctx)) {
-                List<Function<String, @Nullable Path>> lookups = new ArrayList<>(3);
-                lookups.add(classpathLoader::loadExactArtifact);
-                if (typeTable != null) {
-                    lookups.add(typeTable::load);
-                }
-                lookups.add(classpathLoader::load);
-                for (Function<String, @Nullable Path> lookup : lookups) {
-                    missingArtifactNames.removeIf(name -> {
-                        Path located = lookup.apply(name);
-                        return located != null && artifacts.add(located);
-                    });
+                for (String missingArtifactName : new ArrayList<>(missingArtifactNames)) {
+                    Path located = classpathLoader.load(missingArtifactName);
+                    if (located != null) {
+                        artifacts.add(located);
+                        missingArtifactNames.remove(missingArtifactName);
+                    }
                 }
                 if (!missingArtifactNames.isEmpty()) {
-                    if (typeTable != null) {
-                        availableArtifacts.addAll(typeTable.availableArtifacts());
-                    }
                     availableArtifacts.addAll(classpathLoader.availableArtifacts());
                 }
             }
