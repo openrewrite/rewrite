@@ -50,6 +50,9 @@ import {ParserInput} from "../parser";
 import {ReferenceMap} from "../reference";
 import {GetLanguages} from "./request/get-languages";
 
+// Each page is a round trip through both JSON-RPC stacks, so larger pages amortize it
+const DEFAULT_BATCH_SIZE = 5000;
+
 export class RewriteRpc {
     /**
      * Key for the active {@link RewriteRpc} connection on {@link globalThis}. A recipe package that
@@ -137,13 +140,13 @@ export class RewriteRpc {
         Generate.handle(this.connection, this.localObjects, preparedRecipes, recipeCursors, getObject, dataTableStore, options.metricsCsv);
         SetDataTableStore.handle(this.connection, store => this.configuredDataTableStore = store, options.metricsCsv);
         GetObject.handle(this.connection, this.remoteObjects, this.localObjects,
-            this.localRefs, options?.batchSize || 1000, traceGetObject, options.metricsCsv);
+            this.localRefs, options?.batchSize || DEFAULT_BATCH_SIZE, traceGetObject, options.metricsCsv);
         GetMarketplace.handle(this.connection, marketplace, recipeOrigin, options.metricsCsv);
         GetLanguages.handle(this.connection, options.metricsCsv);
         PrepareRecipe.handle(this.connection, marketplace, preparedRecipes, options.metricsCsv);
         Parse.handle(this.connection, this.localObjects, options.metricsCsv);
         ParseProject.handle(this.connection, this.localObjects, options.metricsCsv);
-        DependencyTypes.handle(this.connection, options?.batchSize || 1000, options.metricsCsv);
+        DependencyTypes.handle(this.connection, options?.batchSize || DEFAULT_BATCH_SIZE, options.metricsCsv);
         Print.handle(this.connection, getObject, getCursor, options.logger, options.metricsCsv);
         InstallRecipes.handle(this.connection, options.recipeInstallDir ?? ".rewrite", marketplace, recipeOrigin, options.logger, options.metricsCsv);
 

@@ -17,6 +17,7 @@ package org.openrewrite.xml;
 
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.Cursor;
+import org.openrewrite.FormattingListener;
 import org.openrewrite.SourceFile;
 import org.openrewrite.TreeVisitor;
 import org.openrewrite.internal.ListUtils;
@@ -45,6 +46,7 @@ public class XmlVisitor<P> extends TreeVisitor<Xml, P> {
 
     public <X extends Xml> X maybeAutoFormat(X before, X after, @Nullable Xml stopAfter, P p, Cursor cursor) {
         if (before != after) {
+            FormattingListener.beforeFormat(after, stopAfter, cursor);
             //noinspection unchecked
             return (X) new AutoFormatVisitor<>(stopAfter).visitNonNull(after, p, cursor);
         }
@@ -60,6 +62,7 @@ public class XmlVisitor<P> extends TreeVisitor<Xml, P> {
     }
 
     public <X extends Xml> X autoFormat(X j, @Nullable Xml stopAfter, P p, Cursor cursor) {
+        FormattingListener.beforeFormat(j, stopAfter, cursor);
         //noinspection unchecked
         return (X) new AutoFormatVisitor<>(stopAfter).visitNonNull(j, p, cursor);
     }

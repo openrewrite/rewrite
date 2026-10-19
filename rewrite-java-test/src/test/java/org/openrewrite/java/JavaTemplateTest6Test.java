@@ -24,6 +24,7 @@ import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.java.tree.Space;
 import org.openrewrite.java.tree.TypeUtils;
+import org.openrewrite.test.RecipeQualityValidation;
 import org.openrewrite.test.RewriteTest;
 
 import static java.util.Collections.emptyList;
@@ -284,7 +285,10 @@ class JavaTemplateTest6Test implements RewriteTest {
                   }
                   return super.visitMethodDeclaration(method, p);
               }
-          })).afterRecipe(run -> {
+          }))
+            // resolving List through the file's imports is what this tests
+            .recipeQualityValidation(RecipeQualityValidation.builder().importReferencedTypes(false).build())
+            .afterRecipe(run -> {
               var cu = (J.CompilationUnit) run.getChangeset().getAllResults().getFirst().getAfter();
               JavaType.Method type = ((J.MethodDeclaration) cu.getClasses().getFirst().getBody().getStatements().getFirst()).getMethodType();
               assertThat(type).isNotNull();

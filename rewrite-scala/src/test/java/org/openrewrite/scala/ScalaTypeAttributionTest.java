@@ -17,6 +17,7 @@ package org.openrewrite.scala;
 
 import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.Timeout;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.InMemoryExecutionContext;
 import org.openrewrite.SourceFile;
@@ -35,6 +36,7 @@ import org.openrewrite.test.RewriteTest;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Predicate;
 
@@ -788,6 +790,27 @@ class ScalaTypeAttributionTest implements RewriteTest {
     }
 
     @Test
+    void etaExpandedInitializerOfInferredValIsMarked() {
+        rewriteRun(
+          scala(
+            """
+            class Foo {
+              def inc(i: Int): Int = i + 1
+              val f = inc
+            }
+            """,
+            spec -> spec.afterRecipe(cu -> {
+                J.Identifier inc = findAll(cu, J.Identifier.class, i -> i.getSimpleName().equals("inc")).getLast();
+                assertThat(inc.getType()).isEqualTo(JavaType.Primitive.Int);
+                EtaExpansion eta = inc.getMarkers().findFirst(EtaExpansion.class).orElseThrow();
+                assertThat(eta.getMethod().getName()).isEqualTo("inc");
+                assertThat(TypeUtils.asParameterized(eta.getType()).getFullyQualifiedName()).isEqualTo("scala.Function1");
+            })
+          )
+        );
+    }
+
+    @Test
     void explicitEtaExpansionHasFunctionType() {
         rewriteRun(
           scala(
@@ -830,6 +853,37 @@ class ScalaTypeAttributionTest implements RewriteTest {
                 assertThat(wrongArity.getMethodType()).isNull();
                 J.NewClass newPerson = find(cu, J.NewClass.class, n -> true);
                 assertThat(newPerson.getConstructorType()).isNull();
+            })
+          )
+        );
+    }
+
+    @Test
+    void callsWithNonConformingTypeArgumentsHaveNoMethodType() {
+        rewriteRun(
+          spec -> spec.typeValidationOptions(org.openrewrite.test.TypeValidation.none()),
+          scala(
+            """
+            class Foo {
+              def num[T <: Number](t: T): T = t
+              val xs = List(1, 2)
+              val wrongKind = xs.to[Vector]
+              val outOfBounds = num[String]("a")
+              val conforming = num[Integer](1)
+              val inferred = List.empty[Int]
+            }
+            """,
+            spec -> spec.afterRecipe(cu -> {
+                J.MethodInvocation wrongKind = method(cu, "to");
+                List<J.MethodInvocation> ofNum = findAll(cu, J.MethodInvocation.class, m -> m.getSimpleName().equals("num"));
+                assertThat(wrongKind.getMethodType()).isNull();
+                assertThat(wrongKind.getType()).isNull();
+                assertThat(ofNum).hasSize(2);
+                assertThat(ofNum.getFirst().getMethodType()).isNull();
+                assertThat(ofNum.getLast().getMethodType()).isNotNull()
+                  .satisfies(m -> assertThat(m.getName()).isEqualTo("num"));
+                assertThat(method(cu, "empty").getMethodType()).isNotNull()
+                  .satisfies(m -> assertThat(m.getName()).isEqualTo("empty"));
             })
           )
         );
@@ -1162,6 +1216,79 @@ class ScalaTypeAttributionTest implements RewriteTest {
             })
           )
         );
+    }
+
+    @Test
+    @Timeout(value = 60, unit = TimeUnit.SECONDS, threadMode = Timeout.ThreadMode.SEPARATE_THREAD)
+    void methodTypeParameterRepeatedInItsBound() {
+        rewriteRun(
+          scala(
+            """
+            trait Pair[A, B]
+            object Pairs {
+              def same[T <: Pair[T, T]](t: T): T = t
+            }
+            """,
+            spec -> spec.afterRecipe(cu -> {
+                J.MethodDeclaration same = find(cu, J.MethodDeclaration.class, m -> m.getSimpleName().equals("same"));
+                assertBoundIsPairOfItself(same.getMethodType().getParameterTypes().getFirst(), "T");
+            })
+          )
+        );
+    }
+
+    @Test
+    @Timeout(value = 60, unit = TimeUnit.SECONDS, threadMode = Timeout.ThreadMode.SEPARATE_THREAD)
+    void classTypeParameterRepeatedInItsBound() {
+        rewriteRun(
+          scala(
+            """
+            trait Pair[A, B]
+            class Node[T <: Pair[T, T]](val t: T)
+            """,
+            spec -> spec.afterRecipe(cu -> {
+                J.VariableDeclarations.NamedVariable t = find(cu, J.VariableDeclarations.NamedVariable.class, v -> v.getSimpleName().equals("t"));
+                assertBoundIsPairOfItself(t.getType(), "T");
+            })
+          )
+        );
+    }
+
+    @Test
+    @Timeout(value = 60, unit = TimeUnit.SECONDS, threadMode = Timeout.ThreadMode.SEPARATE_THREAD)
+    void typeParametersBoundingEachOther() {
+        rewriteRun(
+          scala(
+            """
+            trait Pair[A, B]
+            object Pairs {
+              def swap[T <: Pair[U, U], U <: Pair[T, T]](t: T, u: U): T = t
+            }
+            """,
+            spec -> spec.afterRecipe(cu -> {
+                J.MethodDeclaration swap = find(cu, J.MethodDeclaration.class, m -> m.getSimpleName().equals("swap"));
+                List<JavaType> parameterTypes = swap.getMethodType().getParameterTypes();
+                assertBoundIsPairOf(parameterTypes.get(0), "T", "U");
+                assertBoundIsPairOf(parameterTypes.get(1), "U", "T");
+            })
+          )
+        );
+    }
+
+    private static void assertBoundIsPairOfItself(JavaType type, String name) {
+        assertBoundIsPairOf(type, name, name);
+    }
+
+    private static void assertBoundIsPairOf(JavaType type, String name, String argumentName) {
+        assertThat(type).isInstanceOfSatisfying(JavaType.GenericTypeVariable.class, t -> {
+            assertThat(t.getName()).isEqualTo(name);
+            assertThat(t.getBounds()).singleElement().isInstanceOfSatisfying(JavaType.Parameterized.class, bound -> {
+                assertThat(bound.getFullyQualifiedName()).isEqualTo("Pair");
+                assertThat(bound.getTypeParameters()).hasSize(2).allSatisfy(argument ->
+                  assertThat(argument).isInstanceOfSatisfying(JavaType.GenericTypeVariable.class,
+                    a -> assertThat(a.getName()).isEqualTo(argumentName)));
+            });
+        });
     }
 
     @Test

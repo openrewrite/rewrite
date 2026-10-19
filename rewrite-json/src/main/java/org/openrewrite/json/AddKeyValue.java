@@ -75,20 +75,27 @@ public class AddKeyValue extends Recipe {
                 obj = super.visitObject(obj, ctx);
 
                 if (pathMatcher.matches(getCursor()) && objectDoesNotContainKey(obj, key)) {
-                    List<Json> originalMembers = obj.getMembers();
-                    boolean jsonIsEmpty = originalMembers.isEmpty() || originalMembers.get(0) instanceof Json.Empty;
-                    Space space = jsonIsEmpty || Boolean.TRUE.equals(prepend) ? originalMembers.get(0).getPrefix() : Space.build("\n", emptyList());
-
+                    List<JsonRightPadded<Json>> members = obj.getPadding().getMembers();
+                    boolean jsonIsEmpty = members.isEmpty() || members.get(0).getElement() instanceof Json.Empty;
+                    Space space = jsonIsEmpty || Boolean.TRUE.equals(prepend) ?
+                            members.get(0).getElement().getPrefix() : Space.build("\n", emptyList());
                     Json newMember = new Json.Member(randomId(), space, Markers.EMPTY, rightPaddedKey(), parsedValue());
 
+                    // Format the new member as the only one in the object, leaving the other members as they are
+                    Json.JsonObject formatted = autoFormat(obj.withMembers(singletonList(newMember)), ctx,
+                            getCursor().getParentOrThrow());
                     if (jsonIsEmpty) {
-                        return autoFormat(obj.withMembers(singletonList(newMember)), ctx, getCursor().getParent());
+                        return formatted;
                     }
-
-                    List<Json> newMembers = Boolean.TRUE.equals(prepend) ?
-                            ListUtils.concat(newMember, originalMembers) :
-                            ListUtils.concat(originalMembers, newMember);
-                    return autoFormat(obj.withMembers(newMembers), ctx, getCursor().getParent());
+                    Json added = formatted.getMembers().get(0);
+                    if (Boolean.TRUE.equals(prepend)) {
+                        return obj.getPadding().withMembers(ListUtils.concat(
+                                new JsonRightPadded<>(added, Space.EMPTY, Markers.EMPTY), members));
+                    }
+                    Space beforeClosingBrace = members.get(members.size() - 1).getAfter();
+                    return obj.getPadding().withMembers(ListUtils.concat(
+                            ListUtils.mapLast(members, m -> m.withAfter(Space.EMPTY)),
+                            new JsonRightPadded<>(added, beforeClosingBrace, Markers.EMPTY)));
                 }
                 return obj;
             }

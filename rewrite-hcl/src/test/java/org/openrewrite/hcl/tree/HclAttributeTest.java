@@ -18,8 +18,12 @@ package org.openrewrite.hcl.tree;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.DocumentExample;
 import org.openrewrite.ExecutionContext;
+import org.openrewrite.Recipe;
 import org.openrewrite.hcl.HclVisitor;
 import org.openrewrite.test.RewriteTest;
+
+import java.util.ArrayList;
+import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.hcl.Assertions.hcl;
@@ -53,6 +57,81 @@ class HclAttributeTest implements RewriteTest {
               """
           )
         );
+    }
+
+    @Test
+    void booleanAttributeValue() {
+        rewriteRun(
+          spec -> spec.recipe(withAttributeValue("enabled", false)),
+          hcl(
+            """
+              provider {
+                  enabled = true
+              }
+              """,
+            """
+              provider {
+                  enabled = false
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void numericAttributeValue() {
+        rewriteRun(
+          spec -> spec.recipe(withAttributeValue("count", 3)),
+          hcl(
+            """
+              provider {
+                  count = 1
+              }
+              """,
+            """
+              provider {
+                  count = 3
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void unchangedNumericAttributeValue() {
+        rewriteRun(
+          spec -> spec.recipe(withAttributeValue("count", 1)),
+          hcl(
+            """
+              provider {
+                  count = 1
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void nonLiteralAttributeValueIsLeftAlone() {
+        rewriteRun(
+          spec -> spec.recipe(withAttributeValue("key", "goodbye")),
+          hcl(
+            """
+              provider {
+                  key = var.key
+              }
+              """
+          )
+        );
+    }
+
+    private static Recipe withAttributeValue(String attrName, Object value) {
+        return RewriteTest.toRecipe(() -> new HclVisitor<ExecutionContext>() {
+            @Override
+            public Hcl visitBlock(Hcl.Block block, ExecutionContext ctx) {
+                return block.withAttributeValue(attrName, value);
+            }
+        });
     }
 
     @Test
@@ -96,6 +175,43 @@ class HclAttributeTest implements RewriteTest {
               }
               """
           )
+        );
+    }
+
+    @Test
+    void simpleNameOfObjectKeys() {
+        List<String> names = new ArrayList<>();
+        rewriteRun(
+          spec -> spec.recipe(RewriteTest.toRecipe(() -> new HclVisitor<ExecutionContext>() {
+              @Override
+              public Hcl visitAttribute(Hcl.Attribute attribute, ExecutionContext ctx) {
+                  names.add(attribute.getSimpleName());
+                  return super.visitAttribute(attribute, ctx);
+              }
+          })),
+          hcl(
+            """
+              locals {
+                  objectvalue = {
+                    simple_attr = "value1"
+                    "quoted-attr" = "value2"
+                    (template_attr) = "value3"
+                    "${local.simple_str}quoted_template" = "value4"
+                    (local.a) = "value5"
+                    "" = "value6"
+                  }
+              }
+              """
+          )
+        );
+        assertThat(names).containsExactly(
+          "objectvalue",
+          "simple_attr",
+          "quoted-attr",
+          "template_attr",
+          "\"${local.simple_str}quoted_template\"",
+          "(local.a)",
+          ""
         );
     }
 }

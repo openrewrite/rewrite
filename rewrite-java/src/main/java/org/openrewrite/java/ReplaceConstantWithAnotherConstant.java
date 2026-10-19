@@ -21,6 +21,9 @@ import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
 import org.openrewrite.java.search.UsesType;
 import org.openrewrite.java.tree.*;
+import org.openrewrite.marker.Markers;
+
+import static java.util.Collections.emptyList;
 
 @Value
 @EqualsAndHashCode(callSuper = false)
@@ -90,14 +93,19 @@ public class ReplaceConstantWithAnotherConstant extends Recipe {
             }
 
             if (expression instanceof J.Identifier) {
-                String realName = hasNoConflictingImport ? newConstantName : newTargetType.getFullyQualifiedName();
+                J.Identifier identifier = (J.Identifier) expression;
                 if (hasNoConflictingImport) {
                     maybeAddImport(newOwningType.getFullyQualifiedName(), newConstantName, false);
+                    return identifier
+                            .withSimpleName(newConstantName)
+                            .withFieldType(fieldType.withOwner(newOwningType).withName(newConstantName));
                 }
-                J.Identifier identifier = (J.Identifier) expression;
-                return identifier
-                        .withSimpleName(realName)
-                        .withFieldType(fieldType.withOwner(newOwningType).withName(realName));
+                return new J.FieldAccess(Tree.randomId(), identifier.getPrefix(), Markers.EMPTY,
+                        FullyQualifyTypeReference.qualifiedName(newOwningType, Space.EMPTY, emptyList()),
+                        JLeftPadded.build(identifier.withPrefix(Space.EMPTY)
+                                .withSimpleName(newConstantName)
+                                .withFieldType(fieldType.withOwner(newOwningType).withName(newConstantName))),
+                        identifier.getType());
             } else if (expression instanceof J.FieldAccess) {
                 if (hasNoConflictingImport) {
                     maybeAddImport(newOwningType.getFullyQualifiedName(), false);
@@ -105,11 +113,13 @@ public class ReplaceConstantWithAnotherConstant extends Recipe {
                 J.FieldAccess fieldAccess = (J.FieldAccess) expression;
                 Expression target = fieldAccess.getTarget();
                 J.Identifier name = fieldAccess.getName();
-                String realName = hasNoConflictingImport ? newOwningType.getClassName() : newOwningType.getFullyQualifiedName();
-                if (target instanceof J.Identifier) {
-                    target = ((J.Identifier) target).withType(newOwningType).withSimpleName(realName);
+                if (!hasNoConflictingImport) {
+                    target = FullyQualifyTypeReference.qualifiedName(newOwningType, target.getPrefix(), emptyList());
+                } else if (target instanceof J.Identifier) {
+                    target = ((J.Identifier) target).withType(newOwningType).withSimpleName(newOwningType.getClassName());
                 } else {
-                    target = (((J.FieldAccess) target).getName()).withType(newOwningType).withSimpleName(realName);
+                    target = (((J.FieldAccess) target).getName()).withType(newOwningType)
+                            .withSimpleName(newOwningType.getClassName());
                 }
                 JavaType nameType = name.getType();
                 name = name

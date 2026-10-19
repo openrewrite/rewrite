@@ -125,6 +125,7 @@ class PythonPrinterParityTest {
         a **= 2; a //= 2; a @= m
         x = a if b else c
         x = not a
+        x = not(a), not[a], not{a}, not'a'
         x = -a + +b - ~c
         x = a < b <= c > d >= e == f != g
         x = a and b or c
@@ -184,6 +185,7 @@ class PythonPrinterParityTest {
 
         async def g(*, a):
             await a
+            await(a)
             async for i in a:
                 pass
             else:

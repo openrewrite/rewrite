@@ -75,6 +75,8 @@ public class JavaScriptRewriteRpc extends RewriteRpc {
 
     JavaScriptRewriteRpc(RewriteRpcProcess process, RecipeMarketplace marketplace, List<RecipeBundleResolver> resolvers, String command, Map<String, String> commandEnv) {
         super(process.getRpcClient(), marketplace, resolvers);
+        // Each page is a round trip through both JSON-RPC stacks, so larger pages amortize it
+        batchSize(5000);
         this.command = command;
         this.commandEnv = commandEnv;
         this.process = process;

@@ -15,18 +15,23 @@
 """Tests for the Python test harness."""
 
 from pathlib import Path
-from uuid import uuid4
+from typing import Callable, Optional
+from uuid import UUID, uuid4
 
 import pytest
 
-from rewrite import ExecutionContext, Recipe, TreeVisitor
-from rewrite.markers import Markers
+from rewrite import ExecutionContext, Recipe, TreeVisitor, random_id
+from rewrite.execution import Result
+from rewrite.markers import Marker, Markers, SearchResult
 from rewrite.test import RecipeSpec, python, pyproject, uv, from_visitor, dedent
+from rewrite.test.added_markers import assert_no_added_markers
 from rewrite.test.spec import SourceSpec
+from rewrite.python.markers import Quoted
 from rewrite.python.visitor import PythonVisitor
-from rewrite.java.tree import MethodInvocation, Yield
+from rewrite.java.tree import Identifier, MethodInvocation, Yield
 from rewrite.python.tree import Await, CompilationUnit
 from rewrite.java import J, JavaType, Space
+from rewrite.utils import lst_dataclass
 
 
 class TestDedent:
@@ -546,3 +551,130 @@ class TestWellFormedness:
                     """
                 )
             )
+
+
+def _type_name(marker_type: type) -> str:
+    return f"{marker_type.__module__}.{marker_type.__qualname__}"
+
+
+def _marking_calls(marker: Callable[[], Marker], rename: Optional[str] = None) -> Recipe:
+    """A recipe that adds ``marker()`` to every call, and renames the call when ``rename`` is given."""
+
+    class MarkCalls(PythonVisitor[ExecutionContext]):
+        def visit_method_invocation(self, mi: MethodInvocation, ctx: ExecutionContext) -> J:
+            mi = super().visit_method_invocation(mi, ctx)
+            if rename is not None:
+                mi = mi.replace(name=mi.name.replace(simple_name=rename))
+            return mi.replace(markers=mi.markers.add(marker()))
+
+    return from_visitor(MarkCalls())
+
+
+# The marker types a recipe defines for itself are declared in the tests that use them: one declared
+# at module level would count among the package's own marker types in tests/rpc/test_marker_codecs.py.
+class TestAddedMarkers:
+    """The harness rejects a recipe that leaves markers on the LST for its own use."""
+
+    def test_marker_added_alongside_a_change(self):
+        @lst_dataclass
+        class Visited(Marker):
+            _id: int | UUID
+
+        spec = RecipeSpec(recipe=_marking_calls(lambda: Visited(random_id()), rename="bar"), type_attribution=False)
+        with pytest.raises(AssertionError) as failure:
+            spec.rewrite_run(python("foo()\n", "bar()\n", path=Path("a.py")))
+
+        assert str(failure.value) == (
+            "The recipe added markers to the LST that neither the sources it was given nor a fresh parse of its "
+            "output contain:\n"
+            "  a.py\n"
+            f"    {_type_name(Visited)} on MethodInvocation `bar()`\n"
+            "Markers travel with the LST to every recipe that runs after this one and to every tool that reads the "
+            "result, so they are not a place for a recipe to keep information for itself. Instead:\n"
+            "  - share information between the visit methods of one visitor with cursor messages, "
+            "e.g. self.cursor.put_message(...) and self.cursor.get_nearest_message(...)\n"
+            "  - share information between source files, or from scanning to editing, through the accumulator of a "
+            "ScanningRecipe\n"
+            "  - keep the recipe idempotent by recognizing code it has already changed, rather than tagging that code\n"
+            "  - report a finding with SearchResult, and a problem with Markup"
+        )
+
+    def test_marker_added_without_a_change(self):
+        @lst_dataclass
+        class Visited(Marker):
+            _id: int | UUID
+
+        spec = RecipeSpec(recipe=_marking_calls(lambda: Visited(random_id())), type_attribution=False)
+        with pytest.raises(AssertionError) as failure:
+            spec.rewrite_run(python("foo()\n", path=Path("a.py")))
+
+        assert "  a.py (the printed source is unchanged)\n" in str(failure.value)
+        assert f"    {_type_name(Visited)} on MethodInvocation `foo()`\n" in str(failure.value)
+
+    def test_source_file_marker_moved_to_an_element(self):
+        @lst_dataclass
+        class BuildMetadata(Marker):
+            _id: int | UUID
+
+        def with_metadata(cu: CompilationUnit) -> CompilationUnit:
+            return cu.replace(markers=cu.markers.add(BuildMetadata(random_id())))
+
+        class MetadataOnCalls(PythonVisitor[ExecutionContext]):
+            def visit_method_invocation(self, mi: MethodInvocation, ctx: ExecutionContext) -> J:
+                metadata = self.cursor.first_enclosing_or_throw(CompilationUnit).markers.find_first(BuildMetadata)
+                return mi.replace(markers=mi.markers.add(metadata))
+
+        spec = RecipeSpec(recipe=from_visitor(MetadataOnCalls()), type_attribution=False)
+        with pytest.raises(AssertionError) as failure:
+            spec.rewrite_run(python("foo()\n", before_recipe=with_metadata))
+
+        assert f"    {_type_name(BuildMetadata)} on MethodInvocation `foo()`\n" in str(failure.value)
+
+    def test_search_result_passes(self):
+        spec = RecipeSpec(recipe=_marking_calls(lambda: SearchResult(random_id(), None)), type_attribution=False)
+        spec.rewrite_run(python("foo()\n", "/*~~>*/foo()\n"))
+
+    def test_syntax_marker_of_written_code_passes(self):
+        class QuoteAnnotation(PythonVisitor[ExecutionContext]):
+            def visit_identifier(self, ident: Identifier, ctx: ExecutionContext) -> J:
+                if ident.simple_name != "int":
+                    return ident
+                # A forward reference, which the parser marks as Quoted.
+                quoted = Quoted(random_id(), Quoted.Style.DOUBLE)
+                return ident.replace(simple_name="Model", markers=ident.markers.add(quoted))
+
+        spec = RecipeSpec(recipe=from_visitor(QuoteAnnotation()), type_attribution=False)
+        spec.rewrite_run(python("x: int = 1\n", 'x: "Model" = 1\n'))
+
+    def test_generated_source(self):
+        @lst_dataclass
+        class Visited(Marker):
+            _id: int | UUID
+
+        generated = RecipeSpec()._parse_python("x = 1\n", Path("b.py"), None, None)
+        generated = generated.replace(markers=generated.markers.add(Visited(random_id())))
+
+        with pytest.raises(AssertionError) as failure:
+            assert_no_added_markers([], [Result(None, generated)], lambda source_file: None)
+
+        assert f"  b.py (generated)\n    {_type_name(Visited)} on the source file\n" in str(failure.value)
+
+    def test_host_marker_held_as_a_mapping_is_named_by_its_host_type(self):
+        before = RecipeSpec()._parse_python("x = 1\n", Path("a.py"), None, None)
+        # How the RPC receiver holds a host marker that Python has no class for.
+        after = before.replace(markers=Markers(random_id(), [{'kind': 'org.example.HostMarker'}]))
+
+        with pytest.raises(AssertionError) as failure:
+            assert_no_added_markers([before], [Result(before, after)], lambda source_file: None)
+
+        assert "  a.py (the printed source is unchanged)\n    org.example.HostMarker on the source file\n" \
+               in str(failure.value)
+
+    def test_check_turned_off_passes(self):
+        @lst_dataclass
+        class Visited(Marker):
+            _id: int | UUID
+
+        spec = RecipeSpec(recipe=_marking_calls(lambda: Visited(random_id()), rename="bar"),
+                          check_reporting_markers_only=False, type_attribution=False)
+        spec.rewrite_run(python("foo()\n", "bar()\n"))

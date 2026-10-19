@@ -49,6 +49,33 @@ class AddKeyValueTest implements RewriteTest {
     }
 
     @Test
+    void keepFormattingOfOtherMembers() {
+        rewriteRun(
+          spec -> spec.recipe(new AddKeyValue("$", "key", "\"val\"", false)),
+          //language=json
+          json(
+            """
+              {
+                  "x": "x",
+                  "o": {"a": 1, "b": 2},
+                  "l": [1,
+                        2]
+              }
+              """,
+            """
+              {
+                  "x": "x",
+                  "o": {"a": 1, "b": 2},
+                  "l": [1,
+                        2],
+                  "key": "val"
+              }
+              """
+          )
+        );
+    }
+
+    @Test
     void shouldAppendToNestedObject() {
         rewriteRun(
           spec -> spec.recipe(new AddKeyValue("$.x.y.*", "key", "\"val\"", false)),

@@ -17,17 +17,13 @@ package org.openrewrite.json;
 
 import lombok.EqualsAndHashCode;
 import lombok.Value;
-import lombok.With;
 import org.intellij.lang.annotations.Language;
 import org.openrewrite.*;
 import org.openrewrite.json.tree.Json;
 import org.openrewrite.json.tree.JsonValue;
-import org.openrewrite.marker.Marker;
 import org.openrewrite.marker.SearchResult;
 
-import java.util.Objects;
 import java.util.Optional;
-import java.util.UUID;
 
 @Value
 @EqualsAndHashCode(callSuper = false)
@@ -58,19 +54,18 @@ public class ChangeValue extends Recipe {
         // Parse the value once here, outside the visitor
         // Try as keyword/number/array/object first, fallback to string
         Optional<JsonValue> jsonValue = parseValues(firstParserInput(), '"' + value + '"');
-        int optionsHash = Objects.hash(oldKeyPath, value);
         return new JsonIsoVisitor<ExecutionContext>() {
             @Override
             public Json.Member visitMember(Json.Member member, ExecutionContext ctx) {
                 Json.Member m = super.visitMember(member, ctx);
-                if (matcher.matches(getCursor()) &&
-                    !m.getMarkers().findFirst(Changed.class).map(c -> c.getRecipeOptionsHash() == optionsHash).orElse(false)) {
+                if (matcher.matches(getCursor())) {
                     if (!jsonValue.isPresent()) {
                         return SearchResult.found(m, "Could not parse value: " + value);
                     }
-                    JsonValue parsedValue = jsonValue.get();
-                    return m.withValue(parsedValue.withPrefix(m.getValue().getPrefix()))
-                            .withMarkers(m.getMarkers().add(new Changed(Tree.randomId(), optionsHash)));
+                    JsonValue parsedValue = jsonValue.get().withPrefix(m.getValue().getPrefix());
+                    if (!parsedValue.print(getCursor()).equals(m.getValue().print(getCursor()))) {
+                        return m.withValue(parsedValue);
+                    }
                 }
                 return m;
             }
@@ -95,12 +90,5 @@ public class ChangeValue extends Recipe {
                 .map(Json.Document.class::cast)
                 .findFirst()
                 .map(Json.Document::getValue);
-    }
-
-    @Value
-    @With
-    static class Changed implements Marker {
-        UUID id;
-        int recipeOptionsHash;
     }
 }

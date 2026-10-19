@@ -27,8 +27,7 @@ class ChangeNamespaceValueTest implements RewriteTest {
     @Test
     void replaceVersion24Test() {
         rewriteRun(
-          spec -> spec.recipe(new ChangeNamespaceValue("web-app", null, "http://java.sun.com/xml/ns/j2ee", "2.4", false, null, null))
-            .expectedCyclesThatMakeChanges(2),
+          spec -> spec.recipe(new ChangeNamespaceValue("web-app", null, "http://java.sun.com/xml/ns/j2ee", "2.4", false, null, null)),
           xml(
             """
               <web-app xmlns="http://java.sun.com/xml/ns/javaee" version="2.4"
@@ -53,8 +52,7 @@ class ChangeNamespaceValueTest implements RewriteTest {
     @Test
     void replaceVersion25Test() {
         rewriteRun(
-          spec -> spec.recipe(new ChangeNamespaceValue("web-app", null, "http://java.sun.com/xml/ns/java", "2.5,3.0", false, null, null))
-            .expectedCyclesThatMakeChanges(2),
+          spec -> spec.recipe(new ChangeNamespaceValue("web-app", null, "http://java.sun.com/xml/ns/java", "2.5,3.0", false, null, null)),
           xml(
             """
               <web-app xmlns="http://java.sun.com/xml/ns/j2ee" version="2.5"
@@ -79,8 +77,7 @@ class ChangeNamespaceValueTest implements RewriteTest {
     @Test
     void replaceVersion30Test() {
         rewriteRun(
-          spec -> spec.recipe(new ChangeNamespaceValue("web-app", null, "http://java.sun.com/xml/ns/java", "2.5,3.0", false, null, null))
-            .expectedCyclesThatMakeChanges(2),
+          spec -> spec.recipe(new ChangeNamespaceValue("web-app", null, "http://java.sun.com/xml/ns/java", "2.5,3.0", false, null, null)),
           xml(
             """
               <web-app xmlns="http://java.sun.com/xml/ns/j2ee" version="3.0"
@@ -105,8 +102,7 @@ class ChangeNamespaceValueTest implements RewriteTest {
     @Test
     void replaceVersion31Test() {
         rewriteRun(
-          spec -> spec.recipe(new ChangeNamespaceValue("web-app", null, "http://xmlns.jcp.org/xml/ns/javaee", "3.1+", false, null, null))
-            .expectedCyclesThatMakeChanges(2),
+          spec -> spec.recipe(new ChangeNamespaceValue("web-app", null, "http://xmlns.jcp.org/xml/ns/javaee", "3.1+", false, null, null)),
           xml(
             """
               <web-app xmlns="http://java.sun.com/xml/ns/j2ee" version="3.1"
@@ -131,8 +127,7 @@ class ChangeNamespaceValueTest implements RewriteTest {
     @Test
     void replaceVersion32Test() {
         rewriteRun(
-          spec -> spec.recipe(new ChangeNamespaceValue("web-app", null, "http://xmlns.jcp.org/xml/ns/javaee", "3.1+", false, null, null))
-            .expectedCyclesThatMakeChanges(2),
+          spec -> spec.recipe(new ChangeNamespaceValue("web-app", null, "http://xmlns.jcp.org/xml/ns/javaee", "3.1+", false, null, null)),
           xml(
             """
               <web-app xmlns="http://java.sun.com/xml/ns/j2ee" version="3.2"

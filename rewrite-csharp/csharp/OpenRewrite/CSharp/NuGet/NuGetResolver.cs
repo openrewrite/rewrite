@@ -49,6 +49,13 @@ namespace OpenRewrite.CSharp.NuGet;
 /// directory that exists before each evaluation.
 /// </para>
 /// <para>
+/// An in-process build moves the process working directory to the project's directory and swaps
+/// the process environment for the length of the build. Every in-process evaluation or build, and
+/// anything that starts a child process inheriting the working directory it cannot choose itself
+/// (MSBuildWorkspace's BuildHost), runs inside <see cref="EnterOperatingEnvironment"/>, so none of
+/// them sees another's borrowed directory or environment.
+/// </para>
+/// <para>
 /// <c>MSBuildLocator.Register*</c> is NOT needed with current MSBuild libraries and must not be
 /// reintroduced. Reference <c>Microsoft.Build</c>, <c>Microsoft.Build.Tasks.Core</c> and
 /// <c>Microsoft.Build.Utilities.Core</c>, and name the SDK here.
@@ -57,11 +64,48 @@ namespace OpenRewrite.CSharp.NuGet;
 internal static class MSBuildEnvironment
 {
     private static readonly object Lock = new();
+    private static readonly SemaphoreSlim OperatingEnvironmentGate = new(1, 1);
     private static bool _configured;
+
+    public static IDisposable EnterOperatingEnvironment()
+    {
+        OperatingEnvironmentGate.Wait();
+        return Entered();
+    }
+
+    public static async Task<IDisposable> EnterOperatingEnvironmentAsync(CancellationToken ct)
+    {
+        await OperatingEnvironmentGate.WaitAsync(ct);
+        return Entered();
+    }
+
+    private static IDisposable Entered()
+    {
+        try
+        {
+            EnsureWorkingDirectory();
+        }
+        catch
+        {
+            OperatingEnvironmentGate.Release();
+            throw;
+        }
+        return new OperatingEnvironmentLease();
+    }
+
+    private sealed class OperatingEnvironmentLease : IDisposable
+    {
+        private int _released;
+
+        public void Dispose()
+        {
+            if (Interlocked.Exchange(ref _released, 1) == 0)
+                OperatingEnvironmentGate.Release();
+        }
+    }
 
     public static void Ensure()
     {
-        EnsureWorkingDirectory();
         lock (Lock)
         {
             if (_configured)
@@ -83,7 +127,7 @@ internal static class MSBuildEnvironment
         }
     }
 
-    public static void EnsureWorkingDirectory()
+    private static void EnsureWorkingDirectory()
     {
         try
         {
@@ -451,8 +495,6 @@ public static class NuGetResolver
         properties["CheckEolWorkloads"] = "false";
     }
 
-    private static readonly object BuildGate = new();
-
     /// <summary>The workloads a project needs but the SDK does not have installed.</summary>
     /// <param name="TargetFramework">The target framework that needs them.</param>
     /// <param name="Workloads">Installable workload IDs that provide the missing packs.</param>
@@ -477,7 +519,7 @@ public static class NuGetResolver
 
         try
         {
-            lock (BuildGate)
+            using (MSBuildEnvironment.EnterOperatingEnvironment())
             {
                 using var projectCollection = new ProjectCollection(globalProps);
                 var instance = new ProjectInstance(projectPath, globalProps, null, projectCollection);
@@ -523,7 +565,7 @@ public static class NuGetResolver
 
         try
         {
-            lock (BuildGate)
+            using (MSBuildEnvironment.EnterOperatingEnvironment())
             {
                 using var projectCollection = new ProjectCollection(globalProps);
                 var instance = new ProjectInstance(projectPath, globalProps, null, projectCollection);
@@ -731,7 +773,7 @@ public static class NuGetResolver
         Dictionary<string, string> globalProps,
         SerilogMSBuildLogger buildLogger)
     {
-        lock (BuildGate)
+        using (MSBuildEnvironment.EnterOperatingEnvironment())
         {
             using var projectCollection = new ProjectCollection(globalProps);
             var parameters = new BuildParameters(projectCollection)
@@ -768,7 +810,7 @@ public static class NuGetResolver
 
     private static Version? NetCoreAppMaximumVersion(string projectPath, Dictionary<string, string> globalProps)
     {
-        lock (BuildGate)
+        using (MSBuildEnvironment.EnterOperatingEnvironment())
         {
             using var projectCollection = new ProjectCollection(globalProps);
             var instance = new ProjectInstance(projectPath, globalProps, null, projectCollection);

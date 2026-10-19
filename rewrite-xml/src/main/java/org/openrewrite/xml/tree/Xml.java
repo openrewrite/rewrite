@@ -25,12 +25,14 @@ import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
 import org.openrewrite.internal.CommentService;
 import org.openrewrite.internal.StringUtils;
+import org.openrewrite.internal.TreeShapeValidationService;
 import org.openrewrite.internal.WhitespaceValidationService;
 import org.openrewrite.marker.Markers;
 import org.openrewrite.xml.XmlParser;
 import org.openrewrite.xml.XmlVisitor;
 import org.openrewrite.xml.internal.WithPrefix;
 import org.openrewrite.xml.internal.XmlPrinter;
+import org.openrewrite.xml.internal.XmlTreeShapeValidationService;
 import org.openrewrite.xml.internal.XmlWhitespaceValidationService;
 import org.openrewrite.xml.service.XmlCommentService;
 
@@ -169,6 +171,8 @@ public interface Xml extends Tree {
                 return (T) new XmlWhitespaceValidationService();
             } else if (CommentService.class.getName().equals(service.getName())) {
                 return (T) new XmlCommentService();
+            } else if (TreeShapeValidationService.class.getName().equals(service.getName())) {
+                return (T) new XmlTreeShapeValidationService();
             }
             return SourceFileWithReferences.super.service(service);
         }
