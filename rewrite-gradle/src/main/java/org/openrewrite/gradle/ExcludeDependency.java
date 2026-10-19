@@ -45,6 +45,7 @@ import org.openrewrite.kotlin.tree.K;
 import org.openrewrite.maven.tree.Dependency;
 import org.openrewrite.maven.tree.GroupArtifact;
 import org.openrewrite.maven.tree.MavenRepository;
+import org.openrewrite.maven.tree.ResolvedDependency;
 import org.openrewrite.tree.ParseError;
 
 import java.nio.file.Paths;
@@ -185,7 +186,7 @@ public class ExcludeDependency extends Recipe {
                     }
 
                     // Transitive match (null side = match anything).
-                    if (dep.getResolvedDependency().findDependency(effG, effA) == null) {
+                    if (!transitivelyIncludes(dep, effG, effA)) {
                         return m;
                     }
 
@@ -207,6 +208,37 @@ public class ExcludeDependency extends Recipe {
                             ListUtils.concat(existingExclusions(m, kotlinDsl), toGroupArtifact(effG, effA))));
                     return attachExclude(m, dep.getCursor(), kotlinDsl, effG, effA, ctx);
                 });
+    }
+
+    private static boolean transitivelyIncludes(GradleDependency dep, @Nullable String g, @Nullable String a) {
+        ResolvedDependency resolved = dep.getResolvedDependency();
+        if (resolved.findDependency(g, a) != null) {
+            return true;
+        }
+        if (!resolved.getDependencies().isEmpty()) {
+            return false;
+        }
+        // After an earlier change to the model, the trait only re-resolves direct dependencies, without their transitives
+        GradleProject gp = dep.getCursor().firstEnclosingOrThrow(JavaSourceFile.class)
+                .getMarkers().findFirst(GradleProject.class).orElse(null);
+        GradleDependencyConfiguration conf = gp == null ? null : gp.getConfiguration(dep.getConfigurationName());
+        if (conf == null) {
+            return false;
+        }
+        List<GradleDependencyConfiguration> resolvable = conf.isCanBeResolved() ?
+                singletonList(conf) : gp.configurationsExtendingFrom(conf, true);
+        for (GradleDependencyConfiguration c : resolvable) {
+            if (!c.isCanBeResolved()) {
+                continue;
+            }
+            for (ResolvedDependency rd : c.getDirectResolved()) {
+                if (rd.getGroupId().equals(resolved.getGroupId()) && rd.getArtifactId().equals(resolved.getArtifactId()) &&
+                        rd.findDependency(g, a) != null) {
+                    return true;
+                }
+            }
+        }
+        return false;
     }
 
     @Value
