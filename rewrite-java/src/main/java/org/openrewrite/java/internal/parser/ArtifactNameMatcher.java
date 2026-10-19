@@ -24,8 +24,9 @@ import java.util.regex.Pattern;
 /// `log4j-api-2.+`, against `artifactId-version` strings.
 ///
 /// The name is a pattern prefix, so `netty-transport` also matches `netty-transport-classes-epoll-4.2.19.Final`.
-/// When several candidates match, the one whose artifactId the name covers wins, so that the result does not
-/// depend on candidate order.
+/// When several candidates match, the one whose artifactId the name covers wins. Failing that, the shortest
+/// artifactId wins, being the closest to the name. Only candidates with equally long artifactIds, such as two
+/// versions of one artifact, are still picked in candidate order.
 final class ArtifactNameMatcher {
     private final String artifactName;
     private final Pattern pattern;
@@ -48,13 +49,16 @@ final class ArtifactNameMatcher {
     <T> @Nullable T select(Iterable<T> candidates, Function<T, String> artifactId,
                            Function<T, String> artifactIdAndVersion, boolean coveredOnly) {
         T fallback = null;
+        int fallbackLength = Integer.MAX_VALUE;
         for (T candidate : candidates) {
             if (matches(artifactIdAndVersion.apply(candidate))) {
-                if (covers(artifactId.apply(candidate))) {
+                String id = artifactId.apply(candidate);
+                if (covers(id)) {
                     return candidate;
                 }
-                if (fallback == null && !coveredOnly) {
+                if (!coveredOnly && id.length() < fallbackLength) {
                     fallback = candidate;
+                    fallbackLength = id.length();
                 }
             }
         }

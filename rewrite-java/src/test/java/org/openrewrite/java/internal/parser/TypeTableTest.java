@@ -996,7 +996,7 @@ class TypeTableTest implements RewriteTest {
 
             TypeTable table = new TypeTable(ctx, tsv.toUri().toURL(), List.of("netty-trans"));
 
-            assertThat(table.load("netty-trans")).isNotNull();
+            assertThat(table.load("netty-trans")).hasFileName("netty-transport-4.2.19.Final.jar");
         }
 
         @Test

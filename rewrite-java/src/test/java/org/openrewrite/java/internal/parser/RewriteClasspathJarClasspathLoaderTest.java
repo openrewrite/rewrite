@@ -48,6 +48,12 @@ class RewriteClasspathJarClasspathLoaderTest {
     }
 
     @Test
+    void fallsBackToShortestArtifactIdTheNameIsAPrefixOf() {
+        assertThat(selectJar("netty-trans", List.of(EPOLL, TRANSPORT))).isEqualTo(TRANSPORT);
+        assertThat(selectJar("netty-trans", List.of(TRANSPORT, EPOLL))).isEqualTo(TRANSPORT);
+    }
+
+    @Test
     void artifactIdsContainingDigits() {
         String log4j12Api = "META-INF/rewrite/classpath/log4j-1.2-api-2.20.0.jar";
         String log4j = "META-INF/rewrite/classpath/log4j-1.2.17.jar";
