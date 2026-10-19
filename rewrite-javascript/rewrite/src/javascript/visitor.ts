@@ -992,6 +992,7 @@ export class JavaScriptVisitor<P> extends JavaVisitor<P> {
         const updates: any = {
             prefix: await this.visitSpace(forOfLoop.prefix, p),
             markers: await this.visitMarkers(forOfLoop.markers, p),
+            await: forOfLoop.await && await this.visitSpace(forOfLoop.await, p),
             loop: await this.visitDefined<J.ForEachLoop>(forOfLoop.loop, p)
         };
         return updateIfChanged(forOfLoop, updates);
