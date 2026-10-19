@@ -761,7 +761,7 @@ public class RewriteRpc {
                 () -> {
                     CompletableFuture<JsonRpcSuccess> pending = nextPage.getAndSet(null);
                     awaitingPage.set(true);
-                    GetObjectResponse page = await(pending == null ? request("GetObject", request) : pending,
+                    GetObjectResponse page = await(pending == null ? request("GetObject", request, GetObjectResponse.class) : pending,
                             GetObjectResponse.class);
                     awaitingPage.set(false);
                     // The following page is requested before this one is handed over, so the
@@ -769,7 +769,7 @@ public class RewriteRpc {
                     // in END_OF_OBJECT has no successor, and asking for one would restart the
                     // transfer rather than return nothing.
                     if (!page.isEmpty() && page.get(page.size() - 1).getState() != END_OF_OBJECT) {
-                        nextPage.set(request("GetObject", request));
+                        nextPage.set(request("GetObject", request, GetObjectResponse.class));
                     }
                     return page;
                 },
@@ -828,7 +828,7 @@ public class RewriteRpc {
     }
 
     protected <P> P send(String method, @Nullable RpcRequest body, Class<P> responseType) {
-        return await(request(method, body), responseType);
+        return await(request(method, body, responseType), responseType);
     }
 
     /**
@@ -836,9 +836,9 @@ public class RewriteRpc {
      * one in flight while it works through the current response. Requests carry distinct
      * ids and their futures complete independently, so several may be outstanding.
      */
-    private CompletableFuture<JsonRpcSuccess> request(String method, @Nullable RpcRequest body) {
+    private CompletableFuture<JsonRpcSuccess> request(String method, @Nullable RpcRequest body, Class<?> responseType) {
         checkLiveness();
-        return jsonRpc.send(JsonRpcRequest.newRequest(method, body));
+        return jsonRpc.send(JsonRpcRequest.newRequest(method, body), responseType);
     }
 
     private <P> P await(CompletableFuture<JsonRpcSuccess> future, Class<P> responseType) {
