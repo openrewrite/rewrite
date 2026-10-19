@@ -58,7 +58,7 @@ test("flags of a class, its method and its member survive an RPC round trip", as
     const sq = new RpcSendQueue(new ReferenceMap(), undefined, false);
     await sq.send(asRef(cls), undefined, () => new JavaSender().visitType(cls, sq));
     const batch = sq.finish();
-    const rq = new RpcReceiveQueue(new Map(), undefined, async () => batch, undefined, false);
+    const rq = new RpcReceiveQueue(new Map(), undefined, [batch], undefined, false);
     const received = await rq.receive<Type>(undefined, t => new JavaReceiver().visitType(t, rq)) as Type.Class;
 
     expect(received.flags).toBe(CLASS_FLAGS);
