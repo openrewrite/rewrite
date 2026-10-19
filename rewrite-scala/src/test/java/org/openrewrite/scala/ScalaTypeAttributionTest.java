@@ -21,6 +21,7 @@ import org.openrewrite.ExecutionContext;
 import org.openrewrite.InMemoryExecutionContext;
 import org.openrewrite.SourceFile;
 import org.openrewrite.java.JavaParser;
+import org.openrewrite.java.MethodMatcher;
 import org.openrewrite.java.internal.JavaTypeCache;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaType;
@@ -1261,6 +1262,68 @@ class ScalaTypeAttributionTest implements RewriteTest {
         // then
         J.VariableDeclarations xs = (J.VariableDeclarations) cu.getClasses().getFirst().getBody().getStatements().getFirst();
         assertThat(TypeUtils.isAssignableTo("java.util.List", xs.getType())).isTrue();
+    }
+
+    @Test
+    void arrayTypesAreJavaArrays() {
+        rewriteRun(
+          scala(
+            """
+            class Foo {
+              val names: Array[String] = "a,b".split(",")
+              val nums = Array(1, 2)
+              val grid: Array[Array[Int]] = Array(Array(1))
+            }
+            """,
+            spec -> spec.afterRecipe(cu -> {
+                // given
+                J.VariableDeclarations.NamedVariable names = find(cu, J.VariableDeclarations.NamedVariable.class, v -> v.getSimpleName().equals("names"));
+                J.VariableDeclarations.NamedVariable nums = find(cu, J.VariableDeclarations.NamedVariable.class, v -> v.getSimpleName().equals("nums"));
+                J.VariableDeclarations.NamedVariable grid = find(cu, J.VariableDeclarations.NamedVariable.class, v -> v.getSimpleName().equals("grid"));
+
+                // when
+                JavaType.Array namesType = TypeUtils.asArray(names.getType());
+                JavaType.Array splitReturnType = TypeUtils.asArray(method(cu, "split").getMethodType().getReturnType());
+                JavaType.Array numsType = TypeUtils.asArray(nums.getType());
+                JavaType.Array gridType = TypeUtils.asArray(grid.getType());
+
+                // then
+                assertThat(namesType).isNotNull();
+                assertThat(TypeUtils.isOfClassType(namesType.getElemType(), "java.lang.String")).isTrue();
+                assertThat(splitReturnType).isNotNull();
+                assertThat(TypeUtils.isOfClassType(splitReturnType.getElemType(), "java.lang.String")).isTrue();
+                assertThat(numsType).isNotNull();
+                assertThat(numsType.getElemType()).isEqualTo(JavaType.Primitive.Int);
+                assertThat(gridType).isNotNull();
+                assertThat(TypeUtils.asArray(gridType.getElemType())).isNotNull();
+                assertThat(TypeUtils.asArray(gridType.getElemType()).getElemType()).isEqualTo(JavaType.Primitive.Int);
+            })
+          )
+        );
+    }
+
+    @Test
+    void javaMethodWithArrayParameterMatchesJavaSignature() {
+        rewriteRun(
+          scala(
+            """
+            class Foo {
+              val nums: Array[Int] = Array(3, 1)
+              def render = java.util.Arrays.toString(nums)
+            }
+            """,
+            spec -> spec.afterRecipe(cu -> {
+                // given
+                MethodMatcher matcher = new MethodMatcher("java.util.Arrays toString(int[])");
+
+                // when
+                J.MethodInvocation toString = method(cu, "toString");
+
+                // then
+                assertThat(matcher.matches(toString)).isTrue();
+            })
+          )
+        );
     }
 
     private static J.Identifier lambdaParameter(J cu, String name) {

@@ -691,6 +691,8 @@ class ScalaTypeMapping(typeFactory: JavaTypeFactory, typedTree: tpd.Tree,
   }
 
   private def mapAppliedType(at: AppliedType, sig: String): JavaType = {
+    if (at.tycon.typeSymbol == ctx.definitions.ArrayClass) return mapArrayType(at, sig)
+
     val baseType = mapType(at.tycon) match {
       case p: JavaType.Parameterized => p.getType
       case fq: JavaType.FullyQualified => fq
@@ -706,6 +708,12 @@ class ScalaTypeMapping(typeFactory: JavaTypeFactory, typedTree: tpd.Tree,
       pt.unsafeSet(baseType, typeArgs)
     })
   }
+
+  private def mapArrayType(at: AppliedType, sig: String): JavaType =
+    typeFactory.arrayFor(sig, () => {
+      val elemType = mapType(at.args.head)
+      new JavaType.Array(null, if (elemType != null) elemType else unknown, null)
+    })
 
   private def mapGenericTypeVariable(tp: TypeParamRef, sig: String): JavaType =
     mapTypeVariable(tp.paramName.toString, tp.underlying, sig)
