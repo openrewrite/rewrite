@@ -140,6 +140,12 @@ public class JavaScriptVisitor<P> extends JavaVisitor<P> {
         } else {
             d = (JS.Delete) temp;
         }
+        Statement tempStatement = (Statement) visitStatement(d, p);
+        if (!(tempStatement instanceof JS.Delete)) {
+            return tempStatement;
+        } else {
+            d = (JS.Delete) tempStatement;
+        }
         return d.withExpression(requireNonNull(visitAndCast(d.getExpression(), p)));
     }
 

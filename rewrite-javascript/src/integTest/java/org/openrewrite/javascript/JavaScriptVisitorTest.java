@@ -21,7 +21,10 @@ import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.tree.Comment;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.Space;
+import org.openrewrite.java.tree.Statement;
 import org.openrewrite.java.tree.TextComment;
+import org.openrewrite.javascript.tree.JS;
+import org.openrewrite.marker.SearchResult;
 import org.openrewrite.test.RewriteTest;
 
 import java.util.concurrent.atomic.AtomicInteger;
@@ -109,6 +112,29 @@ class JavaScriptVisitorTest implements RewriteTest {
             """
               const o2 = {a: 1};
               delete o2.a;
+              """
+          )
+        );
+    }
+
+    @Test
+    void deleteIsVisitedAsStatement() {
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {
+              @Override
+              public Statement visitStatement(Statement statement, ExecutionContext ctx) {
+                  Statement s = super.visitStatement(statement, ctx);
+                  return s instanceof JS.Delete ? SearchResult.found(s) : s;
+              }
+          })),
+          javascript(
+            """
+              const obj = {a: 1};
+              delete obj.a;
+              """,
+            """
+              const obj = {a: 1};
+              /*~~>*/delete obj.a;
               """
           )
         );
