@@ -585,6 +585,7 @@ public interface JS extends J {
     final class ExpressionStatement implements JS, Expression, Statement {
 
         @With
+        @EqualsAndHashCode.Include
         UUID id;
 
         @With
@@ -2687,6 +2688,7 @@ public interface JS extends J {
     final class StatementExpression implements JS, Expression, Statement {
 
         @With
+        @EqualsAndHashCode.Include
         UUID id;
 
         @With
