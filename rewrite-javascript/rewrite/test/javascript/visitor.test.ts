@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-import {Cursor, ExecutionContext, produceAsync} from "../../src";
+import {Cursor, ExecutionContext, foundSearchResult, produceAsync} from "../../src";
 import {emptySpace, Expression, J, rightPadded} from "../../src/java";
 import {JavaScriptVisitor, JS, template, typescript} from "../../src/javascript";
 import {autoFormat, maybeAutoFormat} from "../../src/javascript/format";
@@ -115,5 +115,24 @@ describe('JavaScript visitor formatting', () => {
                 undefined
             ]);
         });
+    });
+
+    test('visits modifiers of constructor types', async () => {
+        class MarkModifierVisitor extends JavaScriptVisitor<ExecutionContext> {
+            protected override async visitModifier(modifier: J.Modifier, ctx: ExecutionContext): Promise<J | undefined> {
+                return foundSearchResult(await super.visitModifier(modifier, ctx) as J.Modifier);
+            }
+        }
+
+        const spec = new RecipeSpec();
+        spec.recipe = fromVisitor(new MarkModifierVisitor());
+
+        await spec.rewriteRun(
+            //language=typescript
+            typescript(
+                'type C = abstract new () => object;',
+                'type C = /*~~>*/abstract new () => object;'
+            )
+        );
     });
 });
