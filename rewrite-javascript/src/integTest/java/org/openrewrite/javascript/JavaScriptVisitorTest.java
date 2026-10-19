@@ -17,6 +17,7 @@ package org.openrewrite.javascript;
 
 import org.junit.jupiter.api.Test;
 import org.openrewrite.ExecutionContext;
+import org.openrewrite.internal.ListUtils;
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.tree.Comment;
 import org.openrewrite.java.tree.J;
@@ -31,6 +32,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.javascript.Assertions.javascript;
+import static org.openrewrite.javascript.Assertions.typescript;
 import static org.openrewrite.test.RewriteTest.toRecipe;
 
 /**
@@ -136,6 +138,24 @@ class JavaScriptVisitorTest implements RewriteTest {
               const obj = {a: 1};
               /*~~>*/delete obj.a;
               """
+          )
+        );
+    }
+
+    @Test
+    void forOfLoopAwaitSpaceIsVisited() {
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new JavaScriptIsoVisitor<>() {
+              @Override
+              public Space visitSpace(Space space, Space.Location loc, ExecutionContext ctx) {
+                  Space s = super.visitSpace(space, loc, ctx);
+                  return s.withComments(ListUtils.map(s.getComments(), c ->
+                    c instanceof TextComment && " c ".equals(((TextComment) c).getText()) ? ((TextComment) c).withText(" d ") : c));
+              }
+          })),
+          typescript(
+            "async function f(xs: AsyncIterable<number>) { for /* c */ await (const x of xs) {} }",
+            "async function f(xs: AsyncIterable<number>) { for /* d */ await (const x of xs) {} }"
           )
         );
     }
