@@ -154,4 +154,30 @@ class ChangeTagValueVisitorTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void withersReturnSameTreeForUnchangedValues() {
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new XmlIsoVisitor<>() {
+              @Override
+              public Xml.Tag visitTag(Xml.Tag tag, ExecutionContext ctx) {
+                  Xml.Tag t = super.visitTag(tag, ctx);
+                  return "dependency".equals(t.getName()) ? t.withChildValue("version", "2.0") : t;
+              }
+
+              @Override
+              public Xml.JspDirective visitJspDirective(Xml.JspDirective jspDirective, ExecutionContext ctx) {
+                  return super.visitJspDirective(jspDirective, ctx).withType("page");
+              }
+          })),
+          xml(
+            """
+              <%@ page language="java" %>
+              <dependency>
+                  <version>2.0</version>
+              </dependency>
+              """
+          )
+        );
+    }
 }
