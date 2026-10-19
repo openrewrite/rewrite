@@ -115,7 +115,8 @@ public class XmlParser implements Parser {
                         input.getFileAttributes(),
                         sourceStr,
                         is.getCharset(),
-                        is.isCharsetBomMarked()
+                        is.isCharsetBomMarked(),
+                        parser.htmlMode
                 ).visitDocument(parser.document());
                 parsingListener.parsed(input, document);
                 return requirePrintEqualsInput(document, input, relativeTo, ctx);

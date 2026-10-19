@@ -52,6 +52,11 @@ public class XmlParserVisitor extends XMLParserBaseVisitor<Xml> {
     private final String source;
     private final Charset charset;
     private final boolean charsetBomMarked;
+    private final boolean htmlMode;
+
+    /// The first unbalanced tag found, thrown only once the whole document has been visited: it may be an artifact
+    /// of ANTLR recovering from a later malformed attribute, whose own error then pinpoints the cause instead.
+    private @Nullable IllegalStateException unbalancedTag;
 
     /**
      * Track position within the file by character
@@ -63,16 +68,22 @@ public class XmlParserVisitor extends XMLParserBaseVisitor<Xml> {
     private int codePointCursor = 0;
 
     public XmlParserVisitor(Path path, @Nullable FileAttributes fileAttributes, String source, Charset charset, boolean charsetBomMarked) {
+        this(path, fileAttributes, source, charset, charsetBomMarked, false);
+    }
+
+    public XmlParserVisitor(Path path, @Nullable FileAttributes fileAttributes, String source, Charset charset,
+                            boolean charsetBomMarked, boolean htmlMode) {
         this.path = path;
         this.fileAttributes = fileAttributes;
         this.source = source;
         this.charset = charset;
         this.charsetBomMarked = charsetBomMarked;
+        this.htmlMode = htmlMode;
     }
 
     @Override
     public Xml.Document visitDocument(XMLParser.DocumentContext ctx) {
-        return convert(ctx, (c, prefix) -> new Xml.Document(
+        Xml.Document document = convert(ctx, (c, prefix) -> new Xml.Document(
                 randomId(),
                 path,
                 prefix,
@@ -85,6 +96,10 @@ public class XmlParserVisitor extends XMLParserBaseVisitor<Xml> {
                 visitElement(ctx.element()),
                 source.substring(cursor))
         );
+        if (unbalancedTag != null) {
+            throw unbalancedTag;
+        }
+        return document;
     }
 
     @Override
@@ -367,6 +382,8 @@ public class XmlParserVisitor extends XMLParserBaseVisitor<Xml> {
                                 .map(Content.class::cast)
                                 .collect(toList());
 
+                        recordUnbalancedTag(name, c);
+
                         // ANTLR may synthesize missing closing-tag tokens during error recovery
                         // on malformed input; tolerate any combination of null OPEN/Name/CLOSE.
                         if (ctx.OPEN(1) != null || ctx.Name(1) != null || ctx.CLOSE(1) != null) {
@@ -394,6 +411,31 @@ public class XmlParserVisitor extends XMLParserBaseVisitor<Xml> {
                             content, closeTag, beforeTagDelimiterPrefix);
                 }
         );
+    }
+
+    /// Note an element whose closing tag is missing or names another element. The grammar does not compare the
+    /// two names, so `<a><b></a>` would otherwise close `<b>` with `</a>` and shift every enclosing close tag by
+    /// one level, leaving ANTLR to recover at end of input by discarding the outermost element's content.
+    private void recordUnbalancedTag(String name, XMLParser.ElementContext ctx) {
+        if (unbalancedTag != null) {
+            return;
+        }
+        Token open = ctx.getStart();
+        if (!isSourceToken(ctx.OPEN(1)) || !isSourceToken(ctx.SLASH()) ||
+            !isSourceToken(ctx.Name(1)) || !isSourceToken(ctx.CLOSE(1))) {
+            unbalancedTag = new IllegalStateException(String.format(
+                    "Unclosed element <%s> in %s opened at line %d, column %d.",
+                    name, path, open.getLine(), open.getCharPositionInLine() + 1));
+            return;
+        }
+        String closeName = ctx.Name(1).getText();
+        if (htmlMode ? !closeName.equalsIgnoreCase(name) : !closeName.equals(name)) {
+            Token close = ctx.OPEN(1).getSymbol();
+            unbalancedTag = new IllegalStateException(String.format(
+                    "Mismatched closing tag </%s> at line %d, column %d for <%s> opened at line %d, column %d in %s.",
+                    closeName, close.getLine(), close.getCharPositionInLine() + 1,
+                    name, open.getLine(), open.getCharPositionInLine() + 1, path));
+        }
     }
 
     @Override
