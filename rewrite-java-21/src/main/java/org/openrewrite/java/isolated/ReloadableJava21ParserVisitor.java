@@ -2211,7 +2211,7 @@ public class ReloadableJava21ParserVisitor extends TreePathScanner<J, Space> {
 
         return isLombokAnnotationType(sym.getQualifiedName().toString()) ||
                 sym.getDeclarationAttributes().stream()
-                        .map(a -> a.type.toString())
+                        .map(a -> a.type.tsym.getQualifiedName().toString())
                         .anyMatch(ReloadableJava21ParserVisitor::isLombokAnnotationType);
     }
 
