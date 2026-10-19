@@ -39,7 +39,6 @@ import java.util.function.Supplier;
 import java.util.jar.JarEntry;
 import java.util.jar.JarFile;
 import java.util.jar.JarOutputStream;
-import java.util.regex.Pattern;
 import java.util.zip.GZIPInputStream;
 import java.util.zip.GZIPOutputStream;
 import java.util.zip.InflaterInputStream;
@@ -48,7 +47,7 @@ import java.util.zip.ZipException;
 import static java.util.Collections.emptyList;
 import static java.util.Collections.sort;
 import static java.util.Objects.requireNonNull;
-import static java.util.stream.Collectors.toSet;
+import static java.util.stream.Collectors.toList;
 import static org.objectweb.asm.ClassWriter.COMPUTE_MAXS;
 import static org.objectweb.asm.Opcodes.V1_8;
 import static org.openrewrite.java.internal.parser.AnnotationSerializer.convertAnnotationValueToString;
@@ -102,6 +101,8 @@ public class TypeTable implements JavaParserClasspathLoader {
 
     private static final Map<GroupArtifactVersion, CompletableFuture<Path>> jarByArtifact = new ConcurrentHashMap<>();
 
+    private static final Set<String> searchedArtifactNames = ConcurrentHashMap.newKeySet();
+
     public static @Nullable TypeTable fromClasspath(ExecutionContext ctx, Collection<String> artifactNames) {
         try {
             ClassLoader callerClassLoader = findCaller().getClassLoader();
@@ -130,12 +131,14 @@ public class TypeTable implements JavaParserClasspathLoader {
 
     TypeTable(ExecutionContext ctx, URL url, Collection<String> artifactNames) {
         read(url, artifactNames, ctx);
+        searchedArtifactNames.addAll(artifactNames);
     }
 
     TypeTable(ExecutionContext ctx, Enumeration<URL> resources, Collection<String> artifactNames) {
         while (resources.hasMoreElements()) {
             read(resources.nextElement(), artifactNames, ctx);
         }
+        searchedArtifactNames.addAll(artifactNames);
     }
 
     private static void read(URL url, Collection<String> artifactNames, ExecutionContext ctx) {
@@ -160,19 +163,24 @@ public class TypeTable implements JavaParserClasspathLoader {
         }
     }
 
+    /// A jar whose artifactId merely starts with the requested name (`netty-transport-classes-epoll` for
+    /// `netty-transport`) does not count as written until the type tables have been searched for that name once,
+    /// so that the artifact the name actually refers to still gets extracted.
     private static Collection<String> artifactsNotYetWritten(Collection<String> artifactNames) {
-        Collection<String> notWritten = new ArrayList<>(artifactNames);
+        Collection<String> notWritten = new ArrayList<>(artifactNames.size());
         for (String artifactName : artifactNames) {
-            Pattern artifactPattern = Pattern.compile(artifactName + ".*");
-            for (GroupArtifactVersion groupArtifactVersion : jarByArtifact.keySet()) {
-                if (artifactPattern
-                        .matcher(groupArtifactVersion.getArtifactId() + "-" + groupArtifactVersion.getVersion())
-                        .matches()) {
-                    notWritten.remove(artifactName);
-                }
+            boolean coveredOnly = !searchedArtifactNames.contains(artifactName);
+            if (select(artifactName, jarByArtifact.keySet(), coveredOnly) == null) {
+                notWritten.add(artifactName);
             }
         }
         return notWritten;
+    }
+
+    private static @Nullable GroupArtifactVersion select(String artifactName, Iterable<GroupArtifactVersion> gavs,
+                                                         boolean coveredOnly) {
+        return new ArtifactNameMatcher(artifactName).select(gavs, GroupArtifactVersion::getArtifactId,
+                gav -> gav.getArtifactId() + "-" + gav.getVersion(), coveredOnly);
     }
 
     /**
@@ -215,11 +223,11 @@ public class TypeTable implements JavaParserClasspathLoader {
                  * @param artifactPrefixes Collection of artifact name prefixes to match
                  */
                 public Builder artifactPrefixes(Collection<String> artifactPrefixes) {
-                    Set<Pattern> patterns = artifactPrefixes.stream()
-                            .map(prefix -> Pattern.compile(prefix + ".*"))
-                            .collect(toSet());
-                    this.artifactMatcher(artifactVersion -> patterns.stream()
-                            .anyMatch(pattern -> pattern.matcher(artifactVersion).matches()));
+                    List<ArtifactNameMatcher> matchers = artifactPrefixes.stream()
+                            .map(ArtifactNameMatcher::new)
+                            .collect(toList());
+                    this.artifactMatcher(artifactVersion -> matchers.stream()
+                            .anyMatch(matcher -> matcher.matches(artifactVersion)));
                     return this;
                 }
             }
@@ -695,15 +703,19 @@ public class TypeTable implements JavaParserClasspathLoader {
 
     @Override
     public @Nullable Path load(String artifactName) {
-        for (Map.Entry<GroupArtifactVersion, CompletableFuture<Path>> gavAndJar : jarByArtifact.entrySet()) {
-            GroupArtifactVersion gav = gavAndJar.getKey();
-            if (Pattern.compile(artifactName + ".*")
-                    .matcher(gav.getArtifactId() + "-" + gav.getVersion())
-                    .matches()) {
-                return gavAndJar.getValue().join();
-            }
-        }
-        return null;
+        return load(artifactName, false);
+    }
+
+    /// Like [#load(String)], but without falling back to an artifact whose artifactId merely starts with
+    /// the name, such as `netty-transport-classes-epoll` for `netty-transport`.
+    public @Nullable Path loadExactArtifact(String artifactName) {
+        return load(artifactName, true);
+    }
+
+    private @Nullable Path load(String artifactName, boolean coveredOnly) {
+        GroupArtifactVersion gav = select(artifactName, jarByArtifact.keySet(), coveredOnly);
+        CompletableFuture<Path> jar = gav == null ? null : jarByArtifact.get(gav);
+        return jar == null ? null : jar.join();
     }
 
     @Override

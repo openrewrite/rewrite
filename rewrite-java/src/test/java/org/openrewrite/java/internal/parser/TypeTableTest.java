@@ -21,6 +21,8 @@ import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.objectweb.asm.ClassWriter;
 import org.objectweb.asm.FieldVisitor;
 import org.objectweb.asm.Opcodes;
@@ -940,7 +942,7 @@ class TypeTableTest implements RewriteTest {
             assertThat(Files.exists(firstLoaded)).isTrue();
 
             // Simulate a fresh JVM by clearing the in-process map. The jar remains on disk.
-            clearJarByArtifact();
+            clearExtractedArtifacts();
 
             // Second read: must not fail when the target jar already exists on disk.
             Path secondLoaded = new TypeTable(ctx, tsv.toUri().toURL(), List.of("simple"))
@@ -955,12 +957,92 @@ class TypeTableTest implements RewriteTest {
             }
         }
 
-        @SuppressWarnings("unchecked")
-        private void clearJarByArtifact() throws Exception {
-            Field f = TypeTable.class.getDeclaredField("jarByArtifact");
-            f.setAccessible(true);
-            ((Map<?, ?>) f.get(null)).clear();
+    }
+
+    @Nested
+    class ArtifactNameResolutionTests {
+
+        @BeforeEach
+        void setUp() throws Exception {
+            clearExtractedArtifacts();
         }
+
+        @ParameterizedTest
+        @ValueSource(booleans = {true, false})
+        void loadPrefersArtifactOverLongerArtifactSharingItsName(boolean longerArtifactFirst) throws Exception {
+            writeNettyTypeTable(longerArtifactFirst);
+
+            TypeTable table = new TypeTable(ctx, tsv.toUri().toURL(), List.of("netty-transport"));
+
+            assertThat(table.load("netty-transport")).hasFileName("netty-transport-4.2.19.Final.jar");
+            assertThat(table.load("netty-transport-classes-epoll"))
+              .hasFileName("netty-transport-classes-epoll-4.2.19.Final.jar");
+        }
+
+        @Test
+        void loadAcceptsVersionPrefixesAndPatterns() throws Exception {
+            writeNettyTypeTable(true);
+
+            TypeTable table = new TypeTable(ctx, tsv.toUri().toURL(), List.of("netty-transport"));
+
+            assertThat(table.load("netty-transport-4")).hasFileName("netty-transport-4.2.19.Final.jar");
+            assertThat(table.load("netty-transport-4.2.+")).hasFileName("netty-transport-4.2.19.Final.jar");
+            assertThat(table.load("netty-transport-5")).isNull();
+        }
+
+        @Test
+        void loadFallsBackToPrefixOfArtifactId() throws Exception {
+            writeNettyTypeTable(true);
+
+            TypeTable table = new TypeTable(ctx, tsv.toUri().toURL(), List.of("netty-trans"));
+
+            assertThat(table.load("netty-trans")).isNotNull();
+        }
+
+        @Test
+        void extractsArtifactWhenLongerArtifactSharingItsNameWasExtractedFirst() throws Exception {
+            writeNettyTypeTable(true);
+
+            new TypeTable(ctx, tsv.toUri().toURL(), List.of("netty-transport-classes-epoll"));
+            TypeTable table = new TypeTable(ctx, tsv.toUri().toURL(), List.of("netty-transport"));
+
+            assertThat(table.load("netty-transport")).hasFileName("netty-transport-4.2.19.Final.jar");
+        }
+
+        private void writeNettyTypeTable(boolean longerArtifactFirst) throws Exception {
+            Path[] classFiles = compileToClassFiles(
+              //language=java
+              """
+                package io.netty.channel;
+                public interface EventLoopGroup {}
+                """, "io.netty.channel.EventLoopGroup",
+              //language=java
+              """
+                package io.netty.channel.epoll;
+                public final class Epoll {}
+                """, "io.netty.channel.epoll.Epoll"
+            );
+            Path transport = createJarFromClasses("netty-transport.jar", classFiles[0]);
+            Path epoll = createJarFromClasses("netty-transport-classes-epoll.jar", classFiles[1]);
+            try (TypeTable.Writer writer = TypeTable.newWriter(Files.newOutputStream(tsv))) {
+                if (longerArtifactFirst) {
+                    writer.jar("io.netty", "netty-transport-classes-epoll", "4.2.19.Final").write(epoll);
+                }
+                writer.jar("io.netty", "netty-transport", "4.2.19.Final").write(transport);
+                if (!longerArtifactFirst) {
+                    writer.jar("io.netty", "netty-transport-classes-epoll", "4.2.19.Final").write(epoll);
+                }
+            }
+        }
+    }
+
+    private static void clearExtractedArtifacts() throws Exception {
+        Field jarByArtifact = TypeTable.class.getDeclaredField("jarByArtifact");
+        jarByArtifact.setAccessible(true);
+        ((Map<?, ?>) jarByArtifact.get(null)).clear();
+        Field searchedArtifactNames = TypeTable.class.getDeclaredField("searchedArtifactNames");
+        searchedArtifactNames.setAccessible(true);
+        ((Set<?>) searchedArtifactNames.get(null)).clear();
     }
 
     // Helper methods for integration tests

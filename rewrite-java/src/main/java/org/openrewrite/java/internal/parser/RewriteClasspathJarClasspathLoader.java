@@ -45,6 +45,7 @@ import static org.openrewrite.java.internal.parser.JavaParserCaller.findCaller;
  */
 public class RewriteClasspathJarClasspathLoader implements JavaParserClasspathLoader, AutoCloseable {
     private static final String CLASSPATH_PREFIX = "META-INF/rewrite/classpath/";
+    private static final Pattern ARTIFACT_VERSION_SEPARATOR = Pattern.compile("-(?=\\d)");
     private final Class<?> caller = findCaller();
     private final List<String> resourcePaths;
     private final ExecutionContext ctx;
@@ -97,29 +98,53 @@ public class RewriteClasspathJarClasspathLoader implements JavaParserClasspathLo
 
     @Override
     public @Nullable Path load(String artifactName) {
-        Pattern jarPattern = Pattern.compile(artifactName + "-?.*\\.jar$");
-        for (String resourcePath : resourcePaths) {
-            String fileName = Paths.get(resourcePath).getFileName().toString();
-            if (jarPattern.matcher(fileName).matches()) {
+        return load(artifactName, false);
+    }
+
+    /// Like [#load(String)], but without falling back to an artifact whose artifactId merely starts with
+    /// the name, such as `netty-transport-classes-epoll` for `netty-transport`.
+    public @Nullable Path loadExactArtifact(String artifactName) {
+        return load(artifactName, true);
+    }
+
+    private @Nullable Path load(String artifactName, boolean coveredOnly) {
+        String resourcePath = selectJar(artifactName, resourcePaths, coveredOnly);
+        if (resourcePath == null) {
+            return null;
+        }
+        String fileName = jarFileName(resourcePath);
+        try {
+            Path artifact = getJarsFolder(ctx).resolve(fileName);
+            if (!Files.exists(artifact)) {
                 try {
-                    Path artifact = getJarsFolder(ctx).resolve(fileName);
-                    if (!Files.exists(artifact)) {
-                        try {
-                            InputStream resourceAsStream = requireNonNull(
-                                    caller.getResourceAsStream("/" + resourcePath),
-                                    caller.getCanonicalName() + " resource not found: " + resourcePath);
-                            Files.copy(resourceAsStream, artifact);
-                        } catch (FileAlreadyExistsException ignore) {
-                            // can happen when tests run in parallel, for example
-                        }
-                    }
-                    return artifact;
-                } catch (IOException e) {
-                    throw new UncheckedIOException(e);
+                    InputStream resourceAsStream = requireNonNull(
+                            caller.getResourceAsStream("/" + resourcePath),
+                            caller.getCanonicalName() + " resource not found: " + resourcePath);
+                    Files.copy(resourceAsStream, artifact);
+                } catch (FileAlreadyExistsException ignore) {
+                    // can happen when tests run in parallel, for example
                 }
             }
+            return artifact;
+        } catch (IOException e) {
+            throw new UncheckedIOException(e);
         }
-        return null;
+    }
+
+    /// Jar file names carry no separate artifactId, so it is taken to end before the first `-` followed by a digit.
+    static @Nullable String selectJar(String artifactName, List<String> resourcePaths, boolean coveredOnly) {
+        return new ArtifactNameMatcher(artifactName).select(resourcePaths,
+                path -> ARTIFACT_VERSION_SEPARATOR.split(artifactIdAndVersion(path), 2)[0],
+                RewriteClasspathJarClasspathLoader::artifactIdAndVersion, coveredOnly);
+    }
+
+    private static String artifactIdAndVersion(String resourcePath) {
+        String fileName = jarFileName(resourcePath);
+        return fileName.substring(0, fileName.length() - ".jar".length());
+    }
+
+    private static String jarFileName(String resourcePath) {
+        return Paths.get(resourcePath).getFileName().toString();
     }
 
     @Override
