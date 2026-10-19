@@ -13,15 +13,13 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.openrewrite.java.isolated;
+package org.openrewrite.java;
 
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import org.openrewrite.InMemoryExecutionContext;
 import org.openrewrite.SourceFile;
-import org.openrewrite.java.Java25Parser;
-import org.openrewrite.java.JavaParser;
 import org.openrewrite.java.tree.J;
 
 import javax.tools.ToolProvider;
@@ -30,6 +28,9 @@ import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
 
+import static java.nio.charset.StandardCharsets.UTF_8;
+import static java.util.Collections.singletonList;
+import static java.util.stream.Collectors.toList;
 import static org.assertj.core.api.Assertions.assertThat;
 
 class MissingMetaAnnotationReparseTest {
@@ -40,22 +41,22 @@ class MissingMetaAnnotationReparseTest {
     @BeforeAll
     static void compileFixture() throws Exception {
         Path meta = fixtureClasses.resolve("Meta.java");
-        Files.writeString(meta, """
+        Files.write(meta, """
           package fixture;
           import java.lang.annotation.*;
           @Target(ElementType.ANNOTATION_TYPE)
           @Retention(RetentionPolicy.RUNTIME)
           public @interface Meta {}
-          """);
+          """.getBytes(UTF_8));
         Path marked = fixtureClasses.resolve("Marked.java");
-        Files.writeString(marked, """
+        Files.write(marked, """
           package fixture;
           import java.lang.annotation.*;
           @Target(ElementType.METHOD)
           @Retention(RetentionPolicy.RUNTIME)
           @Meta
           public @interface Marked {}
-          """);
+          """.getBytes(UTF_8));
         int exit = ToolProvider.getSystemJavaCompiler().run(null, null, null,
           "-d", fixtureClasses.toString(), meta.toString(), marked.toString());
         assertThat(exit).isZero();
@@ -77,14 +78,14 @@ class MissingMetaAnnotationReparseTest {
               }
           }
           """;
-        JavaParser.Builder<?, ?> builder = Java25Parser.builder().classpath(List.of(fixtureClasses));
-        assertThat(builder.build().parse(new InMemoryExecutionContext(), source).toList())
+        JavaParser.Builder<?, ?> builder = JavaParser.fromJavaVersion().classpath(singletonList(fixtureClasses));
+        assertThat(builder.build().parse(new InMemoryExecutionContext(), source).collect(toList()))
           .singleElement().isInstanceOf(J.CompilationUnit.class);
 
         // when
         List<Throwable> errors = new ArrayList<>();
         List<SourceFile> second = builder.clone().build()
-          .parse(new InMemoryExecutionContext(errors::add), source).toList();
+          .parse(new InMemoryExecutionContext(errors::add), source).collect(toList());
 
         // then
         assertThat(errors).isEmpty();
