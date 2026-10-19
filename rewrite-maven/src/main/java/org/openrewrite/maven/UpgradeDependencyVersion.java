@@ -512,12 +512,7 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
             }
 
             private String resolveVersion(String version) {
-                if (isProperty(version)) {
-                    Map<String, String> properties = getResolutionResult().getPom().getProperties();
-                    String property = version.substring(2, version.length() - 1);
-                    return properties.getOrDefault(property, version);
-                }
-                return version;
+                return requireNonNull(getResolutionResult().getPom().getValue(version));
             }
 
             public @Nullable TreeVisitor<Xml, ExecutionContext> upgradeVersion(ExecutionContext ctx, Xml.Tag tag, @Nullable String requestedVersion, String groupId, String artifactId, String version2) throws MavenDownloadingException {

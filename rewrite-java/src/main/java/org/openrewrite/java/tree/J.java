@@ -4291,7 +4291,9 @@ public interface J extends Tree {
                 if (name.getType() instanceof JavaType.Method && name.getType() != this.methodType) {
                     newType = (JavaType.Method) name.getType();
                 } else {
-                    newType = this.methodType.getName().equals(name.getSimpleName()) ? this.methodType : this.methodType.withName(name.getSimpleName());
+                    // A constructor type is named <constructor> whatever the call spells, like `super` or `this`
+                    newType = this.methodType.isConstructor() || this.methodType.getName().equals(name.getSimpleName()) ?
+                            this.methodType : this.methodType.withName(name.getSimpleName());
                 }
             }
             return new MethodInvocation(id, prefix, markers, select, typeParameters, name.withType(newType), arguments, newType);

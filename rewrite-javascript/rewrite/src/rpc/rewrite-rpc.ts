@@ -22,6 +22,7 @@ import {
     DependencyTypes,
     Generate,
     GenerateResponse,
+    AbortGetObject,
     GetObject,
     GetMarketplace,
     GetMarketplaceResponseRow,
@@ -30,6 +31,7 @@ import {
     ParseProject,
     PrepareRecipe,
     PrepareRecipeResponse,
+    MarkerPrinter,
     Print,
     TraceGetObject,
     Visit,
@@ -47,6 +49,9 @@ import {InstallRecipes, InstallRecipesResponse} from "./request/install-recipes"
 import {ParserInput} from "../parser";
 import {ReferenceMap} from "../reference";
 import {GetLanguages} from "./request/get-languages";
+
+// Each page is a round trip through both JSON-RPC stacks, so larger pages amortize it
+const DEFAULT_BATCH_SIZE = 5000;
 
 export class RewriteRpc {
     /**
@@ -135,14 +140,14 @@ export class RewriteRpc {
         Generate.handle(this.connection, this.localObjects, preparedRecipes, recipeCursors, getObject, dataTableStore, options.metricsCsv);
         SetDataTableStore.handle(this.connection, store => this.configuredDataTableStore = store, options.metricsCsv);
         GetObject.handle(this.connection, this.remoteObjects, this.localObjects,
-            this.localRefs, options?.batchSize || 1000, traceGetObject, options.metricsCsv);
+            this.localRefs, options?.batchSize || DEFAULT_BATCH_SIZE, traceGetObject, options.metricsCsv);
         GetMarketplace.handle(this.connection, marketplace, recipeOrigin, options.metricsCsv);
         GetLanguages.handle(this.connection, options.metricsCsv);
         PrepareRecipe.handle(this.connection, marketplace, preparedRecipes, options.metricsCsv);
         Parse.handle(this.connection, this.localObjects, options.metricsCsv);
         ParseProject.handle(this.connection, this.localObjects, options.metricsCsv);
-        DependencyTypes.handle(this.connection, options?.batchSize || 1000, options.metricsCsv);
-        Print.handle(this.connection, getObject, options.logger, options.metricsCsv);
+        DependencyTypes.handle(this.connection, options?.batchSize || DEFAULT_BATCH_SIZE, options.metricsCsv);
+        Print.handle(this.connection, getObject, getCursor, options.logger, options.metricsCsv);
         InstallRecipes.handle(this.connection, options.recipeInstallDir ?? ".rewrite", marketplace, recipeOrigin, options.logger, options.metricsCsv);
 
         this.connection.onRequest(
@@ -289,6 +294,15 @@ export class RewriteRpc {
                 await nextPage.catch(() => {
                 });
             }
+            // The sender still counts the object and its refs as delivered until it is told otherwise.
+            const rolledBack = await this.connection.sendRequest(
+                new rpc.RequestType<AbortGetObject, boolean, Error>("AbortGetObject"),
+                new AbortGetObject(id)
+            ).catch(() => false);
+            if (rolledBack) {
+                // a peer that could not roll back goes on sending these refs bare, so they are kept for it
+                q.forgetRefs();
+            }
             throw e;
         }
 
@@ -321,9 +335,9 @@ export class RewriteRpc {
         return parsed;
     }
 
-    async print(tree: SourceFile): Promise<string>;
-    async print(tree: Tree, cursor: Cursor): Promise<string>;
-    async print(tree: Tree, cursor?: Cursor): Promise<string> {
+    async print(tree: SourceFile, cursor?: undefined, markerPrinter?: MarkerPrinter): Promise<string>;
+    async print(tree: Tree, cursor: Cursor, markerPrinter?: MarkerPrinter): Promise<string>;
+    async print(tree: Tree, cursor?: Cursor, markerPrinter?: MarkerPrinter): Promise<string> {
         if (!cursor && !isSourceFile(tree)) {
             throw new Error("Cursor is required for non-SourceFile trees");
         }
@@ -331,7 +345,7 @@ export class RewriteRpc {
         const sourceFile = isSourceFile(tree) ? tree : cursor!.firstEnclosing(t => isSourceFile(t))!;
         return await this.connection.sendRequest(
             new rpc.RequestType<Print, string, Error>("Print"),
-            new Print(tree.id, sourceFile.kind)
+            new Print(tree.id, sourceFile.kind, markerPrinter, isSourceFile(tree) ? undefined : this.getCursorIds(cursor))
         );
     }
 

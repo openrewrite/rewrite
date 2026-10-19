@@ -16,16 +16,22 @@
 package org.openrewrite.javascript;
 
 import org.junit.jupiter.api.Test;
+import org.openrewrite.ExecutionContext;
+import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.tree.Comment;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.Space;
+import org.openrewrite.java.tree.Statement;
 import org.openrewrite.java.tree.TextComment;
+import org.openrewrite.javascript.tree.JS;
+import org.openrewrite.marker.SearchResult;
 import org.openrewrite.test.RewriteTest;
 
 import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.javascript.Assertions.javascript;
+import static org.openrewrite.test.RewriteTest.toRecipe;
 
 /**
  * Every newline the JavaScript printer emits must be reachable by an in-process {@link JavaScriptVisitor}
@@ -86,5 +92,51 @@ class JavaScriptVisitorTest implements RewriteTest {
     void commentsClassesAndTemplates() {
         assertVisitorSeesEveryNewline("// header\n/* block\n   comment */\nclass C {\n    m() {\n        return 1; // trailing\n    }\n}");
         assertVisitorSeesEveryNewline("const s = `line one\nline two\nline three`;");
+    }
+
+    @Test
+    void deleteOperandIsVisited() {
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {
+              @Override
+              public J.Identifier visitIdentifier(J.Identifier identifier, ExecutionContext ctx) {
+                  J.Identifier i = super.visitIdentifier(identifier, ctx);
+                  return "obj".equals(i.getSimpleName()) ? i.withSimpleName("o2") : i;
+              }
+          })),
+          javascript(
+            """
+              const obj = {a: 1};
+              delete obj.a;
+              """,
+            """
+              const o2 = {a: 1};
+              delete o2.a;
+              """
+          )
+        );
+    }
+
+    @Test
+    void deleteIsVisitedAsStatement() {
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {
+              @Override
+              public Statement visitStatement(Statement statement, ExecutionContext ctx) {
+                  Statement s = super.visitStatement(statement, ctx);
+                  return s instanceof JS.Delete ? SearchResult.found(s) : s;
+              }
+          })),
+          javascript(
+            """
+              const obj = {a: 1};
+              delete obj.a;
+              """,
+            """
+              const obj = {a: 1};
+              /*~~>*/delete obj.a;
+              """
+          )
+        );
     }
 }

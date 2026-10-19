@@ -25,6 +25,7 @@ import org.openrewrite.gradle.marker.GradleDependencyConfiguration;
 import org.openrewrite.gradle.marker.GradleProject;
 import org.openrewrite.gradle.search.FindGradleProject;
 import org.openrewrite.gradle.trait.GradleDependency;
+import org.openrewrite.gradle.trait.VersionCatalog;
 import org.openrewrite.groovy.tree.G;
 import org.openrewrite.internal.StringUtils;
 import org.openrewrite.java.JavaIsoVisitor;
@@ -45,6 +46,7 @@ import org.openrewrite.semver.DependencyMatcher;
 import org.openrewrite.semver.Semver;
 
 import java.util.*;
+import java.util.concurrent.atomic.AtomicReference;
 
 import static java.util.Objects.requireNonNull;
 
@@ -54,7 +56,7 @@ public class ChangeDependency extends ScanningRecipe<ChangeDependency.Accumulato
     private static final String GRADLE_PROPERTIES_FILE_NAME = "gradle.properties";
 
     @EqualsAndHashCode.Exclude
-    transient MavenMetadataFailures metadataFailures = new MavenMetadataFailures(this);
+    MavenMetadataFailures metadataFailures = new MavenMetadataFailures(this);
 
     @Option(displayName = "Old groupId",
             description = "The old groupId to replace. The groupId is the first part of a dependency coordinate 'com.google.guava:guava:VERSION'. Supports glob expressions.",
@@ -165,6 +167,7 @@ public class ChangeDependency extends ScanningRecipe<ChangeDependency.Accumulato
         Map<String, Object> versionVariableUpdates = new HashMap<>();
         Map<String, Set<GroupArtifact>> versionVariableUsages = new HashMap<>();
         Set<GroupArtifact> failedResolutions = new HashSet<>();
+        AtomicReference<@Nullable GradleProject> gradleProject = new AtomicReference<>();
     }
 
     @Override
@@ -190,6 +193,9 @@ public class ChangeDependency extends ScanningRecipe<ChangeDependency.Accumulato
                     gradleProject = tree.getMarkers().findFirst(GradleProject.class).orElse(null);
                     if (gradleProject == null) {
                         return (J) tree;
+                    }
+                    if (acc.gradleProject.get() == null || ":".equals(gradleProject.getPath())) {
+                        acc.gradleProject.set(gradleProject);
                     }
                 }
                 return super.visit(tree, ctx);
@@ -507,9 +513,16 @@ public class ChangeDependency extends ScanningRecipe<ChangeDependency.Accumulato
         });
 
         DependencyMatcher propsMatcher = requireNonNull(DependencyMatcher.build(oldGroupId + ":" + oldArtifactId).getValue());
+        DependencyMatcher catalogDependencyMatcher = new DependencyMatcher(oldGroupId, oldArtifactId, null);
+        TreeVisitor<?, ExecutionContext> updateVersionCatalog = new VersionCatalog.Matcher().asVisitor((catalog, ctx) ->
+                changeVersionCatalog(catalog, catalogDependencyMatcher,
+                        new DependencyVersionSelector(metadataFailures, acc.gradleProject.get(), null), ctx));
         return new TreeVisitor<Tree, ExecutionContext>() {
             @Override
             public boolean isAcceptable(SourceFile sourceFile, ExecutionContext ctx) {
+                if (updateVersionCatalog.isAcceptable(sourceFile, ctx)) {
+                    return true;
+                }
                 if (sourceFile instanceof Properties.File) {
                     return sourceFile.getSourcePath().endsWith(GRADLE_PROPERTIES_FILE_NAME);
                 }
@@ -519,6 +532,9 @@ public class ChangeDependency extends ScanningRecipe<ChangeDependency.Accumulato
 
             @Override
             public @Nullable Tree visit(@Nullable Tree tree, ExecutionContext ctx) {
+                if (tree instanceof SourceFile && updateVersionCatalog.isAcceptable((SourceFile) tree, ctx)) {
+                    tree = updateVersionCatalog.visitNonNull(tree, ctx);
+                }
                 if (tree instanceof Properties.File) {
                     Properties.File propsFile = (Properties.File) tree;
                     if (propsFile.getSourcePath().endsWith(GRADLE_PROPERTIES_FILE_NAME) && !acc.versionVariableUpdates.isEmpty()) {
@@ -547,6 +563,79 @@ public class ChangeDependency extends ScanningRecipe<ChangeDependency.Accumulato
                 return gradleVisitor.visit(tree, ctx);
             }
         };
+    }
+
+    private Tree changeVersionCatalog(VersionCatalog catalog, DependencyMatcher dependencyMatcher,
+                                      DependencyVersionSelector versionSelector, ExecutionContext ctx) {
+        Map<GroupArtifact, VersionCatalog.Entry> libraries = catalog.getLibraryVersions();
+        Map<String, String> declarations = catalog.getVersionDeclarations();
+        Map<GroupArtifact, GroupArtifact> coordinateChanges = new LinkedHashMap<>();
+        Map<GroupArtifact, String> selectedVersions = new LinkedHashMap<>();
+        List<MavenDownloadingException> failures = new ArrayList<>();
+
+        for (Map.Entry<GroupArtifact, VersionCatalog.Entry> library : libraries.entrySet()) {
+            GroupArtifact oldCoordinates = library.getKey();
+            if (!dependencyMatcher.matches(oldCoordinates.getGroupId(), oldCoordinates.getArtifactId())) {
+                continue;
+            }
+
+            GroupArtifact newCoordinates = new GroupArtifact(
+                    StringUtils.isBlank(newGroupId) ? oldCoordinates.getGroupId() : newGroupId,
+                    StringUtils.isBlank(newArtifactId) ? oldCoordinates.getArtifactId() : newArtifactId);
+            boolean coordinatesChanged = !oldCoordinates.equals(newCoordinates);
+            String currentVersion = library.getValue().getResolvedVersion(declarations);
+            String selectedVersion = null;
+            if (shouldSelectCatalogVersion(currentVersion)) {
+                try {
+                    // The old artifact's version does not bound the version of a relocated one.
+                    selectedVersion = selectCatalogVersion(versionSelector, newCoordinates,
+                            coordinatesChanged ? null : currentVersion, ctx);
+                } catch (MavenDownloadingException e) {
+                    failures.add(e);
+                }
+            }
+            if (selectedVersion == null && shouldSelectCatalogVersion(currentVersion) && !coordinatesChanged) {
+                continue;
+            }
+
+            coordinateChanges.put(oldCoordinates, newCoordinates);
+            if (selectedVersion != null) {
+                selectedVersions.put(newCoordinates, selectedVersion);
+            }
+        }
+
+        VersionCatalog updated = catalog;
+        for (Map.Entry<GroupArtifact, GroupArtifact> change : coordinateChanges.entrySet()) {
+            GroupArtifact newCoordinates = change.getValue();
+            updated = updated.withLibraryCoordinates(
+                    change.getKey(), newCoordinates.getGroupId(), newCoordinates.getArtifactId());
+        }
+        Tree tree = updated.withVersions(selectedVersions).getTree();
+        if (!tree.getMarkers().findFirst(Markup.Warn.class).isPresent()) {
+            for (MavenDownloadingException failure : failures) {
+                tree = failure.warn(tree);
+            }
+        }
+        return tree;
+    }
+
+    private @Nullable String selectCatalogVersion(
+            DependencyVersionSelector versionSelector,
+            GroupArtifact newCoordinates,
+            @Nullable String currentVersion,
+            ExecutionContext ctx) throws MavenDownloadingException {
+        if (currentVersion == null) {
+            return versionSelector.select(newCoordinates, null, newVersion, versionPattern, ctx);
+        }
+        return versionSelector.select(
+                new GroupArtifactVersion(
+                        newCoordinates.getGroupId(), newCoordinates.getArtifactId(), currentVersion),
+                null, newVersion, versionPattern, ctx);
+    }
+
+    private boolean shouldSelectCatalogVersion(@Nullable String currentVersion) {
+        return !StringUtils.isBlank(newVersion) &&
+                (currentVersion != null || Boolean.TRUE.equals(overrideManagedVersion));
     }
 
     private boolean canSafelyUpdateVariable(String varName, DependencyMatcher depMatcher, Accumulator acc) {

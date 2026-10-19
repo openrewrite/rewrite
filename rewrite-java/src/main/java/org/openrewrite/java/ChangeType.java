@@ -34,11 +34,17 @@ import java.nio.file.Paths;
 import java.util.*;
 import java.util.concurrent.atomic.AtomicBoolean;
 
+import static java.util.Collections.emptyList;
 import static java.util.Objects.requireNonNull;
 
 @Value
 @EqualsAndHashCode(callSuper = false)
-public class ChangeType extends Recipe {
+public class ChangeType extends Recipe implements RenamingRecipe {
+
+    /**
+     * The kind of name ChangeType and ChangePackage rename, which shares one namespace of dotted names.
+     */
+    static final String JAVA_TYPES_AND_PACKAGES = "Java type or package";
 
     @Option(displayName = "Old fully-qualified type name",
             description = "Fully-qualified class name of the original type.",
@@ -58,6 +64,29 @@ public class ChangeType extends Recipe {
     Boolean ignoreDefinition;
 
     String displayName = "Change type";
+
+    @Override
+    public String kindOfName() {
+        return JAVA_TYPES_AND_PACKAGES;
+    }
+
+    @Override
+    public String oldName() {
+        return oldFullyQualifiedTypeName;
+    }
+
+    @Override
+    public String rename(String name) {
+        // the types nested in the old type move with it
+        String oldName = oldFullyQualifiedTypeName.replace('$', '.');
+        String dotted = name.replace('$', '.');
+        if (dotted.equals(oldName)) {
+            return newFullyQualifiedTypeName;
+        } else if (dotted.startsWith(oldName + ".")) {
+            return newFullyQualifiedTypeName.replace('$', '.') + dotted.substring(oldName.length());
+        }
+        return name;
+    }
 
     @Override
     public String getInstanceNameSuffix() {
@@ -378,6 +407,14 @@ public class ChangeType extends Recipe {
                 }
 
                 JavaSourceFile sf = getCursor().firstEnclosing(JavaSourceFile.class);
+                // a declaration's own name stays an identifier, while elsewhere the parser makes a qualified name
+                // into field accesses and a keyword into a primitive type
+                Object parent = getCursor().getParentTreeCursor().getValue();
+                boolean nameOnly = !ident.getAnnotations().isEmpty() ||
+                                   parent instanceof J.ClassDeclaration &&
+                                   ((J.ClassDeclaration) parent).getName().getId().equals(ident.getId()) ||
+                                   parent instanceof J.MethodDeclaration &&
+                                   ((J.MethodDeclaration) parent).getName().getId().equals(ident.getId());
                 if (ident.getSimpleName().equals(className)) {
                     if (targetType instanceof JavaType.FullyQualified) {
                         if (((JavaType.FullyQualified) targetType).getOwningClass() != null) {
@@ -387,11 +424,19 @@ public class ChangeType extends Recipe {
                         } else {
                             if (hasNoConflictingImport(sf)) {
                                 ident = ident.withSimpleName(((JavaType.FullyQualified) targetType).getClassName());
-                            } else {
+                            } else if (nameOnly) {
                                 ident = ident.withSimpleName(((JavaType.FullyQualified) targetType).getFullyQualifiedName());
+                            } else {
+                                return FullyQualifyTypeReference.qualifiedName((JavaType.FullyQualified) targetType,
+                                        ident.getPrefix(), emptyList());
                             }
                         }
                     } else if (targetType instanceof JavaType.Primitive) {
+                        // the parser makes `String` an identifier, not a primitive
+                        if (!nameOnly && targetType != JavaType.Primitive.String) {
+                            return new J.Primitive(ident.getId(), ident.getPrefix(), ident.getMarkers(),
+                                    (JavaType.Primitive) targetType);
+                        }
                         ident = ident.withSimpleName(((JavaType.Primitive) targetType).getKeyword());
                     }
                 }

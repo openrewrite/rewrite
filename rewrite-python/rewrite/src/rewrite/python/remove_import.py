@@ -96,6 +96,7 @@ class RemoveImport(PythonVisitor):
         self.only_if_unused = options.only_if_unused
         self._used: Optional[Set[str]] = None
         self._cu: Optional[CompilationUnit] = None
+        self._block: Sequence[Statement] = ()
 
     def visit_compilation_unit(self, cu: CompilationUnit, p) -> J:
         if self.only_if_unused:
@@ -124,8 +125,9 @@ class RemoveImport(PythonVisitor):
 
     def _bound_by_another_import(self, cu: CompilationUnit, target_name: str,
                                  removing: Import) -> bool:
-        """True when some import other than ``removing`` binds ``target_name``."""
-        for stmt in cu.statements:
+        """True when some import other than ``removing``, at module level or in a block
+        enclosing it, binds ``target_name``."""
+        for stmt in [*cu.statements, *self._block]:
             if isinstance(stmt, MultiImport):
                 from_name = get_name_string(stmt.from_) if stmt.from_ is not None else None
                 for imp in stmt.names:
@@ -221,7 +223,10 @@ class RemoveImport(PythonVisitor):
         body = unconditional_body(if_)
         if body is None:
             return if_
+        outer = self._block
+        self._block = [*outer, *body.statements]
         kept = self._prune_statements(body.padding.statements)
+        self._block = outer
         if kept is None:
             return if_
         if not kept:

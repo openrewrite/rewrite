@@ -7,10 +7,13 @@ and type-specific visit methods handling only additional fields.
 from typing import Any, TYPE_CHECKING
 
 from rewrite import Markers
+from rewrite.execution import ExecutionContext
 from rewrite.utils import id_to_int, id_to_str
 from rewrite.java import Space, JRightPadded, JLeftPadded, JContainer, J
+from rewrite.java import tree as jt
 from rewrite.parser import ParseError
 from rewrite.python import CompilationUnit
+from rewrite.python.support_types import PyComment
 from rewrite.python.tree import (
     Async, Await, Binary, ChainedAssignment, ExceptionType,
     LiteralType, TypeHint, ExpressionStatement, ExpressionTypeTree,
@@ -23,6 +26,96 @@ from rewrite.python.tree import (
 if TYPE_CHECKING:
     from rewrite.rpc.send_queue import RpcSendQueue
 
+
+
+# A node is sent by the method of the first row it is an instance of, so a subclass of a
+# listed class is sent as that class. _resolve walks the rows once per concrete type.
+_DISPATCH: tuple = (
+    (CompilationUnit, '_visit_compilation_unit'),
+    (Async, '_visit_async'),
+    (Await, '_visit_await'),
+    (Binary, '_visit_binary'),
+    (ChainedAssignment, '_visit_chained_assignment'),
+    (ExceptionType, '_visit_exception_type'),
+    (LiteralType, '_visit_literal_type'),
+    (TypeHint, '_visit_type_hint'),
+    (ExpressionStatement, '_visit_expression_statement'),
+    (ExpressionTypeTree, '_visit_expression_type_tree'),
+    (StatementExpression, '_visit_statement_expression'),
+    (MultiImport, '_visit_multi_import'),
+    (KeyValue, '_visit_key_value'),
+    (DictLiteral, '_visit_dict_literal'),
+    (CollectionLiteral, '_visit_collection_literal'),
+    (FormattedString.Value, '_visit_formatted_string_value'),
+    (FormattedString, '_visit_formatted_string'),
+    (Pass, '_visit_pass'),
+    (Shebang, '_visit_shebang'),
+    (TrailingElseWrapper, '_visit_trailing_else_wrapper'),
+    (ComprehensionExpression.Condition, '_visit_comprehension_condition'),
+    (ComprehensionExpression.Clause, '_visit_comprehension_clause'),
+    (ComprehensionExpression, '_visit_comprehension_expression'),
+    (TypeAlias, '_visit_type_alias'),
+    (YieldFrom, '_visit_yield_from'),
+    (UnionType, '_visit_union_type'),
+    (VariableScope, '_visit_variable_scope'),
+    (Del, '_visit_del'),
+    (SpecialParameter, '_visit_special_parameter'),
+    (Star, '_visit_star'),
+    (NamedArgument, '_visit_named_argument'),
+    (TypeHintedExpression, '_visit_type_hinted_expression'),
+    (ErrorFrom, '_visit_error_from'),
+    (MatchCase.Pattern, '_visit_match_case_pattern'),
+    (MatchCase, '_visit_match_case'),
+    (Slice, '_visit_slice'),
+    (ParseError, '_visit_parse_error'),
+    (jt.Identifier, '_visit_identifier'),
+    (jt.Literal, '_visit_literal'),
+    (jt.Import, '_visit_import'),
+    (jt.FieldAccess, '_visit_field_access'),
+    (jt.Block, '_visit_block'),
+    (jt.MethodInvocation, '_visit_method_invocation'),
+    (jt.Unary, '_visit_j_unary'),
+    (jt.Binary, '_visit_j_binary'),
+    (jt.Assignment, '_visit_j_assignment'),
+    (jt.AssignmentOperation, '_visit_j_assignment_operation'),
+    (jt.Return, '_visit_j_return'),
+    (jt.If, '_visit_j_if'),
+    (jt.If.Else, '_visit_j_else'),
+    (jt.WhileLoop, '_visit_j_while_loop'),
+    (jt.ForEachLoop.Control, '_visit_j_for_each_control'),
+    (jt.ForEachLoop, '_visit_j_for_each_loop'),
+    (jt.Try, '_visit_j_try'),
+    (jt.Try.Catch, '_visit_j_catch'),
+    (jt.Try.Resource, '_visit_j_try_resource'),
+    (jt.Throw, '_visit_j_throw'),
+    (jt.Assert, '_visit_j_assert'),
+    (jt.Break, '_visit_j_break'),
+    (jt.Continue, '_visit_j_continue'),
+    (jt.Empty, '_visit_j_empty'),
+    (jt.Ternary, '_visit_j_ternary'),
+    (jt.Lambda, '_visit_j_lambda'),
+    (jt.Lambda.Parameters, '_visit_j_lambda_parameters'),
+    (jt.VariableDeclarations, '_visit_j_variable_declarations'),
+    (jt.VariableDeclarations.NamedVariable, '_visit_j_named_variable'),
+    (jt.ClassDeclaration, '_visit_j_class_declaration'),
+    (jt.ClassDeclaration.Kind, '_visit_j_class_declaration_kind'),
+    (jt.MethodDeclaration, '_visit_j_method_declaration'),
+    (jt.Switch, '_visit_j_switch'),
+    (jt.Case, '_visit_j_case'),
+    (jt.ArrayAccess, '_visit_j_array_access'),
+    (jt.ArrayDimension, '_visit_j_array_dimension'),
+    (jt.NewArray, '_visit_j_new_array'),
+    (jt.Annotation, '_visit_j_annotation'),
+    (jt.Parentheses, '_visit_j_parentheses'),
+    (jt.ControlParentheses, '_visit_j_control_parentheses'),
+    (jt.Modifier, '_visit_j_modifier'),
+    (jt.Yield, '_visit_j_yield'),
+    (jt.ParameterizedType, '_visit_j_parameterized_type'),
+    (jt.TypeParameter, '_visit_j_type_parameter'),
+    (jt.TypeParameters, '_visit_j_type_parameters'),
+    (jt.Unknown, '_visit_j_unknown'),
+    (jt.Unknown.Source, '_visit_j_unknown_source'),
+)
 
 class PythonRpcSender:
     """Sender that mirrors Java's PythonSender for RPC serialization."""
@@ -49,6 +142,9 @@ class PythonRpcSender:
         if before is None:
             # ADD for new object
             value_type = get_java_type_name(type(after)) if hasattr(after, '__class__') else None
+            if value_type is None and isinstance(after, ExecutionContext):
+                # the host builds a context from its type alone, and knows this one
+                value_type = 'org.openrewrite.InMemoryExecutionContext'
             q.put({'state': RpcObjectState.ADD, 'valueType': value_type})
             q._before = None
             self._visit(after, q)
@@ -63,99 +159,18 @@ class PythonRpcSender:
         """Visit a tree node, dispatching to appropriate visitor method."""
         if tree is None:
             return
+        visitors = _VISITORS.get(type(tree))
+        if visitors is None:
+            visitors = _VISITORS[type(tree)] = _resolve(tree)
+        pre_visit, visit = visitors
+        if pre_visit is not None:
+            pre_visit(self, tree, q)
+        if visit is not None:
+            visit(self, tree, q)
 
-        # First handle common J fields via pre_visit
-        # ExpressionStatement and StatementExpression delegate prefix/markers to their child, so skip them
-        if isinstance(tree, J):
-            if isinstance(tree, ExpressionStatement):
-                # Only send id; prefix/markers are part of expression
-                q.get_and_send(tree, lambda x: id_to_str(x._id))
-            elif isinstance(tree, StatementExpression):
-                # Only send id; prefix/markers are part of statement
-                q.get_and_send(tree, lambda x: id_to_str(x._id))
-            else:
-                self._pre_visit(tree, q)
-
-        # Then dispatch to type-specific visitor
-        tree_type = type(tree).__name__
-
-        if isinstance(tree, CompilationUnit):
-            self._visit_compilation_unit(tree, q)
-        elif isinstance(tree, Async):
-            self._visit_async(tree, q)
-        elif isinstance(tree, Await):
-            self._visit_await(tree, q)
-        elif isinstance(tree, Binary):
-            self._visit_binary(tree, q)
-        elif isinstance(tree, ChainedAssignment):
-            self._visit_chained_assignment(tree, q)
-        elif isinstance(tree, ExceptionType):
-            self._visit_exception_type(tree, q)
-        elif isinstance(tree, LiteralType):
-            self._visit_literal_type(tree, q)
-        elif isinstance(tree, TypeHint):
-            self._visit_type_hint(tree, q)
-        elif isinstance(tree, ExpressionStatement):
-            self._visit_expression_statement(tree, q)
-        elif isinstance(tree, ExpressionTypeTree):
-            self._visit_expression_type_tree(tree, q)
-        elif isinstance(tree, StatementExpression):
-            self._visit_statement_expression(tree, q)
-        elif isinstance(tree, MultiImport):
-            self._visit_multi_import(tree, q)
-        elif isinstance(tree, KeyValue):
-            self._visit_key_value(tree, q)
-        elif isinstance(tree, DictLiteral):
-            self._visit_dict_literal(tree, q)
-        elif isinstance(tree, CollectionLiteral):
-            self._visit_collection_literal(tree, q)
-        elif isinstance(tree, FormattedString.Value):
-            self._visit_formatted_string_value(tree, q)
-        elif isinstance(tree, FormattedString):
-            self._visit_formatted_string(tree, q)
-        elif isinstance(tree, Pass):
-            self._visit_pass(tree, q)
-        elif isinstance(tree, Shebang):
-            self._visit_shebang(tree, q)
-        elif isinstance(tree, TrailingElseWrapper):
-            self._visit_trailing_else_wrapper(tree, q)
-        elif isinstance(tree, ComprehensionExpression.Condition):
-            self._visit_comprehension_condition(tree, q)
-        elif isinstance(tree, ComprehensionExpression.Clause):
-            self._visit_comprehension_clause(tree, q)
-        elif isinstance(tree, ComprehensionExpression):
-            self._visit_comprehension_expression(tree, q)
-        elif isinstance(tree, TypeAlias):
-            self._visit_type_alias(tree, q)
-        elif isinstance(tree, YieldFrom):
-            self._visit_yield_from(tree, q)
-        elif isinstance(tree, UnionType):
-            self._visit_union_type(tree, q)
-        elif isinstance(tree, VariableScope):
-            self._visit_variable_scope(tree, q)
-        elif isinstance(tree, Del):
-            self._visit_del(tree, q)
-        elif isinstance(tree, SpecialParameter):
-            self._visit_special_parameter(tree, q)
-        elif isinstance(tree, Star):
-            self._visit_star(tree, q)
-        elif isinstance(tree, NamedArgument):
-            self._visit_named_argument(tree, q)
-        elif isinstance(tree, TypeHintedExpression):
-            self._visit_type_hinted_expression(tree, q)
-        elif isinstance(tree, ErrorFrom):
-            self._visit_error_from(tree, q)
-        elif isinstance(tree, MatchCase.Pattern):
-            self._visit_match_case_pattern(tree, q)
-        elif isinstance(tree, MatchCase):
-            self._visit_match_case(tree, q)
-        elif isinstance(tree, Slice):
-            self._visit_slice(tree, q)
-        elif isinstance(tree, ParseError):
-            self._visit_parse_error(tree, q)
-        elif isinstance(tree, J):
-            # Delegate to Java visitor for Java types
-            self._visit_java(tree, q)
+    def _send_id(self, j: J, q: 'RpcSendQueue') -> None:
+        """Pre-visit of a wrapper that sends its prefix and markers through its child."""
+        q.get_and_send(j, lambda x: id_to_str(x._id))
 
     def _pre_visit(self, j: J, q: 'RpcSendQueue') -> None:
         """Handle common J fields: id, prefix, markers."""
@@ -265,7 +280,7 @@ class PythonRpcSender:
     def _visit_formatted_string_value(self, v: FormattedString.Value, q: 'RpcSendQueue') -> None:
         q.get_and_send(v, lambda x: x.padding.expression, lambda el: self._visit_right_padded(el, q))
         q.get_and_send(v, lambda x: x.padding.debug, lambda el: self._visit_right_padded(el, q))
-        q.get_and_send(v, lambda x: x.conversion)
+        q.get_and_send(v, lambda x: x.padding.conversion, lambda el: self._visit_right_padded(el, q))
         q.get_and_send(v, lambda x: x.format, lambda el: self._visit(el, q))
 
     def _visit_pass(self, pass_: Pass, q: 'RpcSendQueue') -> None:
@@ -282,7 +297,7 @@ class PythonRpcSender:
     def _visit_comprehension_expression(self, ce: ComprehensionExpression, q: 'RpcSendQueue') -> None:
         q.get_and_send(ce, lambda x: x.kind)
         q.get_and_send(ce, lambda x: x.result, lambda el: self._visit(el, q))
-        q.get_and_send_list(ce, lambda x: ce.clauses,
+        q.get_and_send_list(ce, lambda x: x.clauses,
                            lambda el: id_to_str(el._id),
                            lambda el: self._visit(el, q))
         q.get_and_send(ce, lambda x: x.suffix, lambda space: self._visit_space(space, q))
@@ -295,7 +310,7 @@ class PythonRpcSender:
         q.get_and_send(cc, lambda x: x.padding.async_, lambda el: self._visit_right_padded(el, q))
         q.get_and_send(cc, lambda x: x.iterator_variable, lambda el: self._visit(el, q))
         q.get_and_send(cc, lambda x: x.padding.iterated_list, lambda el: self._visit_left_padded(el, q))
-        q.get_and_send_list(cc, lambda x: cc.conditions,
+        q.get_and_send_list(cc, lambda x: x.conditions,
                            lambda el: id_to_str(el._id),
                            lambda el: self._visit(el, q))
 
@@ -368,109 +383,11 @@ class PythonRpcSender:
         # Python's Slice doesn't have a type field, but Java expects one (always null)
         q.get_and_send_as_ref(slice_, lambda x: None)
 
-    def _visit_java(self, j: J, q: 'RpcSendQueue') -> None:
-        """Handle Java tree types that Python extends."""
-        from rewrite.java.tree import (
-            Identifier, Literal, MethodInvocation, FieldAccess,
-            ArrayAccess, ArrayDimension, Block, If, Try, MethodDeclaration,
-            ClassDeclaration, VariableDeclarations, Return, Assignment,
-            AssignmentOperation, Unary, Ternary, Lambda, Empty, Throw,
-            Assert, Break, Continue, WhileLoop, ForEachLoop, Switch, Case, Annotation, Import,
-            Binary, Parentheses, ControlParentheses, NewArray, Modifier, Yield,
-            ParameterizedType, TypeParameter, TypeParameters
-        )
+    def _visit_j_unknown(self, unknown, q: 'RpcSendQueue') -> None:
+        q.get_and_send(unknown, lambda x: x.source, lambda el: self._visit(el, q))
 
-        # For Java types, we need to handle their specific fields
-        if isinstance(j, Identifier):
-            self._visit_identifier(j, q)
-        elif isinstance(j, Literal):
-            self._visit_literal(j, q)
-        elif isinstance(j, Import):
-            self._visit_import(j, q)
-        elif isinstance(j, FieldAccess):
-            self._visit_field_access(j, q)
-        elif isinstance(j, Block):
-            self._visit_block(j, q)
-        elif isinstance(j, MethodInvocation):
-            self._visit_method_invocation(j, q)
-        elif isinstance(j, Unary):
-            self._visit_j_unary(j, q)
-        elif isinstance(j, Binary):
-            self._visit_j_binary(j, q)
-        elif isinstance(j, Assignment):
-            self._visit_j_assignment(j, q)
-        elif isinstance(j, AssignmentOperation):
-            self._visit_j_assignment_operation(j, q)
-        elif isinstance(j, Return):
-            self._visit_j_return(j, q)
-        elif isinstance(j, If):
-            self._visit_j_if(j, q)
-        elif isinstance(j, If.Else):
-            self._visit_j_else(j, q)
-        elif isinstance(j, WhileLoop):
-            self._visit_j_while_loop(j, q)
-        elif isinstance(j, ForEachLoop.Control):
-            self._visit_j_for_each_control(j, q)
-        elif isinstance(j, ForEachLoop):
-            self._visit_j_for_each_loop(j, q)
-        elif isinstance(j, Try):
-            self._visit_j_try(j, q)
-        elif isinstance(j, Try.Catch):
-            self._visit_j_catch(j, q)
-        elif isinstance(j, Try.Resource):
-            self._visit_j_try_resource(j, q)
-        elif isinstance(j, Throw):
-            self._visit_j_throw(j, q)
-        elif isinstance(j, Assert):
-            self._visit_j_assert(j, q)
-        elif isinstance(j, Break):
-            self._visit_j_break(j, q)
-        elif isinstance(j, Continue):
-            self._visit_j_continue(j, q)
-        elif isinstance(j, Empty):
-            self._visit_j_empty(j, q)
-        elif isinstance(j, Ternary):
-            self._visit_j_ternary(j, q)
-        elif isinstance(j, Lambda):
-            self._visit_j_lambda(j, q)
-        elif isinstance(j, Lambda.Parameters):
-            self._visit_j_lambda_parameters(j, q)
-        elif isinstance(j, VariableDeclarations):
-            self._visit_j_variable_declarations(j, q)
-        elif isinstance(j, VariableDeclarations.NamedVariable):
-            self._visit_j_named_variable(j, q)
-        elif isinstance(j, ClassDeclaration):
-            self._visit_j_class_declaration(j, q)
-        elif isinstance(j, ClassDeclaration.Kind):
-            self._visit_j_class_declaration_kind(j, q)
-        elif isinstance(j, MethodDeclaration):
-            self._visit_j_method_declaration(j, q)
-        elif isinstance(j, Switch):
-            self._visit_j_switch(j, q)
-        elif isinstance(j, Case):
-            self._visit_j_case(j, q)
-        elif isinstance(j, ArrayAccess):
-            self._visit_j_array_access(j, q)
-        elif isinstance(j, ArrayDimension):
-            self._visit_j_array_dimension(j, q)
-        elif isinstance(j, NewArray):
-            self._visit_j_new_array(j, q)
-        elif isinstance(j, Annotation):
-            self._visit_j_annotation(j, q)
-        elif isinstance(j, Parentheses):
-            self._visit_j_parentheses(j, q)
-        elif isinstance(j, ControlParentheses):
-            self._visit_j_control_parentheses(j, q)
-        elif isinstance(j, Modifier):
-            self._visit_j_modifier(j, q)
-        elif isinstance(j, Yield):
-            self._visit_j_yield(j, q)
-        elif isinstance(j, ParameterizedType):
-            self._visit_j_parameterized_type(j, q)
-        elif isinstance(j, TypeParameter):
-            self._visit_j_type_parameter(j, q)
-        elif isinstance(j, TypeParameters):
-            self._visit_j_type_parameters(j, q)
+    def _visit_j_unknown_source(self, source, q: 'RpcSendQueue') -> None:
+        q.get_and_send(source, lambda x: x.text)
 
     def _visit_identifier(self, ident, q: 'RpcSendQueue') -> None:
         # Java Identifier sends: annotations (list), simpleName, type (ref), fieldType (ref)
@@ -921,7 +838,8 @@ class PythonRpcSender:
             q.get_and_send_list_as_ref(java_type, lambda x: x._annotations or [], self._type_signature, lambda t: self._visit_type(t, q))
 
         elif isinstance(java_type, JT.Variable):
-            # Variable: name, owner, type, annotations (no flags over RPC)
+            # Variable: flagsBitMap, name, owner, type, annotations
+            q.get_and_send(java_type, lambda x: x._flags_bit_map)
             q.get_and_send(java_type, lambda x: x._name)
             q.get_and_send_as_ref(java_type, lambda x: x._owner, lambda t: self._visit_type(t, q))
             q.get_and_send_as_ref(java_type, lambda x: x._type, lambda t: self._visit_type(t, q))
@@ -1041,6 +959,8 @@ class PythonRpcSender:
         q.get_and_send(comment, lambda x: x.text)
         q.get_and_send(comment, lambda x: x.suffix)
         q.get_and_send_as_ref(comment, lambda x: x.markers, lambda markers: self._visit_markers(markers, q))
+        if isinstance(comment, PyComment):
+            q.get_and_send(comment, lambda x: x.aligned_to_indent)
 
     def _visit_right_padded(self, rp: JRightPadded, q: 'RpcSendQueue') -> None:
         """Visit a JRightPadded wrapper."""
@@ -1084,3 +1004,18 @@ class PythonRpcSender:
                            lambda el: id_to_str(el.element._id),
                            lambda el: self._visit_right_padded(el, q))
         q.get_and_send_as_ref(container, lambda x: x.markers, lambda markers: self._visit_markers(markers, q))
+
+
+# Concrete type -> (pre-visit, visit), unbound methods of PythonRpcSender, each possibly None.
+_VISITORS: dict = {}
+
+
+def _resolve(tree: Any) -> tuple:
+    if not isinstance(tree, J):
+        pre_visit = None
+    elif isinstance(tree, (ExpressionStatement, StatementExpression)):
+        pre_visit = PythonRpcSender._send_id
+    else:
+        pre_visit = PythonRpcSender._pre_visit
+    visit = next((getattr(PythonRpcSender, name) for cls, name in _DISPATCH if isinstance(tree, cls)), None)
+    return pre_visit, visit

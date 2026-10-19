@@ -31,6 +31,6 @@ public class ScalaSubstitutions extends Substitutions {
 
     @Override
     protected String newPrimitiveParameter(String fqn, int index) {
-        return newObjectParameter(fqn, index);
+        return newObjectParameter(Character.toUpperCase(fqn.charAt(0)) + fqn.substring(1), index);
     }
 }

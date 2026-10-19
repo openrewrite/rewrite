@@ -250,11 +250,15 @@ public class SpringBomProperty {
      */
     public static JavaSourceFile addDeclaration(Cursor scope, String name, String value) {
         JavaSourceFile cu = scope.getValue();
+        List<Statement> statements = topLevelStatements(cu);
+        if (statements.isEmpty()) {
+            // A template is placed next to a statement, and an empty script has none
+            return cu;
+        }
         JavaTemplate declaration = cu instanceof K.CompilationUnit ?
                 KotlinTemplate.builder("extra[\"" + name + "\"] = \"" + value + "\"").build() :
                 GroovyTemplate.builder("ext['" + name + "'] = '" + value + "'").build();
 
-        List<Statement> statements = topLevelStatements(cu);
         int plugins = lastPluginsBlock(statements);
         // A coordinate places the declaration but says nothing about spacing, and Gradle scripts set their
         // top-level blocks apart with a blank line
@@ -286,7 +290,7 @@ public class SpringBomProperty {
     /**
      * A Kotlin script wraps its statements in a block; a Groovy script holds them directly.
      */
-    private static List<Statement> topLevelStatements(JavaSourceFile cu) {
+    public static List<Statement> topLevelStatements(JavaSourceFile cu) {
         if (cu instanceof K.CompilationUnit) {
             Statement first = ((K.CompilationUnit) cu).getStatements().get(0);
             return first instanceof J.Block ? ((J.Block) first).getStatements() : emptyList();
@@ -294,7 +298,7 @@ public class SpringBomProperty {
         return ((G.CompilationUnit) cu).getStatements();
     }
 
-    private static JavaSourceFile withTopLevelStatements(JavaSourceFile cu, List<Statement> statements) {
+    public static JavaSourceFile withTopLevelStatements(JavaSourceFile cu, List<Statement> statements) {
         if (cu instanceof K.CompilationUnit) {
             K.CompilationUnit k = (K.CompilationUnit) cu;
             return k.withStatements(ListUtils.mapFirst(k.getStatements(), first -> first instanceof J.Block ?

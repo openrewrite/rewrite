@@ -21,6 +21,7 @@ import org.openrewrite.DocumentExample;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Issue;
 import org.openrewrite.java.tree.*;
+import org.openrewrite.test.RecipeQualityValidation;
 import org.openrewrite.test.RewriteTest;
 import org.openrewrite.test.SourceSpec;
 import org.openrewrite.test.TypeValidation;
@@ -1340,7 +1341,10 @@ class JavaTemplateTest implements RewriteTest {
                     return super.visitMethodInvocation(method, ctx);
                 }
             }))
-            .afterTypeValidationOptions(TypeValidation.builder().constructorInvocations(false).build()) // Unclear why
+            // Unclear why
+            .recipeQualityValidation(RecipeQualityValidation.builder()
+              .types(TypeValidation.builder().constructorInvocations(false).build())
+              .build())
             .parser(JavaParser.fromJavaVersion().dependsOn(
                 """
                   package batch;

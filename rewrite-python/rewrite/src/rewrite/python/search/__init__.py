@@ -39,7 +39,7 @@ import fnmatch
 import logging
 from typing import Any, Optional, cast
 
-from rewrite.java.support_types import J
+from rewrite.java.support_types import J, JavaType
 from rewrite.java.tree import Import, MethodInvocation
 from rewrite.markers import SearchResult
 from rewrite.python.import_utils import get_name_string, get_qualid_name
@@ -112,11 +112,7 @@ class UsesType(TreeVisitor[Tree, Any]):
                 types_in_use, "types", None
             )
             if types is not None:
-                for t in types:
-                    fqn = _fully_qualified_name(t)
-                    if fqn and fnmatch.fnmatch(fqn, self._pattern):
-                        return True
-                return False
+                return any(_type_matches(t, self._pattern) for t in types)
         return _TypeSearch(self._pattern).search(tree, p)
 
 
@@ -222,6 +218,13 @@ def _fully_qualified_name(type_obj: Any) -> Optional[str]:
     return None
 
 
+def _type_matches(type_obj: Any, pattern: str) -> bool:
+    if isinstance(type_obj, JavaType.Union):
+        return any(_type_matches(member, pattern) for member in type_obj.bounds)
+    fqn = _fully_qualified_name(type_obj)
+    return fqn is not None and fnmatch.fnmatch(fqn, pattern)
+
+
 class _FindFirst(PythonVisitor[Any]):
     """Traversal that stops at the first node :meth:`matches` accepts.
 
@@ -280,8 +283,7 @@ class _TypeSearch(_FindFirst):
         # Read the attribution off any node that carries it: `Expression`
         # declares its own `type` alongside `TypedTree` rather than under it,
         # so a class check on either one alone misses the other's nodes.
-        fqn = _fully_qualified_name(getattr(tree, "type", None))
-        return fqn is not None and fnmatch.fnmatch(fqn, self._pattern)
+        return _type_matches(getattr(tree, "type", None), self._pattern)
 
 
 class _MethodSearch(_FindFirst):

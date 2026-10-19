@@ -269,6 +269,32 @@ public class SwitchTests : RewriteTest
     }
 
     [Fact]
+    public void SwitchStatementInSwitchExpressionArm()
+    {
+        RewriteRun(
+            CSharp(
+                """
+                class Foo {
+                    System.Func<int> Bar(int x, int y) {
+                        return x switch {
+                            > 0 => () => {
+                                switch (y) {
+                                    case 1:
+                                        return y switch { 1 => 1, _ => 2 };
+                                    default:
+                                        return 0;
+                                }
+                            },
+                            _ => () => 0
+                        };
+                    }
+                }
+                """
+            )
+        );
+    }
+
+    [Fact]
     public void SwitchWithTypePattern()
     {
         RewriteRun(

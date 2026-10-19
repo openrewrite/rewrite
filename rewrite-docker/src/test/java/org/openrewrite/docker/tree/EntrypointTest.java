@@ -71,4 +71,16 @@ class EntrypointTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void execFormWithSpaceBeforeComma() {
+        rewriteRun(
+          docker(
+            """
+              FROM x
+              ENTRYPOINT ["dlv" , "--accept-multiclient" , "--api-version=2"]
+              """
+          )
+        );
+    }
 }

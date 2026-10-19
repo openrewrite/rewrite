@@ -231,6 +231,7 @@ public class PythonVisitor<P> extends JavaVisitor<P>
         value = value.withMarkers(visitMarkers(value.getMarkers(), p));
         value = value.getPadding().withExpression(visitRightPadded(value.getPadding().getExpression(), PyRightPadded.Location.FORMATTED_STRING_VALUE_EXPRESSION, p));
         value = value.getPadding().withDebug(visitRightPadded(value.getPadding().getDebug(), PyRightPadded.Location.FORMATTED_STRING_VALUE_DEBUG, p));
+        value = value.getPadding().withConversion(visitRightPadded(value.getPadding().getConversion(), PyRightPadded.Location.FORMATTED_STRING_VALUE_CONVERSION, p));
         return value.withFormat(visitAndCast(value.getFormat(), p));
     }
 

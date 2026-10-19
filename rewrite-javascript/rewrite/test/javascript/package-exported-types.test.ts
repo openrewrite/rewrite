@@ -298,6 +298,26 @@ declare namespace FakeIntl { interface FakeFormat { format(n: number): string; }
             expect(Type.signature(widget.returnType)).toBe("modern-dep.Widget");
         }, {unsafeCleanup: true});
     }, 60000);
+
+    test("types a package against TypeScript's lib however many packages came before it", async () => {
+        // Every program after the first shares the default lib's parsed and bound files.
+        await withDir(async (root) => {
+            const returnTypes = (name: string) => {
+                const {pkg, nodeModules} = writeFiles(root.path, name, {
+                    "package.json": JSON.stringify({name, version: "1.0.0", types: "index.d.ts"}),
+                    "index.d.ts": `export declare class Loader { load(): Promise<string[]>; sizes(): Map<string, number>; }\n`,
+                });
+                const loader = exportedTypes([pkg], [nodeModules])
+                    .find(t => Type.FullyQualified.getFullyQualifiedName(t) === `${name}.Loader`) as Type.Class;
+                return loader.methods.map(m => `${m.name}: ${Type.signature(m.returnType)}`).sort();
+            };
+
+            const first = returnTypes("first-lib-fixture");
+            expect(first.join("\n")).toContain("Promise");
+            expect(first.join("\n")).toContain("Map");
+            expect(returnTypes("second-lib-fixture")).toEqual(first);
+        }, {unsafeCleanup: true});
+    }, 60000);
 });
 
 /** Register a DependencyTypes handler on a mock connection and return the captured request handler. */
@@ -349,6 +369,19 @@ describe("DependencyTypes.handle", () => {
             const afterDrain = await handler(req);
             expect(afterDrain.length).toBeGreaterThan(0);
             expect(afterDrain).toEqual(slices[0]);
+        }, {unsafeCleanup: true});
+    }, 60000);
+
+    test("resolves against the node_modules of the directory the request names, not the parsed project's", async () => {
+        await withDir(async (root) => {
+            const fetched = path.join(root.path, "fetched", "exported-types-fixture", "1.0.0");
+            writePackage(fetched);
+            // A project with no node_modules at all, so only the request's path can find the package.
+            setLastParsedProject(path.join(root.path, "empty-project"));
+
+            const data = await captureHandler(100000)({name: "exported-types-fixture", version: "1.0.0", path: fetched});
+            expect(data.some(d => d.value === "exported-types-fixture.Greeter")).toBe(true);
+            expect(data[data.length - 1].state).toBe(RpcObjectState.END_OF_OBJECT);
         }, {unsafeCleanup: true});
     }, 60000);
 

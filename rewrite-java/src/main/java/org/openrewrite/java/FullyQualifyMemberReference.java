@@ -21,6 +21,7 @@ import org.openrewrite.java.tree.*;
 import org.openrewrite.marker.Markers;
 
 import static java.util.Collections.emptyList;
+import static java.util.Objects.requireNonNull;
 
 @AllArgsConstructor
 public class FullyQualifyMemberReference<P> extends JavaVisitor<P> {
@@ -45,7 +46,7 @@ public class FullyQualifyMemberReference<P> extends JavaVisitor<P> {
         JavaType.Method m = (JavaType.Method) memberToFullyQualify;
         if (m.getName().equals(methodInvocation.getMethodType().getName()) &&
                 m.getDeclaringType().getFullyQualifiedName().equals(methodInvocation.getMethodType().getDeclaringType().getFullyQualifiedName())) {
-            return mi.withSelect(toIdentifier(m.getDeclaringType()));
+            return mi.withSelect(FullyQualifyTypeReference.qualifiedName(m.getDeclaringType(), Space.EMPTY, emptyList()));
         }
         return mi;
     }
@@ -76,17 +77,13 @@ public class FullyQualifyMemberReference<P> extends JavaVisitor<P> {
                 && !(getCursor().getParentTreeCursor().getValue() instanceof J.FieldAccess); // not qualified
     }
 
-    private J.Identifier toIdentifier(JavaType.FullyQualified fullyQualified) {
-        return new J.Identifier(Tree.randomId(), Space.EMPTY, Markers.EMPTY, emptyList(),
-                fullyQualified.getFullyQualifiedName(), fullyQualified, null);
-    }
-
     private J.FieldAccess toFieldAccess(JavaType.Variable variableType, J.Identifier identifier) {
         return new J.FieldAccess(
                 Tree.randomId(),
                 identifier.getPrefix(),
                 Markers.EMPTY,
-                toIdentifier(TypeUtils.asFullyQualified(variableType.getOwner())),
+                FullyQualifyTypeReference.qualifiedName(requireNonNull(TypeUtils.asFullyQualified(variableType.getOwner())),
+                        Space.EMPTY, emptyList()),
                 JLeftPadded.build(identifier.withPrefix(Space.EMPTY)),
                 variableType.getType()
         );

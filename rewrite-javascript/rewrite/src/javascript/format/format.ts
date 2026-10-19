@@ -47,6 +47,15 @@ export const autoFormat = async <J2 extends J, P>(
 ): Promise<J2> =>
     (await new AutoformatVisitor(stopAfter, styles).visit(j, p, parent) as J2);
 
+/** `j` re-indented to the style of the file `parent` leads to, with its other whitespace as it is. */
+export const autoIndent = async <J2 extends J, P>(j: J2, p: P, parent?: Cursor): Promise<J2> => {
+    const styleSource = (isSourceFile(j) ? j : parent?.firstEnclosing(isSourceFile)) ?? j;
+    const tabsAndIndents = getStyle(StyleKind.TabsAndIndentsStyle, styleSource) as TabsAndIndentsStyle;
+    const prettierStyle = getPrettierStyle(j, parent);
+    const style = prettierStyle ? tabsAndIndentsFrom(prettierStyle, tabsAndIndents) : tabsAndIndents;
+    return await new TabsAndIndentsVisitor(style).visit(j, p, parent) as J2;
+}
+
 /**
  * Formats JavaScript/TypeScript code using a comprehensive set of formatting rules.
  *

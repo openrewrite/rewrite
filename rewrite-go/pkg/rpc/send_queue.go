@@ -17,6 +17,7 @@
 package rpc
 
 import (
+	"encoding/json"
 	"reflect"
 
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/tree/java"
@@ -147,6 +148,9 @@ func inlineValue(afterVal any, onChange func(any), vt *string) (val any, skipDoC
 			return map[string]any{}, true
 		}
 		return gm.Data, true
+	}
+	if m, ok := afterVal.(java.Marker); ok && vt != nil && *vt == rpcMarkerJavaType {
+		return rpcMarkerData(m), true
 	}
 	if onChange == nil && vt == nil {
 		return afterVal, false
@@ -337,12 +341,49 @@ func getValueType(v any) *string {
 	if vt, ok := valueTypeMap[t]; ok {
 		return &vt
 	}
+	if m, ok := v.(java.Markup); ok {
+		vt := markupJavaTypes[m.Level]
+		return &vt
+	}
 	// GenericMarker carries the original Java class name
 	if gm, ok := v.(java.GenericMarker); ok && gm.JavaType != "" {
 		return &gm.JavaType
 	}
+	// a marker type a recipe declares has no Java class to arrive as
+	if _, ok := v.(java.Marker); ok {
+		vt := rpcMarkerJavaType
+		return &vt
+	}
 	// Check padding types (Go generics have no reflect.Name())
 	return getValueTypeForPadding(v)
+}
+
+// rpcMarkerJavaType is the Java class that holds a marker Java has no class for.
+const rpcMarkerJavaType = "org.openrewrite.rpc.RpcMarker"
+
+// rpcMarkerData is what Java holds of such a marker: its id, and whatever
+// JSON carries of its fields.
+func rpcMarkerData(m java.Marker) map[string]any {
+	data := map[string]any{}
+	if encoded, err := json.Marshal(m); err == nil {
+		_ = json.Unmarshal(encoded, &data)
+	}
+	id := m.ID().String()
+	for field, value := range data {
+		if value == id {
+			delete(data, field)
+		}
+	}
+	data["id"] = id
+	return data
+}
+
+// markupJavaTypes names the Java class of each Markup level; Java has one class per level.
+var markupJavaTypes = map[java.MarkupLevel]string{
+	java.MarkupDebugLevel: "org.openrewrite.marker.Markup$Debug",
+	java.MarkupInfoLevel:  "org.openrewrite.marker.Markup$Info",
+	java.MarkupWarnLevel:  "org.openrewrite.marker.Markup$Warn",
+	java.MarkupErrorLevel: "org.openrewrite.marker.Markup$Error",
 }
 
 // valueTypeMap maps Go types to their Java class names for RPC wire format.

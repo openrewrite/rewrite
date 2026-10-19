@@ -338,7 +338,7 @@ func (v *TabsAndIndentsVisitor) VisitCase(c *java.Case, p any) java.J {
 
 	out := *c
 	out.Expressions.Elements = exprs
-	out.Body = indentBody(v, c.Body, p)
+	out.Body.Elements = indentBody(v, c.Body.Elements, p)
 	return &out
 }
 

@@ -341,7 +341,9 @@ public class CSharpSender extends CSharpVisitor<RpcSendQueue> {
     @Override
     public J visitInterpolation(Cs.Interpolation interpolation, RpcSendQueue q) {
         q.getAndSend(interpolation, i -> i.getPadding().getExpression(), el -> visitRightPadded(el, q));
+        q.getAndSend(interpolation, Cs.Interpolation::getAlignmentBefore, space -> visitSpace(space, q));
         q.getAndSend(interpolation, i -> i.getPadding().getAlignment(), el -> visitRightPadded(el, q));
+        q.getAndSend(interpolation, Cs.Interpolation::getFormatBefore, space -> visitSpace(space, q));
         q.getAndSend(interpolation, i -> i.getPadding().getFormat(), el -> visitRightPadded(el, q));
         return interpolation;
     }
@@ -362,6 +364,7 @@ public class CSharpSender extends CSharpVisitor<RpcSendQueue> {
     public J visitUsingDirective(Cs.UsingDirective usingDirective, RpcSendQueue q) {
         q.getAndSend(usingDirective, u -> u.getPadding().getGlobal(), el -> visitRightPadded(el, q));
         q.getAndSend(usingDirective, u -> u.getPadding().getStatic(), el -> visitLeftPadded(el, q));
+        q.getAndSend(usingDirective, u -> u.getPadding().getUnsafe(), el -> visitLeftPadded(el, q));
         q.getAndSend(usingDirective, u -> u.getPadding().getAlias(), el -> visitRightPadded(el, q));
         q.getAndSend(usingDirective, Cs.UsingDirective::getNamespaceOrType, el -> visit(el, q));
         return usingDirective;
@@ -391,7 +394,7 @@ public class CSharpSender extends CSharpVisitor<RpcSendQueue> {
 
     @Override
     public J visitUsingStatement(Cs.UsingStatement usingStatement, RpcSendQueue q) {
-        q.getAndSend(usingStatement, u -> u.getPadding().getExpression(), el -> visitLeftPadded(el, q));
+        q.getAndSend(usingStatement, Cs.UsingStatement::getExpression, el -> visit(el, q));
         q.getAndSend(usingStatement, Cs.UsingStatement::getStatement, el -> visit(el, q));
         return usingStatement;
     }
@@ -513,9 +516,16 @@ public class CSharpSender extends CSharpVisitor<RpcSendQueue> {
 
     @Override
     public J visitSizeOf(Cs.SizeOf sizeOf, RpcSendQueue q) {
-        q.getAndSend(sizeOf, Cs.SizeOf::getExpression, el -> visit(el, q));
+        q.getAndSend(sizeOf, Cs.SizeOf::getClazz, el -> visit(el, q));
         q.getAndSend(sizeOf, s -> asRef(s.getType()), type -> visitType(getValueNonNull(type), q));
         return sizeOf;
+    }
+
+    @Override
+    public J visitTypeOf(Cs.TypeOf typeOf, RpcSendQueue q) {
+        q.getAndSend(typeOf, Cs.TypeOf::getClazz, el -> visit(el, q));
+        q.getAndSend(typeOf, t -> asRef(t.getType()), type -> visitType(getValueNonNull(type), q));
+        return typeOf;
     }
 
     @Override

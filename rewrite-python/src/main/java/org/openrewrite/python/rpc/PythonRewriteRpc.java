@@ -112,7 +112,24 @@ public class PythonRewriteRpc extends RewriteRpc {
     public InstallRecipesResponse installRecipes(File recipes) {
         return send(
                 "InstallRecipes",
-                new InstallRecipesByFile(recipes.getAbsoluteFile().toPath()),
+                new InstallRecipesByFile(recipes.getAbsoluteFile().toPath(), null),
+                InstallRecipesResponse.class
+        );
+    }
+
+    /**
+     * Run a local package's recipes from a venv the caller built, installing nothing. Each call restarts
+     * the bundle on that venv, and its recipes take precedence over a published namesake's. Requires a
+     * {@link Builder#recipeInstallDir(Path)}.
+     *
+     * @param recipes Path to the local package directory, which names the distribution and keys the bundle
+     * @param venv    A venv with that package installed
+     * @return Response with installation details
+     */
+    public InstallRecipesResponse installRecipes(File recipes, Path venv) {
+        return send(
+                "InstallRecipes",
+                new InstallRecipesByFile(recipes.getAbsoluteFile().toPath(), venv.toAbsolutePath().normalize()),
                 InstallRecipesResponse.class
         );
     }
@@ -528,12 +545,14 @@ public class PythonRewriteRpc extends RewriteRpc {
             Stream<SourceFile> result = new PyProjectTomlParser(commandEnv, dependencyPath).parseInputs(
                     singletonList(pyprojectInput), effectiveRelativeTo, ctx);
 
-            Path uvLockPath = projectPath.resolve("uv.lock");
-            if (Files.exists(uvLockPath)) {
-                Parser.Input uvLockInput = Parser.Input.fromFile(uvLockPath);
-                Stream<SourceFile> uvLockStream = new TomlParser().parseInputs(
-                        singletonList(uvLockInput), effectiveRelativeTo, ctx);
-                result = Stream.concat(result, uvLockStream);
+            for (String lockFileName : Arrays.asList("uv.lock", "poetry.lock", "pdm.lock")) {
+                Path lockPath = projectPath.resolve(lockFileName);
+                if (Files.exists(lockPath)) {
+                    Parser.Input lockInput = Parser.Input.fromFile(lockPath);
+                    Stream<SourceFile> lockStream = new TomlParser().parseInputs(
+                            singletonList(lockInput), effectiveRelativeTo, ctx);
+                    result = Stream.concat(result, lockStream);
+                }
             }
             return result;
         }

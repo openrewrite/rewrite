@@ -981,5 +981,9 @@ export function isExpressionStatement(tree: any): tree is JS.ExpressionStatement
     return tree["kind"] === JS.Kind.ExpressionStatement;
 }
 
+export function isObjectBindingPattern(tree: any): tree is JS.ObjectBindingPattern {
+    return tree?.kind === JS.Kind.ObjectBindingPattern;
+}
+
 TypedTree.registerTypeGetter(JS.Kind.PropertyAssignment, (tree: JS.PropertyAssignment) => TypedTree.getType(tree.initializer));
 TypedTree.registerTypeGetter(JS.Kind.FunctionType, (tree: JS.FunctionType) => TypedTree.getType(tree.returnType.element))

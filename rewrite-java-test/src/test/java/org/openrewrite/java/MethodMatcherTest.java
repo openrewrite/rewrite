@@ -229,6 +229,19 @@ class MethodMatcherTest implements RewriteTest {
     }
 
     @Test
+    void typedArgumentMatchesAUnionWhoseMembersBesidesNullAllMatch() {
+        var optionalString = new JavaType.MultiCatch(List.of(JavaType.Primitive.String, JavaType.Primitive.Null));
+        assertTrue(new MethodMatcher("com.example.Foo bar(String)").matches(
+          new JavaType.Method(null, 1L, build("com.example.Foo"), "bar",
+            null, null, List.of(optionalString), emptyList(), emptyList(), emptyList(), null)));
+
+        var stringOrInt = new JavaType.MultiCatch(List.of(JavaType.Primitive.String, JavaType.Primitive.Int));
+        assertFalse(new MethodMatcher("com.example.Foo bar(String)").matches(
+          new JavaType.Method(null, 1L, build("com.example.Foo"), "bar",
+            null, null, List.of(stringOrInt), emptyList(), emptyList(), emptyList(), null)));
+    }
+
+    @Test
     void siteExample() {
         rewriteRun(
           java(
@@ -296,6 +309,24 @@ class MethodMatcherTest implements RewriteTest {
         void matchUnknownTypesRejectsStaticSelectMismatch() {
             var mi = asMethodInvocation("Assert.assertTrue(Foo.bar());");
             assertFalse(new MethodMatcher("org.junit.FooAssert assertTrue(boolean)").matches(mi, true));
+        }
+
+        @Test
+        void matchUnknownTypesRejectsQualifiedCallOnAnotherType() {
+            var mi = asMethodInvocation("com.example.Assertions.assertTrue(true);", """
+              package com.example;
+              public class Assertions {
+                  public static void assertTrue(boolean condition) {
+                  }
+              }
+              """);
+            assertFalse(new MethodMatcher("org.junit.Assert assertTrue(boolean)").matches(mi, true));
+        }
+
+        @Test
+        void matchUnknownTypesOnAField() {
+            var mi = asMethodInvocation("this.helper.doSomething(true);");
+            assertTrue(new MethodMatcher("com.foo.MyHelper doSomething(boolean)").matches(mi, true));
         }
 
         @Test

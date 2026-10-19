@@ -138,25 +138,17 @@ public class ChangeNamespaceValue extends Recipe {
             }
 
             private Xml.Attribute maybeReplaceNamespaceAttribute(Xml.Attribute attribute) {
-                if (isXmlnsAttribute(attribute) && isOldValue(attribute)) {
-                    return attribute.withValue(
-                            new Xml.Attribute.Value(attribute.getId(),
-                                    "",
-                                    attribute.getMarkers(),
-                                    attribute.getValue().getQuote(),
-                                    newValue));
+                if (isXmlnsAttribute(attribute) && isOldValue(attribute) &&
+                    !newValue.equals(attribute.getValueAsString())) {
+                    return attribute.withValue(attribute.getValue().withValue(newValue));
                 }
                 return attribute;
             }
 
             private Xml.Attribute maybeReplaceVersionAttribute(Xml.Attribute attribute) {
-                if (isVersionAttribute(attribute) && newVersion != null) {
-                    return attribute.withValue(
-                            new Xml.Attribute.Value(attribute.getId(),
-                                    "",
-                                    attribute.getMarkers(),
-                                    attribute.getValue().getQuote(),
-                                    newVersion));
+                if (isVersionAttribute(attribute) && newVersion != null &&
+                    !newVersion.equals(attribute.getValueAsString())) {
+                    return attribute.withValue(attribute.getValue().withValue(newVersion));
                 }
                 return attribute;
             }

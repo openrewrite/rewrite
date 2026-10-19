@@ -21,6 +21,7 @@ import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.DocumentExample;
 import org.openrewrite.Issue;
+import org.openrewrite.test.RecipeQualityValidation;
 import org.openrewrite.test.RewriteTest;
 import org.openrewrite.test.SourceSpec;
 
@@ -1565,7 +1566,9 @@ class AddOrUpdateAnnotationAttributeTest implements RewriteTest {
         @Test
         void matchConstant() {
             rewriteRun(
-              spec -> spec.recipe(new AddOrUpdateAnnotationAttribute("org.example.Foo", null, "hi", "Const.A.B.HI", false, null)),
+              spec -> spec.recipe(new AddOrUpdateAnnotationAttribute("org.example.Foo", null, "hi", "Const.A.B.HI", false, null))
+                // the old value is matched as written, so it misses `org.example.Const.A.B.HI`
+                .recipeQualityValidation(RecipeQualityValidation.builder().matchByTypeNotName(false).build()),
               java(
                 """
                   package org.example;
@@ -1860,7 +1863,9 @@ class AddOrUpdateAnnotationAttributeTest implements RewriteTest {
         @Test
         void matchClass() {
             rewriteRun(
-              spec -> spec.recipe(new AddOrUpdateAnnotationAttribute("org.example.Foo", null, "Integer.class", "Long.class", null, null)),
+              spec -> spec.recipe(new AddOrUpdateAnnotationAttribute("org.example.Foo", null, "Integer.class", "Long.class", null, null))
+                // the old value is matched as written, so it misses `java.lang.Long.class`
+                .recipeQualityValidation(RecipeQualityValidation.builder().matchByTypeNotName(false).build()),
               java(
                 """
                   package org.example;
@@ -2604,6 +2609,42 @@ class AddOrUpdateAnnotationAttributeTest implements RewriteTest {
               import org.example.Foo;
 
               @Foo({Integer.class, Long.class})
+              public class A {}
+              """
+          )
+        );
+    }
+
+    @Test
+    void replaceIntArrayValues() {
+        rewriteRun(
+          spec -> spec.recipe(new AddOrUpdateAnnotationAttribute(
+            "org.example.Foo",
+            "versions",
+            "17, 21",
+            null,
+            false,
+            false
+          )),
+          java(
+            """
+              package org.example;
+              public @interface Foo {
+                  int[] versions();
+              }
+              """
+          ),
+          java(
+            """
+              import org.example.Foo;
+
+              @Foo(versions = {11, 17})
+              public class A {}
+              """,
+            """
+              import org.example.Foo;
+
+              @Foo(versions = {17, 21})
               public class A {}
               """
           )

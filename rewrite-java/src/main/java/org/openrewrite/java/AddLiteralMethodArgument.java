@@ -118,18 +118,29 @@ public class AddLiteralMethodArgument extends Recipe {
                 }
                 JavaType.Primitive primitive;
                 String valueSource;
+                Object value;
+                JavaType.Primitive literalType;
                 if (StringUtils.isBlank(primitiveType) || "string".equalsIgnoreCase(primitiveType)) {
                     primitive = Primitive.String;
                     valueSource = String.format("\"%s\"", getLiteral());
+                    value = String.valueOf(getLiteral());
+                    literalType = primitive;
                 } else if("char".equalsIgnoreCase(primitiveType)){
                     primitive = Primitive.Char;
                     valueSource = String.format("'%s'", getLiteral());
+                    String c = String.valueOf(getLiteral());
+                    value = c.length() == 1 ? (Object) c.charAt(0) : getLiteral();
+                    literalType = primitive;
                 }else {
                     primitive = Primitive.fromKeyword(primitiveType.toLowerCase());
                     valueSource = String.valueOf(getLiteral());
+                    // the parser gives the literal the value and type its text has, whatever the parameter's type
+                    Object[] parsed = parseLiteral(valueSource);
+                    value = parsed == null ? getLiteral() : parsed[0];
+                    literalType = parsed == null ? primitive : (JavaType.Primitive) parsed[1];
                 }
 
-                Expression literal = new J.Literal(randomId(), args.isEmpty() ? Space.EMPTY : Space.SINGLE_SPACE, Markers.EMPTY, getLiteral(), valueSource, null, primitive);
+                Expression literal = new J.Literal(randomId(), args.isEmpty() ? Space.EMPTY : Space.SINGLE_SPACE, Markers.EMPTY, value, valueSource, null, literalType);
                 m = m.withArguments(ListUtils.insert(args, literal, argumentIndex));
 
                 JavaType.Method methodType = m.getMethodType();
@@ -145,5 +156,31 @@ public class AddLiteralMethodArgument extends Recipe {
             return m;
         }
 
+        /**
+         * The value and type of a boolean or numeric literal written as {@code source}, or null if it isn't one.
+         */
+        private Object @Nullable [] parseLiteral(String source) {
+            String s = source.replace("_", "");
+            if ("true".equals(s) || "false".equals(s)) {
+                return new Object[]{Boolean.parseBoolean(s), Primitive.Boolean};
+            }
+            if (s.isEmpty()) {
+                return null;
+            }
+            char last = Character.toLowerCase(s.charAt(s.length() - 1));
+            boolean hex = s.startsWith("0x") || s.startsWith("0X") || s.startsWith("-0x") || s.startsWith("-0X");
+            try {
+                if (last == 'l') {
+                    return new Object[]{Long.decode(s.substring(0, s.length() - 1)), Primitive.Long};
+                } else if (!hex && last == 'f') {
+                    return new Object[]{Float.parseFloat(s), Primitive.Float};
+                } else if (!hex && (last == 'd' || s.contains(".") || s.contains("e") || s.contains("E"))) {
+                    return new Object[]{Double.parseDouble(s), Primitive.Double};
+                }
+                return new Object[]{Integer.decode(s), Primitive.Int};
+            } catch (NumberFormatException e) {
+                return null;
+            }
+        }
     }
 }

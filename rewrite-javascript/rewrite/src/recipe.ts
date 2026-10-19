@@ -71,6 +71,12 @@ export abstract class Recipe {
 
     readonly estimatedEffortPerOccurrence: Minutes = 5
 
+    /**
+     * Set to true when changes made by this recipe should trigger another recipe cycle,
+     * mirroring Java's `Recipe.causesAnotherCycle()`.
+     */
+    readonly causesAnotherCycle: boolean = false
+
     readonly dataTables: DataTableDescriptor[] = []
 
     async recipeList(): Promise<Recipe[]> {

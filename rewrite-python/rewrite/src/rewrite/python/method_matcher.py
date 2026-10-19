@@ -35,7 +35,7 @@ Wildcards:
 """
 
 from dataclasses import dataclass
-from typing import Optional, List
+from typing import Callable, Optional, List
 
 from rewrite import Cursor
 from rewrite.java.support_types import JavaType
@@ -135,8 +135,8 @@ class MethodMatcher:
                 it is off by default. Java reads the spelling against a resolved
                 declaring type too; this stops at the guard below.
             cursor: standing on ``method``, which resolves the receiver against
-                the file's imports where its declaring type is ``Unknown``. One
-                binding of a name in any scope leaves every call in the file with
+                the file's imports where its declaring type is ``Unknown``. A name
+                the file rebinds at module scope leaves every call spelling it with
                 that type, so a pattern naming a module needs this to reach them.
 
         Returns:
@@ -583,6 +583,9 @@ class TypedArgumentMatcher(ArgumentMatcher):
                    _type_matcher=_type_matcher_for(type_pattern))
 
     def matches(self, arg_type) -> bool:
+        if isinstance(arg_type, JavaType.Union):
+            return _every_member_but_none(arg_type, self.matches)
+
         fqn = _get_fqn(arg_type)
         if fqn is None:
             return False
@@ -595,7 +598,15 @@ class TypedArgumentMatcher(ArgumentMatcher):
     def matches_unknown(self, arg_type) -> bool:
         if arg_type is None or isinstance(arg_type, JavaType.Unknown):
             return True
+        if isinstance(arg_type, JavaType.Union):
+            return _every_member_but_none(arg_type, self.matches_unknown)
         return self.matches(arg_type)
+
+
+def _every_member_but_none(union: JavaType.Union, matches: Callable[[JavaType], bool]) -> bool:
+    """Patterns have no union syntax, so `str` names an argument that may also be None."""
+    members = [b for b in union.bounds if b is not JavaType.Primitive.Null]
+    return bool(members) and all(matches(b) for b in members)
 
 
 def _get_fqn(type_obj) -> Optional[str]:

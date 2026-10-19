@@ -847,7 +847,7 @@ describe('AddImport visitor', () => {
             );
         });
 
-        test('a CommonJS file gains no import, unlike one that merely requires alongside its imports', async () => {
+        test('a CommonJS file gains a require, unlike one that merely requires alongside its imports', async () => {
             const addReadFile = () => fromVisitor(
                 new AddImport({module: 'fs', member: 'readFile', onlyIfReferenced: false}));
 
@@ -858,6 +858,12 @@ describe('AddImport visitor', () => {
                 javascript(
                     `
                         const other = require('other');
+
+                        readFile('test.txt');
+                    `,
+                    `
+                        const other = require('other');
+                        const {readFile} = require('fs');
 
                         readFile('test.txt');
                     `
@@ -1569,9 +1575,7 @@ describe('AddImport visitor', () => {
             }).toThrow("Cannot combine sideEffectOnly with onlyIfReferenced");
         });
 
-        test('a file that binds its modules with require gains no side-effect import', async () => {
-            // A side-effect import binds no name, but `import` still makes the file an ES module,
-            // where its own `require` calls do not resolve.
+        test('a file that binds its modules with require gains a side-effect require, once', async () => {
             const spec = new RecipeSpec();
             spec.recipe = fromVisitor(new AddImport({module: 'core-js/stable', sideEffectOnly: true}));
 
@@ -1580,6 +1584,16 @@ describe('AddImport visitor', () => {
                 javascript(
                     `
                         const other = require('other');
+                    `,
+                    `
+                        const other = require('other');
+                        require('core-js/stable');
+                    `
+                ),
+                javascript(
+                    `
+                        const other = require('other');
+                        require('core-js/stable');
                     `
                 )
             );
@@ -2253,7 +2267,7 @@ describe('AddImport visitor', () => {
             );
         });
 
-        test('should add value import even when type-only import exists for same member', async () => {
+        test('turns a type-only import of the same member into a value import', async () => {
             const spec = new RecipeSpec();
             spec.recipe = fromVisitor(new AddImport({
                 module: 'react',
@@ -2273,7 +2287,6 @@ describe('AddImport visitor', () => {
                         }
                     `,
                     `
-                        import type {useState} from 'react';
                         import {useState} from 'react';
 
                         function example() {
@@ -2284,7 +2297,7 @@ describe('AddImport visitor', () => {
             );
         });
 
-        test('should add type-only import even when value import exists for same member', async () => {
+        test('a value import of the same member answers a type-only request', async () => {
             const spec = new RecipeSpec();
             spec.recipe = fromVisitor(new AddImport({
                 module: 'react',
@@ -2298,14 +2311,6 @@ describe('AddImport visitor', () => {
                 typescript(
                     `
                         import {useState} from 'react';
-
-                        function example() {
-                            useState(0);
-                        }
-                    `,
-                    `
-                        import {useState} from 'react';
-                        import type {useState} from 'react';
 
                         function example() {
                             useState(0);
@@ -2994,12 +2999,12 @@ describe('AddImport visitor', () => {
             await spec.rewriteRun(
                 typescript(
                     `
-                        import {readFile} from 'node:fs';
+                        import {readFile} from 'fs-extra';
 
                         readFile('x');
                     `,
                     `
-                        import {readFile} from 'node:fs';
+                        import {readFile} from 'fs-extra';
                         import {readFile as readFile_1} from 'fs';
 
                         readFile('x');

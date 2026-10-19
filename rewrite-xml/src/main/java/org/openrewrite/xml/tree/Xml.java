@@ -24,13 +24,16 @@ import org.intellij.lang.annotations.Language;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
 import org.openrewrite.internal.CommentService;
+import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.StringUtils;
+import org.openrewrite.internal.TreeShapeValidationService;
 import org.openrewrite.internal.WhitespaceValidationService;
 import org.openrewrite.marker.Markers;
 import org.openrewrite.xml.XmlParser;
 import org.openrewrite.xml.XmlVisitor;
 import org.openrewrite.xml.internal.WithPrefix;
 import org.openrewrite.xml.internal.XmlPrinter;
+import org.openrewrite.xml.internal.XmlTreeShapeValidationService;
 import org.openrewrite.xml.internal.XmlWhitespaceValidationService;
 import org.openrewrite.xml.service.XmlCommentService;
 
@@ -169,6 +172,8 @@ public interface Xml extends Tree {
                 return (T) new XmlWhitespaceValidationService();
             } else if (CommentService.class.getName().equals(service.getName())) {
                 return (T) new XmlCommentService();
+            } else if (TreeShapeValidationService.class.getName().equals(service.getName())) {
+                return (T) new XmlTreeShapeValidationService();
             }
             return SourceFileWithReferences.super.service(service);
         }
@@ -342,6 +347,10 @@ public interface Xml extends Tree {
         }
 
         public Tag withValue(String value) {
+            if (content != null && content.size() == 1 && content.get(0) instanceof CharData &&
+                ((CharData) content.get(0)).getText().equals(value)) {
+                return this;
+            }
             CharData charData;
             if (content != null && content.get(0) instanceof CharData) {
                 charData = ((CharData) content.get(0)).withText(value);
@@ -388,17 +397,11 @@ public interface Xml extends Tree {
          * @param text      The text value to set.
          * @return This tag.
          */
+        @SuppressWarnings("unchecked")
         public Xml.Tag withChildValue(String childName, String text) {
             return getChild(childName)
-                    .map(tag -> this.withContent(
-                            content == null ?
-                                    null :
-                                    content.stream()
-                                            .map(content -> content == tag ?
-                                                    ((Tag) content).withValue(text) :
-                                                    content)
-                                            .collect(toList())
-                    ))
+                    .map(tag -> this.withContent(ListUtils.map((List<Content>) content,
+                            c -> c == tag ? ((Tag) c).withValue(text) : c)))
                     .orElse(this);
         }
 
@@ -866,6 +869,9 @@ public interface Xml extends Tree {
         String type;
 
         public JspDirective withType(String type) {
+            if (this.type.equals(type)) {
+                return this;
+            }
             return new JspDirective(id, prefixUnsafe, markers, beforeTypePrefix, type, attributes,
                     beforeDirectiveEndPrefix);
         }

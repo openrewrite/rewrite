@@ -142,4 +142,40 @@ public class SemicolonSpacingTests : RewriteTest
             )
         );
     }
+
+    [Fact]
+    public void UsingDirectiveSpaceBeforeSemicolon()
+    {
+        RewriteRun(
+            CSharp(
+                """
+                using System ;
+                using static System.Math ;
+                using Text = global::System.Text ;
+
+                class C {
+                }
+                """
+            )
+        );
+    }
+
+    [Fact]
+    public void EmptyStatementSpaceBeforeSemicolon()
+    {
+        RewriteRun(
+            CSharp(
+                """
+                class C {
+                    void M(int x) {
+                        while (x < 5) ;
+                        for (;;) ;
+                        if (x > 0) ; else ;
+                        ;
+                    }
+                }
+                """
+            )
+        );
+    }
 }

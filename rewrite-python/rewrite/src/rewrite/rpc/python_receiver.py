@@ -18,13 +18,16 @@ Python RPC Receiver that mirrors Java's PythonReceiver structure.
 This uses the visitor pattern with pre_visit handling common fields (id, prefix, markers)
 and type-specific visit methods handling only additional fields.
 """
+from dataclasses import fields, is_dataclass
 from datetime import datetime
 from enum import Enum
 from pathlib import Path
-from typing import Any, Callable, Optional, Type, TypeVar
+from typing import Any, Callable, Optional, Type, TypeVar, get_type_hints
 
 from rewrite.java import Space, JRightPadded, JLeftPadded, JContainer, J
+from rewrite.java import tree as jt
 from rewrite.python import CompilationUnit
+from rewrite.python.support_types import PyComment
 from rewrite.python.tree import (
     Async, Await, Binary, ChainedAssignment, ExceptionType,
     LiteralType, TypeHint, ExpressionStatement, ExpressionTypeTree,
@@ -69,6 +72,95 @@ def _to_variance(value: Any, JT) -> Any:
     return JT.GenericTypeVariable.Variance[mapped]
 
 
+# A node is received by the method of the first row it is an instance of, so a subclass of a
+# listed class is received as that class. _resolve walks the rows once per concrete type.
+_DISPATCH: tuple = (
+    (CompilationUnit, '_visit_compilation_unit'),
+    (Async, '_visit_async'),
+    (Await, '_visit_await'),
+    (Binary, '_visit_binary'),
+    (ChainedAssignment, '_visit_chained_assignment'),
+    (ExceptionType, '_visit_exception_type'),
+    (LiteralType, '_visit_literal_type'),
+    (TypeHint, '_visit_type_hint'),
+    (ExpressionStatement, '_visit_expression_statement'),
+    (ExpressionTypeTree, '_visit_expression_type_tree'),
+    (StatementExpression, '_visit_statement_expression'),
+    (MultiImport, '_visit_multi_import'),
+    (KeyValue, '_visit_key_value'),
+    (DictLiteral, '_visit_dict_literal'),
+    (CollectionLiteral, '_visit_collection_literal'),
+    (FormattedString.Value, '_visit_formatted_string_value'),
+    (FormattedString, '_visit_formatted_string'),
+    (Pass, '_visit_pass'),
+    (Shebang, '_visit_shebang'),
+    (TrailingElseWrapper, '_visit_trailing_else_wrapper'),
+    (ComprehensionExpression.Condition, '_visit_comprehension_condition'),
+    (ComprehensionExpression.Clause, '_visit_comprehension_clause'),
+    (ComprehensionExpression, '_visit_comprehension_expression'),
+    (TypeAlias, '_visit_type_alias'),
+    (YieldFrom, '_visit_yield_from'),
+    (UnionType, '_visit_union_type'),
+    (VariableScope, '_visit_variable_scope'),
+    (Del, '_visit_del'),
+    (SpecialParameter, '_visit_special_parameter'),
+    (Star, '_visit_star'),
+    (NamedArgument, '_visit_named_argument'),
+    (TypeHintedExpression, '_visit_type_hinted_expression'),
+    (ErrorFrom, '_visit_error_from'),
+    (MatchCase.Pattern, '_visit_match_case_pattern'),
+    (MatchCase, '_visit_match_case'),
+    (Slice, '_visit_slice'),
+    (jt.Identifier, '_visit_identifier'),
+    (jt.Literal, '_visit_literal'),
+    (jt.Import, '_visit_import'),
+    (jt.FieldAccess, '_visit_field_access'),
+    (jt.Block, '_visit_block'),
+    (jt.MethodInvocation, '_visit_method_invocation'),
+    (jt.Unary, '_visit_j_unary'),
+    (jt.Binary, '_visit_j_binary'),
+    (jt.Assignment, '_visit_j_assignment'),
+    (jt.AssignmentOperation, '_visit_j_assignment_operation'),
+    (jt.Return, '_visit_j_return'),
+    (jt.If, '_visit_j_if'),
+    (jt.If.Else, '_visit_j_else'),
+    (jt.WhileLoop, '_visit_j_while_loop'),
+    (jt.ForEachLoop.Control, '_visit_j_for_each_control'),
+    (jt.ForEachLoop, '_visit_j_for_each_loop'),
+    (jt.Try, '_visit_j_try'),
+    (jt.Try.Catch, '_visit_j_catch'),
+    (jt.Try.Resource, '_visit_j_try_resource'),
+    (jt.Throw, '_visit_j_throw'),
+    (jt.Assert, '_visit_j_assert'),
+    (jt.Break, '_visit_j_break'),
+    (jt.Continue, '_visit_j_continue'),
+    (jt.Empty, '_visit_j_empty'),
+    (jt.Ternary, '_visit_j_ternary'),
+    (jt.Lambda, '_visit_j_lambda'),
+    (jt.Lambda.Parameters, '_visit_j_lambda_parameters'),
+    (jt.VariableDeclarations, '_visit_j_variable_declarations'),
+    (jt.VariableDeclarations.NamedVariable, '_visit_j_named_variable'),
+    (jt.ClassDeclaration, '_visit_j_class_declaration'),
+    (jt.ClassDeclaration.Kind, '_visit_j_class_declaration_kind'),
+    (jt.MethodDeclaration, '_visit_j_method_declaration'),
+    (jt.Switch, '_visit_j_switch'),
+    (jt.Case, '_visit_j_case'),
+    (jt.ArrayAccess, '_visit_j_array_access'),
+    (jt.ArrayDimension, '_visit_j_array_dimension'),
+    (jt.NewArray, '_visit_j_new_array'),
+    (jt.Annotation, '_visit_j_annotation'),
+    (jt.Parentheses, '_visit_j_parentheses'),
+    (jt.ControlParentheses, '_visit_j_control_parentheses'),
+    (jt.Modifier, '_visit_j_modifier'),
+    (jt.Yield, '_visit_j_yield'),
+    (jt.ParameterizedType, '_visit_j_parameterized_type'),
+    (jt.TypeParameter, '_visit_j_type_parameter'),
+    (jt.TypeParameters, '_visit_j_type_parameters'),
+    (jt.Unknown, '_visit_j_unknown'),
+    (jt.Unknown.Source, '_visit_j_unknown_source'),
+)
+
+
 class PythonRpcReceiver:
     """Receiver that mirrors Java's PythonReceiver for RPC deserialization."""
 
@@ -81,100 +173,25 @@ class PythonRpcReceiver:
         """Visit a tree node, dispatching to appropriate visitor method."""
         if tree is None:
             return None
+        visitors = _VISITORS.get(type(tree))
+        if visitors is None:
+            visitors = _VISITORS[type(tree)] = _resolve(tree)
+        pre_visit, visit = visitors
+        if pre_visit is not None:
+            tree = pre_visit(self, tree, q)
+        return tree if visit is None else visit(self, tree, q)
 
-        # First handle common J fields via pre_visit.
-        # ExpressionStatement and StatementExpression delegate prefix/markers to their
-        # wrapped child: the sender skips them here and sends them via the child's preVisit.
-        if isinstance(tree, J):
-            if isinstance(tree, (ExpressionStatement, StatementExpression)):
-                tree = q.apply(tree, _id=q.receive(tree._id))
-            else:
-                tree = self._pre_visit(tree, q)
-
-        # Then dispatch to type-specific visitor
-        if isinstance(tree, CompilationUnit):
-            return self._visit_compilation_unit(tree, q)
-        elif isinstance(tree, Async):
-            return self._visit_async(tree, q)
-        elif isinstance(tree, Await):
-            return self._visit_await(tree, q)
-        elif isinstance(tree, Binary):
-            return self._visit_binary(tree, q)
-        elif isinstance(tree, ChainedAssignment):
-            return self._visit_chained_assignment(tree, q)
-        elif isinstance(tree, ExceptionType):
-            return self._visit_exception_type(tree, q)
-        elif isinstance(tree, LiteralType):
-            return self._visit_literal_type(tree, q)
-        elif isinstance(tree, TypeHint):
-            return self._visit_type_hint(tree, q)
-        elif isinstance(tree, ExpressionStatement):
-            return self._visit_expression_statement(tree, q)
-        elif isinstance(tree, ExpressionTypeTree):
-            return self._visit_expression_type_tree(tree, q)
-        elif isinstance(tree, StatementExpression):
-            return self._visit_statement_expression(tree, q)
-        elif isinstance(tree, MultiImport):
-            return self._visit_multi_import(tree, q)
-        elif isinstance(tree, KeyValue):
-            return self._visit_key_value(tree, q)
-        elif isinstance(tree, DictLiteral):
-            return self._visit_dict_literal(tree, q)
-        elif isinstance(tree, CollectionLiteral):
-            return self._visit_collection_literal(tree, q)
-        elif isinstance(tree, FormattedString.Value):
-            return self._visit_formatted_string_value(tree, q)
-        elif isinstance(tree, FormattedString):
-            return self._visit_formatted_string(tree, q)
-        elif isinstance(tree, Pass):
-            return self._visit_pass(tree, q)
-        elif isinstance(tree, Shebang):
-            return self._visit_shebang(tree, q)
-        elif isinstance(tree, TrailingElseWrapper):
-            return self._visit_trailing_else_wrapper(tree, q)
-        elif isinstance(tree, ComprehensionExpression.Condition):
-            return self._visit_comprehension_condition(tree, q)
-        elif isinstance(tree, ComprehensionExpression.Clause):
-            return self._visit_comprehension_clause(tree, q)
-        elif isinstance(tree, ComprehensionExpression):
-            return self._visit_comprehension_expression(tree, q)
-        elif isinstance(tree, TypeAlias):
-            return self._visit_type_alias(tree, q)
-        elif isinstance(tree, YieldFrom):
-            return self._visit_yield_from(tree, q)
-        elif isinstance(tree, UnionType):
-            return self._visit_union_type(tree, q)
-        elif isinstance(tree, VariableScope):
-            return self._visit_variable_scope(tree, q)
-        elif isinstance(tree, Del):
-            return self._visit_del(tree, q)
-        elif isinstance(tree, SpecialParameter):
-            return self._visit_special_parameter(tree, q)
-        elif isinstance(tree, Star):
-            return self._visit_star(tree, q)
-        elif isinstance(tree, NamedArgument):
-            return self._visit_named_argument(tree, q)
-        elif isinstance(tree, TypeHintedExpression):
-            return self._visit_type_hinted_expression(tree, q)
-        elif isinstance(tree, ErrorFrom):
-            return self._visit_error_from(tree, q)
-        elif isinstance(tree, MatchCase.Pattern):
-            return self._visit_match_case_pattern(tree, q)
-        elif isinstance(tree, MatchCase):
-            return self._visit_match_case(tree, q)
-        elif isinstance(tree, Slice):
-            return self._visit_slice(tree, q)
-        elif isinstance(tree, J):
-            # Delegate to Java receiver for Java types
-            return self._visit_java(tree, q)
-
-        return tree
+    def _receive_id(self, j: J, q: RpcReceiveQueue) -> J:
+        """Pre-visit of a wrapper whose prefix and markers are received with its child."""
+        return q.apply(j, _id=q.receive(j._id))  # ty: ignore[unresolved-attribute]  # _id on concrete J subclasses
 
     def _pre_visit(self, j: J, q: RpcReceiveQueue) -> J:
         """Handle common J fields: id, prefix, markers."""
         new_id = q.receive(j._id)  # ty: ignore[unresolved-attribute]  # _id on concrete J subclasses
         new_prefix = q.receive(j.prefix)
         new_markers = q.receive_markers(j.markers)
+        if new_markers is not j.markers and None in new_markers.markers:
+            new_markers = _restore_legacy_spelling(j, new_markers)
 
         return q.apply(j, _id=new_id, _prefix=new_prefix, _markers=new_markers)
 
@@ -284,7 +301,8 @@ class PythonRpcReceiver:
     def _visit_formatted_string_value(self, v: FormattedString.Value, q: RpcReceiveQueue) -> FormattedString.Value:
         expression = q.receive(v.padding.expression)
         debug = q.receive(v.padding.debug)
-        conversion = _to_enum(FormattedString.Value.Conversion)(q.receive(v.conversion))
+        conversion = q.receive(v.padding.conversion, lambda rp: self._receive_right_padded(
+            rp, q, _to_enum(FormattedString.Value.Conversion)))
         format_ = q.receive(v.format)
         return q.apply(v, expression=expression, debug=debug, conversion=conversion, format=format_)
 
@@ -396,110 +414,11 @@ class PythonRpcReceiver:
         _ = q.receive(None)  # Consume the null type field
         return q.apply(slice_, start=start, stop=stop, step=step)
 
-    def _visit_java(self, j: J, q: RpcReceiveQueue) -> J:
-        """Handle Java tree types that Python extends."""
-        from rewrite.java.tree import (
-            Identifier, Literal, MethodInvocation, FieldAccess,
-            ArrayAccess, ArrayDimension, Block, If, Try, MethodDeclaration,
-            ClassDeclaration, VariableDeclarations, Return, Assignment,
-            AssignmentOperation, Unary, Ternary, Lambda, Empty, Throw,
-            Assert, Break, Continue, WhileLoop, ForEachLoop, Switch, Case,
-            Annotation, Import, Binary as JBinary, Parentheses, ControlParentheses,
-            NewArray, Modifier, Yield, ParameterizedType, TypeParameter, TypeParameters
-        )
+    def _visit_j_unknown(self, unknown, q: RpcReceiveQueue):
+        return q.apply(unknown, source=q.receive(unknown.source))
 
-        if isinstance(j, Identifier):
-            return self._visit_identifier(j, q)
-        elif isinstance(j, Literal):
-            return self._visit_literal(j, q)
-        elif isinstance(j, Import):
-            return self._visit_import(j, q)
-        elif isinstance(j, FieldAccess):
-            return self._visit_field_access(j, q)
-        elif isinstance(j, Block):
-            return self._visit_block(j, q)
-        elif isinstance(j, MethodInvocation):
-            return self._visit_method_invocation(j, q)
-        elif isinstance(j, Unary):
-            return self._visit_j_unary(j, q)
-        elif isinstance(j, JBinary):
-            return self._visit_j_binary(j, q)
-        elif isinstance(j, Assignment):
-            return self._visit_j_assignment(j, q)
-        elif isinstance(j, AssignmentOperation):
-            return self._visit_j_assignment_operation(j, q)
-        elif isinstance(j, Return):
-            return self._visit_j_return(j, q)
-        elif isinstance(j, If):
-            return self._visit_j_if(j, q)
-        elif isinstance(j, If.Else):
-            return self._visit_j_else(j, q)
-        elif isinstance(j, WhileLoop):
-            return self._visit_j_while_loop(j, q)
-        elif isinstance(j, ForEachLoop.Control):
-            return self._visit_j_for_each_control(j, q)
-        elif isinstance(j, ForEachLoop):
-            return self._visit_j_for_each_loop(j, q)
-        elif isinstance(j, Try):
-            return self._visit_j_try(j, q)
-        elif isinstance(j, Try.Catch):
-            return self._visit_j_catch(j, q)
-        elif isinstance(j, Try.Resource):
-            return self._visit_j_try_resource(j, q)
-        elif isinstance(j, Throw):
-            return self._visit_j_throw(j, q)
-        elif isinstance(j, Assert):
-            return self._visit_j_assert(j, q)
-        elif isinstance(j, Break):
-            return self._visit_j_break(j, q)
-        elif isinstance(j, Continue):
-            return self._visit_j_continue(j, q)
-        elif isinstance(j, Empty):
-            return self._visit_j_empty(j, q)
-        elif isinstance(j, Ternary):
-            return self._visit_j_ternary(j, q)
-        elif isinstance(j, Lambda):
-            return self._visit_j_lambda(j, q)
-        elif isinstance(j, Lambda.Parameters):
-            return self._visit_j_lambda_parameters(j, q)
-        elif isinstance(j, VariableDeclarations):
-            return self._visit_j_variable_declarations(j, q)
-        elif isinstance(j, VariableDeclarations.NamedVariable):
-            return self._visit_j_named_variable(j, q)
-        elif isinstance(j, ClassDeclaration):
-            return self._visit_j_class_declaration(j, q)
-        elif isinstance(j, ClassDeclaration.Kind):
-            return self._visit_j_class_declaration_kind(j, q)
-        elif isinstance(j, MethodDeclaration):
-            return self._visit_j_method_declaration(j, q)
-        elif isinstance(j, Switch):
-            return self._visit_j_switch(j, q)
-        elif isinstance(j, Case):
-            return self._visit_j_case(j, q)
-        elif isinstance(j, ArrayAccess):
-            return self._visit_j_array_access(j, q)
-        elif isinstance(j, ArrayDimension):
-            return self._visit_j_array_dimension(j, q)
-        elif isinstance(j, NewArray):
-            return self._visit_j_new_array(j, q)
-        elif isinstance(j, Annotation):
-            return self._visit_j_annotation(j, q)
-        elif isinstance(j, Parentheses):
-            return self._visit_j_parentheses(j, q)
-        elif isinstance(j, ControlParentheses):
-            return self._visit_j_control_parentheses(j, q)
-        elif isinstance(j, Modifier):
-            return self._visit_j_modifier(j, q)
-        elif isinstance(j, Yield):
-            return self._visit_j_yield(j, q)
-        elif isinstance(j, ParameterizedType):
-            return self._visit_j_parameterized_type(j, q)
-        elif isinstance(j, TypeParameter):
-            return self._visit_j_type_parameter(j, q)
-        elif isinstance(j, TypeParameters):
-            return self._visit_j_type_parameters(j, q)
-
-        return j
+    def _visit_j_unknown_source(self, source, q: RpcReceiveQueue):
+        return q.apply(source, text=q.receive(source.text))
 
     def _visit_identifier(self, ident, q: RpcReceiveQueue):
         annotations = q.receive_list(ident.annotations)
@@ -874,15 +793,19 @@ class PythonRpcReceiver:
         suffix = q.receive_defined(comment.suffix)
         markers = q.receive_markers(comment.markers)
 
+        if isinstance(comment, PyComment):
+            return PyComment(text, suffix, q.receive_defined(comment.aligned_to_indent), markers)
         return TextComment(multiline, text, suffix, markers)
 
-    def _receive_right_padded(self, rp: JRightPadded, q: RpcReceiveQueue) -> Optional[JRightPadded]:
+    def _receive_right_padded(self, rp: JRightPadded, q: RpcReceiveQueue, element_mapping: Optional[Callable[[Any], Any]] = None) -> Optional[JRightPadded]:
         """Receive a JRightPadded wrapper."""
         if rp is None:
             return None
 
         # Codec registry handles type dispatch automatically
         element = q.receive(rp.element)
+        if element_mapping is not None:
+            element = element_mapping(element)
         after = q.receive_defined(rp.after)
         markers = q.receive_markers(rp.markers)
 
@@ -1251,10 +1174,94 @@ def _send_markup_marker(marker, q):
     q.get_and_send(marker, lambda x: x.detail)
 
 
-def _receive_style(style, q: RpcReceiveQueue):
-    """Codec for receiving Style objects."""
-    # For now, styles are passed through - full deserialization would need more work
-    return style
+def _restore_legacy_spelling(tree: J, markers):
+    """Put back the Python 2 spelling a stored LST lost: while these markers had
+    no codec, the host kept null where the parser had attached one."""
+    from rewrite.java import tree as j
+    from rewrite.python.markers import LegacyNotEqual, RaiseTuple, TupleExceptClause
+
+    if isinstance(tree, j.Throw):
+        spelling = RaiseTuple
+    elif isinstance(tree, j.Try.Catch):
+        spelling = TupleExceptClause
+    elif isinstance(tree, j.Binary):
+        spelling = LegacyNotEqual
+    else:
+        return markers
+    return markers.replace(markers=[spelling(random_id()) if marker is None else marker
+                                    for marker in markers.markers])
+
+
+# Property names the host does not derive from the field name
+_STYLE_PROPERTIES = {'_use_crlf_new_lines': 'useCRLFNewLines'}
+
+
+def _style_property(field_name: str) -> str:
+    head, *rest = field_name.lstrip('_').split('_')
+    return _STYLE_PROPERTIES.get(field_name) or head + ''.join(part.capitalize() for part in rest)
+
+
+def _style_types() -> dict:
+    from rewrite.python import style
+    from rewrite.style import GeneralFormatStyle
+    types = {f'org.openrewrite.python.style.{cls.__name__}': cls for cls in (
+        style.SpacesStyle, style.TabsAndIndentsStyle, style.WrappingAndBracesStyle,
+        style.BlankLinesStyle, style.OtherStyle)}
+    types['org.openrewrite.style.GeneralFormatStyle'] = GeneralFormatStyle
+    return types
+
+
+def _style_from_value(cls, value: dict):
+    hints = get_type_hints(cls)
+    properties = {}
+    for field in fields(cls):
+        property_value = value.get(_style_property(field.name))
+        nested = isinstance(property_value, dict) and is_dataclass(hints[field.name])
+        properties[field.name] = _style_from_value(hints[field.name], property_value) if nested else property_value
+    return cls(**properties)
+
+
+def _style_to_value(style) -> dict:
+    value = {}
+    for field in fields(style):
+        property_value = getattr(style, field.name)
+        value[_style_property(field.name)] = \
+            _style_to_value(property_value) if is_dataclass(property_value) else property_value
+    return value
+
+
+def _named_styles_from_value(cls, value: dict):
+    """Read a set of styles as the host serializes it, having no codec for one."""
+    from rewrite.style import NamedStyles
+
+    types = _style_types()
+    # a style only the host knows is kept as it arrived, to be sent back intact
+    styles = [_style_from_value(types[style['@c']], style)
+              if isinstance(style, dict) and style.get('@c') in types else style
+              for style in value.get('styles') or []]
+    # a subclass has a constructor of its own, which takes no fields
+    named = cls.__new__(cls)
+    NamedStyles.__init__(named, value['id'], value.get('name'), value.get('displayName'),
+                         value.get('description'), set(value.get('tags') or []), styles)
+    return named
+
+
+def _named_styles_to_value(named) -> dict:
+    types = {cls: java_type for java_type, cls in _style_types().items()}
+    styles = []
+    # the host's deserializer wants an object id on each style, and gives the first to the set itself
+    for ref, style in enumerate(named._styles or [], start=2):
+        value = dict(style) if isinstance(style, dict) else {'@c': types[type(style)], **_style_to_value(style)}
+        value['@ref'] = ref
+        styles.append(value)
+    return {
+        'id': id_to_str(named._id),
+        'name': named._name,
+        'displayName': named._display_name,
+        'description': named._description,
+        'tags': sorted(named._tags or []),
+        'styles': styles,
+    }
 
 
 def _receive_java_type_primitive(primitive, q: RpcReceiveQueue):
@@ -1433,9 +1440,10 @@ def _receive_java_type_variable(variable, q: RpcReceiveQueue):
     from rewrite.java.support_types import JavaType as JT
 
     # Receive fields in the same order as JavaTypeSender.visitVariable:
-    # name, owner, type, annotations (no flags over RPC)
+    # flagsBitMap, name, owner, type, annotations
     return _unsafe_set(
         variable if isinstance(variable, JT.Variable) else JT.Variable(),
+        _flags_bit_map=q.receive(variable._flags_bit_map),
         _name=q.receive(variable._name),
         _owner=q.receive(variable._owner),
         _type=q.receive(variable._type),
@@ -1659,6 +1667,12 @@ def _register_support_type_codecs():
         _receive_comment,
         lambda: TextComment(False, '', '', Markers.EMPTY)
     )
+    register_codec_with_both_names(
+        'org.openrewrite.python.tree.PyComment',
+        PyComment,
+        _receive_comment,
+        lambda: PyComment('', '', False, Markers.EMPTY)
+    )
 
 
 def _register_core_marker_codecs():
@@ -1731,15 +1745,17 @@ def _register_markup_marker_codecs():
 
 
 def _register_style_codecs():
-    """Register codecs for style types."""
-    from rewrite.style import GeneralFormatStyle, NamedStyles
-    from rewrite.rpc.receive_queue import register_codec_with_both_names, make_dataclass_factory
+    """Register the sets of styles, which the host sends and reads whole."""
+    from rewrite.python.style import IntelliJ
+    from rewrite.style import NamedStyles
+    from rewrite.rpc.receive_queue import register_value_codec
 
     for cls, java_name in [
-        (GeneralFormatStyle, 'org.openrewrite.style.GeneralFormatStyle'),
         (NamedStyles, 'org.openrewrite.style.NamedStyles'),
+        (IntelliJ, 'org.openrewrite.python.style.IntelliJ'),
     ]:
-        register_codec_with_both_names(java_name, cls, _receive_style, make_dataclass_factory(cls))
+        register_value_codec(java_name, cls, lambda value, c=cls: _named_styles_from_value(c, value),
+                             _named_styles_to_value)
 
 
 def _receive_parse_error(parse_error, q: RpcReceiveQueue):
@@ -1812,7 +1828,8 @@ def _register_python_marker_codecs():
     """Register codecs for Python-specific marker types."""
     from rewrite.python.markers import (
         KeywordArguments, KeywordOnlyArguments, Quoted, SuppressNewline,
-        PrintSyntax, ExecSyntax
+        PrintSyntax, ExecSyntax,
+        LegacyNotEqual, RaiseTuple, TupleExceptClause,
     )
     from rewrite.rpc.receive_queue import register_codec_with_both_names
     from rewrite.rpc.send_queue import RpcSendQueue
@@ -1944,6 +1961,25 @@ def _register_python_marker_codecs():
         lambda: ExecSyntax(random_id()),
         _send_exec_syntax
     )
+
+    # The Python 2 spellings - each only has id
+    def _receive_legacy_spelling(marker, q: RpcReceiveQueue):
+        new_id = q.receive_defined(marker.id)
+        if new_id is marker.id:
+            return marker
+        return marker.with_id(new_id)
+
+    def _send_legacy_spelling(marker, q: RpcSendQueue) -> None:
+        q.get_and_send(marker, lambda x: id_to_str(x._id))
+
+    for py_cls in (LegacyNotEqual, RaiseTuple, TupleExceptClause):
+        register_codec_with_both_names(
+            f'org.openrewrite.python.marker.{py_cls.__name__}',
+            py_cls,
+            _receive_legacy_spelling,
+            lambda c=py_cls: c(random_id()),
+            _send_legacy_spelling
+        )
 
 
 def _register_python_resolution_result_codecs():
@@ -2172,3 +2208,18 @@ _register_python_marker_codecs()  # Python-specific markers including PrintSynta
 _register_python_resolution_result_codecs()  # PythonResolutionResult and nested types
 _register_file_attributes_codec()  # Consumes the source-file fileAttributes sub-fields
 _register_execution_context_codec()
+
+
+# Concrete type -> (pre-visit, visit), unbound methods of PythonRpcReceiver, each possibly None.
+_VISITORS: dict = {}
+
+
+def _resolve(tree: Any) -> tuple:
+    if not isinstance(tree, J):
+        pre_visit = None
+    elif isinstance(tree, (ExpressionStatement, StatementExpression)):
+        pre_visit = PythonRpcReceiver._receive_id
+    else:
+        pre_visit = PythonRpcReceiver._pre_visit
+    visit = next((getattr(PythonRpcReceiver, name) for cls, name in _DISPATCH if isinstance(tree, cls)), None)
+    return pre_visit, visit

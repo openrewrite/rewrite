@@ -179,14 +179,41 @@ export class TabsAndIndentsVisitor<P> extends JavaScriptVisitor<P> {
         // TemplateExpressionSpan: reset indent context - template literal content determines its own indentation
         // The expression inside ${...} should be indented based on where it appears in the template, not outer code
         if (tree.kind === JS.Kind.TemplateExpressionSpan) {
-            // Extract base indent from the expression's prefix whitespace (after the last newline)
+            // Whitespace after ${ belongs to the span, not its child expression.
             const span = tree as JS.TemplateExpression.Span;
-            const prefix = span.expression?.prefix?.whitespace ?? "";
+            const prefix = lastWhitespace(span.prefix);
             const lastNewline = prefix.lastIndexOf("\n");
             if (lastNewline >= 0) {
-                return prefix.length - lastNewline - 1;
+                return this.indentWidth(prefix.substring(lastNewline + 1));
+            }
+            const template = this.cursor.parentTree()?.value as JS.TemplateExpression | undefined;
+            if (template?.kind === JS.Kind.TemplateExpression) {
+                const index = template.spans.findIndex(s => s.element.id === span.id);
+                const preceding = index > 0 ? template.spans[index - 1].element.tail : template.head;
+                const text = preceding.valueSource ?? "";
+                const newline = text.lastIndexOf("\n");
+                if (newline >= 0) {
+                    // A span on a literal's own line is anchored to that line's indentation.
+                    const indent = text.substring(newline + 1).match(/^[ \t]*/)?.[0] ?? "";
+                    return this.indentWidth(indent);
+                }
+            }
+            // An inline interpolation continues the surrounding code line, not column zero.
+            for (let c = this.cursor.parent; c; c = c.parent) {
+                const parent = c.value as J;
+                if (parent?.prefix && spaceContainsNewline(parent.prefix)) {
+                    return (c.messages.get("indentContext") as IndentContext | undefined)?.[0] ?? parentMyIndent;
+                }
             }
             return 0;
+        }
+        // The tail prefix is the whitespace before }, not another continuation of the expression.
+        const parentTree = this.cursor.parentTree()?.value;
+        if (parentTree?.kind === JS.Kind.TemplateExpressionSpan &&
+            (parentTree as JS.TemplateExpression.Span).tail === tree) {
+            const prefix = lastWhitespace(tree.prefix);
+            const newline = prefix.lastIndexOf("\n");
+            return newline < 0 ? parentMyIndent : this.indentWidth(prefix.substring(newline + 1));
         }
         if (tree.kind === J.Kind.IfElse || parentIndentKind === 'align') {
             return parentMyIndent;

@@ -48,6 +48,7 @@ internal static class CSharpPrecedences
         Unary => 13,
         CsUnary => 13,
         TypeCast => 13,
+        InstanceOf => 7,
         IsPattern ip => GetIsPatternPrecedence(ip),
         RangeExpression => 12,
         SwitchExpression => 11,

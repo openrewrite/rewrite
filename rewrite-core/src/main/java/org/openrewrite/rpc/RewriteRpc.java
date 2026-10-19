@@ -47,6 +47,7 @@ import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.locks.LockSupport;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.BiFunction;
@@ -83,7 +84,9 @@ public class RewriteRpc {
      * Keeps track of the local and remote state of objects that are used in
      * visits and other operations for which incremental state sharing is useful
      * between two processes. Note these do not need to be ConcurrentHashMap as
-     * each RewriteRpc instance is held in its own ThreadLocal in RewriteRpcProcessManager
+     * each RewriteRpc instance is held in its own ThreadLocal in RewriteRpcProcessManager.
+     * The exception is {@link #localRefs}, which GetObject traversal threads write too, so
+     * it is only rolled back through {@link GetObject.Handler#cancelInProgress}.
      */
     @VisibleForTesting
     final Map<String, Object> remoteObjects = new HashMap<>();
@@ -99,6 +102,8 @@ public class RewriteRpc {
 
     @VisibleForTesting
     final IdentityHashMap<Object, Integer> localRefs = new IdentityHashMap<>();
+
+    private final GetObject.Handler getObject;
 
     private @Nullable List<String> remoteLanguages;
 
@@ -179,8 +184,16 @@ public class RewriteRpc {
                 getRecipeObject, this::getCursor));
         jsonRpc.rpc("Generate", new Generate.Handler(localObjects, preparedRecipes,
                 getRecipeObject));
-        jsonRpc.rpc("GetObject", new GetObject.Handler(batchSize, remoteObjects, localObjects,
-                localRefs, log, () -> traceGetObject.get().isSend()));
+        getObject = new GetObject.Handler(batchSize, remoteObjects, localObjects,
+                localRefs, log, () -> traceGetObject.get().isSend());
+        jsonRpc.rpc("GetObject", getObject);
+        jsonRpc.rpc("AbortGetObject", new JsonRpcMethod<AbortGetObject>() {
+            @Override
+            protected Boolean handle(AbortGetObject request) throws Exception {
+                getObject.abort(request.getId());
+                return true;
+            }
+        });
         jsonRpc.rpc("GetMarketplace", new JsonRpcMethod<Void>() {
             @Override
             protected Object handle(Void noParams) {
@@ -241,17 +254,19 @@ public class RewriteRpc {
             return new RecipeLoader(null).load(id, opts);
         }));
         jsonRpc.rpc("Parse", new Parse.Handler(localObjects, () -> parsers));
-        jsonRpc.rpc("Print", new Print.Handler(this::getObject));
+        jsonRpc.rpc("Print", new Print.Handler(this::getObject, this::getCursor));
         jsonRpc.rpc("SetDataTableStore", new SetDataTableStore.Handler(
                 store -> configuredDataTableStore = store));
         jsonRpc.rpc("Reset", new JsonRpcMethod<Void>() {
             @Override
             protected Boolean handle(Void noParams) {
-                remoteObjects.clear();
-                localObjects.clear();
-                localObjectIds.clear();
+                getObject.cancelInProgress(() -> {
+                    remoteObjects.clear();
+                    localObjects.clear();
+                    localObjectIds.clear();
+                    localRefs.clear();
+                });
                 remoteRefs.clear();
-                localRefs.clear();
                 preparedRecipes.getInstantiated().clear();
                 preparedRecipes.getRecipeCursors().clear();
                 return true;
@@ -360,11 +375,13 @@ public class RewriteRpc {
         send("Reset", null, Boolean.class);
 
         // Clear local caches
-        remoteObjects.clear();
-        localObjects.clear();
-        localObjectIds.clear();
+        getObject.cancelInProgress(() -> {
+            remoteObjects.clear();
+            localObjects.clear();
+            localObjectIds.clear();
+            localRefs.clear();
+        });
         remoteRefs.clear();
-        localRefs.clear();
         remoteLanguages = null;
     }
 
@@ -387,7 +404,8 @@ public class RewriteRpc {
      * Drop a file's tree from both peers and roll their refs back to the pre-file checkpoint.
      * Symmetric by design: dropping the send-side ref forces the next file to re-{@code ADD} the
      * interned object instead of a {@code REF_USE} the rolled-back receiver would reject. Notified
-     * fire-and-forget — under source-outer iteration the file's transfer is already complete.
+     * fire-and-forget — under source-outer iteration the file's transfer is already complete. One
+     * that isn't, because the caller gave up on the remote mid-transfer, is cancelled first.
      *
      * @param localRefsCheckpoint  {@code refCheckpoint()[0]} captured before the file was visited
      * @param remoteRefsCheckpoint {@code refCheckpoint()[1]} captured before the file was visited
@@ -395,10 +413,11 @@ public class RewriteRpc {
     public void evict(String id, int localRefsCheckpoint, int remoteRefsCheckpoint) {
         jsonRpc.notify(new JsonRpcRequest(null, "Evict", RawJson.of(new Evict(id))));
 
-        remoteObjects.remove(id);
-        localObjects.remove(id);
-
-        localRefs.values().removeIf(ref -> ref > localRefsCheckpoint);
+        getObject.cancelInProgress(() -> {
+            remoteObjects.remove(id);
+            localObjects.remove(id);
+            localRefs.values().removeIf(ref -> ref > localRefsCheckpoint);
+        });
         remoteRefs.keySet().removeIf(ref -> ref > remoteRefsCheckpoint);
     }
 
@@ -511,7 +530,7 @@ public class RewriteRpc {
         // Required-option validation is enforced server-side: PrepareRecipe instantiates the whole
         // tree there and validates each recipe's option values (root and children alike), which a
         // host-side check on the root descriptor alone cannot cover.
-        PrepareRecipeResponse r = send("PrepareRecipe", new PrepareRecipe(id, options), PrepareRecipeResponse.class);
+        PrepareRecipeResponse r = send("PrepareRecipe", new PrepareRecipe(id, options, true), PrepareRecipeResponse.class);
         return recipeFromPrepareResponse(r);
     }
 
@@ -528,7 +547,7 @@ public class RewriteRpc {
         }
         return new RpcRecipe(this, r.getId(), r.getDescriptor(), r.getEditVisitor(),
                 matchAll(r.getEditPreconditions()), r.getScanVisitor(), matchAll(r.getScanPreconditions()),
-                r.getRecipeList());
+                r.getRecipeList(), Boolean.TRUE.equals(r.getCausesAnotherCycle()));
     }
 
     private @Nullable TreeVisitor<?, ExecutionContext> matchAll(List<PrepareRecipeResponse.Precondition> preconditions) {
@@ -688,6 +707,8 @@ public class RewriteRpc {
         localObjects.put(treeId, tree);
         SourceFile sourceFile = tree instanceof SourceFile ? (SourceFile) tree : parent.firstEnclosingOrThrow(SourceFile.class);
         String sourceFileType = DynamicDispatchRpcCodec.canonicalSourceFileType(sourceFile.getClass());
+        // The cursor given with a source file holds the source file itself, which has no parent to send.
+        List<String> cursorIds = tree instanceof SourceFile ? null : getCursorIds(parent);
 
         return send(
                 "Print",
@@ -695,7 +716,8 @@ public class RewriteRpc {
                         treeId,
                         sourceFile.getSourcePath(),
                         sourceFileType,
-                        markerPrinter
+                        markerPrinter,
+                        cursorIds
                 ),
                 String.class
         );
@@ -733,18 +755,21 @@ public class RewriteRpc {
 
         GetObject request = new GetObject(id, sourceFileType);
         AtomicReference<CompletableFuture<JsonRpcSuccess>> nextPage = new AtomicReference<>();
+        AtomicBoolean awaitingPage = new AtomicBoolean();
         RpcReceiveQueue q = new RpcReceiveQueue(
                 remoteRefs,
                 () -> {
                     CompletableFuture<JsonRpcSuccess> pending = nextPage.getAndSet(null);
-                    GetObjectResponse page = await(pending == null ? request("GetObject", request) : pending,
+                    awaitingPage.set(true);
+                    GetObjectResponse page = await(pending == null ? request("GetObject", request, GetObjectResponse.class) : pending,
                             GetObjectResponse.class);
+                    awaitingPage.set(false);
                     // The following page is requested before this one is handed over, so the
                     // remote serializes it while this one is being deserialized. A page ending
                     // in END_OF_OBJECT has no successor, and asking for one would restart the
                     // transfer rather than return nothing.
                     if (!page.isEmpty() && page.get(page.size() - 1).getState() != END_OF_OBJECT) {
-                        nextPage.set(request("GetObject", request));
+                        nextPage.set(request("GetObject", request, GetObjectResponse.class));
                     }
                     return page;
                 },
@@ -769,6 +794,7 @@ public class RewriteRpc {
             // Reset our tracking of the remote state so the next interaction
             // forces a full object sync (ADD) instead of a delta (CHANGE).
             remoteObjects.remove(id);
+            q.rollBackRefs();
             CompletableFuture<JsonRpcSuccess> pending = nextPage.getAndSet(null);
             if (pending != null) {
                 // Awaited rather than abandoned so the remote's serialization of it is
@@ -776,6 +802,14 @@ public class RewriteRpc {
                 // id, so an unawaited one is dropped rather than misdelivered.
                 try {
                     await(pending, GetObjectResponse.class);
+                } catch (Exception ignored) {
+                }
+            }
+            if (!awaitingPage.get()) {
+                // The failure is this side's, so the remote still counts the object and the
+                // refs it sent with it as received. A remote without the method stays that way.
+                try {
+                    send("AbortGetObject", new AbortGetObject(id), Boolean.class);
                 } catch (Exception ignored) {
                 }
             }
@@ -794,7 +828,7 @@ public class RewriteRpc {
     }
 
     protected <P> P send(String method, @Nullable RpcRequest body, Class<P> responseType) {
-        return await(request(method, body), responseType);
+        return await(request(method, body, responseType), responseType);
     }
 
     /**
@@ -802,9 +836,9 @@ public class RewriteRpc {
      * one in flight while it works through the current response. Requests carry distinct
      * ids and their futures complete independently, so several may be outstanding.
      */
-    private CompletableFuture<JsonRpcSuccess> request(String method, @Nullable RpcRequest body) {
+    private CompletableFuture<JsonRpcSuccess> request(String method, @Nullable RpcRequest body, Class<?> responseType) {
         checkLiveness();
-        return jsonRpc.send(JsonRpcRequest.newRequest(method, body));
+        return jsonRpc.send(JsonRpcRequest.newRequest(method, body), responseType);
     }
 
     private <P> P await(CompletableFuture<JsonRpcSuccess> future, Class<P> responseType) {

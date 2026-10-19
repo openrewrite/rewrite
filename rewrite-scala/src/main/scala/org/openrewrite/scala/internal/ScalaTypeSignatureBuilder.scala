@@ -31,9 +31,12 @@ class ScalaTypeSignatureBuilder(using ctx: Context) {
 
   private var typeVariableNameStack: HashSet[String] = null
 
+  private var depth = 0
+
   def signature(tpe: Type): String = {
     if (tpe == null) return "{undefined}"
 
+    depth += 1
     try {
       tpe.dealias match {
         case ct: ConstantType =>
@@ -62,7 +65,12 @@ class ScalaTypeSignatureBuilder(using ctx: Context) {
           tpe.show
       }
     } catch {
+      // A type too deep to describe is undefined as a whole. Answering at the level that ran out
+      // of stack would let the caller go on to its next argument and descend just as deep again.
+      case e: VirtualMachineError if depth > 1 => throw e
       case _: Throwable => "{undefined}"
+    } finally {
+      depth -= 1
     }
   }
 
@@ -86,6 +94,7 @@ class ScalaTypeSignatureBuilder(using ctx: Context) {
   private def typeRefSignature(tr: TypeRef): String = {
     val sym = tr.symbol
     if (!sym.exists) return tr.show
+    if (sym.isTypeParam) return typeVariableSignature(sym.name.toString, tr.underlying)
 
     val fqn = sym.fullName.toString
     mapScalaFqnToJava(fqn)
@@ -98,6 +107,7 @@ class ScalaTypeSignatureBuilder(using ctx: Context) {
   }
 
   def parameterizedSignature(at: AppliedType): String = {
+    if (at.tycon.typeSymbol == ctx.definitions.ArrayClass) return signature(at.args.head) + "[]"
     val base = signature(at.tycon)
     val tj = new StringJoiner(", ", "<", ">")
     at.args.foreach { arg =>
@@ -106,28 +116,33 @@ class ScalaTypeSignatureBuilder(using ctx: Context) {
     base + tj.toString
   }
 
-  private def genericSignature(tp: TypeParamRef): String = {
-    val name = tp.paramName.toString
+  private def genericSignature(tp: TypeParamRef): String =
+    typeVariableSignature(tp.paramName.toString, tp.underlying)
 
+  private def typeVariableSignature(name: String, bounds: Type): String = {
     if (typeVariableNameStack == null)
       typeVariableNameStack = new HashSet[String]()
 
+    // Already being described further out: only the frame that added the name takes it off,
+    // or a second mention of it in the same bound would describe the bound all over again.
     if (!typeVariableNameStack.add(name)) {
-      typeVariableNameStack.remove(name)
       return "Generic{" + name + "}"
     }
 
-    val sb = new StringBuilder("Generic{" + name)
+    try {
+      val sb = new StringBuilder("Generic{" + name)
 
-    tp.underlying match {
-      case tb: TypeBounds if !(tb.hi =:= ctx.definitions.AnyType) =>
-        sb.append(" extends ")
-        sb.append(signature(tb.hi))
-      case _ =>
+      bounds match {
+        case tb: TypeBounds if !(tb.hi =:= ctx.definitions.AnyType) =>
+          sb.append(" extends ")
+          sb.append(signature(tb.hi))
+        case _ =>
+      }
+
+      sb.append("}").toString()
+    } finally {
+      typeVariableNameStack.remove(name)
     }
-
-    typeVariableNameStack.remove(name)
-    sb.append("}").toString()
   }
 
   private def boundsSignature(tb: TypeBounds): String = {
@@ -140,10 +155,13 @@ class ScalaTypeSignatureBuilder(using ctx: Context) {
     }
   }
 
-  def methodSignature(sym: Symbols.Symbol): String = {
+  def methodSignature(sym: Symbols.Symbol): String = methodSignature(sym, sym.info)
+
+  /** The signature of the method with the given parameter and result types, as instantiated at a call. */
+  def methodSignature(sym: Symbols.Symbol, info: Type): String = {
     val owner = sym.owner.fullName.toString
     val name = if (sym.isConstructor) "<constructor>" else sym.name.toString
-    val returnType = sym.info.finalResultType match {
+    val returnType = info.finalResultType match {
       case NoType => "void"
       case rt => signature(rt)
     }
@@ -153,15 +171,9 @@ class ScalaTypeSignatureBuilder(using ctx: Context) {
     sb.append(",return=").append(returnType)
 
     val paramTypes = new StringJoiner(",", "[", "]")
-    sym.info match {
+    info.stripPoly match {
       case mt: MethodType =>
         mt.paramInfos.foreach(pt => paramTypes.add(signature(pt)))
-      case pt: PolyType =>
-        pt.resultType match {
-          case mt: MethodType =>
-            mt.paramInfos.foreach(pt => paramTypes.add(signature(pt)))
-          case _ =>
-        }
       case _ =>
     }
     sb.append(",parameters=").append(paramTypes)

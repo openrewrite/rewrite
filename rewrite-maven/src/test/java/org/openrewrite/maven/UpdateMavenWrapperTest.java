@@ -15,33 +15,54 @@
  */
 package org.openrewrite.maven;
 
+import okhttp3.mockwebserver.Dispatcher;
+import okhttp3.mockwebserver.MockResponse;
+import okhttp3.mockwebserver.MockWebServer;
+import okhttp3.mockwebserver.RecordedRequest;
+import okio.Buffer;
 import org.intellij.lang.annotations.Language;
 import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 import org.openrewrite.*;
+import org.openrewrite.internal.InMemoryLargeSourceSet;
 import org.openrewrite.internal.StringUtils;
+import org.openrewrite.ipc.http.HttpSender;
 import org.openrewrite.ipc.http.HttpUrlConnectionSender;
 import org.openrewrite.marker.BuildTool;
+import org.openrewrite.marker.Markers;
 import org.openrewrite.maven.utilities.MavenWrapper;
-import org.openrewrite.remote.Remote;
-import org.openrewrite.remote.RemoteArchive;
-import org.openrewrite.remote.RemoteFile;
+import org.openrewrite.properties.PropertiesParser;
+import org.openrewrite.quark.Quark;
+import org.openrewrite.remote.*;
 import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
 import org.openrewrite.test.SourceSpecs;
 import org.openrewrite.text.PlainText;
 
+import javax.net.ssl.SSLException;
+import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.UncheckedIOException;
 import java.net.URI;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.*;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
 import java.time.Duration;
-import java.util.NoSuchElementException;
-import java.util.Objects;
+import java.util.*;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.function.Consumer;
+import java.util.function.Predicate;
 import java.util.function.UnaryOperator;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import java.util.zip.ZipEntry;
+import java.util.zip.ZipOutputStream;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -90,7 +111,7 @@ class UpdateMavenWrapperTest implements RewriteTest {
 
                 var mavenWrapperJar = result(run, RemoteFile.class, "maven-wrapper.jar");
                 assertThat(mavenWrapperJar.getSourcePath()).isEqualTo(WRAPPER_JAR_LOCATION);
-                assertThat(mavenWrapperJar.getUri()).isEqualTo(URI.create("https://repo.maven.apache.org/maven2/org/apache/maven/wrapper/maven-wrapper/3.1.1/maven-wrapper-3.1.1.jar"));
+                assertThat(mavenWrapperJar.getUri().toString()).endsWith("/org/apache/maven/wrapper/maven-wrapper/3.1.1/maven-wrapper-3.1.1.jar");
                 assertThat(isValidWrapperJar(mavenWrapperJar)).as("Wrapper jar is not valid").isTrue();
             }),
           pomXml(
@@ -133,7 +154,7 @@ class UpdateMavenWrapperTest implements RewriteTest {
 
               var mavenWrapperJar = result(run, RemoteFile.class, "maven-wrapper.jar");
               assertThat(mavenWrapperJar.getSourcePath()).isEqualTo(WRAPPER_JAR_LOCATION);
-              assertThat(mavenWrapperJar.getUri()).isEqualTo(URI.create("https://repo.maven.apache.org/maven2/org/apache/maven/wrapper/maven-wrapper/3.1.1/maven-wrapper-3.1.1.jar"));
+              assertThat(mavenWrapperJar.getUri().toString()).endsWith("/org/apache/maven/wrapper/maven-wrapper/3.1.1/maven-wrapper-3.1.1.jar");
               assertThat(isValidWrapperJar(mavenWrapperJar)).as("Wrapper jar is not valid").isTrue();
           }),
           pomXml(
@@ -177,7 +198,7 @@ class UpdateMavenWrapperTest implements RewriteTest {
 
                 var mavenWrapperJar = result(run, RemoteFile.class, "maven-wrapper.jar");
                 assertThat(mavenWrapperJar.getSourcePath()).isEqualTo(WRAPPER_JAR_LOCATION);
-                assertThat(mavenWrapperJar.getUri()).isEqualTo(URI.create("https://repo.maven.apache.org/maven2/org/apache/maven/wrapper/maven-wrapper/3.1.1/maven-wrapper-3.1.1.jar"));
+                assertThat(mavenWrapperJar.getUri().toString()).endsWith("/org/apache/maven/wrapper/maven-wrapper/3.1.1/maven-wrapper-3.1.1.jar");
                 assertThat(isValidWrapperJar(mavenWrapperJar)).as("Wrapper jar is not valid").isTrue();
             }),
           properties(
@@ -222,7 +243,7 @@ class UpdateMavenWrapperTest implements RewriteTest {
 
                 var mavenWrapperJar = result(run, RemoteFile.class, "maven-wrapper.jar");
                 assertThat(mavenWrapperJar.getSourcePath()).isEqualTo(WRAPPER_JAR_LOCATION);
-                assertThat(mavenWrapperJar.getUri()).isEqualTo(URI.create("https://repo.maven.apache.org/maven2/org/apache/maven/wrapper/maven-wrapper/3.1.1/maven-wrapper-3.1.1.jar"));
+                assertThat(mavenWrapperJar.getUri().toString()).endsWith("/org/apache/maven/wrapper/maven-wrapper/3.1.1/maven-wrapper-3.1.1.jar");
                 assertThat(isValidWrapperJar(mavenWrapperJar)).as("Wrapper jar is not valid").isTrue();
             }),
           properties(
@@ -268,7 +289,7 @@ class UpdateMavenWrapperTest implements RewriteTest {
 
                 var mavenWrapperJar = result(run, RemoteFile.class, "maven-wrapper.jar");
                 assertThat(mavenWrapperJar.getSourcePath()).isEqualTo(WRAPPER_JAR_LOCATION);
-                assertThat(mavenWrapperJar.getUri()).isEqualTo(URI.create("https://repo.maven.apache.org/maven2/org/apache/maven/wrapper/maven-wrapper/3.1.1/maven-wrapper-3.1.1.jar"));
+                assertThat(mavenWrapperJar.getUri().toString()).endsWith("/org/apache/maven/wrapper/maven-wrapper/3.1.1/maven-wrapper-3.1.1.jar");
                 assertThat(isValidWrapperJar(mavenWrapperJar)).as("Wrapper jar is not valid").isTrue();
             }),
           properties(
@@ -447,7 +468,7 @@ class UpdateMavenWrapperTest implements RewriteTest {
 
                 var mvnwDownloaderJava = result(run, RemoteArchive.class, "MavenWrapperDownloader.java");
                 assertThat(mvnwDownloaderJava.getSourcePath()).isEqualTo(WRAPPER_DOWNLOADER_LOCATION);
-                assertThat(mvnwDownloaderJava.getUri()).isEqualTo(URI.create("https://repo.maven.apache.org/maven2/org/apache/maven/wrapper/maven-wrapper-distribution/3.1.1/maven-wrapper-distribution-3.1.1-source.zip"));
+                assertThat(mvnwDownloaderJava.getUri().toString()).endsWith("/org/apache/maven/wrapper/maven-wrapper-distribution/3.1.1/maven-wrapper-distribution-3.1.1-source.zip");
             }),
           pomXml(
             """
@@ -714,7 +735,7 @@ class UpdateMavenWrapperTest implements RewriteTest {
                 assertThat(wrapperVersionMatcher.find()).isTrue();
                 String wrapperVersion = wrapperVersionMatcher.group(1);
                 assertThat(wrapperVersion).isNotEqualTo("3.1.1");
-                assertThat(mavenWrapperJar.getUri()).isEqualTo(URI.create("https://repo.maven.apache.org/maven2/org/apache/maven/wrapper/maven-wrapper/" + wrapperVersion + "/maven-wrapper-" + wrapperVersion + ".jar"));
+                assertThat(mavenWrapperJar.getUri().toString()).endsWith("/org/apache/maven/wrapper/maven-wrapper/" + wrapperVersion + "/maven-wrapper-" + wrapperVersion + ".jar");
                 assertThat(isValidWrapperJar(mavenWrapperJar)).as("Wrapper jar is not valid").isTrue();
             }),
           properties(
@@ -798,7 +819,7 @@ class UpdateMavenWrapperTest implements RewriteTest {
 
                 var mavenWrapperJar = result(run, RemoteFile.class, "maven-wrapper.jar");
                 assertThat(mavenWrapperJar.getSourcePath()).isEqualTo(WRAPPER_JAR_LOCATION);
-                assertThat(mavenWrapperJar.getUri()).isEqualTo(URI.create("https://repo.maven.apache.org/maven2/org/apache/maven/wrapper/maven-wrapper/3.2.0/maven-wrapper-3.2.0.jar"));
+                assertThat(mavenWrapperJar.getUri().toString()).endsWith("/org/apache/maven/wrapper/maven-wrapper/3.2.0/maven-wrapper-3.2.0.jar");
                 assertThat(isValidWrapperJar(mavenWrapperJar)).as("Wrapper jar is not valid").isTrue();
             }),
           properties(
@@ -837,7 +858,7 @@ class UpdateMavenWrapperTest implements RewriteTest {
                 assertThat(mvnwCmd.getText()).isEqualTo(MVNW_CMD_TEXT);
 
                 var mavenWrapperJar = result(run, RemoteFile.class, "maven-wrapper.jar");
-                assertThat(mavenWrapperJar.getUri()).isEqualTo(URI.create("https://repo.maven.apache.org/maven2/org/apache/maven/wrapper/maven-wrapper/3.1.1/maven-wrapper-3.1.1.jar"));
+                assertThat(mavenWrapperJar.getUri().toString()).endsWith("/org/apache/maven/wrapper/maven-wrapper/3.1.1/maven-wrapper-3.1.1.jar");
                 assertThat(isValidWrapperJar(mavenWrapperJar)).as("Wrapper jar is not valid").isTrue();
             }),
           properties(
@@ -873,7 +894,7 @@ class UpdateMavenWrapperTest implements RewriteTest {
                 assertThat(mvnwCmd.getText()).isEqualTo(MVNW_CMD_TEXT);
 
                 var mavenWrapperJar = result(run, RemoteFile.class, "maven-wrapper.jar");
-                assertThat(mavenWrapperJar.getUri()).isEqualTo(URI.create("https://repo.maven.apache.org/maven2/org/apache/maven/wrapper/maven-wrapper/3.1.1/maven-wrapper-3.1.1.jar"));
+                assertThat(mavenWrapperJar.getUri().toString()).endsWith("/org/apache/maven/wrapper/maven-wrapper/3.1.1/maven-wrapper-3.1.1.jar");
                 assertThat(isValidWrapperJar(mavenWrapperJar)).as("Wrapper jar is not valid").isTrue();
             }),
           properties(
@@ -958,6 +979,429 @@ class UpdateMavenWrapperTest implements RewriteTest {
           text("", spec -> spec.path("mvnw.cmd")),
           other("", spec -> spec.path(".mvn/wrapper/maven-wrapper.jar"))
         );
+    }
+
+    @Test
+    void downloadsThroughAnonymousMirrorButWritesCanonicalUrls(@TempDir Path remoteCache) throws IOException {
+        try (Mirror mirror = new Mirror("9.1.1", "9.2.1", "bin", request -> true)) {
+            rewriteRun(
+              spec -> spec.recipe(new UpdateMavenWrapper(null, null, null, null, null, Boolean.TRUE))
+                .executionContext(mirror.context(remoteCache, ""))
+                .afterRecipe(run -> {
+                    assertThat(result(run, RemoteFile.class, "maven-wrapper.jar").getUri())
+                      .isEqualTo(mirror.server.url(mirror.wrapperJarPath()).uri());
+                    assertThat(mirror.sent).allSatisfy(request -> assertThat(request.getUrl().getPort()).isEqualTo(mirror.port()));
+                    assertThat(mirror.served).contains(mirror.wrapperJarPath(), mirror.wrapperDistributionPath(), mirror.distributionPath());
+                }),
+              mavenProject(),
+              addedWrapperProperties(mirror),
+              text(doesNotExist(), "mirrored mvnw", spec -> spec.path(WRAPPER_SCRIPT_LOCATION)),
+              text(doesNotExist(), "mirrored mvnw.cmd", spec -> spec.path(WRAPPER_BATCH_LOCATION)),
+              other(doesNotExist(), mirror.wrapperJarText(), spec -> spec.path(WRAPPER_JAR_LOCATION))
+            );
+        }
+    }
+
+    @Test
+    void downloadsThroughMirrorWithBasicAuthentication(@TempDir Path remoteCache) throws IOException {
+        try (Mirror mirror = new Mirror("9.1.2", "9.2.2", "bin", Mirror.BASIC_AUTHENTICATION)) {
+            rewriteRun(
+              spec -> spec.recipe(new UpdateMavenWrapper(null, null, null, null, null, Boolean.TRUE))
+                .executionContext(mirror.context(remoteCache, Mirror.CREDENTIALS))
+                .afterRecipe(run -> {
+                    assertThat(result(run, RemoteFile.class, "maven-wrapper.jar").getUri())
+                      .isEqualTo(mirror.server.url(mirror.wrapperJarPath()).uri());
+                    assertThat(mirror.sent).allSatisfy(request -> assertThat(request.getUrl().getPort()).isEqualTo(mirror.port()));
+                    assertThat(mirror.served).contains(mirror.wrapperJarPath(), mirror.wrapperDistributionPath(), mirror.distributionPath());
+                }),
+              mavenProject(),
+              addedWrapperProperties(mirror),
+              text(doesNotExist(), "mirrored mvnw", spec -> spec.path(WRAPPER_SCRIPT_LOCATION)),
+              text(doesNotExist(), "mirrored mvnw.cmd", spec -> spec.path(WRAPPER_BATCH_LOCATION)),
+              other(doesNotExist(), mirror.wrapperJarText(), spec -> spec.path(WRAPPER_JAR_LOCATION))
+            );
+        }
+    }
+
+    @Test
+    void downloadsThroughMirrorWithHttpHeaderToken(@TempDir Path remoteCache) throws IOException {
+        try (Mirror mirror = new Mirror("9.1.3", "9.2.3", "bin", Mirror.TOKEN_AUTHENTICATION)) {
+            rewriteRun(
+              spec -> spec.recipe(new UpdateMavenWrapper(null, null, null, null, null, Boolean.TRUE))
+                .executionContext(mirror.context(remoteCache, Mirror.TOKEN))
+                .afterRecipe(run -> assertThat(mirror.served)
+                  .contains(mirror.wrapperJarPath(), mirror.wrapperDistributionPath(), mirror.distributionPath())),
+              mavenProject(),
+              addedWrapperProperties(mirror),
+              text(doesNotExist(), "mirrored mvnw", spec -> spec.path(WRAPPER_SCRIPT_LOCATION)),
+              text(doesNotExist(), "mirrored mvnw.cmd", spec -> spec.path(WRAPPER_BATCH_LOCATION)),
+              other(doesNotExist(), mirror.wrapperJarText(), spec -> spec.path(WRAPPER_JAR_LOCATION))
+            );
+        }
+    }
+
+    @Test
+    void addsWrapperDownloaderSourceThroughAuthenticatedMirror(@TempDir Path remoteCache) throws IOException {
+        try (Mirror mirror = new Mirror("9.1.4", "9.2.4", "source", Mirror.BASIC_AUTHENTICATION)) {
+            rewriteRun(
+              spec -> spec.recipe(new UpdateMavenWrapper(null, "source", null, null, null, null))
+                .executionContext(mirror.context(remoteCache, Mirror.CREDENTIALS)),
+              mavenProject(),
+              properties(
+                doesNotExist(),
+                withLicenseHeader("""
+                  distributionUrl=https://repo.maven.apache.org/maven2/org/apache/maven/apache-maven/9.2.4/apache-maven-9.2.4-bin.zip
+                  distributionSha256Sum=%s
+                  wrapperUrl=https://repo.maven.apache.org/maven2/org/apache/maven/wrapper/maven-wrapper/9.1.4/maven-wrapper-9.1.4.jar
+                  """.formatted(sha256(mirror.distribution))),
+                spec -> spec.path(WRAPPER_PROPERTIES_LOCATION)
+              ),
+              text(doesNotExist(), "mirrored mvnw", spec -> spec.path(WRAPPER_SCRIPT_LOCATION)),
+              text(doesNotExist(), "mirrored mvnw.cmd", spec -> spec.path(WRAPPER_BATCH_LOCATION)),
+              other(doesNotExist(), "mirrored MavenWrapperDownloader.java", spec -> spec.path(WRAPPER_DOWNLOADER_LOCATION))
+            );
+        }
+    }
+
+    @ParameterizedTest
+    @CsvSource({"bin,9.1.5,9.2.5", "source,9.1.15,9.2.15"})
+    void remotesAreServedFromDiskCacheWhenWrittenOutWithAnotherContext(String distributionType, String wrapperVersion,
+                                                                       String mavenVersion, @TempDir Path remoteCache) throws IOException {
+        try (Mirror mirror = new Mirror(wrapperVersion, mavenVersion, distributionType, Mirror.BASIC_AUTHENTICATION)) {
+            // given
+            ExecutionContext ctx = mirror.context(remoteCache, Mirror.CREDENTIALS);
+            List<Remote> remotes = new UpdateMavenWrapper(null, distributionType, null, null, null, null)
+              .run(new InMemoryLargeSourceSet(List.of(mavenProject(ctx))), ctx)
+              .getChangeset().getAllResults().stream()
+              .map(Result::getAfter)
+              .filter(Remote.class::isInstance)
+              .map(Remote.class::cast)
+              .toList();
+            List<HttpSender.Request> sent = new CopyOnWriteArrayList<>();
+            ExecutionContext writeOutContext = new InMemoryExecutionContext();
+            RemoteExecutionContextView.view(writeOutContext).setArtifactCache(new LocalRemoteArtifactCache(remoteCache));
+            HttpSenderExecutionContextView.view(writeOutContext).setLargeFileHttpSender(request -> {
+                sent.add(request);
+                throw new IllegalStateException("Unexpected request to " + request.getUrl());
+            });
+
+            // when
+            List<String> written = remotes.stream().map(remote -> remote.printAll(writeOutContext)).toList();
+
+            // then
+            assertThat(written).containsExactly("bin".equals(distributionType) ?
+              mirror.wrapperJarText() :
+              "mirrored MavenWrapperDownloader.java");
+            assertThat(sent).isEmpty();
+        }
+    }
+
+    @Test
+    void upToDateWrapperIsUnchangedWhenDownloadingThroughMirror(@TempDir Path remoteCache) throws IOException {
+        try (Mirror mirror = new Mirror("9.1.6", "9.2.6", "bin", Mirror.BASIC_AUTHENTICATION)) {
+            rewriteRun(
+              spec -> spec.recipe(new UpdateMavenWrapper(null, null, null, null, Boolean.FALSE, null))
+                .executionContext(mirror.context(remoteCache, Mirror.CREDENTIALS)),
+              properties(
+                withLicenseHeader("""
+                  distributionUrl=https://repo.maven.apache.org/maven2/org/apache/maven/apache-maven/9.2.6/apache-maven-9.2.6-bin.zip
+                  distributionSha256Sum=%s
+                  wrapperUrl=https://repo.maven.apache.org/maven2/org/apache/maven/wrapper/maven-wrapper/9.1.6/maven-wrapper-9.1.6.jar
+                  """.formatted(sha256(mirror.distribution))),
+                spec -> spec.path(WRAPPER_PROPERTIES_LOCATION)
+              ),
+              text("mirrored mvnw", spec -> spec.path(WRAPPER_SCRIPT_LOCATION)),
+              text("mirrored mvnw.cmd", spec -> spec.path(WRAPPER_BATCH_LOCATION))
+            );
+        }
+    }
+
+    @Test
+    void failureToCreateWrapperIsAttemptedOncePerRun(@TempDir Path remoteCache) throws IOException {
+        try (Mirror mirror = new Mirror("9.1.7", "9.2.7", "bin", request -> true)) {
+            // given
+            mirror.failing.add(mirror.wrapperJarPath());
+            List<Throwable> errors = new CopyOnWriteArrayList<>();
+            ExecutionContext ctx = mirror.context(remoteCache, "", errors::add);
+            List<SourceFile> sources = List.of(
+              new PropertiesParser().parse(withLicenseHeader("""
+                  distributionUrl=https://repo.maven.apache.org/maven2/org/apache/maven/apache-maven/3.8.0/apache-maven-3.8.0-bin.zip
+                  wrapperUrl=https://repo.maven.apache.org/maven2/org/apache/maven/wrapper/maven-wrapper/3.1.0/maven-wrapper-3.1.0.jar
+                  """)).findFirst().orElseThrow().withSourcePath(WRAPPER_PROPERTIES_LOCATION),
+              PlainText.builder().text("").sourcePath(WRAPPER_SCRIPT_LOCATION).build(),
+              PlainText.builder().text("").sourcePath(WRAPPER_BATCH_LOCATION).build(),
+              new Quark(Tree.randomId(), WRAPPER_JAR_LOCATION, Markers.EMPTY, null, null),
+              PlainText.builder().text("readme").sourcePath(Path.of("README.md")).build(),
+              PlainText.builder().text("notes").sourcePath(Path.of("NOTES.md")).build()
+            );
+
+            // when
+            new UpdateMavenWrapper(null, null, null, null, null, null).run(new InMemoryLargeSourceSet(sources), ctx);
+
+            // then
+            assertThat(mirror.sent)
+              .filteredOn(request -> request.getUrl().getPath().endsWith("/maven-wrapper-9.1.7.jar"))
+              .hasSize(1);
+            assertThat(errors).isNotEmpty();
+        }
+    }
+
+    @Test
+    void credentialsAreOnlySentToTheMirror(@TempDir Path remoteCache) throws IOException {
+        try (Mirror mirror = new Mirror("9.1.8", "9.2.8", "bin", Mirror.BASIC_AUTHENTICATION)) {
+            // given
+            List<Throwable> errors = new CopyOnWriteArrayList<>();
+            ExecutionContext ctx = mirror.context(remoteCache, Mirror.CREDENTIALS, errors::add);
+            new UpdateMavenWrapper(null, null, null, null, null, null).run(new InMemoryLargeSourceSet(List.of(mavenProject(ctx))), ctx);
+            assertThat(errors).isEmpty();
+            assertThat(mirror.sent)
+              .filteredOn(request -> request.getRequestHeaders().containsKey("Authorization"))
+              .isNotEmpty()
+              .allSatisfy(request -> {
+                  assertThat(request.getUrl().getPort()).isEqualTo(mirror.port());
+                  assertThat(request.getUrl().getPath()).startsWith("/maven2/");
+              });
+            mirror.sent.clear();
+
+            // when
+            for (String uri : List.of(
+              "https://repo.maven.apache.org/maven2/org/apache/maven/wrapper/maven-wrapper/9.1.8/maven-wrapper-9.1.8.jar",
+              mirror.server.url("/other/maven-wrapper-9.1.8.jar").toString(),
+              mirror.url() + "-other/maven-wrapper-9.1.8.jar")) {
+                try {
+                    Remote.builder(WRAPPER_JAR_LOCATION).build(URI.create(uri)).getInputStream(ctx).close();
+                } catch (RuntimeException ignored) {
+                    // expected: every one of these is refused
+                }
+            }
+
+            // then
+            assertThat(mirror.sent).hasSize(3)
+              .allSatisfy(request -> assertThat(request.getRequestHeaders()).doesNotContainKey("Authorization"));
+        }
+    }
+
+    private static SourceSpecs mavenProject() {
+        return pomXml(
+          """
+            <project>
+              <groupId>com.example</groupId>
+              <artifactId>demo</artifactId>
+              <version>1.0.0</version>
+            </project>
+            """
+        );
+    }
+
+    private static SourceFile mavenProject(ExecutionContext ctx) {
+        return MavenParser.builder().build().parse(ctx,
+          """
+            <project>
+              <groupId>com.example</groupId>
+              <artifactId>demo</artifactId>
+              <version>1.0.0</version>
+            </project>
+            """
+        ).findFirst().orElseThrow();
+    }
+
+    private SourceSpecs addedWrapperProperties(Mirror mirror) {
+        return properties(
+          doesNotExist(),
+          withLicenseHeader("""
+            distributionUrl=https://repo.maven.apache.org/maven2/org/apache/maven/apache-maven/%2$s/apache-maven-%2$s-bin.zip
+            distributionSha256Sum=%3$s
+            wrapperUrl=https://repo.maven.apache.org/maven2/org/apache/maven/wrapper/maven-wrapper/%1$s/maven-wrapper-%1$s.jar
+            wrapperSha256Sum=%4$s
+            """.formatted(mirror.wrapperVersion, mirror.mavenVersion, sha256(mirror.distribution), sha256(mirror.wrapperJar))),
+          spec -> spec.path(WRAPPER_PROPERTIES_LOCATION)
+        );
+    }
+
+    private static String sha256(byte[] bytes) {
+        try {
+            return HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(bytes));
+        } catch (NoSuchAlgorithmException e) {
+            throw new IllegalStateException(e);
+        }
+    }
+
+    /**
+     * A Maven repository mirroring everything ({@code <mirrorOf>*</mirrorOf>}) that serves made-up wrapper and
+     * distribution versions, so the static checksum memo of {@link MavenWrapper} can't interfere between tests.
+     */
+    private static final class Mirror implements AutoCloseable {
+        static final Predicate<RecordedRequest> BASIC_AUTHENTICATION = request -> "Basic dXNlcjpzZWNyZXQ=".equals(request.getHeader("Authorization"));
+        static final Predicate<RecordedRequest> TOKEN_AUTHENTICATION = request -> "abc".equals(request.getHeader("Private-Token"));
+
+        @Language("xml")
+        static final String CREDENTIALS = """
+          <server>
+            <id>corporate</id>
+            <username>user</username>
+            <password>secret</password>
+          </server>
+          """;
+
+        @Language("xml")
+        static final String TOKEN = """
+          <server>
+            <id>corporate</id>
+            <configuration>
+              <httpHeaders>
+                <property>
+                  <name>Private-Token</name>
+                  <value>abc</value>
+                </property>
+              </httpHeaders>
+            </configuration>
+          </server>
+          """;
+
+        final String wrapperVersion;
+        final String mavenVersion;
+        final String distributionType;
+        final byte[] wrapperJar;
+        final byte[] distribution;
+        final MockWebServer server = new MockWebServer();
+        final Map<String, byte[]> files = new ConcurrentHashMap<>();
+        final Set<String> failing = ConcurrentHashMap.newKeySet();
+        final Set<String> served = ConcurrentHashMap.newKeySet();
+        final List<HttpSender.Request> sent = new CopyOnWriteArrayList<>();
+
+        Mirror(String wrapperVersion, String mavenVersion, String distributionType, Predicate<RecordedRequest> authorized) throws IOException {
+            this.wrapperVersion = wrapperVersion;
+            this.mavenVersion = mavenVersion;
+            this.distributionType = distributionType;
+            this.wrapperJar = ("mirrored maven-wrapper " + wrapperVersion).getBytes(StandardCharsets.UTF_8);
+            this.distribution = ("mirrored apache-maven " + mavenVersion).getBytes(StandardCharsets.UTF_8);
+            files.put("/maven2/org/apache/maven/wrapper/maven-wrapper-distribution/maven-metadata.xml",
+              metadata("org.apache.maven.wrapper", "maven-wrapper-distribution", wrapperVersion));
+            files.put("/maven2/org/apache/maven/apache-maven/maven-metadata.xml", metadata("org.apache.maven", "apache-maven", mavenVersion));
+            files.put(wrapperJarPath(), wrapperJar);
+            files.put(wrapperDistributionPath(), zip(Map.of(
+              "mvnw", "mirrored mvnw",
+              "mvnw.cmd", "mirrored mvnw.cmd",
+              ".mvn/wrapper/MavenWrapperDownloader.java", "mirrored MavenWrapperDownloader.java")));
+            files.put(distributionPath(), distribution);
+            server.setDispatcher(new Dispatcher() {
+                @Override
+                public MockResponse dispatch(RecordedRequest request) {
+                    if (!authorized.test(request)) {
+                        return new MockResponse().setResponseCode(401);
+                    }
+                    if (failing.contains(request.getPath())) {
+                        return new MockResponse().setResponseCode(429);
+                    }
+                    byte[] body = files.get(request.getPath());
+                    if (body == null) {
+                        return new MockResponse().setResponseCode("GET".equals(request.getMethod()) ? 404 : 200);
+                    }
+                    served.add(request.getPath());
+                    return new MockResponse().setBody(new Buffer().write(body));
+                }
+            });
+            server.start();
+        }
+
+        String url() {
+            return server.url("/maven2").toString();
+        }
+
+        int port() {
+            return server.getPort();
+        }
+
+        String wrapperJarPath() {
+            return "/maven2/org/apache/maven/wrapper/maven-wrapper/%1$s/maven-wrapper-%1$s.jar".formatted(wrapperVersion);
+        }
+
+        String wrapperJarText() {
+            return new String(wrapperJar, StandardCharsets.ISO_8859_1);
+        }
+
+        String wrapperDistributionPath() {
+            return "/maven2/org/apache/maven/wrapper/maven-wrapper-distribution/%1$s/maven-wrapper-distribution-%1$s-%2$s.zip"
+              .formatted(wrapperVersion, distributionType);
+        }
+
+        String distributionPath() {
+            return "/maven2/org/apache/maven/apache-maven/%1$s/apache-maven-%1$s-bin.zip".formatted(mavenVersion);
+        }
+
+        ExecutionContext context(Path remoteCache, @Language("xml") String server) {
+            return context(remoteCache, server, t -> {
+                throw new AssertionError(t);
+            });
+        }
+
+        ExecutionContext context(Path remoteCache, @Language("xml") String server, Consumer<Throwable> onError) {
+            InMemoryExecutionContext ctx = new InMemoryExecutionContext(onError);
+            RemoteExecutionContextView.view(ctx).setArtifactCache(new LocalRemoteArtifactCache(remoteCache));
+            // MockWebServer never answers the TLS handshake of the https probe that precedes the http fallback, so each
+            // probe would wait out its read timeout and retries; a real plain HTTP server rejects the handshake at once
+            HttpSender delegate = new HttpUrlConnectionSender();
+            HttpSender httpSender = request -> {
+                sent.add(request);
+                if ("https".equals(request.getUrl().getProtocol())) {
+                    throw new UncheckedIOException(new SSLException("Unsupported or unrecognized SSL message"));
+                }
+                return delegate.send(request);
+            };
+            HttpSenderExecutionContextView.view(ctx).setHttpSender(httpSender).setLargeFileHttpSender(httpSender);
+            MavenExecutionContextView.view(ctx).setMavenSettings(MavenSettings.parse(Parser.Input.fromString(Path.of("settings.xml"),
+              //language=xml
+              """
+                <settings>
+                  <mirrors>
+                    <mirror>
+                      <id>corporate</id>
+                      <url>%s</url>
+                      <mirrorOf>*</mirrorOf>
+                    </mirror>
+                  </mirrors>
+                  <servers>
+                    %s
+                  </servers>
+                </settings>
+                """.formatted(url(), server)
+            ), ctx));
+            return ctx;
+        }
+
+        @Override
+        public void close() throws IOException {
+            server.close();
+        }
+
+        private static byte[] metadata(String groupId, String artifactId, String version) {
+            //language=xml
+            return """
+              <metadata>
+                <groupId>%s</groupId>
+                <artifactId>%s</artifactId>
+                <versioning>
+                  <latest>%s</latest>
+                  <release>%s</release>
+                  <versions>
+                    <version>%s</version>
+                  </versions>
+                </versioning>
+              </metadata>
+              """.formatted(groupId, artifactId, version, version, version).getBytes(StandardCharsets.UTF_8);
+        }
+
+        private static byte[] zip(Map<String, String> entries) throws IOException {
+            ByteArrayOutputStream bytes = new ByteArrayOutputStream();
+            try (ZipOutputStream zip = new ZipOutputStream(bytes)) {
+                for (Map.Entry<String, String> entry : entries.entrySet()) {
+                    zip.putNextEntry(new ZipEntry(entry.getKey()));
+                    zip.write(entry.getValue().getBytes(StandardCharsets.UTF_8));
+                    zip.closeEntry();
+                }
+            }
+            return bytes.toByteArray();
+        }
     }
 
     private String withLicenseHeader(@Language("properties") String original) {

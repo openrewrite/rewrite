@@ -42,6 +42,33 @@ import static org.openrewrite.yaml.MergeYaml.InsertMode.Last;
 @SuppressWarnings({"KubernetesUnknownResourcesInspection", "KubernetesNonEditableResources"})
 class MergeYamlTest implements RewriteTest {
 
+    @Test
+    void preserveNestedTrailingCommentBeforeMultipleRootSiblings() {
+        rewriteRun(
+          spec -> spec.recipe(new MergeYaml("$.a.tracing", "export:\n  endpoint: url", false, null, null, null, null, null)),
+          yaml(
+            """
+              a:
+                tracing:
+                  sampling:
+                    probability: 1 # sample all
+              z: x # unrelated comment
+              last: y
+              """,
+            """
+              a:
+                tracing:
+                  sampling:
+                    probability: 1 # sample all
+                  export:
+                    endpoint: url
+              z: x # unrelated comment
+              last: y
+              """
+          )
+        );
+    }
+
     @DocumentExample
     @Test
     void nonExistentBlock() {
@@ -1647,6 +1674,64 @@ class MergeYamlTest implements RewriteTest {
                 - name: newName
                   jobs:
                     - newJob
+              """
+          )
+        );
+    }
+
+    @Test
+    void addSequenceUnderMissingKey() {
+        rewriteRun(
+          spec -> spec
+            .recipe(new MergeYaml("$.groups",
+              // language=yaml
+              """
+                - name: newName
+                  jobs:
+                    - newJob
+                """,
+              false, "name",
+              null,
+              null,
+              null,
+              null
+            )),
+          yaml(
+            """
+              other: 1
+              """,
+            """
+              other: 1
+              groups:
+                - name: newName
+                  jobs:
+                    - newJob
+              """
+          ),
+          yaml(
+            "",
+            """
+              groups:
+                - name: newName
+                  jobs:
+                    - newJob
+              """
+          )
+        );
+    }
+
+    @Test
+    void addFlowSequenceUnderMissingKey() {
+        rewriteRun(
+          spec -> spec
+            .recipe(new MergeYaml("$.groups", "[a, b]", false, null, null, null, null, null)),
+          yaml(
+            """
+              other: 1
+              """,
+            """
+              other: 1
+              groups: [a, b]
               """
           )
         );

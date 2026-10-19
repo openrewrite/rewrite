@@ -279,6 +279,14 @@ class TestIsOfType:
         u = JavaType.Unknown()
         assert not is_of_type(u, u)
 
+    def test_unions_compare_as_sets_of_members(self):
+        string, null = JavaType.Primitive.String, JavaType.Primitive.Null
+        assert is_of_type(JavaType.Union(_bounds=[string, null]), JavaType.Union(_bounds=[null, string]))
+
+        wider = JavaType.Union(_bounds=[string, null, JavaType.Primitive.Int])
+        assert not is_of_type(JavaType.Union(_bounds=[string, null]), wider)
+        assert not is_of_type(wider, JavaType.Union(_bounds=[string, null]))
+
 
 # ---------------------------------------------------------------------------
 # is_assignable_to — string (FQN) form
@@ -387,6 +395,13 @@ class TestIsAssignableToType:
 
     def test_variable_to_unwrapped(self):
         assert is_assignable_to(_var("a", ANIMAL), DOG)
+
+    def test_union_from_union_needs_every_member_to_fit(self):
+        string, null, int_ = JavaType.Primitive.String, JavaType.Primitive.Null, JavaType.Primitive.Int
+        optional_str = JavaType.Union(_bounds=[string, null])
+        assert is_assignable_to(JavaType.Union(_bounds=[string, int_, null]), optional_str)
+
+        assert not is_assignable_to(optional_str, JavaType.Union(_bounds=[string, int_]))
 
     def test_none(self):
         assert not is_assignable_to(DOG, None)

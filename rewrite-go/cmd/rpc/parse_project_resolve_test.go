@@ -247,11 +247,8 @@ func findGoMod(t *testing.T, s *server) *golang.GoMod {
 
 func hasGoSumOnlyWarning(gm *golang.GoMod) bool {
 	for _, m := range gm.Markers.Entries() {
-		gmk, ok := m.(java.GenericMarker)
-		if !ok || gmk.JavaType != "org.openrewrite.marker.Markup$Warn" {
-			continue
-		}
-		if msg, ok := gmk.Data["message"].(string); ok && strings.Contains(msg, "go.sum alone") {
+		if warn, ok := m.(java.Markup); ok && warn.Level == java.MarkupWarnLevel &&
+			strings.Contains(warn.Message, "go.sum alone") {
 			return true
 		}
 	}

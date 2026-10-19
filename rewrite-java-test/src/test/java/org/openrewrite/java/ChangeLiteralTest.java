@@ -32,7 +32,7 @@ class ChangeLiteralTest implements RewriteTest {
         spec.recipe(toRecipe(() -> new JavaVisitor<>() {
             @Override
             public J visitLiteral(J.Literal literal, ExecutionContext ctx) {
-                doAfterVisit(new ChangeLiteral<>(literal, s -> s == null ? s : s.toString().replace("%s", "{}")));
+                doAfterVisit(new ChangeLiteral<>(literal, s -> s instanceof String ? ((String) s).replace("%s", "{}") : s));
                 return super.visitLiteral(literal, ctx);
             }
         }));

@@ -17,7 +17,6 @@ package org.openrewrite;
 
 import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
-import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.RecipeRunException;
 import org.openrewrite.internal.TreeVisitorAdapter;
 import org.openrewrite.marker.Marker;
@@ -144,14 +143,6 @@ public abstract class TreeVisitor<T extends @Nullable Tree, P> {
     }
 
     public @Nullable T visit(@Nullable Tree tree, P p, Cursor parent) {
-        assert parent.isRoot() ||
-               !(parent.getValue() instanceof Tree) ||
-               !((Tree) parent.getValue()).isScope(tree) ||
-               !(p instanceof ExecutionContext) ||
-               !CursorValidatingExecutionContextView.view((ExecutionContext) p).getValidateCursorAcyclic() :
-                "The `parent` cursor must not point to the same `tree` as the tree to be visited. " +
-                "This usually indicates that you have used getCursor() where getCursor().getParent() is appropriate. " +
-                "This is a test-only validation which can be opted out of by configuring your test's type validation options with `cursorAcyclic(false)`.";
         this.cursor = parent;
         return visit(tree, p);
     }
@@ -341,7 +332,7 @@ public abstract class TreeVisitor<T extends @Nullable Tree, P> {
             // avoid unnecessary method handle allocation
             return markers;
         }
-        return markers.withMarkers(ListUtils.map(markers.getMarkers(), marker -> this.visitMarker(marker, p)));
+        return markers.map(marker -> this.visitMarker(marker, p));
     }
 
     public <M extends Marker> M visitMarker(Marker marker, P p) {

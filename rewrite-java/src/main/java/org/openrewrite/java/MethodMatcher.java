@@ -438,10 +438,28 @@ public class MethodMatcher {
             if (!typeMatcher.matchesSimpleName(select.getSimpleName())) {
                 return false;
             }
+        } else if (method.getSelect() instanceof J.FieldAccess) {
+            J.FieldAccess select = (J.FieldAccess) method.getSelect();
+            // A fully qualified type name, as in `java.util.Collections.emptyList()`, is checked like a simple one
+            if (select.getType() instanceof JavaType.Class &&
+                ((JavaType.Class) select.getType()).getFullyQualifiedName().replace('$', '.').equals(dottedName(select)) &&
+                !typeMatcher.matchesSimpleName(select.getSimpleName())) {
+                return false;
+            }
         }
 
         // For unknown types, we need to be more lenient with argument matching
         return matchesArgumentsAllowingUnknownTypes(method);
+    }
+
+    private static @Nullable String dottedName(Expression expression) {
+        if (expression instanceof J.Identifier) {
+            return ((J.Identifier) expression).getSimpleName();
+        } else if (expression instanceof J.FieldAccess) {
+            String target = dottedName(((J.FieldAccess) expression).getTarget());
+            return target == null ? null : target + "." + ((J.FieldAccess) expression).getSimpleName();
+        }
+        return null;
     }
 
     private boolean matchesArgumentsAllowingUnknownTypes(J.MethodInvocation method) {
@@ -804,6 +822,9 @@ public class MethodMatcher {
 
         @Override
         public boolean matches(JavaType type) {
+            if (type instanceof JavaType.MultiCatch) {
+                return everyMemberButNull((JavaType.MultiCatch) type);
+            }
             type = unwrapArrays(type, arrayDimensions, false);
             if (type == null) {
                 return false;
@@ -818,6 +839,23 @@ public class MethodMatcher {
                 return true;
             }
             return matches(type);
+        }
+
+        /**
+         * A union parameter type, like Python's {@code str | None}, comes as a {@link JavaType.MultiCatch}.
+         * Patterns have no union syntax, so {@code String} names a parameter that may also be null.
+         */
+        private boolean everyMemberButNull(JavaType.MultiCatch union) {
+            boolean any = false;
+            for (JavaType member : union.getThrowableTypes()) {
+                if (member != JavaType.Primitive.Null) {
+                    if (!matches(member)) {
+                        return false;
+                    }
+                    any = true;
+                }
+            }
+            return any;
         }
 
         @Override

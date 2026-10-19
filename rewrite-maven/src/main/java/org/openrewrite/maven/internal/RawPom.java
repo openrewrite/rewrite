@@ -398,6 +398,9 @@ public class RawPom {
 
         @Nullable
         RawPluginRepositories pluginRepositories;
+
+        @Nullable
+        Build build;
     }
 
     public @Nullable String getGroupId() {
@@ -501,8 +504,8 @@ public class RawPom {
                             mapDependencyManagement(p.getDependencyManagement()),
                             mapRepositories(p.getRepositories()),
                             mapPluginRepositories(p.getPluginRepositories()),
-                            mapPlugins((build != null) ? build.getPlugins() : null),
-                            mapPlugins((build != null && build.getPluginManagement() != null) ? build.getPluginManagement().getPlugins() : null)
+                            mapPlugins(p.getBuild() != null ? p.getBuild().getPlugins() : null),
+                            mapPlugins(p.getBuild() != null && p.getBuild().getPluginManagement() != null ? p.getBuild().getPluginManagement().getPlugins() : null)
                     ));
                 }
 

@@ -15,7 +15,6 @@
  */
 package org.openrewrite;
 
-import lombok.AllArgsConstructor;
 import lombok.EqualsAndHashCode;
 import lombok.With;
 import org.jspecify.annotations.Nullable;
@@ -32,7 +31,6 @@ import static java.util.stream.StreamSupport.stream;
  * A cursor is linked path of LST elements that can be used to traverse down the tree towards the root.
  */
 @EqualsAndHashCode(exclude = "messages")
-@AllArgsConstructor
 public class Cursor {
     public static final String ROOT_VALUE = "root";
 
@@ -46,8 +44,39 @@ public class Cursor {
     private Map<String, Object> messages;
 
     public Cursor(@Nullable Cursor parent, Object value) {
+        this(parent, value, null);
+    }
+
+    public Cursor(@Nullable Cursor parent, Object value, @Nullable Map<String, Object> messages) {
+        if (parent != null) {
+            if (parent.value == value) {
+                throw new IllegalArgumentException(sameElementMessage(value, true));
+            }
+            assert !sameId(parent.value, value) : sameElementMessage(value, false);
+        }
         this.parent = parent;
         this.value = value;
+        this.messages = messages;
+    }
+
+    private static boolean sameId(Object parentValue, Object value) {
+        if (!(parentValue instanceof Tree) || !(value instanceof Tree)) {
+            return false;
+        }
+        // a tree still being received over RPC has no id yet
+        UUID id = ((Tree) value).getId();
+        //noinspection ConstantValue
+        return id != null && id.equals(((Tree) parentValue).getId());
+    }
+
+    private static String sameElementMessage(Object value, boolean sameObject) {
+        String type = value.getClass().getName();
+        type = type.substring(type.lastIndexOf('.') + 1).replace('$', '.');
+        return "The parent of a cursor on a " + type + " is a cursor on " +
+               (sameObject ? "the same " + type : "an element with the same id") + ". A visit method's getCursor() " +
+               "already points to the tree it is given, so to print, format or visit that tree, or a changed copy of " +
+               "it, pass getCursor().getParentOrThrow(), as in tree.printTrimmed(getCursor().getParentOrThrow())." +
+               (sameObject ? "" : " An element built inside another needs an id of its own, from Tree.randomId().");
     }
 
     public Cursor getRoot() {

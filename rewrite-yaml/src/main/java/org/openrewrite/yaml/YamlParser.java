@@ -43,6 +43,7 @@ import org.openrewrite.yaml.marker.OmitColon;
 import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.*;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -52,6 +53,8 @@ import static java.util.Collections.*;
 import static org.openrewrite.Tree.randomId;
 
 public class YamlParser implements org.openrewrite.Parser {
+    private static final Path GITHUB_ACTIONS_LOCKFILE = Paths.get(".github", "workflows", "actions.lock");
+
     private static final Pattern VARIABLE_PATTERN = Pattern.compile(":\\s+(@[^\n\r@]+@)");
     // Only match single-line Helm templates that don't span multiple lines
     private static final Pattern HELM_TEMPLATE_PATTERN = Pattern.compile("\\{\\{[^{}\\n\\r]*}}");
@@ -100,6 +103,26 @@ public class YamlParser implements org.openrewrite.Parser {
                     }
                     return sourceFile;
                 });
+    }
+
+    private static boolean isInsideQuotedScalar(String source, int index) {
+        int lineStart = Math.max(source.lastIndexOf('\n', index - 1), source.lastIndexOf('\r', index - 1)) + 1;
+        char quote = 0;
+        for (int i = lineStart; i < index; i++) {
+            char c = source.charAt(i);
+            if (quote == 0) {
+                char prev = i == lineStart ? ' ' : source.charAt(i - 1);
+                if ((c == '"' || c == '\'') &&
+                    (Character.isWhitespace(prev) || prev == '[' || prev == '{' || prev == ',')) {
+                    quote = c;
+                }
+            } else if (quote == '"' && c == '\\') {
+                i++;
+            } else if (c == quote) {
+                quote = 0;
+            }
+        }
+        return quote != 0;
     }
 
     /**
@@ -177,6 +200,11 @@ public class YamlParser implements org.openrewrite.Parser {
         Matcher asteriskMatcher = ASTERISK_PLACEHOLDER_PATTERN.matcher(processedSource);
         pos = 0;
         while (pos < processedSource.length() && asteriskMatcher.find(pos)) {
+            if (isInsideQuotedScalar(processedSource, asteriskMatcher.start())) {
+                yamlSourceWithPlaceholders.append(processedSource, pos, asteriskMatcher.end());
+                pos = asteriskMatcher.end();
+                continue;
+            }
             yamlSourceWithPlaceholders.append(processedSource, pos, asteriskMatcher.start(1));
             String uuid = UUID.randomUUID().toString();
             variableByUuid.put(uuid, asteriskMatcher.group(1));
@@ -642,7 +670,7 @@ public class YamlParser implements org.openrewrite.Parser {
         StringBuilder postFix = new StringBuilder();
         for (int i = 0; i < whitespaceAndScalar.length(); i++) {
             char c = whitespaceAndScalar.charAt(i);
-            if (c != ' ' && c != '\t') {
+            if (c != ' ' && c != '\t' && !(isForScalar && (c == '\n' || c == '\r'))) {
                 break;
             }
             postFix.append(c);
@@ -848,7 +876,8 @@ public class YamlParser implements org.openrewrite.Parser {
     @Override
     public boolean accept(Path path) {
         String fileName = path.toString();
-        return fileName.endsWith(".yml") || fileName.endsWith(".yaml");
+        return fileName.endsWith(".yml") || fileName.endsWith(".yaml") ||
+               path.endsWith(GITHUB_ACTIONS_LOCKFILE);
     }
 
     @Override

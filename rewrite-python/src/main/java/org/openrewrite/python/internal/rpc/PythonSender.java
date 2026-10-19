@@ -21,6 +21,7 @@ import org.openrewrite.java.internal.rpc.JavaSender;
 import org.openrewrite.java.tree.*;
 import org.openrewrite.python.PythonVisitor;
 import org.openrewrite.python.tree.Py;
+import org.openrewrite.python.tree.PyComment;
 import org.openrewrite.rpc.RpcSendQueue;
 
 import static org.openrewrite.rpc.Reference.asRef;
@@ -191,7 +192,7 @@ public class PythonSender extends PythonVisitor<RpcSendQueue> {
     public J visitFormattedStringValue(Py.FormattedString.Value value, RpcSendQueue q) {
         q.getAndSend(value, el -> el.getPadding().getExpression(), el -> visitRightPadded(el, q));
         q.getAndSend(value, el -> el.getPadding().getDebug(), el -> visitRightPadded(el, q));
-        q.getAndSend(value, Py.FormattedString.Value::getConversion);
+        q.getAndSend(value, el -> el.getPadding().getConversion(), el -> visitRightPadded(el, q));
         q.getAndSend(value, Py.FormattedString.Value::getFormat, el -> visit(el, q));
         return value;
     }
@@ -369,6 +370,29 @@ public class PythonSender extends PythonVisitor<RpcSendQueue> {
                 return delegate.visit(tree, p);
             }
             return super.visit(tree, p);
+        }
+
+        @Override
+        public void visitSpace(Space space, RpcSendQueue q) {
+            q.getAndSendList(space, Space::getComments, c -> text(c) + c.getSuffix(), c -> {
+                q.getAndSend(c, Comment::isMultiline);
+                q.getAndSend(c, PythonSenderDelegate::text);
+                q.getAndSend(c, Comment::getSuffix);
+                q.getAndSend(c, mk -> asRef(mk.getMarkers()));
+                if (c instanceof PyComment) {
+                    q.getAndSend((PyComment) c, PyComment::isAlignedToIndent);
+                }
+            });
+            q.getAndSend(space, Space::getWhitespace);
+        }
+
+        private static String text(Comment comment) {
+            if (comment instanceof PyComment) {
+                return ((PyComment) comment).getText();
+            } else if (comment instanceof TextComment) {
+                return ((TextComment) comment).getText();
+            }
+            throw new IllegalArgumentException("Unexpected comment type " + comment.getClass().getName());
         }
     }
 }

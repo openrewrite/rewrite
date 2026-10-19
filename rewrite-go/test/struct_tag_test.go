@@ -210,6 +210,20 @@ func TestStructTag_RawWithoutKeyValuePairsRoundtrip(t *testing.T) {
 	}
 }
 
+// An interpreted string may spell a character with an escape that quoting
+// its content anew would not choose.
+func TestStructTag_InterpretedStringKeepsItsEscapes(t *testing.T) {
+	src := "package main\n\ntype X struct {\n\tField int \"json:\\\"\\u00e9\\x41\\\"\"\n}\n"
+	cu, err := parser.NewGoParser().Parse("test.go", src)
+	require.NoError(t, err)
+	assert.Equal(t, src, printer.Print(cu))
+
+	// once the tag says something else, it is quoted anew
+	vd := parseStructAndFindField(t, src, "Field")
+	vd.LeadingAnnotations[0].AnnotationType.(*java.Identifier).Name = "yaml"
+	assert.Equal(t, " \"yaml:\\\"éA\\\"\"", printer.Print(vd)[len("\n\tField int"):])
+}
+
 func TestStructTag_InterpretedStringWithControlEscapeRoundtrip(t *testing.T) {
 	src := "package main\n\ntype X struct {\n\tField int \"\\tx:\\\"y\\\"\"\n}\n"
 	cu, err := parser.NewGoParser().Parse("test.go", src)

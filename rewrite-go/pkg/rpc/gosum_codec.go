@@ -132,9 +132,6 @@ func recvGoSumLine(baseline any, q *ReceiveQueue) any {
 }
 
 func goSumLineSlice(s []java.RightPadded[*golang.GoSumLine]) []any {
-	if s == nil {
-		return nil
-	}
 	out := make([]any, len(s))
 	for i, v := range s {
 		out[i] = v

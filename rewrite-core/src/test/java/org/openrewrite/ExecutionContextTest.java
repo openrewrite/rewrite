@@ -17,8 +17,8 @@ package org.openrewrite;
 
 import org.junit.jupiter.api.Test;
 import org.openrewrite.scheduling.WatchableExecutionContext;
+import org.openrewrite.test.RecipeQualityValidation;
 import org.openrewrite.test.RewriteTest;
-import org.openrewrite.test.TypeValidation;
 import org.openrewrite.text.PlainText;
 import org.openrewrite.text.PlainTextVisitor;
 
@@ -45,7 +45,7 @@ class ExecutionContextTest implements RewriteTest {
                   return text;
               }
           }).withCausesAnotherCycle(true))
-            .typeValidationOptions(TypeValidation.all().immutableExecutionContext(false)),
+            .recipeQualityValidation(RecipeQualityValidation.builder().executionContextUnchanged(false).build()),
           text("hello world")
         );
         assertThat(cycles.get()).isEqualTo(2);
@@ -59,7 +59,7 @@ class ExecutionContextTest implements RewriteTest {
 
         assertThatThrownBy(() -> ctx.computeMessageIfAbsent("test", k -> "value"))
           .isInstanceOf(AssertionError.class)
-          .hasMessageContaining("Recipe mutated execution context key \"test\"");
+          .hasMessageContaining("put \"test\" on the ExecutionContext");
         assertThat(ctx.<String>getMessage("test")).isNull();
     }
 
@@ -81,7 +81,7 @@ class ExecutionContextTest implements RewriteTest {
 
         assertThatThrownBy(() -> ctx.getMessages().computeIfAbsent("test", k -> "value"))
           .isInstanceOf(AssertionError.class)
-          .hasMessageContaining("Recipe mutated execution context key \"test\"");
+          .hasMessageContaining("put \"test\" on the ExecutionContext");
         assertThat(ctx.<String>getMessage("test")).isNull();
     }
 }

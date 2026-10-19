@@ -64,7 +64,7 @@ func (w *walker) PreVisit(t java.Tree, p any) java.Tree {
 }
 
 // CollectSearchResultIDs walks t and returns the IDs of every SearchResult
-// and SearchResultMarker found on any node's Markers. The returned slice
+// found on any node's Markers. The returned slice
 // has stable first-seen order; duplicates are dropped.
 //
 // It rides the VisitMarker dispatch seam, matching the JS and C# batch-visit
@@ -92,10 +92,6 @@ func (c *searchCollector) VisitMarker(marker java.Marker, p any) java.Marker {
 	case java.SearchResult:
 		id = x.Ident
 	case *java.SearchResult:
-		id = x.Ident
-	case java.SearchResultMarker:
-		id = x.Ident
-	case *java.SearchResultMarker:
 		id = x.Ident
 	default:
 		return marker

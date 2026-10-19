@@ -687,6 +687,116 @@ class UpgradeDependencyVersionTest implements RewriteTest {
         );
     }
 
+    @ParameterizedTest
+    @ValueSource(strings = {"${project.parent.version}", "${current.version}"})
+    void doNotDowngradePluginDependencyWithNestedVersionProperty(String currentVersion) {
+        rewriteRun(
+          spec -> spec.recipe(new UpgradeDependencyVersion("org.openrewrite.recipe", "rewrite-spring", "5.0.5", null, null, null)),
+          pomXml(
+            """
+              <project>
+                  <groupId>com.mycompany</groupId>
+                  <artifactId>parent</artifactId>
+                  <version>5.0.6</version>
+              </project>
+              """,
+            SourceSpec::skip
+          ),
+          mavenProject("child",
+            pomXml(
+              """
+                <project>
+                    <parent>
+                        <groupId>com.mycompany</groupId>
+                        <artifactId>parent</artifactId>
+                        <version>5.0.6</version>
+                    </parent>
+                    <artifactId>child</artifactId>
+                    <properties>
+                        <current.version>5.0.6</current.version>
+                        <dependency.version>%s</dependency.version>
+                    </properties>
+                    <build>
+                        <plugins>
+                            <plugin>
+                                <groupId>org.openrewrite.maven</groupId>
+                                <artifactId>rewrite-maven-plugin</artifactId>
+                                <version>5.4.1</version>
+                                <dependencies>
+                                    <dependency>
+                                        <groupId>org.openrewrite.recipe</groupId>
+                                        <artifactId>rewrite-spring</artifactId>
+                                        <version>${dependency.version}</version>
+                                    </dependency>
+                                </dependencies>
+                            </plugin>
+                        </plugins>
+                    </build>
+                </project>
+                """.formatted(currentVersion)
+            )
+          )
+        );
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"${project.parent.version}", "${current.version}"})
+    void upgradePluginDependencyWithNestedVersionProperty(String currentVersion) {
+        rewriteRun(
+          spec -> spec.recipe(new UpgradeDependencyVersion("org.openrewrite.recipe", "rewrite-spring", "5.0.6", null, null, null)),
+          pomXml(
+            """
+              <project>
+                  <groupId>com.mycompany</groupId>
+                  <artifactId>parent</artifactId>
+                  <version>5.0.5</version>
+              </project>
+              """,
+            SourceSpec::skip
+          ),
+          mavenProject("child",
+            pomXml(
+              """
+                <project>
+                    <parent>
+                        <groupId>com.mycompany</groupId>
+                        <artifactId>parent</artifactId>
+                        <version>5.0.5</version>
+                    </parent>
+                    <artifactId>child</artifactId>
+                    <properties>
+                        <current.version>5.0.5</current.version>
+                        <dependency.version>%s</dependency.version>
+                    </properties>
+                    <build>
+                        <plugins>
+                            <plugin>
+                                <groupId>org.openrewrite.maven</groupId>
+                                <artifactId>rewrite-maven-plugin</artifactId>
+                                <version>5.4.1</version>
+                                <dependencies>
+                                    <dependency>
+                                        <groupId>org.openrewrite.recipe</groupId>
+                                        <artifactId>rewrite-spring</artifactId>
+                                        <version>${dependency.version}</version>
+                                    </dependency>
+                                </dependencies>
+                            </plugin>
+                        </plugins>
+                    </build>
+                </project>
+                """.formatted(currentVersion),
+              spec -> spec.after(actual -> {
+                  assertThat(actual).contains("<version>5.0.5</version>")
+                    .contains("<current.version>5.0.5</current.version>")
+                    .contains("<dependency.version>5.0.6</dependency.version>");
+                  return actual;
+              })
+            )
+          )
+        );
+    }
+
     @Test
     void upgradePluginDependencies() {
         rewriteRun(
@@ -1977,7 +2087,9 @@ class UpgradeDependencyVersionTest implements RewriteTest {
     @Test
     void deriveFromNexus() {
         rewriteRun(
-          spec -> spec.recipe(new UpgradeDependencyVersion("*", "*", "latest.patch", null, null, null)),
+          spec -> spec.recipe(new UpgradeDependencyVersion("*", "*", "latest.patch", null, null, null))
+            .executionContext(centralWithDirectoryListings())
+            .recipeExecutionContext(centralWithDirectoryListings()),
           pomXml(
             """
               <project>
@@ -2002,7 +2114,9 @@ class UpgradeDependencyVersionTest implements RewriteTest {
     @Test
     void deriveFromNexusUpgrade() {
         rewriteRun(
-          spec -> spec.recipe(new UpgradeDependencyVersion("*", "*", "latest.patch", null, null, null)),
+          spec -> spec.recipe(new UpgradeDependencyVersion("*", "*", "latest.patch", null, null, null))
+            .executionContext(centralWithDirectoryListings())
+            .recipeExecutionContext(centralWithDirectoryListings()),
           pomXml(
             """
               <project>
@@ -2067,7 +2181,9 @@ class UpgradeDependencyVersionTest implements RewriteTest {
     @Test
     void badManagedVersion() {
         rewriteRun(
-          spec -> spec.recipe(new UpgradeDependencyVersion("*", "*", "latest.patch", null, null, null)),
+          spec -> spec.recipe(new UpgradeDependencyVersion("*", "*", "latest.patch", null, null, null))
+            .executionContext(centralWithDirectoryListings())
+            .recipeExecutionContext(centralWithDirectoryListings()),
           pomXml(
             """
               <project>
@@ -2087,6 +2203,19 @@ class UpgradeDependencyVersionTest implements RewriteTest {
               """
           )
         );
+    }
+
+    /**
+     * Some old artifacts have no maven-metadata.xml on Maven Central, only its HTML directory listing.
+     * Pinning Central keeps a ~/.m2/settings.xml mirror, which may serve no listings, out of resolution.
+     */
+    private static MavenExecutionContextView centralWithDirectoryListings() {
+        return MavenExecutionContextView.view(new InMemoryExecutionContext())
+          .setRepositories(singletonList(MavenRepository.builder()
+            .id("central")
+            .uri("https://repo.maven.apache.org/maven2")
+            .knownToExist(true)
+            .build()));
     }
 
     @Test
