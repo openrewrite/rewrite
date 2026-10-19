@@ -1009,6 +1009,21 @@ class TypeTableTest implements RewriteTest {
             assertThat(table.load("netty-transport")).hasFileName("netty-transport-4.2.19.Final.jar");
         }
 
+        @Test
+        void searchesEachTypeTableForArtifactFoundOnlyByPrefixInAnother() throws Exception {
+            writeNettyTypeTable(true);
+            Path epollOnlyTsv = tempDir.resolve("epoll-only.tsv.gz");
+            Path epoll = createJarFromClasses("epoll-only.jar", tempDir.resolve("io/netty/channel/epoll/Epoll.class"));
+            try (TypeTable.Writer writer = TypeTable.newWriter(Files.newOutputStream(epollOnlyTsv))) {
+                writer.jar("io.netty", "netty-transport-classes-epoll", "4.2.19.Final").write(epoll);
+            }
+
+            new TypeTable(ctx, epollOnlyTsv.toUri().toURL(), List.of("netty-transport"));
+            TypeTable table = new TypeTable(ctx, tsv.toUri().toURL(), List.of("netty-transport"));
+
+            assertThat(table.load("netty-transport")).hasFileName("netty-transport-4.2.19.Final.jar");
+        }
+
         private void writeNettyTypeTable(boolean longerArtifactFirst) throws Exception {
             Path[] classFiles = compileToClassFiles(
               //language=java
@@ -1040,9 +1055,9 @@ class TypeTableTest implements RewriteTest {
         Field jarByArtifact = TypeTable.class.getDeclaredField("jarByArtifact");
         jarByArtifact.setAccessible(true);
         ((Map<?, ?>) jarByArtifact.get(null)).clear();
-        Field searchedArtifactNames = TypeTable.class.getDeclaredField("searchedArtifactNames");
+        Field searchedArtifactNames = TypeTable.class.getDeclaredField("searchedArtifactNamesByTypeTable");
         searchedArtifactNames.setAccessible(true);
-        ((Set<?>) searchedArtifactNames.get(null)).clear();
+        ((Map<?, ?>) searchedArtifactNames.get(null)).clear();
     }
 
     // Helper methods for integration tests

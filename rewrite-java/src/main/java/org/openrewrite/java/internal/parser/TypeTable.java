@@ -103,7 +103,7 @@ public class TypeTable implements JavaParserClasspathLoader {
 
     private static final Map<GroupArtifactVersion, CompletableFuture<Path>> jarByArtifact = new ConcurrentHashMap<>();
 
-    private static final Set<String> searchedArtifactNames = ConcurrentHashMap.newKeySet();
+    private static final Map<String, Set<String>> searchedArtifactNamesByTypeTable = new ConcurrentHashMap<>();
 
     public static @Nullable TypeTable fromClasspath(ExecutionContext ctx, Collection<String> artifactNames) {
         try {
@@ -139,17 +139,18 @@ public class TypeTable implements JavaParserClasspathLoader {
         while (resources.hasMoreElements()) {
             read(resources.nextElement(), artifactNames, ctx);
         }
-        searchedArtifactNames.addAll(artifactNames);
     }
 
     private static void read(URL url, Collection<String> artifactNames, ExecutionContext ctx) {
-        Collection<String> missingArtifacts = artifactsNotYetWritten(artifactNames);
+        Set<String> searchedArtifactNames = searchedArtifactNamesByTypeTable
+                .computeIfAbsent(url.toString(), typeTable -> ConcurrentHashMap.newKeySet());
+        Collection<String> missingArtifacts = artifactsNotYetWritten(artifactNames, searchedArtifactNames);
         if (missingArtifacts.isEmpty()) {
             // all artifacts have already been extracted
             return;
         }
 
-        Reader.Options options = Reader.Options.builder().artifactPrefixes(artifactNames).build();
+        Reader.Options options = Reader.Options.builder().artifactPrefixes(missingArtifacts).build();
         try (InputStream is = url.openStream(); InputStream inflate = new GZIPInputStream(is)) {
             new Reader(ctx).read(inflate, options);
         } catch (ZipException e) {
@@ -162,12 +163,14 @@ public class TypeTable implements JavaParserClasspathLoader {
         } catch (IOException e) {
             throw new UncheckedIOException(e);
         }
+        searchedArtifactNames.addAll(missingArtifacts);
     }
 
     /// A jar whose artifactId merely starts with the requested name (`netty-transport-classes-epoll` for
-    /// `netty-transport`) does not count as written until the type tables have been searched for that name once,
+    /// `netty-transport`) does not count as written until this type table has been searched for that name once,
     /// so that the artifact the name actually refers to still gets extracted.
-    private static Collection<String> artifactsNotYetWritten(Collection<String> artifactNames) {
+    private static Collection<String> artifactsNotYetWritten(Collection<String> artifactNames,
+                                                             Set<String> searchedArtifactNames) {
         Collection<String> notWritten = new ArrayList<>(artifactNames.size());
         for (String artifactName : artifactNames) {
             boolean coveredOnly = !searchedArtifactNames.contains(artifactName);
