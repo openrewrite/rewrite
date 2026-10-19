@@ -1806,6 +1806,22 @@ class RewriteTestTest implements RewriteTest {
         }
 
         @Test
+        void reparseConvertedSourceWithItsNewLanguage() {
+            rewriteRun(
+              spec -> spec.recipe(new YamlToJava()),
+              yaml(
+                "deprecated: true",
+                """
+                  @Deprecated
+                  class A {
+                  }
+                  """,
+                spec -> spec.path("a.yaml")
+              )
+            );
+        }
+
+        @Test
         void optOut() {
             rewriteRun(
               spec -> spec.recipe(new ReturnNullByHand(null))
@@ -2295,6 +2311,33 @@ class RepeatFirstEntry extends Recipe {
                     return m;
                 }
                 return m.withEntries(ListUtils.concat(m.getEntries(), m.getEntries().getFirst().copyPaste().withPrefix("\n")));
+            }
+        };
+    }
+}
+
+@EqualsAndHashCode(callSuper = false)
+@Value
+class YamlToJava extends Recipe {
+
+    String displayName = "Replace YAML with Java";
+
+    String description = "Replaces a YAML document with a Java source that keeps its id, as converters do.";
+
+    @Override
+    public TreeVisitor<?, ExecutionContext> getVisitor() {
+        return new TreeVisitor<Tree, ExecutionContext>() {
+            @Override
+            public @Nullable Tree visit(@Nullable Tree tree, ExecutionContext ctx) {
+                if (!(tree instanceof Yaml.Documents yaml)) {
+                    return tree;
+                }
+                return JavaParser.fromJavaVersion().build().parse(ctx, "@Deprecated\nclass A {\n}")
+                  .findFirst()
+                  .<Tree>map(java -> java
+                    .withSourcePath(yaml.getSourcePath().resolveSibling("A.java"))
+                    .withId(yaml.getId()))
+                  .orElse(yaml);
             }
         };
     }

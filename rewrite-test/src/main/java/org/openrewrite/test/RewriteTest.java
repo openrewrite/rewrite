@@ -846,7 +846,9 @@ class RewriteTestUtils {
 
     /**
      * The parsers that might parse a source the recipe returned, the one that parsed it or that its source spec
-     * names first.
+     * names first, unless the recipe turned the source into a kind that parser doesn't make. A parser can make more
+     * kinds than its builder declares, as Gradle's makes Kotlin sources of .gradle.kts files, so the kind of source
+     * it made before the recipe ran counts too.
      */
     static List<Parser.Builder> parsersFor(SourceFile after,
                                            Map<SourceFile, SourceSpec<?>> specBySourceFile,
@@ -855,13 +857,18 @@ class RewriteTestUtils {
                                            List<Parser.Builder> specParsers) {
         Set<Parser.Builder> parsers = new LinkedHashSet<>();
         for (Map.Entry<SourceFile, SourceSpec<?>> entry : specBySourceFile.entrySet()) {
-            if (entry.getKey().getId().equals(after.getId())) {
-                parsers.add(parserBySourceSpec.get(entry.getValue()));
+            Parser.Builder parser = parserBySourceSpec.get(entry.getValue());
+            if (entry.getKey().getId().equals(after.getId()) && parser != null &&
+                (entry.getKey().getClass() == after.getClass() || parser.getSourceFileType().isInstance(after))) {
+                parsers.add(parser);
             }
         }
         for (SourceSpec<?> sourceSpec : sourceSpecs) {
-            if (sourceSpec.before == null && after.getSourcePath().equals(sourceSpec.getSourcePath())) {
-                parsers.add(parserBySourceSpec.get(sourceSpec));
+            Parser.Builder parser = parserBySourceSpec.get(sourceSpec);
+            if (sourceSpec.before == null && after.getSourcePath().equals(sourceSpec.getSourcePath()) &&
+                parser != null &&
+                (sourceSpec.sourceFileType.isInstance(after) || parser.getSourceFileType().isInstance(after))) {
+                parsers.add(parser);
             }
         }
         // The recipe may have turned the source into another language, as when converting Java to Kotlin
