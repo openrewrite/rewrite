@@ -229,8 +229,13 @@ class RecipeSpec:
 
         # Build result map: source_file.id -> after_source_file
         result_map: Dict[Any, Optional[SourceFile]] = {}
+        generated: List[SourceFile] = []
         for result in results:
-            if result._before is not None:
+            if result._before is None:
+                # A file the recipe created, which no spec's `before` can be keyed by.
+                if result._after is not None:
+                    generated.append(result._after)
+            else:
                 # Check if there was a change
                 if result._after is not None and result._after is not result._before:
                     result_map[result._before.id] = result._after
@@ -239,6 +244,7 @@ class RecipeSpec:
 
         # Validate results match expected after states
         self._expect_results_to_match_after(source_specs, all_parsed, result_map, ty_status)
+        self._expect_generated(source_specs, generated)
 
     def _group_by_kind(self, specs: List[SourceSpec]) -> Dict[str, List[SourceSpec]]:
         """Group source specs by their kind."""
@@ -421,7 +427,8 @@ class RecipeSpec:
 
         for spec in specs:
             if spec.before is None:
-                # Generated file case - not implemented yet
+                # A generated file, which `_expect_generated` checks: there is no parsed
+                # source file here to key a result by.
                 continue
 
             source_file = parsed_map.get(id(spec))
@@ -472,6 +479,67 @@ class RecipeSpec:
                 final_sf = after_sf if after_sf is not None else source_file
                 spec.after_recipe(final_sf)
 
+    def _match_generated(
+        self, spec: SourceSpec, unclaimed: List[SourceFile],
+    ) -> Optional[SourceFile]:
+        """The generated file `spec` describes, or None when the recipe produced no match.
+
+        Matched on the source path when the spec gives one, and otherwise on contents, which
+        is what the Java test framework does and is the only thing left to match on.
+        """
+        if spec.path is not None:
+            for source_file in unclaimed:
+                if Path(str(source_file.source_path)) == Path(spec.path):
+                    return source_file
+            return None
+        for source_file in unclaimed:
+            actual = source_file.print_all()
+            if actual == self._resolve_after(spec.after, actual):
+                return source_file
+        return None
+
+    def _expect_generated(
+        self,
+        specs: Tuple[SourceSpec, ...],
+        generated: List[SourceFile],
+    ) -> None:
+        """Check the files the recipe created against the specs that have no `before`."""
+        unclaimed = list(generated)
+        for spec in specs:
+            if spec.before is not None:
+                continue
+            if spec.after is None:
+                raise AssertionError(
+                    "A source spec with neither a `before` nor an `after` describes nothing. "
+                    "Pass the expected contents as `after`, and a `path` when the recipe "
+                    "chooses where the file lands."
+                )
+
+            match = self._match_generated(spec, unclaimed)
+            if match is None:
+                raise AssertionError(
+                    "Expected the recipe to generate a source file%s, and it generated:\n%s"
+                    % ("" if spec.path is None else f" at {spec.path}",
+                       _source_paths(generated))
+                )
+            unclaimed.remove(match)
+            assert_well_formed(match)
+
+            actual = match.print_all()
+            expected = self._resolve_after(spec.after, actual)
+            assert actual == expected, (
+                f"Generated {match.source_path} does not match expected.\n"
+                f"Expected:\n{repr(expected)}\n\nActual:\n{repr(actual)}"
+            )
+            if spec.after_recipe:
+                spec.after_recipe(match)
+
+        if unclaimed:
+            raise AssertionError(
+                "The recipe generated source files the test did not expect:\n%s"
+                % _source_paths(unclaimed)
+            )
+
     def _resolve_after(self, after: AfterRecipeText, actual: str) -> str:
         """Resolve the expected after value."""
         if callable(after):
@@ -480,6 +548,12 @@ class RecipeSpec:
                 return actual  # Callable returned None = actual is acceptable
             return result
         return dedent(after) if after else actual
+
+
+def _source_paths(source_files: List[SourceFile]) -> str:
+    if not source_files:
+        return "    (nothing)"
+    return "\n".join(f"    {source_file.source_path}" for source_file in source_files)
 
 
 class _CompositeRecipe(Recipe):

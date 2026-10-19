@@ -15,12 +15,12 @@
 """Tests for the Python test harness."""
 
 from pathlib import Path
-from typing import Callable, Optional
+from typing import Callable, List, Optional, Set
 from uuid import UUID, uuid4
 
 import pytest
 
-from rewrite import ExecutionContext, Recipe, TreeVisitor, random_id
+from rewrite import ExecutionContext, Recipe, ScanningRecipe, SourceFile, TreeVisitor, random_id
 from rewrite.execution import Result
 from rewrite.markers import Marker, Markers, SearchResult
 from rewrite.test import RecipeSpec, python, pyproject, uv, from_visitor, dedent
@@ -678,3 +678,98 @@ class TestAddedMarkers:
         spec = RecipeSpec(recipe=_marking_calls(lambda: Visited(random_id()), rename="bar"),
                           check_reporting_markers_only=False, type_attribution=False)
         spec.rewrite_run(python("foo()\n", "bar()\n"))
+
+
+class TestGeneratedSources:
+    """A source spec with no `before` describes a file the recipe creates."""
+
+    COMPAT = 'def helper():\n    return None\n'
+
+    @staticmethod
+    def _recipe(file_name="pkg/_helper.py", contents=None):
+        contents = contents if contents is not None else TestGeneratedSources.COMPAT
+
+        class Generates(ScanningRecipe[Set[str]]):
+            @property
+            def name(self) -> str:
+                return "org.openrewrite.test.Generates"
+
+            @property
+            def display_name(self) -> str:
+                return "Generate a module"
+
+            @property
+            def description(self) -> str:
+                return "Generate a module."
+
+            def initial_value(self, ctx: ExecutionContext) -> Set[str]:
+                return set()
+
+            def scanner(self, acc: Set[str]) -> TreeVisitor:
+                class Scan(PythonVisitor[ExecutionContext]):
+                    def visit_compilation_unit(self, cu: CompilationUnit, ctx) -> J:
+                        acc.add(str(cu.source_path))
+                        return cu
+
+                return Scan()
+
+            def generate(self, acc: Set[str], ctx: ExecutionContext) -> List[SourceFile]:
+                if not acc:
+                    return []
+                import ast
+
+                from rewrite.python._parser_visitor import ParserVisitor
+
+                cu = ParserVisitor(contents, None, None).visit_Module(ast.parse(contents))
+                return [cu.replace(_source_path=Path(file_name))]
+
+        return Generates()
+
+    def test_matched_on_its_source_path(self):
+        RecipeSpec(recipe=self._recipe()).rewrite_run(
+            python("import os", path=Path("pkg/client.py")),
+            python(None, self.COMPAT, path=Path("pkg/_helper.py")),
+        )
+
+    def test_matched_on_its_contents_when_the_spec_gives_no_path(self):
+        RecipeSpec(recipe=self._recipe()).rewrite_run(
+            python("import os", path=Path("pkg/client.py")),
+            python(None, self.COMPAT),
+        )
+
+    def test_the_after_recipe_hook_sees_it(self):
+        seen = []
+        RecipeSpec(recipe=self._recipe()).rewrite_run(
+            python("import os", path=Path("pkg/client.py")),
+            python(None, self.COMPAT, path=Path("pkg/_helper.py"),
+                   after_recipe=lambda sf: seen.append(str(sf.source_path))),
+        )
+        assert seen == ["pkg/_helper.py"]
+
+    def test_contents_that_do_not_match(self):
+        with pytest.raises(AssertionError, match="does not match expected"):
+            RecipeSpec(recipe=self._recipe()).rewrite_run(
+                python("import os", path=Path("pkg/client.py")),
+                python(None, "def other():\n    pass\n", path=Path("pkg/_helper.py")),
+            )
+
+    def test_a_path_nothing_was_generated_at(self):
+        with pytest.raises(AssertionError,
+                           match="Expected the recipe to generate a source file"):
+            RecipeSpec(recipe=self._recipe()).rewrite_run(
+                python("import os", path=Path("pkg/client.py")),
+                python(None, self.COMPAT, path=Path("elsewhere/_helper.py")),
+            )
+
+    def test_a_generated_file_no_spec_describes(self):
+        with pytest.raises(AssertionError, match="did not expect"):
+            RecipeSpec(recipe=self._recipe()).rewrite_run(
+                python("import os", path=Path("pkg/client.py")),
+            )
+
+    def test_a_spec_with_neither_before_nor_after(self):
+        with pytest.raises(AssertionError, match="describes nothing"):
+            RecipeSpec(recipe=self._recipe()).rewrite_run(
+                python("import os", path=Path("pkg/client.py")),
+                python(None, None, path=Path("pkg/_helper.py")),
+            )
