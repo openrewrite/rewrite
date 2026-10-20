@@ -306,15 +306,15 @@ public class AddContent extends Recipe {
             if (added instanceof Hcl.Attribute) {
                 String name = ((Hcl.Attribute) added).getSimpleName();
                 if (sibling instanceof Hcl.Attribute && name.equals(((Hcl.Attribute) sibling).getSimpleName()) ||
-                    sibling instanceof Hcl.Block && name.equals(typeName((Hcl.Block) sibling))) {
+                    sibling instanceof Hcl.Block && name.equals(((Hcl.Block) sibling).getSimpleName())) {
                     return true;
                 }
             } else if (added instanceof Hcl.Block) {
                 Hcl.Block block = (Hcl.Block) added;
-                String type = typeName(block);
+                String type = block.getSimpleName();
                 if (sibling instanceof Hcl.Attribute && block.getLabels().isEmpty() &&
                     Objects.equals(type, ((Hcl.Attribute) sibling).getSimpleName()) ||
-                    sibling instanceof Hcl.Block && Objects.equals(type, typeName((Hcl.Block) sibling)) &&
+                    sibling instanceof Hcl.Block && Objects.equals(type, ((Hcl.Block) sibling).getSimpleName()) &&
                     labelNames(block).equals(labelNames((Hcl.Block) sibling))) {
                     return true;
                 }
@@ -323,14 +323,10 @@ public class AddContent extends Recipe {
         return false;
     }
 
-    private static @Nullable String typeName(Hcl.Block block) {
-        return block.getType() == null ? null : block.getType().getName();
-    }
-
-    private static List<@Nullable String> labelNames(Hcl.Block block) {
-        List<@Nullable String> names = new ArrayList<>();
+    private static List<String> labelNames(Hcl.Block block) {
+        List<String> names = new ArrayList<>();
         for (Label label : block.getLabels()) {
-            names.add(JsonPathMatcher.labelName(label));
+            names.add(label.getSimpleName());
         }
         return names;
     }
