@@ -163,6 +163,50 @@ class ChangeValueTest implements RewriteTest {
     }
 
     @Test
+    void changeValueInBlocksSelectedByFilter() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeValue("$.resource.aws_db_instance[?(@.engine == 'mysql')].engine_version", "\"8.0\"", null, null)),
+          hcl(
+            """
+              resource "aws_db_instance" "primary" {
+                engine         = "mysql"
+                engine_version = "5.7"
+              }
+              resource "aws_db_instance" "analytics" {
+                engine         = "postgres"
+                engine_version = "13"
+              }
+              """,
+            """
+              resource "aws_db_instance" "primary" {
+                engine         = "mysql"
+                engine_version = "8.0"
+              }
+              resource "aws_db_instance" "analytics" {
+                engine         = "postgres"
+                engine_version = "13"
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void changeTopLevelAttributeByRootPath() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeValue("$.region", "\"eu-west-1\"", null, null)),
+          hcl(
+            """
+              region = "us-east-1"
+              """,
+            """
+              region = "eu-west-1"
+              """
+          )
+        );
+    }
+
+    @Test
     void changeTopLevelAttribute() {
         rewriteRun(
           spec -> spec.recipe(new ChangeValue("$..region", "\"eu-west-1\"", null, null)),
