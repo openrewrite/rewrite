@@ -258,12 +258,16 @@ public final class UvLockReader {
         int[] p = {0};
         Object value = parseValue(text, p);
         skipWhitespace(text, p);
+        boolean sentinel = "exclude-newer".equals(key) && UvLockOptions.RELATIVE_EXCLUDE_NEWER_TIMESTAMP.equals(value);
         if (p[0] != text.length()) {
             String trailing = text.substring(p[0]);
-            if ("exclude-newer".equals(key) && UvLockOptions.RELATIVE_EXCLUDE_NEWER_COMMENT.equals(trailing)) {
+            if (sentinel && UvLockOptions.RELATIVE_EXCLUDE_NEWER_COMMENT.equals(trailing)) {
                 return value;
             }
             throw new UvLockFormatException("Trailing content after value for key " + key + ": " + trailing);
+        }
+        if (sentinel) {
+            throw new UvLockFormatException("The relative exclude-newer sentinel is missing uv's trailing comment");
         }
         return value;
     }

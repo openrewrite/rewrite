@@ -52,6 +52,13 @@ dependency-group bound on a cascade target; `off18-removed-extra-unbinds-cascade
 activating declaration the same edit removes; `off17-python-upper-bound-marker` an edge marker that
 bounds Python from above and does not fork. `off14-upgrade-drops-extra` and
 `off15-python-lower-bound-marker` are fail-loud scenarios and carry no `uv.lock.after` (BEHAVIOR.md §10).
+`off19`–`off22` (uv 0.13.4, 2026-10-21, `revision = 5`) were built the same way and pin how
+`[package.optional-dependencies]` groups follow activated extras (BEHAVIOR.md §8):
+`off19-extra-group-lockstep-upgrade` an upgrade through an activated extra whose group depends back on
+the package, `off20-transitive-add-with-extras` a transitive requirement with extras,
+`off21-upgrade-activates-extra` an upgrade that activates an extra on an already-locked package, and
+`off22-or-extras-marker` an extra disjunction the engine refuses (its `uv.lock.after` is real uv's
+output, kept for the record).
 
 `off16-tool-uv-dev-dependencies` (pypi.org) declares its dev group through the legacy `[tool.uv]
 dev-dependencies` list; uv's lock is byte-identical to the same list under `[dependency-groups]`.

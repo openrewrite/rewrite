@@ -1,0 +1,47 @@
+version = 1
+revision = 5
+requires-python = ">=3.10"
+
+[[package]]
+name = "alpha"
+version = "2.0"
+source = { registry = "https://index.example/simple/" }
+wheels = [
+    { url = "https://index.example/simple/alpha/alpha-2.0-py3-none-any.whl", hash = "sha256:322d4e7102205e93e4eebcf8dbf70b9366ca5c44aec9ac9b0d32daeaf1a0d190" },
+]
+
+[package.optional-dependencies]
+c = [
+    { name = "alphac" },
+    { name = "alphaw", marker = "sys_platform == 'win32'" },
+]
+
+[[package]]
+name = "alphac"
+version = "2.0"
+source = { registry = "https://index.example/simple/" }
+dependencies = [
+    { name = "alpha" },
+]
+wheels = [
+    { url = "https://index.example/simple/alphac/alphac-2.0-py3-none-any.whl", hash = "sha256:a97a85c2e3e6f43fb93d460fbdc023c2a429193571bb93fde6b8049eccca442a" },
+]
+
+[[package]]
+name = "alphaw"
+version = "1.0"
+source = { registry = "https://index.example/simple/" }
+wheels = [
+    { url = "https://index.example/simple/alphaw/alphaw-1.0-py3-none-any.whl", hash = "sha256:2df6a53bd8fff7d64f87bb5c3ed929a51b53694b25f27a8374511c29a283400d" },
+]
+
+[[package]]
+name = "s25-extra-group-lockstep-upgrade"
+version = "0.1.0"
+source = { virtual = "." }
+dependencies = [
+    { name = "alpha", extra = ["c"] },
+]
+
+[package.metadata]
+requires-dist = [{ name = "alpha", extras = ["c"], specifier = "==2.0" }]

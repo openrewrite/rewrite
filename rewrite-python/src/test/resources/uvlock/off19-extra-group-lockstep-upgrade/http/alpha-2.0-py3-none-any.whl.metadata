@@ -1,0 +1,7 @@
+Metadata-Version: 2.1
+Name: alpha
+Version: 2.0
+Summary: synthetic alpha
+Provides-Extra: c
+Requires-Dist: alphac==2.0; extra == "c"
+Requires-Dist: alphaw>=1; extra == "c" and sys_platform == "win32"

@@ -103,10 +103,10 @@ Every tool stamps its own release into the lock, and that stamp is the one diffe
 | Poetry 2.5.1 | `j-modern-upgrade` | identical, except the header comment names 2.5.1 |
 | PDM 2.29.3 (`--update-reuse`) | `g-upgrade` | identical, except `lock_version = "4.5.1"` |
 
-The engines handle those stamps unevenly. `UvLockReader` rejects any revision above 3 and `PdmLockReader` any
-`lock_version` other than `4.5.0`, both as `MALFORMED_LOCK`, so a lock last written by uv 0.12.22 or later or by
-PDM 2.28.1 or later is refused before any edit is attempted. `PoetryLockWriter` preserves the header and lock-version
-it read.
+The engines handled those stamps unevenly when this assessment was written: `UvLockReader` rejected any revision
+above 3 and `PdmLockReader` any `lock_version` other than `4.5.0`, both as `MALFORMED_LOCK`, so a lock last written
+by uv 0.12.22 or later or by PDM 2.28.1 or later was refused before any edit was attempted. Both readers now accept
+the current stamps (Decision 9). `PoetryLockWriter` preserves the header and lock-version it read.
 
 What the stamps encode, and the other net changes that reach lock bytes:
 
@@ -170,7 +170,10 @@ and fails loud outside it.
 **Verdict: achieved for the conflict-free subset; the residue is backtracking and fork structure.** The
 engine already resolves adds and cascades. Of the remaining gates, several are bookkeeping rather than search
 (adding a dependency with extras, a transitive pulled in with extras, a changed declared-extras list, a pinned
-index on an add) and are likely the most frequent refusals in the field. Backtracking (ADR 0010's T3) is the only
+index on an add) and are likely the most frequent refusals in the field. The two the corpus hit, rebuilding a
+package's `[package.optional-dependencies]` groups and a transitive pulled in with extras, are closed with this
+ADR: groups follow the extras live edges activate, and an extra-gated requirement outside a single-clause
+`extra ==` and-chain fails loud by name. Backtracking (ADR 0010's T3) is the only
 gate that needs a search algorithm, and building it means porting PubGrub's conflict resolution plus uv's conflict
 re-prioritization (`resolver/mod.rs:3087-3143`), since which package yields in a conflict is decided there.
 
@@ -282,9 +285,10 @@ decision should be taken explicitly rather than left to the deferral.
    spans several Rust crates including a marker decision-diagram library, Poetry's and PDM's would each need their
    marker libraries ported for marker strings alone, and pipenv's output is a function of a virtualenv. The greedy
    subset gives the same byte-exactness on the edits it accepts and a named refusal on the rest.
-2. **Order: Poetry, then PDM, then uv gate closures. pipenv stays fail-loud.** The verdicts above carry the
-   reasons. uv's remaining gates are closed individually as the corpus run ranks them; a backtracking T3 is decided
-   only on that data.
+2. **Order: the readers (item 9), then uv's optional-dependencies bookkeeping, then Poetry, then PDM. pipenv stays
+   fail-loud.** The verdicts above carry the reasons; the corpus ranked the uv bookkeeping gates first because they
+   were the only field refusals left for uv (see the uv verdict). uv's other gates are closed individually as the
+   corpus run ranks them; a backtracking T3 is decided only on that data.
 3. **Oracles are fixed per manager**, and the fixture READMEs record them: uv `uv lock`; Poetry `poetry lock` (no
    `--regenerate`); PDM `pdm lock --update-reuse`; every recording from an empty-cache home with the pinned tool
    version. A golden recorded with `poetry add`, `pdm add` or a bare `pdm lock` is not a valid expectation for the

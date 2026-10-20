@@ -221,6 +221,35 @@ class UvLockDeltaOfflineTest {
     }
 
     @Test
+    void upgradeRebuildsActivatedExtraGroupAndCascadesThroughIt() {
+        // alpha[c] 2.0 needs alphac==2.0, which needs alpha==2.0: uv moves both and rebuilds group c
+        routeLocalIndex("off19-extra-group-lockstep-upgrade");
+        assertScenario("off19-extra-group-lockstep-upgrade");
+    }
+
+    @Test
+    void transitiveAddWithExtrasBuildsOnlyItsActivatedGroups() {
+        // beta pulls in gamma[fast]: group fast and delta appear, the unactivated slow extra does not
+        routeLocalIndex("off20-transitive-add-with-extras");
+        assertScenario("off20-transitive-add-with-extras");
+        // the slow extra's closure (epsilon) is not looked up
+        assertThat(http.requests).noneMatch(url -> url.contains("epsilon"));
+    }
+
+    @Test
+    void upgradeActivatingAnExtraOnLockedPackageAddsItsGroup() {
+        // reqlike 2.0 asks for urlish[socks]: urlish keeps its version and gains the socks group
+        routeLocalIndex("off21-upgrade-activates-extra");
+        assertScenario("off21-upgrade-activates-extra");
+    }
+
+    @Test
+    void extraGatedRequirementOutsideAndChainFailsLoud() {
+        routeLocalIndex("off22-or-extras-marker");
+        assertFailsLoud("off22-or-extras-marker", "gamma");
+    }
+
+    @Test
     void upgradeRaisingPythonLowerBoundOnAnEdgeFailsLoud() {
         // uv forks at python_full_version >= '3.11' although every package resolves to one version
         routeLocalIndex("off15-python-lower-bound-marker");
