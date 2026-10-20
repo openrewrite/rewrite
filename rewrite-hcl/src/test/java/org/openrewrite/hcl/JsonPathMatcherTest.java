@@ -490,6 +490,110 @@ class JsonPathMatcherTest implements RewriteTest {
         );
     }
 
+    private static final String SECURITY_GROUPS = """
+      resource "aws_security_group" "web" {
+        dynamic "ingress" {
+          content {
+            from_port = 80
+          }
+        }
+        dynamic "egress" {
+          content {
+            from_port = 0
+          }
+        }
+      }
+      """;
+
+    @Test
+    void recursiveDescentMatchesTypeLabel() {
+        assertMatched(
+          List.of(RESOURCES),
+          List.of("engine_version = \"5.7\"", "engine_version = \"8.0\""),
+          "$..aws_db_instance.engine_version",
+          false
+        );
+    }
+
+    @Test
+    void recursiveDescentMatchesNameLabel() {
+        assertMatched(
+          List.of(RESOURCES),
+          List.of("engine_version = \"8.0\""),
+          "$..replica.engine_version",
+          false
+        );
+        assertMatched(
+          List.of(RESOURCES),
+          List.of("engine_version = \"8.0\""),
+          "$..['replica'].engine_version",
+          false
+        );
+    }
+
+    @Test
+    void recursiveDescentMatchesLabelOfNestedBlock() {
+        assertMatched(
+          List.of(SECURITY_GROUPS),
+          List.of("from_port = 80"),
+          "$..ingress.content.from_port",
+          false
+        );
+    }
+
+    @Test
+    void scopedRecursiveDescentMatchesLabel() {
+        assertMatched(
+          List.of(RESOURCES),
+          List.of("engine_version = \"8.0\""),
+          "$.resource..replica.engine_version",
+          false
+        );
+        assertMatched(
+          List.of(SECURITY_GROUPS),
+          List.of("from_port = 80"),
+          "$.resource..ingress.content.from_port",
+          false
+        );
+    }
+
+    @Test
+    void scopedRecursiveDescentEndingAtLabelMatchesBlock() {
+        assertMatched(
+          List.of(SECURITY_GROUPS),
+          List.of(
+            """
+              dynamic "ingress" {
+                content {
+                  from_port = 80
+                }
+              }
+              """.trim()
+          ),
+          "$.resource..ingress",
+          false
+        );
+    }
+
+    @Test
+    void recursiveDescentPrefersBodyKeyOverLabel() {
+        assertMatched(
+          List.of(
+            """
+              resource "aws_instance" "settings" {
+                settings {
+                  size = 1
+                }
+                size = 2
+              }
+              """
+          ),
+          List.of("size = 1"),
+          "$..settings.size",
+          false
+        );
+    }
+
     @Disabled("Test enables a simple way to test JsonPatchMatches on HCL.")
     @Test
     void findJsonPathMatches() {

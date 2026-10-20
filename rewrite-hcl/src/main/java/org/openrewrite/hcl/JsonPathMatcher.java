@@ -53,7 +53,8 @@ import static java.util.stream.Collectors.toList;
  *     For example, {@code $.resource.aws_db_instance.db.engine_version} selects {@code engine_version} of
  *     {@code resource "aws_db_instance" "db"}, {@code $.resource.aws_db_instance.engine_version} of every
  *     {@code aws_db_instance} resource and {@code $.resource.engine_version} of every resource. A wildcard consumes
- *     one label. Labels can't be skipped.</li>
+ *     one label. Labels can't be skipped, except by recursive descent: {@code $..db.engine_version} and
+ *     {@code $.resource..db.engine_version} match a block with a label {@code db} at any position.</li>
  *     <li>When a path segment equals both the next label of a block and a key in that block's body, the body key wins,
  *     so {@code $.variable.default} selects the {@code default} attribute even of {@code variable "default"}.</li>
  * </ul>
@@ -152,7 +153,10 @@ public class JsonPathMatcher {
         int nextLabel;
 
         @Nullable String nextLabelName() {
-            Label label = block.getLabels().get(nextLabel);
+            return labelName(block.getLabels().get(nextLabel));
+        }
+
+        static @Nullable String labelName(Label label) {
             if (label instanceof Hcl.Literal) {
                 return String.valueOf(((Hcl.Literal) label).getValue());
             } else if (label instanceof Hcl.Identifier) {
@@ -169,12 +173,19 @@ public class JsonPathMatcher {
         protected Object scope;
         private final JsonPathParser.ExpressionContext stop;
         private final boolean isRecursiveDescent;
+        private final boolean matchesAnyLabel;
 
         public JsonPathParserHclVisitor(List<Tree> cursorPath, Object scope, JsonPathParser.ExpressionContext stop, boolean isRecursiveDescent) {
+            this(cursorPath, scope, stop, isRecursiveDescent, false);
+        }
+
+        private JsonPathParserHclVisitor(List<Tree> cursorPath, Object scope, JsonPathParser.ExpressionContext stop,
+                                         boolean isRecursiveDescent, boolean matchesAnyLabel) {
             this.cursorPath = cursorPath;
             this.scope = scope;
             this.stop = stop;
             this.isRecursiveDescent = isRecursiveDescent;
+            this.matchesAnyLabel = matchesAnyLabel;
         }
 
         @Override
@@ -220,7 +231,7 @@ public class JsonPathMatcher {
             if (previous.indexOf(current) < 1 || "$".equals(previous.get(previous.indexOf(current) - 1).getText())) {
                 List<Object> results = new ArrayList<>();
                 for (Tree path : cursorPath) {
-                    JsonPathParserHclVisitor v = new JsonPathParserHclVisitor(cursorPath, path, null, false);
+                    JsonPathParserHclVisitor v = new JsonPathParserHclVisitor(cursorPath, path, null, false, true);
                     for (int i = 1; i < ctx.getChildCount(); i++) {
                         result = v.visit(ctx.getChild(i));
                         if (result != null) {
@@ -231,7 +242,7 @@ public class JsonPathMatcher {
                 return results;
                 // Otherwise, the recursive descent is scoped to the previous match. `$.foo..['find-in-foo']`.
             } else {
-                JsonPathParserHclVisitor v = new JsonPathParserHclVisitor(cursorPath, withoutLabelScopes(scope), null, true);
+                JsonPathParserHclVisitor v = new JsonPathParserHclVisitor(cursorPath, scope, null, true);
                 for (int i = 1; i < ctx.getChildCount(); i++) {
                     result = v.visit(ctx.getChild(i));
                     if (result != null) {
@@ -335,6 +346,9 @@ public class JsonPathMatcher {
                     unquoteStringLiteral(ctx.StringLiteral().getText()) : ctx.Identifier().getText();
             if (scope instanceof LabelScope) {
                 LabelScope labelScope = (LabelScope) scope;
+                if (isRecursiveDescent) {
+                    return visitBlockRecursively(labelScope.getBlock(), labelScope.getNextLabel(), false, name, ctx);
+                }
                 if (name.equals(labelScope.nextLabelName()) && !hasBodyKey(labelScope.getBlock(), name)) {
                     return descendIntoBlock(labelScope.getBlock(), labelScope.getNextLabel() + 1, ctx);
                 }
@@ -342,21 +356,16 @@ public class JsonPathMatcher {
                 return visitProperty(ctx);
             } else if (scope instanceof Hcl.Block) {
                 Hcl.Block block = (Hcl.Block) scope;
-                List<Object> matches = new ArrayList<>();
-                String key = block.getType().getName();
-
+                boolean typeMatches = block.getType().getName().equals(name);
                 if (isRecursiveDescent) {
-                    if (key.equals(name)) {
-                        matches.add(block);
-                    }
-                    scope = block.getBody();
-                    Object result = getResultFromList(visitProperty(ctx));
-                    if (result != null) {
-                        matches.add(result);
-                    }
-                    return getResultFromList(matches);
-                } else if (key.equals(name)) {
+                    return visitBlockRecursively(block, 0, typeMatches, name, ctx);
+                } else if (typeMatches) {
                     return descendIntoBlock(block, 0, ctx);
+                } else if (matchesAnyLabel) {
+                    int nextLabel = labelIndexAfter(block, 0, name);
+                    if (nextLabel > 0) {
+                        return descendIntoBlock(block, nextLabel, ctx);
+                    }
                 }
             } else if (scope instanceof Hcl.Attribute) {
                 Hcl.Attribute attribute = (Hcl.Attribute) scope;
@@ -387,11 +396,50 @@ public class JsonPathMatcher {
             return null;
         }
 
+        private @Nullable Object visitBlockRecursively(Hcl.Block block, int fromLabel, boolean typeMatches, String name,
+                                                       JsonPathParser.PropertyContext ctx) {
+            List<Object> matches = new ArrayList<>();
+            if (typeMatches) {
+                matches.add(block);
+            } else {
+                int nextLabel = labelIndexAfter(block, fromLabel, name);
+                if (nextLabel > 0) {
+                    matches.add(endsPath(ctx) ? block : labelScopeOrBody(block, nextLabel));
+                }
+            }
+            scope = block.getBody();
+            Object result = getResultFromList(visitProperty(ctx));
+            if (result != null) {
+                matches.add(result);
+            }
+            return getResultFromList(matches);
+        }
+
+        private static int labelIndexAfter(Hcl.Block block, int fromLabel, String name) {
+            List<Label> labels = block.getLabels();
+            for (int i = fromLabel; i < labels.size(); i++) {
+                if (name.equals(LabelScope.labelName(labels.get(i)))) {
+                    return hasBodyKey(block, name) ? -1 : i + 1;
+                }
+            }
+            return -1;
+        }
+
+        private boolean endsPath(ParserRuleContext ctx) {
+            JsonPathParser.ExpressionContext expression = getExpressionContext(ctx);
+            ParserRuleContext path = expression.getParent();
+            return path.getParent() == null && path.getChild(path.getChildCount() - 1) == expression;
+        }
+
+        private static Object labelScopeOrBody(Hcl.Block block, int nextLabel) {
+            return nextLabel < block.getLabels().size() ? new LabelScope(block, nextLabel) : block.getBody();
+        }
+
         private Object descendIntoBlock(Hcl.Block block, int nextLabel, ParserRuleContext ctx) {
             if (stop != null && getExpressionContext(ctx) == stop) {
                 return block;
             }
-            scope = nextLabel < block.getLabels().size() ? new LabelScope(block, nextLabel) : block.getBody();
+            scope = labelScopeOrBody(block, nextLabel);
             return scope;
         }
 
@@ -444,6 +492,10 @@ public class JsonPathMatcher {
                 return getResultFromList(matches);
             } else if (scope instanceof LabelScope) {
                 LabelScope labelScope = (LabelScope) scope;
+                if (isRecursiveDescent) {
+                    scope = labelScope.getBlock().getBody();
+                    return visitWildcard(ctx);
+                }
                 return descendIntoBlock(labelScope.getBlock(), labelScope.getNextLabel() + 1, ctx);
             } else if (scope instanceof Hcl.Block) {
                 return descendIntoBlock((Hcl.Block) scope, 0, ctx);
