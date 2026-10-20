@@ -25,7 +25,7 @@ import java.nio.file.Path;
 import java.util.*;
 
 import static java.util.Collections.emptyMap;
-import static java.util.Collections.emptySet;
+import static java.util.Objects.requireNonNull;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.fail;
 
@@ -35,9 +35,10 @@ class LargeSourceSetCheckingExpectedCycles extends InMemoryLargeSourceSet {
     private final @Nullable UnchangedTreeIdentity unchangedTreeIdentity;
     private int cyclesThatResultedInChanges = 0;
 
-    private Map<SourceFile, SourceFile> lastCycleEdits = emptyMap();
-    private Set<SourceFile> lastCycleGenerated = emptySet();
-    private Set<SourceFile> lastCycleDeleted = emptySet();
+    /**
+     * Each source file that differs from its initial state, by id, as it existed after the last cycle, or null if deleted.
+     */
+    private Map<UUID, @Nullable SourceFile> lastCycleVersions = emptyMap();
 
     LargeSourceSetCheckingExpectedCycles(int expectedCyclesThatMakeChanges, List<SourceFile> ls) {
         this(expectedCyclesThatMakeChanges, ls, null, null);
@@ -58,9 +59,7 @@ class LargeSourceSetCheckingExpectedCycles extends InMemoryLargeSourceSet {
         this.addedMarkers = from.addedMarkers;
         this.unchangedTreeIdentity = from.unchangedTreeIdentity;
         this.cyclesThatResultedInChanges = from.cyclesThatResultedInChanges;
-        this.lastCycleEdits = from.lastCycleEdits;
-        this.lastCycleGenerated = from.lastCycleGenerated;
-        this.lastCycleDeleted = from.lastCycleDeleted;
+        this.lastCycleVersions = from.lastCycleVersions;
     }
 
     @Nullable
@@ -90,62 +89,33 @@ class LargeSourceSetCheckingExpectedCycles extends InMemoryLargeSourceSet {
     @Override
     public void afterCycle(boolean lastCycle) {
         boolean detectedChangeInThisCycle = false;
-        Map<SourceFile, SourceFile> thisCycleEdits = new HashMap<>();
-        Set<SourceFile> thisCycleGenerated = new HashSet<>();
-        Set<SourceFile> thisCycleDeleted = new HashSet<>();
+        Map<UUID, @Nullable SourceFile> thisCycleVersions = new HashMap<>();
 
         for (Result result : getChangeset().getAllResults()) {
-            SourceFile before = null; // this source file as it existed after the last cycle
             SourceFile after = result.getAfter();
-
-            if (result.getBefore() == null) {
-                // a source file generated on a prior cycle
-                before = after == null ? null : lastCycleGenerated.stream()
-                        .filter(it -> Objects.equals(it.getId(), result.getAfter().getId()))
-                        .findFirst()
-                        .orElse(null);
-            } else {
-                if (after == null && lastCycleDeleted.contains(result.getBefore())) {
-                    before = result.getBefore();
-                    after = before;
-                }
-                if (before == null) {
-                    before = lastCycleEdits.getOrDefault(result.getBefore(), result.getBefore());
-                }
+            UUID id = requireNonNull(after == null ? result.getBefore() : after).getId();
+            // a source file the last cycle left unchanged is still in its initial state
+            SourceFile before = lastCycleVersions.containsKey(id) ? lastCycleVersions.get(id) : result.getBefore();
+            thisCycleVersions.put(id, after);
+            if (before == after) {
+                continue;
             }
 
-            if (before != null && after != null) {
-                thisCycleEdits.put(before, after);
-                if (!detectedChangeInThisCycle && before != after) {
-                    detectedChangeInThisCycle = true;
-                    cyclesThatResultedInChanges++;
-                }
-                if (cyclesThatResultedInChanges > expectedCyclesThatMakeChanges) {
-                    assertThat(after.printAllTrimmed())
-                            .as(
-                                    "Expected recipe to complete in " + expectedCyclesThatMakeChanges + " cycle" + (expectedCyclesThatMakeChanges == 1 ? "" : "s") + ", " +
-                                    "but took at least one more cycle. Between the last two executed cycles there were changes to \"" + before.getSourcePath() + "\""
-                            )
-                            .isEqualTo(before.printAllTrimmed());
-                }
-            } else if (before == null && after != null) {
-                thisCycleGenerated.add(after);
-                if (!detectedChangeInThisCycle) {
-                    detectedChangeInThisCycle = true;
-                    cyclesThatResultedInChanges++;
-                }
-            } else if (before != null) {
-                thisCycleDeleted.add(before);
-                if (!detectedChangeInThisCycle) {
-                    detectedChangeInThisCycle = true;
-                    cyclesThatResultedInChanges++;
-                }
+            if (!detectedChangeInThisCycle) {
+                detectedChangeInThisCycle = true;
+                cyclesThatResultedInChanges++;
+            }
+            if (before != null && after != null && cyclesThatResultedInChanges > expectedCyclesThatMakeChanges) {
+                assertThat(after.printAllTrimmed())
+                        .as(
+                                "Expected recipe to complete in " + expectedCyclesThatMakeChanges + " cycle" + (expectedCyclesThatMakeChanges == 1 ? "" : "s") + ", " +
+                                "but took at least one more cycle. Between the last two executed cycles there were changes to \"" + before.getSourcePath() + "\""
+                        )
+                        .isEqualTo(before.printAllTrimmed());
             }
         }
 
-        lastCycleEdits = thisCycleEdits;
-        lastCycleGenerated = thisCycleGenerated;
-        lastCycleDeleted = thisCycleDeleted;
+        lastCycleVersions = thisCycleVersions;
         if (lastCycle) {
             if (cyclesThatResultedInChanges != expectedCyclesThatMakeChanges && addedMarkers != null) {
                 // A recipe that only adds markers changes no text, which would otherwise surface below as a
