@@ -581,14 +581,13 @@ class JavaTemplateTest implements RewriteTest {
     @Test
     void templatingWhileLoopCondition() {
         rewriteRun(
-          spec -> spec.expectedCyclesThatMakeChanges(2).recipe(toRecipe(() -> new JavaVisitor<>() {
+          spec -> spec.recipe(toRecipe(() -> new JavaVisitor<>() {
               @Override
               public J visitBinary(J.Binary binary, ExecutionContext ctx) {
                   if (binary.getLeft() instanceof J.MethodInvocation) {
                       var mi = (J.MethodInvocation) binary.getLeft();
-                      return JavaTemplate.apply("!#{any(java.util.List)}.isEmpty()", getCursor(), mi.getCoordinates().replace(), mi.getSelect());
-                  } else if (binary.getLeft() instanceof J.Unary) {
-                      return binary.getLeft();
+                      J.Binary b = JavaTemplate.apply("!#{any(java.util.List)}.isEmpty()", getCursor(), mi.getCoordinates().replace(), mi.getSelect());
+                      return b.getLeft();
                   }
                   return binary;
               }
