@@ -1532,15 +1532,7 @@ export class JavaReceiver extends JavaVisitor<RpcReceiveQueue> {
 
         const updates = {
             before: await q.receive(left.before, space => this.visitSpace(space, q)),
-            element: await q.receive(left.element, elem => {
-                if (isSpace(elem)) {
-                    return this.visitSpace(elem as J.Space, q) as any as T;
-                } else if (typeof elem === 'object' && elem.kind) {
-                    // FIXME find a better way to check if it is a `Tree`
-                    return this.visit(elem as J, q) as any as T;
-                }
-                return elem;
-            }),
+            element: await this.receivePaddedElement(left.element, q),
             markers: await q.receive(left.markers)
         };
         return updateIfChanged(left, updates) as J.LeftPadded<T>;
@@ -1552,19 +1544,27 @@ export class JavaReceiver extends JavaVisitor<RpcReceiveQueue> {
         }
 
         const updates = {
-            element: await q.receive(right.element, elem => {
-                if (isSpace(elem)) {
-                    return this.visitSpace(elem as J.Space, q) as any as T;
-                } else if (typeof elem === 'object' && elem.kind) {
-                    // FIXME find a better way to check if it is a `Tree`
-                    return this.visit(elem as J, q) as any as T;
-                }
-                return elem as any as T;
-            }),
+            element: await this.receivePaddedElement(right.element, q),
             after: await q.receive(right.after, space => this.visitSpace(space, q)),
             markers: await q.receive(right.markers)
         };
         return updateIfChanged(right, updates) as J.RightPadded<T>;
+    }
+
+    private async receivePaddedElement<T>(before: T, q: RpcReceiveQueue): Promise<T> {
+        if (before !== undefined && before !== null && typeof before !== 'object') {
+            // a scalar's new value is inlined in the message, which an onChange callback is never shown
+            return q.receive(before);
+        }
+        return q.receive(before, elem => {
+            if (isSpace(elem)) {
+                return this.visitSpace(elem as J.Space, q) as any as T;
+            } else if (typeof elem === 'object' && (elem as any).kind) {
+                // FIXME find a better way to check if it is a `Tree`
+                return this.visit(elem as J, q) as any as T;
+            }
+            return elem;
+        });
     }
 
     public override async visitContainer<T extends J>(container: J.Container<T>, q: RpcReceiveQueue): Promise<J.Container<T>> {
