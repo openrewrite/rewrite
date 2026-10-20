@@ -273,6 +273,12 @@ public class FindMissingTypes extends Recipe {
                     !(p.getClazz().getType() instanceof JavaType.Class || p.getClazz().getType() instanceof JavaType.Unknown)) {
                 p = SearchResult.found(p, "ParameterizedType#clazz is J.Identifier and the type is is not JavaType$Class.");
             }
+            JavaType.FullyQualified ownType = TypeUtils.asFullyQualified(p.getType());
+            JavaType.FullyQualified clazzType = TypeUtils.asFullyQualified(p.getClazz().getType());
+            if (ownType != null && clazzType != null &&
+                    !TypeUtils.fullyQualifiedNamesAreEqual(ownType.getFullyQualifiedName(), clazzType.getFullyQualifiedName())) {
+                p = SearchResult.found(p, "ParameterizedType#clazz type does not match the raw type of ParameterizedType#type");
+            }
             return p;
         }
 
