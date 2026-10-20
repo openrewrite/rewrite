@@ -134,6 +134,16 @@ class RewriteTestTest implements RewriteTest {
     }
 
     @Test
+    void fileGeneratedInOneCycleAndEditedInTheNext() {
+        rewriteRun(
+          spec -> spec.recipe(new GeneratesPlaceholderThenFillsIt())
+            .cycles(3)
+            .expectedCyclesThatMakeChanges(2),
+          text(null, "filled", spec -> spec.path("generated.txt"))
+        );
+    }
+
+    @Test
     void generatesFileWithInvalidPath() {
         AssertionError e = assertThrows(AssertionError.class,
           () -> rewriteRun(
@@ -2732,6 +2742,51 @@ class GeneratesExistingFile extends ScanningRecipe<AtomicBoolean> {
           .text("generated content")
           .sourcePath(Path.of("existing.txt"))
           .build());
+    }
+}
+
+@EqualsAndHashCode(callSuper = false)
+@Value
+class GeneratesPlaceholderThenFillsIt extends ScanningRecipe<AtomicBoolean> {
+
+    String displayName = "Generates a placeholder, then fills it in";
+
+    String description = "A recipe that generates a placeholder file in one cycle and fills it in on the next.";
+
+    @Override
+    public AtomicBoolean getInitialValue(ExecutionContext ctx) {
+        return new AtomicBoolean(false);
+    }
+
+    @Override
+    public TreeVisitor<?, ExecutionContext> getScanner(AtomicBoolean exists) {
+        return new TreeVisitor<>() {
+            @Override
+            public @Nullable Tree visit(@Nullable Tree tree, ExecutionContext ctx) {
+                if (tree instanceof SourceFile s && "generated.txt".equals(s.getSourcePath().toString())) {
+                    exists.set(true);
+                }
+                return tree;
+            }
+        };
+    }
+
+    @Override
+    public Collection<? extends SourceFile> generate(AtomicBoolean exists, ExecutionContext ctx) {
+        return exists.get() ? emptyList() : List.of(PlainText.builder()
+          .text("placeholder")
+          .sourcePath(Path.of("generated.txt"))
+          .build());
+    }
+
+    @Override
+    public TreeVisitor<?, ExecutionContext> getVisitor(AtomicBoolean exists) {
+        return new PlainTextVisitor<>() {
+            @Override
+            public PlainText visitText(PlainText text, ExecutionContext ctx) {
+                return exists.get() && "placeholder".equals(text.getText()) ? text.withText("filled") : text;
+            }
+        };
     }
 }
 

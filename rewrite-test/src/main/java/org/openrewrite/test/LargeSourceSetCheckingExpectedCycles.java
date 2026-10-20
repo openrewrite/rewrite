@@ -100,10 +100,15 @@ class LargeSourceSetCheckingExpectedCycles extends InMemoryLargeSourceSet {
 
             if (result.getBefore() == null) {
                 // a source file generated on a prior cycle
-                before = after == null ? null : lastCycleGenerated.stream()
-                        .filter(it -> Objects.equals(it.getId(), result.getAfter().getId()))
-                        .findFirst()
-                        .orElse(null);
+                if (after != null) {
+                    before = lastCycleEdits.get(after);
+                    if (before == null) {
+                        before = lastCycleGenerated.stream()
+                                .filter(it -> Objects.equals(it.getId(), result.getAfter().getId()))
+                                .findFirst()
+                                .orElse(null);
+                    }
+                }
             } else {
                 if (after == null && lastCycleDeleted.contains(result.getBefore())) {
                     before = result.getBefore();
