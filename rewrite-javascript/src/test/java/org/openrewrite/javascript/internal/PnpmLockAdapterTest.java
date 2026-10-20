@@ -515,8 +515,8 @@ class PnpmLockAdapterTest {
 
         // then
         assertThat(result.getAll())
-          .extracting(d -> d.getName() + "@" + d.getVersion())
-          .containsExactly("wrappy@1.0.2");
+                .extracting(d -> d.getName() + "@" + d.getVersion())
+                .containsExactly("wrappy@1.0.2");
         assertThat(result.getTopLevel()).containsOnlyKeys("wrappy");
     }
 
