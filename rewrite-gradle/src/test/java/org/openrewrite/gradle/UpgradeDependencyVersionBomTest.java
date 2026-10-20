@@ -570,6 +570,118 @@ class UpgradeDependencyVersionBomTest implements RewriteTest {
     }
 
     /**
+     * Every instance scans the script before any of them edits it, so a later one must find the override an earlier
+     * one declared in the same run and update it rather than declare it again.
+     */
+    @Test
+    void declaresBomPropertyOverrideOnceAcrossRecipeInstances() {
+        rewriteRun(
+          spec -> spec.recipes(
+            new UpgradeDependencyVersion("org.yaml", "snakeyaml", "1.30", null),
+            new UpgradeDependencyVersion("org.yaml", "snakeyaml", "1.33", null)
+          ),
+          buildGradle(
+            """
+              plugins {
+                  id 'java'
+                  id 'io.spring.dependency-management' version '1.1.7'
+              }
+
+              repositories {
+                  mavenCentral()
+              }
+
+              dependencyManagement {
+                  imports {
+                      mavenBom 'org.springframework.boot:spring-boot-dependencies:2.5.7'
+                  }
+              }
+
+              dependencies {
+                  implementation 'org.yaml:snakeyaml'
+              }
+              """,
+            """
+              plugins {
+                  id 'java'
+                  id 'io.spring.dependency-management' version '1.1.7'
+              }
+
+              ext['snakeyaml.version'] = '1.33'
+
+              repositories {
+                  mavenCentral()
+              }
+
+              dependencyManagement {
+                  imports {
+                      mavenBom 'org.springframework.boot:spring-boot-dependencies:2.5.7'
+                  }
+              }
+
+              dependencies {
+                  implementation 'org.yaml:snakeyaml'
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void declaresBomPropertyOverrideOnceAcrossRecipeInstancesInKotlinDsl() {
+        rewriteRun(
+          spec -> spec.recipes(
+            new UpgradeDependencyVersion("org.yaml", "snakeyaml", "1.30", null),
+            new UpgradeDependencyVersion("org.yaml", "snakeyaml", "1.33", null)
+          ),
+          buildGradleKts(
+            """
+              plugins {
+                  java
+                  id("io.spring.dependency-management") version "1.1.7"
+              }
+
+              repositories {
+                  mavenCentral()
+              }
+
+              dependencyManagement {
+                  imports {
+                      mavenBom("org.springframework.boot:spring-boot-dependencies:2.5.7")
+                  }
+              }
+
+              dependencies {
+                  implementation("org.yaml:snakeyaml")
+              }
+              """,
+            """
+              plugins {
+                  java
+                  id("io.spring.dependency-management") version "1.1.7"
+              }
+
+              extra["snakeyaml.version"] = "1.33"
+
+              repositories {
+                  mavenCentral()
+              }
+
+              dependencyManagement {
+                  imports {
+                      mavenBom("org.springframework.boot:spring-boot-dependencies:2.5.7")
+                  }
+              }
+
+              dependencies {
+                  implementation("org.yaml:snakeyaml")
+              }
+              """
+          )
+        );
+    }
+
+    /**
      * log4j-core is managed by the log4j BOM that spring-boot-dependencies imports at {@code ${log4j2.version}},
      * so that property governs it and every other log4j artifact on the classpath.
      */

@@ -912,14 +912,17 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
 
         /**
          * Declares each BOM property override the script does not set yet. Properties the script already sets are
-         * updated in {@code postVisit}, and those defined in gradle.properties by {@code UpdateProperties}.
+         * updated in {@code postVisit}, and those defined in gradle.properties by {@code UpdateProperties}. The scan
+         * saw the scripts before any recipe edited them, so the script itself is checked too for an override that an
+         * earlier recipe in the same run declared.
          */
         private JavaSourceFile declareBomProperties(JavaSourceFile cu, ExecutionContext ctx) {
             if (gradleProject == null) {
                 return cu;
             }
             for (String property : acc.bomPropertiesPerModule.getOrDefault(getGradleProjectKey(gradleProject), emptySet())) {
-                if (acc.gradlePropertiesKeys.contains(property) || acc.declaredExtProperties.contains(property)) {
+                if (acc.gradlePropertiesKeys.contains(property) || acc.declaredExtProperties.contains(property) ||
+                        SpringBomProperty.declaredProperties(cu).contains(property)) {
                     continue;
                 }
                 String version = safeUpdatedVersion(property, dependencyMatcher, acc, gradleProject, ctx);

@@ -1171,6 +1171,65 @@ class UpgradeTransitiveDependencyVersionTest implements RewriteTest {
         );
     }
 
+    /**
+     * Every instance scans the script before any of them edits it, so a later one must find the override an earlier
+     * one declared in the same run and update it rather than declare it again, without moving it back to an older
+     * version.
+     */
+    @ParameterizedTest
+    @ValueSource(booleans = {true, false})
+    void overrideBomPropertyOnceAcrossRecipeInstances(boolean ascending) {
+        Recipe older = new UpgradeTransitiveDependencyVersion("org.apache.logging.log4j", "log4j-core", "2.17.0", null, null, null);
+        Recipe newer = new UpgradeTransitiveDependencyVersion("org.apache.logging.log4j", "log4j-core", "2.17.1", null, null, null);
+        rewriteRun(
+          spec -> spec.recipes(ascending ? older : newer, ascending ? newer : older),
+          buildGradle(
+            """
+              plugins {
+                  id 'java'
+                  id 'io.spring.dependency-management' version '1.1.7'
+              }
+
+              repositories {
+                  mavenCentral()
+              }
+
+              dependencyManagement {
+                  imports {
+                      mavenBom 'org.springframework.boot:spring-boot-dependencies:2.5.7'
+                  }
+              }
+
+              dependencies {
+                  implementation 'org.springframework.boot:spring-boot-starter-log4j2'
+              }
+              """,
+            """
+              plugins {
+                  id 'java'
+                  id 'io.spring.dependency-management' version '1.1.7'
+              }
+
+              ext['log4j2.version'] = '2.17.1'
+
+              repositories {
+                  mavenCentral()
+              }
+
+              dependencyManagement {
+                  imports {
+                      mavenBom 'org.springframework.boot:spring-boot-dependencies:2.5.7'
+                  }
+              }
+
+              dependencies {
+                  implementation 'org.springframework.boot:spring-boot-starter-log4j2'
+              }
+              """
+          )
+        );
+    }
+
     @Test
     void useResolutionStrategyWithApplyFromWhenSpringDependencyManagementPluginIsPresent() {
         rewriteRun(
