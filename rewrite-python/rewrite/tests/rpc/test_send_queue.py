@@ -1,5 +1,6 @@
 """A changed ref-deduplicated slot is re-added under a fresh ref, never CHANGEd
 (see RpcSendQueue._send_as_ref for why)."""
+from rewrite.rpc import receive_queue
 from rewrite.rpc.send_queue import RpcSendQueue
 
 
@@ -22,6 +23,18 @@ def test_complex_value_has_no_wire_form():
 
     assert q._get_primitive_value(1j) is None
     assert q._get_value_type(1j) is None
+
+
+def test_a_codec_registered_after_a_class_was_first_sent_is_used(monkeypatch):
+    class Late:
+        pass
+
+    q = RpcSendQueue()
+    assert q._get_value_type(Late()) is None
+
+    monkeypatch.setitem(receive_queue._python_to_java_type, Late, 'org.example.Late')
+
+    assert q._get_value_type(Late()) == 'org.example.Late'
 
 
 def test_value_without_a_wire_form_is_sent_as_null():

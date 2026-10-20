@@ -242,6 +242,11 @@ public class TabsAndIndentsVisitor<P> extends HclIsoVisitor<P> {
         return super.visitAttribute(a, p);
     }
 
+    @Override
+    public Hcl.HeredocTemplate visitHeredocTemplate(Hcl.HeredocTemplate heredocTemplate, P p) {
+        return heredocTemplate.withPrefix(visitSpace(heredocTemplate.getPrefix(), Space.Location.HEREDOC, p));
+    }
+
     private Space indentTo(Space space, int column, Space.Location spaceLocation) {
         if (!space.getLastWhitespace().contains("\n")) {
             return space;

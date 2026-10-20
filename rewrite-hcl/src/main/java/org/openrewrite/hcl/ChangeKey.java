@@ -43,7 +43,7 @@ public class ChangeKey extends Recipe {
 
     @Option(displayName = "Old key path",
             description = "A JSONPath expression locating the attribute to rename.",
-            example = "$.resource.name")
+            example = "$.resource.aws_db_instance.name")
     String oldKeyPath;
 
     @Option(displayName = "New key",

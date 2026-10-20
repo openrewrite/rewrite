@@ -21,6 +21,7 @@ import org.openrewrite.ExecutionContext;
 import org.openrewrite.HttpSenderExecutionContextView;
 import org.openrewrite.InMemoryExecutionContext;
 import org.openrewrite.ipc.http.HttpSender;
+import org.openrewrite.javascript.marker.NodeResolutionResult;
 import org.openrewrite.javascript.marker.NodeResolutionResult.PackageManager;
 import org.openrewrite.javascript.table.NodeLockRegenerationFailures;
 import org.openrewrite.marker.Markup;
@@ -168,6 +169,29 @@ class UpgradeDependencyVersionLockRegenTest implements RewriteTest {
                 packageJson(resource("lock/pnpm/v9/pkg-before"), resource("lock/pnpm/v9/pkg-after"),
                         nodeResolutionResult(PackageManager.Pnpm, dependency("ms", "2.1.2"))),
                 pnpmLock(resource("lock/pnpm/v9/before"), resource("lock/pnpm/v9/after"),
+                        s -> s.noTrim())
+        );
+    }
+
+    @Test
+    void pnpmLockWithAnEnvDocumentRegeneratesWithoutWarning() {
+        routes.put("https://registry.npmjs.org/wrappy",
+                resource("lock/pnpm/open-pm-dev-engines-kept-beside-edit/http/wrappy"));
+
+        rewriteRun(
+                spec -> spec.recipe(new UpgradeDependencyVersion("wrappy", null, "1.0.2")).executionContext(ctx),
+                packageJson(resource("lock/pnpm/open-pm-dev-engines-kept-beside-edit/pkg-before"),
+                        resource("lock/pnpm/open-pm-dev-engines-kept-beside-edit/pkg"),
+                        nodeResolutionResult(PackageManager.Pnpm, dependency("wrappy", "1.0.1")),
+                        s -> s.afterRecipe(doc -> {
+                            assertThat(doc.getMarkers().findFirst(Markup.Warn.class)).isEmpty();
+                            assertThat(doc.getMarkers().findFirst(NodeResolutionResult.class).orElseThrow()
+                                    .getResolvedDependencies())
+                                    .extracting(d -> d.getName() + "@" + d.getVersion())
+                                    .containsExactly("wrappy@1.0.2");
+                        })),
+                pnpmLock(resource("lock/pnpm/open-pm-dev-engines-kept-beside-edit/before"),
+                        resource("lock/pnpm/open-pm-dev-engines-kept-beside-edit/after"),
                         s -> s.noTrim())
         );
     }

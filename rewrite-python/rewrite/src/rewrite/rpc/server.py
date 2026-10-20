@@ -51,6 +51,7 @@ from rewrite.python._version_detect import (
     detect_from_project, detect_from_source, requested_python_version, ty_python_version)
 from rewrite.python.printer import PythonPrinter
 from rewrite.result import Result
+from rewrite.rpc import json_codec
 from rewrite.rpc.reference import ReferenceMap
 
 # Deeply nested LST nodes (e.g., 256 implicitly concatenated strings) can
@@ -151,7 +152,7 @@ def _issue_request(method: str, params: dict) -> Any:
     }
 
     if _trace_rpc:
-        logger.debug(f"Sending request to Java: {json.dumps(request)}")
+        logger.debug(f"Sending request to Java: {json_codec.dumps(request).decode()}")
 
     # Send the request to Java via stdout
     write_message(request)
@@ -189,7 +190,7 @@ def _await_response(request_id: Any, method: str, timeout_seconds: float = 30.0)
                 continue
 
             if _trace_rpc:
-                logger.debug(f"Received response from Java: {json.dumps(response)}")
+                logger.debug(f"Received response from Java: {json_codec.dumps(response).decode()}")
 
             if 'error' in response:
                 error = response['error']
@@ -3041,7 +3042,7 @@ def _read_body(header_line: bytes) -> Optional[dict]:
         raise _ProtocolError(f"stream ended inside a {content_length} byte message body")
 
     try:
-        return json.loads(content_bytes.decode('utf-8'))
+        return json_codec.loads(content_bytes)
     except (UnicodeDecodeError, json.JSONDecodeError) as e:
         raise _ProtocolError(f"invalid message body: {e}")
 
@@ -3086,7 +3087,7 @@ def write_message(response: dict):
     short header, a cost that scales with the message where the extra syscall does not.
     ``os.writev`` avoids both but is absent on Windows, and measured no better where it exists.
     """
-    content_bytes = json.dumps(response).encode('utf-8')
+    content_bytes = json_codec.dumps(response)
     header = f"Content-Length: {len(content_bytes)}\r\n\r\n".encode('utf-8')
     fd = sys.stdout.fileno()
     os.write(fd, header)
@@ -3114,7 +3115,7 @@ def _write_response(response: dict) -> None:
     """
     try:
         if _trace_rpc:
-            logger.debug(f"Sending: {json.dumps(response)}")
+            logger.debug(f"Sending: {json_codec.dumps(response).decode()}")
         write_message(response)
     except (TypeError, ValueError) as e:
         request_id = response.get('id')
@@ -3133,7 +3134,7 @@ def _serve(message: dict) -> None:
         return
 
     if _trace_rpc:
-        logger.debug(f"Received: {json.dumps(message)}")
+        logger.debug(f"Received: {json_codec.dumps(message).decode()}")
 
     metric_start = time.monotonic()
     metric_error = ''

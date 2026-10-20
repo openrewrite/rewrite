@@ -22,7 +22,6 @@ import lombok.experimental.FieldDefaults;
 import lombok.experimental.NonFinal;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
-import org.openrewrite.hcl.HclParser;
 import org.openrewrite.hcl.HclVisitor;
 import org.openrewrite.hcl.internal.HclPrinter;
 import org.openrewrite.internal.ListUtils;
@@ -105,19 +104,8 @@ public interface Hcl extends Tree {
             if (e instanceof Identifier) {
                 return ((Identifier) e).getName();
             }
-            if (e instanceof QuotedTemplate) {
-                List<Expression> parts = ((QuotedTemplate) e).getExpressions();
-                if (parts.isEmpty()) {
-                    return "";
-                }
-                if (parts.size() == 1 && parts.get(0) instanceof Literal) {
-                    return String.valueOf(((Literal) parts.get(0)).getValue());
-                }
-            }
-            if (e instanceof Literal) {
-                return String.valueOf(((Literal) e).getValue());
-            }
-            return name.printTrimmed(new HclPrinter<>());
+            String value = HclValues.stringValue(e);
+            return value != null ? value : name.printTrimmed(new HclPrinter<>());
         }
 
         HclLeftPadded<Type> type;
@@ -452,6 +440,25 @@ public interface Hcl extends Tree {
         @With
         List<BodyContent> body;
 
+        /**
+         * @return The block type, such as {@code resource}, or {@code null} for anonymous block expressions.
+         */
+        @Incubating(since = "8.94.0")
+        @JsonIgnore
+        public @Nullable String getSimpleName() {
+            return type == null ? null : type.getName();
+        }
+
+        /**
+         * @param index The zero-based position of the label.
+         * @return The name of the label at the given position, or {@code null} if the block has fewer labels.
+         * @see Label#getSimpleName()
+         */
+        @Incubating(since = "8.94.0")
+        public @Nullable String getLabelName(int index) {
+            return index >= 0 && index < labels.size() ? labels.get(index).getSimpleName() : null;
+        }
+
         @Incubating(since = "7.27.0")
         public @Nullable Attribute getAttribute(String attrName) {
             for (BodyContent t : body) {
@@ -510,12 +517,9 @@ public interface Hcl extends Tree {
             Object value = attr.getValue() instanceof Literal ?
                     ((Literal) attr.getValue()).getValueSource() : null;
             if (attr.getValue() instanceof QuotedTemplate) {
-                Cursor root = new Cursor(null, HclParser.builder().build().parse("")
-                        .findFirst()
-                        .orElseThrow(() -> new IllegalArgumentException("Could not parse as HCL")));
                 StringBuilder valueBuilder = new StringBuilder();
                 for (Expression expr : ((QuotedTemplate) attr.getValue()).getExpressions()) {
-                    valueBuilder.append(expr.print(root));
+                    valueBuilder.append(expr.print(new HclPrinter<>()));
                 }
                 value = valueBuilder.toString();
             }

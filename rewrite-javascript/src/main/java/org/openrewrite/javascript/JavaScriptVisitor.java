@@ -968,6 +968,9 @@ public class JavaScriptVisitor<P> extends JavaVisitor<P> {
         } else {
             f = (JS.ForOfLoop) temp;
         }
+        if (f.getAwait() != null) {
+            f = f.withAwait(visitSpace(f.getAwait(), JsSpace.Location.FOR_OF_LOOP_AWAIT, p));
+        }
         return f.withLoop(requireNonNull(visitAndCast(f.getLoop(), p)));
     }
 

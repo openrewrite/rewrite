@@ -107,6 +107,7 @@ class ScalaTypeSignatureBuilder(using ctx: Context) {
   }
 
   def parameterizedSignature(at: AppliedType): String = {
+    if (at.tycon.typeSymbol == ctx.definitions.ArrayClass) return signature(at.args.head) + "[]"
     val base = signature(at.tycon)
     val tj = new StringJoiner(", ", "<", ">")
     at.args.foreach { arg =>

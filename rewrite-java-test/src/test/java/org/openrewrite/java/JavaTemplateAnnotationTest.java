@@ -42,10 +42,12 @@ class JavaTemplateAnnotationTest implements RewriteTest {
     @Test
     void replaceClassAnnotation() {
         rewriteRun(
-          spec -> spec.expectedCyclesThatMakeChanges(2)
-            .recipe(toRecipe(() -> new JavaVisitor<>() {
+          spec -> spec.recipe(toRecipe(() -> new JavaVisitor<>() {
                   @Override
-                  public J visitAnnotation(J.Annotation annotation, ExecutionContext executionContext) {
+                  public J visitAnnotation(J.Annotation annotation, ExecutionContext ctx) {
+                      if (annotation.toString().contains("2.0")) {
+                          return annotation;
+                      }
                       return JavaTemplate.apply("@Deprecated(since = \"#{}\", forRemoval = true)",
                         getCursor(), annotation.getCoordinates().replace(), "2.0");
                   }
@@ -69,10 +71,12 @@ class JavaTemplateAnnotationTest implements RewriteTest {
     @Test
     void replaceNestedClassAnnotation() {
         rewriteRun(
-          spec -> spec.expectedCyclesThatMakeChanges(2)
-            .recipe(toRecipe(() -> new JavaVisitor<>() {
+          spec -> spec.recipe(toRecipe(() -> new JavaVisitor<>() {
                   @Override
-                  public J visitAnnotation(J.Annotation annotation, ExecutionContext executionContext) {
+                  public J visitAnnotation(J.Annotation annotation, ExecutionContext ctx) {
+                      if (annotation.toString().contains("2.0")) {
+                          return annotation;
+                      }
                       return JavaTemplate.apply("@Deprecated(since = \"#{}\", forRemoval = true)",
                         getCursor(), annotation.getCoordinates().replace(), "2.0");
                   }
@@ -91,34 +95,6 @@ class JavaTemplateAnnotationTest implements RewriteTest {
                   @Deprecated(since = "2.0", forRemoval = true)
                   class B {
                   }
-              }
-              """
-          )
-        );
-    }
-
-    @Test
-    void replaceAnnotation2() {
-        rewriteRun(
-          spec -> spec.recipe(toRecipe(() -> new JavaVisitor<>() {
-                  @Override
-                  public J visitAnnotation(J.Annotation annotation, ExecutionContext ctx) {
-                      return JavaTemplate.apply("@Deprecated(since = \"#{}\", forRemoval = true)",
-                        getCursor(), annotation.getCoordinates().replace(), "2.0");
-                  }
-              }
-            ))
-            .cycles(1)
-            .expectedCyclesThatMakeChanges(1),
-          java(
-            """
-              @Deprecated(since = "1.0", forRemoval = true)
-              class A {
-              }
-              """,
-            """
-              @Deprecated(since = "2.0", forRemoval = true)
-              class A {
               }
               """
           )

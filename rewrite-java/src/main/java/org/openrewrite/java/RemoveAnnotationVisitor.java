@@ -23,34 +23,26 @@ import org.openrewrite.ExecutionContext;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.java.tree.*;
 
-import java.util.ArrayList;
+import java.util.Collections;
+import java.util.IdentityHashMap;
 import java.util.List;
+import java.util.Set;
 
 @Value
 @EqualsAndHashCode(callSuper = true)
 public class RemoveAnnotationVisitor extends JavaIsoVisitor<ExecutionContext> {
     AnnotationMatcher annotationMatcher;
 
+    private static final String REMOVED_ANNOTATIONS = "annotationRemoved";
+
     @Override
     public J.ClassDeclaration visitClassDeclaration(J.ClassDeclaration classDecl, ExecutionContext ctx) {
         J.ClassDeclaration c = super.visitClassDeclaration(classDecl, ctx);
-        J.Annotation annotationRemoved = getCursor().pollMessage("annotationRemoved");
-
-        List<J.Annotation> leadingAnnotations = classDecl.getLeadingAnnotations();
-        if (annotationRemoved != null && !leadingAnnotations.isEmpty()) {
-            if (leadingAnnotations.get(0) == annotationRemoved && leadingAnnotations.size() == 1) {
-                if (!c.getModifiers().isEmpty()) {
-                    c = c.withModifiers(Space.formatFirstPrefix(c.getModifiers(), Space.firstPrefix(c.getModifiers()).withWhitespace("")));
-                } else if (c.getPadding().getTypeParameters() != null) {
-                    c = c.getPadding().withTypeParameters(c.getPadding().getTypeParameters().withBefore(c.getPadding().getTypeParameters().getBefore().withWhitespace("")));
-                } else {
-                    c = c.getPadding().withKind(c.getPadding().getKind().withPrefix(c.getPadding().getKind().getPrefix().withWhitespace("")));
-                }
-            } else {
-                List<J.Annotation> newLeadingAnnotations = removeAnnotationOrEmpty(leadingAnnotations, annotationRemoved);
-                if (!newLeadingAnnotations.isEmpty()) {
-                    c = c.withLeadingAnnotations(newLeadingAnnotations);
-                }
+        Set<J.Annotation> removed = getCursor().pollMessage(REMOVED_ANNOTATIONS);
+        if (removed != null && !classDecl.getLeadingAnnotations().isEmpty()) {
+            J.Annotation first = classDecl.getLeadingAnnotations().get(0);
+            if (removed.contains(first)) {
+                c = startWithPrefix(c, first.getPrefix());
             }
             // The manual prefix surgery above writes to whatever modifier or
             // kind happens to be first in the list — on languages like Kotlin,
@@ -68,25 +60,11 @@ public class RemoveAnnotationVisitor extends JavaIsoVisitor<ExecutionContext> {
     @Override
     public J.MethodDeclaration visitMethodDeclaration(J.MethodDeclaration method, ExecutionContext ctx) {
         J.MethodDeclaration m = super.visitMethodDeclaration(method, ctx);
-        J.Annotation annotationRemoved = getCursor().pollMessage("annotationRemoved");
-
-        List<J.Annotation> leadingAnnotations = method.getLeadingAnnotations();
-        if (annotationRemoved != null && !leadingAnnotations.isEmpty()) {
-            if (leadingAnnotations.get(0) == annotationRemoved && leadingAnnotations.size() == 1) {
-                if (!m.getModifiers().isEmpty()) {
-                    m = m.withModifiers(Space.formatFirstPrefix(m.getModifiers(), Space.firstPrefix(m.getModifiers()).withWhitespace("")));
-                } else if (m.getPadding().getTypeParameters() != null) {
-                    m = m.getPadding().withTypeParameters(m.getPadding().getTypeParameters().withPrefix(m.getPadding().getTypeParameters().getPrefix().withWhitespace("")));
-                } else if (m.getReturnTypeExpression() != null) {
-                    m = m.withReturnTypeExpression(m.getReturnTypeExpression().withPrefix(m.getReturnTypeExpression().getPrefix().withWhitespace("")));
-                } else {
-                    m = m.withName(m.getName().withPrefix(m.getName().getPrefix().withWhitespace("")));
-                }
-            } else {
-                List<J.Annotation> newLeadingAnnotations = removeAnnotationOrEmpty(leadingAnnotations, annotationRemoved);
-                if (!newLeadingAnnotations.isEmpty()) {
-                    m = m.withLeadingAnnotations(newLeadingAnnotations);
-                }
+        Set<J.Annotation> removed = getCursor().pollMessage(REMOVED_ANNOTATIONS);
+        if (removed != null && !method.getLeadingAnnotations().isEmpty()) {
+            J.Annotation first = method.getLeadingAnnotations().get(0);
+            if (removed.contains(first)) {
+                m = startWithPrefix(m, first.getPrefix());
             }
             m = maybeRemoveBlankLines(method, m, ctx);
         }
@@ -96,32 +74,23 @@ public class RemoveAnnotationVisitor extends JavaIsoVisitor<ExecutionContext> {
     @Override
     public J.VariableDeclarations visitVariableDeclarations(J.VariableDeclarations multiVariable, ExecutionContext ctx) {
         J.VariableDeclarations v = super.visitVariableDeclarations(multiVariable, ctx);
-        J.Annotation annotationRemoved = getCursor().pollMessage("annotationRemoved");
-
-        List<J.Annotation> leadingAnnotations = multiVariable.getLeadingAnnotations();
-        if (annotationRemoved != null && !leadingAnnotations.isEmpty()) {
-            if (leadingAnnotations.get(0) == annotationRemoved && leadingAnnotations.size() == 1) {
-                if (!v.getModifiers().isEmpty()) {
-                    v = v.withModifiers(Space.formatFirstPrefix(v.getModifiers(), Space.firstPrefix(v.getModifiers()).withWhitespace("")));
-                } else if (v.getTypeExpression() != null) {
-                    v = v.withTypeExpression(v.getTypeExpression().withPrefix(v.getTypeExpression().getPrefix().withWhitespace("")));
-                }
-            } else {
-                List<J.Annotation> newLeadingAnnotations = removeAnnotationOrEmpty(leadingAnnotations, annotationRemoved);
-                if (!newLeadingAnnotations.isEmpty()) {
-                    v = v.withLeadingAnnotations(newLeadingAnnotations);
-                }
+        Set<J.Annotation> removed = getCursor().pollMessage(REMOVED_ANNOTATIONS);
+        if (removed != null && !multiVariable.getLeadingAnnotations().isEmpty()) {
+            J.Annotation first = multiVariable.getLeadingAnnotations().get(0);
+            if (removed.contains(first)) {
+                v = startWithPrefix(v, first.getPrefix());
             }
             v = maybeRemoveBlankLines(multiVariable, v, ctx);
         }
-
         return v;
     }
 
     @Override
     public  J.@Nullable Annotation visitAnnotation(J.Annotation annotation, ExecutionContext ctx) {
         if (annotationMatcher.matches(annotation)) {
-            getCursor().getParentOrThrow().putMessage("annotationRemoved", annotation);
+            getCursor().getParentOrThrow()
+                    .<Set<J.Annotation>>computeMessageIfAbsent(REMOVED_ANNOTATIONS, k -> Collections.newSetFromMap(new IdentityHashMap<>()))
+                    .add(annotation);
             maybeRemoveImport(TypeUtils.asFullyQualified(annotation.getType()));
             maybeRemoveAnnotationParameterImports(annotation);
             //noinspection ConstantConditions
@@ -130,22 +99,48 @@ public class RemoveAnnotationVisitor extends JavaIsoVisitor<ExecutionContext> {
         return super.visitAnnotation(annotation, ctx);
     }
 
-    /* Returns a list of leading annotations with the target removed or an empty list if no changes are necessary.
-     * A prefix only needs to change if the index == 0 and the prefixes of the target annotation and next annotation are not equal.
-     */
-    private List<J.Annotation> removeAnnotationOrEmpty(List<J.Annotation> leadingAnnotations, J.Annotation targetAnnotation) {
-        int index = leadingAnnotations.indexOf(targetAnnotation);
-        List<J.Annotation> newLeadingAnnotations = new ArrayList<>();
-        if (index == 0) {
-            J.Annotation nextAnnotation = leadingAnnotations.get(1);
-            if (!nextAnnotation.getPrefix().equals(targetAnnotation.getPrefix())) {
-                newLeadingAnnotations.add(nextAnnotation.withPrefix(targetAnnotation.getPrefix()));
-                for (int i = 2; i < leadingAnnotations.size(); ++i) {
-                    newLeadingAnnotations.add(leadingAnnotations.get(i));
-                }
-            }
+    private static J.ClassDeclaration startWithPrefix(J.ClassDeclaration c, Space prefix) {
+        if (!c.getLeadingAnnotations().isEmpty()) {
+            return c.withLeadingAnnotations(withFirstPrefix(c.getLeadingAnnotations(), prefix));
+        } else if (!c.getModifiers().isEmpty()) {
+            return c.withModifiers(withFirstWhitespace(c.getModifiers(), prefix));
         }
-        return newLeadingAnnotations;
+        J.ClassDeclaration.Kind kind = c.getPadding().getKind();
+        return c.getPadding().withKind(kind.withPrefix(kind.getPrefix().withWhitespace(prefix.getWhitespace())));
+    }
+
+    private static J.MethodDeclaration startWithPrefix(J.MethodDeclaration m, Space prefix) {
+        if (!m.getLeadingAnnotations().isEmpty()) {
+            return m.withLeadingAnnotations(withFirstPrefix(m.getLeadingAnnotations(), prefix));
+        } else if (!m.getModifiers().isEmpty()) {
+            return m.withModifiers(withFirstWhitespace(m.getModifiers(), prefix));
+        }
+        J.TypeParameters typeParameters = m.getPadding().getTypeParameters();
+        if (typeParameters != null) {
+            return m.getPadding().withTypeParameters(typeParameters.withPrefix(typeParameters.getPrefix().withWhitespace(prefix.getWhitespace())));
+        } else if (m.getReturnTypeExpression() != null) {
+            return m.withReturnTypeExpression(m.getReturnTypeExpression().withPrefix(m.getReturnTypeExpression().getPrefix().withWhitespace(prefix.getWhitespace())));
+        }
+        return m.withName(m.getName().withPrefix(m.getName().getPrefix().withWhitespace(prefix.getWhitespace())));
+    }
+
+    private static J.VariableDeclarations startWithPrefix(J.VariableDeclarations v, Space prefix) {
+        if (!v.getLeadingAnnotations().isEmpty()) {
+            return v.withLeadingAnnotations(withFirstPrefix(v.getLeadingAnnotations(), prefix));
+        } else if (!v.getModifiers().isEmpty()) {
+            return v.withModifiers(withFirstWhitespace(v.getModifiers(), prefix));
+        } else if (v.getTypeExpression() != null) {
+            return v.withTypeExpression(v.getTypeExpression().withPrefix(v.getTypeExpression().getPrefix().withWhitespace(prefix.getWhitespace())));
+        }
+        return v;
+    }
+
+    private static List<J.Annotation> withFirstPrefix(List<J.Annotation> leadingAnnotations, Space prefix) {
+        return ListUtils.mapFirst(leadingAnnotations, a -> a.withPrefix(prefix));
+    }
+
+    private static List<J.Modifier> withFirstWhitespace(List<J.Modifier> modifiers, Space prefix) {
+        return Space.formatFirstPrefix(modifiers, Space.firstPrefix(modifiers).withWhitespace(prefix.getWhitespace()));
     }
 
     /**

@@ -52,7 +52,7 @@ import {GetLanguages} from "./request/get-languages";
 import type {WorkerPageChannel} from "./worker-transport";
 
 // Each page is a round trip through both JSON-RPC stacks, so larger pages amortize it
-const DEFAULT_BATCH_SIZE = 5000;
+export const DEFAULT_BATCH_SIZE = 5000;
 
 export class RewriteRpc {
     /**

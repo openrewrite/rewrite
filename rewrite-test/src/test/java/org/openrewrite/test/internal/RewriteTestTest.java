@@ -143,6 +143,17 @@ class RewriteTestTest implements RewriteTest {
     }
 
     @Test
+    void generatedAndDeletedFilesAreNotCountedAsChangedAgainInLaterCycles() {
+        rewriteRun(
+          spec -> spec.recipe(new DeletesObsoleteGeneratesPlaceholderThenFillsIt())
+            .cycles(3)
+            .expectedCyclesThatMakeChanges(2),
+          text("obsolete", null, spec -> spec.path("obsolete.txt")),
+          text(null, "filled", spec -> spec.path("placeholder.txt"))
+        );
+    }
+
+    @Test
     void cursorValidation() {
         AssertionError e = assertThrows(AssertionError.class, () ->
           rewriteRun(
@@ -2846,5 +2857,54 @@ class RecipeWithOptionalOrValidation extends Recipe {
         return super.validate().and(
           Validated.required("optionA", optionA)
             .or(Validated.required("optionB", optionB)));
+    }
+}
+
+@EqualsAndHashCode(callSuper = false)
+@Value
+class DeletesObsoleteGeneratesPlaceholderThenFillsIt extends ScanningRecipe<AtomicBoolean> {
+
+    String displayName = "Deletes an obsolete file and generates a placeholder, then fills it";
+
+    String description = "A recipe that deletes a file and generates a placeholder in one cycle and fills the placeholder in the next.";
+
+    @Override
+    public AtomicBoolean getInitialValue(ExecutionContext ctx) {
+        return new AtomicBoolean(false);
+    }
+
+    @Override
+    public TreeVisitor<?, ExecutionContext> getScanner(AtomicBoolean placeholderExists) {
+        return new PlainTextVisitor<>() {
+            @Override
+            public PlainText visitText(PlainText text, ExecutionContext ctx) {
+                if ("placeholder.txt".equals(text.getSourcePath().toString())) {
+                    placeholderExists.set(true);
+                }
+                return text;
+            }
+        };
+    }
+
+    @Override
+    public Collection<? extends SourceFile> generate(AtomicBoolean placeholderExists, ExecutionContext ctx) {
+        return placeholderExists.get() ? emptyList() : List.of(PlainText.builder()
+          .text("placeholder")
+          .sourcePath(Path.of("placeholder.txt"))
+          .build());
+    }
+
+    @Override
+    public TreeVisitor<?, ExecutionContext> getVisitor(AtomicBoolean placeholderExists) {
+        return new PlainTextVisitor<>() {
+            @Override
+            public @Nullable PlainText visitText(PlainText text, ExecutionContext ctx) {
+                if ("obsolete.txt".equals(text.getSourcePath().toString())) {
+                    return null;
+                }
+                // Filling only what the scan already saw defers it to the cycle after generation
+                return placeholderExists.get() && "placeholder".equals(text.getText()) ? text.withText("filled") : text;
+            }
+        };
     }
 }
