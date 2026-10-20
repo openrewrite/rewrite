@@ -1328,12 +1328,7 @@ public final class PipenvLockEngine {
             }
         }
 
-        /**
-         * The hash variant the lock's producer verifies against. pipenv 2026.4+ hashes
-         * canonicalized names and earlier releases hash names as written. The two agree unless a
-         * name is non-canonical, and then the recorded hash tells which pipenv wrote the lock.
-         * Without an original Pipfile, or with a stale hash matching neither, legacy is kept.
-         */
+        // the recorded hash tells which pipenv wrote the lock, and legacy wins when it matches neither
         private PipfileLockHash.HashVariant hashVariant() {
             if (originalPipfile == null) {
                 return PipfileLockHash.HashVariant.LEGACY;

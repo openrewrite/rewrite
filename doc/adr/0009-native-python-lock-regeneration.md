@@ -309,11 +309,11 @@ translation is precedent) with a provider that encodes pip + minimal-update beha
   (`Toml.Document`) — sources with env placeholders intact, requires table, all
   dependency categories — serializes with a compact, code-point-sorted,
   ASCII-escaping JSON emitter, and computes the SHA-256. Emits the **variant the existing
-  lock was verified with**: the recorded `_meta.hash` is compared with both hashes of the
-  pre-edit Pipfile, and a match for only the canonicalized variant selects it (pipenv
-  ≥ 2026.4); otherwise — including a stale recorded hash — the legacy (plette) variant,
-  names as written, which every earlier pipenv verifies against. The two variants
-  coincide when names are already canonical.
+  lock was verified with**. The recorded `_meta.hash` is compared with both hashes of the
+  pre-edit Pipfile. A match for only the canonicalized variant, which pipenv 2026.4 and later
+  write, selects it. Otherwise, including when the recorded hash is stale, the engine emits
+  the legacy (plette) variant with names as written, which every earlier pipenv verifies
+  against. The two variants coincide when names are already canonical.
 - **Hash-consistency rule**: when the Pipfile has no `[[source]]`, the hash input's
   sources come from the existing lock's `_meta.sources` (what the machine that produced
   the lock actually used), not from a hardcoded pypi default — otherwise our hash would

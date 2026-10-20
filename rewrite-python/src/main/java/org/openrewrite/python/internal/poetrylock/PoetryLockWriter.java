@@ -66,7 +66,7 @@ public final class PoetryLockWriter {
         if (pkg.getDevelop() != null) {
             b.append("\ndevelop = ").append(pkg.getDevelop());
         }
-        // poetry emits the per-group inline table after every plain key (k-group-markers fixture)
+        // poetry emits the per-group inline table after every plain key
         if (pkg.getMarker() == null && pkg.getGroupMarkers() != null) {
             b.append("\nmarkers = ").append(inlineStringMap(pkg.getGroupMarkers()));
         }

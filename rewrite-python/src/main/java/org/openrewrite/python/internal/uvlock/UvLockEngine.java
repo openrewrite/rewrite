@@ -546,11 +546,7 @@ public final class UvLockEngine {
 
         // ---- requires-python ----
 
-        /**
-         * The header to record for the declared requires-python. A declaration denoting the
-         * range the lock already records keeps the recorded text, so spellings the
-         * normalization does not cover cannot rewrite an unchanged header.
-         */
+        // an unchanged range keeps the recorded header text, whatever spelling declares it
         private String normalizeRequiresPython(@Nullable String declared) {
             if (declared == null) {
                 throw new EngineFailure(Reason.MALFORMED_MANIFEST, null,
@@ -561,7 +557,7 @@ public final class UvLockEngine {
                 normalized = UvLockNormalization.normalizeRequiresPython(declared);
             } catch (IllegalArgumentException e) {
                 throw new EngineFailure(Reason.MALFORMED_MANIFEST, null,
-                        "Unparseable requires-python: " + declared + ": " + e.getMessage());
+                        "Unparseable requires-python '" + declared + "'. " + e.getMessage());
             }
             if (lock.getRequiresPython() != null &&
                     PyRange.parse(normalized).sameBounds(PyRange.parse(lock.getRequiresPython()))) {
@@ -1042,12 +1038,7 @@ public final class UvLockEngine {
             return constraints;
         }
 
-        /**
-         * Whether a dependent's markered requirement takes part in resolution. An {@code extra}
-         * clause needs that extra activated on the dependent (the root's extras always are), and
-         * the remaining clauses must not be always-false under requires-python. Markers outside
-         * the simple and-chain subset cannot be decided and are kept, as uv's union would be.
-         */
+        // a marker outside the simple and-chain subset cannot be decided and is kept, as uv's union would be
         private boolean requirementCanFire(UvLockPackage dependent, String rawMarker, Map<String, Set<String>> live) {
             List<String[]> clauses = UvLockMarkers.parseSimpleAndChain(rawMarker);
             if (clauses == null) {
@@ -1515,12 +1506,7 @@ public final class UvLockEngine {
             return edges;
         }
 
-        /**
-         * The rewritten entry keeps its recorded optional-dependencies groups, which is only
-         * right while the new version still gates requirements on each of those extras. When an
-         * activated extra vanished, uv drops the group, its closure and the extra on every edge.
-         * That rebuild is outside the engine.
-         */
+        // the rewritten entry keeps its optional-dependencies groups, so each must still gate a requirement
         private void requireActivatedExtrasStillDeclared(String pkg, PythonVersion selected, CoreMetadata metadata,
                                                         UvLockPackage base) {
             if (base.getOptionalDependencies() == null) {
@@ -1546,7 +1532,7 @@ public final class UvLockEngine {
                 if (!gated.contains(extra)) {
                     throw new EngineFailure(Reason.RESOLUTION_REQUIRED, pkg,
                             pkg + " " + selected + " no longer gates any requirement on extra '" + extra +
-                                    "'; rebuilding optional-dependency groups is not supported by the native engine");
+                                    "'. The native engine cannot rebuild optional-dependency groups.");
                 }
             }
         }
@@ -1586,7 +1572,6 @@ public final class UvLockEngine {
                 }
                 String simplified = UvLockMarkers.simplifyClauses(range, clauses);
                 // uv forks the resolution where a surviving clause raises the Python lower bound
-                // (BEHAVIOR.md section 4)
                 if (simplified != null && !UvLockMarkers.DROP_EDGE.equals(simplified) &&
                         UvLockMarkers.raisesPythonLowerBound(UvLockMarkers.parseSimpleAndChain(simplified))) {
                     throw new EngineFailure(Reason.RESOLUTION_REQUIRED, pkg,
@@ -1688,11 +1673,7 @@ public final class UvLockEngine {
             return updated;
         }
 
-        /**
-         * The packages reachable from the root, each mapped to the extras some reachable edge
-         * activates on it. A non-root package's optional-dependencies group is followed only
-         * while its extra is activated.
-         */
+        // each package reachable from the root, mapped to the extras some reachable edge activates on it
         private Map<String, Set<String>> liveExtras() {
             Map<String, List<UvLockPackage>> byName = new HashMap<>();
             for (UvLockPackage pkg : packages) {
@@ -1724,7 +1705,6 @@ public final class UvLockEngine {
             return live;
         }
 
-        /** Drops unreachable packages and the optional-dependencies groups no live edge activates. */
         private void dropUnreachable() {
             Map<String, Set<String>> liveExtras = liveExtras();
             List<UvLockPackage> kept = new ArrayList<>();
@@ -1754,7 +1734,7 @@ public final class UvLockEngine {
             return pkg == packages.get(rootIndex);
         }
 
-        /** The root's declared extras are all locked; any other package follows only its activated groups. */
+        // the root's declared extras are all locked
         private List<List<UvLockDependency>> liveEdgeLists(UvLockPackage pkg, Map<String, Set<String>> activatedExtras) {
             if (isRoot(pkg) || pkg.getOptionalDependencies() == null) {
                 return allEdgeLists(pkg);

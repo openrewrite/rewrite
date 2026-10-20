@@ -154,7 +154,7 @@ final class UvLockMetadataBuilder {
                 }
             }
         }
-        // the legacy [tool.uv] dev-dependencies list is the dev group (off16 fixture)
+        // uv locks the legacy [tool.uv] dev-dependencies list as the dev group
         Toml.Table uv = UvLockToml.findTable(pyproject, "tool.uv");
         if (uv != null) {
             for (String spec : UvLockToml.stringArray(uv, "dev-dependencies")) {

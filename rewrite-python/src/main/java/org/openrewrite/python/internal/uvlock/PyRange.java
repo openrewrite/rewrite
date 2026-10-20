@@ -20,6 +20,8 @@ import org.openrewrite.python.internal.pep440.PythonVersion;
 import org.openrewrite.python.internal.pep440.PythonVersionSpecifier;
 import org.openrewrite.python.internal.pep440.PythonVersionSpecifierSet;
 
+import java.util.Objects;
+
 /**
  * The lock's requires-python interval; upper is null when unbounded.
  */
@@ -30,8 +32,8 @@ final class PyRange {
     boolean upperInclusive;
 
     boolean sameBounds(PyRange other) {
-        return java.util.Objects.equals(lower, other.lower) && lowerExclusive == other.lowerExclusive &&
-                java.util.Objects.equals(upper, other.upper) && upperInclusive == other.upperInclusive;
+        return Objects.equals(lower, other.lower) && lowerExclusive == other.lowerExclusive &&
+                Objects.equals(upper, other.upper) && upperInclusive == other.upperInclusive;
     }
 
     static PyRange parse(String requiresPython) {

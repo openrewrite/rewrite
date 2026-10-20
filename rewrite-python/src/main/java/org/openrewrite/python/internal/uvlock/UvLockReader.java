@@ -72,7 +72,7 @@ public final class UvLockReader {
             throw new UvLockFormatException("Unrecognized uv.lock version: " + version);
         }
         // revisions 4 and 5 add only optional header and [options] keys, each rejected below when
-        // present, and their package entries keep the revision-3 shape (z-revision-5 fixture)
+        // present, and keep the revision-3 package entry shape
         if (revision != null && (revision < 1 || revision > 5)) {
             throw new UvLockFormatException("Unrecognized uv.lock revision: " + revision);
         }
