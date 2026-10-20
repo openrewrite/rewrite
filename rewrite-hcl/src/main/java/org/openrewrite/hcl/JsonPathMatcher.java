@@ -31,9 +31,11 @@ import org.openrewrite.hcl.internal.grammar.JsonPathLexer;
 import org.openrewrite.hcl.internal.grammar.JsonPathParser;
 import org.openrewrite.hcl.internal.grammar.JsonPathParserBaseVisitor;
 import org.openrewrite.hcl.internal.grammar.JsonPathParserVisitor;
+import org.openrewrite.hcl.tree.Expression;
 import org.openrewrite.hcl.tree.Hcl;
 import org.openrewrite.hcl.tree.Label;
 
+import java.math.BigDecimal;
 import java.util.*;
 import java.util.function.BiPredicate;
 import java.util.regex.Pattern;
@@ -48,7 +50,8 @@ import static java.util.stream.Collectors.toList;
  * <p>
  * HCL is mapped onto JsonPath as follows:
  * <ul>
- *     <li>{@code $} is the outermost block enclosing the cursor, or the config file if there is none.</li>
+ *     <li>{@code $} is the outermost block enclosing the cursor, or the config file if there is none. So
+ *     {@code $.region} selects a top-level attribute {@code region}.</li>
  *     <li>A block is selected by its type, optionally followed by its labels in order, as in Terraform's JSON syntax.
  *     For example, {@code $.resource.aws_db_instance.db.engine_version} selects {@code engine_version} of
  *     {@code resource "aws_db_instance" "db"}, {@code $.resource.aws_db_instance.engine_version} of every
@@ -57,6 +60,10 @@ import static java.util.stream.Collectors.toList;
  *     {@code $.resource..db.engine_version} match a block with a label {@code db} at any position.</li>
  *     <li>When a path segment equals both the next label of a block and a key in that block's body, the body key wins,
  *     so {@code $.variable.default} selects the {@code default} attribute even of {@code variable "default"}.</li>
+ *     <li>A filter on blocks selects the blocks whose body satisfies it, as a filter on JSON objects does. For example,
+ *     {@code $.resource.aws_db_instance[?(@.engine == 'mysql')].engine_version} selects {@code engine_version} of every
+ *     {@code aws_db_instance} resource with {@code engine = "mysql"}. A quoted string without interpolation compares
+ *     as a string literal.</li>
  * </ul>
  *
  * @see <a href="https://support.smartbear.com/alertsite/docs/monitors/api/endpoint/jsonpath.html">https://support.smartbear.com/alertsite/docs/monitors/api/endpoint/jsonpath.html</a>
@@ -153,7 +160,7 @@ public class JsonPathMatcher {
         int nextLabel;
 
         @Nullable String nextLabelName() {
-            return labelName(block.getLabels().get(nextLabel));
+            return nextLabel < block.getLabels().size() ? labelName(block.getLabels().get(nextLabel)) : null;
         }
 
         static @Nullable String labelName(Label label) {
@@ -266,6 +273,10 @@ public class JsonPathMatcher {
                         .collect(toList());
             }
 
+            if (ctx.filter() != null && containsBlock(scope)) {
+                return filterBlocks(ctx);
+            }
+
             scope = withoutLabelScopes(scope);
             if (ctx.slice() != null) {
                 return visitSlice(ctx.slice());
@@ -276,6 +287,55 @@ public class JsonPathMatcher {
             }
 
             return null;
+        }
+
+        private static boolean containsBlock(@Nullable Object scope) {
+            if (scope instanceof List) {
+                return ((List<Object>) scope).stream().anyMatch(JsonPathParserHclVisitor::containsBlock);
+            }
+            return scope instanceof LabelScope || scope instanceof Hcl.Block;
+        }
+
+        private @Nullable Object filterBlocks(JsonPathParser.BracketOperatorContext ctx) {
+            Object candidates = scope;
+            if (!(candidates instanceof List)) {
+                return filterBlock(candidates, ctx);
+            }
+            List<Object> matches = new ArrayList<>();
+            for (Object candidate : (List<Object>) candidates) {
+                Object result = filterBlock(candidate, ctx);
+                if (result instanceof List) {
+                    matches.addAll((List<Object>) result);
+                } else if (result != null) {
+                    matches.add(result);
+                }
+            }
+            scope = getResultFromList(matches);
+            return scope;
+        }
+
+        private @Nullable Object filterBlock(Object candidate, JsonPathParser.BracketOperatorContext ctx) {
+            Hcl.Block block;
+            int nextLabel;
+            if (candidate instanceof LabelScope) {
+                block = ((LabelScope) candidate).getBlock();
+                nextLabel = ((LabelScope) candidate).getNextLabel();
+            } else if (candidate instanceof Hcl.Block) {
+                block = (Hcl.Block) candidate;
+                nextLabel = 0;
+            } else {
+                scope = withoutLabelScopes(candidate);
+                return visitFilter(ctx.filter());
+            }
+            scope = block;
+            Object result = visitFilter(ctx.filter());
+            if (result == null || result instanceof List && ((List<Object>) result).isEmpty()) {
+                return null;
+            }
+            if (endsPath(ctx)) {
+                return block;
+            }
+            return labelScopeOrBody(block, nextLabel);
         }
 
         @Override
@@ -373,6 +433,9 @@ public class JsonPathMatcher {
                 if (key.equals(name)) {
                     return attribute;
                 }
+            } else if (scope instanceof Hcl.ConfigFile) {
+                scope = ((Hcl.ConfigFile) scope).getBody();
+                return visitProperty(ctx);
             } else if (scope instanceof List) {
                 List<Object> results = ((List<Object>) scope).stream()
                         .map(o -> {
@@ -404,7 +467,7 @@ public class JsonPathMatcher {
             } else {
                 int nextLabel = labelIndexAfter(block, fromLabel, name);
                 if (nextLabel > 0) {
-                    matches.add(endsPath(ctx) ? block : labelScopeOrBody(block, nextLabel));
+                    matches.add(endsPath(ctx) ? block : scopeAfter(block, nextLabel, ctx));
                 }
             }
             scope = block.getBody();
@@ -436,11 +499,32 @@ public class JsonPathMatcher {
         }
 
         private Object descendIntoBlock(Hcl.Block block, int nextLabel, ParserRuleContext ctx) {
-            if (stop != null && getExpressionContext(ctx) == stop) {
+            if (endsPath(ctx)) {
                 return block;
             }
-            scope = labelScopeOrBody(block, nextLabel);
+            scope = scopeAfter(block, nextLabel, ctx);
             return scope;
+        }
+
+        // A filter selects whole blocks, so it needs the block itself in scope rather than its body.
+        private Object scopeAfter(Hcl.Block block, int nextLabel, ParserRuleContext ctx) {
+            return isFollowedByFilter(ctx) ? new LabelScope(block, nextLabel) : labelScopeOrBody(block, nextLabel);
+        }
+
+        private boolean isFollowedByFilter(ParserRuleContext ctx) {
+            JsonPathParser.ExpressionContext expression = getExpressionContext(ctx);
+            if (expression == null) {
+                return false;
+            }
+            List<ParseTree> siblings = expression.getParent().children;
+            int index = siblings.indexOf(expression);
+            if (index + 1 >= siblings.size() || !(siblings.get(index + 1) instanceof JsonPathParser.ExpressionContext)) {
+                return false;
+            }
+            JsonPathParser.ExpressionContext next = (JsonPathParser.ExpressionContext) siblings.get(index + 1);
+            JsonPathParser.BracketOperatorContext bracket = next.bracketOperator() != null ? next.bracketOperator() :
+                    next.dotOperator() != null ? next.dotOperator().bracketOperator() : null;
+            return bracket != null && bracket.filter() != null;
         }
 
         private static boolean hasBodyKey(Hcl.Block block, String name) {
@@ -511,6 +595,8 @@ public class JsonPathMatcher {
                 s = ctx.StringLiteral().getText();
             } else if (ctx.TRUE() != null || ctx.FALSE() != null) {
                 return Boolean.valueOf(ctx.getText());
+            } else if (ctx.PositiveNumber() != null || ctx.NegativeNumber() != null || ctx.NumericLiteral() != null) {
+                return new BigDecimal(ctx.getText());
             } else if (!ctx.children.isEmpty()) {
                 s = ctx.children.get(0).getText();
             }
@@ -540,20 +626,15 @@ public class JsonPathMatcher {
                     scope = attr.getValue();
                     return getResultFromList(visitUnaryExpression(ctx));
                 } else if (scope instanceof Hcl.Block) {
-                    Hcl.Block block = (Hcl.Block) scope;
-                    for (Hcl body : block.getBody()) {
-                        String name = ctx.StringLiteral() != null ?
-                                unquoteStringLiteral(ctx.StringLiteral().getText()) : ctx.Identifier().getText();
-                        if (block.getType() instanceof Hcl.Identifier && block.getType().getName().equals(name)) {
-                            return block;
-                        } else if (body instanceof Hcl.Attribute) {
-                            Hcl.Attribute attr = (Hcl.Attribute) body;
-                            if (ctx.Identifier() != null || ctx.StringLiteral() != null) {
-                                String key = attr.getSimpleName();
-                                if (key.equals(name)) {
-                                    return block;
-                                }
-                            }
+                    if (ctx.Identifier() == null && ctx.StringLiteral() == null) {
+                        return scope;
+                    }
+                    String name = ctx.StringLiteral() != null ?
+                            unquoteStringLiteral(ctx.StringLiteral().getText()) : ctx.Identifier().getText();
+                    for (Hcl body : ((Hcl.Block) scope).getBody()) {
+                        if (body instanceof Hcl.Attribute && ((Hcl.Attribute) body).getSimpleName().equals(name) ||
+                            body instanceof Hcl.Block && ((Hcl.Block) body).getType().getName().equals(name)) {
+                            return body;
                         }
                     }
                 } else if (scope instanceof List) {
@@ -615,35 +696,19 @@ public class JsonPathMatcher {
             if (ctx.children.get(0) instanceof JsonPathParser.UnaryExpressionContext) {
                 Object lhs = visitUnaryExpression(ctx.unaryExpression());
                 Object rhs = visitLiteralExpression(ctx.literalExpression());
-                if (lhs instanceof Hcl.Block && rhs != null) {
-                    Hcl.Block block = (Hcl.Block) lhs;
-                    String key = ctx.children.get(0).getChild(2).getText();
-                    lhs = getResultByKey(block, key);
-                    if (lhs instanceof Hcl.Attribute) {
-                        Hcl.Attribute attr = (Hcl.Attribute) lhs;
-                        if (attr.getValue() instanceof Hcl.Literal) {
-                            Hcl.Literal literal = (Hcl.Literal) attr.getValue();
-                            if (literal.getValue().toString().contains(String.valueOf(rhs))) {
-                                return originalScope;
-                            }
-                        }
+                if (lhs instanceof Hcl.Attribute && rhs != null) {
+                    Hcl.Literal literal = asLiteral(((Hcl.Attribute) lhs).getValue());
+                    if (literal != null && String.valueOf(literal.getValue()).contains(String.valueOf(rhs))) {
+                        return originalScope;
                     }
                 }
             } else {
                 Object lhs = visitLiteralExpression(ctx.literalExpression());
                 Object rhs = visitUnaryExpression(ctx.unaryExpression());
-                if (rhs instanceof Hcl.Block && lhs != null) {
-                    Hcl.Block block = (Hcl.Block) rhs;
-                    String key = ctx.children.get(2).getChild(2).getText();
-                    rhs = getResultByKey(block, key);
-                    if (rhs instanceof Hcl.Attribute) {
-                        Hcl.Attribute attr = (Hcl.Attribute) rhs;
-                        if (attr.getValue() instanceof Hcl.Literal) {
-                            Hcl.Literal literal = (Hcl.Literal) attr.getValue();
-                            if (literal.getValue().toString().contains(String.valueOf(lhs))) {
-                                return originalScope;
-                            }
-                        }
+                if (rhs instanceof Hcl.Attribute && lhs != null) {
+                    Hcl.Literal literal = asLiteral(((Hcl.Attribute) rhs).getValue());
+                    if (literal != null && String.valueOf(literal.getValue()).contains(String.valueOf(lhs))) {
+                        return originalScope;
                     }
                 }
             }
@@ -783,8 +848,8 @@ public class JsonPathMatcher {
         private @Nullable Hcl getOperatorResult(Object lhs, String operator, Object rhs) {
             if (lhs instanceof Hcl.Attribute) {
                 Hcl.Attribute attr = (Hcl.Attribute) lhs;
-                if (attr.getValue() instanceof Hcl.Literal) {
-                    Hcl.Literal literal = (Hcl.Literal) attr.getValue();
+                Hcl.Literal literal = asLiteral(attr.getValue());
+                if (literal != null) {
                     if (checkObjectEquality(literal.getValue(), operator, rhs)) {
                         return attr;
                     }
@@ -798,9 +863,8 @@ public class JsonPathMatcher {
                 Hcl.Block block = (Hcl.Block) lhs;
                 for (Hcl body : block.getBody()) {
                     if (body instanceof Hcl.Attribute) {
-                        Hcl.Attribute attr = (Hcl.Attribute) body;
-                        if (attr.getValue() instanceof Hcl.Literal &&
-                                checkObjectEquality(((Hcl.Literal) attr.getValue()).getValue(), operator, rhs)) {
+                        Hcl.Literal literal = asLiteral(((Hcl.Attribute) body).getValue());
+                        if (literal != null && checkObjectEquality(literal.getValue(), operator, rhs)) {
                             return block;
                         }
                     }
@@ -814,19 +878,41 @@ public class JsonPathMatcher {
             return null;
         }
 
+        private static Hcl.@Nullable Literal asLiteral(Expression value) {
+            if (value instanceof Hcl.Literal) {
+                return (Hcl.Literal) value;
+            } else if (value instanceof Hcl.QuotedTemplate) {
+                List<Expression> expressions = ((Hcl.QuotedTemplate) value).getExpressions();
+                if (expressions.size() == 1 && expressions.get(0) instanceof Hcl.Literal) {
+                    return (Hcl.Literal) expressions.get(0);
+                }
+            }
+            return null;
+        }
+
         private boolean checkObjectEquality(Object lhs, String operator, Object rhs) {
             BiPredicate<Object, Object> predicate = (lh, rh) -> {
                 switch (operator) {
                     case "==":
-                        return Objects.equals(lh, rh);
+                        return valueEquals(lh, rh);
                     case "!=":
-                        return !Objects.equals(lh, rh);
+                        return !valueEquals(lh, rh);
                     case "=~":
                         return Pattern.compile(rh.toString()).matcher(lh.toString()).matches();
                 }
                 return false;
             };
             return predicate.test(lhs, rhs);
+        }
+
+        private boolean valueEquals(@Nullable Object lhs, @Nullable Object rhs) {
+            if (lhs instanceof Number && rhs instanceof BigDecimal) {
+                if (lhs instanceof Double && !Double.isFinite((Double) lhs)) {
+                    return false;
+                }
+                return new BigDecimal(lhs.toString()).compareTo((BigDecimal) rhs) == 0;
+            }
+            return Objects.equals(lhs, rhs);
         }
 
         // Extract the result from JSON objects that can match by key.
