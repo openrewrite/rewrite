@@ -118,13 +118,14 @@ class Space:
 
     @classmethod
     def build(cls, comments: List[Comment], whitespace: Optional[str]) -> Space:
-        """The two comment-free whitespace values that dominate a tree are shared
-        instances; every other Space is built fresh."""
+        """As in Java's Space.build, a comment-free Space with at most 50 characters of
+        whitespace is one shared instance per whitespace string. Every other Space is built fresh."""
         if not comments:
             if not whitespace:
                 return cls.EMPTY
-            if whitespace == ' ':
-                return cls.SINGLE_SPACE
+            if len(whitespace) <= 50:
+                shared = _SHARED_SPACES.get(whitespace)
+                return shared if shared is not None else _SHARED_SPACES.setdefault(whitespace, cls([], whitespace))
         return cls(comments, whitespace)
 
     @classmethod
@@ -175,6 +176,7 @@ class Space:
 
 Space.EMPTY = Space([], '')
 Space.SINGLE_SPACE = Space([], ' ')
+_SHARED_SPACES: Dict[str, Space] = {' ': Space.SINGLE_SPACE}
 
 
 class JavaSourceFile(J, SourceFile):
