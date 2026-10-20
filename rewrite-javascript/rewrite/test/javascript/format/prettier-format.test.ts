@@ -35,8 +35,8 @@ import {
 import {PrettierConfigLoader} from "../../../src/javascript/format/prettier-config-loader";
 import {json} from "../../../src/json";
 import {text} from "../../../src/text";
-import {J, Statement} from "../../../src/java";
-import {randomId, TreePrinters} from "../../../src";
+import {J, Statement, TrailingComma} from "../../../src/java";
+import {findMarker, foundSearchResult, MarkersKind, randomId, SearchResult, TreePrinters} from "../../../src";
 import {withDir} from "tmp-promise";
 import * as path from "path";
 import * as fsp from "fs/promises";
@@ -380,7 +380,74 @@ describe('Prettier marker reconciliation', () => {
         const formattedHasSemicolon = formattedMarkers.some((m: any) => m.kind === J.Markers.Semicolon);
         expect(formattedHasSemicolon).toBe(true);
     });
+
+    test('markers that are not syntax survive formatting', async () => {
+        // given
+        const parser = new JavaScriptParser({sourceFileCache});
+        const parsed = await parser.parseOne({
+            sourcePath: 'test.ts',
+            text: 'const x=1'
+        }) as JS.CompilationUnit;
+        const customMarker = {kind: 'test.CustomMarker', id: randomId()};
+        const statement = parsed.statements[0];
+        const sourceFile = {
+            ...parsed,
+            markers: {...parsed.markers, markers: [...parsed.markers.markers, customMarker]},
+            statements: [{...statement, element: foundSearchResult(statement.element, 'found')}]
+        } as JS.CompilationUnit;
+
+        // when
+        const formatted = await prettierFormat(sourceFile, {semi: true});
+
+        // then
+        expect(await TreePrinters.print(formatted)).toBe('/*~~(found)~~>*/const x = 1;\n');
+        expect(findMarker(formatted, 'test.CustomMarker' as any)).toBe(customMarker);
+        const searchResult = findMarker(formatted.statements[0].element, MarkersKind.SearchResult) as SearchResult;
+        expect(searchResult?.description).toBe('found');
+    });
+
+    test('a syntax marker keeps its id while taking Prettier whitespace', async () => {
+        // given
+        const parser = new JavaScriptParser({sourceFileCache});
+        const sourceFile = await parser.parseOne({
+            sourcePath: 'test.ts',
+            text: 'const o = {\n  a: 1,\n  b: 2 ,\n}'
+        }) as JS.CompilationUnit;
+        const originalTrailingComma = trailingCommaOf(sourceFile);
+
+        // when
+        const formatted = await prettierFormat(sourceFile, {semi: true, trailingComma: 'all'});
+
+        // then
+        expect(await TreePrinters.print(formatted)).toBe('const o = {\n  a: 1,\n  b: 2,\n};\n');
+        expect(trailingCommaOf(formatted).id).toBe(originalTrailingComma.id);
+    });
+
+    test('a structure Prettier changes leaves the attributed original in place', async () => {
+        // given
+        const parser = new JavaScriptParser({sourceFileCache});
+        const sourceFile = await parser.parseOne({
+            sourcePath: 'test.ts',
+            text: 'const x: number = (Math.max(1, 2));'
+        }) as JS.CompilationUnit;
+
+        // when
+        const formatted = await prettierFormat(sourceFile, {semi: true});
+
+        // then
+        expect(formatted).toBe(sourceFile);
+        const variables = formatted.statements[0].element as J.VariableDeclarations;
+        const initializer = variables.variables[0].element.initializer!.element as J.Parentheses<J.MethodInvocation>;
+        expect(initializer.tree.element.methodType).toBeDefined();
+    });
 });
+
+function trailingCommaOf(cu: JS.CompilationUnit): TrailingComma {
+    const variables = cu.statements[0].element as J.VariableDeclarations;
+    const object = variables.variables[0].element.initializer!.element as J.NewClass;
+    const statements = object.body!.statements;
+    return findMarker(statements[statements.length - 1], J.Markers.TrailingComma) as TrailingComma;
+}
 
 describe('Prettier auto-detection integration', () => {
     // These tests verify that Prettier config is automatically detected from .prettierrc
