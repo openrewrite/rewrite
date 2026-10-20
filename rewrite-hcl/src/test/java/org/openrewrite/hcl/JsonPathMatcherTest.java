@@ -254,6 +254,242 @@ class JsonPathMatcherTest implements RewriteTest {
         );
     }
 
+    private static final String RESOURCES = """
+      resource "aws_db_instance" "primary" {
+        engine_version = "5.7"
+        multi_az       = true
+      }
+      resource "aws_db_instance" "replica" {
+        engine_version = "8.0"
+        multi_az       = false
+      }
+      resource "aws_rds_cluster" "cluster" {
+        engine_version = "5.6"
+        multi_az       = true
+      }
+      """;
+
+    @Test
+    void matchByTypeLabel() {
+        assertMatched(
+          List.of(RESOURCES),
+          List.of("engine_version = \"5.7\"", "engine_version = \"8.0\""),
+          "$.resource.aws_db_instance.engine_version",
+          false
+        );
+    }
+
+    @Test
+    void matchByTypeAndNameLabels() {
+        assertMatched(
+          List.of(RESOURCES),
+          List.of("engine_version = \"8.0\""),
+          "$.resource.aws_db_instance.replica.engine_version",
+          false
+        );
+    }
+
+    @Test
+    void matchByWildcardNameLabel() {
+        assertMatched(
+          List.of(RESOURCES),
+          List.of("engine_version = \"5.7\"", "engine_version = \"8.0\""),
+          "$.resource.aws_db_instance.*.engine_version",
+          false
+        );
+    }
+
+    @Test
+    void pathEndingAtLabelMatchesBlock() {
+        assertMatched(
+          List.of(RESOURCES),
+          List.of(
+            """
+              resource "aws_rds_cluster" "cluster" {
+                engine_version = "5.6"
+                multi_az       = true
+              }
+              """.trim()
+          ),
+          "$.resource.aws_rds_cluster",
+          false
+        );
+        assertMatched(
+          List.of(RESOURCES),
+          List.of(
+            """
+              resource "aws_db_instance" "primary" {
+                engine_version = "5.7"
+                multi_az       = true
+              }
+              """.trim()
+          ),
+          "$.resource.aws_db_instance.primary",
+          false
+        );
+    }
+
+    @Test
+    void pathWithoutLabelsStillMatchesAllBlocksOfType() {
+        assertMatched(
+          List.of(RESOURCES),
+          List.of("engine_version = \"5.7\"", "engine_version = \"8.0\"", "engine_version = \"5.6\""),
+          "$.resource.engine_version",
+          false
+        );
+    }
+
+    @Test
+    void matchByLabelsIntoNestedBlock() {
+        assertMatched(
+          List.of(
+            """
+              resource "aws_instance" "web" {
+                ebs_block_device {
+                  volume_size = 10
+                }
+              }
+              resource "aws_instance" "db" {
+                ebs_block_device {
+                  volume_size = 20
+                }
+              }
+              """
+          ),
+          List.of("volume_size = 10"),
+          "$.resource.aws_instance.web.ebs_block_device.volume_size",
+          false
+        );
+    }
+
+    @Test
+    void matchByLabelsOfNestedBlock() {
+        assertMatched(
+          List.of(
+            """
+              resource "aws_security_group" "sg" {
+                dynamic "ingress" {
+                  content {
+                    from_port = 80
+                  }
+                }
+                dynamic "egress" {
+                  content {
+                    from_port = 0
+                  }
+                }
+              }
+              """
+          ),
+          List.of("from_port = 80"),
+          "$.resource.aws_security_group.sg.dynamic.ingress.content.from_port",
+          false
+        );
+    }
+
+    @Test
+    void matchByUnquotedLabels() {
+        assertMatched(
+          List.of(
+            """
+              resource aws_db_instance primary {
+                engine_version = "5.7"
+              }
+              resource aws_rds_cluster cluster {
+                engine_version = "5.6"
+              }
+              """
+          ),
+          List.of("engine_version = \"5.7\""),
+          "$.resource.aws_db_instance.primary.engine_version",
+          false
+        );
+    }
+
+    @Test
+    void matchByLabelInBracketNotation() {
+        assertMatched(
+          List.of(RESOURCES),
+          List.of("engine_version = \"5.7\"", "engine_version = \"8.0\""),
+          "$.resource['aws_db_instance'].engine_version",
+          false
+        );
+    }
+
+    @Test
+    void filterAfterLabels() {
+        assertMatched(
+          List.of(RESOURCES),
+          List.of("multi_az       = true"),
+          "$.resource.aws_db_instance[?(@.multi_az == true)]",
+          false
+        );
+    }
+
+    @Test
+    void bodyKeyTakesPrecedenceOverLabel() {
+        assertMatched(
+          List.of(
+            """
+              resource "aws_instance" "settings" {
+                settings {
+                  size = 1
+                }
+                size = 2
+              }
+              """
+          ),
+          List.of("size = 1"),
+          "$.resource.aws_instance.settings.size",
+          false
+        );
+    }
+
+    @Test
+    void attributeNamedLikeLabelStillMatchesAttribute() {
+        assertMatched(
+          List.of(
+            """
+              variable "default" {
+                default = 1
+              }
+              variable "other" {
+                default = 2
+              }
+              """
+          ),
+          List.of("default = 1", "default = 2"),
+          "$.variable.default",
+          false
+        );
+    }
+
+    @Test
+    void labelsCannotBeSkipped() {
+        assertMatched(
+          List.of(RESOURCES),
+          List.of(),
+          "$.resource.replica.engine_version",
+          false
+        );
+    }
+
+    @Test
+    void noMatchOnWrongLabel() {
+        assertMatched(
+          List.of(RESOURCES),
+          List.of(),
+          "$.resource.aws_db_instance.dne.engine_version",
+          false
+        );
+        assertMatched(
+          List.of(RESOURCES),
+          List.of(),
+          "$.resource.aws_s3_bucket.engine_version",
+          false
+        );
+    }
+
     @Disabled("Test enables a simple way to test JsonPatchMatches on HCL.")
     @Test
     void findJsonPathMatches() {

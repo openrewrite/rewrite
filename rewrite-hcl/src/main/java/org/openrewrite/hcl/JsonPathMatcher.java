@@ -16,6 +16,7 @@
 package org.openrewrite.hcl;
 
 import lombok.EqualsAndHashCode;
+import lombok.Value;
 import org.antlr.v4.runtime.CharStreams;
 import org.antlr.v4.runtime.CommonTokenStream;
 import org.antlr.v4.runtime.ParserRuleContext;
@@ -31,6 +32,7 @@ import org.openrewrite.hcl.internal.grammar.JsonPathParser;
 import org.openrewrite.hcl.internal.grammar.JsonPathParserBaseVisitor;
 import org.openrewrite.hcl.internal.grammar.JsonPathParserVisitor;
 import org.openrewrite.hcl.tree.Hcl;
+import org.openrewrite.hcl.tree.Label;
 
 import java.util.*;
 import java.util.function.BiPredicate;
@@ -43,6 +45,18 @@ import static java.util.stream.Collectors.toList;
  * Provides methods for matching the given cursor location to a specific JsonPath expression.
  * <p>
  * This is not a full implementation of the JsonPath syntax as linked in the "see also."
+ * <p>
+ * HCL is mapped onto JsonPath as follows:
+ * <ul>
+ *     <li>{@code $} is the outermost block enclosing the cursor, or the config file if there is none.</li>
+ *     <li>A block is selected by its type, optionally followed by its labels in order, as in Terraform's JSON syntax.
+ *     For example, {@code $.resource.aws_db_instance.db.engine_version} selects {@code engine_version} of
+ *     {@code resource "aws_db_instance" "db"}, {@code $.resource.aws_db_instance.engine_version} of every
+ *     {@code aws_db_instance} resource and {@code $.resource.engine_version} of every resource. A wildcard consumes
+ *     one label. Labels can't be skipped.</li>
+ *     <li>When a path segment equals both the next label of a block and a key in that block's body, the body key wins,
+ *     so {@code $.variable.default} selects the {@code default} attribute even of {@code variable "default"}.</li>
+ * </ul>
  *
  * @see <a href="https://support.smartbear.com/alertsite/docs/monitors/api/endpoint/jsonpath.html">https://support.smartbear.com/alertsite/docs/monitors/api/endpoint/jsonpath.html</a>
  */
@@ -78,7 +92,7 @@ public class JsonPathMatcher {
                 (JsonPathParser.ExpressionContext) lastChild :
                 null;
         @SuppressWarnings("ConstantConditions") JsonPathParserVisitor<Object> v = new JsonPathParserHclVisitor(cursorPath, start, stop, false);
-        Object result = v.visit(ctx);
+        Object result = JsonPathParserHclVisitor.withoutLabelScopes(v.visit(ctx));
 
         //noinspection unchecked
         return Optional.ofNullable((T) result);
@@ -130,6 +144,22 @@ public class JsonPathMatcher {
         parser.removeErrorListeners();
         parser.addErrorListener(errorListener);
         return parser;
+    }
+
+    @Value
+    private static class LabelScope {
+        Hcl.Block block;
+        int nextLabel;
+
+        @Nullable String nextLabelName() {
+            Label label = block.getLabels().get(nextLabel);
+            if (label instanceof Hcl.Literal) {
+                return String.valueOf(((Hcl.Literal) label).getValue());
+            } else if (label instanceof Hcl.Identifier) {
+                return ((Hcl.Identifier) label).getName();
+            }
+            return null;
+        }
     }
 
     @SuppressWarnings({"ConstantConditions", "unchecked"})
@@ -201,7 +231,7 @@ public class JsonPathMatcher {
                 return results;
                 // Otherwise, the recursive descent is scoped to the previous match. `$.foo..['find-in-foo']`.
             } else {
-                JsonPathParserHclVisitor v = new JsonPathParserHclVisitor(cursorPath, scope, null, true);
+                JsonPathParserHclVisitor v = new JsonPathParserHclVisitor(cursorPath, withoutLabelScopes(scope), null, true);
                 for (int i = 1; i < ctx.getChildCount(); i++) {
                     result = v.visit(ctx.getChild(i));
                     if (result != null) {
@@ -223,7 +253,10 @@ public class JsonPathMatcher {
                 return ctx.property().stream()
                         .map(this::visitProperty)
                         .collect(toList());
-            } else if (ctx.slice() != null) {
+            }
+
+            scope = withoutLabelScopes(scope);
+            if (ctx.slice() != null) {
                 return visitSlice(ctx.slice());
             } else if (ctx.indexes() != null) {
                 return visitIndexes(ctx.indexes());
@@ -298,12 +331,19 @@ public class JsonPathMatcher {
 
         @Override
         public @Nullable Object visitProperty(JsonPathParser.PropertyContext ctx) {
-            if (scope instanceof Hcl.Block) {
+            String name = ctx.StringLiteral() != null ?
+                    unquoteStringLiteral(ctx.StringLiteral().getText()) : ctx.Identifier().getText();
+            if (scope instanceof LabelScope) {
+                LabelScope labelScope = (LabelScope) scope;
+                if (name.equals(labelScope.nextLabelName()) && !hasBodyKey(labelScope.getBlock(), name)) {
+                    return descendIntoBlock(labelScope.getBlock(), labelScope.getNextLabel() + 1, ctx);
+                }
+                scope = labelScope.getBlock().getBody();
+                return visitProperty(ctx);
+            } else if (scope instanceof Hcl.Block) {
                 Hcl.Block block = (Hcl.Block) scope;
                 List<Object> matches = new ArrayList<>();
                 String key = block.getType().getName();
-                String name = ctx.StringLiteral() != null ?
-                        unquoteStringLiteral(ctx.StringLiteral().getText()) : ctx.Identifier().getText();
 
                 if (isRecursiveDescent) {
                     if (key.equals(name)) {
@@ -316,17 +356,11 @@ public class JsonPathMatcher {
                     }
                     return getResultFromList(matches);
                 } else if (key.equals(name)) {
-                    if (stop != null && getExpressionContext(ctx) == stop) {
-                        return block;
-                    }
-                    scope = block.getBody();
-                    return block.getBody();
+                    return descendIntoBlock(block, 0, ctx);
                 }
             } else if (scope instanceof Hcl.Attribute) {
                 Hcl.Attribute attribute = (Hcl.Attribute) scope;
                 String key = attribute.getSimpleName();
-                String name = ctx.StringLiteral() != null ?
-                        unquoteStringLiteral(ctx.StringLiteral().getText()) : ctx.Identifier().getText();
                 if (key.equals(name)) {
                     return attribute;
                 }
@@ -351,6 +385,24 @@ public class JsonPathMatcher {
             }
 
             return null;
+        }
+
+        private Object descendIntoBlock(Hcl.Block block, int nextLabel, ParserRuleContext ctx) {
+            if (stop != null && getExpressionContext(ctx) == stop) {
+                return block;
+            }
+            scope = nextLabel < block.getLabels().size() ? new LabelScope(block, nextLabel) : block.getBody();
+            return scope;
+        }
+
+        private static boolean hasBodyKey(Hcl.Block block, String name) {
+            for (Hcl body : block.getBody()) {
+                if (body instanceof Hcl.Attribute && name.equals(((Hcl.Attribute) body).getSimpleName()) ||
+                    body instanceof Hcl.Block && name.equals(((Hcl.Block) body).getType().getName())) {
+                    return true;
+                }
+            }
+            return false;
         }
 
         private JsonPathParser.ExpressionContext getExpressionContext(ParserRuleContext ctx) {
@@ -390,13 +442,11 @@ public class JsonPathMatcher {
                 }
 
                 return getResultFromList(matches);
+            } else if (scope instanceof LabelScope) {
+                LabelScope labelScope = (LabelScope) scope;
+                return descendIntoBlock(labelScope.getBlock(), labelScope.getNextLabel() + 1, ctx);
             } else if (scope instanceof Hcl.Block) {
-                Hcl.Block block = (Hcl.Block) scope;
-                if (stop != null && getExpressionContext(ctx) == stop) {
-                    return block;
-                }
-                scope = block.getBody();
-                return block.getBody();
+                return descendIntoBlock((Hcl.Block) scope, 0, ctx);
             }
 
             return null;
@@ -476,7 +526,7 @@ public class JsonPathMatcher {
                     return getResultFromList(matches);
                 }
             } else if (ctx.jsonPath() != null) {
-                Object result = visit(ctx.jsonPath());
+                Object result = withoutLabelScopes(visit(ctx.jsonPath()));
                 return getResultByKey(result, ctx.stop.getText());
             }
             return null;
@@ -786,6 +836,17 @@ public class JsonPathMatcher {
             }
 
             return null;
+        }
+
+        private static @Nullable Object withoutLabelScopes(@Nullable Object result) {
+            if (result instanceof LabelScope) {
+                return ((LabelScope) result).getBlock().getBody();
+            } else if (result instanceof List && ((List<Object>) result).stream().anyMatch(LabelScope.class::isInstance)) {
+                return ((List<Object>) result).stream()
+                        .map(JsonPathParserHclVisitor::withoutLabelScopes)
+                        .collect(toList());
+            }
+            return result;
         }
 
         private static String unquoteStringLiteral(String literal) {
