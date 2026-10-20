@@ -24,6 +24,7 @@ import org.openrewrite.javascript.tree.JS;
 import org.openrewrite.javascript.tree.JSX;
 import org.openrewrite.rpc.RpcSendQueue;
 
+import static org.openrewrite.java.internal.rpc.JavaSender.spaceRef;
 import static org.openrewrite.rpc.Reference.asRef;
 import static org.openrewrite.rpc.Reference.getValueNonNull;
 
@@ -46,7 +47,7 @@ public class JavaScriptSender extends JavaScriptVisitor<RpcSendQueue> {
     @Override
     public J preVisit(J j, RpcSendQueue q) {
         q.getAndSend(j, Tree::getId);
-        q.getAndSend(j, J::getPrefix, space -> visitSpace(space, q));
+        q.getAndSend(j, j2 -> spaceRef(j2.getPrefix()), space -> visitSpace(getValueNonNull(space), q));
         q.getAndSend(j, mk -> asRef(mk.getMarkers()));
 
         return j;
@@ -60,7 +61,7 @@ public class JavaScriptSender extends JavaScriptVisitor<RpcSendQueue> {
         q.getAndSend(cu, JS.CompilationUnit::getChecksum);
         q.getAndSend(cu, JS.CompilationUnit::getFileAttributes);
         q.getAndSendList(cu, c -> c.getPadding().getStatements(), stmt -> stmt.getElement().getId(), stmt -> visitRightPadded(stmt, q));
-        q.getAndSend(cu, JS.CompilationUnit::getEof, space -> visitSpace(space, q));
+        q.getAndSend(cu, c -> spaceRef(c.getEof()), space -> visitSpace(getValueNonNull(space), q));
 
         return cu;
     }
@@ -188,7 +189,7 @@ public class JavaScriptSender extends JavaScriptVisitor<RpcSendQueue> {
     public J visitImportTypeAttributes(JS.ImportTypeAttributes importTypeAttributes, RpcSendQueue q) {
         q.getAndSend(importTypeAttributes, el -> el.getPadding().getToken(), el -> visitRightPadded(el, q));
         q.getAndSend(importTypeAttributes, el -> el.getPadding().getElements(), el -> visitContainer(el, q));
-        q.getAndSend(importTypeAttributes, JS.ImportTypeAttributes::getEnd, el -> visitSpace(getValueNonNull(el), q));
+        q.getAndSend(importTypeAttributes, i -> spaceRef(i.getEnd()), el -> visitSpace(getValueNonNull(el), q));
         return importTypeAttributes;
     }
 
@@ -447,13 +448,13 @@ public class JavaScriptSender extends JavaScriptVisitor<RpcSendQueue> {
     public J visitJsxTag(JSX.Tag tag, RpcSendQueue q) {
         q.getAndSend(tag, el -> el.getPadding().getOpenName(), el -> visitLeftPadded(el, q));
         q.getAndSend(tag, JSX.Tag::getTypeArguments, el -> visitContainer(el, q));
-        q.getAndSend(tag, JSX.Tag::getAfterName, space -> visitSpace(space, q));
+        q.getAndSend(tag, t -> spaceRef(t.getAfterName()), space -> visitSpace(getValueNonNull(space), q));
         q.getAndSendList(tag, el -> el.getPadding().getAttributes(), attr -> attr.getElement().getId(), attr -> visitRightPadded(attr, q));
 
-        q.getAndSend(tag, JSX.Tag::getSelfClosing, space -> visitSpace(space, q));
+        q.getAndSend(tag, t -> spaceRef(t.getSelfClosing()), space -> visitSpace(getValueNonNull(space), q));
         q.getAndSendList(tag, JSX.Tag::getChildren, Tree::getId, child -> visit(child, q));
         q.getAndSend(tag, el -> el.getPadding().getClosingName(), el -> visitLeftPadded(el, q));
-        q.getAndSend(tag, JSX.Tag::getAfterClosingName, space -> visitSpace(space, q));
+        q.getAndSend(tag, t -> spaceRef(t.getAfterClosingName()), space -> visitSpace(getValueNonNull(space), q));
 
         return tag;
     }
@@ -467,7 +468,7 @@ public class JavaScriptSender extends JavaScriptVisitor<RpcSendQueue> {
 
     @Override
     public J visitJsxSpreadAttribute(JSX.SpreadAttribute spreadAttribute, RpcSendQueue q) {
-        q.getAndSend(spreadAttribute, JSX.SpreadAttribute::getDots, space -> visitSpace(space, q));
+        q.getAndSend(spreadAttribute, s -> spaceRef(s.getDots()), space -> visitSpace(getValueNonNull(space), q));
         q.getAndSend(spreadAttribute, el -> el.getPadding().getExpression(), el -> visitRightPadded(el, q));
         return spreadAttribute;
     }
@@ -509,7 +510,7 @@ public class JavaScriptSender extends JavaScriptVisitor<RpcSendQueue> {
 
     @Override
     public J visitForOfLoop(JS.ForOfLoop forOfLoop, RpcSendQueue q) {
-        q.getAndSend(forOfLoop, JS.ForOfLoop::getAwait, space -> visitSpace(space, q));
+        q.getAndSend(forOfLoop, f -> spaceRef(f.getAwait()), space -> visitSpace(getValueNonNull(space), q));
         q.getAndSend(forOfLoop, JS.ForOfLoop::getLoop, el -> visit(el, q));
         return forOfLoop;
     }

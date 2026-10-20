@@ -804,18 +804,6 @@ export function isSpace(tree: any): tree is J.Space {
         tree.kind === J.Kind.Space;
 }
 
-/**
- * Builds a comment-free Space. Assigning one over an existing prefix silently drops the comments
- * that prefix carried; spread the prefix to keep them — `{...prefix, whitespace: "\n\n"}`.
- */
-export function space(whitespace: string): J.Space {
-    return {
-        kind: J.Kind.Space,
-        comments: [],
-        whitespace: whitespace,
-    };
-}
-
 export const emptySpace: J.Space = {
     kind: J.Kind.Space,
     comments: [],
@@ -827,6 +815,24 @@ export const singleSpace: J.Space = {
     comments: [],
     whitespace: " ",
 };
+
+// Short whitespace repeats throughout a run, so as with Java's Space.build one instance serves every use.
+const sharedSpaces = new Map<string, J.Space>([["", emptySpace], [" ", singleSpace]]);
+
+/**
+ * Builds a comment-free Space. Assigning one over an existing prefix silently drops the comments
+ * that prefix carried; spread the prefix to keep them — `{...prefix, whitespace: "\n\n"}`.
+ */
+export function space(whitespace: string): J.Space {
+    let s = sharedSpaces.get(whitespace);
+    if (s === undefined) {
+        s = {kind: J.Kind.Space, comments: [], whitespace};
+        if (whitespace.length <= 50) {
+            sharedSpaces.set(whitespace, s);
+        }
+    }
+    return s;
+}
 
 export function emptyContainer<T extends J>(): J.Container<T> {
     return {

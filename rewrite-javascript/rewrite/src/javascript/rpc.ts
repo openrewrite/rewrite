@@ -18,7 +18,7 @@ import {asRef, registerVisitor, RpcReceiveQueue, RpcSendQueue} from "../rpc";
 import {AutoformatVisitor} from "./format";
 import {isJavaScript, JS, JSX} from "./tree";
 import {Expression, J, Statement, Type, TypedTree, TypeTree} from "../java";
-import {JavaReceiver, JavaSender, registerJLanguageCodecs} from "../java/rpc";
+import {JavaReceiver, JavaSender, registerJLanguageCodecs, spaceRef} from "../java/rpc";
 import {Cursor, Tree} from "../tree";
 import {updateIfChanged} from "../util";
 import ComputedPropertyName = JS.ComputedPropertyName;
@@ -41,7 +41,7 @@ class JavaScriptSender extends JavaScriptVisitor<RpcSendQueue> {
 
     override async preVisit(j: JS, q: RpcSendQueue): Promise<J | undefined> {
         await q.getAndSend(j, j2 => j2.id);
-        await q.getAndSend(j, j2 => j2.prefix, space => this.visitSpace(space, q));
+        await q.getAndSend(j, j2 => spaceRef(j2.prefix), space => this.visitSpace(space, q));
         await q.getAndSend(j, j2 => j2.markers);
         return j;
     }
@@ -53,7 +53,7 @@ class JavaScriptSender extends JavaScriptVisitor<RpcSendQueue> {
         await q.getAndSend(cu, c => c.checksum);
         await q.getAndSend(cu, c => c.fileAttributes);
         await q.getAndSendList(cu, c => c.statements, stmt => stmt.element.id, stmt => this.visitRightPadded(stmt, q));
-        await q.getAndSend(cu, c => c.eof, space => this.visitSpace(space, q));
+        await q.getAndSend(cu, c => spaceRef(c.eof), space => this.visitSpace(space, q));
         return cu;
     }
 
@@ -172,7 +172,7 @@ class JavaScriptSender extends JavaScriptVisitor<RpcSendQueue> {
     override async visitImportTypeAttributes(importTypeAttributes: JS.ImportTypeAttributes, q: RpcSendQueue): Promise<J | undefined> {
         await q.getAndSend(importTypeAttributes, el => el.token, el => this.visitRightPadded(el, q));
         await q.getAndSend(importTypeAttributes, el => el.elements, el => this.visitContainer(el, q));
-        await q.getAndSend(importTypeAttributes, el => el.end, el => this.visitSpace(el, q));
+        await q.getAndSend(importTypeAttributes, el => spaceRef(el.end), el => this.visitSpace(el, q));
         return importTypeAttributes;
     }
 
@@ -397,13 +397,13 @@ class JavaScriptSender extends JavaScriptVisitor<RpcSendQueue> {
     override async visitJsxTag(tag: JSX.Tag, q: RpcSendQueue): Promise<J | undefined> {
         await q.getAndSend(tag, el => el.openName, el => this.visitLeftPadded(el, q));
         await q.getAndSend(tag, el => el.typeArguments, el => this.visitContainer(el, q));
-        await q.getAndSend(tag, el => el.afterName, space => this.visitSpace(space, q));
+        await q.getAndSend(tag, el => spaceRef(el.afterName), space => this.visitSpace(space, q));
         await q.getAndSendList(tag, el => el.attributes, attr => attr.element.id, attr => this.visitRightPadded(attr, q));
 
-        await q.getAndSend(tag, el => el.selfClosing, space => this.visitSpace(space, q));
+        await q.getAndSend(tag, el => spaceRef(el.selfClosing), space => this.visitSpace(space, q));
         await q.getAndSendList(tag, el => el.children!, child => child.id, child => this.visit(child, q));
         await q.getAndSend(tag, el => el.closingName, el => this.visitLeftPadded(el, q));
-        await q.getAndSend(tag, el => el.afterClosingName, el => this.visitSpace(el, q));
+        await q.getAndSend(tag, el => spaceRef(el.afterClosingName), el => this.visitSpace(el, q));
 
         return tag;
     }
@@ -415,7 +415,7 @@ class JavaScriptSender extends JavaScriptVisitor<RpcSendQueue> {
     }
 
     override async visitJsxSpreadAttribute(spreadAttribute: JSX.SpreadAttribute, q: RpcSendQueue): Promise<J | undefined> {
-        await q.getAndSend(spreadAttribute, el => el.dots, space => this.visitSpace(space, q));
+        await q.getAndSend(spreadAttribute, el => spaceRef(el.dots), space => this.visitSpace(space, q));
         await q.getAndSend(spreadAttribute, el => el.expression, el => this.visitRightPadded(el, q));
         return spreadAttribute;
     }
@@ -452,7 +452,7 @@ class JavaScriptSender extends JavaScriptVisitor<RpcSendQueue> {
     }
 
     override async visitForOfLoop(forOfLoop: JS.ForOfLoop, q: RpcSendQueue): Promise<J | undefined> {
-        await q.getAndSend(forOfLoop, el => el.await, space => this.visitSpace(space, q));
+        await q.getAndSend(forOfLoop, el => spaceRef(el.await), space => this.visitSpace(space, q));
         await q.getAndSend(forOfLoop, el => el.loop, el => this.visit(el, q));
         return forOfLoop;
     }
