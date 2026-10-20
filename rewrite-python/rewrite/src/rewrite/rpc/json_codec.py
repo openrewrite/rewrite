@@ -28,7 +28,8 @@ except ImportError:
 _DIGITS_TO_ZERO = bytes(0x30 if 0x30 <= b <= 0x39 else 0x20 for b in range(256))
 _POSSIBLY_WIDE_INT = b'0' * 19
 
-# Dataclasses and datetimes are refused, as the stdlib refuses them.
+# Dataclasses and datetimes are refused, as the stdlib refuses them. Unlike the stdlib, orjson encodes
+# a UUID and an enum's value, and writes NaN and infinity as null.
 _ORJSON_OPTIONS = (orjson.OPT_PASSTHROUGH_DATACLASS | orjson.OPT_PASSTHROUGH_DATETIME) if orjson else 0
 
 
@@ -50,4 +51,4 @@ def loads(body: bytes) -> Any:
         except orjson.JSONDecodeError:
             # orjson rejects an escaped lone surrogate, which the stdlib reads.
             pass
-    return json.loads(body)
+    return json.loads(body.decode('utf-8'))

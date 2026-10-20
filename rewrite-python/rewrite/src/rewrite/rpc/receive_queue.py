@@ -138,8 +138,6 @@ class RpcReceiveQueue:
     def _parse_message(self, raw: Dict[str, Any]) -> RpcObjectData:
         """Parse a raw message dict into RpcObjectData."""
         state_raw = raw.get('state', 'NO_CHANGE')
-        # type(x) is str sidesteps the ABC dispatch path that isinstance() takes
-        # — saves a hot per-call ~200 ns × ~70M calls.
         state = _STATE_BY_VALUE[state_raw] if type(state_raw) is str else state_raw
 
         return RpcObjectData(
@@ -350,7 +348,7 @@ class RpcReceiveQueue:
         positions = positions_msg.get('value')
 
         if not isinstance(positions, list):
-            raise RuntimeError(f"Expected positions array but got: {self._parse_message(positions_msg)}")
+            raise RuntimeError(f"Expected positions array but got: {positions_msg}")
 
         after: List[T] = []
         for i, before_idx in enumerate(positions):

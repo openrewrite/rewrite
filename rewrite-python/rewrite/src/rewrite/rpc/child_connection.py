@@ -167,7 +167,8 @@ class ChildConnection:
     def _write(self, msg: dict) -> None:
         data = json_codec.dumps(msg)
         header = ("Content-Length: %d\r\n\r\n" % len(data)).encode("ascii")
-        self._proc.stdin.write(header + data)
+        self._proc.stdin.write(header)
+        self._proc.stdin.write(data)
         self._proc.stdin.flush()
 
     def _read(self):
