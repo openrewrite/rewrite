@@ -31,7 +31,9 @@ import org.openrewrite.javascript.internal.lock.ManifestRules;
 import org.openrewrite.javascript.internal.lock.ManifestRules.OverridePlace;
 import org.openrewrite.javascript.internal.lock.Rejected;
 import org.openrewrite.javascript.internal.lock.Spec;
+import org.openrewrite.javascript.marker.NodeResolutionResult;
 import org.openrewrite.javascript.marker.NodeResolutionResult.PackageManager;
+import org.openrewrite.javascript.marker.NodeResolutionResult.ResolvedDependency;
 import org.openrewrite.javascript.table.NodeDependencyEditsDeclined;
 import org.openrewrite.javascript.table.NodeDependencyProtocolsSkipped;
 import org.openrewrite.javascript.table.NodeLockRegenerationFailures;
@@ -76,7 +78,8 @@ public class UpgradeTransitiveDependencyVersion extends ScanningRecipe<NodeDepen
                 "package manager reads it, and regenerates the lock file natively, without executing the package " +
                 "manager: npm's `overrides`, Bun's `overrides` or `resolutions`, Yarn's `resolutions`, and for " +
                 "pnpm `pnpm-workspace.yaml` or `pnpm.overrides` by the pnpm release the project names. An override " +
-                "the package manager cannot read is not written, and the reason is recorded. Not safe to use as a " +
+                "the package manager cannot read is not written, and the reason is recorded. None is written for a " +
+                "package the lock does not resolve. Not safe to use as a " +
                 "precondition: consults the package registry over the network and publishes per-project state " +
                 "shared with other dependency recipes.";
     }
@@ -118,7 +121,7 @@ public class UpgradeTransitiveDependencyVersion extends ScanningRecipe<NodeDepen
             decision.decline(String.valueOf(e.getMessage()));
             return;
         }
-        if (pm == null) {
+        if (pm == null || !resolves(decision.getManifest())) {
             return;
         }
         Path path = decision.getPath();
@@ -180,6 +183,20 @@ public class UpgradeTransitiveDependencyVersion extends ScanningRecipe<NodeDepen
         } else {
             decision.editManifest(override::apply);
         }
+    }
+
+    // whether the lock the manifest's marker records resolves packageName; true when it records no resolutions at all
+    private boolean resolves(Json.Document manifest) {
+        NodeResolutionResult marker = manifest.getMarkers().findFirst(NodeResolutionResult.class).orElse(null);
+        if (marker == null || marker.getResolvedDependencies().isEmpty()) {
+            return true;
+        }
+        for (ResolvedDependency resolved : marker.getResolvedDependencies()) {
+            if (packageName.equals(resolved.getName())) {
+                return true;
+            }
+        }
+        return false;
     }
 
     // the declarations the override would win over unnamed: packageName through a value that is no version range,
