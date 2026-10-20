@@ -8,6 +8,7 @@ there is nothing to pip-uninstall.
 import os
 import shutil
 import subprocess
+import sys
 from importlib import metadata
 from pathlib import Path
 from typing import Optional
@@ -21,7 +22,7 @@ def venv_python(venv_dir: Path) -> Path:
     return venv_dir / "bin" / "python"
 
 
-def _site_packages(venv_dir: Path) -> Optional[Path]:
+def site_packages(venv_dir: Path) -> Optional[Path]:
     if os.name == "nt":
         sp = venv_dir / "Lib" / "site-packages"
         return sp if sp.exists() else None
@@ -33,11 +34,11 @@ def installed_version(venv_dir: Path, dist: str) -> Optional[str]:
 
     Read off disk, so the recipe is never imported.
     """
-    site_packages = _site_packages(venv_dir)
-    if site_packages is None:
+    packages = site_packages(venv_dir)
+    if packages is None:
         return None
     target = _normalize_package_name(dist)
-    for distribution in metadata.distributions(path=[str(site_packages)]):
+    for distribution in metadata.distributions(path=[str(packages)]):
         name = distribution.metadata["Name"]
         if name and _normalize_package_name(name) == target:
             return distribution.version
@@ -64,14 +65,31 @@ def is_usable_venv(venv_dir: Path) -> bool:
     """
     if not venv_python(venv_dir).exists():
         return False
+    home = _pyvenv_cfg(venv_dir).get("home")  # absent when interrupted before configuration
+    return home is not None and Path(home).exists()
+
+
+def built_by_running_interpreter(venv_dir: Path) -> bool:
+    """True when this process can import the venv's packages.
+
+    A venv's ``site-packages`` carries bytecode and extension modules for the one interpreter
+    version it was built against. An unrecorded version reads as no match.
+    """
+    config = _pyvenv_cfg(venv_dir)
+    version = config.get("version", config.get("version_info"))
+    return version is not None and version.split(".")[:2] == [str(p) for p in sys.version_info[:2]]
+
+
+def _pyvenv_cfg(venv_dir: Path) -> dict:
     config = venv_dir / "pyvenv.cfg"
     if not config.exists():
-        return False  # interrupted before configuration; treat as unbuilt
+        return {}
+    entries = {}
     for line in config.read_text().splitlines():
         key, separator, value = line.partition("=")
-        if separator and key.strip() == "home":
-            return Path(value.strip()).exists()
-    return False
+        if separator:
+            entries.setdefault(key.strip(), value.strip())
+    return entries
 
 
 def install_into_venv(venv_dir: Path, spec: str, force: bool = False) -> None:
