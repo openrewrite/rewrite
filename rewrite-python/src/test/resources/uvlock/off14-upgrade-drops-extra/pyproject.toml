@@ -1,0 +1,12 @@
+[project]
+name = "scen-s7-upgrade-drops-extra"
+version = "0.1.0"
+requires-python = ">=3.10"
+dependencies = [
+    "reqlike[socks]==2.0",
+]
+
+[[tool.uv.index]]
+name = "local"
+url = "https://index.example/simple/"
+default = true

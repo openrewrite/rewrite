@@ -489,6 +489,69 @@ class PipenvLockEngineTest {
         assertThat(result.getLockFileContent()).doesNotContain("click");
     }
 
+    /**
+     * pipenv records an {@code index} key only for bare-string declarations, so an inline-table
+     * entry removed from the Pipfile is recognizable as top-level only through the original
+     * manifest; without that it would silently stay in the lock as if it were transitive.
+     */
+    @Test
+    void removalOfInlineTableEntryWithoutIndexKeyDropsIt() {
+        String original = """
+          [[source]]
+          url = "https://pypi.org/simple"
+          verify_ssl = true
+          name = "pypi"
+
+          [packages]
+          requests = {version = ">=2.31.0", markers = "python_version >= '3.7'"}
+
+          [requires]
+          python_version = "3.11"
+          """;
+        String edited = original.replace("requests = {version = \">=2.31.0\", markers = \"python_version >= '3.7'\"}\n", "");
+        String lock = baseLock().replace("            \"index\": \"pypi\",\n", "");
+        assertThat(lock).doesNotContain("index");
+
+        Result result = PipenvLockEngine.regenerate(edited, original, lock, ctx);
+
+        assertThat(result.getErrorMessage()).isNull();
+        assertThat(result.getDetail()).contains("ORPHANS_RETAINED");
+        assertThat(result.getLockFileContent()).doesNotContain("\"requests\"");
+    }
+
+    /**
+     * pipenv 2026.4+ hashes PEP 503-canonicalized package names and verifies the lock against
+     * that variant; a lock whose recorded hash matches the canonical hash of the original Pipfile
+     * keeps verifying after regeneration only if the new hash uses the same variant. Hashes
+     * recorded from the oracle over the original/edited Pipfile with {@code --canonical}.
+     */
+    @Test
+    void hashVariantFollowsTheExistingLock() {
+        stubRequestsBaseline();
+        String original = """
+          [[source]]
+          url = "https://pypi.org/simple"
+          verify_ssl = true
+          name = "pypi"
+
+          [packages]
+          requests = ">=2.31.0"
+          Flask = ">=3"
+
+          [requires]
+          python_version = "3.11"
+          """;
+        String edited = original.replace(">=2.31.0", ">=2.32.0");
+        String lock = baseLock().replace("0".repeat(64),
+          "ae4ade87639d81539271a16ba72fbd26af316a5bc78230c9c749337611930b73");
+
+        Result result = PipenvLockEngine.regenerate(edited, original, lock, ctx);
+
+        assertThat(result.getErrorMessage()).isNull();
+        assertThat(result.getLockFileContent())
+          .contains("\"sha256\": \"f17d9150f2bbc1ea763d085bfed1c9c5b392cccbc1c8bda4d4fac6820643b6a1\"");
+    }
+
     @Test
     void staleLockVersionInUntouchedPackageIsLeftAsIs() {
         stubRequestsBaseline();

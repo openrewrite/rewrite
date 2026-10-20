@@ -1,0 +1,15 @@
+[project]
+name = "scen-s6-dev-group-constraint"
+version = "0.1.0"
+requires-python = ">=3.10"
+dependencies = [
+    "reqlike==2.0",
+]
+
+[dependency-groups]
+dev = ["urlish<2.4"]
+
+[[tool.uv.index]]
+name = "local"
+url = "https://index.example/simple/"
+default = true

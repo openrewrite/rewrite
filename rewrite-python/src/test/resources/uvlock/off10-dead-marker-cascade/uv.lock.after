@@ -1,0 +1,48 @@
+version = 1
+revision = 3
+requires-python = ">=3.10"
+
+[[package]]
+name = "botolike"
+version = "1.0"
+source = { registry = "https://index.example/simple/" }
+dependencies = [
+    { name = "urlish" },
+]
+wheels = [
+    { url = "https://index.example/simple/botolike/botolike-1.0-py3-none-any.whl", hash = "sha256:f2dcd604c366280b1ac9a88f3b66271a95ed450da0f1372d1b5ee726471e877b" },
+]
+
+[[package]]
+name = "reqlike"
+version = "2.0"
+source = { registry = "https://index.example/simple/" }
+dependencies = [
+    { name = "urlish" },
+]
+wheels = [
+    { url = "https://index.example/simple/reqlike/reqlike-2.0-py3-none-any.whl", hash = "sha256:86b4ee1532ada4612e42c9dad37ca6672939e77bee85c759c1a4708003b00f33" },
+]
+
+[[package]]
+name = "scen-s1-dead-marker-cascade"
+version = "0.1.0"
+source = { virtual = "." }
+dependencies = [
+    { name = "botolike" },
+    { name = "reqlike" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "botolike" },
+    { name = "reqlike", specifier = "==2.0" },
+]
+
+[[package]]
+name = "urlish"
+version = "2.5.0"
+source = { registry = "https://index.example/simple/" }
+wheels = [
+    { url = "https://index.example/simple/urlish/urlish-2.5.0-py3-none-any.whl", hash = "sha256:b86badda86f3b4e27ab1ccc35383a0ef4010c950c6e0c3e3fc2093c52530eb12" },
+]

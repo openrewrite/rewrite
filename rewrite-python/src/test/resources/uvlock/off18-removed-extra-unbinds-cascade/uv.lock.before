@@ -1,0 +1,65 @@
+version = 1
+revision = 3
+requires-python = ">=3.10"
+
+[[package]]
+name = "keeper"
+version = "1.0"
+source = { registry = "https://index.example/simple/" }
+dependencies = [
+    { name = "reqlike" },
+]
+wheels = [
+    { url = "https://index.example/simple/keeper/keeper-1.0-py3-none-any.whl", hash = "sha256:6d7bb2e4f60771286d82e09b8a5ec231dd989886621e4fac5e3ca7d9c2b21eec" },
+]
+
+[[package]]
+name = "other"
+version = "1.0"
+source = { registry = "https://index.example/simple/" }
+dependencies = [
+    { name = "urlish" },
+]
+wheels = [
+    { url = "https://index.example/simple/other/other-1.0-py3-none-any.whl", hash = "sha256:9ab5b4fb24deb9960c2f2ab86b3fa29a5862f88127aaaf2b7f2ae66f3ad43437" },
+]
+
+[[package]]
+name = "reqlike"
+version = "1.0"
+source = { registry = "https://index.example/simple/" }
+wheels = [
+    { url = "https://index.example/simple/reqlike/reqlike-1.0-py3-none-any.whl", hash = "sha256:0c91380de5a729fd7d069df91d44a65983967696db897ccbc55c19bf3c0d8363" },
+]
+
+[package.optional-dependencies]
+socks = [
+    { name = "urlish" },
+]
+
+[[package]]
+name = "scen-s23"
+version = "0.1.0"
+source = { virtual = "." }
+dependencies = [
+    { name = "keeper" },
+    { name = "other" },
+    { name = "reqlike", extra = ["socks"] },
+    { name = "urlish" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "keeper", specifier = "==1.0" },
+    { name = "other", specifier = "==1.0" },
+    { name = "reqlike", extras = ["socks"], specifier = "==1.0" },
+    { name = "urlish", specifier = "==1.0" },
+]
+
+[[package]]
+name = "urlish"
+version = "1.0"
+source = { registry = "https://index.example/simple/" }
+wheels = [
+    { url = "https://index.example/simple/urlish/urlish-1.0-py3-none-any.whl", hash = "sha256:5a615b7e8d99a4427471db640d7625effb07f12ee9550fc8dd3907e3a8174039" },
+]

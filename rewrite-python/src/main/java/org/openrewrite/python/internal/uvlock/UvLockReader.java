@@ -71,7 +71,9 @@ public final class UvLockReader {
         if (version != 1) {
             throw new UvLockFormatException("Unrecognized uv.lock version: " + version);
         }
-        if (revision != null && (revision < 1 || revision > 3)) {
+        // revisions 4 and 5 add only optional header and [options] keys, each rejected below when
+        // present, and keep the revision-3 package entry shape
+        if (revision != null && (revision < 1 || revision > 5)) {
             throw new UvLockFormatException("Unrecognized uv.lock revision: " + revision);
         }
 
@@ -444,8 +446,13 @@ public final class UvLockReader {
                 throw new UvLockFormatException("Unrecognized package key: " + key);
             }
         }
-        if (name == null || version == null || source == null) {
-            throw new UvLockFormatException("Package entry is missing name, version or source");
+        if (name == null || source == null) {
+            throw new UvLockFormatException("Package entry is missing name or source");
+        }
+        // a project with dynamic = ["version"] is locked without a version key
+        if (version == null && source.getType() != UvLockSource.Type.VIRTUAL &&
+                source.getType() != UvLockSource.Type.EDITABLE && source.getType() != UvLockSource.Type.DIRECTORY) {
+            throw new UvLockFormatException("Package entry " + name + " is missing its version");
         }
 
         Map<String, List<UvLockDependency>> optionalDependencies = toDependencyGroups(raw.optionalDependencies);

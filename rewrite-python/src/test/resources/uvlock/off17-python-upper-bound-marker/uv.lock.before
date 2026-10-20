@@ -1,0 +1,33 @@
+version = 1
+revision = 3
+requires-python = ">=3.10"
+
+[[package]]
+name = "reqlike"
+version = "1.0"
+source = { registry = "https://index.example/simple/" }
+dependencies = [
+    { name = "urlish" },
+]
+wheels = [
+    { url = "https://index.example/simple/reqlike/reqlike-1.0-py3-none-any.whl", hash = "sha256:08ffaa42b46cf0930a67e6f851cc00f0433c54baac3851a7f04f8f77465dce89" },
+]
+
+[[package]]
+name = "scen-s17-upper-patch"
+version = "0.1.0"
+source = { virtual = "." }
+dependencies = [
+    { name = "reqlike" },
+]
+
+[package.metadata]
+requires-dist = [{ name = "reqlike", specifier = "==1.0" }]
+
+[[package]]
+name = "urlish"
+version = "1.26.0"
+source = { registry = "https://index.example/simple/" }
+wheels = [
+    { url = "https://index.example/simple/urlish/urlish-1.26.0-py3-none-any.whl", hash = "sha256:9231fc26a7007f527f67b10108d841f8752a27ba04d4979acbdd3daa4e1e7447" },
+]

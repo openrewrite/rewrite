@@ -15,6 +15,7 @@
  */
 package org.openrewrite.python.internal.uvlock;
 
+import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.ExecutionContext;
@@ -140,6 +141,145 @@ class UvLockDeltaOfflineTest {
     }
 
     /**
+     * A dependent's requirement on the cascade target only constrains it when its marker can
+     * fire under requires-python: botolike's {@code urlish<2.1; python_version < '3.10'} is dead
+     * under {@code >=3.10}, so uv moves urlish to 2.5.0, not the 2.0.0 the dead bound would allow.
+     */
+    @Test
+    void cascadeIgnoresConstraintsUnderDeadMarkers() {
+        routeLocalIndex("off10-dead-marker-cascade");
+        assertScenario("off10-dead-marker-cascade");
+    }
+
+    /**
+     * An extra-gated requirement ({@code urlish<2; extra == 'old'}) constrains the cascade target
+     * only when some edge activates that extra on the dependent; here none does, so uv moves urlish
+     * to 2.5.0 where the inactive bound would have made the cascade unsatisfiable.
+     */
+    @Test
+    void cascadeIgnoresConstraintsUnderInactiveExtras() {
+        routeLocalIndex("off12-inactive-extra-constraint");
+        assertScenario("off12-inactive-extra-constraint");
+    }
+
+    /**
+     * A {@code [dependency-groups]} declaration bounds a cascade target like any other root
+     * requirement: {@code dev = ["urlish<2.4"]} keeps uv at 2.0.0 although 2.5.0 is listed.
+     */
+    @Test
+    void cascadeHonorsDependencyGroupConstraints() {
+        routeLocalIndex("off13-dev-group-constraint");
+        assertScenario("off13-dev-group-constraint");
+    }
+
+    @Test
+    void cascadeIgnoresConstraintsUnderExtrasTheSameEditDeactivates() {
+        // dropping reqlike[socks] while keeper still needs reqlike releases its urlish<2 bound, so uv picks 2.5
+        routeLocalIndex("off18-removed-extra-unbinds-cascade");
+        assertScenario("off18-removed-extra-unbinds-cascade");
+    }
+
+    /**
+     * Removing {@code reqlike[socks]} while {@code other} still depends on reqlike keeps the
+     * package but drops its now-unactivated {@code socks} optional-dependencies group and the
+     * socklike entry only that group reached.
+     */
+    @Test
+    void removingExtrasDeclarationDropsOrphanedExtraGroup() {
+        Result result = UvLockEngine.regenerate(
+          resource("off11-extras-removal-keeps-package/pyproject.toml"),
+          resource("off11-extras-removal-keeps-package/uv.lock.before"),
+          ctx);
+        assertThat(result.getFailure())
+          .withFailMessage("engine failed: %s", result.getErrorMessage())
+          .isNull();
+        assertThat(result.getLockFileContent()).isEqualTo(resource("off11-extras-removal-keeps-package/uv.lock.after"));
+        // the recorded graph decides a removal; nothing is fetched
+        assertThat(http.requests).isEmpty();
+    }
+
+    /**
+     * Scenarios recorded against a local PEP 503 index (see the fixture README): the manifest
+     * declares {@code https://index.example/simple/} as its default index, and every simple page
+     * and metadata sidecar under the scenario's {@code http/} directory is served by name.
+     */
+    private void routeLocalIndex(String scenario) {
+        PythonExecutionContextView.view(ctx).setPackageIndexes(List.of(
+          new PythonPackageIndex("local", "https://index.example/simple/", true, null, null, false)));
+        http.routeDirectory("https://index.example/simple/", scenario + "/http/");
+    }
+
+    /**
+     * Upgrading {@code reqlike[socks]} to a version that no longer provides the extra makes uv
+     * drop the extra from the root edge, the optional-dependencies group and its closure;
+     * rebuilding groups is outside the engine, so it fails loud instead of keeping them.
+     */
+    @Test
+    void upgradeToVersionWithoutActivatedExtraFailsLoud() {
+        routeLocalIndex("off14-upgrade-drops-extra");
+        assertFailsLoud("off14-upgrade-drops-extra", "reqlike");
+    }
+
+    @Test
+    void upgradeRaisingPythonLowerBoundOnAnEdgeFailsLoud() {
+        // uv forks at python_full_version >= '3.11' although every package resolves to one version
+        routeLocalIndex("off15-python-lower-bound-marker");
+        assertFailsLoud("off15-python-lower-bound-marker", "reqlike");
+    }
+
+    @Test
+    void upgradeBoundingPythonFromAboveOnAnEdgeRegenerates() {
+        // a patch-level upper bound (python_full_version < '3.10.2') does not fork
+        routeLocalIndex("off17-python-upper-bound-marker");
+        assertScenario("off17-python-upper-bound-marker");
+    }
+
+    /**
+     * uv folds the legacy {@code [tool.uv] dev-dependencies} list into the {@code dev} group
+     * (its lock is identical to the same list under {@code [dependency-groups]}), so a manifest
+     * declaring groups that way is not a removal of the group.
+     */
+    @Test
+    void toolUvDevDependenciesAreTheDevGroup() {
+        assertUnchangedWithoutNetwork("off16-tool-uv-dev-dependencies");
+    }
+
+    /** {@code requires-python = "~=3.10"} denotes the recorded {@code >=3.10, <4}; the header stays. */
+    @Test
+    void equivalentRequiresPythonSpellingKeepsHeader() {
+        assertUnchangedWithoutNetwork("z3-compatible-release-python");
+    }
+
+    /** A root with {@code dynamic = ["version"]} is locked without a version key. */
+    @Test
+    void dynamicVersionRootRegenerates() {
+        assertUnchangedWithoutNetwork("z2-dynamic-version-root");
+    }
+
+    /** The manifest already matches the lock: the engine returns it byte-identical and fetches nothing. */
+    private void assertUnchangedWithoutNetwork(String scenario) {
+        Result result = UvLockEngine.regenerate(
+          resource(scenario + "/pyproject.toml"),
+          resource(scenario + "/uv.lock"),
+          ctx);
+        assertThat(result.getFailure())
+          .withFailMessage("engine failed: %s", result.getErrorMessage())
+          .isNull();
+        assertThat(result.getLockFileContent()).isEqualTo(resource(scenario + "/uv.lock"));
+        assertThat(http.requests).isEmpty();
+    }
+
+    private void assertFailsLoud(String scenario, String packageName) {
+        Result result = UvLockEngine.regenerate(
+          resource(scenario + "/pyproject.toml"),
+          resource(scenario + "/uv.lock.before"),
+          ctx);
+        assertThat(result.isSuccess()).isFalse();
+        assertThat(result.getFailure().getReason()).isEqualTo(Reason.RESOLUTION_REQUIRED);
+        assertThat(result.getFailure().getPackageName()).isEqualTo(packageName);
+    }
+
+    /**
      * A python-version-gated add makes real uv record lock-level resolution-markers (a fork
      * boundary at 3.11) even though iniconfig resolves to one version; that is marker-space
      * resolution, so the engine fails loud before any network fetch.
@@ -226,17 +366,51 @@ class UvLockDeltaOfflineTest {
             routes.put(url, resourceBytes(fixtureName));
         }
 
+        /**
+         * Serves a whole simple index from a fixture directory: {@code <prefix><pkg>/} maps to
+         * {@code <dir><pkg>-listing-html} and {@code <prefix><pkg>/<file>} to {@code <dir><file>}.
+         */
+        void routeDirectory(String urlPrefix, String fixtureDir) {
+            directories.put(urlPrefix, fixtureDir);
+        }
+
+        private final Map<String, String> directories = new LinkedHashMap<>();
+
         @Override
         public Response send(Request request) {
             String url = request.getUrl().toString();
             requests.add(url);
             byte[] body = routes.get(url);
             if (body == null) {
+                body = fromDirectory(url);
+                if (body != null) {
+                    routes.put(url, body);
+                }
+            }
+            if (body == null) {
                 return new Response(404, new ByteArrayInputStream(new byte[0]), () -> {
                 });
             }
             return new Response(200, new ByteArrayInputStream(body), () -> {
             });
+        }
+
+        private byte @Nullable [] fromDirectory(String url) {
+            for (Map.Entry<String, String> directory : directories.entrySet()) {
+                if (!url.startsWith(directory.getKey())) {
+                    continue;
+                }
+                String rest = url.substring(directory.getKey().length());
+                String fixture = rest.endsWith("/") ?
+                  rest.substring(0, rest.length() - 1) + "-listing-html" :
+                  rest.substring(rest.lastIndexOf('/') + 1);
+                try (InputStream is = UvLockDeltaOfflineTest.class.getResourceAsStream("/uvlock/" + directory.getValue() + fixture)) {
+                    return is == null ? null : is.readAllBytes();
+                } catch (IOException e) {
+                    throw new UncheckedIOException(e);
+                }
+            }
+            return null;
         }
     }
 }
