@@ -67,6 +67,7 @@ final class UvLockFixtures {
       "l-flat-index/uv.lock",
       "m2-options/uv.lock",
       "m3-lexical/uv.lock",
+      "m4-exclude-newer-span/uv.lock",
       "n-normalization/uv.lock",
       "n2-inline-width/uv.lock",
       "o-old-uv/proj-0.5.0/uv.lock",

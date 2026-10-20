@@ -15,6 +15,17 @@ Scenarios:
 - `g-upgrade` — the six 1.16.0 → 1.17.0 upgrade golden pair (`.before`/`.after`); drives the engine
   and recipe tests.
 
+Recorded 2026-10-20 with PDM 2.29.3 (macOS arm64, empty-cache home, live pypi.org), each by running
+`pdm lock --update-reuse` over `g-upgrade/pyproject.toml.after` and `pdm.lock.before`:
+- `h-lock-version-4-5-1` — the same upgrade as `g-upgrade`; the only difference from
+  `g-upgrade/pdm.lock.after` is `lock_version = "4.5.1"`, which PDM writes since 2.28.1.
+- `i-lock-inputs` — the same project with `[tool.pdm.resolution] lock_inputs = true`: `[metadata]`
+  carries `lock_inputs` sub-tables and no `content_hash`. The reader refuses it by name.
+
+`pdm lock --update-reuse` is the command a manifest edit corresponds to: a bare `pdm lock` uses the
+`all` strategy and moves every package to its latest version, so it is not a valid golden for the
+engine's minimal-update output.
+
 `http/` holds recorded pypi.org simple-API (PEP 691 JSON) and PEP 658 metadata responses so
 `PdmLockEngineTest` and `UpgradeDependencyVersionPdmLockTest` replay the golden upgrade offline.
 

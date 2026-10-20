@@ -115,6 +115,10 @@ public final class UvLockWriter {
         if (options.getExcludeNewer() != null) {
             b.append("\nexclude-newer = ").append(string(options.getExcludeNewer()));
         }
+        if (options.getExcludeNewerSpan() != null) {
+            b.append(' ').append(UvLockOptions.RELATIVE_EXCLUDE_NEWER_COMMENT);
+            b.append("\nexclude-newer-span = ").append(string(options.getExcludeNewerSpan()));
+        }
         return b.toString();
     }
 

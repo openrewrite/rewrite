@@ -119,6 +119,19 @@ class PdmLockEngineTest {
         assertThat(result.getFailure().getPackageName()).isEqualTo("attrs");
     }
 
+    @Test
+    void lockInputsFreshnessTrackingIsRefusedByName() {
+        // the fixture's [metadata] holds lock_inputs sub-tables and no content_hash (see README)
+        Result result = PdmLockEngine.regenerate(
+                resource("i-lock-inputs/pyproject.toml"),
+                resource("i-lock-inputs/pdm.lock"),
+                ctx);
+        assertThat(result.isSuccess()).isFalse();
+        assertThat(result.getFailure().getReason()).isEqualTo(Reason.MALFORMED_LOCK);
+        assertThat(result.getFailure().getDetail()).contains("lock_inputs");
+        assertThat(http.requests).isEmpty();
+    }
+
     static final class RoutedHttp implements HttpSender {
         final Map<String, byte[]> routes = new LinkedHashMap<>();
         final List<String> requests = new ArrayList<>();

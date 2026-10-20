@@ -26,6 +26,16 @@ import org.jspecify.annotations.Nullable;
 @With
 public class UvLockOptions {
 
+    /** uv writes this in place of a relative {@code exclude-newer}, with the comment on the same line. */
+    static final String RELATIVE_EXCLUDE_NEWER_TIMESTAMP = "0001-01-01T00:00:00Z";
+
+    static final String RELATIVE_EXCLUDE_NEWER_COMMENT =
+            "# This has no effect and is included for backwards compatibility when using relative exclude-newer values.";
+
     @Nullable
     String excludeNewer;
+
+    /** The ISO 8601 duration behind the sentinel, present exactly when {@link #excludeNewer} is it. */
+    @Nullable
+    String excludeNewerSpan;
 }

@@ -36,7 +36,8 @@ final class PdmLockFixtures {
       "e-markers/pdm.lock",
       "f-git/pdm.lock",
       "g-upgrade/pdm.lock.before",
-      "g-upgrade/pdm.lock.after"
+      "g-upgrade/pdm.lock.after",
+      "h-lock-version-4-5-1/pdm.lock"
     };
 
     private PdmLockFixtures() {

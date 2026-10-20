@@ -41,6 +41,12 @@ in CorentinJ/Real-Time-Voice-Cloning@890f3a03187195b9829db2079b75c2ba2ab0405c,
 `supported-markers` in spotDL/spotify-downloader@4aab5fdc5ad949abbb9974d8ad14c66675192c31, and
 `directory` sources in LizardByte/Sunshine@9d2409f71b60f1812f482e6dd807dc52e2f72fe7.
 
+`m4-exclude-newer-span` was recorded 2026-10-20 with uv 0.12.21 (macOS arm64, empty cache, live
+pypi.org) from a manifest declaring `[tool.uv] exclude-newer = "1 week"`: since 0.11.8 a relative
+value is written as the sentinel `exclude-newer = "0001-01-01T00:00:00Z"` followed by a trailing
+`#` comment, plus `exclude-newer-span = "P1W"`. 0.12.21 is the last release writing `revision = 3`;
+0.12.22 and later write `revision = 5` with the same `[options]` shape.
+
 `o-old-uv/proj-0.5.0/uv.lock.engine-edited` is the one ENGINE-DEFINED expectation in the corpus
 (real uv cannot produce it: it would rewrite the whole file at revision 3): the surgical
 six==1.16.0 pin-down of `uv.lock.as-0.5.0` in the file's own revisionless style, derived from the
