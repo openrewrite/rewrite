@@ -177,6 +177,24 @@ final class UvLockMarkers {
         return parts;
     }
 
+    /** Whether any clause compares {@code python_full_version} against a three-component version. */
+    static boolean comparesPatchLevelPython(@Nullable List<String[]> clauses) {
+        if (clauses == null) {
+            return false;
+        }
+        for (String[] clause : clauses) {
+            if (!"python_full_version".equals(clause[0])) {
+                continue;
+            }
+            String value = clause[2].endsWith(".*") ? clause[2].substring(0, clause[2].length() - 2) : clause[2];
+            PythonVersion v = PythonVersion.parse(value);
+            if (v != null && v.getRelease().length > 2) {
+                return true;
+            }
+        }
+        return false;
+    }
+
     /**
      * Drops always-true clauses and signals edge removal on any always-false clause;
      * null result means the whole marker became vacuous.

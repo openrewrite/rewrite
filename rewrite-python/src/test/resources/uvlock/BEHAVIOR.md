@@ -131,3 +131,41 @@ rather than guess dependencies.
   (declared) on the root package; groups are NOT top-level lock concepts (`f-dep-groups/uv.lock`).
 - `[project.optional-dependencies]` → `[package.optional-dependencies]` on the root +
   `marker = "extra == '<name>'"` entries in requires-dist + `provides-extras` (`g-optional-deps/uv.lock`).
+- The legacy `[tool.uv] dev-dependencies` list locks exactly like the same list under
+  `[dependency-groups] dev` (`off16-tool-uv-dev-dependencies/uv.lock` was produced from the former; the
+  latter gives a byte-identical file).
+
+## 9. Which requirements bound a package (local-index scenarios, uv 0.10.11 and 0.13.4)
+
+- A dependent's requirement whose marker is always false under `requires-python` does not constrain
+  the target: with `requires-python = ">=3.10"`, `urlish<2.1; python_version < "3.10"` next to
+  `urlish<3; python_version >= "3.10"` lets a cascade move urlish to 2.5.0 (`off10-dead-marker-cascade/`).
+- An extra-gated requirement (`urlish<2; extra == "old"`) constrains the target only while some edge
+  activates that extra on the dependent (`off12-inactive-extra-constraint/`: nothing activates `old`, urlish
+  moves to 2.5.0).
+- A `[dependency-groups]` declaration bounds a target like a `[project]` one: `dev = ["urlish<2.4"]`
+  keeps urlish at 2.0.0 although 2.5.0 is listed (`off13-dev-group-constraint/`).
+- A non-root package's `[package.optional-dependencies]` group exists only while an edge activates the
+  extra: removing `reqlike[socks]` from the root while `other` still depends on `reqlike` keeps the
+  package, drops the `socks` group and the `socklike` entry only it reached
+  (`off11-extras-removal-keeps-package/`).
+
+## 10. Edits that change the fork structure (fail loud)
+
+- Upgrading `reqlike[socks]` to a version that no longer provides `socks` makes uv drop the extra from
+  the root edge, the group and its closure, with a warning (`off14-upgrade-drops-extra/`, no `.after`).
+- A new version gating a dependency on a patch-level `python_full_version` (`urlish; python_full_version
+  >= '3.10.2'`) makes uv record lock-level `resolution-markers` at 3.10.2 even though every package
+  resolves to one version (`off15-patch-level-marker/`, no `.after`), consistent with §4.
+- Removing a dependency whose closure was the only cause of a fork leaves the top-level
+  `resolution-markers` in place: uv seeds its forks from the existing lock
+  (`s3` probe, dev-time only; the engine's unchanged header matched byte for byte).
+
+## 11. uv 0.13.4
+
+- Writes `revision = 5`; for every scenario in §9 and §10 the file is otherwise byte-identical to
+  uv 0.10.11's (`z-revision-5/uv.lock` is a 0.13.4 lock). Newer header material observed in the wild
+  (`[options] exclude-newer-span`, `[options.exclude-newer-package]`, `[manifest] build-constraints`) is
+  still rejected key by key.
+- Rewrites a revision-3 file at revision 5 when anything changes, as §5 describes for older revisions.
+- Omits `version` on a root with `dynamic = ["version"]` (also 0.10.11: `z2-dynamic-version-root/uv.lock`).

@@ -1,0 +1,35 @@
+version = 1
+revision = 3
+requires-python = ">=3.10"
+
+[[package]]
+name = "reqlike"
+version = "1.0"
+source = { registry = "https://index.example/simple/" }
+wheels = [
+    { url = "https://index.example/simple/reqlike/reqlike-1.0-py3-none-any.whl", hash = "sha256:4f83bcaeb70bd9d5a6500d4ad9e9eb615dd131c0c9804b72fcd36cd9288e69ce" },
+]
+
+[package.optional-dependencies]
+socks = [
+    { name = "socklike" },
+]
+
+[[package]]
+name = "scen-s7-upgrade-drops-extra"
+version = "0.1.0"
+source = { virtual = "." }
+dependencies = [
+    { name = "reqlike", extra = ["socks"] },
+]
+
+[package.metadata]
+requires-dist = [{ name = "reqlike", extras = ["socks"], specifier = "==1.0" }]
+
+[[package]]
+name = "socklike"
+version = "1.0"
+source = { registry = "https://index.example/simple/" }
+wheels = [
+    { url = "https://index.example/simple/socklike/socklike-1.0-py3-none-any.whl", hash = "sha256:4a801f6bb276aacbd7ea39be8328f9e454d1ffe973fd27aa481ca9932aa12f49" },
+]

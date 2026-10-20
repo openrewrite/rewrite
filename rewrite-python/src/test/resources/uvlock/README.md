@@ -41,6 +41,23 @@ in CorentinJ/Real-Time-Voice-Cloning@890f3a03187195b9829db2079b75c2ba2ab0405c,
 `supported-markers` in spotDL/spotify-downloader@4aab5fdc5ad949abbb9974d8ad14c66675192c31, and
 `directory` sources in LizardByte/Sunshine@9d2409f71b60f1812f482e6dd807dc52e2f72fe7.
 
+Local-index scenarios (`off10`–`off15`, uv 0.10.11, 2026-10-20): each was locked against a throwaway
+PEP 503 index of synthetic pure-python wheels built for the scenario, then the index host was rewritten
+to `https://index.example` in the manifest, both locks and the recorded `http/` pages (`<pkg>-listing.html`
+plus the `.metadata` sidecars). The same scenarios re-locked with uv 0.13.4 differ only in the
+`revision` line. `off10-dead-marker-cascade` and `off12-inactive-extra-constraint` pin which of a
+dependent's requirements bound a cascade target; `off11-extras-removal-keeps-package` the drop of an
+optional-dependencies group whose activating declaration was removed; `off13-dev-group-constraint` a
+dependency-group bound on a cascade target; `off14-upgrade-drops-extra` and `off15-patch-level-marker`
+are fail-loud scenarios and carry no `uv.lock.after` (BEHAVIOR.md §10).
+
+`off16-tool-uv-dev-dependencies` (pypi.org) declares its dev group through the legacy `[tool.uv]
+dev-dependencies` list; uv's lock is byte-identical to the same list under `[dependency-groups]`.
+`z-revision-5` was locked by uv 0.13.4 (`revision = 5`, otherwise the revision-3 shape),
+`z2-dynamic-version-root` by uv 0.10.11 for a project with `dynamic = ["version"]`, whose root entry
+carries no `version` key, and `z3-compatible-release-python` by uv 0.10.11 for
+`requires-python = "~=3.10"`, recorded as `>=3.10, <4`.
+
 `o-old-uv/proj-0.5.0/uv.lock.engine-edited` is the one ENGINE-DEFINED expectation in the corpus
 (real uv cannot produce it: it would rewrite the whole file at revision 3): the surgical
 six==1.16.0 pin-down of `uv.lock.as-0.5.0` in the file's own revisionless style, derived from the

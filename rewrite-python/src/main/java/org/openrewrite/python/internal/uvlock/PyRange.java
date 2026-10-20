@@ -29,6 +29,11 @@ final class PyRange {
     @Nullable PythonVersion upper;
     boolean upperInclusive;
 
+    boolean sameBounds(PyRange other) {
+        return java.util.Objects.equals(lower, other.lower) && lowerExclusive == other.lowerExclusive &&
+                java.util.Objects.equals(upper, other.upper) && upperInclusive == other.upperInclusive;
+    }
+
     static PyRange parse(String requiresPython) {
         PyRange range = new PyRange();
         PythonVersionSpecifierSet set = PythonVersionSpecifierSet.parse(requiresPython);

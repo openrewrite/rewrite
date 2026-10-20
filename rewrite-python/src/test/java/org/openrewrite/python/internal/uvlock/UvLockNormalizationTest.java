@@ -47,6 +47,25 @@ class UvLockNormalizationTest {
         assertThat(normalizeRequiresDistSpecifier("<4,==3.1.*")).isEqualTo("==3.1.*,<4");
     }
 
+    /** Clauses on equal versions follow uv's operator order: {@code <=} before {@code >=}. */
+    @Test
+    void equalVersionsOrderedByOperator() {
+        assertThat(normalizeRequiresDistSpecifier(">=2.4, <=2.4.0")).isEqualTo("<=2.4.0,>=2.4");
+    }
+
+    /**
+     * uv records requires-python as a canonical range: compatible releases expand, and a range
+     * covering exactly one minor collapses to a wildcard (each form recorded from real uv 0.10.11).
+     */
+    @Test
+    void requiresPythonRecordedAsCanonicalRange() {
+        assertThat(UvLockNormalization.normalizeRequiresPython("~=3.10")).isEqualTo(">=3.10, <4");
+        assertThat(UvLockNormalization.normalizeRequiresPython("~=3.10.2")).isEqualTo(">=3.10.2, <3.11");
+        assertThat(UvLockNormalization.normalizeRequiresPython("~=3.13.0")).isEqualTo("==3.13.*");
+        assertThat(UvLockNormalization.normalizeRequiresPython(">=3.12,<3.13")).isEqualTo("==3.12.*");
+        assertThat(UvLockNormalization.normalizeRequiresPython("<3.15,>=3.10")).isEqualTo(">=3.10, <3.15");
+    }
+
     @Test
     void unparsableClauseThrows() {
         assertThatThrownBy(() -> normalizeRequiresDistSpecifier(">=not-a-version"))

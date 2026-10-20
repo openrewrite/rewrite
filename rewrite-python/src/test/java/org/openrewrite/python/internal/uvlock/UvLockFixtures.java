@@ -78,6 +78,8 @@ final class UvLockFixtures {
       "o-old-uv/proj-0.7.0/uv.lock.as-0.7.0",
       "p-editable-root/uv.lock",
       "q-workspace/uv.lock",
+      "z-revision-5/uv.lock",
+      "z2-dynamic-version-root/uv.lock",
       "r-removal/uv.lock",
       "r-removal/uv.lock.before",
       "s-remove-last-dep/uv.lock.after",

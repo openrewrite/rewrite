@@ -37,7 +37,8 @@ final class PoetryLockFixtures {
       "f-markers/poetry.lock",
       "g-git/poetry.lock",
       "i-upgrade/poetry.lock.before",
-      "i-upgrade/poetry.lock.after"
+      "i-upgrade/poetry.lock.after",
+      "k-group-markers/poetry.lock"
     };
 
     private PoetryLockFixtures() {

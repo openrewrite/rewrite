@@ -1,0 +1,7 @@
+Metadata-Version: 2.1
+Name: sib
+Version: 1.0
+Summary: synthetic sib
+Provides-Extra: old
+Requires-Dist: urlish>=1.21,<3
+Requires-Dist: urlish<2; extra == "old"
