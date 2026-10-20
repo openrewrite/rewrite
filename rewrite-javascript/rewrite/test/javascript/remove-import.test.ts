@@ -89,6 +89,21 @@ describe('RemoveImport visitor', () => {
                 )
             );
         });
+        test('should not remove aliased import when its alias is used', async () => {
+            const spec = new RecipeSpec();
+            spec.recipe = fromVisitor(new RemoveImport("m"));
+
+            //language=typescript
+            await spec.rewriteRun(
+                typescript(
+                    `
+                        import {foo as bar} from 'm';
+
+                        bar();
+                    `
+                )
+            );
+        });
     });
 
     describe('methods with same names from different types', () => {
@@ -408,6 +423,45 @@ describe('RemoveImport visitor', () => {
                 );
             }, { unsafeCleanup: true });
         });
+        test('should remove default and named imports when none is used', async () => {
+            const spec = new RecipeSpec();
+            spec.recipe = fromVisitor(new RemoveImport("react"));
+
+            //language=typescript
+            await spec.rewriteRun(
+                typescript(
+                    `
+                        import React, {useState} from 'react';
+
+                        const x = 1;
+                    `,
+                    `
+                        const x = 1;
+                    `
+                )
+            );
+        });
+
+        test('should remove default import and unused named imports while keeping used ones', async () => {
+            const spec = new RecipeSpec();
+            spec.recipe = fromVisitor(new RemoveImport("react"));
+
+            //language=typescript
+            await spec.rewriteRun(
+                typescript(
+                    `
+                        import React, {useState, useMemo} from 'react';
+
+                        useMemo();
+                    `,
+                    `
+                        import {useMemo} from 'react';
+
+                        useMemo();
+                    `
+                )
+            );
+        });
     });
 
     describe('namespace imports', () => {
@@ -447,6 +501,19 @@ describe('RemoveImport visitor', () => {
                         function example() {
                             return fs.readFileSync('test.txt');
                         }
+                    `
+                )
+            );
+        });
+        test('should not remove side-effect import when removing the namespace import', async () => {
+            const spec = new RecipeSpec();
+            spec.recipe = fromVisitor(new RemoveImport("m", "*"));
+
+            //language=typescript
+            await spec.rewriteRun(
+                typescript(
+                    `
+                        import 'm';
                     `
                 )
             );

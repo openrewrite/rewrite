@@ -312,6 +312,7 @@ export class JavaScriptVisitor<P> extends JavaVisitor<P> {
         const updates: any = {
             prefix: await this.visitSpace(functionType.prefix, p),
             markers: await this.visitMarkers(functionType.markers, p),
+            modifiers: await mapAsync(functionType.modifiers, item => this.visitDefined<J.Modifier>(item, p)),
             constructorType: await this.visitLeftPadded(functionType.constructorType, p),
             typeParameters: functionType.typeParameters && await this.visitDefined<J.TypeParameters>(functionType.typeParameters, p),
             parameters: await this.visitContainer(functionType.parameters, p),
@@ -991,6 +992,7 @@ export class JavaScriptVisitor<P> extends JavaVisitor<P> {
         const updates: any = {
             prefix: await this.visitSpace(forOfLoop.prefix, p),
             markers: await this.visitMarkers(forOfLoop.markers, p),
+            await: forOfLoop.await && await this.visitSpace(forOfLoop.await, p),
             loop: await this.visitDefined<J.ForEachLoop>(forOfLoop.loop, p)
         };
         return updateIfChanged(forOfLoop, updates);

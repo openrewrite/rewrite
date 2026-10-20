@@ -616,7 +616,7 @@ class DeclarativeRecipeTest implements RewriteTest {
           )
         );
         rewriteRun(
-          spec -> spec.recipe(root).cycles(10).cycles(3).expectedCyclesThatMakeChanges(2),
+          spec -> spec.recipe(root).cycles(10).cycles(3).expectedCyclesThatMakeChanges(2), // the inner MaxCycles stops RepeatedFindAndReplace after two cycles
           text("1", "1+1+1")
         );
         assertThat(cycleCount).hasValue(3);

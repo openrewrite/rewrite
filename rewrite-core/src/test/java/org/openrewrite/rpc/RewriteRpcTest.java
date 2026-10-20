@@ -37,6 +37,7 @@ import org.openrewrite.marker.Markup;
 import org.openrewrite.marker.Markers;
 import org.openrewrite.marker.SearchResult;
 import org.openrewrite.config.CompositeRecipe;
+import org.openrewrite.config.DeclarativeRecipe;
 import org.openrewrite.config.Environment;
 import org.openrewrite.config.OptionDescriptor;
 import org.openrewrite.config.RecipeDescriptor;
@@ -54,6 +55,7 @@ import org.openrewrite.text.PlainTextVisitor;
 import java.io.IOException;
 import java.io.PipedInputStream;
 import java.io.PipedOutputStream;
+import java.net.URI;
 import java.nio.file.Path;
 import java.util.List;
 import java.util.Map;
@@ -62,7 +64,9 @@ import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.CountDownLatch;
 import java.util.function.UnaryOperator;
 
+import static java.util.Collections.emptyList;
 import static java.util.Collections.emptyMap;
+import static java.util.Collections.emptySet;
 import static java.util.Collections.singletonMap;
 import static java.util.Objects.requireNonNull;
 import static java.util.stream.Collectors.joining;
@@ -671,6 +675,21 @@ class RewriteRpcTest implements RewriteTest {
         );
     }
 
+    @Test
+    void batchedChildChangesHonourCompositeCausesAnotherCycle() {
+        var composite = new DeclarativeRecipe("composite", "Composite", "Composite.", emptySet(), null,
+          URI.create("dummy:recipe.yml"), true, emptyList());
+        composite.addUninitialized(client.prepareRecipe("org.openrewrite.text.ChangeText", Map.of("toText", "step1")));
+        composite.addUninitialized(client.prepareRecipe("org.openrewrite.text.ChangeText", Map.of("toText", "step2")));
+        composite.initialize(List.of());
+
+        var ctx = new InMemoryExecutionContext();
+        List<SourceFile> sources = List.of(PlainText.builder().text("hello").sourcePath(Path.of("test.txt")).build());
+        composite.run(new InMemoryLargeSourceSet(sources), ctx, 2, 1);
+
+        assertThat(ctx.getCycle()).isEqualTo(2);
+    }
+
     /**
      * Verifies three consecutive same-RPC recipes. The scheduler should batch
      * all three into one BatchVisit and fetch only once at the end.
@@ -743,7 +762,7 @@ class RewriteRpcTest implements RewriteTest {
           spec -> spec
             .recipe(new CompositeRecipe(List.of(rpc1, local)))
             .validateRecipeSerialization(false)
-            .expectedCyclesThatMakeChanges(2),
+            .expectedCyclesThatMakeChanges(2), // each ChangeText overwrites the other in every cycle
           text(
             "hello",
             "from-local"

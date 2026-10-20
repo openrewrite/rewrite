@@ -374,6 +374,7 @@ public interface G extends J {
     final class ExpressionStatement implements G, Expression, Statement {
 
         @With
+        @EqualsAndHashCode.Include
         UUID id;
 
         @With
@@ -686,6 +687,7 @@ public interface G extends J {
     @Data
     @With
     final class GString implements G, Statement, Expression {
+        @EqualsAndHashCode.Include
         UUID id;
         Space prefix;
         Markers markers;
@@ -711,6 +713,7 @@ public interface G extends J {
         @Data
         @With
         public static final class Value implements G {
+            @EqualsAndHashCode.Include
             UUID id;
             Markers markers;
             J tree;

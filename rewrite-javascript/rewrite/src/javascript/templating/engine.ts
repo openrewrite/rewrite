@@ -23,6 +23,7 @@ import {PlaceholderReplacementVisitor, SubstitutedValue} from './placeholder-rep
 import {isTrailingMarker, maybeParenthesize, parenthesize, requiredPrecedence, startsWithDeclarationToken} from './precedence';
 import {JavaCoordinates} from './template';
 import {autoIndent, maybeAutoFormat} from '../format';
+import {getPrettierStyle} from '../format/prettier-format';
 import {renameBindings} from './bindings';
 import {isExpression, isStatement} from '../parser-utils';
 import {randomId} from '../../uuid';
@@ -893,10 +894,12 @@ export class TemplateApplier {
             (await treeIds(owner as J)).has(originalTree.id) ? this.cursor : this.cursor?.parent;
         const formatted =
             await maybeAutoFormat(originalTree, result, null, undefined, parent);
-        // A value Prettier lays out arrives unmarked, since reconciling takes the markers of Prettier's parse
+        // A value Prettier lays out keeps Prettier's layout
         let laidOut = formatted;
         if (this.substituted) {
-            const restore = new SubstitutedLayoutVisitor(await substitutedValues(result));
+            const prettierStyle = getPrettierStyle(result, parent);
+            const prettierLaysOut = prettierStyle !== undefined && !prettierStyle.ignored;
+            const restore = new SubstitutedLayoutVisitor(prettierLaysOut ? undefined : await substitutedValues(result));
             laidOut = (await restore.visit<J>(formatted, undefined))!;
             if (restore.restored) {
                 laidOut = await autoIndent(laidOut, null, parent);
