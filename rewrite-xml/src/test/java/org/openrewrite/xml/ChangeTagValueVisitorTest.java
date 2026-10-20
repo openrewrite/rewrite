@@ -156,6 +156,31 @@ class ChangeTagValueVisitorTest implements RewriteTest {
     }
 
     @Test
+    void withValueOnEmptyElement() {
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new XmlIsoVisitor<>() {
+              @Override
+              public Xml.Tag visitTag(Xml.Tag tag, ExecutionContext ctx) {
+                  Xml.Tag t = super.visitTag(tag, ctx);
+                  return "dependency".equals(t.getName()) ? t.withChildValue("version", "2.0") : t;
+              }
+          })),
+          xml(
+            """
+              <dependency>
+                  <version></version>
+              </dependency>
+              """,
+            """
+              <dependency>
+                  <version>2.0</version>
+              </dependency>
+              """
+          )
+        );
+    }
+
+    @Test
     void withersReturnSameTreeForUnchangedValues() {
         rewriteRun(
           spec -> spec.recipe(toRecipe(() -> new XmlIsoVisitor<>() {
