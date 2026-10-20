@@ -76,6 +76,61 @@ refuse, and both present as a requirement on an already-decided package.
 What differs per tool, and must be encoded per tool, is the admissibility filter: prerelease policy, yanked policy,
 the `Requires-Python` rule, and index precedence. These are small, explicit functions in each source tree.
 
+### Current releases versus the pinned versions
+
+The fixtures pin uv 0.10.11, Poetry 2.4.1 and PDM 2.28.0. On 2026-10-20 the current releases are uv 0.13.4,
+Poetry 2.5.1 and PDM 2.29.3. Each was run from an empty-cache home over the existing leaf-upgrade goldens, and the
+resolver and lock-writer sources were diffed from the pinned tag to the current one. A change a release introduced
+and a later release in the range fixed is not listed; only the net behavior at the current release counts.
+
+Every tool stamps its own release into the lock, and that stamp is the one difference in the goldens:
+
+| Tool | Golden | Current release's output |
+|---|---|---|
+| uv 0.13.4 | `i-minimal-update` | identical, except `revision = 3` becomes `revision = 5` on any change; an unchanged lock is preserved and `uv lock --check` passes |
+| Poetry 2.5.1 | `j-modern-upgrade` | identical, except the header comment names 2.5.1 |
+| PDM 2.29.3 (`--update-reuse`) | `g-upgrade` | identical, except `lock_version = "4.5.1"` |
+
+The engines handle those stamps unevenly. `UvLockReader` rejects any revision above 3 and `PdmLockReader` any
+`lock_version` other than `4.5.0`, both as `MALFORMED_LOCK`, so a lock last written by uv 0.12.22 or later or by
+PDM 2.28.1 or later is refused before any edit is attempted. `PoetryLockWriter` preserves the header and lock-version
+it read.
+
+What the stamps encode, and the other net changes that reach lock bytes:
+
+- **uv.** Revision 4 was only ever written by the metadata-free preview (0.11.33, #20695); the default writer went
+  from 3 to 5 in one step at 0.12.22 (#22010, #22044), where revision 5 records workspace default groups and group
+  `requires-python`, written only when configured away from the default.
+  The reader accepts any revision and leaves a satisfied older lock untouched (`uv-lock/src/lock/mod.rs:124-138`,
+  `6582`). Beyond the stamp: a relative `exclude-newer` is written as a sentinel
+  timestamp plus `exclude-newer-span` (0.11.8); prerelease selection became "stable first within the range, then
+  prerelease" for every package, so a range with no stable candidate now resolves instead of failing (0.12.0,
+  #19993); a `Requires-Python` known only from fetched metadata now forks instead of marking the version unavailable
+  (0.11.32, #20586); dependency markers are simplified under the parent's reachability marker (0.11.25, #19971) and
+  rendered from a new irredundant DNF cover (0.13.2, #22608), so a conditional edge's string can differ from the
+  0.10.11 form the engine reproduces. Unchanged by diff: preference lookup, yank allowances, PubGrub priority
+  classes, the conflict threshold, fork detection, package and edge sort order, `hash = max(hashes)`, and `uv add`
+  passing no implicit upgrade. The code moved (`uv-lock`, `uv-lock-operations`, `uv-resolver-types` crates), so the
+  line citations in the uv section refer to 0.10.11.
+- **Poetry.** `lock-version` is still 2.1 and both releases read 1.0 through 2.1 silently; the header flips only when
+  data changes (`Locker._should_write` compares parsed dicts). poetry-core 2.5.0 (#939) renders a constraint that
+  combines `!=` with a bound as `>=1,!=2` where 2.4.0 wrote `>=1,<2 || >2`, and Poetry re-renders every package's
+  `[package.dependencies]` on any rewrite, so a 2.5.1 relock changes those strings file-wide while the engine
+  preserves untouched entries. The same change admits prereleases differently at `<V` and `!=V` boundaries.
+  poetry-core 2.4.1 (#943, first shipped with Poetry 2.5.0) changes `without_extras()` for disjunctions containing an
+  `extra ==` term, which feeds per-package `markers` and `[package.extras]`. Poetry 2.5.0 (#10944) resolves
+  mutually exclusive marker conflicts by splitting into override runs that 2.4.1 failed on. Unchanged: the solver's
+  preference order, `search_for`, `get_locked`, `_do_refresh`, JSON API usage, wheel choice for metadata, and
+  `content-hash` inputs.
+- **PDM.** `lock_version` 4.5.1 (2.28.1, #3821) encodes the opt-in `metadata.lock_inputs` table, which replaces
+  `content_hash` when enabled; both releases read the other's stamp with a warning only. A lock with two or more
+  platform targets gains `sys_platform` markers on later targets (2.29.0, #3261); `python_version <= "X.Y"` is now
+  converted to `<X.Y+1` in the Python-range arithmetic that decides marker dropping (2.29.3, #3902). The marker and
+  specifier library dep-logic is pinned only as `>=0.5`, so the installed 0.5.2 or 0.7.x is an input: it changes
+  the rendering of a `targets[].requires_python` with a hole and one marker-union shape. Resolution code for named
+  requirements, `strategy.update = "reuse"`, and the `[metadata]` key set are unchanged.
+- **pipenv** was not re-examined; its verdict does not depend on the release.
+
 ## Per-manager assessment
 
 ### uv 0.10.11
@@ -245,7 +300,21 @@ accuracy contract exists to prevent.
 7. **The differential harness is the gate**, as ADR 0010 required for uv: for each manager a live test that applies
    the recipe's edit to a fixture project, runs the engine, runs the real tool with the oracle command in an
    empty-cache home, asserts byte identity, and records the HTTP exchange for an offline replay test. The corpus run
-   in progress supplies the edits and the failure ranking.
+   in progress supplies the edits and the failure ranking. Goldens are recorded with the current release and kept
+   per release, as ADR 0013 keeps Node scenarios, so an older release's output stays a checked expectation.
+8. **An engine writes as one named release, and reads any stamp up to the newest it reproduces.** The release is
+   taken from the host through `PythonExecutionContextView` when the host knows which tool the project runs; without
+   that, the release the lock's own stamp names (Poetry's header exactly; for uv and PDM the newest reproduced release
+   that writes that stamp). Writing as a release means its stamp and its renderings: uv revision 5, Poetry's header
+   plus poetry-core 2.5.0's constraint rendering across the file, PDM `lock_version` 4.5.1. The lock's own stamp is the
+   default because every current release accepts the previous stamp (`uv lock --check` passes on revision 3, Poetry
+   reads 2.1, PDM warns on 4.5.0), so the output is byte-identical to the release that evidently wrote the lock and
+   still passes the current one's check. A stamp newer than the newest reproduced release fails loud, because the
+   lock may carry keys the engine does not model.
+9. **Before any resolver work, the readers accept the current stamps.** `UvLockReader` accepts revisions 4 and 5 and
+   fails loud only on the keys they can carry (`default-groups`, `group-requires-python`, `[package.metadata]`
+   omitted for a registry package); `PdmLockReader` accepts 4.5.1 and fails loud on a `lock_inputs` table. This is
+   a reader change independent of resolution and precedes every item above.
 
 ## Consequences
 
@@ -261,5 +330,8 @@ accuracy contract exists to prevent.
 - The oracle choice for PDM changes what "correct" means for its existing golden: the `g-upgrade` pair must be
   re-recorded with `--update-reuse` (for a single leaf the bytes are the same, so no test changes, but the README and
   the recorder must say so).
-- The tracked tool versions grow to Poetry 2.4.1 and PDM 2.28.0 for resolution behavior, not only for format. A
-  newer release is a diff of the files cited here, replayed against the fixtures.
+- The tracked tool versions grow to Poetry and PDM for resolution behavior, not only for format, and move from the
+  fixture pins to the current releases. A newer release is a diff of the files cited here, replayed against the
+  fixtures.
+- The uv engine's reproduced marker forms are 0.10.11's, and 0.13.2's DNF cover can render the same Boolean function
+  differently, so each form is re-recorded against the current release before it stays accepted.
