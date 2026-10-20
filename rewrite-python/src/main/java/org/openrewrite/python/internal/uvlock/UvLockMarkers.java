@@ -41,6 +41,8 @@ final class UvLockMarkers {
             "\\s*([A-Za-z_][A-Za-z0-9_]*)\\s*(===|==|!=|<=|>=|<|>|~=|not\\s+in|in)\\s*(['\"])([^'\"]*)\\3\\s*");
     private static final Set<String> VERSION_VARS = new HashSet<>(Arrays.asList(
             "python_version", "python_full_version"));
+    private static final Set<String> LOWER_BOUND_OPERATORS = new HashSet<>(Arrays.asList(
+            ">=", ">", "==", "===", "~="));
 
     private UvLockMarkers() {
     }
@@ -177,18 +179,13 @@ final class UvLockMarkers {
         return parts;
     }
 
-    /** Whether any clause compares {@code python_full_version} against a three-component version. */
-    static boolean comparesPatchLevelPython(@Nullable List<String[]> clauses) {
+    /** Whether any clause bounds the Python version from below ({@code >=}, {@code >}, {@code ==}, {@code ~=}). */
+    static boolean raisesPythonLowerBound(@Nullable List<String[]> clauses) {
         if (clauses == null) {
             return false;
         }
         for (String[] clause : clauses) {
-            if (!"python_full_version".equals(clause[0])) {
-                continue;
-            }
-            String value = clause[2].endsWith(".*") ? clause[2].substring(0, clause[2].length() - 2) : clause[2];
-            PythonVersion v = PythonVersion.parse(value);
-            if (v != null && v.getRelease().length > 2) {
+            if (VERSION_VARS.contains(clause[0]) && LOWER_BOUND_OPERATORS.contains(clause[1])) {
                 return true;
             }
         }

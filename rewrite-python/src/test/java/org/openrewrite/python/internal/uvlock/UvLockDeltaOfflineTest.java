@@ -172,6 +172,13 @@ class UvLockDeltaOfflineTest {
         assertScenario("off13-dev-group-constraint");
     }
 
+    @Test
+    void cascadeIgnoresConstraintsUnderExtrasTheSameEditDeactivates() {
+        // dropping reqlike[socks] while keeper still needs reqlike releases its urlish<2 bound, so uv picks 2.5
+        routeLocalIndex("off18-removed-extra-unbinds-cascade");
+        assertScenario("off18-removed-extra-unbinds-cascade");
+    }
+
     /**
      * Removing {@code reqlike[socks]} while {@code other} still depends on reqlike keeps the
      * package but drops its now-unactivated {@code socks} optional-dependencies group and the
@@ -213,15 +220,18 @@ class UvLockDeltaOfflineTest {
         assertFailsLoud("off14-upgrade-drops-extra", "reqlike");
     }
 
-    /**
-     * A new version gating a dependency on a patch-level {@code python_full_version} makes uv
-     * fork the resolution (lock-level resolution-markers at 3.10.2) even though every package
-     * resolves to one version; the engine fails loud rather than emit the edge without the fork.
-     */
     @Test
-    void upgradeIntroducingPatchLevelMarkerFailsLoud() {
-        routeLocalIndex("off15-patch-level-marker");
-        assertFailsLoud("off15-patch-level-marker", "reqlike");
+    void upgradeRaisingPythonLowerBoundOnAnEdgeFailsLoud() {
+        // uv forks at python_full_version >= '3.11' although every package resolves to one version
+        routeLocalIndex("off15-python-lower-bound-marker");
+        assertFailsLoud("off15-python-lower-bound-marker", "reqlike");
+    }
+
+    @Test
+    void upgradeBoundingPythonFromAboveOnAnEdgeRegenerates() {
+        // a patch-level upper bound (python_full_version < '3.10.2') does not fork
+        routeLocalIndex("off17-python-upper-bound-marker");
+        assertScenario("off17-python-upper-bound-marker");
     }
 
     /**

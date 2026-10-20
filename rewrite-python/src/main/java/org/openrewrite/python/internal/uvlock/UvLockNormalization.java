@@ -68,13 +68,12 @@ public final class UvLockNormalization {
                 continue;
             }
             if (clause.startsWith("~=")) {
-                PythonVersion v = clauseVersion(clause);
-                long[] release = v.getRelease();
-                if (release.length < 2) {
+                PythonVersion upper = PyRange.bumpTrailingRelease(clauseVersion(clause));
+                if (upper == null) {
                     throw new IllegalArgumentException("Compatible release needs two components: " + clause);
                 }
                 expanded.add(">=" + clause.substring(2));
-                expanded.add("<" + bumpedPrefix(release, release.length - 1));
+                expanded.add("<" + upper);
             } else {
                 expanded.add(clause);
             }
@@ -102,18 +101,6 @@ public final class UvLockNormalization {
             }
         }
         return true;
-    }
-
-    /** The release truncated to {@code components} parts with the last one incremented, e.g. 3.10.2 -> 3.11. */
-    private static String bumpedPrefix(long[] release, int components) {
-        StringBuilder b = new StringBuilder();
-        for (int i = 0; i < components; i++) {
-            if (i > 0) {
-                b.append('.');
-            }
-            b.append(i == components - 1 ? release[i] + 1 : release[i]);
-        }
-        return b.toString();
     }
 
     private static List<String> sortedClauses(String specifier) {

@@ -14,7 +14,7 @@ wheels = [
 ]
 
 [[package]]
-name = "scen-s8-patch-level-marker"
+name = "scen-s17-upper-patch"
 version = "0.1.0"
 source = { virtual = "." }
 dependencies = [

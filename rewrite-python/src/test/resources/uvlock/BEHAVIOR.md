@@ -68,8 +68,12 @@ that keeps `[package.metadata]` in sync with pyproject.toml passes `--check` and
   top-level and per-package `resolution-markers` (`e2-true-fork/`).
 - A bare environment marker (`sys_platform == 'win32'`) does NOT fork; the dep simply carries the
   marker (`e-markers-forks/` — no resolution-markers despite three conditional deps).
-- A `python_full_version` comparison against a **patch version** (`>= '3.10.2'`) forks the
-  resolution even without version conflicts (`n2-inline-width/`).
+- A dependency marker that raises the Python lower bound above `requires-python` (`>=`, `>` or `==`
+  on `python_version`/`python_full_version`, at any precision, alone or and-ed with other clauses)
+  forks the resolution even without version conflicts (`n2-inline-width/`, `off15-python-lower-bound-marker/`).
+  An upper bound or exclusion (`<`, `<=`, `!=`) does not fork, even at patch precision
+  (`off17-python-upper-bound-marker/`). Every corpus lock with such a lower-bound edge records
+  `resolution-markers`.
 
 ## 5. Lockfile revision migration
 
@@ -149,14 +153,17 @@ rather than guess dependencies.
   extra: removing `reqlike[socks]` from the root while `other` still depends on `reqlike` keeps the
   package, drops the `socks` group and the `socklike` entry only it reached
   (`off11-extras-removal-keeps-package/`).
+- The same holds within one edit: dropping `reqlike[socks]` while `keeper` still depends on reqlike
+  releases reqlike's `urlish<2; extra == "socks"` bound on a cascade the edit also triggers, so urlish
+  moves to 2.5 rather than 1.9 (`off18-removed-extra-unbinds-cascade/`).
 
 ## 10. Edits that change the fork structure (fail loud)
 
 - Upgrading `reqlike[socks]` to a version that no longer provides `socks` makes uv drop the extra from
   the root edge, the group and its closure, with a warning (`off14-upgrade-drops-extra/`, no `.after`).
-- A new version gating a dependency on a patch-level `python_full_version` (`urlish; python_full_version
-  >= '3.10.2'`) makes uv record lock-level `resolution-markers` at 3.10.2 even though every package
-  resolves to one version (`off15-patch-level-marker/`, no `.after`), consistent with §4.
+- A new version gating a dependency on a raised Python lower bound (`urlish; python_full_version >= '3.11'`)
+  makes uv record lock-level `resolution-markers` at 3.11 even though every package resolves to one
+  version (`off15-python-lower-bound-marker/`, no `.after`), as §4 describes.
 - Removing a dependency whose closure was the only cause of a fork leaves the top-level
   `resolution-markers` in place: uv seeds its forks from the existing lock
   (`s3` probe, dev-time only; the engine's unchanged header matched byte for byte).

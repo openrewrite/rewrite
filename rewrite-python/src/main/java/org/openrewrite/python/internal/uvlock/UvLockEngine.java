@@ -311,6 +311,11 @@ public final class UvLockEngine {
                 }
                 structural = true;
             }
+            // cascades below bound targets only by what stays live, so the root edits come first
+            for (Removal removal : removals) {
+                applyRemoval(removal);
+                structural = true;
+            }
             Set<String> rewritten = new HashSet<>();
             Set<String> resolved = new HashSet<>();
             for (Change change : changes) {
@@ -352,10 +357,6 @@ public final class UvLockEngine {
                     rewritten.add(target);
                     structural = true;
                 }
-            }
-            for (Removal removal : removals) {
-                applyRemoval(removal);
-                structural = true;
             }
             if (structural) {
                 dropUnreachable();
@@ -986,8 +987,10 @@ public final class UvLockEngine {
          */
         private List<PythonVersionSpecifierSet> gatherConstraints(String target) {
             List<PythonVersionSpecifierSet> constraints = new ArrayList<>();
+            Map<String, Set<String>> live = liveExtras();
             for (UvLockPackage q : packages) {
-                if (q.getSource().getType() != UvLockSource.Type.REGISTRY || !dependsOn(q, target)) {
+                if (q.getSource().getType() != UvLockSource.Type.REGISTRY || !live.containsKey(q.getName()) ||
+                        !dependsOn(q, target)) {
                     continue;
                 }
                 CoreMetadata meta = metadataFor(q);
@@ -1001,7 +1004,7 @@ public final class UvLockEngine {
                     }
                     int semi = raw.indexOf(';');
                     String rawMarker = req.getMarker() != null && semi >= 0 ? raw.substring(semi + 1).trim() : null;
-                    if (rawMarker != null && !requirementCanFire(q, rawMarker)) {
+                    if (rawMarker != null && !requirementCanFire(q, rawMarker, live)) {
                         continue;
                     }
                     PythonVersionSpecifierSet specs = req.getSpecifiers();
@@ -1026,7 +1029,7 @@ public final class UvLockEngine {
                         }
                         // every root extra and dependency group is locked, so only requires-python
                         // can rule a root declaration out
-                        if (req.getMarker() != null && !requirementCanFire(packages.get(rootIndex), req.getMarker())) {
+                        if (req.getMarker() != null && !requirementCanFire(packages.get(rootIndex), req.getMarker(), live)) {
                             continue;
                         }
                         PythonVersionSpecifierSet specs = PythonVersionSpecifierSet.parse(req.getSpecifier());
@@ -1045,7 +1048,7 @@ public final class UvLockEngine {
          * the remaining clauses must not be always-false under requires-python. Markers outside
          * the simple and-chain subset cannot be decided and are kept, as uv's union would be.
          */
-        private boolean requirementCanFire(UvLockPackage dependent, String rawMarker) {
+        private boolean requirementCanFire(UvLockPackage dependent, String rawMarker, Map<String, Set<String>> live) {
             List<String[]> clauses = UvLockMarkers.parseSimpleAndChain(rawMarker);
             if (clauses == null) {
                 return true;
@@ -1055,9 +1058,8 @@ public final class UvLockEngine {
                 if (!"extra".equals(clause[0])) {
                     environmentClauses.add(clause);
                 } else if ("==".equals(clause[1]) && dependent.getSource().getType() == UvLockSource.Type.REGISTRY) {
-                    String extra = Pep508Requirement.canonicalize(clause[2]);
-                    if (dependent.getOptionalDependencies() == null ||
-                            !dependent.getOptionalDependencies().containsKey(extra)) {
+                    if (!live.getOrDefault(dependent.getName(), Collections.emptySet())
+                            .contains(Pep508Requirement.canonicalize(clause[2]))) {
                         return false;
                     }
                 }
@@ -1583,13 +1585,13 @@ public final class UvLockEngine {
                     return normalized;
                 }
                 String simplified = UvLockMarkers.simplifyClauses(range, clauses);
-                // a patch-level python_full_version bound that still varies over the range is a
-                // fork boundary uv records as lock-level resolution-markers (BEHAVIOR.md section 4)
+                // uv forks the resolution where a surviving clause raises the Python lower bound
+                // (BEHAVIOR.md section 4)
                 if (simplified != null && !UvLockMarkers.DROP_EDGE.equals(simplified) &&
-                        UvLockMarkers.comparesPatchLevelPython(UvLockMarkers.parseSimpleAndChain(simplified))) {
+                        UvLockMarkers.raisesPythonLowerBound(UvLockMarkers.parseSimpleAndChain(simplified))) {
                     throw new EngineFailure(Reason.RESOLUTION_REQUIRED, pkg,
-                            "Dependency marker \"" + rawMarker + "\" forks the resolution at a patch-level Python " +
-                                    "version, which the native engine does not support");
+                            "Dependency marker \"" + rawMarker + "\" raises the Python lower bound, which forks " +
+                                    "the resolution");
                 }
                 return simplified;
             }
@@ -1687,29 +1689,29 @@ public final class UvLockEngine {
         }
 
         /**
-         * Reachability sweep over the graph. A non-root package's optional-dependencies group is
-         * live only while some reachable edge activates that extra, so a group whose last
-         * activating edge went away is dropped along with whatever only it reached.
+         * The packages reachable from the root, each mapped to the extras some reachable edge
+         * activates on it. A non-root package's optional-dependencies group is followed only
+         * while its extra is activated.
          */
-        private void dropUnreachable() {
-            Set<String> reachable = new HashSet<>();
-            Map<String, Set<String>> activatedExtras = new HashMap<>();
+        private Map<String, Set<String>> liveExtras() {
+            Map<String, List<UvLockPackage>> byName = new HashMap<>();
+            for (UvLockPackage pkg : packages) {
+                byName.computeIfAbsent(pkg.getName(), k -> new ArrayList<>()).add(pkg);
+            }
+            Map<String, Set<String>> live = new HashMap<>();
             List<String> frontier = new ArrayList<>();
             // only the root is a permanent seed; other editable/path packages must be reached via edges
             String rootName = packages.get(rootIndex).getName();
-            reachable.add(rootName);
+            live.put(rootName, new HashSet<>());
             frontier.add(rootName);
             while (!frontier.isEmpty()) {
                 String name = frontier.remove(frontier.size() - 1);
-                for (UvLockPackage pkg : packages) {
-                    if (!pkg.getName().equals(name)) {
-                        continue;
-                    }
-                    for (List<UvLockDependency> edges : liveEdgeLists(pkg, activatedExtras)) {
+                for (UvLockPackage pkg : byName.getOrDefault(name, Collections.emptyList())) {
+                    for (List<UvLockDependency> edges : liveEdgeLists(pkg, live)) {
                         for (UvLockDependency edge : edges) {
-                            boolean revisit = reachable.add(edge.getName());
+                            boolean revisit = !live.containsKey(edge.getName());
+                            Set<String> extras = live.computeIfAbsent(edge.getName(), k -> new HashSet<>());
                             if (edge.getExtra() != null) {
-                                Set<String> extras = activatedExtras.computeIfAbsent(edge.getName(), k -> new HashSet<>());
                                 revisit |= extras.addAll(edge.getExtra());
                             }
                             if (revisit) {
@@ -1719,16 +1721,22 @@ public final class UvLockEngine {
                     }
                 }
             }
+            return live;
+        }
+
+        /** Drops unreachable packages and the optional-dependencies groups no live edge activates. */
+        private void dropUnreachable() {
+            Map<String, Set<String>> liveExtras = liveExtras();
             List<UvLockPackage> kept = new ArrayList<>();
             for (UvLockPackage pkg : packages) {
-                if (!reachable.contains(pkg.getName())) {
+                if (!liveExtras.containsKey(pkg.getName())) {
                     continue;
                 }
                 if (pkg.getOptionalDependencies() == null || isRoot(pkg)) {
                     kept.add(pkg);
                     continue;
                 }
-                Set<String> activated = activatedExtras.getOrDefault(pkg.getName(), Collections.emptySet());
+                Set<String> activated = liveExtras.get(pkg.getName());
                 Map<String, List<UvLockDependency>> live = new LinkedHashMap<>();
                 for (Map.Entry<String, List<UvLockDependency>> group : pkg.getOptionalDependencies().entrySet()) {
                     if (activated.contains(group.getKey())) {
