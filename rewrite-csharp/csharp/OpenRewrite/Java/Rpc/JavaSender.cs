@@ -673,13 +673,13 @@ public class JavaSender : JavaVisitor<RpcSendQueue>
     }
 
     /// <summary>
-    /// A Space that <see cref="Space.Format"/> shares goes as a ref to that shared instance, so each
+    /// A Space that <see cref="Space.Shared"/> has an instance for goes as a ref to that instance, so each
     /// repeat is a ref-only message. Other values go as they are, since a ref stays in both peers'
     /// tables for the whole connection.
     /// </summary>
     public static object? SpaceRef(object? value) =>
-        value is Space { Comments.Count: 0 } space && space.Whitespace.Length <= 50
-            ? AsRef(Space.Format(space.Whitespace))
+        value is Space { Comments.Count: 0 } space && Space.Shared(space.Whitespace) is { } shared
+            ? AsRef(shared)
             : value;
 
     public virtual void VisitSpace(Space space, RpcSendQueue q)

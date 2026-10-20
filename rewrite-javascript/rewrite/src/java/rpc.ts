@@ -15,7 +15,7 @@
  */
 import {JavaVisitor} from "./visitor";
 import {asRef, RpcCodecs, RpcReceiveQueue, RpcSendQueue} from "../rpc";
-import {Expression, isSpace, J, space, TextComment} from "./tree";
+import {Expression, isSpace, J, sharedSpace, TextComment} from "./tree";
 import {isTree} from "../tree";
 import {Type} from "./type";
 import {TypeVisitor} from "./type-visitor";
@@ -23,14 +23,12 @@ import {updateIfChanged} from "../util";
 import Space = J.Space;
 
 /**
- * A Space that {@link space} shares goes as a ref to that shared instance, so each repeat is a ref-only
- * message. Other values go as they are, since a ref stays in both peers' tables for the whole connection.
+ * A Space that {@link sharedSpace} has an instance for goes as a ref to that instance, so each repeat is a
+ * ref-only message. Other values go as they are, since a ref stays in both peers' tables for the whole connection.
  */
 export function spaceRef<T>(value: T): T {
-    if (!isSpace(value) || value.comments.length > 0 || value.whitespace.length > 50) {
-        return value;
-    }
-    return asRef(space(value.whitespace)) as T;
+    const shared = isSpace(value) && value.comments.length === 0 ? sharedSpace(value.whitespace) : undefined;
+    return shared === undefined ? value : asRef(shared) as T;
 }
 
 class TypeSender extends TypeVisitor<RpcSendQueue> {
@@ -1531,9 +1529,8 @@ export class JavaReceiver extends JavaVisitor<RpcReceiveQueue> {
             }),
             whitespace: await q.receive(before.whitespace)
         };
-        return updates.comments.length === 0
-            ? space(updates.whitespace)
-            : updateIfChanged(before, updates);
+        return (updates.comments.length === 0 ? sharedSpace(updates.whitespace) : undefined)
+            ?? updateIfChanged(before, updates);
     }
 
     public override async visitLeftPadded<T extends J | J.Space | number | string | boolean>(left: J.LeftPadded<T>, q: RpcReceiveQueue): Promise<J.LeftPadded<T>> {

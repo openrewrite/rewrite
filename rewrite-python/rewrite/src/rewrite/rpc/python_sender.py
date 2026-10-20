@@ -119,9 +119,13 @@ _DISPATCH: tuple = (
 
 
 def _shared_space(value: Any) -> Optional[Space]:
-    if not isinstance(value, Space) or value.comments or len(value.whitespace) > 50:
-        return None
-    return Space.build([], value.whitespace)
+    return Space.shared(value.whitespace) if isinstance(value, Space) and not value.comments else None
+
+
+def _shared_or_self(value: Any) -> Any:
+    shared = _shared_space(value)
+    return value if shared is None else shared
+
 
 class PythonRpcSender:
     """Sender that mirrors Java's PythonSender for RPC serialization."""
@@ -947,19 +951,14 @@ class PythonRpcSender:
         return str(id(java_type))
 
     def _send_space(self, parent: Any, getter: Callable[[Any], Any], q: 'RpcSendQueue') -> None:
-        """A Space that Space.build shares goes as a ref to that shared instance, so each repeat
-        is a ref-only message. Other Spaces go by value, since a ref stays in both peers' tables
-        for the whole connection."""
-        def shared_or_self(p: Any) -> Any:
-            value = getter(p)
-            shared = _shared_space(value)
-            return value if shared is None else shared
-
+        """A Space that Space.shared has an instance for goes as a ref to that instance, so each repeat
+        is a ref-only message. Other Spaces go by value, since a ref stays in both peers' tables for
+        the whole connection."""
         on_change = lambda space: self._visit_space(space, q)
         if _shared_space(getter(parent)) is None:
             q.get_and_send(parent, getter, on_change)
         else:
-            q.get_and_send_as_ref(parent, shared_or_self, on_change)
+            q.get_and_send_as_ref(parent, lambda p: _shared_or_self(getter(p)), on_change)
 
     def _visit_space(self, space: Space, q: 'RpcSendQueue') -> None:
         """Visit a Space object.

@@ -44,13 +44,18 @@ func TestShortCommentFreeSpaceIsSentOnceAsRefAndOthersByValue(t *testing.T) {
 	}
 	sendQ.Flush()
 
-	byValue := 0
+	byValue, defined := 0, 0
 	for _, m := range messages {
-		if m.ValueType != nil && *m.ValueType == "org.openrewrite.java.tree.Space" && m.Ref == nil {
-			byValue++
+		if m.ValueType != nil && *m.ValueType == "org.openrewrite.java.tree.Space" {
+			if m.Ref == nil {
+				byValue++
+			} else {
+				defined++
+			}
 		}
 	}
 	assert.Equal(t, 2, byValue, "the commented and the long Space go by value")
+	assert.Equal(t, 1, defined, "the shared Space is defined once")
 
 	delivered := false
 	recvQ := NewReceiveQueue(make(map[int]any), func() []RpcObjectData {

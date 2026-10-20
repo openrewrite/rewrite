@@ -81,6 +81,8 @@ class JavaSenderTest {
 
         assertThat(sent.stream().filter(d -> Space.class.getName().equals(d.getValueType()) && d.getRef() == null))
                 .as("the commented and the long Space go by value").hasSize(2);
+        assertThat(sent.stream().filter(d -> Space.class.getName().equals(d.getValueType()) && d.getRef() != null))
+                .as("each shared Space, EMPTY and \" \", is defined once").hasSize(2);
         List<Expression> args = received.getArguments();
         assertThat(args.get(0).getPrefix()).isSameAs(args.get(1).getPrefix());
         assertThat(args.get(2).getPrefix().getComments()).singleElement()

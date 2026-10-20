@@ -15,6 +15,7 @@
  */
 import {Marker, MarkersKind} from "../markers";
 import {J} from "../java";
+import {spaceRef} from "../java/rpc";
 import {JS} from "./tree";
 import {RpcCodecs, RpcReceiveQueue, RpcSendQueue} from "../rpc";
 import {
@@ -112,7 +113,7 @@ function registerPrefixedMarkerCodec<M extends Marker & { prefix: J.Space }>(
 
         async rpcSend(after: M, q: RpcSendQueue): Promise<void> {
             await q.getAndSend(after, a => a.id);
-            await q.getAndSend(after, a => a.prefix);
+            await q.getAndSend(after, a => spaceRef(a.prefix));
         }
     });
 }
@@ -133,7 +134,7 @@ RpcCodecs.registerCodec(JS.Markers.Computed, {
 
     async rpcSend(after: Computed, q: RpcSendQueue): Promise<void> {
         await q.getAndSend(after, a => a.id);
-        await q.getAndSend(after, a => a.suffix);
+        await q.getAndSend(after, a => spaceRef(a.suffix));
     }
 });
 

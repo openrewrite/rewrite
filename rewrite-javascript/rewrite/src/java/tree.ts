@@ -816,20 +816,29 @@ export const singleSpace: J.Space = {
     whitespace: " ",
 };
 
-// Short whitespace repeats throughout a run, so as with Java's Space.build one instance serves every use.
+// Short whitespace repeats throughout a run, so as with Java's Space.shared one instance serves every use.
 const sharedSpaces = new Map<string, J.Space>([["", emptySpace], [" ", singleSpace]]);
 
 /**
- * Builds a comment-free Space. Assigning one over an existing prefix silently drops the comments
- * that prefix carried; spread the prefix to keep them — `{...prefix, whitespace: "\n\n"}`.
+ * A comment-free Space, shared with every other use of short whitespace, so it must never be mutated.
+ * Assigning one over an existing prefix silently drops the comments that prefix carried; spread the
+ * prefix to keep them — `{...prefix, whitespace: "\n\n"}`.
  */
 export function space(whitespace: string): J.Space {
+    return sharedSpace(whitespace) ?? {kind: J.Kind.Space, comments: [], whitespace};
+}
+
+/**
+ * The one comment-free Space shared for `whitespace`, or undefined when `whitespace` is too long to share.
+ */
+export function sharedSpace(whitespace: string): J.Space | undefined {
+    if (whitespace.length > 50) {
+        return undefined;
+    }
     let s = sharedSpaces.get(whitespace);
     if (s === undefined) {
         s = {kind: J.Kind.Space, comments: [], whitespace};
-        if (whitespace.length <= 50) {
-            sharedSpaces.set(whitespace, s);
-        }
+        sharedSpaces.set(whitespace, s);
     }
     return s;
 }

@@ -45,7 +45,7 @@ func emptyAsNil(s string) any {
 // both peers' tables for the whole connection.
 func spaceRef(v any) any {
 	s, ok := v.(java.Space)
-	if !ok || s == nil || len(s.Comments()) > 0 || len(s.Whitespace()) > 50 {
+	if !ok || len(s.Comments()) > 0 || len(s.Whitespace()) > 50 {
 		return v
 	}
 	return AsRef(s)

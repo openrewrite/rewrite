@@ -21,7 +21,6 @@ import org.openrewrite.java.JavaVisitor;
 import org.openrewrite.java.tree.*;
 import org.openrewrite.rpc.RpcSendQueue;
 
-import static java.util.Collections.emptyList;
 import static org.openrewrite.rpc.Reference.asRef;
 import static org.openrewrite.rpc.Reference.getValueNonNull;
 
@@ -644,15 +643,13 @@ public class JavaSender extends JavaVisitor<RpcSendQueue> {
     }
 
     /**
-     * A Space that {@link Space#build} would share goes as a ref to that shared instance, so each repeat
+     * A Space that {@link Space#shared} has an instance for goes as a ref to that instance, so each repeat
      * is a ref-only message. Other Spaces go by value, since a ref stays in both peers' tables for the
      * whole connection.
      */
     public static @Nullable Object spaceRef(@Nullable Space space) {
-        if (space == null || !space.getComments().isEmpty() || space.getWhitespace().length() > 50) {
-            return space;
-        }
-        return asRef(Space.build(space.getWhitespace(), emptyList()));
+        Space shared = space == null || !space.getComments().isEmpty() ? null : Space.shared(space.getWhitespace());
+        return shared == null ? space : asRef(shared);
     }
 
     public void visitSpace(Space space, RpcSendQueue q) {

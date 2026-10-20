@@ -118,15 +118,24 @@ class Space:
 
     @classmethod
     def build(cls, comments: List[Comment], whitespace: Optional[str]) -> Space:
-        """As in Java's Space.build, a comment-free Space with at most 50 characters of
-        whitespace is one shared instance per whitespace string. Every other Space is built fresh."""
+        """A comment-free Space is the instance `shared` has for its whitespace, when there is one.
+        Every other Space is built fresh."""
         if not comments:
-            if not whitespace:
-                return cls.EMPTY
-            if len(whitespace) <= 50:
-                shared = _SHARED_SPACES.get(whitespace)
-                return shared if shared is not None else _SHARED_SPACES.setdefault(whitespace, cls([], whitespace))
+            shared = cls.shared(whitespace or '')
+            if shared is not None:
+                return shared
         return cls(comments, whitespace)
+
+    @classmethod
+    def shared(cls, whitespace: str) -> Optional[Space]:
+        """As in Java's Space.shared, the one comment-free Space shared for `whitespace`, or None
+        when it is too long to share."""
+        if not whitespace:
+            return cls.EMPTY
+        if len(whitespace) > 50:
+            return None
+        shared = _SHARED_SPACES.get(whitespace)
+        return shared if shared is not None else _SHARED_SPACES.setdefault(whitespace, cls([], whitespace))
 
     @classmethod
     def first_prefix(cls, trees: Optional[Iterable[J]]) -> Space:

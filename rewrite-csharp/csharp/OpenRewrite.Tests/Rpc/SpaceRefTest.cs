@@ -45,6 +45,7 @@ public class SpaceRefTest
         sendQueue.Flush();
 
         Assert.Equal(2, data.Count(d => d.ValueType == "org.openrewrite.java.tree.Space" && d.Ref == null));
+        Assert.Equal(1, data.Count(d => d.ValueType == "org.openrewrite.java.tree.Space" && d.Ref != null));
 
         var wireData = JsonSerializer.Deserialize<List<RpcObjectData>>(
             JsonSerializer.Serialize(data, RpcJson.Options), RpcJson.Options)!;
