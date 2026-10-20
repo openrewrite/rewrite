@@ -31,10 +31,22 @@ deferred Phase B. Since then:
 - **pipenv** (`PipenvLockEngine`) proves the closure unchanged for a version change and prunes on removal; adds and
   closure-changing upgrades fail loud (10 sites).
 
-ADR 0010's corpus census is the only sizing data: over 55 uv repositories, 32% of direct dependencies are leaves,
-and of decidable non-leaf upgrades to latest 23% cascade into `RESOLUTION_REQUIRED`. Adds are structurally 100%
-deferred on the three non-uv managers. A corpus run of all four real tools over the same edits, in progress at the
-time of writing, will replace these estimates.
+ADR 0010's corpus census gave the first sizing: over 55 uv repositories, 32% of direct dependencies are leaves,
+and of decidable non-leaf upgrades to latest 23% cascade into `RESOLUTION_REQUIRED`. A second run on 2026-10-20
+applied real edits over a 70-repository corpus per manager and compared the engines with the real tools (uv 0.10.11
+and 0.13.4, pipenv 2026.6.1, Poetry 2.4.1, PDM 2.28.0):
+
+- uv, 9 real upgrades and 16 removals that both the engine and uv could perform: every engine success was
+  byte-identical to uv 0.13.4, and 7 of them differed from 0.10.11 only on lines the edit did not touch; the
+  refusals were the `[package.optional-dependencies]` rebuild (3 upgrades), a transitive pulled in with extras (1),
+  and `[tool.uv] environments` (1). No edit was refused for backtracking.
+- pipenv, 6 upgrades: 4 refused because the new version's requirements were not satisfied by existing pins
+  (`boto3`/`botocore`, `fastapi`/`starlette`, `myst-parser`/`docutils`, `asfpy`/`cffi`), 1 byte-identical to
+  `pipenv lock` on the edited entry.
+- Poetry and PDM: no closure-changing edits were attempted; the no-op round trip failed loud on 25 of 70 Poetry
+  locks (lock-version 2.0 or no `@generated` header) and 35 of 70 PDM locks (`lock_version` 4.4.x or 4.5.1).
+
+Adds remain structurally 100% deferred on the three non-uv managers.
 
 ### What byte identity requires
 
@@ -259,7 +271,8 @@ the engine is not. The existing Phase A pipenv paths are already held to ADR 000
 (`pipenv verify` green, installable, minimal change) rather than to byte identity with `pipenv lock`. Extending that
 weaker contract to adds and cascades is a product decision, not an engineering one; it is not recommended here
 because a lock whose markers were composed for an assumed platform is exactly the plausible-but-different output the
-accuracy contract exists to prevent.
+accuracy contract exists to prevent. The demand is real, though: 4 of the 6 corpus upgrades needed it, so the
+decision should be taken explicitly rather than left to the deferral.
 
 ## Decision
 
@@ -313,8 +326,12 @@ accuracy contract exists to prevent.
    lock may carry keys the engine does not model.
 9. **Before any resolver work, the readers accept the current stamps.** `UvLockReader` accepts revisions 4 and 5 and
    fails loud only on the keys they can carry (`default-groups`, `group-requires-python`, `[package.metadata]`
-   omitted for a registry package); `PdmLockReader` accepts 4.5.1 and fails loud on a `lock_inputs` table. This is
-   a reader change independent of resolution and precedes every item above.
+   omitted for a registry package); `PdmLockReader` accepts 4.5.1 and fails loud on a `lock_inputs` table. The
+   corpus adds the other direction: `UvLockReader` parses the commented `exclude-newer` line 0.11.8 writes (15 of 70
+   locks) so the edit reaches the `exclude-newer` gate instead of `MALFORMED_LOCK`, and PDM 4.4.x and Poetry 2.0
+   locks are refused with a named reason, since the current tools rewrite those wholesale with per-package keys the
+   engine would have to compute for every entry. This is reader work independent of resolution and precedes every
+   item above.
 
 ## Consequences
 
