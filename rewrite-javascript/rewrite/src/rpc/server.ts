@@ -15,7 +15,7 @@
  * limitations under the License.
  */
 import * as rpc from "vscode-jsonrpc/node";
-import {RewriteRpc} from "./rewrite-rpc";
+import {DEFAULT_BATCH_SIZE, RewriteRpc} from "./rewrite-rpc";
 import {chunkedJsonDecoder} from "./message-decoder";
 import {chunkedJsonEncoder} from "./message-encoder";
 import * as fs from "fs";
@@ -81,7 +81,7 @@ async function main() {
         .option('--log-file <log_path>', 'log file path')
         .option('--metrics-csv <metrics_csv_path>', 'metrics CSV output path')
         .option('--trace-rpc-messages', 'trace RPC messages at the protocol level')
-        .option('--batch-size [size]', 'sets the batch size (default is 200)', s => parseInt(s, 10), 1000)
+        .option('--batch-size <size>', `messages per page sent to the peer (default is ${DEFAULT_BATCH_SIZE})`, s => parseInt(s, 10))
         .option('--recipe-install-dir <install_dir>', 'Recipe installation directory (default is a temporary directory)')
         .parse();
 
