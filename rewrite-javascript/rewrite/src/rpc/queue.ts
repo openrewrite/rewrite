@@ -170,6 +170,10 @@ export class RpcSendQueue {
         result.push({state: RpcObjectState.END_OF_OBJECT});
 
         this.q = [];
+        if (this.drain) {
+            this.drain.sink(result);
+            return [];
+        }
         return result;
     }
 
@@ -197,11 +201,27 @@ export class RpcSendQueue {
         return result;
     }
 
+    private drain?: { batchSize: number, sink: (page: RpcObjectData[]) => void };
+
+    /**
+     * Hands each full page to `sink` while the object is still being traversed, so the sender holds
+     * one page at a time. {@link generate} then hands over the final page and returns an empty batch.
+     */
+    drainEvery(batchSize: number, sink: (page: RpcObjectData[]) => void): this {
+        this.drain = {batchSize, sink};
+        return this;
+    }
+
     private put(d: RpcObjectData): void {
         if (this.trace) {
             d.trace = trace("Sender");
         }
         this.q.push(d);
+        if (this.drain && this.q.length >= this.drain.batchSize) {
+            const page = this.q;
+            this.q = [];
+            this.drain.sink(page);
+        }
     }
 
     getAndSend<T, U>(parent: T,
@@ -441,7 +461,6 @@ function withoutSerializerKeys(value: any): any {
 export class RpcReceiveQueue {
     private batch: readonly RpcObjectData[] = EMPTY_LIST;
     private batchIndex = 0;
-    private pageIndex = 0;
     private recorded: number[] = [];
     private rootReceived = false;
 
@@ -450,11 +469,27 @@ export class RpcReceiveQueue {
      */
     constructor(private readonly refs: Map<number, any>,
                 private sourceFileType: string | undefined,
-                private readonly pages: readonly (readonly RpcObjectData[])[],
+                pages: (readonly RpcObjectData[] | undefined)[] | (() => readonly RpcObjectData[]),
                 private readonly logger: rpc.Logger | undefined,
                 private readonly trace: boolean,
                 private readonly internedStrings: StringInternTable = new StringInternTable()) {
+        if (typeof pages === "function") {
+            this.nextPage = pages;
+        } else {
+            let pageIndex = 0;
+            this.nextPage = () => {
+                if (pageIndex >= pages.length) {
+                    throw new Error("Unexpected end of RPC data");
+                }
+                const page = pages[pageIndex]!;
+                // A consumed page is released so a transfer holds the tree it has built plus one page
+                pages[pageIndex++] = undefined;
+                return page;
+            };
+        }
     }
+
+    private readonly nextPage: () => readonly RpcObjectData[];
 
     private record(ref: number, value: any): void {
         this.refs.set(ref, value);
@@ -483,12 +518,9 @@ export class RpcReceiveQueue {
             if (this.batch[this.batchIndex - 1]?.state === RpcObjectState.END_OF_OBJECT) {
                 throw new Error("Read past END_OF_OBJECT: the sender and receiver disagree on this object's shape.");
             }
-            if (this.pageIndex >= this.pages.length) {
-                throw new Error("Unexpected end of RPC data");
-            }
             // A batch is read through an index, which keeps draining it linear in its length.
             // Array.shift() copies the remaining elements on every call.
-            this.batch = this.pages[this.pageIndex++];
+            this.batch = this.nextPage();
             this.batchIndex = 0;
         }
         return this.batch[this.batchIndex++]!;
