@@ -17,9 +17,12 @@ package org.openrewrite.javascript.internal;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
+import org.openrewrite.javascript.internal.lock.StripBom;
+import org.openrewrite.javascript.internal.lock.pnpm.LockfileReader;
 import org.yaml.snakeyaml.Yaml;
 
 import java.io.IOException;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashSet;
@@ -61,6 +64,9 @@ import java.util.Set;
  *     lodash@4.17.21: {}
  *   </pre></li>
  * </ul>
+ * From pnpm 11 the lock may start with an env document (pnpm's own release and config dependencies) ahead of the
+ * lockfile document; only the lockfile document is read, as {@code pnpm list} does.
+ * <p>
  * Top-level packages (those listed at the root or under {@code importers}) get
  * {@code node_modules/&lt;name&gt;} paths; everything else in the {@code packages} map
  * goes to a synthetic nested path so it's preserved in {@code all} but not in
@@ -79,9 +85,12 @@ public final class PnpmLockAdapter {
     public static String toNpmV3(String pnpmLockYaml) {
         Object loaded;
         try {
-            loaded = new Yaml().load(pnpmLockYaml);
+            loaded = new Yaml().load(LockfileReader.extractMainDocument(StripBom.stripBom(pnpmLockYaml)));
         } catch (RuntimeException e) {
             throw new RuntimeException("malformed pnpm-lock.yaml: " + e.getMessage(), e);
+        }
+        if (loaded == null) {
+            loaded = Collections.emptyMap();
         }
         if (!(loaded instanceof Map)) {
             throw new RuntimeException("pnpm-lock.yaml root is not a YAML map");

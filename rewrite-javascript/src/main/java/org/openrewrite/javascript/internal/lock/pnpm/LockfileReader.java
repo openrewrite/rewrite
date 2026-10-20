@@ -29,7 +29,7 @@ import java.util.List;
  * Port of @pnpm/lockfile.fs src/read.ts, src/yamlDocuments.ts and src/gitMergeFile.ts (pnpm 11.2.2): the text of
  * pnpm-lock.yaml to a {@link LockfileObject}.
  */
-final class LockfileReader {
+public final class LockfileReader {
 
     static final String WANTED_LOCKFILE = "pnpm-lock.yaml";
     static final String YAML_DOCUMENT_SEPARATOR = "\n---\n";
@@ -126,7 +126,7 @@ final class LockfileReader {
     /**
      * The main document of a lock that may start with the env document.
      */
-    static String extractMainDocument(String content) {
+    public static String extractMainDocument(String content) {
         return extractMainDocument(content, PnpmRelease.PORTED);
     }
 
