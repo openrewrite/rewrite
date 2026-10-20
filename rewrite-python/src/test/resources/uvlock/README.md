@@ -43,7 +43,7 @@ in CorentinJ/Real-Time-Voice-Cloning@890f3a03187195b9829db2079b75c2ba2ab0405c,
 
 Local-index scenarios (`off10`–`off15`, `off17`, `off18`, uv 0.10.11, 2026-10-20): each was locked against a throwaway
 PEP 503 index of synthetic pure-python wheels built for the scenario, then the index host was rewritten
-to `https://index.example` in the manifest, both locks and the recorded `http/` pages (`<pkg>-listing.html`
+to `https://index.example` in the manifest, both locks and the recorded `http/` pages (`<pkg>-listing-html`
 plus the `.metadata` sidecars). The same scenarios re-locked with uv 0.13.4 differ only in the
 `revision` line. `off10-dead-marker-cascade` and `off12-inactive-extra-constraint` pin which of a
 dependent's requirements bound a cascade target; `off11-extras-removal-keeps-package` the drop of an

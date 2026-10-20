@@ -368,7 +368,7 @@ class UvLockDeltaOfflineTest {
 
         /**
          * Serves a whole simple index from a fixture directory: {@code <prefix><pkg>/} maps to
-         * {@code <dir><pkg>-listing.html} and {@code <prefix><pkg>/<file>} to {@code <dir><file>}.
+         * {@code <dir><pkg>-listing-html} and {@code <prefix><pkg>/<file>} to {@code <dir><file>}.
          */
         void routeDirectory(String urlPrefix, String fixtureDir) {
             directories.put(urlPrefix, fixtureDir);
@@ -402,7 +402,7 @@ class UvLockDeltaOfflineTest {
                 }
                 String rest = url.substring(directory.getKey().length());
                 String fixture = rest.endsWith("/") ?
-                  rest.substring(0, rest.length() - 1) + "-listing.html" :
+                  rest.substring(0, rest.length() - 1) + "-listing-html" :
                   rest.substring(rest.lastIndexOf('/') + 1);
                 try (InputStream is = UvLockDeltaOfflineTest.class.getResourceAsStream("/uvlock/" + directory.getValue() + fixture)) {
                     return is == null ? null : is.readAllBytes();
