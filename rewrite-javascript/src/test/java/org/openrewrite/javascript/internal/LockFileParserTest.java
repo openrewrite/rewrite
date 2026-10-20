@@ -270,4 +270,68 @@ class LockFileParserTest {
                 .isInstanceOf(RuntimeException.class)
                 .hasMessageContaining("packages");
     }
+
+    @Test
+    void resolveSkipsPathHitThatViolatesConstraint() {
+        // given
+        String lock = """
+                {
+                  "packages": {
+                    "": { },
+                    "node_modules/lodash": { "version": "3.10.1" },
+                    "node_modules/__dup_0__/node_modules/lodash": { "version": "4.17.21" }
+                  }
+                }
+                """;
+
+        // when
+        ResolvedDependency resolved = LockFileParser.parse(lock).resolve("lodash", "^4.17.0");
+
+        // then
+        assertThat(resolved).isNotNull();
+        assertThat(resolved.getVersion()).isEqualTo("4.17.21");
+    }
+
+    @Test
+    void resolveFallbackPicksHighestSatisfyingVersion() {
+        // given
+        String lock = """
+                {
+                  "packages": {
+                    "": { },
+                    "node_modules/__dup_0__/node_modules/lodash": { "version": "4.17.0" },
+                    "node_modules/__dup_1__/node_modules/lodash": { "version": "4.17.21" },
+                    "node_modules/__dup_2__/node_modules/lodash": { "version": "3.10.1" }
+                  }
+                }
+                """;
+
+        // when
+        ResolvedDependency resolved = LockFileParser.parse(lock).resolve("lodash", "^4.17.0");
+
+        // then
+        assertThat(resolved).isNotNull();
+        assertThat(resolved.getVersion()).isEqualTo("4.17.21");
+    }
+
+    @Test
+    void resolveKeepsPathHitWhenNoVersionSatisfiesConstraint() {
+        // given
+        String lock = """
+                {
+                  "packages": {
+                    "": { },
+                    "node_modules/lodash": { "version": "3.10.1" },
+                    "node_modules/__dup_0__/node_modules/lodash": { "version": "4.17.21" }
+                  }
+                }
+                """;
+
+        // when
+        ResolvedDependency resolved = LockFileParser.parse(lock).resolve("lodash", "^5.0.0");
+
+        // then
+        assertThat(resolved).isNotNull();
+        assertThat(resolved.getVersion()).isEqualTo("3.10.1");
+    }
 }
