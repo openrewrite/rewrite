@@ -15,6 +15,9 @@ Scenarios:
 - `g-git` — a git dependency: `[package.source]` plus `develop`.
 - `i-upgrade` — the legacy-layout six 1.16.0 → 1.17.0 upgrade golden pair (`.before`/`.after`).
 - `j-modern-upgrade` — the PEP 621-layout six 1.16.0 → 1.17.0 upgrade pair; drives the recipe test.
+- `k-group-markers` — a `develop` path dependency with different markers per group (Poetry 2.4.1,
+  2026-10-20): the per-group `markers = { main = …, dev = … }` inline table is written after `files`
+  and `develop`, unlike a plain `markers` string, which precedes `files` (`f-markers`).
 
 `http/` holds recorded pypi.org simple-API (PEP 691 JSON) and PEP 658 metadata responses so
 `PoetryLockEngineTest` and `UpgradeDependencyVersionPoetryLockTest` replay the golden upgrade

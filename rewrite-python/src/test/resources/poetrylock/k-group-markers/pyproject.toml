@@ -1,0 +1,13 @@
+[project]
+name = "order-probe"
+version = "0.1.0"
+requires-python = ">=3.10"
+
+[tool.poetry]
+package-mode = false
+
+[tool.poetry.dependencies]
+libfoo = { path = "libfoo", develop = true, markers = "sys_platform == \"linux\"" }
+
+[tool.poetry.group.dev.dependencies]
+libfoo = { path = "libfoo", develop = true, markers = "python_version < \"3.12\"" }

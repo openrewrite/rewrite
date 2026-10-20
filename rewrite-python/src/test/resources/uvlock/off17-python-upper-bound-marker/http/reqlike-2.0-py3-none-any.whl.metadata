@@ -1,0 +1,5 @@
+Metadata-Version: 2.1
+Name: reqlike
+Version: 2.0
+Summary: synthetic reqlike
+Requires-Dist: urlish; python_full_version < '3.10.2'

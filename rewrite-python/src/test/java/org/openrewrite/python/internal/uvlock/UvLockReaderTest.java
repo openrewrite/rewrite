@@ -133,7 +133,7 @@ class UvLockReaderTest {
 
     @Test
     void unrecognizedRevisionThrows() {
-        assertThatThrownBy(() -> UvLockReader.parse("version = 1\nrevision = 4\n"))
+        assertThatThrownBy(() -> UvLockReader.parse("version = 1\nrevision = 6\n"))
           .isInstanceOf(UvLockFormatException.class)
           .hasMessageContaining("revision");
     }

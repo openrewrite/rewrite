@@ -1,0 +1,41 @@
+version = 1
+revision = 3
+requires-python = ">=3.10"
+
+[[package]]
+name = "reqlike"
+version = "2.0"
+source = { registry = "https://index.example/simple/" }
+dependencies = [
+    { name = "urlish" },
+]
+wheels = [
+    { url = "https://index.example/simple/reqlike/reqlike-2.0-py3-none-any.whl", hash = "sha256:86b4ee1532ada4612e42c9dad37ca6672939e77bee85c759c1a4708003b00f33" },
+]
+
+[[package]]
+name = "scen-s6-dev-group-constraint"
+version = "0.1.0"
+source = { virtual = "." }
+dependencies = [
+    { name = "reqlike" },
+]
+
+[package.dev-dependencies]
+dev = [
+    { name = "urlish" },
+]
+
+[package.metadata]
+requires-dist = [{ name = "reqlike", specifier = "==2.0" }]
+
+[package.metadata.requires-dev]
+dev = [{ name = "urlish", specifier = "<2.4" }]
+
+[[package]]
+name = "urlish"
+version = "2.0.0"
+source = { registry = "https://index.example/simple/" }
+wheels = [
+    { url = "https://index.example/simple/urlish/urlish-2.0.0-py3-none-any.whl", hash = "sha256:7e4f387e224f737d11ed5010e1b34bdccc0e39b21878e6bec33669acbeb1e470" },
+]

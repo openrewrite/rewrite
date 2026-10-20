@@ -129,7 +129,9 @@ public final class UvLockWriter {
     private static void addPackageBlocks(List<String> blocks, UvLockPackage pkg) {
         StringBuilder b = new StringBuilder("[[package]]");
         b.append("\nname = ").append(string(pkg.getName()));
-        b.append("\nversion = ").append(string(pkg.getVersion()));
+        if (pkg.getVersion() != null) {
+            b.append("\nversion = ").append(string(pkg.getVersion()));
+        }
         b.append("\nsource = ").append(source(pkg.getSource()));
         if (pkg.getResolutionMarkers() != null) {
             b.append("\nresolution-markers = ").append(multilineStringArray(pkg.getResolutionMarkers()));

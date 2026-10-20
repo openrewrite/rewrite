@@ -19,6 +19,7 @@ import org.openrewrite.python.internal.pep440.PythonVersion;
 
 import java.util.AbstractMap;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 
@@ -37,12 +38,72 @@ public final class UvLockNormalization {
     }
 
     /**
+     * uv's operator order, the tie-break between clauses on equal versions (pep440_rs
+     * {@code Operator} declaration order).
+     */
+    private static final List<String> OPERATOR_ORDER =
+            Arrays.asList("==", "===", "!=", "~=", "<", "<=", ">", ">=");
+
+    /**
      * Normalize a requires-dist version specifier the way uv records it: all whitespace
      * removed, clauses joined by a bare comma (no space — unlike the header's
      * {@code requires-python}, which keeps its {@code ", "} separator), clauses sorted
-     * ascending by version.
+     * ascending by version, then by operator.
      */
     public static String normalizeRequiresDistSpecifier(String specifier) {
+        return String.join(",", sortedClauses(specifier));
+    }
+
+    /**
+     * Normalize the header's {@code requires-python} the way uv records it: a compatible
+     * release expands to its bounds ({@code ~=3.10} is {@code >=3.10, <4}), a range covering
+     * exactly one minor version collapses to its wildcard ({@code >=3.12, <3.13} is
+     * {@code ==3.12.*}), and clauses are joined by {@code ", "} in version order.
+     */
+    public static String normalizeRequiresPython(String declared) {
+        List<String> expanded = new ArrayList<>();
+        for (String raw : declared.split(",")) {
+            String clause = raw.replaceAll("\\s+", "");
+            if (clause.isEmpty()) {
+                continue;
+            }
+            if (clause.startsWith("~=")) {
+                PythonVersion upper = PyRange.bumpTrailingRelease(clauseVersion(clause));
+                if (upper == null) {
+                    throw new IllegalArgumentException("Compatible release needs two components: " + clause);
+                }
+                expanded.add(">=" + clause.substring(2));
+                expanded.add("<" + upper);
+            } else {
+                expanded.add(clause);
+            }
+        }
+        List<String> clauses = sortedClauses(String.join(",", expanded));
+        if (clauses.size() == 2 && clauses.get(0).startsWith(">=") && clauses.get(1).startsWith("<")
+                && !clauses.get(1).startsWith("<=")) {
+            long[] lower = clauseVersion(clauses.get(0)).getRelease();
+            long[] upper = clauseVersion(clauses.get(1)).getRelease();
+            if (isMinor(lower) && isMinor(upper) && lower[0] == upper[0] && lower[1] + 1 == upper[1]) {
+                return "==" + lower[0] + "." + lower[1] + ".*";
+            }
+        }
+        return String.join(", ", clauses);
+    }
+
+    /** Whether the release is X.Y or X.Y.0 (a whole minor version). */
+    private static boolean isMinor(long[] release) {
+        if (release.length < 2) {
+            return false;
+        }
+        for (int i = 2; i < release.length; i++) {
+            if (release[i] != 0) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    private static List<String> sortedClauses(String specifier) {
         String[] rawClauses = specifier.split(",");
         // Keys extracted eagerly so every clause is validated even when no comparison runs
         List<Map.Entry<PythonVersion, String>> clauses = new ArrayList<>(rawClauses.length);
@@ -53,24 +114,25 @@ public final class UvLockNormalization {
             }
             clauses.add(new AbstractMap.SimpleImmutableEntry<>(clauseVersion(clause), clause));
         }
-        // Stable sort keeps original order for equal versions
-        clauses.sort(Map.Entry.comparingByKey());
-        StringBuilder b = new StringBuilder();
-        for (int i = 0; i < clauses.size(); i++) {
-            if (i > 0) {
-                b.append(',');
-            }
-            b.append(clauses.get(i).getValue());
+        clauses.sort(Map.Entry.<PythonVersion, String>comparingByKey()
+                .thenComparing(e -> OPERATOR_ORDER.indexOf(clauseOperator(e.getValue()))));
+        List<String> sorted = new ArrayList<>(clauses.size());
+        for (Map.Entry<PythonVersion, String> clause : clauses) {
+            sorted.add(clause.getValue());
         }
-        return b.toString();
+        return sorted;
     }
 
-    private static PythonVersion clauseVersion(String clause) {
+    private static String clauseOperator(String clause) {
         int i = 0;
         while (i < clause.length() && "=<>!~".indexOf(clause.charAt(i)) >= 0) {
             i++;
         }
-        String version = clause.substring(i);
+        return clause.substring(0, i);
+    }
+
+    private static PythonVersion clauseVersion(String clause) {
+        String version = clause.substring(clauseOperator(clause).length());
         if (version.endsWith(".*")) {
             version = version.substring(0, version.length() - 2);
         }

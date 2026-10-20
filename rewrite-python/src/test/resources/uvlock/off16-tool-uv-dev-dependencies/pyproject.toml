@@ -1,0 +1,8 @@
+[project]
+name = "devprobe"
+version = "0.1.0"
+requires-python = ">=3.12"
+dependencies = ["six==1.17.0"]
+
+[tool.uv]
+dev-dependencies = ["iniconfig>=2"]

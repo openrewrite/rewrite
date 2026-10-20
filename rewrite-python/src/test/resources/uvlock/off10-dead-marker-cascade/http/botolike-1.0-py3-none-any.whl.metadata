@@ -1,0 +1,6 @@
+Metadata-Version: 2.1
+Name: botolike
+Version: 1.0
+Summary: synthetic botolike
+Requires-Dist: urlish>=1.25,<2.1; python_version < "3.10"
+Requires-Dist: urlish>=1.25,<3; python_version >= "3.10"
