@@ -577,7 +577,7 @@ public class ChangeType extends Recipe implements RenamingRecipe {
                 return pt;
             } else if (oldType instanceof JavaType.FullyQualified) {
                 JavaType.FullyQualified original = TypeUtils.asFullyQualified(oldType);
-                if (isTargetFullyQualifiedType(original)) {
+                if (isTargetFullyQualifiedType(original) || isTargetPrimitiveType(original)) {
                     oldNameToChangedType.put(oldType, targetType);
                     return targetType;
                 } else if (isNestedTypeOfOriginal(original)) {
@@ -586,8 +586,8 @@ public class ChangeType extends Recipe implements RenamingRecipe {
                     return updatedNestedType;
                 } else if (oldType instanceof JavaType.Class) {
                     JavaType.Class clazz = ((JavaType.Class) oldType)
-                            .withInterfaces(ListUtils.map(original.getInterfaces(), t -> (JavaType.FullyQualified) updateType(t)))
-                            .withSupertype((JavaType.FullyQualified) updateType(original.getSupertype()));
+                            .withInterfaces(ListUtils.map(original.getInterfaces(), t -> (JavaType.FullyQualified) updateOwnerType(t)))
+                            .withSupertype((JavaType.FullyQualified) updateOwnerType(original.getSupertype()));
                     oldNameToChangedType.put(oldType, clazz);
                     oldNameToChangedType.put(clazz, clazz);
                     return clazz;
@@ -609,7 +609,7 @@ public class ChangeType extends Recipe implements RenamingRecipe {
                 return gtv;
             } else if (oldType instanceof JavaType.Variable) {
                 JavaType.Variable variable = (JavaType.Variable) oldType;
-                variable = variable.withOwner(updateType(variable.getOwner()));
+                variable = variable.withOwner(updateOwnerType(variable.getOwner()));
                 variable = variable.withType(updateType(variable.getType()));
                 oldNameToChangedType.put(oldType, variable);
                 oldNameToChangedType.put(variable, variable);
@@ -633,7 +633,7 @@ public class ChangeType extends Recipe implements RenamingRecipe {
                 }
 
                 method = oldMethodType;
-                method = method.withDeclaringType((JavaType.FullyQualified) updateType(method.getDeclaringType()))
+                method = method.withDeclaringType((JavaType.FullyQualified) updateOwnerType(method.getDeclaringType()))
                         .withReturnType(updateType(method.getReturnType()))
                         .withParameterTypes(ListUtils.map(method.getParameterTypes(), this::updateType));
                 oldNameToChangedType.put(oldMethodType, method);
@@ -641,6 +641,20 @@ public class ChangeType extends Recipe implements RenamingRecipe {
                 return method;
             }
             return null;
+        }
+
+        /**
+         * Declaring types, owners and supertypes are classes, so they keep the original type when the target is primitive.
+         */
+        private @Nullable JavaType updateOwnerType(@Nullable JavaType oldType) {
+            JavaType updated = updateType(oldType);
+            return updated instanceof JavaType.Primitive ? oldType : updated;
+        }
+
+        private boolean isTargetPrimitiveType(JavaType.@Nullable FullyQualified fq) {
+            // The parser types `String` as the java.lang.String class, so the String keyword is no target here
+            return fq != null && TypeUtils.isOfClassType(fq, originalType.getFullyQualifiedName()) &&
+                   targetType instanceof JavaType.Primitive && targetType != JavaType.Primitive.String;
         }
 
         private boolean isTargetFullyQualifiedType(JavaType.@Nullable FullyQualified fq) {
