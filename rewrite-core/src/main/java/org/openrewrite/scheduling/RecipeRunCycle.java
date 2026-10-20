@@ -101,6 +101,10 @@ public class RecipeRunCycle<LSS extends LargeSourceSet> {
     @Getter
     Set<Recipe> madeChangesInThisCycle = newSetFromMap(new IdentityHashMap<>());
 
+    @Getter
+    @NonFinal
+    boolean causesAnotherCycle;
+
     /**
      * Scanning recipes whose accumulator is incomplete because a scan was abandoned at the source file timeout.
      */
@@ -377,7 +381,7 @@ public class RecipeRunCycle<LSS extends LargeSourceSet> {
                         if (!generated.isEmpty()) {
                             acc.addAll(generated);
                             generated.forEach(source -> recordSourceFileResultAndSearchResults(null, source, recipeStack, ctx));
-                            madeChangesInThisCycle.add(recipe);
+                            recordChange(recipeStack);
                         }
                     } catch (Throwable t) {
                         handleError(recipe, new Quark(Tree.randomId(), Paths.get("error during generation"), Markers.EMPTY, null, null), null, t);
@@ -528,7 +532,7 @@ public class RecipeRunCycle<LSS extends LargeSourceSet> {
                 });
 
                 if (after != src) {
-                    madeChangesInThisCycle.add(recipe);
+                    recordChange(recipeStack);
                     recordSourceFileResultAndSearchResults(src, after, recipeStack, ctx);
                     if (src.getMarkers().findFirst(Generated.class).isPresent()) {
                         // skip edits made to generated source files so that they don't show up in a diff
@@ -536,8 +540,8 @@ public class RecipeRunCycle<LSS extends LargeSourceSet> {
                         return src;
                     }
                 } else if (ctx.hasNewMessages()) {
-                    // consider any recipes adding new messages as a changing recipe (which can request another cycle)
-                    madeChangesInThisCycle.add(recipe);
+                    // new messages count as a change, but only the writing recipe's causesAnotherCycle() applies
+                    recordChange(singletonList(recipe));
                     ctx.resetHasNewMessages();
                 }
             } catch (Throwable t) {
@@ -589,8 +593,10 @@ public class RecipeRunCycle<LSS extends LargeSourceSet> {
             List<Recipe> recipeStack = batch.recipeStacks.get(i);
             Recipe recipe = leaf(recipeStack);
 
-            if (r.isModified() || r.isHasNewMessages()) {
-                madeChangesInThisCycle.add(recipe);
+            if (r.isModified() || r.isDeleted()) {
+                recordChange(recipeStack);
+            } else if (r.isHasNewMessages()) {
+                recordChange(singletonList(recipe));
             }
 
             if (r.isModified()) {
@@ -599,7 +605,6 @@ public class RecipeRunCycle<LSS extends LargeSourceSet> {
 
             if (r.isDeleted()) {
                 deleted = true;
-                madeChangesInThisCycle.add(recipe);
                 break;
             }
 
@@ -888,6 +893,16 @@ public class RecipeRunCycle<LSS extends LargeSourceSet> {
      */
     private static Recipe leaf(List<Recipe> recipeStack) {
         return recipeStack.get(recipeStack.size() - 1);
+    }
+
+    private void recordChange(List<Recipe> recipeStack) {
+        madeChangesInThisCycle.add(leaf(recipeStack));
+        for (Recipe recipe : recipeStack) {
+            if (recipe.causesAnotherCycle()) {
+                causesAnotherCycle = true;
+                break;
+            }
+        }
     }
 
     private static <S extends SourceFile> S addRecipesThatMadeChanges(List<Recipe> recipeStack, S afterFile) {
