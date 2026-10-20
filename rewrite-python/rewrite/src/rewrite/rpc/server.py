@@ -51,6 +51,7 @@ from rewrite.python._version_detect import (
     detect_from_project, detect_from_source, requested_python_version, ty_python_version)
 from rewrite.python.printer import PythonPrinter
 from rewrite.result import Result
+from rewrite.rpc import json_codec
 from rewrite.rpc.reference import ReferenceMap
 
 # Deeply nested LST nodes (e.g., 256 implicitly concatenated strings) can
@@ -3041,7 +3042,7 @@ def _read_body(header_line: bytes) -> Optional[dict]:
         raise _ProtocolError(f"stream ended inside a {content_length} byte message body")
 
     try:
-        return json.loads(content_bytes.decode('utf-8'))
+        return json_codec.loads(content_bytes)
     except (UnicodeDecodeError, json.JSONDecodeError) as e:
         raise _ProtocolError(f"invalid message body: {e}")
 
@@ -3086,7 +3087,7 @@ def write_message(response: dict):
     short header, a cost that scales with the message where the extra syscall does not.
     ``os.writev`` avoids both but is absent on Windows, and measured no better where it exists.
     """
-    content_bytes = json.dumps(response).encode('utf-8')
+    content_bytes = json_codec.dumps(response)
     header = f"Content-Length: {len(content_bytes)}\r\n\r\n".encode('utf-8')
     fd = sys.stdout.fileno()
     os.write(fd, header)
