@@ -241,6 +241,34 @@ class RecipeSchedulerTest implements RewriteTest {
     }
 
     @Test
+    void compositeCausesAnotherCycleWhenChildMakesChanges() {
+        List<Integer> cycles = new java.util.ArrayList<>();
+        var composite = new DeclarativeRecipe(
+          "composite",
+          "Composite",
+          "Composite.",
+          emptySet(),
+          null,
+          URI.create("dummy:recipe.yml"),
+          true,
+          emptyList()
+        );
+        composite.addUninitialized(toRecipe(() -> new PlainTextVisitor<>() {
+            @Override
+            public PlainText visitText(PlainText text, ExecutionContext ctx) {
+                cycles.add(ctx.getCycle());
+                return text.withText("hello");
+            }
+        }));
+        composite.initialize(List.of());
+
+        List<SourceFile> sources = List.of(PlainText.builder().text("hi").sourcePath(Path.of("test.txt")).build());
+        composite.run(new InMemoryLargeSourceSet(sources), new InMemoryExecutionContext(), 3, 1);
+
+        assertThat(cycles).containsExactly(1, 2);
+    }
+
+    @Test
     void recordsBeforeAndAfterSourceFilesCorrectly() {
         List<String> beforeContents = new java.util.ArrayList<>();
         List<String> afterContents = new java.util.ArrayList<>();

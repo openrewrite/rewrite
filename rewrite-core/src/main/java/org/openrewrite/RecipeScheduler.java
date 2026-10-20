@@ -107,15 +107,7 @@ public class RecipeScheduler {
                     after = cycle.generateSources(after);
                     after = cycle.editSources(after);
 
-                    boolean anyRecipeCausingAnotherCycle = false;
-                    for (Recipe madeChanges : cycle.getMadeChangesInThisCycle()) {
-                        if (madeChanges.causesAnotherCycle()) {
-                            anyRecipeCausingAnotherCycle = true;
-                        }
-                    }
-
-                    if (i >= minCycles &&
-                        (cycle.getMadeChangesInThisCycle().isEmpty() || !anyRecipeCausingAnotherCycle)) {
+                    if (i >= minCycles && !cycle.isCausesAnotherCycle()) {
                         after.afterCycle(true);
                         break;
                     }
