@@ -43,6 +43,7 @@ import org.openrewrite.javascript.internal.LockFileRegeneration;
 import org.openrewrite.javascript.marker.NodeResolutionResult;
 import org.openrewrite.javascript.marker.NodeResolutionResult.Dependency;
 import org.openrewrite.javascript.marker.NodeResolutionResult.PackageManager;
+import org.openrewrite.javascript.marker.NodeResolutionResult.ResolvedDependency;
 import org.openrewrite.javascript.table.NodeDependencyEditsDeclined;
 import org.openrewrite.javascript.table.NodeLockRegenerationFailures;
 import org.openrewrite.json.AddKeyValue;
@@ -746,6 +747,43 @@ class UpgradeTransitiveDependencyVersionTest implements RewriteTest {
     void pnpmNamesAnOverrideScopedToAParentThatStillApplies() {
         golden("pnpm/override-recipe-parent-selector-present", PackageManager.Pnpm, "7.0.0", null,
           "pnpm applies is-odd>is-number before a global override of is-number");
+    }
+
+    @Test
+    void npmPackageNotInTheResolvedTreeGetsNoOverride() {
+        Scenario s = new Scenario("npm/override-recipe-global");
+        String before = requireNonNull(s.file("pkg-before"));
+        rewriteRun(
+          spec -> spec.recipe(new UpgradeTransitiveDependencyVersion("left-pad", "1.3.0", null))
+            .executionContext(s.ctx())
+            .afterRecipe(run -> assertThat(run.getDataTableRows(NodeDependencyEditsDeclined.class)).isEmpty()),
+          packageJson(before, null, resolved(nodeResolutionResult(PackageManager.Npm, dependencies(before)),
+            "is-odd@3.0.1", "is-number@6.0.0"), spec -> spec.noTrim()),
+          s.lock(PackageManager.Npm, null)
+        );
+    }
+
+    @Test
+    void npmPackageInTheResolvedTreeIsOverridden() {
+        Scenario s = new Scenario("npm/override-recipe-global");
+        String before = requireNonNull(s.file("pkg-before"));
+        rewriteRun(
+          spec -> s.spec(spec, "^7.0.0", null),
+          packageJson(before, s.file("pkg"), resolved(nodeResolutionResult(PackageManager.Npm,
+            dependencies(before)), "is-odd@3.0.1", "is-number@6.0.0"), spec -> spec.noTrim()
+            .afterRecipe(UpgradeTransitiveDependencyVersionTest::noWarning)),
+          s.lock(PackageManager.Npm, s.file("after"))
+        );
+    }
+
+    private static NodeResolutionResult resolved(NodeResolutionResult marker, String... packages) {
+        List<ResolvedDependency> resolved = new ArrayList<>();
+        for (String pkg : packages) {
+            int at = pkg.lastIndexOf('@');
+            resolved.add(new ResolvedDependency(pkg.substring(0, at), pkg.substring(at + 1), null, null, null, null,
+              null, null));
+        }
+        return marker.withResolvedDependencies(resolved);
     }
 
     private void golden(String scenario, PackageManager pm, String version, @Nullable String path) {
