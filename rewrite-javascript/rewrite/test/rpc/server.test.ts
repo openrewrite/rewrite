@@ -17,7 +17,8 @@ import {ChildProcessWithoutNullStreams, spawn} from "child_process";
 import * as fs from "fs";
 import * as path from "path";
 import * as rpc from "vscode-jsonrpc/node";
-import {RewriteRpc} from "../../src/rpc";
+import {RewriteRpc, RpcObjectData} from "../../src/rpc";
+import {DEFAULT_BATCH_SIZE} from "../../src/rpc/rewrite-rpc";
 import {chunkedJsonDecoder} from "../../src/rpc/message-decoder";
 import {chunkedJsonEncoder} from "../../src/rpc/message-encoder";
 import {JS} from "../../src/javascript";
@@ -60,6 +61,35 @@ describe.skipIf(!fs.existsSync(serverJs))("the server process", () => {
 
         server.stdin.end();
         expect(await exited).toEqual(0);
+    }, 60000);
+
+    test("pages at the default batch size when started without --batch-size", async () => {
+        const connection = rpc.createMessageConnection(
+            new rpc.StreamMessageReader(server.stdout, {contentTypeDecoder: chunkedJsonDecoder}),
+            new rpc.StreamMessageWriter(server.stdin, {contentTypeEncoder: chunkedJsonEncoder})
+        );
+        const pages: RpcObjectData[][] = [];
+        const sendRequest = connection.sendRequest.bind(connection);
+        connection.sendRequest = (async (type: any, ...args: any[]) => {
+            const response = await sendRequest(type, ...args);
+            if (type.method === "GetObject") {
+                pages.push(response as RpcObjectData[]);
+            }
+            return response;
+        }) as typeof connection.sendRequest;
+        const client = new RewriteRpc(connection, {batchSize: 1000});
+
+        let text = "";
+        for (let i = 0; i < 30; i++) {
+            text += `const v${i} = ${i};\n`;
+        }
+        await client.parse([{text, sourcePath: "many.js"}], JS.Kind.CompilationUnit);
+
+        // Too many messages for a page of 1000 and few enough for one page of DEFAULT_BATCH_SIZE,
+        // so a single page proves the default applied rather than that the tree was small.
+        expect(pages.length).toEqual(1);
+        expect(pages[0].length).toBeGreaterThan(1000);
+        expect(pages[0].length).toBeLessThanOrEqual(DEFAULT_BATCH_SIZE);
     }, 60000);
 
     test("shuts down when it is asked to terminate", async () => {
