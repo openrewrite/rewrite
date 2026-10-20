@@ -45,19 +45,6 @@ class JsonPathMatcherTest implements RewriteTest {
         return matches.get();
     }
 
-    private boolean anyAttributeMatch(Hcl hcl, JsonPathMatcher matcher) {
-        var matches = new AtomicBoolean(false);
-        new HclVisitor<Integer>() {
-            @Override
-            public Hcl visitAttribute(Hcl.Attribute attribute, Integer p) {
-                var a = super.visitAttribute(attribute, p);
-                matches.set(matcher.matches(getCursor()) || matches.get());
-                return a;
-            }
-        }.visit(hcl, 0);
-        return matches.get();
-    }
-
     @Test
     void match() {
         rewriteRun(
@@ -97,8 +84,8 @@ class JsonPathMatcherTest implements RewriteTest {
               }
               """,
             spec -> spec.beforeRecipe(configFile -> {
-                assertThat(anyAttributeMatch(configFile, new JsonPathMatcher("$.provider.features.key_vault[?(@.purge_soft_delete_on_destroy == true)]"))).isTrue();
-                assertThat(anyAttributeMatch(configFile, new JsonPathMatcher("$.provider.features.key_vault[?(@.purge_soft_delete_on_destroy == false)]"))).isFalse();
+                assertThat(anyBlockMatch(configFile, new JsonPathMatcher("$.provider.features.key_vault[?(@.purge_soft_delete_on_destroy == true)]"))).isTrue();
+                assertThat(anyBlockMatch(configFile, new JsonPathMatcher("$.provider.features.key_vault[?(@.purge_soft_delete_on_destroy == false)]"))).isFalse();
             })
           )
         );
@@ -118,8 +105,8 @@ class JsonPathMatcherTest implements RewriteTest {
               }
               """,
             spec -> spec.beforeRecipe(configFile -> {
-                assertThat(anyAttributeMatch(configFile, new JsonPathMatcher("$.provider.features.key_vault[?(@.purge_soft_delete_on_destroy)]"))).isTrue();
-                assertThat(anyAttributeMatch(configFile, new JsonPathMatcher("$.provider.features.key_vault[?(@.no_match)]"))).isFalse();
+                assertThat(anyBlockMatch(configFile, new JsonPathMatcher("$.provider.features.key_vault[?(@.purge_soft_delete_on_destroy)]"))).isTrue();
+                assertThat(anyBlockMatch(configFile, new JsonPathMatcher("$.provider.features.key_vault[?(@.no_match)]"))).isFalse();
             })
           )
         );
@@ -189,8 +176,8 @@ class JsonPathMatcherTest implements RewriteTest {
               }
               """,
             spec -> spec.beforeRecipe(configFile -> {
-                assertThat(anyAttributeMatch(configFile, new JsonPathMatcher("$.provider.features.key_vault[?(!@.no_match)]"))).isTrue();
-                assertThat(anyAttributeMatch(configFile, new JsonPathMatcher("$.provider.features.key_vault[?(!@.purge_soft_delete_on_destroy)]"))).isFalse();
+                assertThat(anyBlockMatch(configFile, new JsonPathMatcher("$.provider.features.key_vault[?(!@.no_match)]"))).isTrue();
+                assertThat(anyBlockMatch(configFile, new JsonPathMatcher("$.provider.features.key_vault[?(!@.purge_soft_delete_on_destroy)]"))).isFalse();
             })
           )
         );
@@ -210,8 +197,8 @@ class JsonPathMatcherTest implements RewriteTest {
               }
               """,
             spec -> spec.beforeRecipe(configFile -> {
-                assertThat(anyAttributeMatch(configFile, new JsonPathMatcher("$.provider.features.key_vault[?(!(@.purge_soft_delete_on_destroy == false))]"))).isTrue();
-                assertThat(anyAttributeMatch(configFile, new JsonPathMatcher("$.provider.features.key_vault[?(!(@.purge_soft_delete_on_destroy == true))]"))).isFalse();
+                assertThat(anyBlockMatch(configFile, new JsonPathMatcher("$.provider.features.key_vault[?(!(@.purge_soft_delete_on_destroy == false))]"))).isTrue();
+                assertThat(anyBlockMatch(configFile, new JsonPathMatcher("$.provider.features.key_vault[?(!(@.purge_soft_delete_on_destroy == true))]"))).isFalse();
             })
           )
         );
@@ -420,7 +407,14 @@ class JsonPathMatcherTest implements RewriteTest {
     void filterAfterLabels() {
         assertMatched(
           List.of(RESOURCES),
-          List.of("multi_az       = true"),
+          List.of(
+            """
+              resource "aws_db_instance" "primary" {
+                engine_version = "5.7"
+                multi_az       = true
+              }
+              """.trim()
+          ),
           "$.resource.aws_db_instance[?(@.multi_az == true)]",
           false
         );
@@ -590,6 +584,234 @@ class JsonPathMatcherTest implements RewriteTest {
           ),
           List.of("size = 1"),
           "$..settings.size",
+          false
+        );
+    }
+
+    private static final String TFVARS_AND_RESOURCES = """
+      region = "a"
+      resource "x" "y" {
+        engine = "mysql"
+        v = 1
+      }
+      resource "x" "z" {
+        engine = "postgres"
+        v = 2
+      }
+      """;
+
+    @Test
+    void matchTopLevelAttribute() {
+        assertMatched(
+          List.of(TFVARS_AND_RESOURCES),
+          List.of("region = \"a\""),
+          "$.region",
+          false
+        );
+    }
+
+    @Test
+    void filterOnNumericAttributeSelectsBlock() {
+        assertMatched(
+          List.of(TFVARS_AND_RESOURCES),
+          List.of(
+            """
+              resource "x" "y" {
+                engine = "mysql"
+                v = 1
+              }
+              """.trim()
+          ),
+          "$.resource[?(@.v == 1)]",
+          false
+        );
+    }
+
+    @Test
+    void filterOnNumericAttributeFollowedByChild() {
+        assertMatched(
+          List.of(TFVARS_AND_RESOURCES),
+          List.of("v = 2"),
+          "$.resource[?(@.v == 2)].v",
+          false
+        );
+    }
+
+    @Test
+    void filterOnQuotedStringFollowedByChild() {
+        assertMatched(
+          List.of(TFVARS_AND_RESOURCES),
+          List.of("v = 1"),
+          "$.resource[?(@.engine == 'mysql')].v",
+          false
+        );
+    }
+
+    @Test
+    void filterOnQuotedStringSelectsBlock() {
+        assertMatched(
+          List.of(TFVARS_AND_RESOURCES),
+          List.of(
+            """
+              resource "x" "z" {
+                engine = "postgres"
+                v = 2
+              }
+              """.trim()
+          ),
+          "$.resource[?(@.engine == 'postgres')]",
+          false
+        );
+    }
+
+    @Test
+    void filterComparesOnlyTheNamedAttribute() {
+        assertMatched(
+          List.of(TFVARS_AND_RESOURCES),
+          List.of(),
+          "$.resource[?(@.v == 'mysql')]",
+          false
+        );
+    }
+
+    @Test
+    void notEqualFilterSelectsOtherBlocks() {
+        assertMatched(
+          List.of(TFVARS_AND_RESOURCES),
+          List.of("v = 2"),
+          "$.resource[?(@.engine != 'mysql')].v",
+          false
+        );
+    }
+
+    @Test
+    void regexFilterOnQuotedString() {
+        assertMatched(
+          List.of(TFVARS_AND_RESOURCES),
+          List.of("v = 2"),
+          "$.resource[?(@.engine =~ 'post.*')].v",
+          false
+        );
+    }
+
+    @Test
+    void containsFilterOnQuotedString() {
+        assertMatched(
+          List.of(TFVARS_AND_RESOURCES),
+          List.of("v = 1"),
+          "$.resource[?(@.engine contains 'my')].v",
+          false
+        );
+    }
+
+    @Test
+    void negatedFilterOnBlock() {
+        assertMatched(
+          List.of(TFVARS_AND_RESOURCES),
+          List.of("v = 2"),
+          "$.resource[?(!(@.engine == 'mysql'))].v",
+          false
+        );
+    }
+
+    @Test
+    void logicalFilterOnBlock() {
+        assertMatched(
+          List.of(TFVARS_AND_RESOURCES),
+          List.of("engine = \"postgres\""),
+          "$.resource[?(@.engine == 'postgres' && @.v == 2)].engine",
+          false
+        );
+        assertMatched(
+          List.of(TFVARS_AND_RESOURCES),
+          List.of(),
+          "$.resource[?(@.engine == 'postgres' && @.v == 1)].engine",
+          false
+        );
+    }
+
+    @Test
+    void filterAfterLabelsFollowedByChild() {
+        assertMatched(
+          List.of(RESOURCES),
+          List.of("engine_version = \"8.0\""),
+          "$.resource.aws_db_instance[?(@.multi_az == false)].engine_version",
+          false
+        );
+    }
+
+    @Test
+    void filterOnNestedBlockPresence() {
+        assertMatched(
+          List.of(
+            """
+              resource "aws_instance" "web" {
+                ebs_block_device {
+                  volume_size = 10
+                }
+                ami = "a"
+              }
+              resource "aws_instance" "db" {
+                ami = "b"
+              }
+              """
+          ),
+          List.of("ami = \"a\""),
+          "$.resource[?(@.ebs_block_device)].ami",
+          false
+        );
+    }
+
+    @Test
+    void recursiveDescentFollowedByFilter() {
+        assertMatched(
+          List.of(RESOURCES),
+          List.of("engine_version = \"5.7\""),
+          "$..aws_db_instance[?(@.multi_az == true)].engine_version",
+          false
+        );
+    }
+
+    @Test
+    void recursiveDescentMatchesNestedBlock() {
+        assertMatched(
+          List.of(
+            """
+              resource "x" "y" {
+                versioning {
+                  enabled = true
+                }
+                lifecycle_rule {
+                  versioning {
+                    enabled = false
+                  }
+                }
+              }
+              """
+          ),
+          List.of(
+            """
+              versioning {
+                enabled = true
+              }
+              """.trim(),
+            """
+              versioning {
+                enabled = false
+              }
+              """.trim()
+          ),
+          "$..versioning",
+          false
+        );
+    }
+
+    @Test
+    void recursiveDescentMatchesSingleLineNestedBlock() {
+        assertMatched(
+          List.of("resource \"x\" \"y\" { versioning { enabled = true } }"),
+          List.of("versioning { enabled = true }"),
+          "$..versioning",
           false
         );
     }
