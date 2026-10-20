@@ -170,4 +170,21 @@ class YarnClassicLockAdapterTest {
         assertThat(result.getAll().get(0).getName()).isEqualTo("lodash");
         assertThat(result.getAll().get(0).getVersion()).isEqualTo("4.17.21");
     }
+
+    @Test
+    void resolvesDeclaredConstraintWhenOlderVersionIsListedFirst() {
+        // given
+        String yarn = "lodash@^3.10.1:\n" +
+                "  version \"3.10.1\"\n" +
+                "\n" +
+                "lodash@^4.17.21:\n" +
+                "  version \"4.17.21\"\n";
+
+        // when
+        LockFileParser.ParseResult result = LockFileParser.parse(YarnClassicLockAdapter.toNpmV3(yarn));
+
+        // then
+        assertThat(result.resolve("lodash", "^4.17.21", "").getVersion()).isEqualTo("4.17.21");
+        assertThat(result.resolve("lodash", "^3.10.1", "").getVersion()).isEqualTo("3.10.1");
+    }
 }

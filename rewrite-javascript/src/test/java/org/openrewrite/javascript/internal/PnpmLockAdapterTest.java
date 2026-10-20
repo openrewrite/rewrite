@@ -358,4 +358,103 @@ class PnpmLockAdapterTest {
         assertThat(PnpmLockAdapter.parsePackageKey("")).isNull();
         assertThat(PnpmLockAdapter.parsePackageKey(null)).isNull();
     }
+
+    @Test
+    void topLevelIsTheVersionTheRootImporterResolves() {
+        // given
+        String pnpm = "lockfileVersion: '9.0'\n" +
+                "\n" +
+                "importers:\n" +
+                "\n" +
+                "  .:\n" +
+                "    dependencies:\n" +
+                "      lodash:\n" +
+                "        specifier: ^4.17.21\n" +
+                "        version: 4.17.21\n" +
+                "      legacy:\n" +
+                "        specifier: 1.0.0\n" +
+                "        version: 1.0.0\n" +
+                "\n" +
+                "packages:\n" +
+                "\n" +
+                "  legacy@1.0.0:\n" +
+                "    resolution: {integrity: sha512-a}\n" +
+                "\n" +
+                "  lodash@3.10.1:\n" +
+                "    resolution: {integrity: sha512-b}\n" +
+                "\n" +
+                "  lodash@4.17.21:\n" +
+                "    resolution: {integrity: sha512-c}\n" +
+                "\n" +
+                "snapshots:\n" +
+                "\n" +
+                "  legacy@1.0.0:\n" +
+                "    dependencies:\n" +
+                "      lodash: 3.10.1\n" +
+                "\n" +
+                "  lodash@3.10.1: {}\n" +
+                "\n" +
+                "  lodash@4.17.21: {}\n";
+
+        // when
+        LockFileParser.ParseResult result = LockFileParser.parse(PnpmLockAdapter.toNpmV3(pnpm));
+
+        // then
+        assertThat(result.getTopLevel().get("lodash").getVersion()).isEqualTo("4.17.21");
+        assertThat(result.resolve("lodash", "^4.17.21", "").getVersion()).isEqualTo("4.17.21");
+        assertThat(result.getTopLevel().get("legacy").getDependencies())
+                .extracting(d -> d.getResolved().getVersion())
+                .containsExactly("3.10.1");
+    }
+
+    @Test
+    void topLevelIsTheVersionTheRootResolvesInLockfileVersion6() {
+        // given
+        String pnpm = "lockfileVersion: '6.0'\n" +
+                "\n" +
+                "dependencies:\n" +
+                "  lodash:\n" +
+                "    specifier: ^4.17.21\n" +
+                "    version: 4.17.21\n" +
+                "\n" +
+                "packages:\n" +
+                "\n" +
+                "  /lodash@3.10.1:\n" +
+                "    resolution: {integrity: sha512-b}\n" +
+                "\n" +
+                "  /lodash@4.17.21:\n" +
+                "    resolution: {integrity: sha512-c}\n";
+
+        // when
+        LockFileParser.ParseResult result = LockFileParser.parse(PnpmLockAdapter.toNpmV3(pnpm));
+
+        // then
+        assertThat(result.getTopLevel().get("lodash").getVersion()).isEqualTo("4.17.21");
+    }
+
+    @Test
+    void topLevelIsTheVersionTheRootResolvesInLockfileVersion5() {
+        // given
+        String pnpm = "lockfileVersion: 5.4\n" +
+                "\n" +
+                "specifiers:\n" +
+                "  lodash: ^4.17.21\n" +
+                "\n" +
+                "dependencies:\n" +
+                "  lodash: 4.17.21\n" +
+                "\n" +
+                "packages:\n" +
+                "\n" +
+                "  /lodash/3.10.1:\n" +
+                "    resolution: {integrity: sha512-b}\n" +
+                "\n" +
+                "  /lodash/4.17.21:\n" +
+                "    resolution: {integrity: sha512-c}\n";
+
+        // when
+        LockFileParser.ParseResult result = LockFileParser.parse(PnpmLockAdapter.toNpmV3(pnpm));
+
+        // then
+        assertThat(result.getTopLevel().get("lodash").getVersion()).isEqualTo("4.17.21");
+    }
 }
