@@ -743,7 +743,7 @@ class RewriteRpcTest implements RewriteTest {
           spec -> spec
             .recipe(new CompositeRecipe(List.of(rpc1, local)))
             .validateRecipeSerialization(false)
-            .expectedCyclesThatMakeChanges(2),
+            .expectedCyclesThatMakeChanges(2), // each ChangeText overwrites the other in every cycle
           text(
             "hello",
             "from-local"
