@@ -31,7 +31,9 @@ import java.nio.charset.Charset;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.UUID;
+import static org.openrewrite.java.internal.rpc.JavaSender.spaceRef;
 import static org.openrewrite.rpc.Reference.asRef;
+import static org.openrewrite.rpc.Reference.getValueNonNull;
 
 // Field order must match the Go-side gosum_codec.go exactly.
 @Getter
@@ -60,7 +62,7 @@ public class GoSumRpcCodec extends DynamicDispatchRpcCodec<GoSumTree> {
 
     private static void sendGoSum(GolangSender sender, GoSum after, RpcSendQueue q) {
         q.getAndSend(after, Tree::getId);
-        q.getAndSend(after, GoSum::getPrefix, space -> sender.visitSpace(space, q));
+        q.getAndSend(after, x -> spaceRef(x.getPrefix()), space -> sender.visitSpace(getValueNonNull(space), q));
         q.getAndSend(after, mk -> asRef(mk.getMarkers()));
         q.getAndSend(after, (GoSum g) -> g.getSourcePath().toString());
         q.getAndSend(after, (GoSum g) -> g.getCharset().name());
@@ -70,18 +72,18 @@ public class GoSumRpcCodec extends DynamicDispatchRpcCodec<GoSumTree> {
         q.getAndSendList(after, GoSum::getLines,
                 rp -> rp.getElement().getId(),
                 rp -> sendRightPadded(sender, rp, q));
-        q.getAndSend(after, GoSum::getEof, space -> sender.visitSpace(space, q));
+        q.getAndSend(after, x -> spaceRef(x.getEof()), space -> sender.visitSpace(getValueNonNull(space), q));
     }
 
     private static void sendRightPadded(GolangSender sender, JRightPadded<GoSum.Line> rp, RpcSendQueue q) {
         q.getAndSend(rp, JRightPadded::getElement, el -> sendLine(sender, el, q));
-        q.getAndSend(rp, JRightPadded::getAfter, space -> sender.visitSpace(space, q));
+        q.getAndSend(rp, x -> spaceRef(x.getAfter()), space -> sender.visitSpace(getValueNonNull(space), q));
         q.getAndSend(rp, mk -> asRef(mk.getMarkers()));
     }
 
     private static void sendLine(GolangSender sender, GoSum.Line l, RpcSendQueue q) {
         q.getAndSend(l, GoSum.Line::getId);
-        q.getAndSend(l, GoSum.Line::getPrefix, space -> sender.visitSpace(space, q));
+        q.getAndSend(l, x -> spaceRef(x.getPrefix()), space -> sender.visitSpace(getValueNonNull(space), q));
         q.getAndSend(l, mk -> asRef(mk.getMarkers()));
         q.getAndSend(l, GoSum.Line::getModulePath);
         q.getAndSend(l, GoSum.Line::getVersion);
