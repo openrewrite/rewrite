@@ -274,13 +274,15 @@ class LockFileParserTest {
     @Test
     void resolveSkipsPathHitThatViolatesConstraint() {
         // given
-        String lock = "{\n" +
-                "  \"packages\": {\n" +
-                "    \"\": { },\n" +
-                "    \"node_modules/lodash\": { \"version\": \"3.10.1\" },\n" +
-                "    \"node_modules/__dup_0__/node_modules/lodash\": { \"version\": \"4.17.21\" }\n" +
-                "  }\n" +
-                "}";
+        String lock = """
+                {
+                  "packages": {
+                    "": { },
+                    "node_modules/lodash": { "version": "3.10.1" },
+                    "node_modules/__dup_0__/node_modules/lodash": { "version": "4.17.21" }
+                  }
+                }
+                """;
 
         // when
         ResolvedDependency resolved = LockFileParser.parse(lock).resolve("lodash", "^4.17.0");
@@ -293,14 +295,16 @@ class LockFileParserTest {
     @Test
     void resolveFallbackPicksHighestSatisfyingVersion() {
         // given
-        String lock = "{\n" +
-                "  \"packages\": {\n" +
-                "    \"\": { },\n" +
-                "    \"node_modules/__dup_0__/node_modules/lodash\": { \"version\": \"4.17.0\" },\n" +
-                "    \"node_modules/__dup_1__/node_modules/lodash\": { \"version\": \"4.17.21\" },\n" +
-                "    \"node_modules/__dup_2__/node_modules/lodash\": { \"version\": \"3.10.1\" }\n" +
-                "  }\n" +
-                "}";
+        String lock = """
+                {
+                  "packages": {
+                    "": { },
+                    "node_modules/__dup_0__/node_modules/lodash": { "version": "4.17.0" },
+                    "node_modules/__dup_1__/node_modules/lodash": { "version": "4.17.21" },
+                    "node_modules/__dup_2__/node_modules/lodash": { "version": "3.10.1" }
+                  }
+                }
+                """;
 
         // when
         ResolvedDependency resolved = LockFileParser.parse(lock).resolve("lodash", "^4.17.0");
@@ -313,13 +317,15 @@ class LockFileParserTest {
     @Test
     void resolveKeepsPathHitWhenNoVersionSatisfiesConstraint() {
         // given
-        String lock = "{\n" +
-                "  \"packages\": {\n" +
-                "    \"\": { },\n" +
-                "    \"node_modules/lodash\": { \"version\": \"3.10.1\" },\n" +
-                "    \"node_modules/__dup_0__/node_modules/lodash\": { \"version\": \"4.17.21\" }\n" +
-                "  }\n" +
-                "}";
+        String lock = """
+                {
+                  "packages": {
+                    "": { },
+                    "node_modules/lodash": { "version": "3.10.1" },
+                    "node_modules/__dup_0__/node_modules/lodash": { "version": "4.17.21" }
+                  }
+                }
+                """;
 
         // when
         ResolvedDependency resolved = LockFileParser.parse(lock).resolve("lodash", "^5.0.0");
