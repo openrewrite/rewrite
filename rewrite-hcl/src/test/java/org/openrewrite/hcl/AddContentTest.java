@@ -698,6 +698,124 @@ class AddContentTest implements RewriteTest {
         );
     }
 
+    @Test
+    void trailingCommentStaysWithLastAttributeOfBlock() {
+        rewriteRun(
+          spec -> spec.recipe(new AddContent("$.resource.aws_db_instance", "publicly_accessible = false", null)),
+          hcl(
+            """
+              resource "aws_db_instance" "db" {
+                engine = "mysql" # the engine
+              }
+              """,
+            """
+              resource "aws_db_instance" "db" {
+                engine              = "mysql" # the engine
+                publicly_accessible = false
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void commentAfterOpeningBraceStaysThereOnPrepend() {
+        rewriteRun(
+          spec -> spec.recipe(new AddContent("$.resource.aws_db_instance", "publicly_accessible = false", true)),
+          hcl(
+            """
+              resource "aws_db_instance" "db" { # the database
+                engine = "mysql"
+              }
+              """,
+            """
+              resource "aws_db_instance" "db" { # the database
+                publicly_accessible = false
+                engine              = "mysql"
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void trailingCommentStaysWithLastElementOfObject() {
+        rewriteRun(
+          spec -> spec.recipe(new AddContent("$.resource.aws_instance.tags", "Owner = \"platform\"", null)),
+          hcl(
+            """
+              resource "aws_instance" "web" {
+                tags = {
+                  Name = "web" # the name
+                }
+              }
+              """,
+            """
+              resource "aws_instance" "web" {
+                tags = {
+                  Name  = "web" # the name
+                  Owner = "platform"
+                }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void commentInEmptyObjectIsKept() {
+        rewriteRun(
+          spec -> spec.recipe(new AddContent("$.resource.aws_instance.tags", "Owner = \"platform\"", null)),
+          hcl(
+            """
+              resource "aws_instance" "web" {
+                tags = {
+                  # to be completed
+                }
+              }
+              """,
+            """
+              resource "aws_instance" "web" {
+                tags = {
+                  Owner = "platform"
+                  # to be completed
+                }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void trailingCommentStaysWithLastAttributeOfFile() {
+        rewriteRun(
+          spec -> spec.recipe(new AddContent("$", "instance_type = \"t3.micro\"", null)),
+          hcl(
+            """
+              region = "eu-west-1" # the region
+              """,
+            """
+              region        = "eu-west-1" # the region
+              instance_type = "t3.micro"
+              """
+          )
+        );
+    }
+
+    @Test
+    void addToFileWithOnlyAComment() {
+        rewriteRun(
+          spec -> spec.recipe(new AddContent("$", "region = \"eu-west-1\"", null)),
+          hcl(
+            "# variables",
+            """
+              # variables
+              region = "eu-west-1"
+              """
+          )
+        );
+    }
+
     @ParameterizedTest
     @ValueSource(strings = {"", "a = 1\nb = 2", "a = ", "a = 1 }", "block {", "a = 1 # comment", "{ a = 1 }"})
     void invalidContent(String content) {

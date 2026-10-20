@@ -155,15 +155,15 @@ public class JsonPathMatcher {
         @Nullable String nextLabelName() {
             return labelName(block.getLabels().get(nextLabel));
         }
+    }
 
-        static @Nullable String labelName(Label label) {
-            if (label instanceof Hcl.Literal) {
-                return String.valueOf(((Hcl.Literal) label).getValue());
-            } else if (label instanceof Hcl.Identifier) {
-                return ((Hcl.Identifier) label).getName();
-            }
-            return null;
+    static @Nullable String labelName(Label label) {
+        if (label instanceof Hcl.Literal) {
+            return String.valueOf(((Hcl.Literal) label).getValue());
+        } else if (label instanceof Hcl.Identifier) {
+            return ((Hcl.Identifier) label).getName();
         }
+        return null;
     }
 
     @SuppressWarnings({"ConstantConditions", "unchecked"})
@@ -418,7 +418,7 @@ public class JsonPathMatcher {
         private static int labelIndexAfter(Hcl.Block block, int fromLabel, String name) {
             List<Label> labels = block.getLabels();
             for (int i = fromLabel; i < labels.size(); i++) {
-                if (name.equals(LabelScope.labelName(labels.get(i)))) {
+                if (name.equals(labelName(labels.get(i)))) {
                     return hasBodyKey(block, name) ? -1 : i + 1;
                 }
             }

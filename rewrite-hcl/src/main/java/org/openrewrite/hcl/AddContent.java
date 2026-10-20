@@ -28,10 +28,7 @@ import org.openrewrite.internal.StringUtils;
 import org.openrewrite.marker.Markers;
 import org.openrewrite.style.Style;
 
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Objects;
-import java.util.Optional;
+import java.util.*;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.regex.Pattern;
 
@@ -97,10 +94,9 @@ public class AddContent extends Recipe {
                 List<BodyContent> body = c.getBody();
                 Space eof = c.getEof();
                 if (body.isEmpty()) {
-                    if (!eof.getComments().isEmpty()) {
-                        added = added.withPrefix(eof.withComments(
-                                ListUtils.concatAll(eof.getComments(), added.getPrefix().getComments())));
-                        eof = Space.format("\n");
+                    Space prefix = c.getPrefix();
+                    if (!prefix.getComments().isEmpty() && !prefix.getLastWhitespace().contains("\n")) {
+                        added = startingWith(added, "\n");
                     }
                     body = singletonList(added);
                 } else if (first) {
@@ -109,7 +105,11 @@ public class AddContent extends Recipe {
                         return whitespace.contains("\n") ? e : startingWith(e, "\n" + whitespace);
                     }));
                 } else {
-                    body = ListUtils.concat(body, startingWith(added, "\n"));
+                    Space[] split = splitSameLineComments(eof);
+                    added = startingWith(added, "\n");
+                    added = added.withPrefix(join(split[0], added.getPrefix()));
+                    eof = split[1];
+                    body = ListUtils.concat(body, added);
                 }
                 Hcl.Block before = topLevel(c.getBody());
                 Hcl.Block after = topLevel(body);
@@ -126,9 +126,23 @@ public class AddContent extends Recipe {
                 String blockIndent = indentOf(b.getPrefix());
                 String indent = siblingIndent(b.getBody(), first, blockIndent + indentUnit());
                 BodyContent added = startingWith(copy(bodyContent, indent), "\n" + indent);
-                List<BodyContent> body = ListUtils.map(b.getBody(), e -> onOwnLine(e, indent));
+                List<BodyContent> body = b.getBody();
+                Space end = b.getEnd();
+                if (first && !body.isEmpty()) {
+                    Space firstPrefix = body.get(0).getPrefix();
+                    if (firstPrefix.getLastWhitespace().contains("\n")) {
+                        Space[] split = splitSameLineComments(firstPrefix);
+                        added = added.withPrefix(join(split[0], added.getPrefix()));
+                        body = ListUtils.mapFirst(body, e -> e.withPrefix(split[1]));
+                    }
+                } else {
+                    Space[] split = splitSameLineComments(end);
+                    added = added.withPrefix(join(split[0], added.getPrefix()));
+                    end = split[1];
+                }
+                body = ListUtils.map(body, e -> onOwnLine(e, indent));
                 body = first ? ListUtils.concat(added, body) : ListUtils.concat(body, added);
-                Hcl.Block after = b.withBody(body).withEnd(onOwnLine(b.getEnd(), blockIndent));
+                Hcl.Block after = b.withBody(body).withEnd(onOwnLine(end, blockIndent));
                 return after.withBody(realign(getCursor().getParentOrThrow(), b, b.getBody(), after, body, ctx));
             }
 
@@ -156,8 +170,11 @@ public class AddContent extends Recipe {
                 if (attributes.size() == 1 && attributes.get(0) instanceof Hcl.Empty) {
                     String indent = objectIndent + indentUnit();
                     Hcl.Attribute added = startingWith(copy(objectElement, indent), "\n" + indent);
-                    return withElements(o, singletonList(new HclRightPadded<>(added, Space.format("\n" + objectIndent),
-                            Markers.EMPTY)));
+                    Space[] split = splitSameLineComments(attributes.get(0).getPrefix());
+                    added = added.withPrefix(join(split[0], added.getPrefix()));
+                    Space end = split[1].getComments().isEmpty() ?
+                            Space.format("\n" + objectIndent) : onOwnLine(split[1], objectIndent);
+                    return withElements(o, singletonList(new HclRightPadded<>(added, end, Markers.EMPTY)));
                 }
                 HclRightPadded<Expression> neighbor = elements.get(first ? 0 : elements.size() - 1);
                 if (!(neighbor.getElement() instanceof Hcl.Attribute)) {
@@ -179,20 +196,30 @@ public class AddContent extends Recipe {
                     if (!multiline) {
                         added = added.withComma(comma());
                         if (neighborAttribute.getPrefix().isEmpty()) {
-                            padded.set(0, neighbor.withElement(neighborAttribute.withPrefix(Space.format(" "))));
+                            neighborAttribute = neighborAttribute.withPrefix(Space.format(" "));
                         }
+                    } else if (neighborAttribute.getPrefix().getLastWhitespace().contains("\n")) {
+                        Space[] split = splitSameLineComments(neighborAttribute.getPrefix());
+                        added = added.withPrefix(join(split[0], added.getPrefix()));
+                        neighborAttribute = neighborAttribute.withPrefix(split[1]);
                     }
+                    padded.set(0, neighbor.withElement(neighborAttribute));
                     padded.add(0, new HclRightPadded<>(added, Space.EMPTY, Markers.EMPTY));
                 } else {
+                    Space after = neighbor.getAfter();
                     if (!multiline) {
                         if (neighborAttribute.getComma() == null) {
                             neighborAttribute = neighborAttribute.withComma(comma());
                         } else {
                             added = added.withComma(comma());
                         }
+                    } else {
+                        Space[] split = splitSameLineComments(after);
+                        added = added.withPrefix(join(split[0], added.getPrefix()));
+                        after = split[1];
                     }
                     padded.set(padded.size() - 1, neighbor.withElement(neighborAttribute).withAfter(Space.EMPTY));
-                    padded.add(new HclRightPadded<>(added, neighbor.getAfter(), Markers.EMPTY));
+                    padded.add(new HclRightPadded<>(added, after, Markers.EMPTY));
                 }
                 return withElements(o, padded);
             }
@@ -217,13 +244,15 @@ public class AddContent extends Recipe {
                 };
                 Cursor cursorBefore = new Cursor(parentCursor, parentBefore);
                 Cursor cursorAfter = new Cursor(parentCursor, parentAfter);
-                List<Hcl.Attribute> aligned = new ArrayList<>();
+                Set<UUID> existing = new HashSet<>();
+                Set<UUID> aligned = new HashSet<>();
                 boolean allAligned = true;
                 for (T original : before) {
+                    existing.add(original.getId());
                     if (original instanceof Hcl.Attribute) {
                         Hcl realigned = realigner.visitNonNull(original, ctx, cursorBefore);
                         if (typeSpace(realigned).equals(typeSpace(original))) {
-                            aligned.add((Hcl.Attribute) original);
+                            aligned.add(original.getId());
                         } else {
                             allAligned = false;
                         }
@@ -234,8 +263,8 @@ public class AddContent extends Recipe {
                     if (!(e instanceof Hcl.Attribute)) {
                         return e;
                     }
-                    boolean isAdded = before.stream().noneMatch(o -> o.getId().equals(e.getId()));
-                    if (isAdded ? alignAdded : aligned.stream().anyMatch(o -> o.getId().equals(e.getId()))) {
+                    boolean isAdded = !existing.contains(e.getId());
+                    if (isAdded ? alignAdded : aligned.contains(e.getId())) {
                         return (T) realigner.visitNonNull(e, ctx, cursorAfter);
                     }
                     if (isAdded) {
@@ -301,13 +330,7 @@ public class AddContent extends Recipe {
     private static List<@Nullable String> labelNames(Hcl.Block block) {
         List<@Nullable String> names = new ArrayList<>();
         for (Label label : block.getLabels()) {
-            if (label instanceof Hcl.Literal) {
-                names.add(String.valueOf(((Hcl.Literal) label).getValue()));
-            } else if (label instanceof Hcl.Identifier) {
-                names.add(((Hcl.Identifier) label).getName());
-            } else {
-                names.add(null);
-            }
+            names.add(JsonPathMatcher.labelName(label));
         }
         return names;
     }
@@ -328,6 +351,33 @@ public class AddContent extends Recipe {
 
     private static <T extends Hcl> T startingWith(T tree, String whitespace) {
         return tree.withPrefix(tree.getPrefix().withWhitespace(whitespace));
+    }
+
+    private static Space[] splitSameLineComments(Space space) {
+        List<Comment> comments = space.getComments();
+        if (comments.isEmpty() || space.getWhitespace().contains("\n")) {
+            return new Space[]{Space.EMPTY, space};
+        }
+        int last = 0;
+        while (last < comments.size() - 1 && !comments.get(last).getSuffix().contains("\n")) {
+            last++;
+        }
+        Comment lastComment = comments.get(last);
+        List<Comment> sameLine = new ArrayList<>(comments.subList(0, last));
+        sameLine.add(lastComment.withSuffix(""));
+        return new Space[]{
+                Space.build(space.getWhitespace(), sameLine),
+                Space.build(lastComment.getSuffix(), new ArrayList<>(comments.subList(last + 1, comments.size())))
+        };
+    }
+
+    private static Space join(Space sameLine, Space prefix) {
+        if (sameLine.getComments().isEmpty()) {
+            return prefix;
+        }
+        return Space.build(sameLine.getWhitespace(), ListUtils.concatAll(
+                ListUtils.mapLast(sameLine.getComments(), c -> c.withSuffix(prefix.getWhitespace())),
+                prefix.getComments()));
     }
 
     private static <T extends Hcl> T onOwnLine(T tree, String indent) {
