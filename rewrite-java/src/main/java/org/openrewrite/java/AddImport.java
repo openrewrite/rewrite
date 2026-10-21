@@ -34,9 +34,7 @@ import org.openrewrite.marker.Markers;
 import org.openrewrite.style.GeneralFormatStyle;
 import org.openrewrite.style.Style;
 
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Optional;
+import java.util.*;
 import java.util.concurrent.atomic.AtomicReference;
 
 import static java.util.Collections.emptyList;
@@ -287,7 +285,14 @@ public class AddImport<P> extends JavaIsoVisitor<P> {
     private Optional<JavaType> findTypeReference(JavaSourceFile compilationUnit) {
         if (member == null) {
             //Non-static imports, we just look for field accesses.
+            Set<NameTree> inImports = new HashSet<>();
+            for (J.Import anImport : compilationUnit.getImports()) {
+                inImports.addAll(FindTypes.find(anImport, fullyQualifiedName));
+            }
             for (NameTree t : FindTypes.find(compilationUnit, fullyQualifiedName)) {
+                if (inImports.contains(t)) {
+                    continue;
+                }
                 if (!(t instanceof J.FieldAccess) || !((J.FieldAccess) t).isFullyQualifiedClassReference(fullyQualifiedName)) {
                     Optional<JavaType> mayBeTypeReference = getTypeReference(t);
                     if (mayBeTypeReference.isPresent()) {
