@@ -2977,6 +2977,46 @@ describe('JavaScript type mapping', () => {
             }, {unsafeCleanup: true});
         });
 
+        test('a member bound from a require() is attributed to the required module only in its own file', async () => {
+            const spec = new RecipeSpec();
+            spec.recipe = markTypes((node, type) => {
+                if (node?.kind === J.Kind.Identifier && (node as J.Identifier).simpleName === 'bar') {
+                    const fieldType = (node as J.Identifier).fieldType;
+                    return fieldType?.owner ?
+                        `${Type.FullyQualified.getFullyQualifiedName(fieldType.owner)}#${fieldType.name}` : null;
+                }
+                return null;
+            });
+
+            const local = typescript(
+                `
+                    export const bar = require('node:path').sep;
+                    bar.length;
+                `,
+                //@formatter:off
+                `
+                    export const /*~~(path#sep)~~>*/bar = require('node:path').sep;
+                    /*~~(path#sep)~~>*/bar.length;
+                `
+                //@formatter:on
+            );
+            local.path = 'local.ts';
+            const main = typescript(
+                `
+                    import * as ns from './local';
+                    ns.bar.length;
+                `,
+                //@formatter:off
+                `
+                    import * as ns from './local';
+                    ns./*~~(<unknown>#bar)~~>*/bar.length;
+                `
+                //@formatter:on
+            );
+            main.path = 'main.ts';
+            await withDir(async repo => spec.rewriteRun(npm(repo.path, local, main)), {unsafeCleanup: true});
+        });
+
         test('members bound from a require() of a package without type declarations attribute to the package', async () => {
             const spec = new RecipeSpec();
             spec.recipe = markTypes(declaringTypeAndName);

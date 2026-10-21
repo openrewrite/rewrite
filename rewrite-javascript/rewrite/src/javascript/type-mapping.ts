@@ -609,7 +609,7 @@ export class JavaScriptTypeMapping {
         let ownerType: Type | undefined;
 
         // Check if the variable is imported
-        const requiredMember = this.requiredMember(symbol.declarations?.[0]);
+        const requiredMember = this.requiredMember(symbol.declarations?.[0], node);
         if (symbol.flags & ts.SymbolFlags.Alias || requiredMember) {
             // For imported variables, find the module specifier
             const moduleSpecifier = this.importedModule(symbol.declarations?.[0]) ?? requiredMember?.module;
@@ -737,7 +737,7 @@ export class JavaScriptTypeMapping {
         if (!declaration) {
             return undefined;
         }
-        const required = this.requiredMember(declaration);
+        const required = this.requiredMember(declaration, node);
         if (required) {
             return {module: required.module, namespace: false, exportName: required.exportName};
         }
@@ -773,10 +773,12 @@ export class JavaScriptTypeMapping {
     /**
      * The module and export a `const` binds from a `require()` result, as in `const {x} = require('m')`,
      * `const {x: y} = require('m')` or `const y = require('m').x`. Read from the syntax, since in a
-     * TypeScript file `require` returns `any`. A nested destructuring pattern binds no export.
+     * TypeScript file `require` returns `any`. A nested destructuring pattern binds no export, and
+     * another file reading an exported binding reads a member of the module that declares it.
      */
-    private requiredMember(declaration: ts.Node | undefined): { module: string, exportName: string } | undefined {
-        if (!declaration || !(ts.getCombinedNodeFlags(declaration) & ts.NodeFlags.Const)) {
+    private requiredMember(declaration: ts.Node | undefined, location: ts.Node): { module: string, exportName: string } | undefined {
+        if (!declaration || declaration.getSourceFile() !== location.getSourceFile() ||
+            !(ts.getCombinedNodeFlags(declaration) & ts.NodeFlags.Const)) {
             return undefined;
         }
         if (ts.isBindingElement(declaration) && !declaration.dotDotDotToken &&
@@ -1201,7 +1203,7 @@ export class JavaScriptTypeMapping {
                             moduleSpecifier = this.importedModule(exprSymbol.declarations?.[0]);
                         }
                     }
-                    moduleSpecifier ??= this.requiredMember(exprSymbol.declarations?.[0])?.module;
+                    moduleSpecifier ??= this.requiredMember(exprSymbol.declarations?.[0], node.expression)?.module;
                 }
 
                 const declared = this.parsedFunctionDeclaration(aliasedSymbol ?? symbol);
