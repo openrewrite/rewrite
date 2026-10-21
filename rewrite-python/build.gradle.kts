@@ -562,6 +562,8 @@ val printTestClasspath by tasks.registering {
 
 extensions.configure<LicenseExtension> {
     exclude("**/rewrite-python-version.txt")
+    // uv's own marker test cases, kept as JSON data
+    exclude("**/marker/uv-*-tree-rows.json")
 }
 
 // The lock regeneration test fixtures (recorded package-manager output) live in
