@@ -25,6 +25,7 @@ from rewrite.java.support_types import JContainer, JLeftPadded, JRightPadded
 from rewrite.java.tree import Empty, FieldAccess, Identifier, Import, Literal, Space
 from rewrite.markers import Markers
 from rewrite.python.binding_utils import is_reference
+from rewrite.python.format.line_breaks import line_break
 from rewrite.python.import_utils import (get_qualid_name, get_name_string, get_alias_name,
                                          get_canonical_fqn, module_binding_name, pad_right,
                                          referenced_names)
@@ -268,6 +269,7 @@ class AddImport(PythonVisitor):
     def _add_import(self, cu: CompilationUnit) -> CompilationUnit:
         """Add a new import statement to the compilation unit."""
         new_import = create_import_statement(self.module, self.name, self.alias)
+        newline = line_break(cu)
 
         # Insert after the module docstring (which must stay first) and any existing imports.
         padded_stmts = list(cu.padding.statements)
@@ -288,29 +290,29 @@ class AddImport(PythonVisitor):
             padded_stmts = [new_padded]
             eof = cu.eof
             if eof.comments and '\n' not in eof.whitespace:
-                cu = cu.replace(eof=eof.replace(whitespace='\n' + eof.whitespace))
+                cu = cu.replace(eof=eof.replace(whitespace=newline + eof.whitespace))
         elif insert_idx == 0:
             first = padded_stmts[0]
             first_prefix = first.element.prefix
-            if first_prefix.whitespace and first_prefix.whitespace.startswith('\n'):
+            if first_prefix.whitespace and first_prefix.whitespace.startswith(('\n', '\r\n')):
                 # First statement has a leading newline (e.g., a prior import was
                 # removed). The new import becomes the true first statement with
-                # empty prefix; the existing statement keeps its '\n'.
+                # empty prefix; the existing statement keeps its line break.
                 new_padded = JRightPadded(new_import.replace(prefix=Space.EMPTY), Space.EMPTY, Markers.EMPTY)
             else:
                 # Normal case: new import takes the first statement's prefix,
-                # and the first statement gets '\n' as separator.
+                # and the first statement gets a line break as separator.
                 new_padded = JRightPadded(new_import.replace(prefix=first_prefix), Space.EMPTY, Markers.EMPTY)
                 padded_stmts[0] = JRightPadded(
-                    first.element.replace(prefix=Space([], '\n')),
+                    first.element.replace(prefix=Space([], newline)),
                     first.after, first.markers
                 )
             padded_stmts.insert(insert_idx, new_padded)
         else:
-            # Inserting after existing imports. The new import needs '\n' as
+            # Inserting after existing imports. The new import needs a line break as
             # its prefix since each statement's prefix carries the newline
             # that separates it from the preceding statement.
-            new_padded = JRightPadded(new_import.replace(prefix=Space([], '\n')), Space.EMPTY, Markers.EMPTY)
+            new_padded = JRightPadded(new_import.replace(prefix=Space([], newline)), Space.EMPTY, Markers.EMPTY)
             padded_stmts.insert(insert_idx, new_padded)
 
         return cu.padding.replace(_statements=padded_stmts)

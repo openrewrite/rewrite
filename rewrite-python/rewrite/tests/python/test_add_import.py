@@ -516,3 +516,30 @@ class TestCanonicalAddImportDedup:
                 """,
             )
         )
+
+
+class TestAddImportLineBreaks:
+    """A synthesized line break is the one the file is written with."""
+
+    @pytest.mark.parametrize("module, name, before, after", [
+        pytest.param('os', 'path', "import sys\r\n\r\nx = 1\r\n",
+                     "import sys\r\nfrom os import path\r\n\r\nx = 1\r\n", id='after-imports'),
+        pytest.param('os', 'path', "x = 1\r\ny = 2\r\n",
+                     "from os import path\r\nx = 1\r\ny = 2\r\n", id='first-statement'),
+        pytest.param('os', 'path', "\r\nx = 1\r\n",
+                     "from os import path\r\nx = 1\r\n", id='first-statement-after-a-blank-line'),
+        pytest.param('os', None, '"""Doc."""\r\nx = 1\r\n',
+                     '"""Doc."""\r\nimport os\r\nx = 1\r\n', id='after-docstring'),
+        pytest.param('os', None, "# c\r\n", "import os\r\n# c\r\n", id='comment-only'),
+    ])
+    def test_crlf(self, arm, module, name, before, after):
+        RecipeSpec(recipe=from_visitor(_add_import_visitor(arm, module, name))).rewrite_run(
+            python(before, after))
+
+    def test_lf_in_a_file_mostly_written_with_lf(self, arm):
+        RecipeSpec(recipe=from_visitor(_add_import_visitor(arm, 'os', 'path'))).rewrite_run(
+            python(
+                "import sys\n\nx = 1\r\ny = 2\n",
+                "import sys\nfrom os import path\n\nx = 1\r\ny = 2\n",
+            )
+        )
