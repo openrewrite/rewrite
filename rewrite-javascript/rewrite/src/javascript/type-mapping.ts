@@ -1377,7 +1377,7 @@ export class JavaScriptTypeMapping {
             if (aliasedSymbol && aliasedSymbol !== symbol && symbol.declarations && symbol.declarations.length > 0) {
                 const binding = this.moduleBinding(symbol.declarations[0], symbol.declarations[0]);
                 if (binding) {
-                    return `${binding.module}.${symbol.getName()}`;
+                    return `${binding.module}.${binding.exportName ?? symbol.getName()}`;
                 }
             }
         }
