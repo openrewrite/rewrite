@@ -185,7 +185,7 @@ public class CSharpSender : CSharpVisitor<RpcSendQueue>
     public new J PreVisit(J j, RpcSendQueue q)
     {
         q.GetAndSend(j, (J t) => t.Id);
-        q.GetAndSend(j, (J t) => t.Prefix, space => VisitSpace(GetValueNonNull<Space>(space), q));
+        q.GetAndSend(j, (J t) => JavaSender.SpaceRef(t.Prefix), space => VisitSpace(GetValueNonNull<Space>(space), q));
         q.GetAndSend(j, (J t) => Reference.AsRef(t.Markers));
         return j;
     }
@@ -209,7 +209,7 @@ public class CSharpSender : CSharpVisitor<RpcSendQueue>
             a => (object)a.Id, a => Visit(a, q));
         q.GetAndSendList(cu, c => c.Members,
             r => (object)r.Element.Id, r => VisitRightPadded(r, q));
-        q.GetAndSend(cu, c => c.Eof, space => VisitSpace(space, q));
+        q.GetAndSend(cu, c => JavaSender.SpaceRef(c.Eof), space => VisitSpace(GetValueNonNull<Space>(space), q));
         return cu;
     }
 
@@ -421,14 +421,14 @@ public class CSharpSender : CSharpVisitor<RpcSendQueue>
         q.GetAndSend(interp,
             i => new JRightPadded<Expression>(i.Expression, i.After, Markers.Empty),
             rp => VisitRightPadded(rp, q));
-        q.GetAndSend(interp, i => i.Alignment?.Before ?? Space.Empty, space => VisitSpace(space, q));
+        q.GetAndSend(interp, i => JavaSender.SpaceRef(i.Alignment?.Before ?? Space.Empty), space => VisitSpace(GetValueNonNull<Space>(space), q));
         q.GetAndSend(interp,
             i => i.Alignment != null
                 ? (JRightPadded<Expression>?)new JRightPadded<Expression>(
                     i.Alignment.Element, Space.Empty, Markers.Empty)
                 : null,
             rp => VisitRightPadded(rp!, q));
-        q.GetAndSend(interp, i => i.Format?.Before ?? Space.Empty, space => VisitSpace(space, q));
+        q.GetAndSend(interp, i => JavaSender.SpaceRef(i.Format?.Before ?? Space.Empty), space => VisitSpace(GetValueNonNull<Space>(space), q));
         q.GetAndSend(interp,
             i => i.Format != null
                 ? (JRightPadded<Expression>?)new JRightPadded<Expression>(
@@ -464,7 +464,7 @@ public class CSharpSender : CSharpVisitor<RpcSendQueue>
             r => (object)r.Element.Id, r => VisitRightPadded(r, q));
         q.GetAndSendList(ns, n => n.Members,
             r => (object)r.Element.Id, r => VisitRightPadded(r, q));
-        q.GetAndSend(ns, n => n.End, space => VisitSpace(space, q));
+        q.GetAndSend(ns, n => JavaSender.SpaceRef(n.End), space => VisitSpace(GetValueNonNull<Space>(space), q));
         return ns;
     }
 
@@ -504,8 +504,8 @@ public class CSharpSender : CSharpVisitor<RpcSendQueue>
     public override J VisitPragmaWarningDirective(PragmaWarningDirective pwd, RpcSendQueue q)
     {
         q.GetAndSend(pwd, p => (object)p.Action);
-        q.GetAndSend(pwd, p => p.KeywordSpacing, space => VisitSpace(space, q));
-        q.GetAndSend(pwd, p => p.ActionSpacing, space => VisitSpace(space, q));
+        q.GetAndSend(pwd, p => JavaSender.SpaceRef(p.KeywordSpacing), space => VisitSpace(GetValueNonNull<Space>(space), q));
+        q.GetAndSend(pwd, p => JavaSender.SpaceRef(p.ActionSpacing), space => VisitSpace(GetValueNonNull<Space>(space), q));
         q.GetAndSendList(pwd, p => p.WarningCodes,
             r => (object)r.Element.Id, r => VisitRightPadded(r, q));
         return pwd;
@@ -569,7 +569,7 @@ public class CSharpSender : CSharpVisitor<RpcSendQueue>
     // ---- PragmaChecksumDirective ----
     public override J VisitPragmaChecksumDirective(PragmaChecksumDirective pcd, RpcSendQueue q)
     {
-        q.GetAndSend(pcd, p => p.KeywordSpacing, space => VisitSpace(space, q));
+        q.GetAndSend(pcd, p => JavaSender.SpaceRef(p.KeywordSpacing), space => VisitSpace(GetValueNonNull<Space>(space), q));
         q.GetAndSend(pcd, p => (object)p.Arguments);
         return pcd;
     }

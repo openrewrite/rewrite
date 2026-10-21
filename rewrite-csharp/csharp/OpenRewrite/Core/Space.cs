@@ -39,16 +39,20 @@ public sealed class Space(string whitespace, IList<Comment> comments)
         Flyweights["\n"] = Newline;
     }
 
-    private static Space Build(string whitespace, IList<Comment> comments)
+    private static Space Build(string whitespace, IList<Comment> comments) =>
+        (comments.Count == 0 ? Shared(whitespace) : null) ?? new Space(whitespace, comments);
+
+    /// <summary>
+    /// The one comment-free Space shared for <paramref name="whitespace"/>, or null when it is too
+    /// long to share.
+    /// </summary>
+    public static Space? Shared(string? whitespace)
     {
-        if (comments.Count == 0)
-        {
-            if (string.IsNullOrEmpty(whitespace))
-                return Empty;
-            if (whitespace.Length <= MaxFlyweightLength)
-                return Flyweights.GetOrAdd(whitespace, static ws => new Space(ws, []));
-        }
-        return new Space(whitespace, comments);
+        if (string.IsNullOrEmpty(whitespace))
+            return Empty;
+        return whitespace.Length <= MaxFlyweightLength
+            ? Flyweights.GetOrAdd(whitespace, static ws => new Space(ws, []))
+            : null;
     }
 
     public static Space Format(string whitespace) =>

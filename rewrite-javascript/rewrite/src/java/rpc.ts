@@ -14,11 +14,20 @@
  * limitations under the License.
  */
 import {asRef, RpcCodecs, RpcReceiveQueue, RpcSendQueue} from "../rpc";
-import {emptySpace, Expression, isSpace, J, TextComment} from "./tree";
+import {Expression, isSpace, J, sharedSpace, TextComment} from "./tree";
 import {isTree, Tree} from "../tree";
 import {Type} from "./type";
 import {updateIfChanged} from "../util";
 import Space = J.Space;
+
+/**
+ * A Space that {@link sharedSpace} has an instance for goes as a ref to that instance, so each repeat is a
+ * ref-only message. Other values go as they are, since a ref stays in both peers' tables for the whole connection.
+ */
+export function spaceRef<T>(value: T): T {
+    const shared = isSpace(value) && value.comments.length === 0 ? sharedSpace(value.whitespace) : undefined;
+    return shared === undefined ? value : asRef(shared) as T;
+}
 
 /**
  * Dispatches a type to the sender's or receiver's method for its kind, like {@link JavaRpcVisitor}.
@@ -581,7 +590,7 @@ export class JavaSender extends JavaRpcVisitor<RpcSendQueue> {
 
     protected preVisit(j: J, q: RpcSendQueue): J | undefined {
         q.getAndSend(j, j2 => j2.id);
-        q.getAndSend(j, j2 => j2.prefix, space => this.visitSpace(space, q));
+        q.getAndSend(j, j2 => spaceRef(j2.prefix), space => this.visitSpace(space, q));
         q.getAndSend(j, j2 => j2.markers);
         return j;
     }
@@ -779,7 +788,7 @@ export class JavaSender extends JavaRpcVisitor<RpcSendQueue> {
 
     protected visitLambda(lambda: J.Lambda, q: RpcSendQueue): J | undefined {
         q.getAndSend(lambda, l => l.parameters, params => this.visit(params, q));
-        q.getAndSend(lambda, l => l.arrow, arrow => this.visitSpace(arrow, q));
+        q.getAndSend(lambda, l => spaceRef(l.arrow), arrow => this.visitSpace(arrow, q));
         q.getAndSend(lambda, l => l.body, body => this.visit(body, q));
         q.getAndSend(lambda, l => asRef(l.type), type => this.visitType(type, q));
         return lambda;
@@ -843,7 +852,7 @@ export class JavaSender extends JavaRpcVisitor<RpcSendQueue> {
 
     protected visitNewClass(newClass: J.NewClass, q: RpcSendQueue): J | undefined {
         q.getAndSend(newClass, n => n.enclosing, encl => this.visitRightPadded(encl, q));
-        q.getAndSend(newClass, n => n.new, n => this.visitSpace(n, q));
+        q.getAndSend(newClass, n => spaceRef(n.new), n => this.visitSpace(n, q));
         q.getAndSend(newClass, n => n.class, clazz => this.visit(clazz, q));
         q.getAndSend(newClass, n => n.arguments, args => this.visitContainer(args, q));
         q.getAndSend(newClass, n => n.body, body => this.visit(body, q));
@@ -1009,7 +1018,7 @@ export class JavaSender extends JavaRpcVisitor<RpcSendQueue> {
         q.getAndSend(cu, c => c.packageDeclaration, pkg => this.visitRightPadded(pkg, q));
         q.getAndSendList(cu, c => c.imports, imp => imp.element.id, imp => this.visitRightPadded(imp, q));
         q.getAndSendList(cu, c => c.classes, cls => cls.id, cls => this.visit(cls, q));
-        q.getAndSend(cu, c => c.eof, space => this.visitSpace(space, q));
+        q.getAndSend(cu, c => spaceRef(c.eof), space => this.visitSpace(space, q));
         return cu;
     }
 
@@ -1043,7 +1052,7 @@ export class JavaSender extends JavaRpcVisitor<RpcSendQueue> {
     protected visitBlock(block: J.Block, q: RpcSendQueue): J | undefined {
         q.getAndSend(block, b => b.static, s => this.visitRightPadded(s, q));
         q.getAndSendList(block, b => b.statements, stmt => stmt.element.id, stmt => this.visitRightPadded(stmt, q));
-        q.getAndSend(block, b => b.end, space => this.visitSpace(space, q));
+        q.getAndSend(block, b => spaceRef(b.end), space => this.visitSpace(space, q));
         return block;
     }
 
@@ -1067,7 +1076,7 @@ export class JavaSender extends JavaRpcVisitor<RpcSendQueue> {
         q.getAndSendList(varDecls, v => v.leadingAnnotations, annot => annot.id, annot => this.visit(annot, q));
         q.getAndSendList(varDecls, v => v.modifiers, mod => mod.id, mod => this.visit(mod, q));
         q.getAndSend(varDecls, v => v.typeExpression, type => this.visit(type, q));
-        q.getAndSend(varDecls, v => v.varargs, space => this.visitSpace(space, q));
+        q.getAndSend(varDecls, v => spaceRef(v.varargs), space => this.visitSpace(space, q));
         q.getAndSendList(varDecls, v => v.variables, variable => variable.element.id, variable => this.visitRightPadded(variable, q));
         return varDecls;
     }
@@ -1104,11 +1113,11 @@ export class JavaSender extends JavaRpcVisitor<RpcSendQueue> {
     }
 
     public override visitLeftPadded<T extends J | J.Space | number | string | boolean>(left: J.LeftPadded<T>, q: RpcSendQueue): J.LeftPadded<T> {
-        q.getAndSend(left, l => l.before, space => this.visitSpace(space, q));
+        q.getAndSend(left, l => spaceRef(l.before), space => this.visitSpace(space, q));
         if (isTree(left.element)) {
             q.getAndSend(left, l => l.element, elem => this.visit(elem as J, q));
         } else if (isSpace(left.element)) {
-            q.getAndSend(left, l => l.element, space => this.visitSpace(space as J.Space, q));
+            q.getAndSend(left, l => spaceRef(l.element), space => this.visitSpace(space as J.Space, q));
         } else {
             q.getAndSend(left, l => l.element);
         }
@@ -1122,13 +1131,13 @@ export class JavaSender extends JavaRpcVisitor<RpcSendQueue> {
         } else {
             q.getAndSend(right, r => r.element);
         }
-        q.getAndSend(right, r => r.after, space => this.visitSpace(space, q));
+        q.getAndSend(right, r => spaceRef(r.after), space => this.visitSpace(space, q));
         q.getAndSend(right, r => r.markers);
         return right;
     }
 
     public override visitContainer<T extends J>(container: J.Container<T>, q: RpcSendQueue): J.Container<T> {
-        q.getAndSend(container, c => c.before, space => this.visitSpace(space, q));
+        q.getAndSend(container, c => spaceRef(c.before), space => this.visitSpace(space, q));
         q.getAndSendList(container, c => c.elements, elem => elem.element.id, elem => this.visitRightPadded(elem, q));
         q.getAndSend(container, c => c.markers);
         return container;
@@ -1834,9 +1843,8 @@ export class JavaReceiver extends JavaRpcVisitor<RpcReceiveQueue> {
             }),
             whitespace: q.receive(space.whitespace)
         };
-        return updates.whitespace === "" && updates.comments.length === 0
-            ? emptySpace
-            : updateIfChanged(space, updates);
+        return (updates.comments.length === 0 ? sharedSpace(updates.whitespace) : undefined)
+            ?? updateIfChanged(space, updates);
     }
 
     public override visitLeftPadded<T extends J | J.Space | number | string | boolean>(left: J.LeftPadded<T>, q: RpcReceiveQueue): J.LeftPadded<T> {

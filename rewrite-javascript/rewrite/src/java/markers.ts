@@ -18,7 +18,7 @@ import {J} from "./tree";
 import {RpcCodecs, RpcReceiveQueue, RpcSendQueue} from "../rpc";
 import {updateIfChanged} from "../util";
 // The `RpcCodec` for `J.Space` is registered in the `rpc` module.
-import "./rpc";
+import {spaceRef} from "./rpc";
 
 declare module "./tree" {
     namespace J {
@@ -61,7 +61,7 @@ RpcCodecs.registerCodec(J.Markers.TrailingComma, {
 
     rpcSend(after: TrailingComma, q: RpcSendQueue): void {
         q.getAndSend(after, a => a.id);
-        q.getAndSend(after, a => a.suffix);
+        q.getAndSend(after, a => spaceRef(a.suffix));
     }
 });
 

@@ -6,6 +6,8 @@ import {MarkersKind} from "../../src/markers";
 import {NamedStyles} from "../../src/style";
 import {TreePrinters} from "../../src/print";
 import {ExecutionContext} from "../../src/execution";
+import {isRef} from "../../src/reference";
+import {J} from "../../src/java";
 
 describe("RPC queues", () => {
 
@@ -407,4 +409,44 @@ describe("RPC queues", () => {
             "No RPC codec registered on the TypeScript side for 'com.example.UnknownMarker'"
         );
     });
+
+    test("a copy of a ref is not a ref", () => {
+        const shared = asRef({kind: J.Kind.Space, comments: [], whitespace: "  "});
+
+        expect(isRef({...shared, whitespace: "   "})).toBe(false);
+    });
+
+    test("a short comment-free space travels as a ref and arrives as one instance, others by value", async () => {
+        // given
+        const source = `/* c */ const a = 1, b =${" ".repeat(51)}2;`;
+        const parser = new JavaScriptParser({sourceFileCache});
+        const parsed = (await parser.parse({text: source, sourcePath: "t.ts"}).next()).value as JS.CompilationUnit;
+
+        // when
+        const batch = new RpcSendQueue(new ReferenceMap(), JS.Kind.CompilationUnit, false).generate(parsed, undefined);
+        const received = new RpcReceiveQueue(new Map(), JS.Kind.CompilationUnit, [batch], undefined, false)
+            .receive<JS.CompilationUnit>(undefined);
+
+        // then
+        const spaceAdds = batch.filter(d => d.state === RpcObjectState.ADD && d.valueType === J.Kind.Space);
+        expect(spaceAdds.filter(d => d.ref === undefined)).toHaveLength(2);
+        const shared = new Set(spacesOf(parsed).filter(s => s.comments.length === 0 && s.whitespace.length <= 50).map(s => s.whitespace));
+        expect(spaceAdds.filter(d => d.ref !== undefined)).toHaveLength(shared.size);
+        expect(new Set(spacesOf(received).filter(s => s.whitespace === " ")).size).toBe(1);
+        expect(await TreePrinters.print(received)).toBe(source);
+    });
 });
+
+function spacesOf(tree: any, seen = new Set<any>(), found: J.Space[] = []): J.Space[] {
+    if (tree === null || typeof tree !== "object" || seen.has(tree)) {
+        return found;
+    }
+    seen.add(tree);
+    if (tree.kind === J.Kind.Space) {
+        found.push(tree);
+    }
+    for (const value of Object.values(tree)) {
+        spacesOf(value, seen, found);
+    }
+    return found;
+}

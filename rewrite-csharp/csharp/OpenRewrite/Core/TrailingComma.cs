@@ -35,7 +35,7 @@ public sealed class TrailingComma(Guid id, Space suffix) : Marker, IRpcCodec<Tra
     public void RpcSend(TrailingComma after, RpcSendQueue q)
     {
         q.GetAndSend(after, m => m.Id);
-        q.GetAndSend(after, m => m.Suffix, s => new JavaSender().VisitSpace(s, q));
+        q.GetAndSend(after, m => JavaSender.SpaceRef(m.Suffix), s => new JavaSender().VisitSpace(Rewrite.Core.Rpc.Reference.GetValueNonNull<Space>(s), q));
     }
 
     public TrailingComma RpcReceive(TrailingComma before, RpcReceiveQueue q) =>

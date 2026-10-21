@@ -22,6 +22,7 @@ import {
     Expression,
     J,
     NameTree,
+    space,
     Statement,
     TextComment,
     TrailingComma,
@@ -5023,7 +5024,7 @@ function prefixFromNode(node: ts.Node, sourceFile: ts.SourceFile): J.Space {
         whitespace = text.slice(nodeStart, leadingWhitespacePos);
     }
 
-    return {kind: J.Kind.Space, comments: comments, whitespace: whitespace};
+    return comments.length === 0 ? space(whitespace) : {kind: J.Kind.Space, comments: comments, whitespace: whitespace};
 }
 
 class FlowSyntaxNotSupportedError extends SyntaxError {

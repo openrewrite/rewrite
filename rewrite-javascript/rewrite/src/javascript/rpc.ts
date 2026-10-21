@@ -17,7 +17,7 @@ import {asRef, registerVisitor, RpcReceiveQueue, RpcSendQueue} from "../rpc";
 import {AutoformatVisitor} from "./format";
 import {isJavaScript, JS, JSX} from "./tree";
 import {Expression, J, Statement, Type, TypedTree, TypeTree} from "../java";
-import {JavaReceiver, JavaSender, registerJLanguageCodecs} from "../java/rpc";
+import {JavaReceiver, JavaSender, registerJLanguageCodecs, spaceRef} from "../java/rpc";
 import {Tree} from "../tree";
 import {updateIfChanged} from "../util";
 import ComputedPropertyName = JS.ComputedPropertyName;
@@ -282,7 +282,7 @@ class JavaScriptSender extends JavaScriptRpcVisitor<RpcSendQueue> {
 
     override preVisit(j: JS, q: RpcSendQueue): J | undefined {
         q.getAndSend(j, j2 => j2.id);
-        q.getAndSend(j, j2 => j2.prefix, space => this.visitSpace(space, q));
+        q.getAndSend(j, j2 => spaceRef(j2.prefix), space => this.visitSpace(space, q));
         q.getAndSend(j, j2 => j2.markers);
         return j;
     }
@@ -294,7 +294,7 @@ class JavaScriptSender extends JavaScriptRpcVisitor<RpcSendQueue> {
         q.getAndSend(cu, c => c.checksum);
         q.getAndSend(cu, c => c.fileAttributes);
         q.getAndSendList(cu, c => c.statements, stmt => stmt.element.id, stmt => this.visitRightPadded(stmt, q));
-        q.getAndSend(cu, c => c.eof, space => this.visitSpace(space, q));
+        q.getAndSend(cu, c => spaceRef(c.eof), space => this.visitSpace(space, q));
         return cu;
     }
 
@@ -413,7 +413,7 @@ class JavaScriptSender extends JavaScriptRpcVisitor<RpcSendQueue> {
     override visitImportTypeAttributes(importTypeAttributes: JS.ImportTypeAttributes, q: RpcSendQueue): J | undefined {
         q.getAndSend(importTypeAttributes, el => el.token, el => this.visitRightPadded(el, q));
         q.getAndSend(importTypeAttributes, el => el.elements, el => this.visitContainer(el, q));
-        q.getAndSend(importTypeAttributes, el => el.end, el => this.visitSpace(el, q));
+        q.getAndSend(importTypeAttributes, el => spaceRef(el.end), el => this.visitSpace(el, q));
         return importTypeAttributes;
     }
 
@@ -638,13 +638,13 @@ class JavaScriptSender extends JavaScriptRpcVisitor<RpcSendQueue> {
     override visitJsxTag(tag: JSX.Tag, q: RpcSendQueue): J | undefined {
         q.getAndSend(tag, el => el.openName, el => this.visitLeftPadded(el, q));
         q.getAndSend(tag, el => el.typeArguments, el => this.visitContainer(el, q));
-        q.getAndSend(tag, el => el.afterName, space => this.visitSpace(space, q));
+        q.getAndSend(tag, el => spaceRef(el.afterName), space => this.visitSpace(space, q));
         q.getAndSendList(tag, el => el.attributes, attr => attr.element.id, attr => this.visitRightPadded(attr, q));
 
-        q.getAndSend(tag, el => el.selfClosing, space => this.visitSpace(space, q));
+        q.getAndSend(tag, el => spaceRef(el.selfClosing), space => this.visitSpace(space, q));
         q.getAndSendList(tag, el => el.children!, child => child.id, child => this.visit(child, q));
         q.getAndSend(tag, el => el.closingName, el => this.visitLeftPadded(el, q));
-        q.getAndSend(tag, el => el.afterClosingName, el => this.visitSpace(el, q));
+        q.getAndSend(tag, el => spaceRef(el.afterClosingName), el => this.visitSpace(el, q));
 
         return tag;
     }
@@ -656,7 +656,7 @@ class JavaScriptSender extends JavaScriptRpcVisitor<RpcSendQueue> {
     }
 
     override visitJsxSpreadAttribute(spreadAttribute: JSX.SpreadAttribute, q: RpcSendQueue): J | undefined {
-        q.getAndSend(spreadAttribute, el => el.dots, space => this.visitSpace(space, q));
+        q.getAndSend(spreadAttribute, el => spaceRef(el.dots), space => this.visitSpace(space, q));
         q.getAndSend(spreadAttribute, el => el.expression, el => this.visitRightPadded(el, q));
         return spreadAttribute;
     }
@@ -693,7 +693,7 @@ class JavaScriptSender extends JavaScriptRpcVisitor<RpcSendQueue> {
     }
 
     override visitForOfLoop(forOfLoop: JS.ForOfLoop, q: RpcSendQueue): J | undefined {
-        q.getAndSend(forOfLoop, el => el.await, space => this.visitSpace(space, q));
+        q.getAndSend(forOfLoop, el => spaceRef(el.await), space => this.visitSpace(space, q));
         q.getAndSend(forOfLoop, el => el.loop, el => this.visit(el, q));
         return forOfLoop;
     }
