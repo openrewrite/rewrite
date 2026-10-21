@@ -24,6 +24,7 @@ import org.openrewrite.SourceFile;
 import org.openrewrite.java.JavaParser;
 import org.openrewrite.java.MethodMatcher;
 import org.openrewrite.java.internal.JavaTypeCache;
+import org.openrewrite.java.tree.Flag;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.java.tree.TypeUtils;
@@ -1271,6 +1272,113 @@ class ScalaTypeAttributionTest implements RewriteTest {
                 List<JavaType> parameterTypes = swap.getMethodType().getParameterTypes();
                 assertBoundIsPairOf(parameterTypes.get(0), "T", "U");
                 assertBoundIsPairOf(parameterTypes.get(1), "U", "T");
+            })
+          )
+        );
+    }
+
+    @Test
+    void repeatedParameterOfScalaMethodIsSeq() {
+        rewriteRun(
+          scala(
+            """
+            object Foo {
+              def f(x: Int, more: String*): Int = more.size
+              val n = f(1, "a", "b")
+            }
+            """,
+            spec -> spec.afterRecipe(cu -> {
+                // given
+                J.MethodDeclaration f = find(cu, J.MethodDeclaration.class, m -> m.getSimpleName().equals("f"));
+                J.VariableDeclarations.NamedVariable more = find(cu, J.VariableDeclarations.NamedVariable.class, v -> v.getSimpleName().equals("more"));
+                J.Identifier moreRef = find(cu, J.Identifier.class, i -> i.getSimpleName().equals("more") && i != more.getName());
+                S.RepeatedType repeated = find(cu, S.RepeatedType.class, r -> true);
+
+                // when
+                JavaType.Method declared = f.getMethodType();
+                JavaType.Method invoked = method(cu, "f").getMethodType();
+
+                // then
+                assertThat(declared.getParameterTypes()).hasSize(2);
+                assertThat(TypeUtils.toString(declared.getParameterTypes().get(1))).isEqualTo("scala.collection.immutable.Seq<java.lang.String>");
+                assertThat(declared.hasFlags(Flag.Varargs)).isTrue();
+                assertThat(invoked).isSameAs(declared);
+                assertThat(more.getVariableType().getType()).isSameAs(declared.getParameterTypes().get(1));
+                assertThat(more.getVariableType().hasFlags(Flag.Varargs)).isTrue();
+                assertThat(moreRef.getType()).isSameAs(declared.getParameterTypes().get(1));
+                assertThat(repeated.getType()).isSameAs(declared.getParameterTypes().get(1));
+            })
+          )
+        );
+    }
+
+    @Test
+    void repeatedParameterOfScalaLibraryMethodIsSeq() {
+        rewriteRun(
+          scala(
+            """
+            object Foo {
+              val xs = List(1, 2)
+            }
+            """,
+            spec -> spec.afterRecipe(cu -> {
+                // when
+                JavaType.Method apply = method(cu, "apply").getMethodType();
+
+                // then
+                assertThat(apply.getParameterTypes()).singleElement()
+                  .satisfies(p -> assertThat(TypeUtils.toString(p)).isEqualTo("scala.collection.immutable.Seq<int>"));
+                assertThat(apply.hasFlags(Flag.Varargs)).isTrue();
+            })
+          )
+        );
+    }
+
+    @Test
+    void repeatedParameterOfJavaMethodIsArray() {
+        rewriteRun(
+          scala(
+            """
+            object Foo {
+              val s = String.format("%s-%s", "a", "b")
+              val xs = java.util.Arrays.asList("a", "b")
+            }
+            """,
+            spec -> spec.afterRecipe(cu -> {
+                // when
+                JavaType.Method format = method(cu, "format").getMethodType();
+                JavaType.Method asList = method(cu, "asList").getMethodType();
+
+                // then
+                assertThat(format.getParameterTypes()).hasSize(2);
+                assertThat(format.getParameterTypes().get(1)).isInstanceOfSatisfying(JavaType.Array.class,
+                  a -> assertThat(TypeUtils.isOfClassType(a.getElemType(), "java.lang.Object")).isTrue());
+                assertThat(format.hasFlags(Flag.Varargs)).isTrue();
+                assertThat(asList.getParameterTypes()).singleElement().isInstanceOf(JavaType.Array.class);
+                assertThat(asList.hasFlags(Flag.Varargs)).isTrue();
+            })
+          )
+        );
+    }
+
+    @Test
+    void methodWithoutRepeatedParameterIsNotVarargs() {
+        rewriteRun(
+          scala(
+            """
+            object Foo {
+              def f(xs: Seq[String]): Int = xs.size
+              val s = String.valueOf(1)
+            }
+            """,
+            spec -> spec.afterRecipe(cu -> {
+                // when
+                JavaType.Method f = find(cu, J.MethodDeclaration.class, m -> m.getSimpleName().equals("f")).getMethodType();
+                JavaType.Method valueOf = method(cu, "valueOf").getMethodType();
+
+                // then
+                assertThat(f.hasFlags(Flag.Varargs)).isFalse();
+                assertThat(valueOf.hasFlags(Flag.Varargs)).isFalse();
             })
           )
         );

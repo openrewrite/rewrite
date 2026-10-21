@@ -16,6 +16,7 @@
 package org.openrewrite.scala.internal
 
 import dotty.tools.dotc.core.Contexts.*
+import dotty.tools.dotc.core.Flags
 import dotty.tools.dotc.core.Names
 import dotty.tools.dotc.core.Symbols
 import dotty.tools.dotc.core.Types.*
@@ -45,6 +46,8 @@ class ScalaTypeSignatureBuilder(using ctx: Context) {
           typeRefSignature(tr)
         case tmr: TermRef =>
           termRefSignature(tmr)
+        case at: AppliedType if at.isRepeatedParam =>
+          signature(at.translateFromRepeated(toArray = false))
         case at: AppliedType =>
           parameterizedSignature(at)
         case tp: TypeParamRef =>
@@ -173,13 +176,19 @@ class ScalaTypeSignatureBuilder(using ctx: Context) {
     val paramTypes = new StringJoiner(",", "[", "]")
     info.stripPoly match {
       case mt: MethodType =>
-        mt.paramInfos.foreach(pt => paramTypes.add(signature(pt)))
+        mt.paramInfos.foreach(pt => paramTypes.add(signature(parameterType(sym, pt))))
       case _ =>
     }
     sb.append(",parameters=").append(paramTypes)
     sb.append("}")
     sb.toString()
   }
+
+  /** The type of a parameter of the method as the JVM sees it: a repeated parameter is an array of a Java method, a `Seq` otherwise. */
+  def parameterType(method: Symbols.Symbol, pt: Type): Type =
+    if (!pt.isRepeatedParam) pt
+    else if (method.is(Flags.JavaDefined)) pt.translateParameterized(ctx.definitions.RepeatedParamClass, ctx.definitions.ArrayClass)
+    else pt.translateFromRepeated(toArray = false)
 
   def variableSignature(sym: Symbols.Symbol): String = {
     val owner = sym.owner.fullName.toString
