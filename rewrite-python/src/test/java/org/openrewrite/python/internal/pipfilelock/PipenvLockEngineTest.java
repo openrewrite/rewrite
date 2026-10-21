@@ -440,7 +440,16 @@ class PipenvLockEngineTest {
     }
 
     @Test
-    void additionRequiresResolution() {
+    void addedDeclarationEntersTheLockWithItsIndex() {
+        listing("flask",
+          wheel("flask-3.0.3-py3-none-any.whl", "1".repeat(64), ">=3.8"),
+          sdist("flask-3.0.3.tar.gz", "2".repeat(64), ">=3.8"));
+        metadata("flask-3.0.3-py3-none-any.whl", """
+          Metadata-Version: 2.1
+          Name: Flask
+          Version: 3.0.3
+          Requires-Python: >=3.8
+          """);
         String pipfile = """
           [[source]]
           url = "https://pypi.org/simple"
@@ -457,9 +466,18 @@ class PipenvLockEngineTest {
 
         Result result = PipenvLockEngine.regenerate(pipfile, baseLock(), ctx);
 
-        assertThat(result.isSuccess()).isFalse();
-        assertThat(result.getFailure().getReason()).isEqualTo(Reason.RESOLUTION_REQUIRED);
-        assertThat(result.getFailure().getPackageName()).isEqualTo("flask");
+        assertThat(result.getErrorMessage()).isNull();
+        assertThat(compact(result.getLockFileContent())).contains(compact("""
+          "flask": {
+              "hashes": [
+                  "sha256:%s",
+                  "sha256:%s"
+              ],
+              "index": "pypi",
+              "markers": "python_version >= '3.8'",
+              "version": "==3.0.3"
+          },
+          "idna": {""".formatted("1".repeat(64), "2".repeat(64))));
     }
 
     @Test
@@ -648,9 +666,15 @@ class PipenvLockEngineTest {
     }
 
     @Test
-    void newlyAddedAbsentPackageStillFailsLoudUnderScoping() {
-        // With the original supplied, an ADD (flask absent from lock and freshly declared) IS in
-        // scope, so the native engine still fails loud rather than emit a lock missing the dependency.
+    void addedDeclarationIsInScopeWhenTheOriginalPipfileIsKnown() {
+        // scoping skips untouched packages, and a freshly declared one is touched, so it enters the lock
+        listing("flask", wheel("flask-3.0.3-py3-none-any.whl", "1".repeat(64), ">=3.8"));
+        metadata("flask-3.0.3-py3-none-any.whl", """
+          Metadata-Version: 2.1
+          Name: Flask
+          Version: 3.0.3
+          Requires-Python: >=3.8
+          """);
         String original = """
           [[source]]
           url = "https://pypi.org/simple"
@@ -679,9 +703,8 @@ class PipenvLockEngineTest {
 
         Result result = PipenvLockEngine.regenerate(edited, original, baseLock(), ctx);
 
-        assertThat(result.isSuccess()).isFalse();
-        assertThat(result.getFailure().getReason()).isEqualTo(Reason.RESOLUTION_REQUIRED);
-        assertThat(result.getFailure().getPackageName()).isEqualTo("flask");
+        assertThat(result.getErrorMessage()).isNull();
+        assertThat(compact(result.getLockFileContent())).contains(compact("\"version\": \"==3.0.3\""));
     }
 
     @Test

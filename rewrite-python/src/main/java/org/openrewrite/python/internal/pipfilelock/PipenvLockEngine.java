@@ -63,6 +63,7 @@ import java.util.TreeSet;
 
 import static java.util.Collections.emptyList;
 import static java.util.Collections.emptyMap;
+import static java.util.Collections.singletonList;
 import static java.util.Collections.singletonMap;
 
 /**
@@ -180,7 +181,7 @@ public final class PipenvLockEngine {
 
     private static class Edit {
         enum Kind {
-            CHANGE, ATTRIBUTES, REMOVAL
+            CHANGE, ATTRIBUTES, REMOVAL, ADD
         }
 
         final String lockCategory;
@@ -284,6 +285,9 @@ public final class PipenvLockEngine {
                         break;
                     case ATTRIBUTES:
                         failure = applyAttributes(edit);
+                        break;
+                    case ADD:
+                        failure = applyAdd(edit);
                         break;
                     default:
                         failure = applyChange(edit);
@@ -476,9 +480,8 @@ public final class PipenvLockEngine {
                             return new Failure(Reason.UNSUPPORTED_ENTRY_TYPE, entry.keyAsWritten, null,
                                     "VCS/path/file/editable entries cannot be locked by the native engine");
                         }
-                        return new Failure(Reason.RESOLUTION_REQUIRED, entry.keyAsWritten, null,
-                                "Package is not in the existing lock; adding a package requires delta " +
-                                        "resolution, which the native engine does not yet support");
+                        edits.add(new Edit(lockCategory, entry, null, Edit.Kind.ADD));
+                        continue;
                     }
                     Map<String, Object> lockEntry = entryMap(lockEntries.get(lockKey));
                     String pinned = pinnedVersion(lockEntry);
@@ -743,6 +746,28 @@ public final class PipenvLockEngine {
             applyExtras(newEntry, entry);
             applyIndex(newEntry, entry);
             lockEntries.put(edit.lockKey, newEntry);
+            return null;
+        }
+
+        /** A declaration the lock does not hold enters it under its Pipfile constraint, with its closure. */
+        private @Nullable Failure applyAdd(Edit edit) {
+            PipfileEntry entry = edit.entry;
+            PythonVersionSpecifierSet constraint = parseConstraint(entry.constraint);
+            if (constraint == null) {
+                return new Failure(Reason.RESOLUTION_REQUIRED, entry.keyAsWritten, null,
+                        "Unparseable version constraint: " + entry.constraint);
+            }
+            Failure failure = pin(entry.keyAsWritten, edit.lockCategory, null, singletonList(constraint), entry.extras,
+                    new HashSet<>());
+            if (failure != null) {
+                return failure;
+            }
+            Map<String, Object> lockEntries = lockCategory(edit.lockCategory);
+            String lockKey = canonicalKeys(lockEntries).get(Pep508Requirement.canonicalize(entry.keyAsWritten));
+            Map<String, Object> added = new LinkedHashMap<>(entryMap(lockEntries.get(lockKey)));
+            applyExtras(added, entry);
+            applyIndex(added, entry);
+            lockEntries.put(lockKey, added);
             return null;
         }
 
