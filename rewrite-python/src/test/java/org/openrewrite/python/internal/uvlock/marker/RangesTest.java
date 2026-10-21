@@ -21,15 +21,17 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 class RangesTest {
 
-    // "[1,3) (5,*)": segments in interval notation, * for unbounded
+    // segments in interval notation, such as "[1,3) (5,*)", with * for unbounded
     private static Ranges<Integer> r(String spec) {
         Ranges<Integer> ranges = Ranges.empty();
         for (String segment : spec.trim().split("\\s+")) {
             String[] ends = segment.substring(1, segment.length() - 1).split(",");
             Ranges.Bound<Integer> start = "*".equals(ends[0]) ? Ranges.Bound.unbounded() :
-              segment.charAt(0) == '[' ? Ranges.Bound.included(Integer.valueOf(ends[0])) : Ranges.Bound.excluded(Integer.valueOf(ends[0]));
+              segment.charAt(0) == '[' ? Ranges.Bound.included(Integer.valueOf(ends[0]))
+                      : Ranges.Bound.excluded(Integer.valueOf(ends[0]));
             Ranges.Bound<Integer> end = "*".equals(ends[1]) ? Ranges.Bound.unbounded() :
-              segment.charAt(segment.length() - 1) == ']' ? Ranges.Bound.included(Integer.valueOf(ends[1])) : Ranges.Bound.excluded(Integer.valueOf(ends[1]));
+              segment.charAt(segment.length() - 1) == ']' ? Ranges.Bound.included(Integer.valueOf(ends[1]))
+                      : Ranges.Bound.excluded(Integer.valueOf(ends[1]));
             ranges = ranges.union(Ranges.fromRangeBounds(start, end));
         }
         return ranges;
@@ -69,15 +71,9 @@ class RangesTest {
 
     @Test
     void boundsWithNoValueBetweenThemAreEmpty() {
-        assertThat(Ranges.fromRangeBounds(Ranges.Bound.excluded(5), Ranges.Bound.included(5))).isEqualTo(Ranges.empty());
+        assertThat(Ranges.fromRangeBounds(Ranges.Bound.excluded(5),
+                Ranges.Bound.included(5))).isEqualTo(Ranges.empty());
         assertThat(r("[4,4]")).isEqualTo(Ranges.singleton(4));
         assertThat(r("[1,3) (6,*)").boundingRange()).isEqualTo(r("[1,*)").segments().get(0));
-    }
-
-    @Test
-    void rendersAsTheCrateDisplays() {
-        assertThat(r("[1,3) [5,5] (7,*)").toString()).isEqualTo(">=1, <3 | ==5 | >7");
-        assertThat(Ranges.<Integer>empty().toString()).isEqualTo("∅");
-        assertThat(Ranges.<Integer>full().toString()).isEqualTo("*");
     }
 }

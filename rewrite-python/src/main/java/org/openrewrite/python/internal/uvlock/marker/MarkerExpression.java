@@ -15,6 +15,8 @@
  */
 package org.openrewrite.python.internal.uvlock.marker;
 
+import lombok.AccessLevel;
+import lombok.RequiredArgsConstructor;
 import lombok.EqualsAndHashCode;
 import lombok.Getter;
 import org.jspecify.annotations.Nullable;
@@ -49,9 +51,12 @@ public abstract class MarkerExpression {
         OS_NAME_DEPRECATED("os_name", CanonicalString.OS_NAME),
         PLATFORM_MACHINE("platform_machine", CanonicalString.PLATFORM_MACHINE),
         PLATFORM_MACHINE_DEPRECATED("platform_machine", CanonicalString.PLATFORM_MACHINE),
-        PLATFORM_PYTHON_IMPLEMENTATION("platform_python_implementation", CanonicalString.PLATFORM_PYTHON_IMPLEMENTATION),
-        PLATFORM_PYTHON_IMPLEMENTATION_DEPRECATED("platform_python_implementation", CanonicalString.PLATFORM_PYTHON_IMPLEMENTATION),
-        PYTHON_IMPLEMENTATION_DEPRECATED("platform_python_implementation", CanonicalString.PLATFORM_PYTHON_IMPLEMENTATION),
+        PLATFORM_PYTHON_IMPLEMENTATION("platform_python_implementation",
+                CanonicalString.PLATFORM_PYTHON_IMPLEMENTATION),
+        PLATFORM_PYTHON_IMPLEMENTATION_DEPRECATED("platform_python_implementation",
+                CanonicalString.PLATFORM_PYTHON_IMPLEMENTATION),
+        PYTHON_IMPLEMENTATION_DEPRECATED("platform_python_implementation",
+                CanonicalString.PLATFORM_PYTHON_IMPLEMENTATION),
         PLATFORM_RELEASE("platform_release", CanonicalString.PLATFORM_RELEASE),
         PLATFORM_SYSTEM("platform_system", CanonicalString.PLATFORM_SYSTEM),
         PLATFORM_VERSION("platform_version", CanonicalString.PLATFORM_VERSION),
@@ -186,8 +191,8 @@ public abstract class MarkerExpression {
     }
 
     /**
-     * A PEP 440 version comparison as uv-pep440's {@code VersionSpecifier} builds it: the star
-     * forms are operators of their own, and a local version or a short {@code ~=} is rejected.
+     * A PEP 440 version comparison as uv-pep440's {@code VersionSpecifier} builds it. The star forms are
+     * operators of their own, and a local version or a short {@code ~=} is rejected.
      */
     @Getter
     @EqualsAndHashCode
@@ -329,14 +334,10 @@ public abstract class MarkerExpression {
     /** {@code <version key> <op> '<version>'}. */
     @Getter
     @EqualsAndHashCode(callSuper = false)
+    @RequiredArgsConstructor
     public static final class Version extends MarkerExpression {
         private final VersionKey key;
         private final Specifier specifier;
-
-        public Version(VersionKey key, Specifier specifier) {
-            this.key = key;
-            this.specifier = specifier;
-        }
 
         @Override
         public String toString() {
@@ -348,16 +349,11 @@ public abstract class MarkerExpression {
     /** {@code <version key> [not] in '<version> <version> ...'}, matched version-aware. */
     @Getter
     @EqualsAndHashCode(callSuper = false)
+    @RequiredArgsConstructor
     public static final class VersionIn extends MarkerExpression {
         private final VersionKey key;
         private final List<PythonVersion> versions;
         private final boolean notIn;
-
-        public VersionIn(VersionKey key, List<PythonVersion> versions, boolean notIn) {
-            this.key = key;
-            this.versions = versions;
-            this.notIn = notIn;
-        }
 
         @Override
         public String toString() {
@@ -372,16 +368,11 @@ public abstract class MarkerExpression {
     /** {@code <string key> <op> '<value>'}, with {@code CONTAINS} for {@code '<value>' in <key>}. */
     @Getter
     @EqualsAndHashCode(callSuper = false)
+    @RequiredArgsConstructor
     public static final class Str extends MarkerExpression {
         private final StringKey key;
         private final Operator operator;
         private final String value;
-
-        public Str(StringKey key, Operator operator, String value) {
-            this.key = key;
-            this.operator = operator;
-            this.value = value;
-        }
 
         @Override
         public String toString() {
@@ -392,11 +383,12 @@ public abstract class MarkerExpression {
         }
     }
 
-    /** {@code '<value>' [not] in extras} or {@code dependency_groups}; the value is normalized where uv can. */
+    /** {@code '<value>' [not] in extras} or {@code dependency_groups}, with the value normalized where uv can. */
     @Getter
     @EqualsAndHashCode(callSuper = false)
+    @RequiredArgsConstructor(access = AccessLevel.PACKAGE)
     public static final class ListPair extends MarkerExpression {
-        /** The pair's kind in uv's {@code CanonicalMarkerListPair} order: extras, group, then an arbitrary value. */
+        /** The pair's kind, in uv's {@code CanonicalMarkerListPair} order of extras, group and arbitrary value. */
         enum Kind { EXTRAS, DEPENDENCY_GROUP, ARBITRARY }
 
         private final Kind kind;
@@ -404,32 +396,20 @@ public abstract class MarkerExpression {
         private final String value;
         private final boolean notIn;
 
-        ListPair(Kind kind, ListKey key, String value, boolean notIn) {
-            this.kind = kind;
-            this.key = key;
-            this.value = value;
-            this.notIn = notIn;
-        }
-
         @Override
         public String toString() {
             return "'" + value + "' " + (notIn ? "not in" : "in") + " " + key.display;
         }
     }
 
-    /** {@code extra == '<name>'} or {@code !=}; an invalid name is kept as given and is always false. */
+    /** {@code extra == '<name>'} or {@code !=}. An invalid name is kept as given and is always false. */
     @Getter
     @EqualsAndHashCode(callSuper = false)
+    @RequiredArgsConstructor
     public static final class Extra extends MarkerExpression {
         private final String name;
         private final boolean valid;
         private final boolean notEqual;
-
-        public Extra(String name, boolean valid, boolean notEqual) {
-            this.name = name;
-            this.valid = valid;
-            this.notEqual = notEqual;
-        }
 
         @Override
         public String toString() {

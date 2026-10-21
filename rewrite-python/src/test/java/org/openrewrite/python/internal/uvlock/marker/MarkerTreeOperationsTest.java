@@ -22,8 +22,8 @@ import org.openrewrite.python.internal.pep440.PythonVersion;
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**
- * uv's tests of the marker operations, translated from uv 0.13.4 {@code crates/uv-pep508/src/marker/tree.rs};
- * each method is named after the upstream test it reproduces.
+ * uv's tests of the marker operations, translated from uv 0.13.4 {@code crates/uv-pep508/src/marker/tree.rs}.
+ * Each method is named after the upstream test it reproduces.
  */
 class MarkerTreeOperationsTest {
 
@@ -31,7 +31,7 @@ class MarkerTreeOperationsTest {
 
     private MarkerTree m(String marker) {
         try {
-            return MarkerTree.trueIn(interner).parse(marker);
+            return MarkerTree.parse(interner, marker);
         } catch (MarkerParser.MarkerSyntaxException e) {
             throw new IllegalArgumentException(e);
         }
@@ -83,8 +83,10 @@ class MarkerTreeOperationsTest {
           .isEqualTo("python_full_version < '3.10'");
         assertThat(m("python_version <= '3.12'").simplifyPythonVersions(excluded("3.12"), excluded(null)).tryToString())
           .isEqualTo("python_full_version < '3.13'");
-        assertThat(m("python_full_version <= '3.12'").simplifyPythonVersions(excluded("3.12"), excluded(null))).isEqualTo(f());
-        assertThat(m("python_full_version <= '3.12.1'").simplifyPythonVersions(excluded("3.12"), excluded(null)).tryToString())
+        assertThat(m("python_full_version <= '3.12'").simplifyPythonVersions(excluded("3.12"),
+                excluded(null))).isEqualTo(f());
+        assertThat(m("python_full_version <= '3.12.1'").simplifyPythonVersions(excluded("3.12"),
+                excluded(null)).tryToString())
           .isEqualTo("python_full_version <= '3.12.1'");
     }
 
@@ -103,7 +105,8 @@ class MarkerTreeOperationsTest {
         String[][] pairs = {
           {"python_version < '3.11'", "sys_platform == 'linux'"},
           {"sys_platform == 'linux'", "python_version < '3.11'"},
-          {"sys_platform == 'linux' or python_version < '3.11'", "sys_platform == 'darwin' or python_version >= '3.10'"},
+          {"sys_platform == 'linux' or python_version < '3.11'",
+                  "sys_platform == 'darwin' or python_version >= '3.10'"},
           {"extra == 'foo' and sys_platform == 'linux'", "extra == 'foo' or sys_platform == 'darwin'"},
           {"python_version < '3.11'", "python_version >= '3.12'"},
         };
@@ -122,20 +125,28 @@ class MarkerTreeOperationsTest {
     void complexified_markers() {
         MarkerTree never = m("python_full_version < '0' and python_full_version > '0'");
         assertThat(complexify(null, null, "python_full_version < '3.10'")).isEqualTo(m("python_full_version < '3.10'"));
-        assertThat(complexify("3.8", null, "python_full_version < '3.10'")).isEqualTo(m("python_full_version >= '3.8' and python_full_version < '3.10'"));
+        assertThat(complexify("3.8", null,
+                "python_full_version < '3.10'")).isEqualTo(m("python_full_version >= '3.8' and python_full_version < '3.10'"));
         assertThat(complexify(null, "3.8", "python_full_version < '3.10'")).isEqualTo(m("python_full_version < '3.8'"));
         assertThat(complexify("3.8", "3.8", "python_full_version < '3.10'")).isEqualTo(never);
         assertThat(complexify("3.11", null, "python_full_version < '3.10'")).isEqualTo(never);
-        assertThat(complexify("3.11", null, "python_full_version >= '3.10'")).isEqualTo(m("python_full_version >= '3.11'"));
-        assertThat(complexify("3.11", null, "python_full_version >= '3.12'")).isEqualTo(m("python_full_version >= '3.12'"));
+        assertThat(complexify("3.11", null,
+                "python_full_version >= '3.10'")).isEqualTo(m("python_full_version >= '3.11'"));
+        assertThat(complexify("3.11", null,
+                "python_full_version >= '3.12'")).isEqualTo(m("python_full_version >= '3.12'"));
         assertThat(complexify(null, "3.11", "python_full_version > '3.12'")).isEqualTo(never);
-        assertThat(complexify(null, "3.11", "python_full_version <= '3.12'")).isEqualTo(m("python_full_version < '3.11'"));
-        assertThat(complexify(null, "3.11", "python_full_version <= '3.10'")).isEqualTo(m("python_full_version <= '3.10'"));
+        assertThat(complexify(null, "3.11",
+                "python_full_version <= '3.12'")).isEqualTo(m("python_full_version < '3.11'"));
+        assertThat(complexify(null, "3.11",
+                "python_full_version <= '3.10'")).isEqualTo(m("python_full_version <= '3.10'"));
         assertThat(complexify("3.11", null, "python_full_version == '3.8'")).isEqualTo(never);
-        assertThat(complexify("3.11", null, "python_full_version == '3.8' or python_full_version == '3.12'")).isEqualTo(m("python_full_version == '3.12'"));
-        assertThat(complexify("3.11", null, "python_full_version == '3.8' or python_full_version == '3.11' or python_full_version == '3.12'"))
+        assertThat(complexify("3.11", null,
+                "python_full_version == '3.8' or python_full_version == '3.12'")).isEqualTo(m("python_full_version == '3.12'"));
+        assertThat(complexify("3.11", null,
+                "python_full_version == '3.8' or python_full_version == '3.11' or python_full_version == '3.12'"))
           .isEqualTo(m("python_full_version == '3.11' or python_full_version == '3.12'"));
-        assertThat(complexify("3.12", null, "python_full_version < '3.10' or python_full_version >= '3.10'")).isEqualTo(m("python_full_version >= '3.12'"));
+        assertThat(complexify("3.12", null,
+                "python_full_version < '3.10' or python_full_version >= '3.10'")).isEqualTo(m("python_full_version >= '3.12'"));
     }
 
     private MarkerTree simplify(@Nullable String lower, @Nullable String upper, String marker) {
@@ -144,12 +155,16 @@ class MarkerTreeOperationsTest {
 
     @Test
     void simplified_markers() {
-        assertThat(simplify("3.8", null, "python_full_version >= '3.8' and python_full_version < '3.10'")).isEqualTo(m("python_full_version < '3.10'"));
-        assertThat(simplify("3.8", null, "python_full_version < '3.7'")).isEqualTo(m("python_full_version < '0' and python_full_version > '0'"));
+        assertThat(simplify("3.8", null,
+                "python_full_version >= '3.8' and python_full_version < '3.10'")).isEqualTo(m("python_full_version < '3.10'"));
+        assertThat(simplify("3.8", null,
+                "python_full_version < '3.7'")).isEqualTo(m("python_full_version < '0' and python_full_version > '0'"));
         assertThat(simplify("3.8", "3.11", "python_full_version == '3.7.*' or python_full_version == '3.8.*' or " +
           "python_full_version == '3.10.*' or python_full_version == '3.11.*'")).isEqualTo(m("python_full_version != '3.9.*'"));
-        assertThat(simplify("3.8", null, "python_full_version >= '3.8' and sys_platform == 'win32'")).isEqualTo(m("sys_platform == 'win32'"));
-        assertThat(simplify("3.8", null, "python_full_version >= '3.9' and (sys_platform == 'win32' or python_full_version >= '3.8')"))
+        assertThat(simplify("3.8", null,
+                "python_full_version >= '3.8' and sys_platform == 'win32'")).isEqualTo(m("sys_platform == 'win32'"));
+        assertThat(simplify("3.8", null,
+                "python_full_version >= '3.9' and (sys_platform == 'win32' or python_full_version >= '3.8')"))
           .isEqualTo(m("python_full_version >= '3.9'"));
     }
 

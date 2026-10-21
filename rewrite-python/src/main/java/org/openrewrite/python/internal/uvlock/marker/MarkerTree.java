@@ -22,7 +22,7 @@ import java.util.List;
 import java.util.function.Predicate;
 
 /**
- * An immutable marker as uv-pep508's {@code MarkerTree} (uv 0.13.4 {@code marker/tree.rs}): a node
+ * An immutable marker, as uv-pep508's {@code MarkerTree} in {@code marker/tree.rs} (uv 0.13.4). It is a node
  * of its interner's decision diagram, so two equal markers from one interner are the same tree.
  */
 public final class MarkerTree {
@@ -40,9 +40,16 @@ public final class MarkerTree {
         return new MarkerTree(interner, MarkerInterner.TRUE);
     }
 
-    /** Parses a marker into this tree's interner. */
-    public MarkerTree parse(String marker) throws MarkerParser.MarkerSyntaxException {
+    public static MarkerTree parse(MarkerInterner interner, String marker) throws MarkerParser.MarkerSyntaxException {
         return new MarkerTree(interner, new MarkerParser(interner, marker).parse());
+    }
+
+    // node ids mean something only in the interner that made them
+    private int sameInterner(MarkerTree other) {
+        if (other.interner != interner) {
+            throw new IllegalArgumentException("Markers from different interners cannot be combined");
+        }
+        return other.id;
     }
 
     int id() {
@@ -66,11 +73,11 @@ public final class MarkerTree {
     }
 
     public MarkerTree and(MarkerTree other) {
-        return new MarkerTree(interner, interner.and(id, other.id));
+        return new MarkerTree(interner, interner.and(id, sameInterner(other)));
     }
 
     public MarkerTree or(MarkerTree other) {
-        return new MarkerTree(interner, interner.or(id, other.id));
+        return new MarkerTree(interner, interner.or(id, sameInterner(other)));
     }
 
     public MarkerTree implies(MarkerTree consequent) {
@@ -79,14 +86,11 @@ public final class MarkerTree {
 
     /** Whether no environment satisfies both markers. */
     public boolean isDisjoint(MarkerTree other) {
-        return interner.isDisjoint(id, other.id);
+        return interner.isDisjoint(id, sameInterner(other));
     }
 
     /** Whether the marker is unsatisfiable, counting pairs of values known never to hold together. */
     public boolean isUnreachable() {
-        if (isTrue() || isFalse()) {
-            return isFalse();
-        }
         return interner.isUnreachable(id);
     }
 
@@ -102,7 +106,7 @@ public final class MarkerTree {
 
     /** This marker wherever {@code assumption} holds, simplified by leaving its value elsewhere open. */
     public MarkerTree restrict(MarkerTree assumption) {
-        return new MarkerTree(interner, interner.restrict(id, assumption.id));
+        return new MarkerTree(interner, interner.restrict(id, sameInterner(assumption)));
     }
 
     /** The marker with {@code extra == x} taken as true for every extra the predicate accepts. */
@@ -114,7 +118,8 @@ public final class MarkerTree {
     /** The marker with {@code extra == x} taken as false for every extra the predicate accepts. */
     public MarkerTree simplifyNotExtrasWith(Predicate<String> isExtra) {
         return new MarkerTree(interner, interner.restrictBy(id, v ->
-                v.getKind() == MarkerInterner.Variable.Kind.EXTRA && isExtra.test(v.getValue()) ? Boolean.FALSE : null));
+                v.getKind() == MarkerInterner.Variable.Kind.EXTRA && isExtra.test(v.getValue()) ? Boolean.FALSE
+                        : null));
     }
 
     public MarkerTree withoutExtras() {
@@ -164,7 +169,8 @@ public final class MarkerTree {
 
     @Override
     public boolean equals(@Nullable Object o) {
-        return this == o || o instanceof MarkerTree && ((MarkerTree) o).interner == interner && ((MarkerTree) o).id == id;
+        return this == o || o instanceof MarkerTree && ((MarkerTree) o).interner == interner
+                && ((MarkerTree) o).id == id;
     }
 
     @Override

@@ -24,7 +24,7 @@ class MarkerParserTest {
     private final MarkerInterner interner = new MarkerInterner();
 
     private String render(String marker) throws MarkerParser.MarkerSyntaxException {
-        return MarkerTree.trueIn(interner).parse(marker).toString();
+        return MarkerTree.parse(interner, marker).toString();
     }
 
     @Test

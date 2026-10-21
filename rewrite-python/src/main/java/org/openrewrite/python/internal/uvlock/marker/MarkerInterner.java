@@ -35,9 +35,10 @@ import static org.openrewrite.python.internal.uvlock.marker.MarkerExpression.onl
 import static org.openrewrite.python.internal.uvlock.marker.MarkerExpression.releaseVersion;
 
 /**
- * Port of uv-pep508 {@code marker/algebra.rs} (uv 0.13.4): marker trees as reduced ordered algebraic
- * decision diagrams with complemented edges, interned so that equal markers are the same node.
+ * Marker trees as reduced ordered algebraic decision diagrams with complemented edges, ported from uv-pep508
+ * {@code marker/algebra.rs} (uv 0.13.4). Nodes are interned, so equal markers are the same node.
  * A node id's lowest bit marks a complement, and ids 0 and 1 are the constants true and false.
+ * An interner is not thread-safe, so each thread builds markers in its own.
  */
 public final class MarkerInterner {
 
@@ -94,7 +95,10 @@ public final class MarkerInterner {
 
     // ---- variables, nodes and edges
 
-    /** A decision variable; the declaration order of {@link Kind} and then its fields is the diagram's variable order. */
+    /**
+     * A decision variable. The declaration order of {@link Kind}, and then of its fields, is the diagram's variable
+     * order.
+     */
     @Value
     static class Variable implements Comparable<Variable> {
         enum Kind { STRING, VERSION_STRING, VERSION, IN, CONTAINS, EXTRA, LIST }
@@ -172,14 +176,17 @@ public final class MarkerInterner {
         }
     }
 
-    /** One edge of a version or string decision: the values it covers and the child it leads to. */
+    /** One edge of a version or string decision, with the values it covers and the child it leads to. */
     @Value
     static class Edge<T extends Comparable<T>> {
         Ranges<T> range;
         int node;
     }
 
-    /** The outgoing edges of a decision node: disjoint ranges covering the variable's values, or high and low for a boolean. */
+    /**
+     * The outgoing edges of a decision node. A range variable's edges are disjoint ranges covering its values, and a
+     * boolean's are high and low.
+     */
     @Value
     static class Edges {
         enum Kind { VERSION, STRING, BOOLEAN }
@@ -223,21 +230,14 @@ public final class MarkerInterner {
             return out;
         }
 
-        boolean hasMultipleNonterminalChildren() {
-            int count = 0;
-            for (int n : nodes()) {
-                if (n != TRUE && n != FALSE && ++count > 1) {
-                    return true;
-                }
-            }
-            return false;
-        }
-
         Edges not() {
             return map(TRUE, MarkerInterner::not, false);
         }
 
-        /** The children mapped by {@code f} after restoring their sign under {@code parent}, coalescing equal neighbours. */
+        /**
+         * The children mapped by {@code f} after restoring their sign under {@code parent}, with equal neighbours
+         * coalesced.
+         */
         Edges map(int parent, IntUnaryOperator f) {
             return map(parent, f, true);
         }
@@ -286,9 +286,9 @@ public final class MarkerInterner {
             }
         }
 
-        private static <T extends Comparable<T>> List<Edge<T>> applyRanges(List<Edge<T>> left, int leftParent,
-                                                                           List<Edge<T>> right, int rightParent,
-                                                                           BiFunction<Integer, Integer, Integer> apply) {
+        private static <T extends Comparable<T>> List<Edge<T>> applyRanges(
+                List<Edge<T>> left, int leftParent, List<Edge<T>> right, int rightParent,
+                BiFunction<Integer, Integer, Integer> apply) {
             List<Edge<T>> combined = new ArrayList<>();
             for (Edge<T> l : left) {
                 for (Edge<T> r : right) {
@@ -311,7 +311,7 @@ public final class MarkerInterner {
         }
     }
 
-    /** A decision node: a variable and the edges for its values. */
+    /** A decision node, with its variable and the edges for its values. */
     @Value
     static class Node {
         Variable var;
@@ -360,7 +360,8 @@ public final class MarkerInterner {
                 if (full instanceof Integer) {
                     return (Integer) full;
                 }
-                return createNode(Variable.version(CanonicalVersion.PYTHON_FULL_VERSION), fromSpecifier((Specifier) full));
+                return createNode(Variable.version(CanonicalVersion.PYTHON_FULL_VERSION),
+                        fromSpecifier((Specifier) full));
             }
             CanonicalVersion key = v.getKey() == VersionKey.IMPLEMENTATION_VERSION ?
                     CanonicalVersion.IMPLEMENTATION_VERSION : CanonicalVersion.PYTHON_FULL_VERSION;
@@ -544,7 +545,8 @@ public final class MarkerInterner {
         }
     }
 
-    private <T extends Comparable<T>> boolean disjointRanges(List<Edge<T>> left, int leftParent, List<Edge<T>> right, int rightParent) {
+    private <T extends Comparable<T>> boolean disjointRanges(List<Edge<T>> left, int leftParent, List<Edge<T>> right,
+            int rightParent) {
         for (Edge<T> l : left) {
             for (Edge<T> r : right) {
                 if (r.getRange().isDisjoint(l.getRange())) {
@@ -612,7 +614,8 @@ public final class MarkerInterner {
         int result;
         int cmp = valueNode.getVar().compareTo(assumptionNode.getVar());
         if (cmp < 0) {
-            result = createNode(valueNode.getVar(), valueNode.getChildren().map(value, v -> restrictCached(v, assumption, cache)));
+            result = createNode(valueNode.getVar(), valueNode.getChildren().map(value, v -> restrictCached(v,
+                    assumption, cache)));
         } else if (cmp > 0) {
             // the value does not depend on this variable, so it is quantified out of the assumption
             int quantified = FALSE;
@@ -635,7 +638,8 @@ public final class MarkerInterner {
             if (fallback[0] < 0) {
                 return FALSE;
             }
-            result = createNode(valueNode.getVar(), valueNode.getChildren().apply(value, assumptionNode.getChildren(), assumption,
+            result = createNode(valueNode.getVar(), valueNode.getChildren().apply(value, assumptionNode.getChildren(),
+                    assumption,
                     (v, a) -> a == FALSE ? fallback[0] : restrictCached(v, a, cache)));
         }
         cache.put(key, result);
@@ -692,7 +696,8 @@ public final class MarkerInterner {
             return i;
         }
         Node node = node(i);
-        if (!(node.getVar().getKind() == Variable.Kind.VERSION && node.getVar().getVersion() == CanonicalVersion.PYTHON_FULL_VERSION &&
+        if (!(node.getVar().getKind() == Variable.Kind.VERSION
+                && node.getVar().getVersion() == CanonicalVersion.PYTHON_FULL_VERSION &&
                 node.getChildren().getKind() == Edges.Kind.VERSION)) {
             return createNode(node.getVar(), node.getChildren().map(i, n -> simplifyPythonVersions(n, lower, upper)));
         }
@@ -709,9 +714,11 @@ public final class MarkerInterner {
         }
         // the surviving edges extend to infinity on both sides, where the bounds are known to hold
         Edge<PythonVersion> first = kept.get(0);
-        kept.set(0, new Edge<>(Ranges.fromRangeBounds(Ranges.Bound.unbounded(), first.getRange().boundingRange().getEnd()), first.getNode()));
+        kept.set(0, new Edge<>(Ranges.fromRangeBounds(Ranges.Bound.unbounded(),
+                first.getRange().boundingRange().getEnd()), first.getNode()));
         Edge<PythonVersion> last = kept.get(kept.size() - 1);
-        kept.set(kept.size() - 1, new Edge<>(Ranges.fromRangeBounds(last.getRange().boundingRange().getStart(), Ranges.Bound.unbounded()), last.getNode()));
+        kept.set(kept.size() - 1, new Edge<>(Ranges.fromRangeBounds(last.getRange().boundingRange().getStart(),
+                Ranges.Bound.unbounded()), last.getNode()));
         return negate(createNode(node.getVar(), Edges.version(kept)), i);
     }
 
@@ -721,7 +728,8 @@ public final class MarkerInterner {
             return i;
         }
         Ranges<PythonVersion> pyRange = Ranges.fromRangeBounds(lower, upper);
-        int versions = createNode(Variable.version(CanonicalVersion.PYTHON_FULL_VERSION), Edges.version(fromRange(pyRange)));
+        int versions = createNode(Variable.version(CanonicalVersion.PYTHON_FULL_VERSION),
+                Edges.version(fromRange(pyRange)));
         return and(i, versions);
     }
 
@@ -729,7 +737,10 @@ public final class MarkerInterner {
         return and(marker, not(exclusions())) == FALSE;
     }
 
-    /** The disjunction of pairs of values known never to hold together, such as {@code os_name == 'nt'} with {@code sys_platform == 'linux'}. */
+    /**
+     * The disjunction of pairs of values known never to hold together, such as {@code os_name == 'nt'} with
+     * {@code sys_platform == 'linux'}.
+     */
     private int exclusions() {
         if (exclusions != null) {
             return exclusions;
@@ -750,7 +761,8 @@ public final class MarkerInterner {
         int platformIpados = platformSystem("iPadOS");
         int[] platformSystems = {platformSystem("FreeBSD"), platformSystem("NetBSD"), platformSystem("OpenBSD"),
                 platformSystem("SunOS"), platformIos, platformIpados};
-        int[] sysPlatforms = {sys("aix"), sys("android"), sys("emscripten"), ios, linux, darwin, win32, sys("cygwin"), sys("wasi")};
+        int[] sysPlatforms = {sys("aix"), sys("android"), sys("emscripten"), ios, linux, darwin, win32, sys("cygwin"),
+                sys("wasi")};
         for (int platform : platformSystems) {
             for (int sysPlatform : sysPlatforms) {
                 if (sysPlatform == ios && (platform == platformIos || platform == platformIpados)) {
@@ -796,7 +808,8 @@ public final class MarkerInterner {
         } else if (cmp > 0) {
             node = createNode(y.getVar(), y.getChildren().map(yi, n -> conjunction(cache, n, xi)));
         } else {
-            node = createNode(x.getVar(), x.getChildren().apply(xi, y.getChildren(), yi, (a, b) -> conjunction(cache, a, b)));
+            node = createNode(x.getVar(), x.getChildren().apply(xi, y.getChildren(), yi, (a, b) -> conjunction(cache,
+                    a, b)));
         }
         cache.put(key, node);
         return node;
@@ -840,7 +853,8 @@ public final class MarkerInterner {
     private static Object fromPythonVersions(List<PythonVersion> versions, boolean notIn) {
         Ranges<PythonVersion> range = Ranges.empty();
         for (PythonVersion version : versions) {
-            Specifier equals = new Specifier(Specifier.Op.EQUAL, releaseVersion(version.getRelease(), version.getRelease().length));
+            Specifier equals = new Specifier(Specifier.Op.EQUAL, releaseVersion(version.getRelease(),
+                    version.getRelease().length));
             Object full = pythonVersionToFullVersion(equals);
             if (full instanceof Integer) {
                 return full;
@@ -873,30 +887,12 @@ public final class MarkerInterner {
         for (Ranges.Segment<T> s : range.complement().segments()) {
             edges.add(new Edge<>(Ranges.fromRangeBounds(s.getStart(), s.getEnd()), FALSE));
         }
-        edges.sort((a, b) -> compareDisjointRangeStart(a.getRange(), b.getRange()));
+        edges.sort((a, b) -> Ranges.compareStarts(a.getRange().boundingRange().getStart(),
+                b.getRange().boundingRange().getStart()));
         return edges;
     }
 
-    private static <T extends Comparable<T>> int compareDisjointRangeStart(Ranges<T> a, Ranges<T> b) {
-        Ranges.Bound<T> s1 = a.boundingRange().getStart();
-        Ranges.Bound<T> s2 = b.boundingRange().getStart();
-        if (s1.isUnbounded()) {
-            return -1;
-        }
-        if (s2.isUnbounded()) {
-            return 1;
-        }
-        int cmp = s1.getValue().compareTo(s2.getValue());
-        if (cmp == 0 && s1.isIncluded() && s2.isExcluded()) {
-            return -1;
-        }
-        if (cmp == 0 && s1.isExcluded() && s2.isIncluded()) {
-            return 1;
-        }
-        return cmp;
-    }
-
-    // two disjoint ranges meet without a gap: one includes the position the other excludes
+    // two disjoint ranges meet without a gap when one includes the position the other excludes
     static <T extends Comparable<T>> boolean canConjoin(Ranges<T> a, Ranges<T> b) {
         Ranges.Segment<T> r1 = a.boundingRange();
         Ranges.Segment<T> r2 = b.boundingRange();
@@ -933,7 +929,8 @@ public final class MarkerInterner {
             case TILDE_EQUAL: {
                 long[] upper = Arrays.copyOf(release, release.length - 1);
                 upper[upper.length - 1]++;
-                return Ranges.fromRangeBounds(Ranges.Bound.included(trimmed), Ranges.Bound.excluded(releaseVersion(upper, upper.length)));
+                return Ranges.fromRangeBounds(Ranges.Bound.included(trimmed),
+                        Ranges.Bound.excluded(releaseVersion(upper, upper.length)));
             }
             default: {
                 // trailing zeros stay significant before a star
@@ -984,7 +981,8 @@ public final class MarkerInterner {
                 case NOT_EQUAL:
                     return new Specifier(Specifier.Op.NOT_EQUAL_STAR, version);
                 case GREATER_THAN:
-                    return new Specifier(Specifier.Op.GREATER_THAN_EQUAL, releaseVersion(new long[]{major, minor + 1}, 2));
+                    return new Specifier(Specifier.Op.GREATER_THAN_EQUAL, releaseVersion(new long[]{major, minor + 1},
+                            2));
                 case LESS_THAN:
                     return major == 0 && minor == 0 ? FALSE : specifier;
                 case GREATER_THAN_EQUAL:

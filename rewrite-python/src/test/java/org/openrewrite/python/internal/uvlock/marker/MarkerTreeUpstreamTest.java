@@ -32,14 +32,16 @@ import java.util.stream.Stream;
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**
- * Marker behavior recorded from uv 0.13.4: its own tests in {@code crates/uv-pep508/src/marker/tree.rs}, and
- * how it renders every distinct marker found in the corpus locks (see {@code lock/uv/README.md} of the lock fixtures).
+ * Marker behavior recorded from uv 0.13.4. The cases come from its own tests in
+ * {@code crates/uv-pep508/src/marker/tree.rs} and from how it renders every distinct marker in the corpus locks,
+ * as {@code lock/uv/README.md} of the lock fixtures describes.
  */
 class MarkerTreeUpstreamTest {
 
     static Stream<Map<String, String>> rows() throws IOException {
         try (InputStream in = MarkerTreeUpstreamTest.class.getResourceAsStream("/marker/uv-0.13.4-tree-rows.json")) {
-            List<Map<String, String>> rows = new ObjectMapper().readValue(in, new TypeReference<List<Map<String, String>>>() {
+            List<Map<String, String>> rows = new ObjectMapper().readValue(in, new TypeReference<List<Map<String,
+                    String>>>() {
             });
             return rows.stream();
         }
@@ -64,7 +66,7 @@ class MarkerTreeUpstreamTest {
     }
 
     private static MarkerTree m(MarkerInterner interner, String marker) throws MarkerParser.MarkerSyntaxException {
-        return MarkerTree.trueIn(interner).parse(marker);
+        return MarkerTree.parse(interner, marker);
     }
 
     @ParameterizedTest(name = "{index} {0}")
@@ -87,7 +89,8 @@ class MarkerTreeUpstreamTest {
                 assertThat(a.isDisjoint(m(interner, row.get("b"))) && m(interner, row.get("b")).isDisjoint(a)).isTrue();
                 break;
             case "not_disjoint":
-                assertThat(a.isDisjoint(m(interner, row.get("b"))) && m(interner, row.get("b")).isDisjoint(a)).isFalse();
+                assertThat(a.isDisjoint(m(interner, row.get("b"))) && m(interner,
+                        row.get("b")).isDisjoint(a)).isFalse();
                 break;
             case "implies":
                 assertThat(a.implies(m(interner, row.get("b"))).isTrue()).isTrue();

@@ -32,9 +32,9 @@ import static org.openrewrite.python.internal.uvlock.marker.MarkerExpression.rel
 import static org.openrewrite.python.internal.uvlock.marker.MarkerInterner.*;
 
 /**
- * Port of uv-pep508 {@code marker/simplify.rs} and {@code marker/algebra/isop.rs} (uv 0.13.4): a
- * marker tree rendered as the disjunctive normal form uv prints, from a sum-of-products cover the
- * decision diagram yields directly.
+ * A marker tree rendered as the disjunctive normal form uv prints, ported from uv-pep508
+ * {@code marker/simplify.rs} and {@code marker/algebra/isop.rs} (uv 0.13.4). The clauses come from a
+ * sum-of-products cover the decision diagram yields directly.
  */
 final class MarkerDnf {
 
@@ -75,7 +75,7 @@ final class MarkerDnf {
         Cover suffix;
     }
 
-    /** A single-variable condition: an interned node, or the edges of a decision that lead to one child. */
+    /** A single-variable condition, either an interned node or the edges of a decision that lead to one child. */
     @Value
     static class Guard {
         int node;
@@ -178,22 +178,12 @@ final class MarkerDnf {
                 edges = Edges.fromBool(negate(children.getHigh(), guard.getNode()) == guard.getChild());
                 break;
             case VERSION:
-                edges = Edges.version(guardEdges(children.getVersions(), guard.getNode(), guard.getChild()));
+                edges = Edges.version(fromRange(guardRange(children.getVersions(), guard.getNode(), guard.getChild())));
                 break;
             default:
-                edges = Edges.string(guardEdges(children.getStrings(), guard.getNode(), guard.getChild()));
+                edges = Edges.string(fromRange(guardRange(children.getStrings(), guard.getNode(), guard.getChild())));
         }
         return interner.createNode(decision.getVar(), edges);
-    }
-
-    private static <T extends Comparable<T>> List<Edge<T>> guardEdges(List<Edge<T>> edges, int parent, int child) {
-        Ranges<T> range = Ranges.empty();
-        for (Edge<T> e : edges) {
-            if (negate(e.getNode(), parent) == child) {
-                range = range.union(e.getRange());
-            }
-        }
-        return fromRange(range);
     }
 
     private List<Cofactor> coverCofactors(int lower, int upper) {
@@ -249,7 +239,8 @@ final class MarkerDnf {
                 return out;
             }
             case VERSION: {
-                for (Region<PythonVersion> r : rangeCofactors(lower, lowerHas ? lowerNode.getChildren().getVersions() : null,
+                for (Region<PythonVersion> r : rangeCofactors(lower, lowerHas ? lowerNode.getChildren().getVersions()
+                        : null,
                         upper, upperHas ? upperNode.getChildren().getVersions() : null)) {
                     if (r.lower == FALSE) {
                         out.add(new Cofactor(Guard.node(FALSE), r.lower, r.upper));
@@ -288,11 +279,13 @@ final class MarkerDnf {
     }
 
     // intersect two sorted partitions, grouping the regions whose cofactors match
-    private static <T extends Comparable<T>> List<Region<T>> rangeCofactors(int lower, @Nullable List<Edge<T>> lowerEdges,
-                                                                            int upper, @Nullable List<Edge<T>> upperEdges) {
-        List<Edge<T>> left = lowerEdges != null ? lowerEdges : Collections.singletonList(new Edge<>(Ranges.<T>full(), lower));
+    private static <T extends Comparable<T>> List<Region<T>> rangeCofactors(
+            int lower, @Nullable List<Edge<T>> lowerEdges, int upper, @Nullable List<Edge<T>> upperEdges) {
+        List<Edge<T>> left = lowerEdges != null ? lowerEdges :
+                Collections.singletonList(new Edge<>(Ranges.<T>full(), lower));
         int leftParent = lowerEdges != null ? lower : TRUE;
-        List<Edge<T>> right = upperEdges != null ? upperEdges : Collections.singletonList(new Edge<>(Ranges.<T>full(), upper));
+        List<Edge<T>> right = upperEdges != null ? upperEdges :
+                Collections.singletonList(new Edge<>(Ranges.<T>full(), upper));
         int rightParent = upperEdges != null ? upper : TRUE;
         LinkedHashMap<Long, Region<T>> regions = new LinkedHashMap<>();
         int l = 0;
@@ -319,7 +312,7 @@ final class MarkerDnf {
             } else if (rb == null) {
                 r++;
             } else {
-                int cmp = compareEnds(lb.getEnd(), rb.getEnd());
+                int cmp = Ranges.compareEnds(lb.getEnd(), rb.getEnd());
                 if (cmp < 0) {
                     l++;
                 } else if (cmp > 0) {
@@ -331,18 +324,6 @@ final class MarkerDnf {
             }
         }
         return new ArrayList<>(regions.values());
-    }
-
-    // an included end comes after an excluded end at the same value
-    private static <T extends Comparable<T>> int compareEnds(Ranges.Bound<T> left, Ranges.Bound<T> right) {
-        if (left.isUnbounded() || right.isUnbounded()) {
-            return left.isUnbounded() ? (right.isUnbounded() ? 0 : 1) : -1;
-        }
-        int cmp = left.getValue().compareTo(right.getValue());
-        if (cmp != 0 || left.getKind() == right.getKind()) {
-            return cmp;
-        }
-        return left.isIncluded() ? 1 : -1;
     }
 
     // ---- rendering the cover (simplify.rs)
@@ -366,7 +347,8 @@ final class MarkerDnf {
         }
     }
 
-    private void collectGuard(Guard guard, Cover suffix, List<List<MarkerExpression>> dnf, List<MarkerExpression> path) {
+    private void collectGuard(Guard guard, Cover suffix, List<List<MarkerExpression>> dnf,
+            List<MarkerExpression> path) {
         int tree = guard.getNode();
         int child = guard.isEdge() ? guard.getChild() : TRUE;
         if (tree == FALSE) {
@@ -414,7 +396,8 @@ final class MarkerDnf {
                 for (Ranges.Segment<PythonVersion> s : range.segments()) {
                     for (Object[] opValue : fromBounds(
                             mapBound(s.getStart()), mapBound(s.getEnd()))) {
-                        path.add(new MarkerExpression.Str(var.getString().key(), (Operator) opValue[0], (String) opValue[1]));
+                        path.add(new MarkerExpression.Str(var.getString().key(), (Operator) opValue[0],
+                                (String) opValue[1]));
                     }
                     collectCover(suffix, dnf, path);
                     truncate(path, size);
@@ -434,7 +417,8 @@ final class MarkerDnf {
                 }
                 for (Ranges.Segment<String> s : range.segments()) {
                     for (Object[] opValue : fromBounds(s.getStart(), s.getEnd())) {
-                        path.add(new MarkerExpression.Str(var.getString().key(), (Operator) opValue[0], (String) opValue[1]));
+                        path.add(new MarkerExpression.Str(var.getString().key(), (Operator) opValue[0],
+                                (String) opValue[1]));
                     }
                     collectCover(suffix, dnf, path);
                     truncate(path, size);
@@ -442,7 +426,7 @@ final class MarkerDnf {
                 return;
             }
             default:
-                // boolean variables: in, contains, extra and list membership, high edge first
+                // the boolean variables (in, contains, extra and list membership) render their high edge first
                 for (boolean value : new boolean[]{true, false}) {
                     int edgeChild = negate(value ? edges.getHigh() : edges.getLow(), tree);
                     if (edgeChild != child) {
@@ -458,9 +442,11 @@ final class MarkerDnf {
     private static MarkerExpression booleanExpression(Variable var, boolean value) {
         switch (var.getKind()) {
             case IN:
-                return new MarkerExpression.Str(var.getString().key(), value ? Operator.IN : Operator.NOT_IN, var.getValue());
+                return new MarkerExpression.Str(var.getString().key(), value ? Operator.IN : Operator.NOT_IN,
+                        var.getValue());
             case CONTAINS:
-                return new MarkerExpression.Str(var.getString().key(), value ? Operator.CONTAINS : Operator.NOT_CONTAINS, var.getValue());
+                return new MarkerExpression.Str(var.getString().key(), value ? Operator.CONTAINS
+                        : Operator.NOT_CONTAINS, var.getValue());
             case LIST:
                 return new MarkerExpression.ListPair(var.getListKind(), var.getListKey(), var.getValue(), !value);
             default:
@@ -472,7 +458,8 @@ final class MarkerDnf {
         if (b.isUnbounded()) {
             return Ranges.Bound.unbounded();
         }
-        return b.isIncluded() ? Ranges.Bound.included(b.getValue().toString()) : Ranges.Bound.excluded(b.getValue().toString());
+        return b.isIncluded() ? Ranges.Bound.included(b.getValue().toString())
+                : Ranges.Bound.excluded(b.getValue().toString());
     }
 
     private static void truncate(List<MarkerExpression> path, int size) {
@@ -503,7 +490,8 @@ final class MarkerDnf {
             return out;
         }
         if (!lower.isUnbounded()) {
-            out.add(new Object[]{lower.isIncluded() ? Operator.GREATER_EQUAL : Operator.GREATER_THAN, lower.getValue()});
+            out.add(new Object[]{lower.isIncluded() ? Operator.GREATER_EQUAL : Operator.GREATER_THAN,
+                    lower.getValue()});
         }
         if (!upper.isUnbounded()) {
             out.add(new Object[]{upper.isIncluded() ? Operator.LESS_EQUAL : Operator.LESS_THAN, upper.getValue()});
@@ -542,7 +530,8 @@ final class MarkerDnf {
         }
         Ranges.Segment<PythonVersion> b1 = segments.get(0);
         Ranges.Segment<PythonVersion> b2 = segments.get(1);
-        if (!(b1.getStart().isUnbounded() && b1.getEnd().isExcluded() && b2.getStart().isIncluded() && b2.getEnd().isUnbounded())) {
+        if (!(b1.getStart().isUnbounded() && b1.getEnd().isExcluded() && b2.getStart().isIncluded()
+                && b2.getEnd().isUnbounded())) {
             return null;
         }
         long[] v1 = onlyReleaseTrimmed(b1.getEnd().getValue()).getRelease();
@@ -578,10 +567,12 @@ final class MarkerDnf {
             }
         }
         if (!lo.isUnbounded()) {
-            out.add(new Specifier(lo.isIncluded() ? Specifier.Op.GREATER_THAN_EQUAL : Specifier.Op.GREATER_THAN, lo.getValue()));
+            out.add(new Specifier(lo.isIncluded() ? Specifier.Op.GREATER_THAN_EQUAL : Specifier.Op.GREATER_THAN,
+                    lo.getValue()));
         }
         if (!hi.isUnbounded()) {
-            out.add(new Specifier(hi.isIncluded() ? Specifier.Op.LESS_THAN_EQUAL : Specifier.Op.LESS_THAN, hi.getValue()));
+            out.add(new Specifier(hi.isIncluded() ? Specifier.Op.LESS_THAN_EQUAL : Specifier.Op.LESS_THAN,
+                    hi.getValue()));
         }
         return out;
     }

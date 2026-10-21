@@ -15,6 +15,8 @@
  */
 package org.openrewrite.python.internal.uvlock.marker;
 
+import lombok.AccessLevel;
+import lombok.RequiredArgsConstructor;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.python.internal.pep440.PythonVersion;
 import org.openrewrite.python.internal.uvlock.marker.MarkerExpression.ListKey;
@@ -28,10 +30,11 @@ import java.util.List;
 import java.util.function.IntPredicate;
 
 /**
- * Port of uv-pep508 {@code marker/parse.rs} (uv 0.13.4): reads a marker into its interner as it
- * goes. An expression uv ignores (comparing two markers, a string with {@code ~=}, an unparseable
- * version) evaluates to true there and is recorded in {@link #getWarnings()}.
+ * Reads a marker into its interner as it goes, ported from uv-pep508 {@code marker/parse.rs} (uv 0.13.4).
+ * An expression uv ignores, such as a comparison of two markers, a string with {@code ~=} or an unparseable
+ * version, evaluates to true.
  */
+@RequiredArgsConstructor(access = AccessLevel.PACKAGE)
 public final class MarkerParser {
 
     /** A marker uv rejects outright. */
@@ -44,18 +47,8 @@ public final class MarkerParser {
     private final MarkerInterner interner;
     private final String input;
     private int pos;
-    private final List<String> warnings = new ArrayList<>();
 
-    MarkerParser(MarkerInterner interner, String input) {
-        this.interner = interner;
-        this.input = input;
-    }
-
-    public List<String> getWarnings() {
-        return warnings;
-    }
-
-    /** marker = marker_or, with nothing left over; a marker of ignored expressions only is true. */
+    /** The whole input as one marker. A marker of ignored expressions only is true. */
     int parse() throws MarkerSyntaxException {
         Integer marker = parseOr();
         eatWhitespace();
@@ -140,9 +133,9 @@ public final class MarkerParser {
         while (expressions.size() > 1) {
             List<Integer> combined = new ArrayList<>();
             for (int i = 0; i < expressions.size(); i += 2) {
-                int result = i + 1 < expressions.size() ?
-                        (or ? interner.or(expressions.get(i), expressions.get(i + 1)) : interner.and(expressions.get(i), expressions.get(i + 1))) :
-                        expressions.get(i);
+                int a = expressions.get(i);
+                int result = i + 1 == expressions.size() ? a :
+                        or ? interner.or(a, expressions.get(i + 1)) : interner.and(a, expressions.get(i + 1));
                 if (or && result == MarkerInterner.TRUE || !or && result == MarkerInterner.FALSE) {
                     return result;
                 }
@@ -167,7 +160,8 @@ public final class MarkerParser {
         return expression == null ? null : interner.expression(expression);
     }
 
-    /** A value of either side: a quoted string or an environment key. */
+    /** A value on either side, which is a quoted string or an environment key. */
+    @RequiredArgsConstructor(access = AccessLevel.PACKAGE)
     private static final class Value {
         final @Nullable String quoted;
         final @Nullable VersionKey version;
@@ -175,17 +169,10 @@ public final class MarkerParser {
         final @Nullable ListKey list;
         final boolean extra;
 
-        Value(@Nullable String quoted, @Nullable VersionKey version, @Nullable StringKey string, @Nullable ListKey list, boolean extra) {
-            this.quoted = quoted;
-            this.version = version;
-            this.string = string;
-            this.list = list;
-            this.extra = extra;
-        }
-
         @Override
         public String toString() {
-            return quoted != null ? "'" + quoted + "'" : version != null ? version.display : string != null ? string.display :
+            return quoted != null ? "'" + quoted + "'" : version != null ? version.display : string != null
+                    ? string.display :
                     list != null ? list.display : "extra";
         }
     }
@@ -209,9 +196,13 @@ public final class MarkerParser {
             case "os.name": return deprecated(StringKey.OS_NAME_DEPRECATED, "os.name");
             case "platform_machine": return new Value(null, null, StringKey.PLATFORM_MACHINE, null, false);
             case "platform.machine": return deprecated(StringKey.PLATFORM_MACHINE_DEPRECATED, "platform.machine");
-            case "platform_python_implementation": return new Value(null, null, StringKey.PLATFORM_PYTHON_IMPLEMENTATION, null, false);
-            case "platform.python_implementation": return deprecated(StringKey.PLATFORM_PYTHON_IMPLEMENTATION_DEPRECATED, "platform.python_implementation");
-            case "python_implementation": return deprecated(StringKey.PYTHON_IMPLEMENTATION_DEPRECATED, "python_implementation");
+            case "platform_python_implementation": return new Value(null, null,
+                    StringKey.PLATFORM_PYTHON_IMPLEMENTATION, null, false);
+            case "platform.python_implementation":
+                return deprecated(StringKey.PLATFORM_PYTHON_IMPLEMENTATION_DEPRECATED,
+                        "platform.python_implementation");
+            case "python_implementation": return deprecated(StringKey.PYTHON_IMPLEMENTATION_DEPRECATED,
+                    "python_implementation");
             case "platform_release": return new Value(null, null, StringKey.PLATFORM_RELEASE, null, false);
             case "platform_system": return new Value(null, null, StringKey.PLATFORM_SYSTEM, null, false);
             case "platform_version": return new Value(null, null, StringKey.PLATFORM_VERSION, null, false);
@@ -227,8 +218,8 @@ public final class MarkerParser {
         }
     }
 
+    // uv accepts the dotted spelling with a deprecation warning
     private Value deprecated(StringKey key, String name) {
-        warnings.add(name + " is deprecated");
         return new Value(null, null, key, null, false);
     }
 
@@ -265,7 +256,8 @@ public final class MarkerParser {
         Value r = parseValue();
         if (l.version != null) {
             if (r.quoted == null) {
-                return ignore("Expected double quoted PEP 440 version to compare with " + l.version.display + ", found " + r);
+                return ignore("Expected double quoted PEP 440 version to compare with " + l.version.display
+                        + ", found " + r);
             }
             MarkerExpression in = parseVersionIn(l.version, operator, r.quoted);
             if (in != null || operator == Operator.IN || operator == Operator.NOT_IN) {
@@ -310,11 +302,11 @@ public final class MarkerParser {
             String name = MarkerExpression.normalizeName(lString);
             MarkerExpression.ListPair.Kind kind;
             if (name == null) {
-                warnings.add("Expected a name, found `" + lString + "`");
                 kind = MarkerExpression.ListPair.Kind.ARBITRARY;
                 name = lString;
             } else {
-                kind = r.list == ListKey.EXTRAS ? MarkerExpression.ListPair.Kind.EXTRAS : MarkerExpression.ListPair.Kind.DEPENDENCY_GROUP;
+                kind = r.list == ListKey.EXTRAS ? MarkerExpression.ListPair.Kind.EXTRAS
+                        : MarkerExpression.ListPair.Kind.DEPENDENCY_GROUP;
             }
             return new MarkerExpression.ListPair(kind, r.list, name, operator == Operator.NOT_IN);
         }
@@ -324,8 +316,8 @@ public final class MarkerParser {
         return ignore("Comparing two quoted strings with each other doesn't make sense");
     }
 
-    private @Nullable MarkerExpression ignore(String warning) {
-        warnings.add(warning);
+    /** uv warns with the reason and treats the expression as true, which an absent expression is. */
+    private @Nullable MarkerExpression ignore(String reason) {
         return null;
     }
 
@@ -350,7 +342,8 @@ public final class MarkerParser {
     private @Nullable MarkerExpression parseVersion(VersionKey key, Operator operator, String value) {
         Specifier.Op op = operator.toPep440();
         if (op == null) {
-            return ignore("Expected PEP 440 version operator to compare " + key.display + " with `" + value + "`, found `" + operator.display + "`");
+            return ignore("Expected PEP 440 version operator to compare " + key.display + " with `" + value
+                    + "`, found `" + operator.display + "`");
         }
         Specifier specifier = Specifier.fromPattern(op, value);
         if (specifier == null) {
@@ -367,7 +360,8 @@ public final class MarkerParser {
         }
         Specifier.Op op = inverted.toPep440();
         if (op == null) {
-            return ignore("Expected PEP 440 version operator to compare " + key.display + " with `" + value + "`, found `" + inverted.display + "`");
+            return ignore("Expected PEP 440 version operator to compare " + key.display + " with `" + value
+                    + "`, found `" + inverted.display + "`");
         }
         Specifier specifier = Specifier.fromVersion(op, version);
         if (specifier == null) {
@@ -379,7 +373,6 @@ public final class MarkerParser {
     private @Nullable MarkerExpression parseExtra(Operator operator, String value) {
         String name = MarkerExpression.normalizeName(value);
         if (name == null) {
-            warnings.add("Expected extra name, found `" + value + "`");
         }
         if (operator != Operator.EQUAL && operator != Operator.NOT_EQUAL) {
             return ignore("Comparing `extra` with any operator other than `==` or `!=` is wrong and will be ignored");
