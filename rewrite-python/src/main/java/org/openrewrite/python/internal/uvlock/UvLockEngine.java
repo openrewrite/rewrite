@@ -508,9 +508,10 @@ public final class UvLockEngine {
             }
             verifyDependents(rewritten);
             addProxyForks(rewritten);
-            List<String> forks = convergentForks(rewritten);
-            if (forks != null) {
-                updated = updated.withResolutionMarkers(forks);
+            List<String> addedForks = convergentForks(rewritten);
+            if (addedForks != null) {
+                refineEntryForks(addedForks);
+                updated = updated.withPackages(packages).withResolutionMarkers(addedForks);
             }
             if (structural && !writesCurrentMarkerForms()) {
                 prunePlatformWheels(rewritten);
@@ -3386,13 +3387,43 @@ public final class UvLockEngine {
          * The forks a converging split adds to an unforked lock without duplicating any package, or null for none.
          * That holds only while no package the run moved would take a newer version under a fork's narrower range.
          */
+        /**
+         * An entry recorded under a fork the run has since split holds for each new fork that falls inside it,
+         * which is how uv writes the entry once the resolution's forks are finer than its own.
+         */
+        private void refineEntryForks(List<String> forks) {
+            MarkerInterner interner = new MarkerInterner();
+            for (int i = 0; i < packages.size(); i++) {
+                List<String> recorded = packages.get(i).getResolutionMarkers();
+                if (recorded == null || forks.containsAll(recorded)) {
+                    continue;
+                }
+                List<String> refined = new ArrayList<>();
+                try {
+                    MarkerTree covered = MarkerTree.trueIn(interner).negate();
+                    for (String marker : recorded) {
+                        covered = covered.or(MarkerTree.parse(interner, marker));
+                    }
+                    for (String fork : forks) {
+                        if (MarkerTree.parse(interner, fork).and(covered.negate()).isFalse()) {
+                            refined.add(fork);
+                        }
+                    }
+                } catch (MarkerParser.MarkerSyntaxException e) {
+                    throw new EngineFailure(Reason.RESOLUTION_REQUIRED, packages.get(i).getName(),
+                            "Re-expressing " + packages.get(i).getName() + "'s forks needs its recorded markers");
+                }
+                if (refined.isEmpty()) {
+                    throw new EngineFailure(Reason.RESOLUTION_REQUIRED, packages.get(i).getName(),
+                            "The run's forks leave " + packages.get(i).getName() + " no fork of its own");
+                }
+                packages.set(i, packages.get(i).withResolutionMarkers(refined));
+            }
+        }
+
         private @Nullable List<String> convergentForks(Set<String> rewritten) {
             if (forks == null) {
                 return null;
-            }
-            if (lock.getResolutionMarkers() != null) {
-                throw new EngineFailure(Reason.RESOLUTION_REQUIRED, null,
-                        "Requirements that split the resolution add forks to a lock that is already forked");
             }
             for (String name : rewritten) {
                 if (entriesNamed(name) != 1) {
