@@ -137,10 +137,23 @@ def test_uses_type_reaches_a_type_only_used_as_an_optional():
     assert _matches(UsesType("re.Match"), optional_only)
 
 
-def test_uses_type_with_check_assignability_matches_a_subtype():
+def test_uses_type_matches_a_subtype_of_the_named_type():
     subclass_only = _parse_attributed("class MyError(ValueError):\n    pass\n")
-    assert not _matches(uses_type("Exception").local_visitor, subclass_only)
-    assert _matches(uses_type("Exception", check_assignability=True).local_visitor, subclass_only)
+    assert _matches(uses_type("Exception").local_visitor, subclass_only)
 
-    assert not _matches(uses_type("Exc*on").local_visitor, subclass_only)
-    assert _matches(uses_type("Exc*on", check_assignability=True).local_visitor, subclass_only)
+    assert _matches(uses_type("Exc*on").local_visitor, subclass_only)
+
+    bound_only = _parse_attributed("def f[T: ValueError](x: T):\n    return x\n")
+    assert _matches(uses_type("Exc*on").local_visitor, bound_only)
+
+
+def test_uses_type_with_check_assignability_matches_types_of_called_methods():
+    # `tzinfo` appears only as the type of `now`'s `tz` parameter.
+    implicit_only = _parse_attributed("from datetime import datetime\nnow = datetime.now()\n")
+    assert not _matches(uses_type("datetime.tzinfo").local_visitor, implicit_only)
+    assert _matches(uses_type("datetime.tzinfo", check_assignability=True).local_visitor, implicit_only)
+
+
+def test_uses_type_glob_that_covers_the_root_name_does_not_match_every_type():
+    assert not _matches(uses_type("o*", check_assignability=True).local_visitor,
+                        _parse_attributed("class MyError(ValueError):\n    pass\n"))
