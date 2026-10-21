@@ -209,21 +209,37 @@ final class UvLockMarkers {
         }
         List<List<String[]>> result = new ArrayList<>(terms.size());
         for (String term : terms) {
-            List<String> parts = splitTopLevel(stripWrappingParens(term), "and");
-            if (parts == null) {
+            List<String[]> clauses = new ArrayList<>();
+            if (!addConjunction(term, clauses)) {
                 return null;
-            }
-            List<String[]> clauses = new ArrayList<>(parts.size());
-            for (String part : parts) {
-                Matcher m = SIMPLE_CLAUSE.matcher(stripWrappingParens(part));
-                if (!m.matches()) {
-                    return null;
-                }
-                clauses.add(new String[]{m.group(1), m.group(2), m.group(4)});
             }
             result.add(clauses);
         }
         return result;
+    }
+
+    // a parenthesized conjunction inside a conjunction flattens into it; a nested disjunction does not
+    private static boolean addConjunction(String text, List<String[]> clauses) {
+        String inner = stripWrappingParens(text);
+        List<String> ors = splitTopLevel(inner, "or");
+        List<String> parts = splitTopLevel(inner, "and");
+        if (ors == null || ors.size() > 1 || parts == null) {
+            return false;
+        }
+        if (parts.size() == 1) {
+            Matcher m = SIMPLE_CLAUSE.matcher(inner);
+            if (!m.matches()) {
+                return false;
+            }
+            clauses.add(new String[]{m.group(1), m.group(2), m.group(4)});
+            return true;
+        }
+        for (String part : parts) {
+            if (!addConjunction(part, clauses)) {
+                return false;
+            }
+        }
+        return true;
     }
 
     // splits at the operator word outside quotes and parentheses; null when parentheses do not balance
