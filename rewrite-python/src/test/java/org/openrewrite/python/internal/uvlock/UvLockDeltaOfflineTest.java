@@ -383,6 +383,20 @@ class UvLockDeltaOfflineTest {
     }
 
     @Test
+    void exactMinorRequiresPythonDropsWheelsTaggedOutsideIt() {
+        // ==3.12.* keeps cp312, the abi3 and py3 wheels, and drops cp311 and cp313
+        routeLocalIndex("off35-exact-minor-wheel-filter");
+        assertScenario("off35-exact-minor-wheel-filter");
+    }
+
+    @Test
+    void exactMinorRequiresPythonDropsMarkersItDecides() {
+        // under ==3.12.*, python_version < '3.14' is always true and python_version < '3.12' never fires
+        routeLocalIndex("off36-exact-minor-marker-drop");
+        assertScenario("off36-exact-minor-marker-drop");
+    }
+
+    @Test
     void markeredConstraintFailsLoud() {
         routeLocalIndex("off29-transitive-constraint");
         String pyproject = resource("off29-transitive-constraint/pyproject.toml")

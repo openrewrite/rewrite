@@ -193,6 +193,11 @@ rather than guess dependencies.
   in `off19`, where the dependent is the one moving), and then fails loud on any untouched dependent the
   new version no longer satisfies.
 
+- An exact-minor `requires-python = "==3.12.*"` bounds the lock from above as well: wheels tagged for another
+  minor (`cp311`, `cp313`) are dropped while `cp39-abi3`, `cp313-abi3` and `py3-none-any` stay, in filename
+  order (`off35-exact-minor-wheel-filter/`); `python_version < '3.14'` is always true and vanishes from the
+  edge, `python_version < '3.12'` never fires and takes its edge with it (`off36-exact-minor-marker-drop/`).
+
 ## 9a. `[tool.uv] constraint-dependencies` (local-index scenarios, uv 0.13.4)
 
 - A constraint bounds every resolution like a requirement without adding the package, and the lock

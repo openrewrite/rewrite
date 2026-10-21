@@ -68,7 +68,9 @@ extras, and `off28-add-pinned-index` an add pinned to a second index (served und
 without the newer `urlish 2.5`, which was then published to the recorded index before the edit, so the
 constraint is what moves the pin (BEHAVIOR.md §9a). `off34-exclude-newer-package-and-build-constraints`
 (pypi.org, uv 0.13.4, 2026-10-21) carries `[options.exclude-newer-package]` and `[manifest] build-constraints`
-through a removal that touches neither; both are read and written verbatim.
+through a removal that touches neither; both are read and written verbatim. `off35-exact-minor-wheel-filter`
+and `off36-exact-minor-marker-drop` (local index, uv 0.13.4) lock under `requires-python = "==3.12.*"`; the
+former's index serves one synthetic wheel per tag listed in its `index.json`.
 A `uv.lock.after.uv-<release>` file is the same edit relocked by that release from the same `uv.lock.before`
 (2026-10-21): 0.13.4 restamps the revision-3 `off18` lock at revision 5 and 0.12.21 restamps the
 revision-5 `off21` lock at revision 3, each otherwise byte-identical to `uv.lock.after`.

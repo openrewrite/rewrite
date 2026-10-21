@@ -1,0 +1,33 @@
+version = 1
+revision = 5
+requires-python = "==3.12.*"
+
+[[package]]
+name = "anyioish"
+version = "2.0"
+source = { registry = "https://index.example/simple/" }
+dependencies = [
+    { name = "typingish" },
+]
+wheels = [
+    { url = "https://index.example/simple/anyioish/anyioish-2.0-py3-none-any.whl", hash = "sha256:cce694ce0afc1ce123557f6a4457bfd551a364ec268e8a9d290a9314cc5a6a8d" },
+]
+
+[[package]]
+name = "s46-exact-minor-marker-drop"
+version = "0.1.0"
+source = { virtual = "." }
+dependencies = [
+    { name = "anyioish" },
+]
+
+[package.metadata]
+requires-dist = [{ name = "anyioish", specifier = "==2.0" }]
+
+[[package]]
+name = "typingish"
+version = "1.0"
+source = { registry = "https://index.example/simple/" }
+wheels = [
+    { url = "https://index.example/simple/typingish/typingish-1.0-py3-none-any.whl", hash = "sha256:7c83d1be497c94819298130b5d7bc7629ed4b1f2dbe228b1f3050239be73ce3f" },
+]

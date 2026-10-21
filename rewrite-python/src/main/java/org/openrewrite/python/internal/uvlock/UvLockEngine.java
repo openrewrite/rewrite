@@ -689,7 +689,7 @@ public final class UvLockEngine {
                     List<UvLockArtifact> keptWheels = new ArrayList<>();
                     for (UvLockArtifact wheel : pkg.getWheels()) {
                         String filename = wheelFilename(wheel);
-                        if (filename == null || wheelAdmittedByLowerBound(filename)) {
+                        if (filename == null || wheelAdmittedByRange(filename)) {
                             keptWheels.add(wheel);
                         }
                     }
@@ -808,11 +808,11 @@ public final class UvLockEngine {
          * wheel's Python tag (FORMAT.md §8): abi3 and generic py3 tags always stay, while
          * minor-versioned tags below the bound are dropped.
          */
-        private boolean wheelAdmittedByLowerBound(String filename) {
-            if (range.lower == null) {
+        private boolean wheelAdmittedByRange(String filename) {
+            if (range.lower == null && range.upper == null) {
                 return true;
             }
-            long[] release = range.lower.getRelease();
+            long[] release = range.lower != null ? range.lower.getRelease() : new long[0];
             long lowerMajor = release.length > 0 ? release[0] : 0;
             long lowerMinor = release.length > 1 ? release[1] : 0;
 
@@ -851,13 +851,25 @@ public final class UvLockEngine {
                     // stable-ABI wheels support every Python from their tag upward
                     return true;
                 } else {
-                    if (minor < 0 ? major >= lowerMajor :
-                            (major > lowerMajor || (major == lowerMajor && minor >= lowerMinor))) {
+                    // an interpreter-specific tag covers one minor, which must meet the lower bound and start
+                    // below the upper one
+                    boolean aboveLower = minor < 0 ? major >= lowerMajor :
+                            (major > lowerMajor || (major == lowerMajor && minor >= lowerMinor));
+                    if (aboveLower && minorStartsBelowUpper(major, minor)) {
                         return true;
                     }
                 }
             }
             return false;
+        }
+
+        private boolean minorStartsBelowUpper(long major, long minor) {
+            if (range.upper == null) {
+                return true;
+            }
+            PythonVersion start = PythonVersion.parse(major + "." + Math.max(minor, 0));
+            int cmp = start == null ? -1 : start.compareTo(range.upper);
+            return range.upperInclusive ? cmp <= 0 : cmp < 0;
         }
 
         private static long parseLongOrZero(String s) {
@@ -1000,7 +1012,7 @@ public final class UvLockEngine {
                 if (dist.getType() == DistFilename.Type.SDIST && sdistFile == null) {
                     sdistFile = file;
                 } else if (dist.getType() == DistFilename.Type.WHEEL &&
-                        wheelAdmittedByLowerBound(file.getFilename())) {
+                        wheelAdmittedByRange(file.getFilename())) {
                     wheelFiles.add(file);
                 }
             }
@@ -1008,6 +1020,8 @@ public final class UvLockEngine {
                 throw new EngineFailure(new Failure(Reason.RESOLUTION_CONFLICT, change.canonicalName,
                         listing.index.getIndex().getUrl(), "No installable distribution for " + selected));
             }
+            // uv records wheels in filename order, whatever order the index lists them in
+            wheelFiles.sort(Comparator.comparing(PackageFile::getFilename));
             List<UvLockArtifact> wheels = new ArrayList<>();
             for (PackageFile wheel : wheelFiles) {
                 wheels.add(toArtifact(change.canonicalName, listing.index, wheel));

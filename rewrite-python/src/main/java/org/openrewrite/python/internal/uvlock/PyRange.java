@@ -65,7 +65,8 @@ final class PyRange {
                     range.lower = v;
                     range.lowerExclusive = false;
                 }
-                PythonVersion next = bumpTrailingRelease(v);
+                // ~=X.Y admits up to X+1, ==X.Y.* only up to X.(Y+1)
+                PythonVersion next = wildcard ? bumpLastRelease(v) : bumpTrailingRelease(v);
                 if (next != null && (range.upper == null || next.compareTo(range.upper) < 0)) {
                     range.upper = next;
                     range.upperInclusive = false;
@@ -91,6 +92,21 @@ final class PyRange {
                 b.append('.');
             }
             b.append(i == release.length - 2 ? release[i] + 1 : release[i]);
+        }
+        return PythonVersion.parse(b.toString());
+    }
+
+    static @Nullable PythonVersion bumpLastRelease(PythonVersion v) {
+        long[] release = v.getRelease();
+        if (release.length == 0) {
+            return null;
+        }
+        StringBuilder b = new StringBuilder();
+        for (int i = 0; i < release.length; i++) {
+            if (i > 0) {
+                b.append('.');
+            }
+            b.append(i == release.length - 1 ? release[i] + 1 : release[i]);
         }
         return PythonVersion.parse(b.toString());
     }
