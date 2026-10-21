@@ -526,6 +526,15 @@ public final class NpmRelease implements Comparable<NpmRelease> {
     }
 
     /**
+     * In {@code #loadPeerSet} a peer conflict with a node that failed to load lets the failure report itself as
+     * {@code ETARGET}, from npm 12.2.1 and, of npm 11, from 11.21.1 (npm/cli#9987). Earlier releases report the
+     * failure's versionless node as the conflict, {@code ERESOLVE}.
+     */
+    boolean defersPeerConflictToLoadFailure() {
+        return atLeast(12, 2, 1) || atLeast(11, 21, 1) && !atLeast(12, 0, 0);
+    }
+
+    /**
      * {@code [_placeDep]} passes over an unmet peer of the placed node that its virtual root does not hold, an optional
      * peer {@code [_loadPeerSet]} never loads, from npm 7.0.8, as 7.0.0 does; npm 7.0.1 to 7.0.7, whose one peer loop
      * dropped 7.0.0's check, place the missing peer, a TypeError.
@@ -1653,12 +1662,15 @@ public final class NpmRelease implements Comparable<NpmRelease> {
     // brace-expansion
 
     /**
-     * The brace-expansion minimatch calls: 5.0.9 from npm 11.19.1 and, of npm 12, from 12.1.0, which combines the
-     * sets of a pattern left to right (index.js expand_); before, 5.0.6 and 5.0.7, which expand alike.
+     * The brace-expansion minimatch calls. 5.0.12, from npm 11.21.1 and, of npm 12, from 12.2.1, leaves a set nested
+     * more than 1000 deep unexpanded and rescans for <code>{a},b}</code> at most 1000 times. 5.0.9, from npm 11.19.1 and,
+     * of npm 12, from 12.1.0, combines the sets of a pattern left to right (index.js expand_). Earlier releases call
+     * 5.0.6 or 5.0.7, which expand alike.
      */
     BraceExpansion.Release braceExpansion() {
-        return atLeast(12, 1, 0) || atLeast(11, 19, 1) && !atLeast(12, 0, 0) ? BraceExpansion.Release.V5_0_9 :
-                BraceExpansion.Release.V5_0_6;
+        return atLeast(12, 2, 1) || atLeast(11, 21, 1) && !atLeast(12, 0, 0) ? BraceExpansion.Release.V5_0_12 :
+                atLeast(12, 1, 0) || atLeast(11, 19, 1) && !atLeast(12, 0, 0) ? BraceExpansion.Release.V5_0_9 :
+                        BraceExpansion.Release.V5_0_6;
     }
 
     // hosted-git-info
