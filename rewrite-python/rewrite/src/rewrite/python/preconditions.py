@@ -98,7 +98,7 @@ def uses_type(
             "fullyQualifiedTypeName": fully_qualified_type,
             "checkAssignability": check_assignability,
         },
-        UsesType(fully_qualified_type),
+        UsesType(fully_qualified_type, check_assignability),
     )
 
 

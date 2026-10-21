@@ -46,6 +46,7 @@ from rewrite.python.import_utils import get_name_string, get_qualid_name
 from rewrite.python.method_matcher import MethodMatcher
 from rewrite.python.support_types import Py
 from rewrite.python.tree import MultiImport
+from rewrite.python.type_utils import is_assignable_to, is_of_type_with_name
 from rewrite.python.visitor import PythonVisitor
 from rewrite.tree import SourceFile, Tree
 from rewrite.visitor import Cursor, TreeVisitor
@@ -87,10 +88,13 @@ class UsesType(TreeVisitor[Tree, Any]):
     Mirrors ``org.openrewrite.java.search.HasType``. ``fqn_pattern`` is
     matched against fully-qualified type names via :func:`fnmatch.fnmatch`,
     so ``java.util.*`` matches ``java.util.List`` etc.
+
+    With ``check_assignability``, a subtype of a matching type matches too.
     """
 
-    def __init__(self, fully_qualified_type: str) -> None:
+    def __init__(self, fully_qualified_type: str, check_assignability: bool = False) -> None:
         self._pattern = fully_qualified_type
+        self._check_assignability = check_assignability
 
     def visit(
         self,
@@ -112,8 +116,9 @@ class UsesType(TreeVisitor[Tree, Any]):
                 types_in_use, "types", None
             )
             if types is not None:
-                return any(_type_matches(t, self._pattern) for t in types)
-        return _TypeSearch(self._pattern).search(tree, p)
+                return any(_type_matches(t, self._pattern, self._check_assignability)
+                           for t in types)
+        return _TypeSearch(self._pattern, self._check_assignability).search(tree, p)
 
 
 class UsesMethod(TreeVisitor[Tree, Any]):
@@ -218,11 +223,22 @@ def _fully_qualified_name(type_obj: Any) -> Optional[str]:
     return None
 
 
-def _type_matches(type_obj: Any, pattern: str) -> bool:
+def _type_matches(type_obj: Any, pattern: str, check_assignability: bool = False) -> bool:
+    if type_obj is None:
+        return False
     if isinstance(type_obj, JavaType.Union):
-        return any(_type_matches(member, pattern) for member in type_obj.bounds)
+        return any(_type_matches(member, pattern, check_assignability)
+                   for member in type_obj.bounds)
+    if check_assignability and _is_assignable_to_pattern(pattern, type_obj):
+        return True
     fqn = _fully_qualified_name(type_obj)
     return fqn is not None and fnmatch.fnmatch(fqn, pattern)
+
+
+def _is_assignable_to_pattern(pattern: str, type_obj: Any) -> bool:
+    if any(c in pattern for c in "*?["):
+        return is_of_type_with_name(type_obj, True, lambda name: fnmatch.fnmatch(name, pattern))
+    return is_assignable_to(pattern, type_obj)
 
 
 class _FindFirst(PythonVisitor[Any]):
@@ -275,15 +291,16 @@ class _FindFirst(PythonVisitor[Any]):
 
 
 class _TypeSearch(_FindFirst):
-    def __init__(self, pattern: str) -> None:
+    def __init__(self, pattern: str, check_assignability: bool = False) -> None:
         super().__init__()
         self._pattern = pattern
+        self._check_assignability = check_assignability
 
     def matches(self, tree: Tree) -> bool:
         # Read the attribution off any node that carries it: `Expression`
         # declares its own `type` alongside `TypedTree` rather than under it,
         # so a class check on either one alone misses the other's nodes.
-        return _type_matches(getattr(tree, "type", None), self._pattern)
+        return _type_matches(getattr(tree, "type", None), self._pattern, self._check_assignability)
 
 
 class _MethodSearch(_FindFirst):

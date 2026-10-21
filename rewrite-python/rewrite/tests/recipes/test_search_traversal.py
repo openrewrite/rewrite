@@ -30,6 +30,7 @@ import pytest
 
 from rewrite import InMemoryExecutionContext
 from rewrite.python._parser_visitor import ParserVisitor
+from rewrite.python.preconditions import uses_type
 from rewrite.python.search import UsesImport, UsesMethod, UsesType
 
 NESTED_SOURCE = '''\
@@ -134,3 +135,12 @@ def test_uses_type_reaches_a_type_only_used_as_an_optional():
     optional_only = _parse_attributed(
         "import re\n\ndef first(s: str):\n    m = re.match('a', s)\n    return m\n")
     assert _matches(UsesType("re.Match"), optional_only)
+
+
+def test_uses_type_with_check_assignability_matches_a_subtype():
+    subclass_only = _parse_attributed("class MyError(ValueError):\n    pass\n")
+    assert not _matches(uses_type("Exception").local_visitor, subclass_only)
+    assert _matches(uses_type("Exception", check_assignability=True).local_visitor, subclass_only)
+
+    assert not _matches(uses_type("Exc*on").local_visitor, subclass_only)
+    assert _matches(uses_type("Exc*on", check_assignability=True).local_visitor, subclass_only)
