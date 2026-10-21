@@ -23,7 +23,7 @@ import java.nio.charset.StandardCharsets;
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**
- * Fixtures under {@code src/test/resources/uvlock/} are real uv output; the README.md there
+ * Fixtures under {@code lock/uv/} are real uv output; the README.md there
  * records which release produced each. Contents are byte-exact reference outputs.
  */
 final class UvLockFixtures {
@@ -178,7 +178,7 @@ final class UvLockFixtures {
     }
 
     static String resource(String name) {
-        try (InputStream is = UvLockFixtures.class.getResourceAsStream("/uvlock/" + name)) {
+        try (InputStream is = UvLockFixtures.class.getResourceAsStream("/lock/uv/" + name)) {
             assertThat(is).as(name).isNotNull();
             return new String(is.readAllBytes(), StandardCharsets.UTF_8);
         } catch (IOException e) {

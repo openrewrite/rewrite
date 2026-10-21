@@ -23,7 +23,7 @@ import java.nio.charset.StandardCharsets;
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**
- * Fixtures under {@code src/test/resources/pdmlock/} are real PDM output against live pypi.org;
+ * Fixtures under {@code lock/pdm/} are real PDM output against live pypi.org;
  * the README.md there records which release produced each. Contents are byte-exact reference outputs.
  */
 final class PdmLockFixtures {
@@ -44,7 +44,7 @@ final class PdmLockFixtures {
     }
 
     static String resource(String name) {
-        try (InputStream is = PdmLockFixtures.class.getResourceAsStream("/pdmlock/" + name)) {
+        try (InputStream is = PdmLockFixtures.class.getResourceAsStream("/lock/pdm/" + name)) {
             assertThat(is).as(name).isNotNull();
             return new String(is.readAllBytes(), StandardCharsets.UTF_8);
         } catch (IOException e) {

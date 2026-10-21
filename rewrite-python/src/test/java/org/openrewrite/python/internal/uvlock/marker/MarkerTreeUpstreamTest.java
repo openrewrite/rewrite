@@ -33,12 +33,12 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 /**
  * Marker behavior recorded from uv 0.13.4: its own tests in {@code crates/uv-pep508/src/marker/tree.rs}, and
- * how it renders every distinct marker found in the corpus locks (see {@code uvlock/README.md}).
+ * how it renders every distinct marker found in the corpus locks (see {@code lock/uv/README.md} of the lock fixtures).
  */
 class MarkerTreeUpstreamTest {
 
     static Stream<Map<String, String>> rows() throws IOException {
-        try (InputStream in = MarkerTreeUpstreamTest.class.getResourceAsStream("/uvlock/marker/uv-0.13.4-tree-rows.json")) {
+        try (InputStream in = MarkerTreeUpstreamTest.class.getResourceAsStream("/marker/uv-0.13.4-tree-rows.json")) {
             List<Map<String, String>> rows = new ObjectMapper().readValue(in, new TypeReference<List<Map<String, String>>>() {
             });
             return rows.stream();
@@ -49,7 +49,7 @@ class MarkerTreeUpstreamTest {
     void rendersCorpusMarkersAsUv() throws Exception {
         List<String> mismatches = new ArrayList<>();
         int rows = 0;
-        try (InputStream in = MarkerTreeUpstreamTest.class.getResourceAsStream("/uvlock/marker/uv-0.13.4-rendered-markers.tsv")) {
+        try (InputStream in = MarkerTreeUpstreamTest.class.getResourceAsStream("/lock/uv/marker/uv-0.13.4-rendered-markers.tsv")) {
             for (String line : new String(in.readAllBytes(), StandardCharsets.UTF_8).split("\n")) {
                 String[] cols = line.split("\t");
                 rows++;

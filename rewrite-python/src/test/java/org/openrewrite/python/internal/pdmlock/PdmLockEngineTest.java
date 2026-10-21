@@ -38,7 +38,7 @@ import static org.openrewrite.python.internal.pdmlock.PdmLockFixtures.resource;
 
 /**
  * Golden scenarios replay PDM 2.28.0 runs against pypi.org (see the fixture README); the recorded
- * index/metadata responses under {@code /pdmlock/http/} keep the tests offline.
+ * index/metadata responses under {@code /lock/pdm/http/} keep the tests offline.
  */
 class PdmLockEngineTest {
 
