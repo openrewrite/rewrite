@@ -17,9 +17,11 @@
 from dataclasses import dataclass
 from typing import List, Optional, Sequence, Set
 
+from rewrite import random_id
 from rewrite.java import J
 from rewrite.java.support_types import JContainer, JRightPadded, Statement
-from rewrite.java.tree import Identifier, If, Import, Space
+from rewrite.java.tree import Empty, Identifier, If, Import, Space
+from rewrite.markers import Markers
 from rewrite.python.binding_utils import is_reference
 from rewrite.python.import_utils import (get_qualid_name, get_name_string, get_alias_name,
                                          get_canonical_fqn, module_binding_name,
@@ -173,7 +175,11 @@ class RemoveImport(PythonVisitor):
     def _remove_import(self, cu: CompilationUnit) -> CompilationUnit:
         """Remove the import from the compilation unit."""
         kept = self._prune_statements(cu.padding.statements)
-        return cu if kept is None else cu.padding.replace(_statements=kept)
+        if kept is None:
+            return cu
+        # A parse of an empty module gives it one Empty statement.
+        return cu.padding.replace(_statements=kept or [
+            JRightPadded(Empty(random_id(), Space.EMPTY, Markers.EMPTY), Space.EMPTY, Markers.EMPTY)])
 
     def _prune_statements(self, padded_statements: Sequence[JRightPadded]) -> Optional[List[JRightPadded]]:
         """The statements with the import gone, or None to leave them as they are —

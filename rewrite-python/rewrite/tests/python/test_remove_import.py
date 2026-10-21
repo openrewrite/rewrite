@@ -18,12 +18,14 @@ import pytest
 
 from rewrite import ExecutionContext, InMemoryExecutionContext
 from rewrite.java import J
+from rewrite.python.add_import import AddImportOptions, maybe_add_import
 from rewrite.python.remove_import import RemoveImportOptions, maybe_remove_import
 from rewrite.python.tree import CompilationUnit
 from rewrite.python.visitor import PythonVisitor
 from rewrite.test import RecipeSpec, python, from_visitor
 
 from ._java_import_arm import java_remove_import
+from ._parse_shape import parse_shape
 
 
 def _assert_ids_accessible(source_file):
@@ -80,6 +82,32 @@ class TestMaybeRemoveImport:
                 """
                 x = 1
                 """,
+            )
+        )
+
+    def test_removing_the_only_statement_leaves_an_empty_module(self, arm):
+        spec = RecipeSpec(recipe=from_visitor(
+            _remove_import_visitor(arm, '__future__', 'division', only_if_unused=False)))
+        spec.rewrite_run(
+            python(
+                "from __future__ import division",
+                "",
+                after_recipe=parse_shape(""),
+            )
+        )
+
+    def test_an_import_added_to_an_emptied_module_replaces_its_empty_statement(self):
+        class _V(PythonVisitor[ExecutionContext]):
+            def visit_compilation_unit(self, cu: CompilationUnit, p: ExecutionContext) -> J:
+                maybe_remove_import(self, RemoveImportOptions(module='os', only_if_unused=False))
+                maybe_add_import(self, AddImportOptions(module='os', name='path', only_if_referenced=False))
+                return cu
+
+        RecipeSpec(recipe=from_visitor(_V())).rewrite_run(
+            python(
+                "import os\n",
+                "from os import path\n",
+                after_recipe=parse_shape("from os import path\n"),
             )
         )
 

@@ -24,6 +24,7 @@ from rewrite.python.visitor import PythonVisitor
 from rewrite.test import RecipeSpec, python, from_visitor
 
 from ._java_import_arm import java_add_import
+from ._parse_shape import parse_shape
 
 
 def _assert_ids_accessible(source_file):
@@ -80,6 +81,16 @@ class TestMaybeAddImport:
                 from os.path import join
                 x = 1
                 """,
+            )
+        )
+
+    def test_add_to_a_comment_only_file(self):
+        spec = RecipeSpec(recipe=from_visitor(_add_import_visitor('native', 'os', 'path')))
+        spec.rewrite_run(
+            python(
+                "# c\n",
+                "from os import path\n# c\n",
+                after_recipe=parse_shape("from os import path\n# c\n"),
             )
         )
 
