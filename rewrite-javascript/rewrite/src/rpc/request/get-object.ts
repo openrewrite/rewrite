@@ -92,7 +92,7 @@ export class GetObject {
                         const savedRefCount = localRefs.snapshot();
                         try {
                             pending = {
-                                data: await new RpcSendQueue(localRefs, request.sourceFileType, trace())
+                                data: new RpcSendQueue(localRefs, request.sourceFileType, trace())
                                     .generate(after, before),
                                 offset: 0
                             };

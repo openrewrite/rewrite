@@ -72,12 +72,12 @@ async function roundTrip<T extends JS.CompilationUnit>(
     const remoteRefs = new Map<number, any>();
 
     const initial = await new RpcSendQueue(localRefs, JS.Kind.CompilationUnit, false).generate(parsed, undefined);
-    const before = await new RpcReceiveQueue(remoteRefs, JS.Kind.CompilationUnit, async () => wireCopy(initial), undefined, false)
+    const before = await new RpcReceiveQueue(remoteRefs, JS.Kind.CompilationUnit, [wireCopy(initial)], undefined, false)
         .receive<T>(undefined);
 
     const edited = edit(parsed);
     const change = await new RpcSendQueue(localRefs, JS.Kind.CompilationUnit, false).generate(edited, parsed);
-    const after = await new RpcReceiveQueue(remoteRefs, JS.Kind.CompilationUnit, async () => wireCopy(change), undefined, false)
+    const after = await new RpcReceiveQueue(remoteRefs, JS.Kind.CompilationUnit, [wireCopy(change)], undefined, false)
         .receive<T>(before);
     return {before, after, expected: await TreePrinters.print(edited)};
 }
