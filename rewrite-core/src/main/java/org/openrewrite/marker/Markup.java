@@ -21,7 +21,9 @@ import lombok.Value;
 import lombok.With;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.Cursor;
+import org.openrewrite.ExecutionContext;
 import org.openrewrite.Incubating;
+import org.openrewrite.Recipe;
 import org.openrewrite.RecipeScheduler;
 import org.openrewrite.Tree;
 import org.openrewrite.internal.ExceptionUtils;
@@ -29,6 +31,7 @@ import org.openrewrite.internal.RecipeRunException;
 import org.openrewrite.rpc.RpcCodec;
 import org.openrewrite.rpc.RpcReceiveQueue;
 import org.openrewrite.rpc.RpcSendQueue;
+import org.openrewrite.scheduling.RecipeRunCycle;
 
 import java.util.UUID;
 import java.util.function.UnaryOperator;
@@ -42,6 +45,19 @@ public interface Markup extends Marker {
 
     @Nullable
     String getDetail();
+
+    /**
+     * The {@link Recipe#getName() name} of the recipe that added this markup, or {@code null} when unknown.
+     */
+    @Incubating(since = "8.94.0")
+    default @Nullable String getRecipeName() {
+        return null;
+    }
+
+    @Incubating(since = "8.94.0")
+    default Markup withRecipeName(@Nullable String recipeName) {
+        return this;
+    }
 
     @Override
     default String print(Cursor cursor, UnaryOperator<String> commentWrapper, boolean verbose) {
@@ -85,6 +101,15 @@ public interface Markup extends Marker {
     }
 
     static <T extends Tree> T markup(T t, Markup markup) {
+        if (markup.getRecipeName() == null) {
+            // Not CURRENT_RECIPE: putting a message on the context counts as a change by the running recipe
+            ExecutionContext ctx = ExecutionContext.current();
+            RecipeRunCycle<?> cycle = ctx == null ? null : ctx.getMessage(ExecutionContext.CURRENT_CYCLE);
+            Recipe recipe = cycle == null ? null : cycle.getCurrentRecipe();
+            if (recipe != null) {
+                markup = markup.withRecipeName(recipe.getName());
+            }
+        }
         return t.withMarkers(t.getMarkers().compute(markup, (s1, s2) -> s1 == null ? s2 : s1));
     }
 
@@ -100,18 +125,27 @@ public interface Markup extends Marker {
         @EqualsAndHashCode.Include
         String detail;
 
+        @Nullable
+        String recipeName;
+
         public Error(UUID id, Throwable exception) {
             this.id = id;
             Throwable cause = exception instanceof RecipeRunException ? exception.getCause() : exception;
             this.message = cause.getMessage();
             this.detail = ExceptionUtils.sanitizeStackTrace(cause, RecipeScheduler.class);
+            this.recipeName = null;
+        }
+
+        public Error(UUID id, String message, String detail) {
+            this(id, message, detail, null);
         }
 
         @JsonCreator
-        public Error(UUID id, String message, String detail) {
+        public Error(UUID id, String message, String detail, @Nullable String recipeName) {
             this.id = id;
             this.message = message;
             this.detail = detail;
+            this.recipeName = recipeName;
         }
 
         @Override
@@ -142,18 +176,27 @@ public interface Markup extends Marker {
         @EqualsAndHashCode.Include
         String detail;
 
+        @Nullable
+        String recipeName;
+
         public Warn(UUID id, Throwable exception) {
             this.id = id;
             Throwable cause = exception instanceof RecipeRunException ? exception.getCause() : exception;
             this.message = cause.getMessage();
             this.detail = ExceptionUtils.sanitizeStackTrace(cause, RecipeScheduler.class);
+            this.recipeName = null;
+        }
+
+        public Warn(UUID id, String message, String detail) {
+            this(id, message, detail, null);
         }
 
         @JsonCreator
-        public Warn(UUID id, String message, String detail) {
+        public Warn(UUID id, String message, String detail, @Nullable String recipeName) {
             this.id = id;
             this.message = message;
             this.detail = detail;
+            this.recipeName = recipeName;
         }
 
         @Override
@@ -184,6 +227,21 @@ public interface Markup extends Marker {
         @EqualsAndHashCode.Include
         @Nullable
         String detail;
+
+        @Nullable
+        String recipeName;
+
+        public Info(UUID id, String message, @Nullable String detail) {
+            this(id, message, detail, null);
+        }
+
+        @JsonCreator
+        public Info(UUID id, String message, @Nullable String detail, @Nullable String recipeName) {
+            this.id = id;
+            this.message = message;
+            this.detail = detail;
+            this.recipeName = recipeName;
+        }
 
         @Override
         public String getMessage() {
@@ -223,6 +281,21 @@ public interface Markup extends Marker {
         @EqualsAndHashCode.Include
         @Nullable
         String detail;
+
+        @Nullable
+        String recipeName;
+
+        public Debug(UUID id, String message, @Nullable String detail) {
+            this(id, message, detail, null);
+        }
+
+        @JsonCreator
+        public Debug(UUID id, String message, @Nullable String detail, @Nullable String recipeName) {
+            this.id = id;
+            this.message = message;
+            this.detail = detail;
+            this.recipeName = recipeName;
+        }
 
         @Override
         public String getMessage() {

@@ -50,6 +50,14 @@ public interface ExecutionContext extends RpcCodec<ExecutionContext> {
     String REQUIRE_PRINT_EQUALS_INPUT = "org.openrewrite.requirePrintEqualsInput";
     String SCANNING_MUTATION_VALIDATION = "org.openrewrite.test.scanningMutationValidation";
 
+    /**
+     * The context of the recipe run executing on this thread, or {@code null} outside a recipe run.
+     */
+    @Incubating(since = "8.94.0")
+    static @Nullable ExecutionContext current() {
+        return RecipeScheduler.currentContext();
+    }
+
     @Incubating(since = "7.20.0")
     default ExecutionContext addObserver(TreeObserver.Subscription observer) {
         putMessageInCollection("org.openrewrite.internal.treeObservers", observer,

@@ -115,6 +115,14 @@ public class RecipeRunCycle<LSS extends LargeSourceSet> {
     }
 
     /**
+     * The recipe currently scanning, generating, or editing in this cycle, or {@code null} when no single recipe is responsible.
+     */
+    @Incubating(since = "8.94.0")
+    public @Nullable Recipe getCurrentRecipe() {
+        return allRecipeStack.getCurrentRecipe();
+    }
+
+    /**
      * Whether the elapsed time for this cycle has exceeded the run timeout, firing the
      * timeout callbacks (at most once) if so. The run timeout is fixed for the duration of a
      * cycle, so it is resolved from the {@link ExecutionContext} lazily on first access and
@@ -285,7 +293,8 @@ public class RecipeRunCycle<LSS extends LargeSourceSet> {
             batch.rpc.batchVisit(source, ctx, rootCursor, batch.items);
         } catch (Throwable t) {
             if (!batch.recipeStacks.isEmpty()) {
-                handleError(leaf(batch.recipeStacks.get(0)), source, source, t);
+                allRecipeStack.attributedTo(soleRecipe(batch), () ->
+                        handleError(leaf(batch.recipeStacks.get(0)), source, source, t));
             }
         }
 
@@ -352,7 +361,8 @@ public class RecipeRunCycle<LSS extends LargeSourceSet> {
                             return acc;
                         }
                         List<SourceFile> generated = new ArrayList<>(scanningRecipe.generate(scanningRecipe.getAccumulator(rootCursor, ctx), unmodifiableList(acc), ctx));
-                        generated.replaceAll(source -> addRecipesThatMadeChanges(recipeStack, source));
+                        generated.replaceAll(source -> addRecipesThatMadeChanges(recipeStack,
+                                recipe instanceof RpcRecipe ? attributeNewMarkup(null, source, recipe) : source));
                         Set<Path> seenInThisBatch = new HashSet<>();
                         generated.removeIf(source -> {
                             Path sourcePath = source.getSourcePath();
@@ -531,6 +541,10 @@ public class RecipeRunCycle<LSS extends LargeSourceSet> {
                     return src;
                 });
 
+                if (recipe instanceof RpcRecipe && after != null && after != src) {
+                    after = attributeNewMarkup(src, after, recipe);
+                }
+
                 if (after != src) {
                     recordChange(recipeStack);
                     recordSourceFileResultAndSearchResults(src, after, recipeStack, ctx);
@@ -587,6 +601,8 @@ public class RecipeRunCycle<LSS extends LargeSourceSet> {
         Map<UUID, String> attributionMap = new HashMap<>();
         boolean anyModified = false;
         boolean deleted = false;
+        @Nullable Recipe soleModifier = null;
+        int modifiedCount = 0;
 
         for (int i = 0; i < response.getResults().size(); i++) {
             BatchVisitResponse.BatchVisitResult r = response.getResults().get(i);
@@ -601,6 +617,8 @@ public class RecipeRunCycle<LSS extends LargeSourceSet> {
 
             if (r.isModified()) {
                 anyModified = true;
+                soleModifier = recipe;
+                modifiedCount++;
             }
 
             if (r.isDeleted()) {
@@ -631,6 +649,10 @@ public class RecipeRunCycle<LSS extends LargeSourceSet> {
             }
         }
 
+        if (modifiedCount == 1) {
+            fetched = attributeNewMarkup(originalBefore, fetched, soleModifier);
+        }
+
         if (anyModified) {
             // Collect ALL search results from the after tree ONCE, grouped by recipe.
             // This is O(treeSize) instead of O(recipes × treeSize).
@@ -655,6 +677,17 @@ public class RecipeRunCycle<LSS extends LargeSourceSet> {
     }
 
     private @Nullable SourceFile batchFailed(BatchState batch, SourceFile originalBefore, SourceFile source, Throwable t) {
+        return allRecipeStack.attributedTo(soleRecipe(batch), () -> recordBatchFailure(batch, originalBefore, source, t));
+    }
+
+    /**
+     * A failed batch can't tell which of its recipes failed, so only a single-recipe batch is attributed.
+     */
+    private static @Nullable Recipe soleRecipe(BatchState batch) {
+        return batch.recipeStacks.size() == 1 ? leaf(batch.recipeStacks.get(0)) : null;
+    }
+
+    private @Nullable SourceFile recordBatchFailure(BatchState batch, SourceFile originalBefore, SourceFile source, Throwable t) {
         if (!batch.recipeStacks.isEmpty()) {
             SourceFile beforeError = source;
             if (!(t instanceof RecipeRunException)) {
@@ -667,6 +700,35 @@ public class RecipeRunCycle<LSS extends LargeSourceSet> {
         }
         batch.clear();
         return source;
+    }
+
+    /**
+     * Markup added by an RPC peer arrives through its codec rather than {@link Markup#markup}, so it is stamped here.
+     */
+    private static SourceFile attributeNewMarkup(@Nullable SourceFile before, SourceFile after, Recipe recipe) {
+        Set<UUID> existing = new HashSet<>();
+        if (before != null) {
+            new TreeVisitor<Tree, Set<UUID>>() {
+                @Override
+                public <M extends Marker> M visitMarker(Marker marker, Set<UUID> ids) {
+                    if (marker instanceof Markup) {
+                        ids.add(marker.getId());
+                    }
+                    return super.visitMarker(marker, ids);
+                }
+            }.visit(before, existing);
+        }
+        String recipeName = recipe.getName();
+        return (SourceFile) new TreeVisitor<Tree, Integer>() {
+            @Override
+            public <M extends Marker> M visitMarker(Marker marker, Integer p) {
+                if (marker instanceof Markup && ((Markup) marker).getRecipeName() == null && !existing.contains(marker.getId())) {
+                    //noinspection unchecked
+                    return (M) ((Markup) marker).withRecipeName(recipeName);
+                }
+                return super.visitMarker(marker, p);
+            }
+        }.visitNonNull(after, 0);
     }
 
     /**

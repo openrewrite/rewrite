@@ -34,6 +34,11 @@ import static org.openrewrite.Recipe.PANIC;
 import static org.openrewrite.scheduling.WorkingDirectoryExecutionContextView.WORKING_DIRECTORY_ROOT;
 
 public class RecipeScheduler {
+    private static final ThreadLocal<@Nullable ExecutionContext> CURRENT_CONTEXT = new ThreadLocal<>();
+
+    static @Nullable ExecutionContext currentContext() {
+        return CURRENT_CONTEXT.get();
+    }
 
     @Nullable
     private Supplier<Cursor> rootCursorProvider;
@@ -83,6 +88,8 @@ public class RecipeScheduler {
 
         LargeSourceSet after = sourceSet;
 
+        ExecutionContext previousContext = CURRENT_CONTEXT.get();
+        CURRENT_CONTEXT.set(ctxWithWatch);
         try {
             for (int i = 1; i <= maxCycles; i++) {
                 if (ctx.getMessage(PANIC) != null) {
@@ -125,6 +132,11 @@ public class RecipeScheduler {
                 }
             }
         } finally {
+            if (previousContext == null) {
+                CURRENT_CONTEXT.remove();
+            } else {
+                CURRENT_CONTEXT.set(previousContext);
+            }
             recipeRunStats.flush(ctx);
             recursiveOnComplete(recipe, ctxWithWatch);
         }
