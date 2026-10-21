@@ -724,10 +724,10 @@ export class JavaScriptTypeMapping {
     }
 
     /**
-     * How an identifier is bound by an `import` declaration: the module specifier, whether it binds
-     * the whole module (a default or namespace import) or one named export, and that export's name.
-     * Read from the syntax, since an import of a package without type declarations resolves to
-     * nothing the checker can describe.
+     * How an identifier is bound by an `import` declaration or a `const` member of a `require()`: the
+     * module specifier, whether it binds the whole module (a default or namespace import) or one named
+     * export, and that export's name. Read from the syntax, since an import of a package without type
+     * declarations resolves to nothing the checker can describe.
      */
     private importBinding(node: ts.Expression): { module: string, namespace: boolean, exportName?: string } | undefined {
         if (!ts.isIdentifier(node)) {
@@ -1224,9 +1224,9 @@ export class JavaScriptTypeMapping {
                         flags: 0, // TODO - determine flags
                         fullyQualifiedName: moduleSpecifier
                     } as Type.FullyQualified;
-                    // A default import binds an `ImportClause`; its aliased symbol carries the internal
-                    // name of the default export (e.g. `e` for express), so represent it as `<default>`.
-                    // Named imports (`ImportSpecifier`) keep the original exported name.
+                    // A default import binds an `ImportClause`, and `{default: x}` binds the default export
+                    // by name; its aliased symbol carries the internal name of the default export (e.g. `e`
+                    // for express), so represent it as `<default>`. Other named bindings keep the exported name.
                     const exportName = this.importBinding(node.expression)?.exportName;
                     const isDefaultImport = exportName === 'default' ||
                         (exprSymbol?.declarations?.some(ts.isImportClause) ?? false);
