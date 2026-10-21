@@ -35,6 +35,7 @@ from rewrite.python.add_import import (
 )
 from rewrite.python.binding_utils import Binding, dotted_path, import_bindings, is_reference, resolves_in_scope
 from rewrite.python.import_utils import (
+    bare_import,
     get_alias_name,
     get_canonical_fqn,
     get_name_string,
@@ -388,7 +389,8 @@ def _binds_module(stmt: Statement, module: str) -> bool:
     return isinstance(stmt, Import) and get_qualid_name(stmt.qualid) == module
 
 
-def _without(multi: MultiImport, module: str, member: Optional[str], local: str) -> Optional[MultiImport]:
+def _without(multi: MultiImport, module: str, member: Optional[str],
+             local: str) -> Import | MultiImport | None:
     """``multi`` without what moves, or None where nothing would be left."""
     elements = multi.padding.names.padding.elements
     kept = [e for e in elements if not _moves(e.element, multi.from_, module, member, local)]
@@ -396,6 +398,8 @@ def _without(multi: MultiImport, module: str, member: Optional[str], local: str)
         return None
     if len(kept) == len(elements):
         return multi
+    if multi.from_ is None and len(kept) == 1:
+        return bare_import(multi, kept[0].element)
     if kept[0].element.prefix != Space.EMPTY:
         kept[0] = kept[0].replace(_element=kept[0].element.replace(prefix=Space.EMPTY))
     return multi.padding.replace(
@@ -534,6 +538,8 @@ class _RebindImport(PythonVisitor[Any]):
         self.local_bindings = LocalBindings()
         self.rewrote_qualified = False
         self.old_at_module_level = False
+        self.dropped: Set[Any] = set()
+        self.replaced: Dict[Any, Any] = {}
 
     @property
     def _renaming(self) -> bool:
@@ -541,6 +547,8 @@ class _RebindImport(PythonVisitor[Any]):
 
     def visit_compilation_unit(self, cu: CompilationUnit, p: Any) -> Any:
         self.moved_types = self._moved_types(cu)
+        self.dropped.clear()
+        self.replaced.clear()
         self.old_at_module_level = any(
             self.local_name is not None and self._binds(stmt) for stmt in cu.statements)
         result = super().visit_compilation_unit(cu, p)
@@ -599,7 +607,10 @@ class _RebindImport(PythonVisitor[Any]):
     def visit_import(self, import_: Import, p: Any) -> Any:
         if self.from_member is not None or self.local_name is None or not self._at_module_level():
             return import_
-        return None if self._binds(import_) else import_
+        if not self._binds(import_):
+            return import_
+        self.dropped.add(import_.id)
+        return None
 
     def visit_multi_import(self, multi: MultiImport, p: Any) -> Any:
         multi = super().visit_multi_import(multi, p)  # ty: ignore[invalid-assignment]  # visitor covariance
@@ -607,7 +618,12 @@ class _RebindImport(PythonVisitor[Any]):
             return multi
         if not self._binds(multi):
             return multi
-        return _without(multi, self.from_module, self.from_member, self.local_name)
+        reduced = _without(multi, self.from_module, self.from_member, self.local_name)
+        if reduced is None:
+            self.dropped.add(multi.id)
+        else:
+            self.replaced[multi.id] = reduced.id
+        return reduced
 
     def visit_identifier(self, ident: Identifier, p: Any) -> Any:
         # The position predicates match the cursor's nodes by identity, so they are asked of
@@ -784,15 +800,13 @@ class _RebindImport(PythonVisitor[Any]):
     def _transfer_removed_prefixes(self, before: CompilationUnit, after: CompilationUnit) -> CompilationUnit:
         """Dropping a statement discards its prefix. When it is worth rescuing (see
         prefix_to_inherit) it goes to the next surviving statement, as RemoveImport does."""
-        removed_ids = ({p.element.id for p in before.padding.statements}
-                       - {p.element.id for p in after.padding.statements})
-        if not removed_ids:
+        if not self.dropped:
             return after
         inherited = None
         prefix_by_id = {}
         for index, padded in enumerate(before.padding.statements):
             stmt = padded.element
-            if stmt.id in removed_ids:
+            if stmt.id in self.dropped:
                 prefix = prefix_to_inherit(stmt, index)
                 if prefix is not None:
                     inherited = prefix
@@ -801,7 +815,7 @@ class _RebindImport(PythonVisitor[Any]):
                 # statement keeps its own separation, which AddImport relies on when it inserts
                 # the replacement import before it.
                 if inherited.comments or isinstance(stmt, (Import, MultiImport)):
-                    prefix_by_id[stmt.id] = inherited
+                    prefix_by_id[self.replaced.get(stmt.id, stmt.id)] = inherited
                 inherited = None
         if not prefix_by_id:
             return after

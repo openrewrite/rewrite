@@ -375,9 +375,23 @@ class TestMaybeRemoveImport:
         )
 
     def test_partial_direct_import_removal_keeps_ids_accessible(self, arm):
-        """Removing one module from 'import X, Y' rebuilds the MultiImport from the
-        public `.id` property; the rebuilt node's id must remain accessible
-        (regression for the 8.84.8 int-id migration)."""
+        """Removing one module from 'import X, Y' leaves the surviving `Import` bare, as a
+        parse of 'import Y' gives it, with its id (regression for the 8.84.8 int-id migration)."""
+        surviving_id = []
+
+        def record_sys_id(cu):
+            surviving_id.append(cu.statements[0].names[1].id)
+            return cu
+
+        def bare_sys(cu):
+            _assert_ids_accessible(cu)
+            parse_shape(after)(cu)
+            assert cu.statements[0].id == surviving_id[0]
+
+        after = """
+                import sys
+                x = 1
+                """
         spec = RecipeSpec(recipe=from_visitor(
             _remove_import_visitor(arm, 'os', only_if_unused=False)))
         spec.rewrite_run(
@@ -386,11 +400,9 @@ class TestMaybeRemoveImport:
                 import os, sys
                 x = 1
                 """,
-                """
-                import sys
-                x = 1
-                """,
-                after_recipe=_assert_ids_accessible,
+                after,
+                before_recipe=record_sys_id,
+                after_recipe=bare_sys,
             )
         )
 
