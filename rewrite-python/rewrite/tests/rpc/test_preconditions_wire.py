@@ -16,8 +16,8 @@
 
 These exercise ``handle_prepare_recipe`` and verify it correctly extracts
 precondition wire entries from a ``Preconditions.check(...)`` wrapper around
-``recipe.editor()``, registers the bare editor in the override cache, and
-returns the wrapper-free editor on subsequent ``_instantiate_visitor`` calls.
+``recipe.editor()``, and that ``_instantiate_visitor`` then returns the
+wrapper-free editor.
 """
 
 from typing import Any
@@ -111,14 +111,14 @@ def isolated_server():
     saved_marketplace = server._marketplace
     server._marketplace = RecipeMarketplace()
     server._prepared_recipes.clear()
-    server._prepared_editor_overrides.clear()
+    server._prepared_unwrapped_editors.clear()
     server._prepared_edit_preconditions.clear()
     try:
         yield server
     finally:
         server._marketplace = saved_marketplace
         server._prepared_recipes.clear()
-        server._prepared_editor_overrides.clear()
+        server._prepared_unwrapped_editors.clear()
         server._prepared_edit_preconditions.clear()
 
 
@@ -140,8 +140,8 @@ class TestPrepareRecipeWithPreconditions:
         assert len(precs) == 1
         assert precs[0]["visitorName"] == "org.openrewrite.rpc.internal.FindTreesOfType"
         prepared_id = response["id"]
-        # No override cached: editor() returned a plain visitor.
-        assert prepared_id not in server._prepared_editor_overrides
+        # editor() returned a plain visitor, so there is nothing to unwrap.
+        assert prepared_id not in server._prepared_unwrapped_editors
 
     def test_check_wrapped_editor_emits_recipe_precondition(self, isolated_server):
         server = isolated_server
@@ -194,9 +194,7 @@ class TestPrepareRecipeWithPreconditions:
         )
         assert precs[1]["visitorName"] == cond_visitor
 
-    def test_bare_editor_is_cached_and_returned_by_instantiate(
-        self, isolated_server
-    ):
+    def test_each_dispatch_gets_a_fresh_bare_editor(self, isolated_server):
         server = isolated_server
         _install(server, _ConditionRecipe)
 
@@ -225,15 +223,12 @@ class TestPrepareRecipeWithPreconditions:
         resp = server.handle_prepare_recipe({"id": "test.precondition.Wrapper"})
         prepared_id = resp["id"]
 
-        # The override cache holds the BARE editor (not the Check wrapper),
-        # so dispatch via _instantiate_visitor returns it directly.
-        assert prepared_id in server._prepared_editor_overrides
-        cached = server._prepared_editor_overrides[prepared_id]
-        assert isinstance(cached, _BareEditor)
-
         ctx = InMemoryExecutionContext()
-        instantiated = server._instantiate_visitor(f"edit:{prepared_id}", ctx)
-        assert instantiated is cached
+        first = server._instantiate_visitor(f"edit:{prepared_id}", ctx)
+        second = server._instantiate_visitor(f"edit:{prepared_id}", ctx)
+        assert isinstance(first, _BareEditor)
+        assert isinstance(second, _BareEditor)
+        assert first is not second
 
     def test_recipe_ref_emits_class_name_and_options(self, isolated_server):
         """uses_method/uses_type return a RecipeRef; the wire entry should
@@ -278,10 +273,10 @@ class TestPrepareRecipeWithPreconditions:
             "matchOverrides": False,
         }
 
-        # Bare editor cached so dispatch via _instantiate_visitor returns it.
-        prepared_id = resp["id"]
-        assert prepared_id in server._prepared_editor_overrides
-        assert isinstance(server._prepared_editor_overrides[prepared_id], _BareEditor)
+        instantiated = server._instantiate_visitor(
+            f"edit:{resp['id']}", InMemoryExecutionContext()
+        )
+        assert isinstance(instantiated, _BareEditor)
 
     def test_or_emits_composite_wire_entry(self, isolated_server):
         """Preconditions.or_ over RecipeRefs becomes a single composite wire entry
@@ -373,5 +368,5 @@ class TestPrepareRecipeWithPreconditions:
 
         # No wire entry beyond the baseline language gate.
         assert len(resp["editPreconditions"]) == 1
-        # No override cached — the wrapper still runs Python-side as a fallback.
-        assert prepared_id not in server._prepared_editor_overrides
+        # Not unwrapped, so the wrapper still runs Python-side as a fallback.
+        assert prepared_id not in server._prepared_unwrapped_editors

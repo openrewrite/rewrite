@@ -371,23 +371,14 @@ def _sort_key(imp: Import) -> str:
 
 
 def create_import_statement(module: str, name: Optional[str] = None,
-                            alias: Optional[str] = None) -> MultiImport:
+                            alias: Optional[str] = None) -> Import | MultiImport:
     """Build ``import module [as alias]`` or ``from module import name [as alias]``."""
     if name is None:
-        # Direct import: import module [as alias]
+        # A parse gives a lone ``import module`` as a bare Import, its qualid prefixed by the
+        # space after the keyword.
         import_elem = create_import_element(module, alias)
-        return MultiImport(
-            random_id(),
-            Space([], '\n'),
-            Markers.EMPTY,
-            None,  # No 'from'
-            False,  # Not parenthesized
-            JContainer(
-                Space.SINGLE_SPACE,
-                [pad_right(import_elem)],
-                Markers.EMPTY
-            )
-        )
+        return import_elem.replace(prefix=Space([], '\n'),
+                                   qualid=import_elem.qualid.replace(prefix=Space.SINGLE_SPACE))
     else:
         # From import: from module import name [as alias]
         from_name = _create_module_name(module)
