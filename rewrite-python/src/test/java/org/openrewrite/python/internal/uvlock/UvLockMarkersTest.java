@@ -32,7 +32,7 @@ class UvLockMarkersTest {
       "python_version > '3'            | python_full_version >= '3.1'",
       "python_version == '3.0'         | python_full_version == '3.0.*'",
       "python_full_version < '3.11.0a6' | python_full_version < '3.11'",
-      "python_full_version == '3.11.0.*' | python_full_version == '3.11.0.*'",
+      "python_full_version == '3.11.0.*' | python_full_version >= '3.11.0' and python_full_version < '3.11.1'",
     })
     void versionClausesRecordAsUvLowersThem(String marker, String recorded) {
         assertThat(UvLockMarkers.recordMarker(marker, null)).isEqualTo(recorded);

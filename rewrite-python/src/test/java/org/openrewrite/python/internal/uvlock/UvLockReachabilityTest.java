@@ -40,7 +40,7 @@ class UvLockReachabilityTest {
         UvLockPackage b = UvLockPackage.builder().name("b").version("1.0").source(UvLockSource.registry("https://index.example/simple/")).build();
         UvLockPackage c = UvLockPackage.builder().name("c").version("1.0").source(UvLockSource.registry("https://index.example/simple/")).build();
 
-        List<UvLockPackage> simplified = UvLockReachability.simplify(List.of(root, a, b, c), 0, PyRange.parse(">=3.10"));
+        List<UvLockPackage> simplified = UvLockReachability.simplify(List.of(root, a, b, c), 0, PyRange.parse(">=3.10"), null);
 
         // b can never be reached through a, while c's platform clause is undecided and stays
         assertThat(simplified.get(1).getDependencies())
@@ -60,7 +60,7 @@ class UvLockReachabilityTest {
         UvLockPackage b = UvLockPackage.builder().name("b").version("1.0").source(UvLockSource.registry("https://index.example/simple/")).build();
         UvLockPackage c = UvLockPackage.builder().name("c").version("1.0").source(UvLockSource.registry("https://index.example/simple/")).build();
 
-        List<UvLockPackage> simplified = UvLockReachability.simplify(List.of(root, a, b, c), 0, PyRange.parse(">=3.10"));
+        List<UvLockPackage> simplified = UvLockReachability.simplify(List.of(root, a, b, c), 0, PyRange.parse(">=3.10"), null);
 
         // a is only reached on win32, which already rules darwin out
         assertThat(simplified.get(1).getDependencies()).containsExactly(new UvLockDependency("b", null, null, null, null));
@@ -90,7 +90,7 @@ class UvLockReachabilityTest {
           .build();
         UvLockPackage x = UvLockPackage.builder().name("x").version("1.0").source(UvLockSource.registry("https://index.example/simple/")).build();
 
-        UvLockReachability reachability = UvLockReachability.of(List.of(root, x), 0, PyRange.parse(">=3.10"));
+        UvLockReachability reachability = UvLockReachability.of(List.of(root, x), 0, PyRange.parse(">=3.10"), null);
 
         assertThat(reachability.wheelUnreachable(1, wheel)).isEqualTo(unreachable);
     }

@@ -371,15 +371,27 @@ class UvLockDeltaOfflineTest {
     }
 
     @Test
-    void selectingAVersionOfAnExcludeNewerPackageFailsLoud() {
-        String pyproject = resource("off34-exclude-newer-package-and-build-constraints/pyproject.toml")
-          .replace("six==1.17.0", "six==1.16.0");
-        Result result = UvLockEngine.regenerate(pyproject,
-          resource("off34-exclude-newer-package-and-build-constraints/uv.lock.before"), ctx);
-        assertThat(result.isSuccess()).isFalse();
-        assertThat(result.getFailure().getReason()).isEqualTo(Reason.RESOLUTION_REQUIRED);
-        assertThat(result.getFailure().getDetail()).contains("exclude-newer-package");
-        assertThat(http.requests).isEmpty();
+    void splitMovesALockedPackageOnlyInTheForkThatRequiresIt() {
+        // six 1.18.0 needs iniconfig>=9 only from 3.14, so iniconfig 2.3.0 stays below it
+        PythonExecutionContextView.view(ctx).setUvVersion("0.13.4");
+        routeLocalIndex("off38-split-moves-locked-in-one-fork");
+        assertScenario("off38-split-moves-locked-in-one-fork");
+    }
+
+    @Test
+    void forkMoveResolvesWhatTheMovedVersionRequires() {
+        // iniconfig 9.0, taken from 3.14 only, requires xdep, which the lock does not hold yet
+        PythonExecutionContextView.view(ctx).setUvVersion("0.13.4");
+        routeLocalIndex("off43-fork-move-pulls-in-a-new-package");
+        assertScenario("off43-fork-move-pulls-in-a-new-package");
+    }
+
+    @Test
+    void overrideReplacesTheRequirementOfAMovedPackage() {
+        // pkga 2.0 requires dep>=3, which the dep[x]==1.0 override replaces, extra included
+        PythonExecutionContextView.view(ctx).setUvVersion("0.13.4");
+        routeLocalIndex("off37-override-replaces-requirement");
+        assertScenario("off37-override-replaces-requirement");
     }
 
     @Test
@@ -434,7 +446,7 @@ class UvLockDeltaOfflineTest {
     }
 
     @Test
-    void oldUvLockPrunesWheelsUnderItsRewrittenMarkers() {
+    void oldUvLockIsKeptWhileUnchangedAndPrunesWheelsUnderItsRewrittenMarkersOnceEdited() {
         // platform_system == 'Linux' rules out win_amd64 only once rewritten as sys_platform == 'linux'.
         // An older uv kept such a wheel, so the before-lock carries one, and uv 0.13.4 drops it.
         PythonExecutionContextView.view(ctx).setUvVersion("0.13.4");
@@ -443,7 +455,12 @@ class UvLockDeltaOfflineTest {
         String before = resource("off42-old-uv-platform-wheels/uv.lock.before")
           .replace(linuxWheel, linuxWheel + "    { url = \"https://index.example/simple/winonly/winonly-1.0-py3-none-win_amd64.whl\", hash = \"sha256:492d19c44841b557a2e8241dadf72139b4001d476f332e82bb7481614034808c\" },\n");
         assertThat(before).contains("win_amd64");
-        Result result = UvLockEngine.regenerate(resource("off42-old-uv-platform-wheels/pyproject.toml"), before, ctx);
+        String unchanged = resource("off42-old-uv-platform-wheels/pyproject.toml").replace("\"iniconfig==1.0\", ", "");
+        Result result = UvLockEngine.regenerate(unchanged, before, ctx);
+        assertThat(result.getErrorMessage()).isNull();
+        assertThat(result.getLockFileContent()).isEqualTo(before);
+
+        result = UvLockEngine.regenerate(resource("off42-old-uv-platform-wheels/pyproject.toml"), before, ctx);
         assertThat(result.getErrorMessage()).isNull();
         assertThat(result.getLockFileContent()).isEqualTo(resource("off42-old-uv-platform-wheels/uv.lock.after"));
     }
@@ -490,10 +507,17 @@ class UvLockDeltaOfflineTest {
     }
 
     @Test
-    void upgradeRaisingPythonLowerBoundOnAnEdgeFailsLoud() {
+    void upgradeRaisingPythonLowerBoundOnAnEdgeForksTheLock() {
         // uv forks at python_full_version >= '3.11' although every package resolves to one version
+        PythonExecutionContextView.view(ctx).setUvVersion("0.13.4");
         routeLocalIndex("off15-python-lower-bound-marker");
-        assertFailsLoud("off15-python-lower-bound-marker", "reqlike");
+        Result result = UvLockEngine.regenerate(
+          resource("off15-python-lower-bound-marker/pyproject.toml"),
+          resource("off15-python-lower-bound-marker/uv.lock.before"),
+          ctx);
+        assertThat(result.getErrorMessage()).isNull();
+        assertThat(result.getLockFileContent())
+          .isEqualTo(resource("off15-python-lower-bound-marker/uv.lock.after.uv-0.13.4"));
     }
 
     @Test
@@ -564,16 +588,9 @@ class UvLockDeltaOfflineTest {
         assertThat(http.requests).isEmpty();
     }
 
-    /**
-     * A lock restricted to a subset of environments ({@code [tool.uv] environments}, recorded as
-     * {@code supported-markers}) is resolved per environment: uv drops edges gated on an unsupported
-     * platform (this base lock's linux-only supported-markers already dropped click's win32-only
-     * {@code colorama}). Resolving a new dependency into it needs marker-space resolution, so the
-     * engine fails loud before any network fetch -- even when the manifest itself does not repeat the
-     * {@code [tool.uv]} block (environments can come from {@code uv.toml} or the CLI).
-     */
     @Test
     void restrictedEnvironmentsLockFailsLoud() {
+        // the lock records environments the manifest does not declare, so they come from uv.toml or the CLI
         Result result = UvLockEngine.regenerate(
           resource("off8-restricted-environments/pyproject.toml"),
           resource("off8-restricted-environments/uv.lock.before"),
@@ -583,13 +600,9 @@ class UvLockDeltaOfflineTest {
         assertThat(http.requests).isEmpty();
     }
 
-    /**
-     * A manifest declaring {@code [tool.uv] environments} restricts resolution to those environments;
-     * the engine rejects any resolution under it (here an unforked base lock, so the manifest is the
-     * only signal) rather than resolve universally and emit a lock uv would not.
-     */
     @Test
     void manifestEnvironmentsFailsLoud() {
+        // the manifest declares environments the lock does not record yet
         Result result = UvLockEngine.regenerate(
           resource("off9-manifest-environments/pyproject.toml"),
           resource("off1-add-leaf/uv.lock.before"),

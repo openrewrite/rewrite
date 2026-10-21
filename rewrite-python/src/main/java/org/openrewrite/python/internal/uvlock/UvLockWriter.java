@@ -115,9 +115,18 @@ public final class UvLockWriter {
 
     private static String optionsBlock(UvLockOptions options) {
         StringBuilder b = new StringBuilder("[options]");
+        if (options.getResolutionMode() != null) {
+            b.append("\nresolution-mode = ").append(string(options.getResolutionMode()));
+        }
+        if (options.getPrereleaseMode() != null) {
+            b.append("\nprerelease-mode = ").append(string(options.getPrereleaseMode()));
+        }
+        if (options.getForkStrategy() != null) {
+            b.append("\nfork-strategy = ").append(string(options.getForkStrategy()));
+        }
         if (options.getExcludeNewer() != null) {
             b.append("\nexclude-newer = ").append(string(options.getExcludeNewer()));
-            if (options.getExcludeNewerSpan() != null) {
+            if (UvLockOptions.RELATIVE_EXCLUDE_NEWER_TIMESTAMP.equals(options.getExcludeNewer())) {
                 b.append(' ').append(UvLockOptions.RELATIVE_EXCLUDE_NEWER_COMMENT);
             }
         }
@@ -144,6 +153,9 @@ public final class UvLockWriter {
         if (manifest.getConstraints() != null) {
             b.append("\nconstraints = ").append(requirementArray(manifest.getConstraints()));
         }
+        if (manifest.getOverrides() != null) {
+            b.append("\noverrides = ").append(requirementArray(manifest.getOverrides()));
+        }
         if (manifest.getBuildConstraints() != null) {
             b.append("\nbuild-constraints = ").append(requirementArray(manifest.getBuildConstraints()));
         }
@@ -157,6 +169,12 @@ public final class UvLockWriter {
             b.append("\nversion = ").append(string(pkg.getVersion()));
         }
         b.append("\nsource = ").append(source(pkg.getSource()));
+        if (pkg.getDefaultGroups() instanceof String) {
+            b.append("\ndefault-groups = ").append(string((String) pkg.getDefaultGroups()));
+        } else if (pkg.getDefaultGroups() != null) {
+            @SuppressWarnings("unchecked") List<String> groups = (List<String>) pkg.getDefaultGroups();
+            b.append("\ndefault-groups = ").append(inlineStringArray(groups));
+        }
         if (pkg.getResolutionMarkers() != null) {
             b.append("\nresolution-markers = ").append(multilineStringArray(pkg.getResolutionMarkers()));
         }
