@@ -20,7 +20,7 @@ from typing import List, Optional, Sequence, Set
 from rewrite import random_id
 from rewrite.java import J
 from rewrite.java.support_types import JContainer, JRightPadded, Statement
-from rewrite.java.tree import Empty, Identifier, If, Import, Space
+from rewrite.java.tree import Empty, FieldAccess, Identifier, If, Import, Space
 from rewrite.markers import Markers
 from rewrite.python.binding_utils import is_reference
 from rewrite.python.import_utils import (bare_import, get_qualid_name, get_name_string, get_alias_name,
@@ -97,6 +97,7 @@ class RemoveImport(PythonVisitor):
         self.name = options.name
         self.only_if_unused = options.only_if_unused
         self._used: Optional[Set[str]] = None
+        self._read_paths: Set[str] = set()
         self._cu: Optional[CompilationUnit] = None
         self._block: Sequence[Statement] = ()
 
@@ -153,9 +154,9 @@ class RemoveImport(PythonVisitor):
         # Same module and same name means this *is* the import we were asked to remove.
         if self.name is None:
             if from_name is None and alias is None and '.' in self.module:
-                # `import a.b` also loads the submodule `a.b`, so only an import of a module inside
-                # it stands in for it.
-                return qualid.startswith(self.module + '.')
+                # `import a.b` also loads the submodule `a.b`, which a read spelling `a.b` needs.
+                return qualid.startswith(self.module + '.') or not any(
+                    path == self.module or path.startswith(self.module + '.') for path in self._read_paths)
             return from_name is not None or qualid != self.module
         return from_name != self.module or qualid != self.name
 
@@ -164,6 +165,7 @@ class RemoveImport(PythonVisitor):
         `resp.json()`, `post(url, json=body)`, `item.payload.json` — spells the import
         without reading it."""
         used: Set[str] = set()
+        read_paths = self._read_paths
         bindings = LocalBindings()
 
         class UsageCollector(PythonVisitor):
@@ -171,7 +173,17 @@ class RemoveImport(PythonVisitor):
                 if is_reference(self.cursor, ident):
                     used.update(name for name in referenced_names(ident)
                                 if not bindings.is_bound(self.cursor, name))
+                    read_paths.add(self._read_path(ident))
                 return ident
+
+            def _read_path(self, ident: Identifier) -> str:
+                """The dotted name read from ``ident`` on: ``a.b`` for the ``a`` of ``a.b.c()``."""
+                path, node, parent = ident.simple_name, ident, self.cursor.parent_tree_cursor()
+                while isinstance(parent.value, FieldAccess) and parent.value.target is node:
+                    node = parent.value
+                    path = f'{path}.{node.name.simple_name}'
+                    parent = parent.parent_tree_cursor()
+                return path
 
         UsageCollector().visit(cu, None)
         return used

@@ -220,7 +220,9 @@ def test_a_member_read_through_its_module_is_attributed_as_a_parse_of_the_result
 
 
 # The package imports its submodule, as `os` does `os.path`.
-_DOTTED = {**_PACKAGES, 'legacy/__init__.py': 'from legacy import http', 'legacy/http.py': _PACKAGES['legacy_http/__init__.py']}
+_DOTTED = {**_PACKAGES, 'legacy/__init__.py': 'from legacy import http',
+           'legacy/http.py': _PACKAGES['legacy_http/__init__.py'], 'legacy/auth.py': 'def login() -> None: ...',
+           'vendor/__init__.py': '', 'vendor/http.py': 'class Http: ...'}
 
 
 def _move_http() -> List[Recipe]:
@@ -292,6 +294,67 @@ def test_a_member_read_through_its_parent_package_moves():
         ''',
         _DOTTED,
     )
+
+
+@requires_ty
+def test_every_binding_the_member_is_read_through_moves():
+    _assert_attributed_as_parsed(
+        _move_http(),
+        '''
+        import legacy
+        from legacy import http
+        a = legacy.http.Http()
+        b = http.Http()
+        ''',
+        '''
+        import acme_common.http
+        a = acme_common.http.HttpClient()
+        b = acme_common.http.HttpClient()
+        ''',
+        _DOTTED,
+    )
+
+
+@requires_ty
+def test_a_move_removes_the_imports_that_load_the_module_and_no_other():
+    _assert_attributed_as_parsed(
+        _move_http(),
+        '''
+        import legacy.auth
+        import legacy.http
+        client = legacy.http.Http()
+        ''',
+        '''
+        import legacy.auth
+        import acme_common.http
+        client = acme_common.http.HttpClient()
+        ''',
+        _DOTTED,
+    )
+
+    _assert_attributed_as_parsed(
+        _move_http(),
+        '''
+        import legacy
+        import legacy.http
+        client = legacy.http.Http()
+        ''',
+        '''
+        import acme_common.http
+        client = acme_common.http.HttpClient()
+        ''',
+        _DOTTED,
+    )
+
+
+@requires_ty
+def test_a_shadowed_import_of_the_module_reads_nothing():
+    before = '''
+        from legacy import http
+        from vendor import http
+        client = http.Http()
+        '''
+    assert _run(_move_http(), before, _DOTTED).print_all() == dedent(before)
 
 
 @requires_ty
