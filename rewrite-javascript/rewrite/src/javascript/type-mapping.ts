@@ -609,9 +609,10 @@ export class JavaScriptTypeMapping {
         let ownerType: Type | undefined;
 
         // Check if the variable is imported
-        if (symbol.flags & ts.SymbolFlags.Alias) {
+        const requiredMember = this.requiredMember(symbol.declarations?.[0], node);
+        if (symbol.flags & ts.SymbolFlags.Alias || requiredMember) {
             // For imported variables, find the module specifier
-            const moduleSpecifier = this.importedModule(symbol.declarations?.[0]);
+            const moduleSpecifier = this.importedModule(symbol.declarations?.[0]) ?? requiredMember?.module;
             if (moduleSpecifier) {
                 ownerType = {
                     kind: Type.Kind.Class,
@@ -677,7 +678,7 @@ export class JavaScriptTypeMapping {
         const variable = {
             kind: Type.Kind.Variable,
             flags: 0,
-            name: actualSymbol.getName(),
+            name: requiredMember?.exportName ?? actualSymbol.getName(),
             owner: ownerType,
             type: mappedType,
             annotations: [],
@@ -723,10 +724,10 @@ export class JavaScriptTypeMapping {
     }
 
     /**
-     * How an identifier is bound by an `import` declaration: the module specifier, whether it binds
-     * the whole module (a default or namespace import) or one named export, and that export's name.
-     * Read from the syntax, since an import of a package without type declarations resolves to
-     * nothing the checker can describe.
+     * How an identifier is bound by an `import` declaration or a `const` member of a `require()`: the
+     * module specifier, whether it binds the whole module (a default or namespace import) or one named
+     * export, and that export's name. Read from the syntax, since an import of a package without type
+     * declarations resolves to nothing the checker can describe.
      */
     private importBinding(node: ts.Expression): { module: string, namespace: boolean, exportName?: string } | undefined {
         if (!ts.isIdentifier(node)) {
@@ -735,6 +736,10 @@ export class JavaScriptTypeMapping {
         const declaration = this.checker.getSymbolAtLocation(node)?.declarations?.[0];
         if (!declaration) {
             return undefined;
+        }
+        const required = this.requiredMember(declaration, node);
+        if (required) {
+            return {module: required.module, namespace: false, exportName: required.exportName};
         }
         const module = this.importedModule(declaration);
         if (!module) {
@@ -763,6 +768,40 @@ export class JavaScriptTypeMapping {
         }
         const binding = this.importBinding(node);
         return binding && binding.exportName === undefined ? binding.module : undefined;
+    }
+
+    /**
+     * The module and export a `const` binds from a `require()` result, as in `const {x} = require('m')`,
+     * `const {x: y} = require('m')` or `const y = require('m').x`. Read from the syntax, since in a
+     * TypeScript file `require` returns `any`. A nested destructuring pattern binds no export, and
+     * another file reading an exported binding reads a member of the module that declares it.
+     */
+    private requiredMember(declaration: ts.Node | undefined, location: ts.Node): { module: string, exportName: string } | undefined {
+        if (!declaration) {
+            return undefined;
+        }
+        const member = this.requiredMemberSyntax(declaration);
+        return member && declaration.getSourceFile() === location.getSourceFile() &&
+            ts.getCombinedNodeFlags(declaration) & ts.NodeFlags.Const ? member : undefined;
+    }
+
+    private requiredMemberSyntax(declaration: ts.Node): { module: string, exportName: string } | undefined {
+        if (ts.isBindingElement(declaration) && !declaration.dotDotDotToken &&
+            ts.isObjectBindingPattern(declaration.parent) && ts.isVariableDeclaration(declaration.parent.parent) &&
+            declaration.parent.parent.initializer) {
+            const property = declaration.propertyName ?? declaration.name;
+            if (!ts.isIdentifier(property) && !ts.isStringLiteral(property)) {
+                return undefined;
+            }
+            const module = this.requiredModuleSpecifier(declaration.parent.parent.initializer);
+            return module ? {module, exportName: property.text} : undefined;
+        }
+        if (ts.isVariableDeclaration(declaration) && declaration.initializer &&
+            ts.isPropertyAccessExpression(declaration.initializer) && ts.isIdentifier(declaration.initializer.name)) {
+            const module = this.requiredModuleSpecifier(declaration.initializer.expression);
+            return module ? {module, exportName: declaration.initializer.name.text} : undefined;
+        }
+        return undefined;
     }
 
     /**
@@ -1171,6 +1210,7 @@ export class JavaScriptTypeMapping {
                             moduleSpecifier = this.importedModule(exprSymbol.declarations?.[0]);
                         }
                     }
+                    moduleSpecifier ??= this.requiredMember(exprSymbol.declarations?.[0], node.expression)?.module;
                 }
 
                 const declared = this.parsedFunctionDeclaration(aliasedSymbol ?? symbol);
@@ -1184,10 +1224,12 @@ export class JavaScriptTypeMapping {
                         flags: 0, // TODO - determine flags
                         fullyQualifiedName: moduleSpecifier
                     } as Type.FullyQualified;
-                    // A default import binds an `ImportClause`; its aliased symbol carries the internal
-                    // name of the default export (e.g. `e` for express), so represent it as `<default>`.
-                    // Named imports (`ImportSpecifier`) keep the original exported name.
-                    const isDefaultImport = exprSymbol?.declarations?.some(ts.isImportClause) ?? false;
+                    // A default import binds an `ImportClause`, and `{default: x}` binds the default export
+                    // by name; its aliased symbol carries the internal name of the default export (e.g. `e`
+                    // for express), so represent it as `<default>`. Other named bindings keep the exported name.
+                    const exportName = this.importBinding(node.expression)?.exportName;
+                    const isDefaultImport = exportName === 'default' ||
+                        (exprSymbol?.declarations?.some(ts.isImportClause) ?? false);
                     if (isDefaultImport) {
                         methodName = '<default>';
                     } else if (aliasedSymbol?.declarations?.length) {
@@ -1195,7 +1237,7 @@ export class JavaScriptTypeMapping {
                     } else {
                         // A package without type declarations resolves the import to the checker's
                         // `unknown` symbol, so the exported name comes from the import itself.
-                        methodName = this.importBinding(node.expression)?.exportName ?? aliasedSymbol?.name ?? methodName;
+                        methodName = exportName ?? aliasedSymbol?.name ?? methodName;
                     }
                 } else if (this.requiredModuleOfExpression(node.expression)) {
                     // `const m = require('m'); m()` calls the module's default export.

@@ -19,6 +19,8 @@ import lombok.Value;
 import lombok.With;
 import org.jspecify.annotations.Nullable;
 
+import java.util.Map;
+
 /**
  * The {@code [options]} table, emitted by uv only for non-default options.
  */
@@ -26,6 +28,20 @@ import org.jspecify.annotations.Nullable;
 @With
 public class UvLockOptions {
 
+    /** uv writes this in place of a relative {@code exclude-newer}, with the comment on the same line. */
+    static final String RELATIVE_EXCLUDE_NEWER_TIMESTAMP = "0001-01-01T00:00:00Z";
+
+    static final String RELATIVE_EXCLUDE_NEWER_COMMENT =
+            "# This has no effect and is included for backwards compatibility when using relative exclude-newer values.";
+
     @Nullable
     String excludeNewer;
+
+    /** The ISO 8601 duration behind the sentinel, present exactly when {@link #excludeNewer} is it. */
+    @Nullable
+    String excludeNewerSpan;
+
+    /** The {@code [options.exclude-newer-package]} sub-table: a timestamp string, or {@code false}, per package. */
+    @Nullable
+    Map<String, Object> excludeNewerPackage;
 }

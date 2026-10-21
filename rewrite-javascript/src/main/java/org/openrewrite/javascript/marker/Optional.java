@@ -27,6 +27,9 @@ import org.openrewrite.rpc.RpcSendQueue;
 
 import java.util.UUID;
 
+import static org.openrewrite.java.internal.rpc.JavaSender.spaceRef;
+import static org.openrewrite.rpc.Reference.getValueNonNull;
+
 @Value
 @With
 public class Optional implements Marker, RpcCodec<Optional> {
@@ -36,7 +39,7 @@ public class Optional implements Marker, RpcCodec<Optional> {
     @Override
     public void rpcSend(Optional after, RpcSendQueue q) {
         q.getAndSend(after, Marker::getId);
-        q.getAndSend(after, Optional::getPrefix, space -> new JavaSender().visitSpace(space, q));
+        q.getAndSend(after, x -> spaceRef(x.getPrefix()), space -> new JavaSender().visitSpace(getValueNonNull(space), q));
     }
 
     @Override

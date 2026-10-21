@@ -61,7 +61,7 @@ func (s *JavaSender) PreVisit(t java.Tree, p any) java.Tree {
 	}
 	q := p.(*SendQueue)
 	q.GetAndSend(t, func(v any) any { return v.(java.J).GetID().String() }, nil)
-	q.GetAndSend(t, func(v any) any { return v.(java.J).GetPrefix() },
+	q.GetAndSend(t, func(v any) any { return spaceRef(v.(java.J).GetPrefix()) },
 		func(v any) { sendSpace(v.(java.Space), q) })
 	q.GetAndSend(t, func(v any) any { return AsRef(v.(java.J).GetMarkers()) },
 		func(v any) { SendMarkersCodec(v.(java.Markers), q) })
@@ -172,7 +172,7 @@ func (s *JavaSender) VisitBlock(b *java.Block, p any) java.J {
 		func(v any) any { return containerElementID(v) },
 		func(v any) { sendRightPadded(s, v, q) })
 	// end space
-	q.GetAndSend(b, func(v any) any { return v.(*java.Block).End },
+	q.GetAndSend(b, func(v any) any { return spaceRef(v.(*java.Block).End) },
 		func(v any) { sendSpace(v.(java.Space), q) })
 	return b
 }
@@ -538,7 +538,7 @@ func (s *JavaSender) VisitVariableDeclarations(vd *java.VariableDeclarations, p 
 	q.GetAndSend(vd, func(v any) any {
 		va := v.(*java.VariableDeclarations).Varargs
 		if va != nil {
-			return *va
+			return spaceRef(*va)
 		}
 		return nil
 	}, func(v any) { sendSpace(v.(java.Space), q) })

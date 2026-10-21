@@ -59,15 +59,26 @@ public class Space {
     @JsonCreator
     public static Space build(@Nullable String whitespace, List<Comment> comments) {
         if (comments.isEmpty()) {
-            if (whitespace == null || whitespace.isEmpty()) {
-                return Space.EMPTY;
-            } else if (whitespace.length() <= 50) {
-                Space newSpace = new Space(whitespace, comments);
-                Space existing = flyweights.putIfAbsent(whitespace, newSpace);
-                return existing != null ? existing : newSpace;
+            Space shared = shared(whitespace == null ? "" : whitespace);
+            if (shared != null) {
+                return shared;
             }
         }
         return new Space(whitespace, comments);
+    }
+
+    /**
+     * @return The one instance shared for comment-free {@code whitespace}, or null when
+     * {@code whitespace} is too long to share and every comment-free Space with it is a new one.
+     */
+    public static @Nullable Space shared(String whitespace) {
+        if (whitespace.isEmpty()) {
+            return Space.EMPTY;
+        } else if (whitespace.length() > 50) {
+            return null;
+        }
+        Space existing = flyweights.get(whitespace);
+        return existing != null ? existing : flyweights.computeIfAbsent(whitespace, ws -> new Space(ws, emptyList()));
     }
 
     public String getIndent() {

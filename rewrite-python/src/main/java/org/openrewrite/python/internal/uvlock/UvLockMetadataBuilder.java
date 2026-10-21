@@ -154,6 +154,13 @@ final class UvLockMetadataBuilder {
                 }
             }
         }
+        // uv locks the legacy [tool.uv] dev-dependencies list as the dev group
+        Toml.Table uv = UvLockToml.findTable(pyproject, "tool.uv");
+        if (uv != null) {
+            for (String spec : UvLockToml.stringArray(uv, "dev-dependencies")) {
+                declared.add(toDeclared(spec, null, "dev"));
+            }
+        }
         return declared;
     }
 
@@ -297,11 +304,16 @@ final class UvLockMetadataBuilder {
         String specifier = normalizeSpecifier(decl);
         String index = pins == null ? null : declaredIndexUrl(pins.get(0), decl.canonicalName);
         String marker = resolveMetadataMarker(decl);
-        return new UvLockRequirement(decl.canonicalName, extras, null, marker, specifier, index, null, null, null);
+        return new UvLockRequirement(decl.canonicalName, extras, null, marker, specifier, index, null, null, null, null);
     }
 
     private @Nullable String normalizeSpecifier(Declared decl) {
-        PythonVersionSpecifierSet specifiers = decl.requirement.getSpecifiers();
+        return normalizeSpecifier(decl.requirement);
+    }
+
+    /** uv's requires-dist rendering of a requirement's specifier set, or null when it accepts any version. */
+    static @Nullable String normalizeSpecifier(Pep508Requirement requirement) {
+        PythonVersionSpecifierSet specifiers = requirement.getSpecifiers();
         if (specifiers == null || specifiers.isMatchAll()) {
             return null;
         }
@@ -315,7 +327,7 @@ final class UvLockMetadataBuilder {
         try {
             return UvLockNormalization.normalizeRequiresDistSpecifier(joined.toString());
         } catch (IllegalArgumentException e) {
-            throw new EngineFailure(Reason.RESOLUTION_REQUIRED, decl.canonicalName,
+            throw new EngineFailure(Reason.RESOLUTION_REQUIRED, requirement.getCanonicalName(),
                     "Cannot normalize version specifier " + joined + ": " + e.getMessage());
         }
     }

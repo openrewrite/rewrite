@@ -19,11 +19,13 @@ import pytest
 from rewrite import ExecutionContext, InMemoryExecutionContext
 from rewrite.java import J
 from rewrite.python.add_import import AddImportOptions, maybe_add_import
+from rewrite.java.tree import Import
 from rewrite.python.tree import CompilationUnit
 from rewrite.python.visitor import PythonVisitor
 from rewrite.test import RecipeSpec, python, from_visitor
 
 from ._java_import_arm import java_add_import
+from ._parse_shape import parse_shape
 
 
 def _assert_ids_accessible(source_file):
@@ -83,8 +85,21 @@ class TestMaybeAddImport:
             )
         )
 
+    def test_add_to_a_comment_only_file(self):
+        spec = RecipeSpec(recipe=from_visitor(_add_import_visitor('native', 'os', 'path')))
+        spec.rewrite_run(
+            python(
+                "# c\n",
+                "from os import path\n# c\n",
+                after_recipe=parse_shape("from os import path\n# c\n"),
+            )
+        )
+
     def test_add_direct_import(self, arm):
-        """Add 'import os' to a file."""
+        """Add 'import os' to a file, as the bare `Import` a parse of it gives."""
+        def bare_import(cu):
+            assert isinstance(cu.statements[0], Import)
+
         spec = RecipeSpec(recipe=from_visitor(_add_import_visitor(arm, 'os')))
         spec.rewrite_run(
             python(
@@ -95,6 +110,7 @@ class TestMaybeAddImport:
                 import os
                 x = 1
                 """,
+                after_recipe=bare_import,
             )
         )
 
