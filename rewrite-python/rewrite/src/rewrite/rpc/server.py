@@ -2476,9 +2476,9 @@ def _instantiate_visitor(visitor_name: str, ctx, visitor_options: Optional[Dict[
         # keeps on self does not carry over to the next file.
         editor = recipe.editor()
         if recipe_id in _prepared_unwrapped_editors:
-            extracted = _extract_preconditions_from_editor(editor)
-            if extracted is not None:
-                return extracted[0]
+            from rewrite.preconditions import Check
+            while isinstance(editor, Check):
+                editor = editor.wrapped
         return editor
 
     elif visitor_name.startswith('scan:'):

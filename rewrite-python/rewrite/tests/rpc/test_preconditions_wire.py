@@ -273,6 +273,11 @@ class TestPrepareRecipeWithPreconditions:
             "matchOverrides": False,
         }
 
+        instantiated = server._instantiate_visitor(
+            f"edit:{resp['id']}", InMemoryExecutionContext()
+        )
+        assert isinstance(instantiated, _BareEditor)
+
     def test_or_emits_composite_wire_entry(self, isolated_server):
         """Preconditions.or_ over RecipeRefs becomes a single composite wire entry
         with op="or" and operands carrying each leaf precondition."""
