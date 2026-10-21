@@ -150,7 +150,7 @@ final class UvLockMetadataBuilder {
                             "Unreadable [dependency-groups] entry");
                 }
                 for (String spec : UvLockToml.stringArrayValues((Toml.Array) kv.getValue(), "dependency-groups")) {
-                    declared.add(toDeclared(spec, null, group));
+                    declared.add(toDeclared(spec, null, Pep508Requirement.canonicalize(group)));
                 }
             }
         }
@@ -216,11 +216,15 @@ final class UvLockMetadataBuilder {
             for (Toml value : groups.getValues()) {
                 if (value instanceof Toml.KeyValue) {
                     String group = UvLockToml.keyName((Toml.KeyValue) value);
-                    if (group != null && !requiresDev.containsKey(group)) {
-                        requiresDev.put(group, new ArrayList<>());
+                    if (group != null) {
+                        requiresDev.computeIfAbsent(Pep508Requirement.canonicalize(group), k -> new ArrayList<>());
                     }
                 }
             }
+        }
+        Toml.Table uv = UvLockToml.findTable(pyproject, "tool.uv");
+        if (uv != null && UvLockToml.hasKey(uv, "dev-dependencies")) {
+            requiresDev.computeIfAbsent("dev", k -> new ArrayList<>());
         }
         requiresDist.sort(Comparator.comparing(UvLockRequirement::getName));
         for (List<UvLockRequirement> group : requiresDev.values()) {

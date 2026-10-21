@@ -81,6 +81,15 @@ final class UvLockToml {
         return null;
     }
 
+    static boolean hasKey(Toml.Table table, String key) {
+        for (Toml value : table.getValues()) {
+            if (value instanceof Toml.KeyValue && key.equals(keyName((Toml.KeyValue) value))) {
+                return true;
+            }
+        }
+        return false;
+    }
+
     static List<String> stringArray(Toml.Table table, String key) {
         for (Toml value : table.getValues()) {
             if (value instanceof Toml.KeyValue) {

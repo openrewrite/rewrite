@@ -15,6 +15,7 @@
  */
 package org.openrewrite.python.internal.uvlock;
 
+import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
 
@@ -35,5 +36,25 @@ class UvLockMarkersTest {
     })
     void versionClausesRecordAsUvLowersThem(String marker, String recorded) {
         assertThat(UvLockMarkers.recordMarker(marker, null)).isEqualTo(recorded);
+    }
+
+    @Test
+    void clausesRecordWithPythonFirstAndExtrasLast() {
+        assertThat(UvLockMarkers.recordMarker(
+          "sys_platform == 'linux' and platform_machine == 'x86_64' and python_full_version < '3.13' and os_name == 'posix'",
+          "extra == 'cli'"))
+          .isEqualTo("python_full_version < '3.13' and os_name == 'posix' and platform_machine == 'x86_64' and sys_platform == 'linux' and extra == 'cli'");
+    }
+
+    @Test
+    void parenthesizedConjunctionInsideATermFlattens() {
+        assertThat(UvLockMarkers.parseDisjunction("(python_version >= '3.11' and sys_platform != 'win32') and extra == 'dev'"))
+          .singleElement()
+          .satisfies(term -> assertThat(term).extracting(c -> c[0])
+            .containsExactly("python_version", "sys_platform", "extra"));
+
+        // a disjunction nested inside a conjunction would need distributing, which the parser does not do
+        assertThat(UvLockMarkers.parseDisjunction("(sys_platform == 'linux' or sys_platform == 'darwin') and extra == 'dev'"))
+          .isNull();
     }
 }

@@ -286,17 +286,17 @@ class UvLockEngineTest {
     }
 
     @Test
-    void configuredUvReleaseRefusesChangingPreRevision3Locks() {
-        // uv 0.13.4 would rewrite the whole 0.5.0-format file in its own shape, and leaves it alone unchanged
+    void configuredUvReleaseRewritesAChangedPreRevision3LockInItsOwnShape() {
+        // uv stamps the whole file at its revision and gives every artifact, the untouched iniconfig too, its upload time
         stubPypiSix();
-        PythonExecutionContextView.view(ctx).setUvVersion("0.13.4");
+        http.route("https://pypi.org/simple/iniconfig/", resource("off1-add-leaf/http/iniconfig-listing-json"));
+        PythonExecutionContextView.view(ctx).setUvVersion("0.10.11");
         Result result = UvLockEngine.regenerate(
           resource("o-old-uv/proj-0.5.0/pyproject.toml"),
           resource("o-old-uv/proj-0.5.0/uv.lock.as-0.5.0"),
           ctx);
-        assertThat(result.isSuccess()).isFalse();
-        assertThat(result.getFailure().getReason()).isEqualTo(Reason.RESOLUTION_REQUIRED);
-        assertThat(result.getFailure().getDetail()).contains("below revision 3");
+        assertThat(result.getErrorMessage()).isNull();
+        assertThat(result.getLockFileContent()).isEqualTo(resource("o-old-uv/proj-0.5.0/uv.lock.after-change-current-uv"));
 
         Result unchanged = UvLockEngine.regenerate(
           resource("o-old-uv/proj-0.5.0/pyproject.toml").replace("six==1.16.0", "six>=1.16"),
@@ -304,6 +304,57 @@ class UvLockEngineTest {
           ctx);
         assertThat(unchanged.getErrorMessage()).isNull();
         assertThat(unchanged.getLockFileContent()).isEqualTo(resource("o-old-uv/proj-0.5.0/uv.lock.as-0.5.0"));
+    }
+
+    @Test
+    void lockSatisfyingTheManifestByMeaningIsKeptVerbatimUntilAnythingElseChanges() {
+        // uv compares provides-extras as a set and specifiers by value, so neither reordering nor a trailing zero rewrites
+        String pyproject = resource("g-optional-deps/pyproject.toml")
+          .replace("\"six>=1.16\"", "\"six>=1.16.0\"")
+          .replace("cli = [\n    \"click>=8.1\",\n]\nyaml = [\n    \"pyyaml>=6.0\",\n]", "yaml = [\n    \"pyyaml>=6.0\",\n]\ncli = [\n    \"click>=8.1\",\n]");
+        assertThat(pyproject).contains("yaml = [\n    \"pyyaml>=6.0\",\n]\ncli");
+        Result result = UvLockEngine.regenerate(pyproject, resource("g-optional-deps/uv.lock"), ctx);
+        assertThat(result.getErrorMessage()).isNull();
+        assertThat(result.getLockFileContent()).isEqualTo(resource("g-optional-deps/uv.lock"));
+
+        // once anything else in the lock changes, uv writes the metadata fresh from the manifest
+        result = UvLockEngine.regenerate(pyproject + "\n[tool.uv]\nconstraint-dependencies = [\"six>=1\"]\n",
+          resource("g-optional-deps/uv.lock"), ctx);
+        assertThat(result.getErrorMessage()).isNull();
+        assertThat(result.getLockFileContent())
+          .contains("[manifest]\nconstraints = [{ name = \"six\", specifier = \">=1\" }]")
+          .contains("{ name = \"six\", specifier = \">=1.16.0\" }")
+          .contains("provides-extras = [\"yaml\", \"cli\"]");
+
+        // a lock written before provides-extras existed (version 1 without a revision) is never judged on it
+        String revisionless = resource("g-optional-deps/uv.lock")
+          .replace("revision = 3\n", "")
+          .replace("provides-extras = [\"cli\", \"yaml\"]\n", "");
+        result = UvLockEngine.regenerate(resource("g-optional-deps/pyproject.toml"), revisionless, ctx);
+        assertThat(result.getErrorMessage()).isNull();
+        assertThat(result.getLockFileContent()).isEqualTo(revisionless);
+        assertThat(http.requests).isEmpty();
+    }
+
+    @Test
+    void declaredGroupsAreRecordedAsUvNormalizesThem() {
+        String pyproject = resource("f-dep-groups/pyproject.toml").replace("lint = [", "Lint = [");
+        Result result = UvLockEngine.regenerate(pyproject, resource("f-dep-groups/uv.lock"), ctx);
+        assertThat(result.getErrorMessage()).isNull();
+        assertThat(result.getLockFileContent()).isEqualTo(resource("f-dep-groups/uv.lock"));
+
+        result = UvLockEngine.regenerate(pyproject + "test_integration = []\n", resource("f-dep-groups/uv.lock"), ctx);
+        assertThat(result.getErrorMessage()).isNull();
+        assertThat(result.getLockFileContent()).contains("lint = [{ name = \"pyflakes\"").contains("\ntest-integration = []\n");
+
+        // an empty legacy dev-dependencies list still declares the dev group
+        String withEmptyDev = resource("g-optional-deps/uv.lock").replace("provides-extras = [\"cli\", \"yaml\"]\n",
+          "provides-extras = [\"cli\", \"yaml\"]\n\n[package.metadata.requires-dev]\ndev = []\n");
+        result = UvLockEngine.regenerate(resource("g-optional-deps/pyproject.toml") + "\n[tool.uv]\ndev-dependencies = []\n",
+          withEmptyDev, ctx);
+        assertThat(result.getErrorMessage()).isNull();
+        assertThat(result.getLockFileContent()).isEqualTo(withEmptyDev);
+        assertThat(http.requests).isEmpty();
     }
 
     // ---- structured failures ----

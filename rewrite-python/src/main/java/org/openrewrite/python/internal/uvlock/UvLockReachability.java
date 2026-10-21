@@ -22,9 +22,9 @@ import org.openrewrite.python.internal.LockFileRegeneration.Reason;
 import java.util.*;
 
 /**
- * The marker under which each lock entry is reachable from the root, and the edge simplification uv
- * derives from it since 0.11.25: a clause the parent's reachability implies leaves the edge marker,
- * and an edge the reachability contradicts leaves the lock.
+ * The marker under which each lock entry is reachable from the root, and what uv derives from it: the
+ * edge simplification of 0.11.25 (a clause the parent's reachability implies leaves the edge marker,
+ * an edge it contradicts leaves the lock) and the wheels an entry's reachability rules out.
  */
 final class UvLockReachability {
 
@@ -52,6 +52,228 @@ final class UvLockReachability {
             simplified.add(r.simplifyEntry(i, i == rootIndex));
         }
         return simplified;
+    }
+
+    /** The reachability of every entry, or null when the lock's markers are outside the pass's algebra. */
+    static @Nullable UvLockReachability of(List<UvLockPackage> packages, int rootIndex, PyRange requiresPython) {
+        UvLockReachability r = new UvLockReachability(packages, requiresPython);
+        try {
+            r.propagate(rootIndex);
+        } catch (EngineFailure e) {
+            return null;
+        }
+        return r;
+    }
+
+    /** The entry's reachability, in a form two passes can compare. */
+    String reachKey(int index) {
+        List<String> keys = new ArrayList<>();
+        for (Term t : reach.getOrDefault(new Node(index, null), Collections.emptyList())) {
+            keys.add(t.key());
+        }
+        Collections.sort(keys);
+        return keys.toString();
+    }
+
+    /** Whether every path to the entry carries a clause on the platform. */
+    boolean platformScoped(int index) {
+        List<Term> terms = reach.get(new Node(index, null));
+        if (terms == null || terms.isEmpty()) {
+            return false;
+        }
+        for (Term t : terms) {
+            boolean scoped = false;
+            for (Atom atom : t.getAtoms()) {
+                scoped |= PLATFORM_VARS.contains(atom.getVar());
+            }
+            if (!scoped) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    // ---- wheels the reachability rules out (uv-lock is_wheel_unreachable_for_marker)
+
+    private static final Set<String> PLATFORM_VARS = new HashSet<>(Arrays.asList(
+            "sys_platform", "platform_system", "os_name", "platform_machine"));
+
+    private enum Os { LINUX, WINDOWS, MACOS, ANDROID, IOS, OTHER }
+
+    private enum Arch { ARM, X86_64, X86, PPC64LE, PPC64, S390X, RISCV64, LOONGARCH64, ARMV7L, ARMV6L, OTHER }
+
+    /** One platform tag of a wheel filename as uv classifies it, or null for a tag uv does not recognize. */
+    @Value
+    private static class Platform {
+        Os os;
+        Arch arch;
+
+        static @Nullable Platform of(String tag) {
+            for (String prefix : new String[]{"manylinux1_", "manylinux2010_", "manylinux2014_", "linux_"}) {
+                if (tag.startsWith(prefix)) {
+                    return new Platform(Os.LINUX, linuxArch(tag.substring(prefix.length())));
+                }
+            }
+            java.util.regex.Matcher m = java.util.regex.Pattern.compile("(?:manylinux|musllinux)_\\d+_\\d+_(.+)").matcher(tag);
+            if (m.matches()) {
+                return new Platform(Os.LINUX, linuxArch(m.group(1)));
+            }
+            switch (tag) {
+                case "win32": return new Platform(Os.WINDOWS, Arch.X86);
+                case "win_amd64": return new Platform(Os.WINDOWS, Arch.X86_64);
+                case "win_arm64": return new Platform(Os.WINDOWS, Arch.ARM);
+                case "win_ia64": return new Platform(Os.WINDOWS, Arch.OTHER);
+                default: break;
+            }
+            m = java.util.regex.Pattern.compile("macosx_\\d+_\\d+_(.+)").matcher(tag);
+            if (m.matches()) {
+                String format = m.group(1);
+                return new Platform(Os.MACOS, "arm64".equals(format) ? Arch.ARM : "x86_64".equals(format) ? Arch.X86_64 :
+                        "i386".equals(format) ? Arch.X86 : Arch.OTHER);
+            }
+            m = java.util.regex.Pattern.compile("android_\\d+_(.+)").matcher(tag);
+            if (m.matches()) {
+                String abi = m.group(1);
+                return new Platform(Os.ANDROID, "arm64_v8a".equals(abi) ? Arch.ARM : "x86_64".equals(abi) ? Arch.X86_64 :
+                        "x86".equals(abi) ? Arch.X86 : Arch.OTHER);
+            }
+            m = java.util.regex.Pattern.compile("ios_\\d+_\\d+_(.+)").matcher(tag);
+            if (m.matches()) {
+                String multiarch = m.group(1);
+                return new Platform(Os.IOS, multiarch.startsWith("arm64_") ? Arch.ARM :
+                        "x86_64_iphonesimulator".equals(multiarch) ? Arch.X86_64 : Arch.OTHER);
+            }
+            return null;
+        }
+
+        private static Arch linuxArch(String arch) {
+            switch (arch) {
+                case "aarch64": return Arch.ARM;
+                case "x86_64": return Arch.X86_64;
+                case "i686": return Arch.X86;
+                case "ppc64le": return Arch.PPC64LE;
+                case "ppc64": return Arch.PPC64;
+                case "s390x": return Arch.S390X;
+                case "riscv64": return Arch.RISCV64;
+                case "loongarch64": return Arch.LOONGARCH64;
+                case "armv7l": return Arch.ARMV7L;
+                case "armv6l": return Arch.ARMV6L;
+                default: return Arch.OTHER;
+            }
+        }
+    }
+
+    private static final Map<Os, Atom[]> OS_ATOMS = new HashMap<>();
+    private static final Map<Arch, String[]> MACHINES = new HashMap<>();
+
+    static {
+        OS_ATOMS.put(Os.LINUX, new Atom[]{new Atom("os_name", true, "posix"), new Atom("sys_platform", true, "linux")});
+        OS_ATOMS.put(Os.WINDOWS, new Atom[]{new Atom("os_name", true, "nt"), new Atom("sys_platform", true, "win32")});
+        OS_ATOMS.put(Os.MACOS, new Atom[]{new Atom("os_name", true, "posix"), new Atom("sys_platform", true, "darwin")});
+        OS_ATOMS.put(Os.ANDROID, new Atom[]{new Atom("sys_platform", true, "android")});
+        MACHINES.put(Arch.ARM, new String[]{"aarch64", "arm64", "ARM64"});
+        MACHINES.put(Arch.X86_64, new String[]{"x86_64", "amd64", "AMD64"});
+        MACHINES.put(Arch.X86, new String[]{"i686", "i386", "win32", "x86"});
+        MACHINES.put(Arch.PPC64LE, new String[]{"ppc64le"});
+        MACHINES.put(Arch.PPC64, new String[]{"ppc64"});
+        MACHINES.put(Arch.S390X, new String[]{"s390x"});
+        MACHINES.put(Arch.RISCV64, new String[]{"riscv64"});
+        MACHINES.put(Arch.LOONGARCH64, new String[]{"loongarch64"});
+        MACHINES.put(Arch.ARMV7L, new String[]{"armv7l", "armv8l"});
+        MACHINES.put(Arch.ARMV6L, new String[]{"armv6l"});
+    }
+
+    // the constant marker for an OS, an architecture, or both, as a disjunction over machine aliases
+    private static List<Term> constant(@Nullable Os os, @Nullable Arch arch) {
+        List<Term> terms = new ArrayList<>();
+        for (String machine : arch != null ? MACHINES.get(arch) : new String[]{null}) {
+            Set<Atom> atoms = new LinkedHashSet<>();
+            if (os != null) {
+                atoms.addAll(Arrays.asList(OS_ATOMS.get(os)));
+            }
+            if (machine != null) {
+                atoms.add(new Atom("platform_machine", true, machine));
+            }
+            terms.add(new Term(new ArrayList<>(), atoms));
+        }
+        return terms;
+    }
+
+    private boolean disjoint(List<Term> reachTerms, List<Term> constant) {
+        return and(reachTerms, constant).isEmpty();
+    }
+
+    /** Whether the wheel's platform tags can never be installed where the entry is reachable. */
+    boolean wheelUnreachable(int index, String filename) {
+        List<Term> marker = reach.get(new Node(index, null));
+        if (marker == null) {
+            return false;
+        }
+        String base = filename.substring(0, filename.length() - ".whl".length());
+        List<Platform> platforms = new ArrayList<>();
+        boolean allAny = true;
+        for (String tag : base.substring(base.lastIndexOf('-') + 1).split("\\.")) {
+            if ("any".equals(tag)) {
+                continue;
+            }
+            allAny = false;
+            Platform platform = Platform.of(tag);
+            if (platform == null) {
+                return false;
+            }
+            platforms.add(platform);
+        }
+        if (allAny) {
+            return false;
+        }
+        // emulated x86_64 Python on Windows ARM64 installs win_amd64 wheels
+        if (platforms.contains(new Platform(Os.WINDOWS, Arch.X86_64)) && !disjoint(marker, constant(Os.WINDOWS, Arch.ARM))) {
+            return false;
+        }
+        for (Os os : new Os[]{Os.LINUX, Os.WINDOWS, Os.MACOS, Os.ANDROID}) {
+            if (allOs(platforms, os)) {
+                Arch arch = sharedArch(platforms, os);
+                if (disjoint(marker, constant(os, arch))) {
+                    return true;
+                }
+            }
+        }
+        for (Arch arch : MACHINES.keySet()) {
+            if (allArch(platforms, arch) && disjoint(marker, constant(null, arch))) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private static boolean allOs(List<Platform> platforms, Os os) {
+        for (Platform p : platforms) {
+            if (p.getOs() != os) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    private static boolean allArch(List<Platform> platforms, Arch arch) {
+        for (Platform p : platforms) {
+            if (p.getArch() != arch) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    // the architecture an OS check narrows to: Linux knows every one, Windows, macOS and Android only arm, x86_64 and x86
+    private static @Nullable Arch sharedArch(List<Platform> platforms, Os os) {
+        Arch arch = platforms.get(0).getArch();
+        if (arch == Arch.OTHER || !allArch(platforms, arch)) {
+            return null;
+        }
+        if (os != Os.LINUX && arch != Arch.ARM && arch != Arch.X86_64 && arch != Arch.X86) {
+            return null;
+        }
+        return arch;
     }
 
     /** A lock entry, or one of its extras, as a node of the reachability graph. */
