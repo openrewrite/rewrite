@@ -14,6 +14,8 @@
 
 """Tests for AddImport / maybe_add_import."""
 
+from pathlib import Path
+
 import pytest
 
 from rewrite import ExecutionContext, InMemoryExecutionContext
@@ -541,5 +543,121 @@ class TestAddImportLineBreaks:
             python(
                 "import sys\n\nx = 1\r\ny = 2\n",
                 "import sys\nfrom os import path\n\nx = 1\r\ny = 2\n",
+            )
+        )
+
+
+class TestAddImportGrouping:
+    """Where the imports already sit in isort's sections, a new import joins its own."""
+
+    GROUPED = (
+        "import os\n"
+        "import sys\n"
+        "\n"
+        "import requests\n"
+        "\n"
+        "from mypkg import util\n"
+        "\n"
+        "x = 1\n"
+    )
+
+    @pytest.mark.parametrize("module, name, after", [
+        pytest.param('json', None,
+                     "import json\nimport os\nimport sys\n\nimport requests\n\nfrom mypkg import util\n\nx = 1\n",
+                     id='first-in-stdlib'),
+        pytest.param('collections.abc', 'Mapping',
+                     "import os\nimport sys\nfrom collections.abc import Mapping\n\nimport requests\n\n"
+                     "from mypkg import util\n\nx = 1\n",
+                     id='from-after-straight-in-stdlib'),
+        pytest.param('attr', None,
+                     "import os\nimport sys\n\nimport attr\nimport requests\n\nfrom mypkg import util\n\nx = 1\n",
+                     id='first-in-third-party'),
+        pytest.param('yaml', None,
+                     "import os\nimport sys\n\nimport requests\nimport yaml\n\nfrom mypkg import util\n\nx = 1\n",
+                     id='last-in-third-party'),
+        pytest.param('mypkg.helpers', 'helper',
+                     "import os\nimport sys\n\nimport requests\n\nfrom mypkg import util\n"
+                     "from mypkg.helpers import helper\n\nx = 1\n",
+                     id='local-by-path'),
+        pytest.param('__future__', 'annotations',
+                     "from __future__ import annotations\n\nimport os\nimport sys\n\nimport requests\n\n"
+                     "from mypkg import util\n\nx = 1\n",
+                     id='new-future-group'),
+    ])
+    def test_grouped(self, arm, module, name, after):
+        RecipeSpec(recipe=from_visitor(_add_import_visitor(arm, module, name))).rewrite_run(
+            python(self.GROUPED, after, path=Path('mypkg/sub/mod.py')))
+
+    def test_a_section_the_file_lacks_gets_its_own_group(self, arm):
+        RecipeSpec(recipe=from_visitor(_add_import_visitor(arm, 'mypkg'))).rewrite_run(
+            python(
+                "import os\n\nimport requests\n\nx = 1\n",
+                "import os\n\nimport requests\n\nimport mypkg\n\nx = 1\n",
+                path=Path('mypkg/mod.py'),
+            )
+        )
+
+    def test_a_group_ahead_of_the_first_keeps_the_header_above_it(self, arm):
+        RecipeSpec(recipe=from_visitor(_add_import_visitor(arm, 'os', 'path'))).rewrite_run(
+            python(
+                '"""Doc."""\n\nimport requests  # c\n\nfrom . import util\n\nx = 1\n',
+                '"""Doc."""\n\nfrom os import path\n\nimport requests  # c\n\nfrom . import util\n\nx = 1\n',
+            )
+        )
+
+    def test_one_run_of_imports_shows_no_layout(self, arm):
+        RecipeSpec(recipe=from_visitor(_add_import_visitor(arm, 'json'))).rewrite_run(
+            python(
+                "import requests\nimport yaml\n\nx = 1\n",
+                "import requests\nimport yaml\nimport json\n\nx = 1\n",
+            )
+        )
+
+    def test_crlf(self, arm):
+        RecipeSpec(recipe=from_visitor(_add_import_visitor(arm, 'json'))).rewrite_run(
+            python(
+                "import os\r\n\r\nimport requests\r\n\r\nx = 1\r\n",
+                "import json\r\nimport os\r\n\r\nimport requests\r\n\r\nx = 1\r\n",
+            )
+        )
+
+    def test_ungrouped_imports_take_the_new_one_last(self, arm):
+        RecipeSpec(recipe=from_visitor(_add_import_visitor(arm, 'json'))).rewrite_run(
+            python(
+                "import os\nimport requests\nimport sys\n\nx = 1\n",
+                "import os\nimport requests\nimport sys\nimport json\n\nx = 1\n",
+            )
+        )
+
+    def test_a_trailing_comment_stays_on_its_line(self, arm):
+        RecipeSpec(recipe=from_visitor(_add_import_visitor(arm, 'json'))).rewrite_run(
+            python(
+                "import os\nimport requests  # pinned\n\nx = 1\n",
+                "import os\nimport requests  # pinned\nimport json\n\nx = 1\n",
+            )
+        )
+
+    def test_a_trailing_comment_stays_on_its_line_inside_a_group(self, arm):
+        RecipeSpec(recipe=from_visitor(_add_import_visitor(arm, 'pathlib'))).rewrite_run(
+            python(
+                "import os  # first\nimport sys\n\nimport requests\n\nx = 1\n",
+                "import os  # first\nimport pathlib\nimport sys\n\nimport requests\n\nx = 1\n",
+            )
+        )
+
+    def test_a_trailing_comment_ending_the_file_stays_on_its_line(self, arm):
+        RecipeSpec(recipe=from_visitor(_add_import_visitor(arm, 'yaml'))).rewrite_run(
+            python(
+                "import os\n\nimport requests  # pinned\n",
+                "import os\n\nimport requests  # pinned\nimport yaml\n",
+            )
+        )
+
+    def test_a_trailing_comment_stays_on_its_line_ahead_of_a_new_group(self, arm):
+        RecipeSpec(recipe=from_visitor(_add_import_visitor(arm, 'mypkg'))).rewrite_run(
+            python(
+                "import os\n\nimport requests  # pinned\n\nx = 1\n",
+                "import os\n\nimport requests  # pinned\n\nimport mypkg\n\nx = 1\n",
+                path=Path('mypkg/mod.py'),
             )
         )
