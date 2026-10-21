@@ -46,7 +46,7 @@ import static org.openrewrite.python.internal.uvlock.UvLockFixtures.resource;
 /**
  * Golden scenarios replay uv 0.10.11 runs against pypi.org (see the fixture README):
  * the engine's output for the same edit must be byte-identical to what real uv wrote.
- * Recorded index/metadata responses under {@code /uvlock/http/} keep the tests offline.
+ * Recorded index/metadata responses under {@code /lock/uv/http/} keep the tests offline.
  */
 class UvLockEngineTest {
 

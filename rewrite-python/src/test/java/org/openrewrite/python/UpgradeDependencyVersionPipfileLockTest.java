@@ -41,7 +41,7 @@ import static org.openrewrite.python.Assertions.pipfile;
 /**
  * End-to-end recipe test of native Pipfile.lock regeneration against a stub package
  * index. The expected {@code _meta.hash} was recorded from the repo's python3 oracle
- * ({@code src/test/resources/pipfilelock/oracle.py hash --sources-json ...}).
+ * ({@code record/pipenv-oracle.py hash --sources-json ...}).
  */
 class UpgradeDependencyVersionPipfileLockTest implements RewriteTest {
 

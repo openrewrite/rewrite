@@ -42,7 +42,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 /**
  * Offline replay of the greedy-forward delta resolver (ADR 0010 T2 adds and T1 cascades)
  * against tiny packages so CI has a network-free regression test. Each scenario's index and
- * metadata responses under its {@code /uvlock/offN-.../http/} directory were recorded from
+ * metadata responses under its {@code /lock/uv/offN-.../http/} directory were recorded from
  * pypi.org while the engine's output was verified byte-identical to real {@code uv lock} 0.10.11; the
  * network-hitting counterparts live in {@link UvLockCascadeLiveTest}.
  */
@@ -581,7 +581,7 @@ class UvLockDeltaOfflineTest {
     }
 
     static byte[] resourceBytes(String name) {
-        try (InputStream is = UvLockDeltaOfflineTest.class.getResourceAsStream("/uvlock/" + name)) {
+        try (InputStream is = UvLockDeltaOfflineTest.class.getResourceAsStream("/lock/uv/" + name)) {
             assertThat(is).as(name).isNotNull();
             return is.readAllBytes();
         } catch (IOException e) {
@@ -636,7 +636,7 @@ class UvLockDeltaOfflineTest {
                 String fixture = rest.endsWith("/") ?
                   rest.substring(0, rest.length() - 1) + "-listing-html" :
                   rest.substring(rest.lastIndexOf('/') + 1);
-                try (InputStream is = UvLockDeltaOfflineTest.class.getResourceAsStream("/uvlock/" + directory.getValue() + fixture)) {
+                try (InputStream is = UvLockDeltaOfflineTest.class.getResourceAsStream("/lock/uv/" + directory.getValue() + fixture)) {
                     return is == null ? null : is.readAllBytes();
                 } catch (IOException e) {
                     throw new UncheckedIOException(e);

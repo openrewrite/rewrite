@@ -415,7 +415,7 @@ class AddDependencyTest implements RewriteTest {
     }
 
     private static String uvResource(String name) {
-        try (InputStream is = AddDependencyTest.class.getResourceAsStream("/uvlock/" + name)) {
+        try (InputStream is = AddDependencyTest.class.getResourceAsStream("/lock/uv/" + name)) {
             assertThat(is).as(name).isNotNull();
             return new String(is.readAllBytes(), StandardCharsets.UTF_8);
         } catch (IOException e) {
