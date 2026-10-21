@@ -15,6 +15,13 @@
  */
 package org.openrewrite.python.internal.uvlock;
 
+import static java.util.Objects.requireNonNull;
+import java.util.Objects;
+import org.openrewrite.python.internal.uvlock.marker.MarkerTree;
+import org.openrewrite.python.internal.uvlock.marker.MarkerParser;
+import org.openrewrite.python.internal.uvlock.marker.Ranges;
+import org.openrewrite.python.internal.pep440.PythonVersion;
+import org.openrewrite.python.internal.uvlock.marker.MarkerInterner;
 import lombok.Value;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.python.internal.LockFileRegeneration.Reason;
@@ -33,19 +40,23 @@ final class UvLockReachability {
 
     private final List<UvLockPackage> packages;
     private final PyRange requiresPython;
+    /** The lock's supported environments, under one of which the root is reachable, or null for every environment. */
+    private final @Nullable List<String> environments;
     private final Map<String, List<Integer>> byName = new HashMap<>();
     private final Map<Node, List<Term>> reach = new HashMap<>();
 
-    private UvLockReachability(List<UvLockPackage> packages, PyRange requiresPython) {
+    private UvLockReachability(List<UvLockPackage> packages, PyRange requiresPython, @Nullable List<String> environments) {
         this.packages = packages;
         this.requiresPython = requiresPython;
+        this.environments = environments;
         for (int i = 0; i < packages.size(); i++) {
             byName.computeIfAbsent(packages.get(i).getName(), k -> new ArrayList<>()).add(i);
         }
     }
 
-    static List<UvLockPackage> simplify(List<UvLockPackage> packages, int rootIndex, PyRange requiresPython) {
-        UvLockReachability r = new UvLockReachability(packages, requiresPython);
+    static List<UvLockPackage> simplify(List<UvLockPackage> packages, int rootIndex, PyRange requiresPython,
+                                        @Nullable List<String> environments) {
+        UvLockReachability r = new UvLockReachability(packages, requiresPython, environments);
         r.propagate(rootIndex);
         List<UvLockPackage> simplified = new ArrayList<>(packages.size());
         for (int i = 0; i < packages.size(); i++) {
@@ -55,8 +66,9 @@ final class UvLockReachability {
     }
 
     /** The reachability of every entry, or null when the lock's markers are outside the pass's algebra. */
-    static @Nullable UvLockReachability of(List<UvLockPackage> packages, int rootIndex, PyRange requiresPython) {
-        UvLockReachability r = new UvLockReachability(packages, requiresPython);
+    static @Nullable UvLockReachability of(List<UvLockPackage> packages, int rootIndex, PyRange requiresPython,
+                                           @Nullable List<String> environments) {
+        UvLockReachability r = new UvLockReachability(packages, requiresPython, environments);
         try {
             r.propagate(rootIndex);
         } catch (EngineFailure e) {
@@ -108,13 +120,19 @@ final class UvLockReachability {
         Os os;
         Arch arch;
 
+        private static final java.util.regex.Pattern MANYLINUX =
+                java.util.regex.Pattern.compile("(?:manylinux|musllinux)_\\d+_\\d+_(.+)");
+        private static final java.util.regex.Pattern MACOSX = java.util.regex.Pattern.compile("macosx_\\d+_\\d+_(.+)");
+        private static final java.util.regex.Pattern ANDROID = java.util.regex.Pattern.compile("android_\\d+_(.+)");
+        private static final java.util.regex.Pattern IOS = java.util.regex.Pattern.compile("ios_\\d+_\\d+_(.+)");
+
         static @Nullable Platform of(String tag) {
             for (String prefix : new String[]{"manylinux1_", "manylinux2010_", "manylinux2014_", "linux_"}) {
                 if (tag.startsWith(prefix)) {
                     return new Platform(Os.LINUX, linuxArch(tag.substring(prefix.length())));
                 }
             }
-            java.util.regex.Matcher m = java.util.regex.Pattern.compile("(?:manylinux|musllinux)_\\d+_\\d+_(.+)").matcher(tag);
+            java.util.regex.Matcher m = MANYLINUX.matcher(tag);
             if (m.matches()) {
                 return new Platform(Os.LINUX, linuxArch(m.group(1)));
             }
@@ -125,19 +143,19 @@ final class UvLockReachability {
                 case "win_ia64": return new Platform(Os.WINDOWS, Arch.OTHER);
                 default: break;
             }
-            m = java.util.regex.Pattern.compile("macosx_\\d+_\\d+_(.+)").matcher(tag);
+            m = MACOSX.matcher(tag);
             if (m.matches()) {
                 String format = m.group(1);
                 return new Platform(Os.MACOS, "arm64".equals(format) ? Arch.ARM : "x86_64".equals(format) ? Arch.X86_64 :
                         "i386".equals(format) ? Arch.X86 : Arch.OTHER);
             }
-            m = java.util.regex.Pattern.compile("android_\\d+_(.+)").matcher(tag);
+            m = ANDROID.matcher(tag);
             if (m.matches()) {
                 String abi = m.group(1);
                 return new Platform(Os.ANDROID, "arm64_v8a".equals(abi) ? Arch.ARM : "x86_64".equals(abi) ? Arch.X86_64 :
                         "x86".equals(abi) ? Arch.X86 : Arch.OTHER);
             }
-            m = java.util.regex.Pattern.compile("ios_\\d+_\\d+_(.+)").matcher(tag);
+            m = IOS.matcher(tag);
             if (m.matches()) {
                 String multiarch = m.group(1);
                 return new Platform(Os.IOS, multiarch.startsWith("arm64_") ? Arch.ARM :
@@ -403,7 +421,11 @@ final class UvLockReachability {
     private void propagate(int rootIndex) {
         Deque<Node> queue = new ArrayDeque<>();
         Node root = new Node(rootIndex, null);
-        reach.put(root, new ArrayList<>(dnf(null)));
+        List<Term> seed = new ArrayList<>();
+        for (String environment : environments != null ? environments : Collections.<String>singletonList(null)) {
+            seed.addAll(dnf(environment));
+        }
+        reach.put(root, seed);
         queue.add(root);
         while (!queue.isEmpty()) {
             Node node = queue.poll();
@@ -486,23 +508,55 @@ final class UvLockReachability {
     }
 
     /** Adds the terms to the node's reachability and reports whether it grew. */
+    // a term another one already covers adds nothing, so the disjunction keeps only terms none covers
     private boolean or(Node node, List<Term> terms) {
         List<Term> existing = reach.computeIfAbsent(node, k -> new ArrayList<>());
-        Set<String> keys = new HashSet<>();
-        for (Term t : existing) {
-            keys.add(t.key());
-        }
         boolean grew = false;
         for (Term t : terms) {
-            if (keys.add(t.key())) {
-                existing.add(t);
-                grew = true;
+            boolean covered = false;
+            for (Term e : existing) {
+                if (e.key().equals(t.key()) || covers(e, t)) {
+                    covered = true;
+                    break;
+                }
             }
+            if (covered) {
+                continue;
+            }
+            existing.removeIf(e -> covers(t, e));
+            existing.add(t);
+            grew = true;
         }
         if (existing.size() > MAX_TERMS) {
             throw unsupported("a reachability marker with more than " + MAX_TERMS + " disjuncts");
         }
         return grew;
+    }
+
+    /**
+     * Whether every environment the inner term holds in, the outer one holds in too. A term with a != Python
+     * clause covers nothing, as its range stands for more than the clause admits.
+     */
+    private boolean covers(Term outer, Term inner) {
+        for (String[] clause : outer.getPythonClauses()) {
+            String[] lowered = UvLockMarkers.lowerVersionClause(clause[0], clause[1], clause[2]);
+            if (lowered == null || "!=".equals(lowered[1])) {
+                return false;
+            }
+        }
+        for (Atom atom : outer.getAtoms()) {
+            if (inner.getAtoms().stream().noneMatch(a -> a.implies(atom))) {
+                return false;
+            }
+        }
+        PyRange in = inner.range(requiresPython);
+        PyRange out = outer.range(requiresPython);
+        if (in == null) {
+            return true;
+        }
+        PyRange both = out == null ? null : out.intersect(in);
+        return both != null && Objects.equals(both.lower, in.lower) && both.lowerExclusive == in.lowerExclusive &&
+                Objects.equals(both.upper, in.upper) && both.upperInclusive == in.upperInclusive;
     }
 
     // ---- simplification
@@ -547,78 +601,37 @@ final class UvLockReachability {
     }
 
     /**
-     * The edge with its marker restricted to what the parent's reachability leaves undecided, or null
-     * when no term survives. A clause every reachable term decides goes, and a multi-term marker only
-     * survives untouched.
+     * The edge with its marker restricted by the parent's reachability, as uv-lock's
+     * {@code simplify_dependency_marker} does, or null when the edge cannot fire where the parent is reachable.
      */
     private @Nullable UvLockDependency restrict(UvLockDependency edge, List<Term> parent) {
-        List<PyRange> ranges = new ArrayList<>();
-        for (Term t : parent) {
-            PyRange r = t.range(requiresPython);
-            if (r != null) {
-                ranges.add(r);
-            }
-        }
-        if (ranges.isEmpty()) {
-            return edge;
-        }
-        List<String> kept = new ArrayList<>();
-        boolean changed = false;
-        for (Term term : dnf(edge.getMarker())) {
-            List<String> clauses = new ArrayList<>();
-            boolean falseTerm = false;
-            for (String[] c : term.getPythonClauses()) {
-                boolean allTrue = true;
-                boolean allFalse = true;
-                for (PyRange r : ranges) {
-                    Boolean truth = UvLockMarkers.clauseTruth(r, c[0], c[1], c[2]);
-                    allTrue &= Boolean.TRUE.equals(truth);
-                    allFalse &= Boolean.FALSE.equals(truth);
+        try {
+            MarkerInterner interner = new MarkerInterner();
+            MarkerTree reachable = MarkerTree.trueIn(interner).negate();
+            for (Term term : parent) {
+                MarkerTree conjunction = MarkerTree.trueIn(interner);
+                for (String[] c : term.getPythonClauses()) {
+                    conjunction = conjunction.and(MarkerTree.parse(interner, c[0] + " " + c[1] + " '" + c[2] + "'"));
                 }
-                if (allFalse) {
-                    falseTerm = true;
-                } else if (!allTrue) {
-                    clauses.add(c[0] + " " + c[1] + " '" + c[2] + "'");
+                for (Atom atom : term.getAtoms()) {
+                    conjunction = conjunction.and(MarkerTree.parse(interner, atom.toString()));
                 }
-                changed |= allTrue || allFalse;
+                reachable = reachable.or(conjunction);
             }
-            for (Atom atom : term.getAtoms()) {
-                boolean allImplied = true;
-                boolean allContradicted = true;
-                for (Term t : parent) {
-                    boolean implied = false;
-                    boolean contradicted = false;
-                    for (Atom given : t.getAtoms()) {
-                        implied |= given.implies(atom);
-                        contradicted |= given.contradicts(atom);
-                    }
-                    allImplied &= implied;
-                    allContradicted &= contradicted;
-                }
-                if (allContradicted) {
-                    falseTerm = true;
-                } else if (!allImplied) {
-                    clauses.add(atom.toString());
-                }
-                changed |= allImplied || allContradicted;
+            Ranges.Bound<PythonVersion> lower = requiresPython.lower == null ? Ranges.Bound.unbounded() :
+                    requiresPython.lowerExclusive ? Ranges.Bound.excluded(requiresPython.lower) : Ranges.Bound.included(requiresPython.lower);
+            Ranges.Bound<PythonVersion> upper = requiresPython.upper == null ? Ranges.Bound.unbounded() :
+                    requiresPython.upperInclusive ? Ranges.Bound.included(requiresPython.upper) : Ranges.Bound.excluded(requiresPython.upper);
+            MarkerTree restricted = MarkerTree.parse(interner, requireNonNull(edge.getMarker()))
+                    .simplifyPythonVersions(lower, upper)
+                    .restrict(reachable.simplifyPythonVersions(lower, upper));
+            if (restricted.isFalse()) {
+                return null;
             }
-            if (falseTerm) {
-                continue;
-            }
-            if (clauses.isEmpty()) {
-                return edge.withMarker(null);
-            }
-            kept.add(String.join(" and ", clauses));
+            String marker = restricted.tryToString();
+            return Objects.equals(marker, edge.getMarker()) ? edge : edge.withMarker(marker);
+        } catch (MarkerParser.MarkerSyntaxException e) {
+            throw unsupported("the marker \"" + edge.getMarker() + "\"");
         }
-        if (!changed) {
-            return edge;
-        }
-        if (kept.isEmpty()) {
-            return null;
-        }
-        if (kept.size() > 1) {
-            throw unsupported("the disjunction \"" + edge.getMarker() + "\" that reachability narrows");
-        }
-        return edge.withMarker(kept.get(0));
     }
 }
