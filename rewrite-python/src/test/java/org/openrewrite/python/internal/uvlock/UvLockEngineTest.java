@@ -286,17 +286,17 @@ class UvLockEngineTest {
     }
 
     @Test
-    void configuredUvReleaseRefusesChangingPreRevision3Locks() {
-        // uv 0.13.4 would rewrite the whole 0.5.0-format file in its own shape, and leaves it alone unchanged
+    void configuredUvReleaseRewritesAChangedPreRevision3LockInItsOwnShape() {
+        // uv stamps the whole file at its revision and gives every artifact, the untouched iniconfig too, its upload time
         stubPypiSix();
-        PythonExecutionContextView.view(ctx).setUvVersion("0.13.4");
+        http.route("https://pypi.org/simple/iniconfig/", resource("off1-add-leaf/http/iniconfig-listing-json"));
+        PythonExecutionContextView.view(ctx).setUvVersion("0.10.11");
         Result result = UvLockEngine.regenerate(
           resource("o-old-uv/proj-0.5.0/pyproject.toml"),
           resource("o-old-uv/proj-0.5.0/uv.lock.as-0.5.0"),
           ctx);
-        assertThat(result.isSuccess()).isFalse();
-        assertThat(result.getFailure().getReason()).isEqualTo(Reason.RESOLUTION_REQUIRED);
-        assertThat(result.getFailure().getDetail()).contains("below revision 3");
+        assertThat(result.getErrorMessage()).isNull();
+        assertThat(result.getLockFileContent()).isEqualTo(resource("o-old-uv/proj-0.5.0/uv.lock.after-change-current-uv"));
 
         Result unchanged = UvLockEngine.regenerate(
           resource("o-old-uv/proj-0.5.0/pyproject.toml").replace("six==1.16.0", "six>=1.16"),

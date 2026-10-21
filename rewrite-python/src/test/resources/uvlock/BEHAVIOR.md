@@ -94,6 +94,10 @@ that keeps `[package.metadata]` in sync with pyproject.toml passes `--check` and
   only six changed).
 - There is no way to force modernization (issue 15220 closed as not-planned).
 
+With a configured uv release (`PythonExecutionContextView.setUvVersion`) the engine does what that release does:
+a changed lock below revision 3 is written at the release's revision with every artifact's upload time from its
+index, byte for byte `uv.lock.after-change-current-uv` above. Without one it keeps the lock's own style:
+
 **Engine consequence**: a Java surgical editor must (a) detect the lock's revision (absent/2/3) and
 emit the matching style for edited entries — same-revision edits must NOT add upload-time to a
 rev-none file; and (b) accept that its output will differ from what a real `uv lock` would produce

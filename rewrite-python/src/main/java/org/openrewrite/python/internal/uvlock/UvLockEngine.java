@@ -227,6 +227,8 @@ public final class UvLockEngine {
         private final Map<String, List<String>> indexPins;
         private final Set<String> nonRegistrySources;
         private final @Nullable String uvVersion;
+        // a configured release rewrites a changed lock below revision 3 at its own revision, upload times included
+        private boolean migrating;
 
         private List<UvLockPackage> packages;
         private int rootIndex;
@@ -277,6 +279,7 @@ public final class UvLockEngine {
                         "Workspace locks ([manifest] with members) are not supported by the native engine");
             }
             Integer writeRevision = configuredRevision();
+            migrating = writeRevision != null && (lock.getRevision() == null || lock.getRevision() < 3);
             packages = new ArrayList<>(lock.getPackages());
             rootIndex = findRoot();
             UvLockPackage root = packages.get(rootIndex);
@@ -414,10 +417,9 @@ public final class UvLockEngine {
                 packages.set(rootIndex, packages.get(rootIndex).withMetadata(metadataEmpty ? null : freshMetadata));
                 updated = updated.withPackages(packages);
             }
-            if (writeRevision != null && (lock.getRevision() == null || lock.getRevision() < 3)) {
-                throw new EngineFailure(Reason.RESOLUTION_REQUIRED, null,
-                        "uv " + uvVersion + " rewrites a lock below revision 3 in its own shape, " +
-                                "which the native engine does not reproduce");
+            if (migrating) {
+                packages = withUploadTimes(packages);
+                updated = updated.withPackages(packages);
             }
             if (writesReachabilityMarkers()) {
                 if (lock.getSupportedMarkers() != null || lock.getRequiredMarkers() != null) {
@@ -443,6 +445,60 @@ public final class UvLockEngine {
                 return version != null && version.compareTo(PythonVersion.parse("0.11.25")) >= 0;
             }
             return lock.getRevision() != null && lock.getRevision() >= 3;
+        }
+
+        /** Every registry artifact without an upload time gets the one its index lists. */
+        private List<UvLockPackage> withUploadTimes(List<UvLockPackage> pkgs) {
+            List<UvLockPackage> out = new ArrayList<>(pkgs.size());
+            for (UvLockPackage pkg : pkgs) {
+                if (pkg.getSource().getType() != UvLockSource.Type.REGISTRY || !lacksUploadTime(pkg)) {
+                    out.add(pkg);
+                    continue;
+                }
+                List<String> pins = indexPins.get(pkg.getName());
+                Map<String, PackageFile> byFilename = new HashMap<>();
+                for (PackageFile file : fetchListing(pkg.getName(), pins != null ? pins.get(0) : null).listing.getFiles()) {
+                    byFilename.put(file.getFilename(), file);
+                }
+                List<UvLockArtifact> wheels = null;
+                if (pkg.getWheels() != null) {
+                    wheels = new ArrayList<>();
+                    for (UvLockArtifact wheel : pkg.getWheels()) {
+                        wheels.add(withUploadTime(pkg, wheel, byFilename));
+                    }
+                }
+                out.add(pkg.toBuilder()
+                        .sdist(pkg.getSdist() != null ? withUploadTime(pkg, pkg.getSdist(), byFilename) : null)
+                        .wheels(wheels)
+                        .build());
+            }
+            return out;
+        }
+
+        private static boolean lacksUploadTime(UvLockPackage pkg) {
+            if (pkg.getSdist() != null && pkg.getSdist().getUploadTime() == null) {
+                return true;
+            }
+            for (UvLockArtifact wheel : pkg.getWheels() != null ? pkg.getWheels() : Collections.<UvLockArtifact>emptyList()) {
+                if (wheel.getUploadTime() == null) {
+                    return true;
+                }
+            }
+            return false;
+        }
+
+        private UvLockArtifact withUploadTime(UvLockPackage pkg, UvLockArtifact artifact, Map<String, PackageFile> byFilename) {
+            if (artifact.getUploadTime() != null || artifact.getUrl() == null) {
+                return artifact;
+            }
+            PackageFile file = byFilename.get(artifact.getUrl().substring(artifact.getUrl().lastIndexOf('/') + 1));
+            String uploadTime = file != null ? formatUploadTime(file.getUploadTime()) : null;
+            if (uploadTime == null) {
+                throw new EngineFailure(Reason.RESOLUTION_REQUIRED, pkg.getName(),
+                        "uv " + uvVersion + " records an upload time for " + artifact.getUrl() +
+                                ", which the index does not list");
+            }
+            return artifact.withUploadTime(uploadTime);
         }
 
         /** The revision the configured uv release writes, 5 from 0.12.22 on and 3 before, or null without a release. */
@@ -1978,7 +2034,7 @@ public final class UvLockEngine {
                         "The index lists " + file.getFilename() +
                                 " without a sha256 digest, and it could not be downloaded to hash"));
             }
-            String uploadTime = lock.expectsUploadTime() ? formatUploadTime(file.getUploadTime()) : null;
+            String uploadTime = lock.expectsUploadTime() || migrating ? formatUploadTime(file.getUploadTime()) : null;
             return new UvLockArtifact(file.getUrl(), null, "sha256:" + sha256, file.getSize(), uploadTime);
         }
 
