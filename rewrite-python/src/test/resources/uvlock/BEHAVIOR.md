@@ -185,6 +185,14 @@ rather than guess dependencies.
   releases reqlike's `urlish<2; extra == "socks"` bound on a cascade the edit also triggers, so urlish
   moves to 2.5 rather than 1.9 (`off18-removed-extra-unbinds-cascade/`).
 
+- A declared package is bounded by its live dependents as much as by its declaration: with `other==1.0`
+  requiring `reqlike<1.5`, the edit `reqlike>=1.2` resolves to 1.4 although 2.0 is listed
+  (`off33-dependent-bound-shapes-selection/`), and `reqlike==1.5` is "unsatisfiable" rather than a reason
+  to move anything (`off32-upgrade-past-dependent-bound/`, no `.after`). The engine selects under the
+  dependents' bounds, falls back to the declaration alone when nothing satisfies both (the lockstep pair
+  in `off19`, where the dependent is the one moving), and then fails loud on any untouched dependent the
+  new version no longer satisfies.
+
 ## 9a. `[tool.uv] constraint-dependencies` (local-index scenarios, uv 0.13.4)
 
 - A constraint bounds every resolution like a requirement without adding the package, and the lock

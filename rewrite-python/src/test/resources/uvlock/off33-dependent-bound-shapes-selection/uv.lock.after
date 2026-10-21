@@ -1,0 +1,37 @@
+version = 1
+revision = 5
+requires-python = ">=3.10"
+
+[[package]]
+name = "other"
+version = "1.0"
+source = { registry = "https://index.example/simple/" }
+dependencies = [
+    { name = "reqlike" },
+]
+wheels = [
+    { url = "https://index.example/simple/other/other-1.0-py3-none-any.whl", hash = "sha256:0c7bf51a16f6783cefac397a46656a023c55c8ee65c68c5f2dca42c18b158298" },
+]
+
+[[package]]
+name = "reqlike"
+version = "1.4"
+source = { registry = "https://index.example/simple/" }
+wheels = [
+    { url = "https://index.example/simple/reqlike/reqlike-1.4-py3-none-any.whl", hash = "sha256:6229d514792af7d148d21da964599921971603695a275beae1f595e58094a261" },
+]
+
+[[package]]
+name = "s43-dependent-bound-shapes-selection"
+version = "0.1.0"
+source = { virtual = "." }
+dependencies = [
+    { name = "other" },
+    { name = "reqlike" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "other", specifier = "==1.0" },
+    { name = "reqlike", specifier = ">=1.2" },
+]

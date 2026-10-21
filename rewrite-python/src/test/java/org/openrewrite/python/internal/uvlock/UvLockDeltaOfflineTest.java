@@ -340,6 +340,26 @@ class UvLockDeltaOfflineTest {
     }
 
     @Test
+    void upgradePastADependentsBoundFailsAsConflict() {
+        // other==1.0 requires reqlike<1.5, so uv calls reqlike==1.5 unsatisfiable rather than moving it
+        routeLocalIndex("off32-upgrade-past-dependent-bound");
+        Result result = UvLockEngine.regenerate(
+          resource("off32-upgrade-past-dependent-bound/pyproject.toml"),
+          resource("off32-upgrade-past-dependent-bound/uv.lock.before"),
+          ctx);
+        assertThat(result.isSuccess()).isFalse();
+        assertThat(result.getFailure().getReason()).isEqualTo(Reason.RESOLUTION_REQUIRED);
+        assertThat(result.getFailure().getDetail()).contains("other 1.0 requires reqlike<1.5");
+    }
+
+    @Test
+    void rangeUpgradeLandsUnderTheDependentsBound() {
+        // other==1.0 requires reqlike<1.5, so reqlike>=1.2 resolves to 1.4 although 2.0 is listed
+        routeLocalIndex("off33-dependent-bound-shapes-selection");
+        assertScenario("off33-dependent-bound-shapes-selection");
+    }
+
+    @Test
     void markeredConstraintFailsLoud() {
         routeLocalIndex("off29-transitive-constraint");
         String pyproject = resource("off29-transitive-constraint/pyproject.toml")

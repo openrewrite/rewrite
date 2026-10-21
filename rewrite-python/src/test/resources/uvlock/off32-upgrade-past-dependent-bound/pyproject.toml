@@ -1,0 +1,10 @@
+[project]
+name = "s42-upgrade-past-dependent-bound"
+version = "0.1.0"
+requires-python = ">=3.10"
+dependencies = ["other==1.0", "reqlike==1.5"]
+
+[[tool.uv.index]]
+name = "local"
+url = "https://index.example/simple/"
+default = true

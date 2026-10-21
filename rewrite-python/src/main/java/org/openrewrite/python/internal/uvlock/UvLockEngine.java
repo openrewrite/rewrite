@@ -175,6 +175,8 @@ public final class UvLockEngine {
     private static final class Change {
         final String canonicalName;
         final List<PythonVersionSpecifierSet> constraints = new ArrayList<>();
+        /** What live dependents require of the package, which shapes selection but may itself be about to move. */
+        final List<PythonVersionSpecifierSet> dependentBounds = new ArrayList<>();
         @Nullable String pinnedIndexName;
         boolean indexChanged;
         /** Root edges whose declared extras changed, keyed by dev group ("" for [project] dependencies). */
@@ -350,6 +352,7 @@ public final class UvLockEngine {
                 if (!resolved.add(change.canonicalName)) {
                     continue;
                 }
+                change.dependentBounds.addAll(gatherConstraints(change.canonicalName));
                 if (applyChange(change)) {
                     rewritten.add(change.canonicalName);
                     structural = true;
@@ -391,6 +394,7 @@ public final class UvLockEngine {
             if (structural) {
                 dropUnreachable();
             }
+            verifyDependents(rewritten);
             if (pythonChanged && lowerBoundIncreased()) {
                 validatePinsAgainstPython(rewritten);
             }
@@ -961,7 +965,7 @@ public final class UvLockEngine {
                         "Rewriting entries served from a flat index is not supported by the native engine");
             }
             Map<PythonVersion, List<PackageFile>> byVersion = groupByVersion(listing.listing, change.canonicalName);
-            PythonVersion selected = selectVersion(byVersion, change, pinned);
+            PythonVersion selected = selectUnderDependents(byVersion, change, pinned);
             if (selected == null) {
                 throw new EngineFailure(new Failure(Reason.RESOLUTION_CONFLICT, change.canonicalName,
                         listing.index.getIndex().getUrl(),
@@ -1009,6 +1013,81 @@ public final class UvLockEngine {
                     .sdist(sdistFile != null ? toArtifact(change.canonicalName, listing.index, sdistFile) : null)
                     .wheels(wheels.isEmpty() ? null : wheels)
                     .build();
+        }
+
+        /**
+         * Selects under the dependents' bounds as well, so a range edit lands where uv lands it. When
+         * nothing satisfies both, the dependents may be the ones about to move (a lockstep pair), so
+         * the declaration alone decides and {@link #verifyDependents} judges the outcome afterwards.
+         */
+        private @Nullable PythonVersion selectUnderDependents(Map<PythonVersion, List<PackageFile>> byVersion,
+                                                              Change change, @Nullable PythonVersion pinned) {
+            if (change.dependentBounds.isEmpty()) {
+                return selectVersion(byVersion, change, pinned);
+            }
+            List<PythonVersionSpecifierSet> declared = new ArrayList<>(change.constraints);
+            change.constraints.addAll(change.dependentBounds);
+            PythonVersion selected = selectVersion(byVersion, change, pinned);
+            change.constraints.clear();
+            change.constraints.addAll(declared);
+            return selected != null ? selected : selectVersion(byVersion, change, pinned);
+        }
+
+        /**
+         * Every live dependent this run left alone must still admit the version its target moved to.
+         * uv would revise that dependent or fail, and the greedy engine does neither.
+         */
+        private void verifyDependents(Set<String> rewritten) {
+            Map<String, Set<String>> live = liveExtras();
+            for (String name : rewritten) {
+                int index = findSinglePackage(name);
+                if (index < 0) {
+                    continue;
+                }
+                PythonVersion version = PythonVersion.parse(packages.get(index).getVersion());
+                if (version == null) {
+                    continue;
+                }
+                forEachDependentRequirement(name, live, (dependent, raw, requirement) -> {
+                    if (!rewritten.contains(dependent.getName()) && requirement.getSpecifiers() != null &&
+                            !requirement.getSpecifiers().contains(version, true)) {
+                        throw new EngineFailure(Reason.RESOLUTION_REQUIRED, name,
+                                dependent.getName() + " " + dependent.getVersion() + " requires " + raw + ", which " +
+                                        name + " " + version + " does not satisfy; uv would revise " + dependent.getName() +
+                                        " or fail, and the native engine does neither");
+                    }
+                });
+            }
+        }
+
+        private interface RequirementVisitor {
+            void visit(UvLockPackage dependent, String raw, Pep508Requirement requirement);
+        }
+
+        // every requirement a live registry dependent places on target and whose marker can fire
+        private void forEachDependentRequirement(String target, Map<String, Set<String>> live, RequirementVisitor visitor) {
+            for (UvLockPackage q : packages) {
+                if (q.getSource().getType() != UvLockSource.Type.REGISTRY || !live.containsKey(q.getName()) ||
+                        !dependsOn(q, target)) {
+                    continue;
+                }
+                CoreMetadata meta = metadataFor(q);
+                if (meta == null) {
+                    continue;
+                }
+                for (String raw : meta.getRequiresDist()) {
+                    Pep508Requirement req = Pep508Requirement.parse(raw);
+                    if (req == null || !req.getCanonicalName().equals(target)) {
+                        continue;
+                    }
+                    int semi = raw.indexOf(';');
+                    String rawMarker = req.getMarker() != null && semi >= 0 ? raw.substring(semi + 1).trim() : null;
+                    if (rawMarker != null && !requirementCanFire(q, rawMarker, live)) {
+                        continue;
+                    }
+                    visitor.visit(q, raw, req);
+                }
+            }
         }
 
         /**
@@ -1074,31 +1153,12 @@ public final class UvLockEngine {
         private List<PythonVersionSpecifierSet> gatherConstraints(String target) {
             List<PythonVersionSpecifierSet> constraints = new ArrayList<>();
             Map<String, Set<String>> live = liveExtras();
-            for (UvLockPackage q : packages) {
-                if (q.getSource().getType() != UvLockSource.Type.REGISTRY || !live.containsKey(q.getName()) ||
-                        !dependsOn(q, target)) {
-                    continue;
+            forEachDependentRequirement(target, live, (dependent, raw, req) -> {
+                PythonVersionSpecifierSet specs = req.getSpecifiers();
+                if (specs != null && !specs.isMatchAll()) {
+                    constraints.add(specs);
                 }
-                CoreMetadata meta = metadataFor(q);
-                if (meta == null) {
-                    continue;
-                }
-                for (String raw : meta.getRequiresDist()) {
-                    Pep508Requirement req = Pep508Requirement.parse(raw);
-                    if (req == null || !req.getCanonicalName().equals(target)) {
-                        continue;
-                    }
-                    int semi = raw.indexOf(';');
-                    String rawMarker = req.getMarker() != null && semi >= 0 ? raw.substring(semi + 1).trim() : null;
-                    if (rawMarker != null && !requirementCanFire(q, rawMarker, live)) {
-                        continue;
-                    }
-                    PythonVersionSpecifierSet specs = req.getSpecifiers();
-                    if (specs != null && !specs.isMatchAll()) {
-                        constraints.add(specs);
-                    }
-                }
-            }
+            });
             PythonVersionSpecifierSet constraint = constraintSpecifiers(target);
             if (constraint != null) {
                 constraints.add(constraint);
