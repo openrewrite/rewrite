@@ -34,7 +34,11 @@ import java.util.Map;
 public class UvLockPackage {
 
     String name;
+
+    /** Absent for a virtual, editable or directory project whose version is dynamic. */
+    @Nullable
     String version;
+
     UvLockSource source;
 
     /**

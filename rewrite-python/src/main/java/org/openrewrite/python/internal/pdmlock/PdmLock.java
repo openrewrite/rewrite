@@ -22,7 +22,7 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * Typed document model of a pdm.lock file (lock_version 4.5.0). Values are stored as read;
+ * Typed document model of a pdm.lock file (lock_version 4.5.0 or 4.5.1). Values are stored as read;
  * {@link PdmLockWriter} re-emits without reformatting.
  */
 @Value

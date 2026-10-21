@@ -13,9 +13,9 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-// brace-expansion 1.1.11, 5.0.6 and 5.0.9 for upstream-calls.js: expand. A 5.x release's tests import its build, which
-// is the copy npm bundles (5.0.6 in npm 11.17.0, 5.0.9 in npm 11.19.1): BRACE_EXPANSION_5 names that package's
-// directory.
+// brace-expansion 1.1.11, 5.0.6, 5.0.9 and 5.0.12 for upstream-calls.js: expand. A 5.x release's tests import its
+// build, which is the copy npm bundles (5.0.6 in npm 11.17.0, 5.0.9 in npm 11.19.1, 5.0.12 in npm 11.21.1).
+// BRACE_EXPANSION_5 names that package's directory.
 const fs = require('fs')
 const path = require('path')
 

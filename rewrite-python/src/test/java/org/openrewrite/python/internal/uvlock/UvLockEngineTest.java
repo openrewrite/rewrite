@@ -46,7 +46,7 @@ import static org.openrewrite.python.internal.uvlock.UvLockFixtures.resource;
 /**
  * Golden scenarios replay uv 0.10.11 runs against pypi.org (see the fixture README):
  * the engine's output for the same edit must be byte-identical to what real uv wrote.
- * Recorded index/metadata responses under {@code /uvlock/http/} keep the tests offline.
+ * Recorded index/metadata responses under {@code /lock/uv/http/} keep the tests offline.
  */
 class UvLockEngineTest {
 
@@ -283,6 +283,27 @@ class UvLockEngineTest {
           ctx);
         assertThat(result.getErrorMessage()).isNull();
         assertThat(result.getLockFileContent()).isEqualTo(resource("o-old-uv/proj-0.5.0/uv.lock.engine-edited"));
+    }
+
+    @Test
+    void configuredUvReleaseRefusesChangingPreRevision3Locks() {
+        // uv 0.13.4 would rewrite the whole 0.5.0-format file in its own shape, and leaves it alone unchanged
+        stubPypiSix();
+        PythonExecutionContextView.view(ctx).setUvVersion("0.13.4");
+        Result result = UvLockEngine.regenerate(
+          resource("o-old-uv/proj-0.5.0/pyproject.toml"),
+          resource("o-old-uv/proj-0.5.0/uv.lock.as-0.5.0"),
+          ctx);
+        assertThat(result.isSuccess()).isFalse();
+        assertThat(result.getFailure().getReason()).isEqualTo(Reason.RESOLUTION_REQUIRED);
+        assertThat(result.getFailure().getDetail()).contains("below revision 3");
+
+        Result unchanged = UvLockEngine.regenerate(
+          resource("o-old-uv/proj-0.5.0/pyproject.toml").replace("six==1.16.0", "six>=1.16"),
+          resource("o-old-uv/proj-0.5.0/uv.lock.as-0.5.0"),
+          ctx);
+        assertThat(unchanged.getErrorMessage()).isNull();
+        assertThat(unchanged.getLockFileContent()).isEqualTo(resource("o-old-uv/proj-0.5.0/uv.lock.as-0.5.0"));
     }
 
     // ---- structured failures ----
@@ -848,6 +869,19 @@ class UvLockEngineTest {
         // declared unsorted [zeta, alpha]; the recorded edge sorts them
         assertThat(result.getLockFileContent())
           .contains("{ name = \"target\", extra = [\"alpha\", \"zeta\"] }");
+    }
+
+    @Test
+    void relativeExcludeNewerReachesItsGate() {
+        // the fixture's [options] carries uv's commented sentinel line for a relative exclude-newer
+        Result result = UvLockEngine.regenerate(
+          resource("m4-exclude-newer-span/pyproject.toml").replace("six==1.16.0", "six==1.17.0"),
+          resource("m4-exclude-newer-span/uv.lock"),
+          ctx);
+        assertThat(result.isSuccess()).isFalse();
+        assertThat(result.getFailure().getReason()).isEqualTo(Reason.RESOLUTION_REQUIRED);
+        assertThat(result.getFailure().getDetail()).contains("exclude-newer");
+        assertThat(http.requests).isEmpty();
     }
 
     // ---- lazy wheel metadata: listing advertises no PEP 658 sidecar ----
