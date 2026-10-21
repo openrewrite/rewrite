@@ -140,7 +140,7 @@ public class GradleDependency implements Trait<J.MethodInvocation> {
     ResolvedDependency resolvedDependency;
 
     /**
-     * Like {@link #getResolvedDependency()}, but with its transitive dependencies populated. When a recipe has marked
+     * Like {@code getResolvedDependency()}, but with its transitive dependencies populated. When a recipe has marked
      * the configuration for re-resolution, the matcher resolves it with
      * {@link GradleDependencyConfiguration#getDirectResolvedShallow()}, which leaves them empty.
      */
