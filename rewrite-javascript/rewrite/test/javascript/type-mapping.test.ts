@@ -2764,6 +2764,34 @@ describe('JavaScript type mapping', () => {
             );
         });
 
+        test.each([
+            ['javascript', javascript],
+            ['typescript', typescript]
+        ])('a rest element, a nested pattern or a let bound from a require() binds no export in %s', async (_, source) => {
+            const spec = new RecipeSpec();
+            spec.recipe = markTypes((node) => {
+                if (node?.kind === J.Kind.Identifier && ['delimiter', 'rest', 'sep'].includes((node as J.Identifier).simpleName)) {
+                    const fieldType = (node as J.Identifier).fieldType;
+                    return fieldType?.owner ?
+                        `${Type.FullyQualified.getFullyQualifiedName(fieldType.owner)}#${fieldType.name}` : null;
+                }
+                return null;
+            });
+
+            await spec.rewriteRun(
+                source(
+                    `
+                        let {delimiter} = require('node:path');
+                        const {...rest} = require('node:path');
+                        const {posix: {sep}} = require('node:path');
+                        delimiter.length;
+                        rest.delimiter;
+                        sep.length;
+                    `
+                )
+            );
+        });
+
         test('every spelling of a callable module\'s member attributes to its namespace, as a static', async () => {
             const spec = new RecipeSpec();
             spec.recipe = markTypes((node, type) => {
