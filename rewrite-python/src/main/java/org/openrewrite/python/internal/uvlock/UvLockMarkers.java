@@ -102,8 +102,9 @@ final class UvLockMarkers {
             }
             mapped.addAll(extra);
         }
-        // stable sort: uv orders and-chains alphabetically by variable
-        mapped.sort(Comparator.comparing(a -> a[0]));
+        // uv prints python_full_version clauses first, the other variables by name, and extra last
+        mapped.sort(Comparator.<String[]>comparingInt(a -> "python_full_version".equals(a[0]) ? 0 : "extra".equals(a[0]) ? 2 : 1)
+                .thenComparing(a -> a[0]));
         List<String> parts = new ArrayList<>(mapped.size());
         for (String[] clause : mapped) {
             parts.add(clause[0] + " " + clause[1] + " '" + clause[2] + "'");

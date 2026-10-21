@@ -39,6 +39,15 @@ class UvLockMarkersTest {
     }
 
     @Test
+    void clausesRecordWithPythonFirstAndExtrasLast() {
+        // uv 0.13.4 prints python_full_version first, the other variables by name, and extra last
+        assertThat(UvLockMarkers.recordMarker(
+          "sys_platform == 'linux' and platform_machine == 'x86_64' and python_full_version < '3.13' and os_name == 'posix'",
+          "extra == 'cli'"))
+          .isEqualTo("python_full_version < '3.13' and os_name == 'posix' and platform_machine == 'x86_64' and sys_platform == 'linux' and extra == 'cli'");
+    }
+
+    @Test
     void parenthesizedConjunctionInsideATermFlattens() {
         assertThat(UvLockMarkers.parseDisjunction("(python_version >= '3.11' and sys_platform != 'win32') and extra == 'dev'"))
           .singleElement()
