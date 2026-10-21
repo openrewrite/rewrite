@@ -913,13 +913,8 @@ public class GradleDependency implements Trait<J.MethodInvocation> {
         } else if (m.getArguments().get(0) instanceof G.MapLiteral) {
             updated = m.withArguments(ListUtils.mapFirst(m.getArguments(), arg -> {
                 G.MapLiteral mapLiteral = (G.MapLiteral) arg;
-                return mapLiteral.withElements(ListUtils.map(mapLiteral.getElements(), entry -> {
-                    if (entry.getKey() instanceof J.Literal && "version".equals(((J.Literal) entry.getKey()).getValue())) {
-                        //noinspection DataFlowIssue
-                        return null;
-                    }
-                    return entry;
-                }));
+                return mapLiteral.withElements(ListUtils.filter(mapLiteral.getElements(), entry ->
+                  !(entry.getKey() instanceof J.Literal && "version".equals(((J.Literal) entry.getKey()).getValue()))));
             }));
         } else if (m.getArguments().get(0) instanceof G.MapEntry) {
             updated = m.withArguments(ListUtils.map(m.getArguments(), arg -> {

@@ -593,12 +593,8 @@ public class UpdateGradleWrapper extends ScanningRecipe<UpdateGradleWrapper.Grad
                 List<Properties.Content> contentList = ListUtils.concat(((Properties.File) p).getContent(), entry);
                 p = ((Properties.File) p).withContent(contentList);
             } else if (!checksumKey.isEmpty() && checksum == null) {
-                List<Properties.Content> contentList = ListUtils.map(((Properties.File) p).getContent(), c -> {
-                    if (c instanceof Properties.Entry && DISTRIBUTION_SHA_256_SUM_KEY.equals(((Properties.Entry) c).getKey())) {
-                        return null;
-                    }
-                    return c;
-                });
+                List<Properties.Content> contentList = ListUtils.filter(((Properties.File) p).getContent(), c ->
+                  !(c instanceof Properties.Entry && DISTRIBUTION_SHA_256_SUM_KEY.equals(((Properties.Entry) c).getKey())));
                 p = ((Properties.File) p).withContent(contentList);
             }
             return p;

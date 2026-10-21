@@ -180,7 +180,7 @@ public class ChangeDependencyClassifier extends Recipe {
                     } else {
                         G.MapEntry finalClassifier = classifierEntry;
                         if (newClassifier == null) {
-                            m = m.withArguments(ListUtils.map(m.getArguments(), arg -> arg == finalClassifier ? null : arg));
+                            m = m.withArguments(ListUtils.filter(m.getArguments(), arg -> arg != finalClassifier));
                         } else {
                             m = m.withArguments(ListUtils.map(m.getArguments(), arg -> {
                                 if (arg == finalClassifier) {
@@ -245,7 +245,7 @@ public class ChangeDependencyClassifier extends Recipe {
                         if (newClassifier == null) {
                             m = m.withArguments(ListUtils.mapFirst(m.getArguments(), arg -> {
                                 G.MapLiteral mapLiteral = (G.MapLiteral) arg;
-                                return mapLiteral.withElements(ListUtils.map(mapLiteral.getElements(), e -> e == finalClassifier ? null : e));
+                                return mapLiteral.withElements(ListUtils.filter(mapLiteral.getElements(), e -> e != finalClassifier));
                             }));
                         } else {
                             m = m.withArguments(ListUtils.mapFirst(m.getArguments(), arg -> {

@@ -163,9 +163,9 @@ public class ResolvedPom {
     public ResolvedPom deduplicate() {
         Set<UniqueDependencyKey> uniqueDependencies = new LinkedHashSet<>(dependencyManagement.size());
         //noinspection DataFlowIssue
-        requestedDependencies = ListUtils.map(requestedDependencies,
+        requestedDependencies = ListUtils.filter(requestedDependencies,
                 d -> uniqueDependencies.add(
-                        new UniqueDependencyKey(d.getGav(), d.getType(), d.getClassifier(), d.getScope())) ? d : null);
+                        new UniqueDependencyKey(d.getGav(), d.getType(), d.getClassifier(), d.getScope())));
         return this;
     }
 
