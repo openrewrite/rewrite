@@ -403,9 +403,23 @@ public final class UvLockEngine {
 
             updated = updated.withPackages(packages);
             String written = UvLockWriter.write(updated);
-            // uv restamps a lock it changed with its own revision and leaves an unchanged one as it is
-            if (writeRevision != null && !writeRevision.equals(lock.getRevision()) &&
-                    !written.equals(UvLockWriter.write(lock))) {
+            String original = UvLockWriter.write(lock);
+            if (written.equals(original)) {
+                return Result.success(written);
+            }
+            // a changed lock is written as a release from 0.11.25 on, which rewrites every edge marker under
+            // its parent's reachability. A revisionless or revision 1 and 2 lock keeps its own style.
+            if (lock.getRevision() != null && lock.getRevision() >= 3) {
+                if (lock.getSupportedMarkers() != null || lock.getRequiredMarkers() != null) {
+                    throw new EngineFailure(Reason.RESOLUTION_REQUIRED, null,
+                            "Changing a lock with restricted environments ([tool.uv] environments / " +
+                                    "required-environments) is not supported by the native engine");
+                }
+                updated = updated.withPackages(UvLockReachability.simplify(packages, rootIndex, range));
+                written = UvLockWriter.write(updated);
+            }
+            // uv restamps a lock it changed with its own revision
+            if (writeRevision != null && !writeRevision.equals(lock.getRevision())) {
                 written = UvLockWriter.write(updated.withRevision(writeRevision));
             }
             return Result.success(written);

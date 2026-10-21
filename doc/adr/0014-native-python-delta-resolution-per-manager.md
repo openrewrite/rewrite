@@ -184,9 +184,10 @@ UpgradeTransitiveDependencyVersion edit, which the engine had silently ignored),
 its live dependents (a wrong-lock path), `[options.exclude-newer-package]` and `[manifest] build-constraints`
 read through, and `requires-python = "==3.X.*"` parsed with its real ceiling (wheel filtering, marker dropping).
 Writing as uv 0.13.4, 26 of the 29 corpus edits both tools performed were byte-identical before the last four
-of those landed; the residue is marker re-simplification on forked locks (uv 0.11.25+ drops edge markers its
-parent's reachability implies), a relative `exclude-newer` (time-dependent by construction), and recorded marker
-forms outside the catalogued subset.
+of those landed. Marker re-simplification under parent reachability (uv 0.11.25+) is reproduced for python
+clauses and equality atoms on any changed lock, with named refusals outside that algebra. The residue is a
+relative `exclude-newer` (time-dependent by construction) and recorded marker forms outside the catalogued
+subset.
 
 ### Poetry 2.4.1
 

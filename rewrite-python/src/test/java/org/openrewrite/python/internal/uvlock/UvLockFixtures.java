@@ -151,6 +151,8 @@ final class UvLockFixtures {
       "off35-exact-minor-wheel-filter/uv.lock.before",
       "off36-exact-minor-marker-drop/uv.lock.after",
       "off36-exact-minor-marker-drop/uv.lock.before",
+      "off37-parent-reachability-markers/uv.lock.after",
+      "off37-parent-reachability-markers/uv.lock.before",
       "off2-add-closure/uv.lock.after",
       "off2-add-closure/uv.lock.before",
       "off3-cascade-flake8/uv.lock.after",

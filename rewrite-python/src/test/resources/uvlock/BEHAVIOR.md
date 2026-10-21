@@ -75,6 +75,14 @@ that keeps `[package.metadata]` in sync with pyproject.toml passes `--check` and
   (`off17-python-upper-bound-marker/`). Every corpus lock with such a lower-bound edge records
   `resolution-markers`.
 
+- Since 0.11.25 uv restricts every edge marker by the marker under which its parent is reachable (the union
+  over all paths of the edge markers along them): inside the `aiofileish` entry forked at `< '3.11'` the edge
+  `caioish; python_full_version < '3.11'` loses its marker, and `zippish; python_full_version < '3.12'` under an
+  `importlibish` only reachable below 3.12 does too. A lock written by 0.10.11 still carries them, and any
+  change relocked by 0.13.4 rewrites them all (`off37-parent-reachability-markers/`, before by 0.10.11). The
+  engine applies the same pass to a changed revision-3-or-later lock and fails loud on marker shapes outside
+  python clauses and equality atoms, on a disjunction the pass would narrow, and on restricted environments.
+
 ## 5. Lockfile revision migration
 
 - Current uv **preserves** old-format locks as long as nothing must change: `--check` passes and

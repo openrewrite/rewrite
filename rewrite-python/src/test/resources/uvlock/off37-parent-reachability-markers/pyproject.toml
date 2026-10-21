@@ -1,0 +1,15 @@
+[project]
+name = "s48-parent-reachability-markers"
+version = "0.1.0"
+requires-python = ">=3.10"
+dependencies = [
+    "aiofileish==1.0; python_version < '3.11'",
+    "aiofileish==2.0; python_version >= '3.11'",
+    "importlibish==1.0; python_version < '3.12'",
+    "keeper==1.0",
+]
+
+[[tool.uv.index]]
+name = "local"
+url = "https://index.example/simple/"
+default = true

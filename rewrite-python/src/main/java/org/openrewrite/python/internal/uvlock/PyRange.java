@@ -111,6 +111,32 @@ final class PyRange {
         return PythonVersion.parse(b.toString());
     }
 
+    /** The versions in both ranges, or null when there are none. */
+    @Nullable PyRange intersect(PyRange other) {
+        PyRange r = new PyRange();
+        if (lower == null || (other.lower != null && other.lower.compareTo(lower) > 0)) {
+            r.lower = other.lower;
+            r.lowerExclusive = other.lowerExclusive;
+        } else {
+            r.lower = lower;
+            r.lowerExclusive = lowerExclusive || (other.lower != null && other.lower.compareTo(lower) == 0 && other.lowerExclusive);
+        }
+        if (upper == null || (other.upper != null && other.upper.compareTo(upper) < 0)) {
+            r.upper = other.upper;
+            r.upperInclusive = other.upperInclusive;
+        } else {
+            r.upper = upper;
+            r.upperInclusive = upperInclusive && (other.upper == null || other.upper.compareTo(upper) != 0 || other.upperInclusive);
+        }
+        if (r.lower != null && r.upper != null) {
+            int cmp = r.lower.compareTo(r.upper);
+            if (cmp > 0 || (cmp == 0 && (r.lowerExclusive || !r.upperInclusive))) {
+                return null;
+            }
+        }
+        return r;
+    }
+
     boolean withinUpperBound(PythonVersion version) {
         if (upper == null) {
             return true;

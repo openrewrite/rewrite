@@ -1,0 +1,89 @@
+version = 1
+revision = 5
+requires-python = ">=3.10"
+resolution-markers = [
+    "python_full_version >= '3.11'",
+    "python_full_version < '3.11'",
+]
+
+[[package]]
+name = "aiofileish"
+version = "1.0"
+source = { registry = "https://index.example/simple/" }
+resolution-markers = [
+    "python_full_version < '3.11'",
+]
+dependencies = [
+    { name = "caioish" },
+]
+wheels = [
+    { url = "https://index.example/simple/aiofileish/aiofileish-1.0-py3-none-any.whl", hash = "sha256:f390c3a9c49a93131b7af35f75a70f10e831e59593e6f860d521e12b80956c5d" },
+]
+
+[[package]]
+name = "aiofileish"
+version = "2.0"
+source = { registry = "https://index.example/simple/" }
+resolution-markers = [
+    "python_full_version >= '3.11'",
+]
+dependencies = [
+    { name = "caioish" },
+]
+wheels = [
+    { url = "https://index.example/simple/aiofileish/aiofileish-2.0-py3-none-any.whl", hash = "sha256:4ead40de9f691941f0d9ef74da8c212eb898f8e4dd4cb45e816e3d3dee40d813" },
+]
+
+[[package]]
+name = "caioish"
+version = "1.0"
+source = { registry = "https://index.example/simple/" }
+wheels = [
+    { url = "https://index.example/simple/caioish/caioish-1.0-py3-none-any.whl", hash = "sha256:ca5fa0806a2106f36965c506118ff65fc03d58dbdec5fa38eb9d5ff3f2402086" },
+]
+
+[[package]]
+name = "importlibish"
+version = "1.0"
+source = { registry = "https://index.example/simple/" }
+dependencies = [
+    { name = "zippish" },
+]
+wheels = [
+    { url = "https://index.example/simple/importlibish/importlibish-1.0-py3-none-any.whl", hash = "sha256:5bc0b18782bc546251c1e667f6003f447c85db4c585be724a135eeb713b0d16d" },
+]
+
+[[package]]
+name = "keeper"
+version = "1.0"
+source = { registry = "https://index.example/simple/" }
+wheels = [
+    { url = "https://index.example/simple/keeper/keeper-1.0-py3-none-any.whl", hash = "sha256:69b5705b9b71e898cd067240f4801725481689cec4f78cd9f2655947fac7ecc3" },
+]
+
+[[package]]
+name = "s48-parent-reachability-markers"
+version = "0.1.0"
+source = { virtual = "." }
+dependencies = [
+    { name = "aiofileish", version = "1.0", source = { registry = "https://index.example/simple/" }, marker = "python_full_version < '3.11'" },
+    { name = "aiofileish", version = "2.0", source = { registry = "https://index.example/simple/" }, marker = "python_full_version >= '3.11'" },
+    { name = "importlibish", marker = "python_full_version < '3.12'" },
+    { name = "keeper" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "aiofileish", marker = "python_full_version < '3.11'", specifier = "==1.0" },
+    { name = "aiofileish", marker = "python_full_version >= '3.11'", specifier = "==2.0" },
+    { name = "importlibish", marker = "python_full_version < '3.12'", specifier = "==1.0" },
+    { name = "keeper", specifier = "==1.0" },
+]
+
+[[package]]
+name = "zippish"
+version = "1.0"
+source = { registry = "https://index.example/simple/" }
+wheels = [
+    { url = "https://index.example/simple/zippish/zippish-1.0-py3-none-any.whl", hash = "sha256:70126b64356c576a25b653e4f854e1ac69e2cba3bf486f991e135f16a0da3155" },
+]

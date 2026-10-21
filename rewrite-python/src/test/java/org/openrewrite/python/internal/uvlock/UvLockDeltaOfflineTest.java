@@ -397,6 +397,14 @@ class UvLockDeltaOfflineTest {
     }
 
     @Test
+    void anyChangeDropsEdgeMarkersTheParentsReachabilityImplies() {
+        // a uv 0.10.11 lock: 0.13.4 drops caioish's fork markers and zippish's inherited python bound on any relock
+        PythonExecutionContextView.view(ctx).setUvVersion("0.13.4");
+        routeLocalIndex("off37-parent-reachability-markers");
+        assertScenario("off37-parent-reachability-markers");
+    }
+
+    @Test
     void markeredConstraintFailsLoud() {
         routeLocalIndex("off29-transitive-constraint");
         String pyproject = resource("off29-transitive-constraint/pyproject.toml")
