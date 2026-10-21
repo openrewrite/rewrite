@@ -2710,6 +2710,56 @@ describe('JavaScript type mapping', () => {
             );
         });
 
+        test.each([
+            ['javascript', javascript],
+            ['typescript', typescript]
+        ])('a member bound from a require() attributes like a named import in %s', async (_, source) => {
+            const spec = new RecipeSpec();
+            spec.recipe = markTypes((node, type) => {
+                if (node?.kind === J.Kind.Identifier && ['delimiter', 'separator'].includes((node as J.Identifier).simpleName)) {
+                    const fieldType = (node as J.Identifier).fieldType;
+                    return fieldType?.owner ?
+                        `${Type.FullyQualified.getFullyQualifiedName(fieldType.owner)}#${fieldType.name}` : null;
+                }
+                return declaringTypeAndName(node, type);
+            });
+
+            await spec.rewriteRun(
+                source(
+                    `
+                        const a = require('node:fs');
+                        const {truncateSync} = require('node:fs');
+                        const {truncateSync: renamed} = require('node:fs');
+                        const viaProp = require('node:fs').truncateSync;
+                        const {delimiter} = require('node:path');
+                        const {sep: separator} = require('path');
+                        a.truncateSync(1);
+                        truncateSync(1);
+                        renamed(1);
+                        viaProp(1);
+                        delimiter.length;
+                        separator.length;
+                    `,
+                    //@formatter:off
+                    `
+                        const a = require('node:fs');
+                        const {truncateSync} = require('node:fs');
+                        const {truncateSync: renamed} = require('node:fs');
+                        const viaProp = require('node:fs').truncateSync;
+                        const {/*~~(path#delimiter)~~>*/delimiter} = require('node:path');
+                        const {sep: /*~~(path#sep)~~>*/separator} = require('path');
+                        /*~~(fs#truncateSync)~~>*/a.truncateSync(1);
+                        /*~~(fs#truncateSync)~~>*/truncateSync(1);
+                        /*~~(fs#truncateSync)~~>*/renamed(1);
+                        /*~~(fs#truncateSync)~~>*/viaProp(1);
+                        /*~~(path#delimiter)~~>*/delimiter.length;
+                        /*~~(path#sep)~~>*/separator.length;
+                    `
+                    //@formatter:on
+                )
+            );
+        });
+
         test('every spelling of a callable module\'s member attributes to its namespace, as a static', async () => {
             const spec = new RecipeSpec();
             spec.recipe = markTypes((node, type) => {
@@ -2903,6 +2953,54 @@ describe('JavaScript type mapping', () => {
                                 /*~~(fs-extra#readFile)~~>*/fse.readFile('a');
                                 /*~~(fs-extra#remove)~~>*/remove('b');
                                 /*~~(fs-extra#copy)~~>*/ns.copy('a', 'b');
+                            `
+                            //@formatter:on
+                        ),
+                        //language=json
+                        packageJson(
+                            `
+                              {
+                                "name": "test-project",
+                                "version": "1.0.0",
+                                "dependencies": {
+                                  "fs-extra": "^11"
+                                }
+                              }
+                            `
+                        )
+                    )
+                );
+            }, {unsafeCleanup: true});
+        });
+
+        test('members bound from a require() of a package without type declarations attribute to the package', async () => {
+            const spec = new RecipeSpec();
+            spec.recipe = markTypes(declaringTypeAndName);
+
+            await withDir(async (repo) => {
+                await spec.rewriteRun(
+                    npm(
+                        repo.path,
+                        //language=javascript
+                        javascript(
+                            `
+                                const {remove} = require('fs-extra');
+                                const {copy: cp} = require('fs-extra');
+                                const ensureDir = require('fs-extra').ensureDir;
+
+                                remove('a');
+                                cp('a', 'b');
+                                ensureDir('c');
+                            `,
+                            //@formatter:off
+                            `
+                                const {remove} = require('fs-extra');
+                                const {copy: cp} = require('fs-extra');
+                                const ensureDir = require('fs-extra').ensureDir;
+
+                                /*~~(fs-extra#remove)~~>*/remove('a');
+                                /*~~(fs-extra#copy)~~>*/cp('a', 'b');
+                                /*~~(fs-extra#ensureDir)~~>*/ensureDir('c');
                             `
                             //@formatter:on
                         ),

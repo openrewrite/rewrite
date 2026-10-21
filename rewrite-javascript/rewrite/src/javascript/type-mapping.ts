@@ -609,9 +609,10 @@ export class JavaScriptTypeMapping {
         let ownerType: Type | undefined;
 
         // Check if the variable is imported
-        if (symbol.flags & ts.SymbolFlags.Alias) {
+        const requiredMember = this.requiredMember(symbol.declarations?.[0]);
+        if (symbol.flags & ts.SymbolFlags.Alias || requiredMember) {
             // For imported variables, find the module specifier
-            const moduleSpecifier = this.importedModule(symbol.declarations?.[0]);
+            const moduleSpecifier = this.importedModule(symbol.declarations?.[0]) ?? requiredMember?.module;
             if (moduleSpecifier) {
                 ownerType = {
                     kind: Type.Kind.Class,
@@ -677,7 +678,7 @@ export class JavaScriptTypeMapping {
         const variable = {
             kind: Type.Kind.Variable,
             flags: 0,
-            name: actualSymbol.getName(),
+            name: requiredMember?.exportName ?? actualSymbol.getName(),
             owner: ownerType,
             type: mappedType,
             annotations: [],
@@ -736,6 +737,10 @@ export class JavaScriptTypeMapping {
         if (!declaration) {
             return undefined;
         }
+        const required = this.requiredMember(declaration);
+        if (required) {
+            return {module: required.module, namespace: false, exportName: required.exportName};
+        }
         const module = this.importedModule(declaration);
         if (!module) {
             return undefined;
@@ -763,6 +768,31 @@ export class JavaScriptTypeMapping {
         }
         const binding = this.importBinding(node);
         return binding && binding.exportName === undefined ? binding.module : undefined;
+    }
+
+    /**
+     * The module and export a `const` binds from a `require()` result, as in `const {x} = require('m')`,
+     * `const {x: y} = require('m')` or `const y = require('m').x`. Read from the syntax, since in a
+     * TypeScript file `require` returns `any`. A nested destructuring pattern binds no export.
+     */
+    private requiredMember(declaration: ts.Node | undefined): { module: string, exportName: string } | undefined {
+        if (!declaration || !(ts.getCombinedNodeFlags(declaration) & ts.NodeFlags.Const)) {
+            return undefined;
+        }
+        if (ts.isBindingElement(declaration) && !declaration.dotDotDotToken &&
+            ts.isObjectBindingPattern(declaration.parent) && ts.isVariableDeclaration(declaration.parent.parent) &&
+            declaration.parent.parent.initializer) {
+            const module = this.requiredModuleSpecifier(declaration.parent.parent.initializer);
+            const property = declaration.propertyName ?? declaration.name;
+            return module && (ts.isIdentifier(property) || ts.isStringLiteral(property)) ?
+                {module, exportName: property.text} : undefined;
+        }
+        if (ts.isVariableDeclaration(declaration) && declaration.initializer &&
+            ts.isPropertyAccessExpression(declaration.initializer) && ts.isIdentifier(declaration.initializer.name)) {
+            const module = this.requiredModuleSpecifier(declaration.initializer.expression);
+            return module ? {module, exportName: declaration.initializer.name.text} : undefined;
+        }
+        return undefined;
     }
 
     /**
@@ -1171,6 +1201,7 @@ export class JavaScriptTypeMapping {
                             moduleSpecifier = this.importedModule(exprSymbol.declarations?.[0]);
                         }
                     }
+                    moduleSpecifier ??= this.requiredMember(exprSymbol.declarations?.[0])?.module;
                 }
 
                 const declared = this.parsedFunctionDeclaration(aliasedSymbol ?? symbol);
