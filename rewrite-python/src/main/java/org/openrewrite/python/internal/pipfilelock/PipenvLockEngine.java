@@ -219,6 +219,8 @@ public final class PipenvLockEngine {
         private final @Nullable Map<String, Map<String, PipfileEntry>> originalCategories;
         // The edited declarations by lock category
         private Map<String, Map<String, PipfileEntry>> declaredCategories = emptyMap();
+        // Packages this run pinned at a version it chose, beyond the declared edit
+        private final Set<String> resolved = new TreeSet<>();
         // Metadata of the versions this run moved packages to, by canonical name
         private final Map<String, CoreMetadata> movedMetadata = new HashMap<>();
         // Metadata of locked versions, by "name==version", null where it could not be read
@@ -297,6 +299,10 @@ public final class PipenvLockEngine {
                 }
             }
 
+            if (!resolved.isEmpty()) {
+                notes.add("MINIMAL_CHANGE: pinned " + String.join(", ", resolved) + " at the newest versions their " +
+                        "requirements accept and left every other entry as it was, where pipenv would re-resolve them");
+            }
             rebuildMeta(pipfileCategories.keySet());
             String content = PipfileLockWriter.write(lock, newline);
             return Result.success(content, notes.isEmpty() ? null : String.join("; ", notes));
@@ -1029,6 +1035,7 @@ public final class PipenvLockEngine {
                     md.metadata.getRequiresPython() != null ? md.metadata.getRequiresPython() : firstRequiresPython(files));
             newEntry.put("version", "==" + selected);
             putInOrder(lockCategory(category), oldEntry != null ? lockKey : canonical, newEntry);
+            resolved.add(canonical);
             movedMetadata.put(canonical, md.metadata);
             return ensureClosure(lockKey, md.metadata, extras, category, moving);
         }

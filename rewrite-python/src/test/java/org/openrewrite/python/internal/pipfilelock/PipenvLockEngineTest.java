@@ -467,6 +467,7 @@ class PipenvLockEngineTest {
         Result result = PipenvLockEngine.regenerate(pipfile, baseLock(), ctx);
 
         assertThat(result.getErrorMessage()).isNull();
+        assertThat(result.getDetail()).contains("MINIMAL_CHANGE");
         assertThat(compact(result.getLockFileContent())).contains(compact("""
           "flask": {
               "hashes": [
