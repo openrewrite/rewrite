@@ -222,9 +222,10 @@ rather than guess dependencies.
 - Writes `revision = 5`; for every scenario in §9 and §10 the file is otherwise byte-identical to
   uv 0.10.11's (`z-revision-5/uv.lock` is a 0.13.4 lock). A relative `exclude-newer` is written as the
   sentinel `0001-01-01T00:00:00Z` with a trailing comment plus `exclude-newer-span`
-  (`m4-exclude-newer-span/uv.lock`, since 0.11.8) and reads and writes back verbatim; other newer header
-  material observed in the wild (`[options.exclude-newer-package]`, `[manifest] build-constraints`) is
-  still rejected key by key.
+  (`m4-exclude-newer-span/uv.lock`, since 0.11.8) and reads and writes back verbatim, as do
+  `[options.exclude-newer-package]` and `[manifest] build-constraints`
+  (`off34-exclude-newer-package-and-build-constraints/`); selecting a version of a package named with a
+  timestamp under `exclude-newer-package` fails loud, a `false` entry restricts nothing.
 - Rewrites a revision-3 file at revision 5 when anything changes, as §5 describes for older revisions, and
   the file is otherwise byte-identical (`off18-removed-extra-unbinds-cascade/uv.lock.after.uv-0.13.4`);
   0.12.21 does the reverse to a revision-5 file (`off21-upgrade-activates-extra/uv.lock.after.uv-0.12.21`).

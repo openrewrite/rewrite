@@ -95,6 +95,11 @@ public final class UvLockReader {
                     throw new UvLockFormatException("Unexpected [options] table placement");
                 }
                 options = toOptions(readKeyValues(lines, pos));
+            } else if ("[options.exclude-newer-package]".equals(headerLine)) {
+                if (options == null || options.getExcludeNewerPackage() != null || !rawPackages.isEmpty()) {
+                    throw new UvLockFormatException("Unexpected [options.exclude-newer-package] table placement");
+                }
+                options = options.withExcludeNewerPackage(toExcludeNewerPackage(readKeyValues(lines, pos)));
             } else if ("[manifest]".equals(headerLine)) {
                 if (manifest != null || !rawPackages.isEmpty()) {
                     throw new UvLockFormatException("Unexpected [manifest] table placement");
@@ -290,6 +295,12 @@ public final class UvLockReader {
         if (c >= '0' && c <= '9') {
             return parseInteger(s, p);
         }
+        for (String literal : new String[]{"true", "false"}) {
+            if (s.startsWith(literal, p[0])) {
+                p[0] += literal.length();
+                return Boolean.valueOf(literal);
+            }
+        }
         throw new UvLockFormatException("Unsupported value syntax at: " + s.substring(p[0]));
     }
 
@@ -411,25 +422,37 @@ public final class UvLockReader {
             throw new UvLockFormatException("exclude-newer-span must accompany exactly the sentinel exclude-newer " +
                     UvLockOptions.RELATIVE_EXCLUDE_NEWER_TIMESTAMP);
         }
-        return new UvLockOptions(excludeNewer, excludeNewerSpan);
+        return new UvLockOptions(excludeNewer, excludeNewerSpan, null);
+    }
+
+    private static Map<String, Object> toExcludeNewerPackage(Map<String, Object> map) {
+        for (Map.Entry<String, Object> e : map.entrySet()) {
+            if (!(e.getValue() instanceof String) && !Boolean.FALSE.equals(e.getValue())) {
+                throw new UvLockFormatException("Expected a timestamp or false for [options.exclude-newer-package] " + e.getKey());
+            }
+        }
+        return map;
     }
 
     private static UvLockManifest toManifest(Map<String, Object> map) {
         List<String> members = null;
         List<UvLockRequirement> constraints = null;
+        List<UvLockRequirement> buildConstraints = null;
         for (Map.Entry<String, Object> e : map.entrySet()) {
             if ("members".equals(e.getKey())) {
                 members = stringList(e.getKey(), e.getValue());
             } else if ("constraints".equals(e.getKey())) {
                 constraints = toRequirements(e.getKey(), e.getValue());
+            } else if ("build-constraints".equals(e.getKey())) {
+                buildConstraints = toRequirements(e.getKey(), e.getValue());
             } else {
                 throw new UvLockFormatException("Unrecognized [manifest] key: " + e.getKey());
             }
         }
-        if (members == null && constraints == null) {
-            throw new UvLockFormatException("[manifest] table has neither members nor constraints");
+        if (members == null && constraints == null && buildConstraints == null) {
+            throw new UvLockFormatException("[manifest] table has no recognized keys");
         }
-        return new UvLockManifest(members, constraints);
+        return new UvLockManifest(members, constraints, buildConstraints);
     }
 
     private static UvLockPackage toPackage(RawPackage raw) {
@@ -614,6 +637,7 @@ public final class UvLockReader {
         String url = null;
         String git = null;
         String directory = null;
+        List<String> hashes = null;
         for (Map.Entry<String, Object> e : table.entrySet()) {
             String key = e.getKey();
             Object v = e.getValue();
@@ -635,6 +659,8 @@ public final class UvLockReader {
                 git = stringValue(key, v);
             } else if ("directory".equals(key)) {
                 directory = stringValue(key, v);
+            } else if ("hashes".equals(key)) {
+                hashes = stringList(key, v);
             } else {
                 throw new UvLockFormatException("Unrecognized requirement key: " + key);
             }
@@ -642,7 +668,7 @@ public final class UvLockReader {
         if (name == null) {
             throw new UvLockFormatException("Requirement entry is missing name");
         }
-        return new UvLockRequirement(name, extras, editable, marker, specifier, index, url, git, directory);
+        return new UvLockRequirement(name, extras, editable, marker, specifier, index, url, git, directory, hashes);
     }
 
     // ---- typed accessors over the generic parse ----

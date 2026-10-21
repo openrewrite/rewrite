@@ -360,6 +360,29 @@ class UvLockDeltaOfflineTest {
     }
 
     @Test
+    void excludeNewerPackageAndBuildConstraintsPassThroughAnUnrelatedRemoval() {
+        Result result = UvLockEngine.regenerate(
+          resource("off34-exclude-newer-package-and-build-constraints/pyproject.toml"),
+          resource("off34-exclude-newer-package-and-build-constraints/uv.lock.before"),
+          ctx);
+        assertThat(result.getErrorMessage()).isNull();
+        assertThat(result.getLockFileContent()).isEqualTo(resource("off34-exclude-newer-package-and-build-constraints/uv.lock.after"));
+        assertThat(http.requests).isEmpty();
+    }
+
+    @Test
+    void selectingAVersionOfAnExcludeNewerPackageFailsLoud() {
+        String pyproject = resource("off34-exclude-newer-package-and-build-constraints/pyproject.toml")
+          .replace("six==1.17.0", "six==1.16.0");
+        Result result = UvLockEngine.regenerate(pyproject,
+          resource("off34-exclude-newer-package-and-build-constraints/uv.lock.before"), ctx);
+        assertThat(result.isSuccess()).isFalse();
+        assertThat(result.getFailure().getReason()).isEqualTo(Reason.RESOLUTION_REQUIRED);
+        assertThat(result.getFailure().getDetail()).contains("exclude-newer-package");
+        assertThat(http.requests).isEmpty();
+    }
+
+    @Test
     void markeredConstraintFailsLoud() {
         routeLocalIndex("off29-transitive-constraint");
         String pyproject = resource("off29-transitive-constraint/pyproject.toml")

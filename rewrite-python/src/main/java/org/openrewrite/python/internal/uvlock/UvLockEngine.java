@@ -335,8 +335,10 @@ public final class UvLockEngine {
                 structural = true;
             }
             if (constraintsChanged()) {
-                updated = updated.withManifest(constraintDependencies.isEmpty() ? null :
-                        new UvLockManifest(null, new ArrayList<>(constraintDependencies.values())));
+                UvLockManifest manifest = (lock.getManifest() != null ? lock.getManifest() : new UvLockManifest(null, null, null))
+                        .withConstraints(constraintDependencies.isEmpty() ? null : new ArrayList<>(constraintDependencies.values()));
+                updated = updated.withManifest(manifest.getConstraints() == null && manifest.getBuildConstraints() == null ?
+                        null : manifest);
                 structural = true;
                 for (String name : constrainedLockedNames(constraintDependencies.values())) {
                     Change change = new Change(name);
@@ -950,6 +952,11 @@ public final class UvLockEngine {
                 throw new EngineFailure(Reason.RESOLUTION_REQUIRED, change.canonicalName,
                         "Version selection under [options] exclude-newer is not supported");
             }
+            if (lock.getOptions() != null && lock.getOptions().getExcludeNewerPackage() != null &&
+                    lock.getOptions().getExcludeNewerPackage().get(change.canonicalName) instanceof String) {
+                throw new EngineFailure(Reason.RESOLUTION_REQUIRED, change.canonicalName,
+                        "Version selection under [options] exclude-newer-package is not supported");
+            }
             checkNoUvResolutionOverrides(change.canonicalName);
             if (lock.getSupportedMarkers() != null || lock.getRequiredMarkers() != null) {
                 // uv resolves a restricted-environments lock per environment, dropping edges gated on
@@ -1344,7 +1351,7 @@ public final class UvLockEngine {
                                     "constraint-dependencies: " + spec);
                 }
                 constraintDependencies.put(name, new UvLockRequirement(name, null, null, null,
-                        UvLockMetadataBuilder.normalizeSpecifier(requirement), null, null, null, null));
+                        UvLockMetadataBuilder.normalizeSpecifier(requirement), null, null, null, null, null));
             }
         }
 

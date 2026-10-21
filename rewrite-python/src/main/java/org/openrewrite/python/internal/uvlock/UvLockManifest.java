@@ -22,7 +22,7 @@ import org.jspecify.annotations.Nullable;
 import java.util.List;
 
 /**
- * The {@code [manifest]} table: workspace members and the resolver constraints in force.
+ * The {@code [manifest]} table: workspace members and the resolver and build constraints in force.
  */
 @Value
 @With
@@ -33,4 +33,7 @@ public class UvLockManifest {
 
     @Nullable
     List<UvLockRequirement> constraints;
+
+    @Nullable
+    List<UvLockRequirement> buildConstraints;
 }

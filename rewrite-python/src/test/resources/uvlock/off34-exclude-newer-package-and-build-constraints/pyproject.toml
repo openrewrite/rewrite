@@ -1,0 +1,12 @@
+[project]
+name = "s44-exclude-newer-package-and-build-constraints"
+version = "0.1.0"
+requires-python = ">=3.10"
+dependencies = ["six==1.17.0"]
+
+[tool.uv]
+build-constraint-dependencies = ["setuptools==83.0.0", "wheel<1"]
+
+[tool.uv.exclude-newer-package]
+six = "2027-01-01T00:00:00Z"
+iniconfig = false

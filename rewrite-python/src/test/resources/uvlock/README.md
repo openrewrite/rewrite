@@ -66,7 +66,9 @@ extras, and `off28-add-pinned-index` an add pinned to a second index (served und
 `off29-transitive-constraint` and `off30-two-constraints` add `[tool.uv] constraint-dependencies`
 (the UpgradeTransitiveDependencyVersion edit); their `uv.lock.before` was locked against an index
 without the newer `urlish 2.5`, which was then published to the recorded index before the edit, so the
-constraint is what moves the pin (BEHAVIOR.md §9a).
+constraint is what moves the pin (BEHAVIOR.md §9a). `off34-exclude-newer-package-and-build-constraints`
+(pypi.org, uv 0.13.4, 2026-10-21) carries `[options.exclude-newer-package]` and `[manifest] build-constraints`
+through a removal that touches neither; both are read and written verbatim.
 A `uv.lock.after.uv-<release>` file is the same edit relocked by that release from the same `uv.lock.before`
 (2026-10-21): 0.13.4 restamps the revision-3 `off18` lock at revision 5 and 0.12.21 restamps the
 revision-5 `off21` lock at revision 3, each otherwise byte-identical to `uv.lock.after`.

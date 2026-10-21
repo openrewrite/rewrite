@@ -304,7 +304,7 @@ final class UvLockMetadataBuilder {
         String specifier = normalizeSpecifier(decl);
         String index = pins == null ? null : declaredIndexUrl(pins.get(0), decl.canonicalName);
         String marker = resolveMetadataMarker(decl);
-        return new UvLockRequirement(decl.canonicalName, extras, null, marker, specifier, index, null, null, null);
+        return new UvLockRequirement(decl.canonicalName, extras, null, marker, specifier, index, null, null, null, null);
     }
 
     private @Nullable String normalizeSpecifier(Declared decl) {

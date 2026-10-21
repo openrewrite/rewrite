@@ -145,6 +145,8 @@ final class UvLockFixtures {
       "off32-upgrade-past-dependent-bound/uv.lock.before",
       "off33-dependent-bound-shapes-selection/uv.lock.after",
       "off33-dependent-bound-shapes-selection/uv.lock.before",
+      "off34-exclude-newer-package-and-build-constraints/uv.lock.after",
+      "off34-exclude-newer-package-and-build-constraints/uv.lock.before",
       "off2-add-closure/uv.lock.after",
       "off2-add-closure/uv.lock.before",
       "off3-cascade-flake8/uv.lock.after",
