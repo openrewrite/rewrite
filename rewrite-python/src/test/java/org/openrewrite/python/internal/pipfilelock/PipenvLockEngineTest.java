@@ -956,6 +956,46 @@ class PipenvLockEngineTest {
     }
 
     @Test
+    void addedDeclarationAndAMovedRequirementOnItBothBindItsPin() {
+        listing("requests",
+          wheel("requests-2.31.0-py3-none-any.whl", WHEEL_2310, ">=3.7"),
+          wheel("requests-2.33.0-py3-none-any.whl", "3".repeat(64), ">=3.8"));
+        metadata("requests-2.33.0-py3-none-any.whl", """
+          Metadata-Version: 2.1
+          Name: requests
+          Version: 2.33.0
+          Requires-Python: >=3.8
+          Requires-Dist: brand-new-package>=1.1
+          """);
+        listing("brand-new-package",
+          wheel("brand_new_package-1.0-py3-none-any.whl", "b".repeat(64), ">=3.9"),
+          wheel("brand_new_package-1.1-py3-none-any.whl", "c".repeat(64), ">=3.9"));
+        metadata("brand_new_package-1.0-py3-none-any.whl",
+          "Metadata-Version: 2.1\nName: brand-new-package\nVersion: 1.0\n");
+        metadata("brand_new_package-1.1-py3-none-any.whl",
+          "Metadata-Version: 2.1\nName: brand-new-package\nVersion: 1.1\n");
+        String pipfile = """
+          [[source]]
+          url = "https://pypi.org/simple"
+          verify_ssl = true
+          name = "pypi"
+
+          [packages]
+          requests = ">=2.33.0"
+          brand-new-package = "<1.1"
+
+          [requires]
+          python_version = "3.11"
+          """;
+
+        Result result = PipenvLockEngine.regenerate(pipfile, baseLock(), ctx);
+
+        // no version meets both requests' >=1.1 and the Pipfile's <1.1
+        assertThat(result.isSuccess()).isFalse();
+        assertThat(result.getFailure().getPackageName()).isEqualTo("brand-new-package");
+    }
+
+    @Test
     void sdistOnlyReleaseWithoutStaticMetadataFails() throws IOException {
         byte[] sdistZip = zip("requests-2.34.0/PKG-INFO", """
           Metadata-Version: 2.1

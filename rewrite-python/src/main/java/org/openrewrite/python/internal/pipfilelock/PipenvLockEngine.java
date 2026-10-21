@@ -763,7 +763,14 @@ public final class PipenvLockEngine {
                 return new Failure(Reason.RESOLUTION_REQUIRED, entry.keyAsWritten, null,
                         "Unparseable version constraint: " + entry.constraint);
             }
-            Failure failure = pin(entry.keyAsWritten, edit.lockCategory, null, singletonList(constraint), entry.extras,
+            // a pin an earlier edit's closure added answers to the packages that edit moved as well
+            List<PythonVersionSpecifierSet> constraints = new ArrayList<>();
+            Failure unreadable = boundByRun(Pep508Requirement.canonicalize(entry.keyAsWritten), edit.lockCategory,
+                    constraints);
+            if (unreadable != null) {
+                return unreadable;
+            }
+            Failure failure = pin(entry.keyAsWritten, edit.lockCategory, null, constraints, entry.extras,
                     new HashSet<>());
             if (failure != null) {
                 return failure;
@@ -930,6 +937,11 @@ public final class PipenvLockEngine {
                     if (requirement.getSpecifiers() != null) {
                         constraints.add(requirement.getSpecifiers());
                     }
+                    // the Pipfile may declare the package too, in an edit not applied yet
+                    Failure unreadable = boundByRun(requirement.getCanonicalName(), category, constraints);
+                    if (unreadable != null) {
+                        return unreadable;
+                    }
                     // no pin in the lock can require a package the lock does not hold
                     Failure added = pin(requirement.getName(), category, null, constraints,
                             new ArrayList<>(requirement.getExtras()), moving);
@@ -1053,6 +1065,31 @@ public final class PipenvLockEngine {
         }
 
         /** The Pipfile's declaration of the package and every requirement on it from the category's other pins. */
+        /** The Pipfile's declaration of the package and the requirements of the packages this run moved. */
+        private @Nullable Failure boundByRun(String canonical, String category,
+                                             List<PythonVersionSpecifierSet> constraints) {
+            for (PipfileEntry declared : declaredCategories.getOrDefault(category, emptyMap()).values()) {
+                if (Pep508Requirement.canonicalize(declared.keyAsWritten).equals(canonical)) {
+                    PythonVersionSpecifierSet constraint = parseConstraint(declared.constraint);
+                    if (constraint == null) {
+                        return new Failure(Reason.RESOLUTION_REQUIRED, declared.keyAsWritten, null,
+                                "Unparseable version constraint: " + declared.constraint);
+                    }
+                    constraints.add(constraint);
+                }
+            }
+            for (CoreMetadata metadata : movedMetadata.values()) {
+                for (String raw : metadata.getRequiresDist()) {
+                    Pep508Requirement requirement = Pep508Requirement.parse(raw);
+                    if (requirement != null && requirement.getCanonicalName().equals(canonical) &&
+                            requirement.getSpecifiers() != null && applies(requirement.getMarker(), emptyList())) {
+                        constraints.add(requirement.getSpecifiers());
+                    }
+                }
+            }
+            return null;
+        }
+
         private @Nullable Failure gatherConstraints(String canonical, String category,
                                                     List<PythonVersionSpecifierSet> constraints) {
             for (PipfileEntry declared : declaredCategories.getOrDefault(category, emptyMap()).values()) {
