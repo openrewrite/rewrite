@@ -599,6 +599,33 @@ public final class UvLockEngine {
         }
 
         // uv builds every lock with its packages sorted by id: name, then version with none first
+        /**
+         * A registry entry records the index as configured, so a lock written against
+         * {@code https://pypi.org/simple/} records {@code https://pypi.org/simple} once anything changes. An index
+         * the manifest does not configure keeps its recorded URL, since only its own configuration names it.
+         */
+        private UvLockSource asConfigured(UvLockSource source) {
+            if (source.getType() != UvLockSource.Type.REGISTRY || source.getValue() == null) {
+                return source;
+            }
+            String recorded = source.getValue();
+            String match = null;
+            for (UvIndex index : indexes) {
+                String configured = index.getIndex().getUrl();
+                if (configured.equals(recorded)) {
+                    return source;
+                }
+                if (match == null && withoutTrailingSlash(configured).equals(withoutTrailingSlash(recorded))) {
+                    match = configured;
+                }
+            }
+            return match == null ? source : UvLockSource.registry(match);
+        }
+
+        private static String withoutTrailingSlash(String url) {
+            return url.endsWith("/") ? url.substring(0, url.length() - 1) : url;
+        }
+
         private List<UvLockPackage> inUvOrder(List<UvLockPackage> pkgs) {
             List<UvLockPackage> sorted = new ArrayList<>(pkgs);
             sorted.sort(Comparator.comparing(UvLockPackage::getName).thenComparing(pkg ->
@@ -610,6 +637,7 @@ public final class UvLockEngine {
             List<UvLockPackage> out = new ArrayList<>(pkgs.size());
             for (UvLockPackage pkg : withRecordedMarkers(pkgs)) {
                 UvLockPackage.UvLockPackageBuilder b = pkg.toBuilder()
+                        .source(asConfigured(pkg.getSource()))
                         .resolutionMarkers(currentForms(pkg.getName(), pkg.getResolutionMarkers()));
                 UvLockMetadata metadata = pkg.getMetadata();
                 if (metadata != null) {
