@@ -829,7 +829,7 @@ class PipenvLockEngineTest {
     }
 
     @Test
-    void newRequirementOutsideTheLockRequiresResolution() {
+    void newRequirementEntersTheLockWithItsClosure() {
         listing("requests",
           wheel("requests-2.31.0-py3-none-any.whl", WHEEL_2310, ">=3.7"),
           wheel("requests-2.33.0-py3-none-any.whl", "3".repeat(64), ">=3.8"));
@@ -839,6 +839,19 @@ class PipenvLockEngineTest {
           Version: 2.33.0
           Requires-Python: >=3.8
           Requires-Dist: brand-new-package>=1.0
+          """);
+        // 1.2 needs a newer Python than the lock's 3.11, so 1.1 is the newest that installs
+        listing("brand-new-package",
+          wheel("brand_new_package-1.1-py3-none-any.whl", "c".repeat(64), ">=3.9"),
+          sdist("brand_new_package-1.1.tar.gz", "d".repeat(64), ">=3.9"),
+          wheel("brand_new_package-1.2-py3-none-any.whl", "e".repeat(64), ">=3.12"));
+        // the lock environment is Linux, as pipenv's own on a Linux machine
+        metadata("brand_new_package-1.1-py3-none-any.whl", """
+          Metadata-Version: 2.1
+          Name: brand-new-package
+          Version: 1.1
+          Requires-Python: >=3.9
+          Requires-Dist: pywin32>=300; sys_platform == "win32"
           """);
         String pipfile = """
           [[source]]
@@ -855,10 +868,19 @@ class PipenvLockEngineTest {
 
         Result result = PipenvLockEngine.regenerate(pipfile, baseLock(), ctx);
 
-        assertThat(result.isSuccess()).isFalse();
-        assertThat(result.getFailure().getReason()).isEqualTo(Reason.RESOLUTION_REQUIRED);
-        assertThat(result.getFailure().getPackageName()).isEqualTo("requests");
-        assertThat(result.getFailure().getDetail()).contains("brand-new-package");
+        assertThat(result.getErrorMessage()).isNull();
+        assertThat(compact(result.getLockFileContent())).contains(compact("""
+          "default": {
+              "brand-new-package": {
+                  "hashes": [
+                      "sha256:%s",
+                      "sha256:%s"
+                  ],
+                  "markers": "python_version >= '3.9'",
+                  "version": "==1.1"
+              },
+              "certifi": {""".formatted("c".repeat(64), "d".repeat(64))))
+          .doesNotContain("pywin32");
     }
 
     @Test
@@ -1472,7 +1494,7 @@ class PipenvLockEngineTest {
     }
 
     @Test
-    void extrasAddedTriggersClosureProof() {
+    void extrasAddedBringTheirRequirementsIntoTheLock() {
         listing("requests",
           wheel("requests-2.31.0-py3-none-any.whl", WHEEL_2310, ">=3.7"),
           sdist("requests-2.31.0.tar.gz", SDIST_2310, ">=3.7"));
@@ -1484,6 +1506,12 @@ class PipenvLockEngineTest {
           Requires-Dist: certifi>=2017.4.17
           Requires-Dist: idna<4,>=2.5
           Requires-Dist: pysocks!=1.5.7,>=1.5.6; extra == 'socks'
+          """);
+        listing("pysocks", wheel("PySocks-1.7.1-py3-none-any.whl", "f".repeat(64), ">=2.7, !=3.0.*, !=3.1.*, !=3.2.*, !=3.3.*"));
+        metadata("PySocks-1.7.1-py3-none-any.whl", """
+          Metadata-Version: 2.1
+          Name: PySocks
+          Version: 1.7.1
           """);
         String pipfile = """
           [[source]]
@@ -1500,10 +1528,10 @@ class PipenvLockEngineTest {
 
         Result result = PipenvLockEngine.regenerate(pipfile, baseLock(), ctx);
 
-        assertThat(result.isSuccess()).isFalse();
-        assertThat(result.getFailure().getReason()).isEqualTo(Reason.RESOLUTION_REQUIRED);
-        assertThat(result.getFailure().getPackageName()).isEqualTo("requests");
-        assertThat(result.getFailure().getDetail()).contains("pysocks");
+        assertThat(result.getErrorMessage()).isNull();
+        assertThat(compact(result.getLockFileContent()))
+          .contains(compact("\"pysocks\": {\"hashes\": [\"sha256:" + "f".repeat(64) + "\"]"))
+          .contains(compact("\"extras\": [\"socks\"]"));
     }
 
     @Test

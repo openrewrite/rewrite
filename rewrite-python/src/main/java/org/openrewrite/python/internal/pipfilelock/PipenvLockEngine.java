@@ -895,9 +895,17 @@ public final class PipenvLockEngine {
                 }
                 String lockKey = canonicalKeys(lockEntries).get(requirement.getCanonicalName());
                 if (lockKey == null) {
-                    return new Failure(Reason.RESOLUTION_REQUIRED, pkg, null,
-                            "Requirement " + raw + " of the new version is not satisfied by the existing " +
-                                    "lock; delta resolution is not yet supported by the native engine");
+                    List<PythonVersionSpecifierSet> constraints = new ArrayList<>();
+                    if (requirement.getSpecifiers() != null) {
+                        constraints.add(requirement.getSpecifiers());
+                    }
+                    // no pin in the lock can require a package the lock does not hold
+                    Failure added = pin(requirement.getName(), category, null, constraints,
+                            new ArrayList<>(requirement.getExtras()), moving);
+                    if (added != null) {
+                        return added;
+                    }
+                    continue;
                 }
                 Map<String, Object> depEntry = entryMap(lockEntries.get(lockKey));
                 if (!requirement.getExtras().isEmpty() && !recordedExtras(depEntry).containsAll(
@@ -927,23 +935,31 @@ public final class PipenvLockEngine {
 
         /** Moves a transitive pin to the newest version every live requirement on it accepts. */
         private @Nullable Failure movePin(String lockKey, String category, Set<String> moving) {
-            String canonical = Pep508Requirement.canonicalize(lockKey);
-            if (moving.contains(canonical)) {
+            if (moving.contains(Pep508Requirement.canonicalize(lockKey))) {
                 return new Failure(Reason.RESOLUTION_REQUIRED, lockKey, null,
                         "Moving " + lockKey + " again within one cascade would need backtracking, which the " +
                                 "native engine does not do");
             }
-            Map<String, Object> lockEntries = lockCategory(category);
-            Map<String, Object> oldEntry = entryMap(lockEntries.get(lockKey));
             List<PythonVersionSpecifierSet> constraints = new ArrayList<>();
-            Failure gathered = gatherConstraints(canonical, category, constraints);
+            Failure gathered = gatherConstraints(Pep508Requirement.canonicalize(lockKey), category, constraints);
             if (gathered != null) {
                 return gathered;
             }
+            Map<String, Object> oldEntry = entryMap(lockCategory(category).get(lockKey));
+            return pin(lockKey, category, oldEntry, constraints, recordedExtrasList(oldEntry), moving);
+        }
+
+        /**
+         * Pins the package at the newest installable version the constraints accept, as a new entry or over the old
+         * one, and meets that version's requirements in turn.
+         */
+        private @Nullable Failure pin(String lockKey, String category, @Nullable Map<String, Object> oldEntry,
+                                      List<PythonVersionSpecifierSet> constraints, List<String> extras, Set<String> moving) {
+            String canonical = Pep508Requirement.canonicalize(lockKey);
             PythonPackageIndex index;
             PackageListing listing;
             try {
-                index = selectIndex(indexName(oldEntry));
+                index = selectIndex(oldEntry != null ? indexName(oldEntry) : null);
                 listing = client.listFiles(index, SimpleIndexClient.canonicalName(lockKey));
             } catch (PythonIndexException e) {
                 return indexFailure(lockKey, e);
@@ -963,7 +979,7 @@ public final class PipenvLockEngine {
             }
             if (selected == null) {
                 return new Failure(Reason.RESOLUTION_CONFLICT, lockKey, index.getUrl(),
-                        "No version of " + lockKey + " satisfies every requirement on it in the lock");
+                        "No installable version of " + lockKey + " satisfies every requirement on it in the lock");
             }
             List<PackageFile> files = byVersion.get(selected);
             MetadataResult md = fetchMetadata(lockKey, index, files);
@@ -976,15 +992,32 @@ public final class PipenvLockEngine {
                         "The index lists a file of " + lockKey + " " + selected +
                                 " without a sha256 digest, and it could not be downloaded to hash");
             }
-            Map<String, Object> newEntry = new LinkedHashMap<>(oldEntry);
-            newEntry.put("version", "==" + selected);
+            Map<String, Object> newEntry = new LinkedHashMap<>();
+            if (oldEntry != null) {
+                newEntry.putAll(oldEntry);
+            } else if (!extras.isEmpty()) {
+                newEntry.put("extras", new ArrayList<>(new TreeSet<>(canonicalizeAll(new HashSet<>(extras)))));
+            }
             newEntry.put("hashes", hashes);
             PipfileEntry declared = declaredCategories.getOrDefault(category, emptyMap()).get(lockKey);
             applyMarkers(newEntry, declared != null ? declared : new PipfileEntry(lockKey),
                     md.metadata.getRequiresPython() != null ? md.metadata.getRequiresPython() : firstRequiresPython(files));
-            lockEntries.put(lockKey, newEntry);
+            newEntry.put("version", "==" + selected);
+            putInOrder(lockCategory(category), oldEntry != null ? lockKey : canonical, newEntry);
             movedMetadata.put(canonical, md.metadata);
-            return ensureClosure(lockKey, md.metadata, recordedExtrasList(oldEntry), category, moving);
+            return ensureClosure(lockKey, md.metadata, extras, category, moving);
+        }
+
+        // pipenv lists a category's packages by name
+        private static void putInOrder(Map<String, Object> entries, String key, Map<String, Object> entry) {
+            if (entries.containsKey(key)) {
+                entries.put(key, entry);
+                return;
+            }
+            TreeMap<String, Object> sorted = new TreeMap<>(entries);
+            sorted.put(key, entry);
+            entries.clear();
+            entries.putAll(sorted);
         }
 
         /** The Pipfile's declaration of the package and every requirement on it from the category's other pins. */
