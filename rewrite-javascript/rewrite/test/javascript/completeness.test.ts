@@ -90,7 +90,7 @@ describe('JS LST element tree', () => {
         "JavaScriptSender",
     ])("rpc.ts / %s", (className) => {
         const rpcTsMethods = Array.from(rpcTsContentByClass.get(className)!
-            .matchAll(/override async (visit\w+)[(<]/gm), m => m[1])
+            .matchAll(/override (visit\w+)[(<]/gm), m => m[1])
             .filter(m => !excused.includes(m))
             .sort();
 

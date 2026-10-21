@@ -49,6 +49,7 @@ import {InstallRecipes, InstallRecipesResponse} from "./request/install-recipes"
 import {ParserInput} from "../parser";
 import {ReferenceMap} from "../reference";
 import {GetLanguages} from "./request/get-languages";
+import type {WorkerPageChannel} from "./worker-transport";
 
 // Each page is a round trip through both JSON-RPC stacks, so larger pages amortize it
 export const DEFAULT_BATCH_SIZE = 5000;
@@ -88,6 +89,8 @@ export class RewriteRpc {
 
     private configuredDataTableStore?: DataTableStore;
 
+    private readonly pageChannel?: WorkerPageChannel;
+
     constructor(readonly connection: MessageConnection = rpc.createMessageConnection(
                     new rpc.StreamMessageReader(process.stdin),
                     new rpc.StreamMessageWriter(process.stdout),
@@ -97,7 +100,8 @@ export class RewriteRpc {
                     marketplace?: RecipeMarketplace,
                     logger?: rpc.Logger,
                     metricsCsv?: string,
-                    recipeInstallDir?: string
+                    recipeInstallDir?: string,
+                    pageChannel?: WorkerPageChannel
                 }) {
         // Initialize metrics CSV file if configured
         initializeMetricsCsv(options.metricsCsv, options.logger);
@@ -107,6 +111,7 @@ export class RewriteRpc {
             refs: this.remoteRefs.size + this.localRefs.size,
         }));
         this.logger = options.logger;
+        this.pageChannel = options.pageChannel;
 
         const preparedRecipes: Map<String, Recipe> = new Map();
         const recipeCursors: WeakMap<Recipe, Cursor> = new WeakMap()
@@ -140,7 +145,7 @@ export class RewriteRpc {
         Generate.handle(this.connection, this.localObjects, preparedRecipes, recipeCursors, getObject, dataTableStore, options.metricsCsv);
         SetDataTableStore.handle(this.connection, store => this.configuredDataTableStore = store, options.metricsCsv);
         GetObject.handle(this.connection, this.remoteObjects, this.localObjects,
-            this.localRefs, options?.batchSize || DEFAULT_BATCH_SIZE, traceGetObject, options.metricsCsv);
+            this.localRefs, options?.batchSize || DEFAULT_BATCH_SIZE, traceGetObject, options.metricsCsv, options.pageChannel);
         GetMarketplace.handle(this.connection, marketplace, recipeOrigin, options.metricsCsv);
         GetLanguages.handle(this.connection, options.metricsCsv);
         PrepareRecipe.handle(this.connection, marketplace, preparedRecipes, options.metricsCsv);
@@ -246,40 +251,32 @@ export class RewriteRpc {
         // (e.g., via a local recipe) since the remote doesn't know about those changes.
         const before = this.remoteObjects.get(id);
 
-        const requestPage = () => {
-            const page = this.connection.sendRequest(
-                new rpc.RequestType<GetObject, RpcObjectData[], Error>("GetObject"),
-                new GetObject(id, sourceFileType),
-            );
-            // Marks the promise handled so a rejection on a page that is requested but
-            // never awaited is not reported as an unhandled rejection; awaiting it later
-            // still throws.
-            page.catch(() => {
-            });
-            return page;
-        };
-
-        // The following page is requested before this one is handed to the queue, so the
-        // remote serializes it while this side deserializes what it already has.
-        let nextPage: Promise<RpcObjectData[]> | undefined;
-        const q = new RpcReceiveQueue(this.remoteRefs, sourceFileType, async () => {
-            const pending = nextPage;
-            nextPage = undefined;
-            const page = await (pending ?? requestPage());
-            // A page ending in END_OF_OBJECT has no successor; the remote drops its
-            // transfer state when it sends that marker, so asking again would restart
-            // the transfer rather than return nothing.
-            if (page.length > 0 && page[page.length - 1].state !== RpcObjectState.END_OF_OBJECT) {
-                nextPage = requestPage();
-            }
-            return page;
-        }, this.logger, this.traceGetObject.receive, this.internedStrings);
-
+        let q: RpcReceiveQueue | undefined;
         let remoteObject: P;
         try {
-            remoteObject = await q.receive<P>(before as P);
-            const takenEof = q.take();
-            const eof = takenEof instanceof Promise ? await takenEof : takenEof;
+            // The codecs receive synchronously. Over the worker transport each page is pulled when the
+            // previous one runs out. Otherwise the whole transfer is fetched before any of it is read.
+            // A page ending in END_OF_OBJECT has no successor. The remote drops its transfer state
+            // when it sends that marker, so asking again would restart the transfer.
+            let pages: RpcObjectData[][] | (() => readonly RpcObjectData[]);
+            if (this.pageChannel) {
+                pages = this.pageChannel.pages(id, sourceFileType);
+            } else {
+                pages = [];
+                let page: RpcObjectData[];
+                do {
+                    page = await this.connection.sendRequest(
+                        new rpc.RequestType<GetObject, RpcObjectData[], Error>("GetObject"),
+                        new GetObject(id, sourceFileType),
+                    );
+                    pages.push(page);
+                } while (page.length > 0 && page[page.length - 1].state !== RpcObjectState.END_OF_OBJECT);
+            }
+
+            q = new RpcReceiveQueue(this.remoteRefs, sourceFileType, pages, this.logger,
+                this.traceGetObject.receive, this.internedStrings);
+            remoteObject = q.receive<P>(before as P);
+            const eof = q.take();
             if (eof.state !== RpcObjectState.END_OF_OBJECT) {
                 RpcObjectData.logTrace(eof, this.traceGetObject.receive, this.logger);
                 throw new Error(`Expected END_OF_OBJECT but got: ${eof.state}`);
@@ -288,12 +285,7 @@ export class RewriteRpc {
             // Reset our tracking of the remote state so the next interaction
             // forces a full object sync (ADD) instead of a delta (CHANGE).
             this.remoteObjects.delete(id);
-            if (nextPage) {
-                // At most one page is ever requested ahead; settling it leaves no request
-                // outstanding on an object this side has stopped receiving.
-                await nextPage.catch(() => {
-                });
-            }
+            this.pageChannel?.settle();
             // The sender still counts the object and its refs as delivered until it is told otherwise.
             const rolledBack = await this.connection.sendRequest(
                 new rpc.RequestType<AbortGetObject, boolean, Error>("AbortGetObject"),
@@ -301,7 +293,7 @@ export class RewriteRpc {
             ).catch(() => false);
             if (rolledBack) {
                 // a peer that could not roll back goes on sending these refs bare, so they are kept for it
-                q.forgetRefs();
+                q?.forgetRefs();
             }
             throw e;
         }

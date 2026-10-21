@@ -93,7 +93,7 @@ describeJavaRpc("a transfer that could not be read to its end", () => {
             let untilFailure = 5;
             vi.spyOn(RpcReceiveQueue.prototype, "receive").mockImplementation(function (this: RpcReceiveQueue, before: any, onChange?: any) {
                 if (untilFailure > 0 && --untilFailure === 0) {
-                    return Promise.reject(new Error("cannot decode"));
+                    throw new Error("cannot decode");
                 }
                 return receive.call(this, before, onChange);
             } as any);
