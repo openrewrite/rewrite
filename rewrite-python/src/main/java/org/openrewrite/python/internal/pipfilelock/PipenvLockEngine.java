@@ -1091,6 +1091,19 @@ public final class PipenvLockEngine {
             return null;
         }
 
+        // an old sdist's requirements as setuptools recorded them, which bound a move but never pin anything
+        private @Nullable CoreMetadata eggInfoMetadata(String key, PythonVersion version, List<PackageFile> files) {
+            for (PackageFile file : files) {
+                DistFilename dist = DistFilename.parse(file.getFilename());
+                if (dist != null && dist.getType() == DistFilename.Type.SDIST) {
+                    List<String> requirements = SdistMetadataReader.eggInfoRequirements(http, file.getUrl());
+                    return requirements == null ? null : new CoreMetadata("1.0", key, version.toString(), null,
+                            requirements, null, emptyList(), emptyList());
+                }
+            }
+            return null;
+        }
+
         private @Nullable CoreMetadata lockedMetadata(String key, Map<String, Object> lockEntry) {
             String pinned = pinnedVersion(lockEntry);
             PythonVersion version = PythonVersion.parse(pinned);
@@ -1104,6 +1117,9 @@ public final class PipenvLockEngine {
                     PythonPackageIndex index = selectIndex(indexName(lockEntry));
                     List<PackageFile> files = filesOfVersion(client.listFiles(index, SimpleIndexClient.canonicalName(key)), key, version);
                     metadata = files.isEmpty() ? null : fetchMetadata(key, index, files).metadata;
+                    if (metadata == null) {
+                        metadata = eggInfoMetadata(key, version, files);
+                    }
                 } catch (PythonIndexException e) {
                     metadata = null;
                 }

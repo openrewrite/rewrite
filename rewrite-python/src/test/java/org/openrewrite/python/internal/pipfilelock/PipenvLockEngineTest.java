@@ -853,6 +853,54 @@ class PipenvLockEngineTest {
     }
 
     @Test
+    void anOldSdistsEggInfoRequirementsBoundAMove() throws IOException {
+        listing("requests",
+          wheel("requests-2.31.0-py3-none-any.whl", WHEEL_2310, ">=3.7"),
+          wheel("requests-2.33.0-py3-none-any.whl", "3".repeat(64), ">=3.8"));
+        metadata("requests-2.33.0-py3-none-any.whl", """
+          Metadata-Version: 2.1
+          Name: requests
+          Version: 2.33.0
+          Requires-Python: >=3.8
+          Requires-Dist: idna<4,>=3.8
+          """);
+        listing("idna",
+          wheel("idna-3.7-py3-none-any.whl", IDNA, ">=3.5"),
+          wheel("idna-3.8-py3-none-any.whl", "8".repeat(64), ">=3.6"),
+          wheel("idna-3.10-py3-none-any.whl", "a".repeat(64), ">=3.6"));
+        metadata("idna-3.8-py3-none-any.whl", "Metadata-Version: 2.1\nName: idna\nVersion: 3.8\n");
+        metadata("idna-3.10-py3-none-any.whl", "Metadata-Version: 2.1\nName: idna\nVersion: 3.10\n");
+        // certifi's only distribution is an sdist whose PKG-INFO predates Requires-Dist
+        listing("certifi", sdist("certifi-2024.2.2.zip", CERTIFI, ">=3.6"));
+        String pipfile = """
+          [[source]]
+          url = "https://pypi.org/simple"
+          verify_ssl = true
+          name = "pypi"
+
+          [packages]
+          requests = ">=2.33.0"
+
+          [requires]
+          python_version = "3.11"
+          """;
+
+        byte[] noRequirements = zip("certifi-2024.2.2/PKG-INFO", "Metadata-Version: 1.1\nName: certifi\nVersion: 2024.2.2\n",
+          "certifi-2024.2.2/certifi.egg-info/PKG-INFO", "Metadata-Version: 1.1\nName: certifi\nVersion: 2024.2.2\n");
+        routes.put("/packages/certifi-2024.2.2.zip", () -> new MockResponse().setBody(new Buffer().write(noRequirements)));
+        Result result = PipenvLockEngine.regenerate(pipfile, baseLock(), ctx);
+        assertThat(result.getErrorMessage()).isNull();
+        assertThat(compact(result.getLockFileContent())).contains(compact("\"version\": \"==3.10\""));
+
+        byte[] boundsIdna = zip("certifi-2024.2.2/PKG-INFO", "Metadata-Version: 1.1\nName: certifi\nVersion: 2024.2.2\n",
+          "certifi-2024.2.2/certifi.egg-info/requires.txt", "idna<3.9\n\n[socks]\npysocks\n");
+        routes.put("/packages/certifi-2024.2.2.zip", () -> new MockResponse().setBody(new Buffer().write(boundsIdna)));
+        result = PipenvLockEngine.regenerate(pipfile, baseLock(), ctx);
+        assertThat(result.getErrorMessage()).isNull();
+        assertThat(compact(result.getLockFileContent())).contains(compact("\"version\": \"==3.8\""));
+    }
+
+    @Test
     void newRequirementEntersTheLockWithItsClosure() {
         listing("requests",
           wheel("requests-2.31.0-py3-none-any.whl", WHEEL_2310, ">=3.7"),
@@ -1752,12 +1800,15 @@ class PipenvLockEngineTest {
         return hex.toString();
     }
 
-    private static byte[] zip(String entryName, String content) throws IOException {
+    // entries as alternating names and contents
+    private static byte[] zip(String... entries) throws IOException {
         ByteArrayOutputStream out = new ByteArrayOutputStream();
         try (ZipOutputStream zip = new ZipOutputStream(out)) {
-            zip.putNextEntry(new ZipEntry(entryName));
-            zip.write(content.getBytes(StandardCharsets.UTF_8));
-            zip.closeEntry();
+            for (int i = 0; i < entries.length; i += 2) {
+                zip.putNextEntry(new ZipEntry(entries[i]));
+                zip.write(entries[i + 1].getBytes(StandardCharsets.UTF_8));
+                zip.closeEntry();
+            }
         }
         return out.toByteArray();
     }
