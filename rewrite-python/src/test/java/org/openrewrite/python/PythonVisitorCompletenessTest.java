@@ -37,8 +37,7 @@ class PythonVisitorCompletenessTest {
     }
 
     long visitorNewlines(SourceFile cu) {
-        AtomicInteger n = new AtomicInteger();
-        new PythonVisitor<AtomicInteger>() {
+        return new PythonVisitor<AtomicInteger>() {
             @Override
             public Space visitSpace(Space s, Space.Location l, AtomicInteger a) {
                 a.addAndGet((int) nl(s.getWhitespace()));
@@ -54,8 +53,7 @@ class PythonVisitorCompletenessTest {
                 a.addAndGet((int) nl(lit.getValueSource()));
                 return super.visitLiteral(lit, a);
             }
-        }.visit(cu, n);
-        return n.get();
+        }.reduce(cu, new AtomicInteger()).get();
     }
 
     void check(String src) {

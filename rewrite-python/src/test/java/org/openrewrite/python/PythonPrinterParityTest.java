@@ -588,8 +588,7 @@ class PythonPrinterParityTest {
                     printed.put(tree.getClass(), tree.print(getCursor().getParentOrThrow()));
                     assertThat(tree.print(getCursor().getParentTreeCursor())).isEqualTo(printed.get(tree.getClass()));
 
-                    PrintOutputCapture<Integer> alone = new PrintOutputCapture<>(0);
-                    new PythonPrinter<Integer>().visit(tree, alone);
+                    PrintOutputCapture<Integer> alone = new PythonPrinter<Integer>().reduce(tree, new PrintOutputCapture<>(0));
                     withoutAncestors.put(tree.getClass(), alone.getOut());
                 }
                 return tree;

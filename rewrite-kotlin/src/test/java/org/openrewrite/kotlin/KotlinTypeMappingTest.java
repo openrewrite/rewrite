@@ -381,8 +381,7 @@ class KotlinTypeMappingTest {
                   """,
                     spec -> spec.afterRecipe(cu -> {
                         var methodMatcher = new MethodMatcher("kotlin.collections.MutableList addAll(..)");
-                        var found = new AtomicBoolean(false);
-                        new KotlinIsoVisitor<AtomicBoolean>() {
+                        var found = new KotlinIsoVisitor<AtomicBoolean>() {
                             @Override
                             public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, AtomicBoolean found) {
                                 if (methodMatcher.matches(method)) {
@@ -391,7 +390,7 @@ class KotlinTypeMappingTest {
                                 }
                                 return super.visitMethodInvocation(method, found);
                             }
-                        }.visit(cu, found);
+                        }.reduce(cu, new AtomicBoolean(false));
                         assertThat(found.get()).isTrue();
                     })
               )
@@ -410,8 +409,7 @@ class KotlinTypeMappingTest {
                   abstract class Foo<T> : OfField<Foo<Any>>
                   """,
                     spec -> spec.afterRecipe(cu -> {
-                        var found = new AtomicBoolean(false);
-                        new KotlinIsoVisitor<AtomicBoolean>() {
+                        var found = new KotlinIsoVisitor<AtomicBoolean>() {
                             @Override
                             public J.ClassDeclaration visitClassDeclaration(J.ClassDeclaration classDecl, AtomicBoolean found) {
                                 if ("Foo".equals(classDecl.getSimpleName())) {
@@ -420,7 +418,7 @@ class KotlinTypeMappingTest {
                                 }
                                 return super.visitClassDeclaration(classDecl, found);
                             }
-                        }.visit(cu, found);
+                        }.reduce(cu, new AtomicBoolean(false));
                         assertThat(found.get()).isTrue();
                     })
               )
@@ -436,8 +434,7 @@ class KotlinTypeMappingTest {
                   """,
                     spec -> spec.afterRecipe(cu -> {
                         var methodMatcher = new MethodMatcher("kotlin.collections.CollectionsKt listOf(..)");
-                        var found = new AtomicBoolean(false);
-                        new KotlinIsoVisitor<AtomicBoolean>() {
+                        var found = new KotlinIsoVisitor<AtomicBoolean>() {
                             @Override
                             public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, AtomicBoolean found) {
                                 if (methodMatcher.matches(method)) {
@@ -447,7 +444,7 @@ class KotlinTypeMappingTest {
                                 }
                                 return super.visitMethodInvocation(method, found);
                             }
-                        }.visit(cu, found);
+                        }.reduce(cu, new AtomicBoolean(false));
                         assertThat(found.get()).isTrue();
                     })
               )
@@ -491,8 +488,7 @@ class KotlinTypeMappingTest {
                   val s = map.orEmpty().entries.joinToString { (key, value) -> "$key: $value" }
                   """,
                     spec -> spec.afterRecipe(cu -> {
-                        var found = new AtomicBoolean(false);
-                        new KotlinIsoVisitor<AtomicBoolean>() {
+                        var found = new KotlinIsoVisitor<AtomicBoolean>() {
                             @Override
                             public J.FieldAccess visitFieldAccess(J.FieldAccess fieldAccess, AtomicBoolean found) {
                                 if ("entries".equals(fieldAccess.getSimpleName())) {
@@ -504,7 +500,7 @@ class KotlinTypeMappingTest {
                                 }
                                 return super.visitFieldAccess(fieldAccess, found);
                             }
-                        }.visit(cu, found);
+                        }.reduce(cu, new AtomicBoolean(false));
                         assertThat(found.get()).isTrue();
                     })
               )
@@ -644,8 +640,7 @@ class KotlinTypeMappingTest {
                   }
                   """,
                     spec -> spec.afterRecipe(cu -> {
-                        var found = new AtomicBoolean(false);
-                        new KotlinIsoVisitor<AtomicBoolean>() {
+                        var found = new KotlinIsoVisitor<AtomicBoolean>() {
                             @Override
                             public K.When visitWhen(K.When when, AtomicBoolean found) {
                                 if (when.getType() instanceof JavaType.GenericTypeVariable) {
@@ -654,7 +649,7 @@ class KotlinTypeMappingTest {
                                 }
                                 return super.visitWhen(when, found);
                             }
-                        }.visit(cu, found);
+                        }.reduce(cu, new AtomicBoolean(false));
                         assertThat(found.get()).isTrue();
                     })
               )
@@ -766,8 +761,7 @@ class KotlinTypeMappingTest {
                   }
                   """.formatted(invocation), spec -> spec.afterRecipe(cu -> {
                     var matcher = new MethodMatcher("*..* foo(..)");
-                    var methodFound = new AtomicBoolean(false);
-                    new KotlinIsoVisitor<AtomicBoolean>() {
+                    var methodFound = new KotlinIsoVisitor<AtomicBoolean>() {
                         @Override
                         public J.MethodDeclaration visitMethodDeclaration(J.MethodDeclaration method, AtomicBoolean found) {
                             if (!"m".equals(method.getSimpleName())) {
@@ -791,7 +785,7 @@ class KotlinTypeMappingTest {
                             }
                             return super.visitMethodInvocation(method, found);
                         }
-                    }.visit(cu, methodFound);
+                    }.reduce(cu, new AtomicBoolean(false));
                     assertThat(methodFound.get()).isTrue();
                 })
               )
@@ -933,8 +927,7 @@ class KotlinTypeMappingTest {
                   }
                   """,
                     spec -> spec.afterRecipe(cu -> {
-                        var found = new AtomicBoolean(false);
-                        new KotlinIsoVisitor<AtomicBoolean>() {
+                        var found = new KotlinIsoVisitor<AtomicBoolean>() {
                             @Override
                             public K.DestructuringPattern visitDestructuringPattern(K.DestructuringPattern pattern, AtomicBoolean found) {
                                 found.set(true);
@@ -979,7 +972,7 @@ class KotlinTypeMappingTest {
                                 }
                                 return super.visitVariable(variable, found);
                             }
-                        }.visit(cu, found);
+                        }.reduce(cu, new AtomicBoolean(false));
                         assertThat(found.get()).isTrue();
                     })
               )

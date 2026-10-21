@@ -335,9 +335,7 @@ public class AddImport<P> extends KotlinIsoVisitor<P> {
         }
 
         // Check whether there is static-style access of the field in question
-        AtomicReference<Boolean> hasStaticFieldAccess = new AtomicReference<>(false);
-        new AddImport<P>.FindStaticFieldAccess().visit(compilationUnit, hasStaticFieldAccess);
-        return hasStaticFieldAccess.get();
+        return new AddImport<P>.FindStaticFieldAccess().reduce(compilationUnit, new AtomicReference<>(false)).get();
     }
 
     private class FindStaticFieldAccess extends JavaIsoVisitor<AtomicReference<Boolean>> {
