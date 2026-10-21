@@ -185,6 +185,19 @@ rather than guess dependencies.
   releases reqlike's `urlish<2; extra == "socks"` bound on a cascade the edit also triggers, so urlish
   moves to 2.5 rather than 1.9 (`off18-removed-extra-unbinds-cascade/`).
 
+## 9a. `[tool.uv] constraint-dependencies` (local-index scenarios, uv 0.13.4)
+
+- A constraint bounds every resolution like a requirement without adding the package, and the lock
+  records the full list under `[manifest] constraints` as `{ name, specifier }` entries sorted by name,
+  one inline and several multiline (`off29-transitive-constraint/`, `off30-two-constraints/`). Adding
+  `urlish==2.5` once 2.5 exists moves urlish from its 1.0 pin, which a plain relock would have kept.
+- The lock is rewritten only when the constraints on packages it holds differ from the recorded ones:
+  a constraint naming only an absent package leaves an otherwise satisfied lock untouched and
+  `uv lock --check` passes, while a changed constraint on a held package rewrites the manifest with
+  every constraint, absent names included, even when the pin already satisfies it. Removing the last
+  held-package constraint removes `[manifest]`.
+- Markered constraints were not reproduced and are refused by the engine.
+
 ## 10. Edits that change the fork structure (fail loud)
 
 - Upgrading `reqlike[socks]` to a version that no longer provides `socks` makes uv drop the extra from

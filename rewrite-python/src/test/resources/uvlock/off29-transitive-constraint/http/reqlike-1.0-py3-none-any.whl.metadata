@@ -1,0 +1,5 @@
+Metadata-Version: 2.1
+Name: reqlike
+Version: 1.0
+Summary: synthetic reqlike
+Requires-Dist: urlish>=1

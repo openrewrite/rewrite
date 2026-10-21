@@ -416,17 +416,20 @@ public final class UvLockReader {
 
     private static UvLockManifest toManifest(Map<String, Object> map) {
         List<String> members = null;
+        List<UvLockRequirement> constraints = null;
         for (Map.Entry<String, Object> e : map.entrySet()) {
             if ("members".equals(e.getKey())) {
                 members = stringList(e.getKey(), e.getValue());
+            } else if ("constraints".equals(e.getKey())) {
+                constraints = toRequirements(e.getKey(), e.getValue());
             } else {
                 throw new UvLockFormatException("Unrecognized [manifest] key: " + e.getKey());
             }
         }
-        if (members == null) {
-            throw new UvLockFormatException("[manifest] table is missing members");
+        if (members == null && constraints == null) {
+            throw new UvLockFormatException("[manifest] table has neither members nor constraints");
         }
-        return new UvLockManifest(members);
+        return new UvLockManifest(members, constraints);
     }
 
     private static UvLockPackage toPackage(RawPackage raw) {

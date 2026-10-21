@@ -125,7 +125,14 @@ public final class UvLockWriter {
     }
 
     private static String manifestBlock(UvLockManifest manifest) {
-        return "[manifest]\nmembers = " + multilineStringArray(manifest.getMembers());
+        StringBuilder b = new StringBuilder("[manifest]");
+        if (manifest.getMembers() != null) {
+            b.append("\nmembers = ").append(multilineStringArray(manifest.getMembers()));
+        }
+        if (manifest.getConstraints() != null) {
+            b.append("\nconstraints = ").append(requirementArray(manifest.getConstraints()));
+        }
+        return b.toString();
     }
 
     private static void addPackageBlocks(List<String> blocks, UvLockPackage pkg) {

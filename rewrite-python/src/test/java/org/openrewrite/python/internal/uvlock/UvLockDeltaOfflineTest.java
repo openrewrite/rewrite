@@ -302,6 +302,55 @@ class UvLockDeltaOfflineTest {
     }
 
     @Test
+    void constraintDependencyMovesTransitiveAndRecordsManifest() {
+        // the UpgradeTransitiveDependencyVersion edit: [tool.uv] constraint-dependencies = ["urlish==2.5"]
+        routeLocalIndex("off29-transitive-constraint");
+        assertScenario("off29-transitive-constraint");
+    }
+
+    @Test
+    void constraintsAreRecordedSortedAndBoundKeptPins() {
+        // reqlike<1.5 keeps reqlike at its pin although 1.5 is listed; urlish>=2 moves urlish
+        routeLocalIndex("off30-two-constraints");
+        assertScenario("off30-two-constraints");
+    }
+
+    @Test
+    void constraintOnPackageAbsentFromLockLeavesItUntouched() {
+        routeLocalIndex("off29-transitive-constraint");
+        String pyproject = resource("off29-transitive-constraint/pyproject.toml")
+          .replace("constraint-dependencies = [\"urlish==2.5\"]", "constraint-dependencies = [\"nothere>=3\"]");
+        Result result = UvLockEngine.regenerate(pyproject, resource("off29-transitive-constraint/uv.lock.before"), ctx);
+        assertThat(result.getErrorMessage()).isNull();
+        assertThat(result.getLockFileContent()).isEqualTo(resource("off29-transitive-constraint/uv.lock.before"));
+        assertThat(http.requests).isEmpty();
+    }
+
+    @Test
+    void declarationConflictingWithRecordedConstraintFailsAsConflict() {
+        // uv refuses reqlike>=1.5 against the recorded reqlike<1.5, so the listed 1.5 must not be picked
+        routeLocalIndex("off31-declaration-vs-constraint-conflict");
+        Result result = UvLockEngine.regenerate(
+          resource("off31-declaration-vs-constraint-conflict/pyproject.toml"),
+          resource("off31-declaration-vs-constraint-conflict/uv.lock.before"),
+          ctx);
+        assertThat(result.isSuccess()).isFalse();
+        assertThat(result.getFailure().getReason()).isEqualTo(Reason.RESOLUTION_CONFLICT);
+        assertThat(result.getFailure().getPackageName()).isEqualTo("reqlike");
+    }
+
+    @Test
+    void markeredConstraintFailsLoud() {
+        routeLocalIndex("off29-transitive-constraint");
+        String pyproject = resource("off29-transitive-constraint/pyproject.toml")
+          .replace("constraint-dependencies = [\"urlish==2.5\"]", "constraint-dependencies = [\"urlish==2.5; sys_platform == 'win32'\"]");
+        Result result = UvLockEngine.regenerate(pyproject, resource("off29-transitive-constraint/uv.lock.before"), ctx);
+        assertThat(result.isSuccess()).isFalse();
+        assertThat(result.getFailure().getReason()).isEqualTo(Reason.RESOLUTION_REQUIRED);
+        assertThat(result.getFailure().getPackageName()).isEqualTo("urlish");
+    }
+
+    @Test
     void configuredUvReleaseStampsChangedLocksWithItsRevision() {
         PythonExecutionContextView.view(ctx).setUvVersion("0.13.4");
         routeLocalIndex("off18-removed-extra-unbinds-cascade");

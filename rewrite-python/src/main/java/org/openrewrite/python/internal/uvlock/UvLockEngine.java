@@ -244,6 +244,8 @@ public final class UvLockEngine {
         // (fail loud). Unconditional transitive edges keep the closure identical to an
         // unmarkered add, which is byte-identical to uv (verified: python-dateutil -> six).
         private final Set<String> markeredAddClosure = new HashSet<>();
+        // [tool.uv] constraint-dependencies, by canonical name: uv bounds every resolution by them
+        private final Map<String, UvLockRequirement> constraintDependencies = new TreeMap<>();
 
         Run(Toml.Document pyproject, UvLock lock, ExecutionContext ctx) {
             this.pyproject = pyproject;
@@ -266,7 +268,7 @@ public final class UvLockEngine {
         }
 
         private Result run() {
-            if (lock.getManifest() != null) {
+            if (lock.getManifest() != null && lock.getManifest().getMembers() != null) {
                 throw new EngineFailure(Reason.RESOLUTION_REQUIRED, null,
                         "Workspace locks ([manifest] with members) are not supported by the native engine");
             }
@@ -281,6 +283,7 @@ public final class UvLockEngine {
             UvLockPackage root = packages.get(rootIndex);
             oldMetadata = root.getMetadata() != null ? root.getMetadata() :
                     UvLockMetadata.builder().build();
+            readConstraintDependencies();
 
             Toml.Table project = UvLockToml.findTable(pyproject, "project");
             if (project == null) {
@@ -329,10 +332,24 @@ public final class UvLockEngine {
                 applyRemoval(removal);
                 structural = true;
             }
+            if (constraintsChanged()) {
+                updated = updated.withManifest(constraintDependencies.isEmpty() ? null :
+                        new UvLockManifest(null, new ArrayList<>(constraintDependencies.values())));
+                structural = true;
+                for (String name : constrainedLockedNames(constraintDependencies.values())) {
+                    Change change = new Change(name);
+                    change.constraints.addAll(gatherConstraints(name));
+                    List<String> pins = indexPins.get(name);
+                    change.pinnedIndexName = pins != null ? pins.get(0) : null;
+                    changes.add(change);
+                }
+            }
             Set<String> rewritten = new HashSet<>();
             Set<String> resolved = new HashSet<>();
             for (Change change : changes) {
-                resolved.add(change.canonicalName);
+                if (!resolved.add(change.canonicalName)) {
+                    continue;
+                }
                 if (applyChange(change)) {
                     rewritten.add(change.canonicalName);
                     structural = true;
@@ -455,6 +472,10 @@ public final class UvLockEngine {
                 collectConstraints(change, newMetadata.getRequiresDist());
                 for (List<UvLockRequirement> group : newDev.values()) {
                     collectConstraints(change, group);
+                }
+                PythonVersionSpecifierSet constraint = constraintSpecifiers(change.canonicalName);
+                if (constraint != null) {
+                    change.constraints.add(constraint);
                 }
             }
             changes.addAll(changeByName.values());
@@ -1078,6 +1099,10 @@ public final class UvLockEngine {
                     }
                 }
             }
+            PythonVersionSpecifierSet constraint = constraintSpecifiers(target);
+            if (constraint != null) {
+                constraints.add(constraint);
+            }
             UvLockMetadata rootMeta = packages.get(rootIndex).getMetadata();
             if (rootMeta != null) {
                 List<List<UvLockRequirement>> sections = new ArrayList<>();
@@ -1223,7 +1248,7 @@ public final class UvLockEngine {
                 for (Toml value : uvTable.getValues()) {
                     if (value instanceof Toml.KeyValue) {
                         String key = UvLockToml.keyName((Toml.KeyValue) value);
-                        if ("constraint-dependencies".equals(key) || "override-dependencies".equals(key) ||
+                        if ("override-dependencies".equals(key) ||
                                 "environments".equals(key) || "required-environments".equals(key)) {
                             throw new EngineFailure(Reason.RESOLUTION_REQUIRED, pkg,
                                     "Version selection under [tool.uv] " + key + " is not supported");
@@ -1231,6 +1256,79 @@ public final class UvLockEngine {
                     }
                 }
             }
+        }
+
+        // ---- [tool.uv] constraint-dependencies ----
+
+        /**
+         * Reads the manifest's constraints in the form uv records under {@code [manifest] constraints},
+         * a canonical name with a normalized specifier, sorted by name. Only that shape is reproduced,
+         * so extras, markers, URLs and duplicate names fail loud.
+         */
+        private void readConstraintDependencies() {
+            Toml.Table uv = UvLockToml.findTable(pyproject, "tool.uv");
+            if (uv == null) {
+                return;
+            }
+            for (String spec : UvLockToml.stringArray(uv, "constraint-dependencies")) {
+                Pep508Requirement requirement = Pep508Requirement.parse(spec);
+                if (requirement == null) {
+                    throw new EngineFailure(Reason.MALFORMED_MANIFEST, null,
+                            "Unparseable constraint-dependencies entry: " + spec);
+                }
+                String name = requirement.getCanonicalName();
+                if (requirement.getMarker() != null || !requirement.getExtras().isEmpty() ||
+                        requirement.getUrl() != null || constraintDependencies.containsKey(name)) {
+                    throw new EngineFailure(Reason.RESOLUTION_REQUIRED, name,
+                            "Only one plain version constraint per package is supported under [tool.uv] " +
+                                    "constraint-dependencies: " + spec);
+                }
+                constraintDependencies.put(name, new UvLockRequirement(name, null, null, null,
+                        UvLockMetadataBuilder.normalizeSpecifier(requirement), null, null, null, null));
+            }
+        }
+
+        private @Nullable PythonVersionSpecifierSet constraintSpecifiers(String name) {
+            UvLockRequirement constraint = constraintDependencies.get(name);
+            return constraint != null && constraint.getSpecifier() != null ?
+                    PythonVersionSpecifierSet.parse(constraint.getSpecifier()) : null;
+        }
+
+        /**
+         * uv rewrites {@code [manifest] constraints} (and resolves under the new set) only when the
+         * constraints on packages the lock holds differ from the recorded ones. Constraints that name
+         * no locked package leave an otherwise satisfied lock untouched.
+         */
+        private boolean constraintsChanged() {
+            List<UvLockRequirement> recorded = lock.getManifest() != null && lock.getManifest().getConstraints() != null ?
+                    lock.getManifest().getConstraints() : emptyList();
+            Set<String> locked = new HashSet<>();
+            for (UvLockPackage pkg : packages) {
+                locked.add(pkg.getName());
+            }
+            Set<UvLockRequirement> before = new HashSet<>();
+            for (UvLockRequirement constraint : recorded) {
+                if (locked.contains(constraint.getName())) {
+                    before.add(constraint);
+                }
+            }
+            Set<UvLockRequirement> after = new HashSet<>();
+            for (UvLockRequirement constraint : constraintDependencies.values()) {
+                if (locked.contains(constraint.getName())) {
+                    after.add(constraint);
+                }
+            }
+            return !before.equals(after);
+        }
+
+        private List<String> constrainedLockedNames(Collection<UvLockRequirement> constraints) {
+            List<String> names = new ArrayList<>();
+            for (UvLockRequirement constraint : constraints) {
+                if (findSinglePackage(constraint.getName()) >= 0) {
+                    names.add(constraint.getName());
+                }
+            }
+            return names;
         }
 
         private static boolean satisfiesAll(List<PythonVersionSpecifierSet> constraints, PythonVersion v) {

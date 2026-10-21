@@ -1,0 +1,39 @@
+version = 1
+revision = 5
+requires-python = ">=3.10"
+
+[manifest]
+constraints = [
+    { name = "reqlike", specifier = "<1.5" },
+    { name = "urlish", specifier = ">=2" },
+]
+
+[[package]]
+name = "reqlike"
+version = "1.0"
+source = { registry = "https://index.example/simple/" }
+dependencies = [
+    { name = "urlish" },
+]
+wheels = [
+    { url = "https://index.example/simple/reqlike/reqlike-1.0-py3-none-any.whl", hash = "sha256:51b5f203bca1d4b300b5d900988b95a4e4b351fcae5c773f3d8fb7a232633234" },
+]
+
+[[package]]
+name = "s36-two-constraints"
+version = "0.1.0"
+source = { virtual = "." }
+dependencies = [
+    { name = "reqlike" },
+]
+
+[package.metadata]
+requires-dist = [{ name = "reqlike", specifier = ">=1.0" }]
+
+[[package]]
+name = "urlish"
+version = "2.5"
+source = { registry = "https://index.example/simple/" }
+wheels = [
+    { url = "https://index.example/simple/urlish/urlish-2.5-py3-none-any.whl", hash = "sha256:8e325accdc003b98798123795f73a740fd405b41616fbbc009d80f3c98a3c97b" },
+]

@@ -63,6 +63,10 @@ a marker mixing an extra with a platform clause, which the engine refuses (its `
 uv's output, kept for the record), `off25-add-with-extras` a direct add with extras,
 `off26-declared-extras-added` and `off27-declared-extras-removed` a declaration gaining and losing its
 extras, and `off28-add-pinned-index` an add pinned to a second index (served under `http-alt/`).
+`off29-transitive-constraint` and `off30-two-constraints` add `[tool.uv] constraint-dependencies`
+(the UpgradeTransitiveDependencyVersion edit); their `uv.lock.before` was locked against an index
+without the newer `urlish 2.5`, which was then published to the recorded index before the edit, so the
+constraint is what moves the pin (BEHAVIOR.md §9a).
 A `uv.lock.after.uv-<release>` file is the same edit relocked by that release from the same `uv.lock.before`
 (2026-10-21): 0.13.4 restamps the revision-3 `off18` lock at revision 5 and 0.12.21 restamps the
 revision-5 `off21` lock at revision 3, each otherwise byte-identical to `uv.lock.after`.
