@@ -1047,3 +1047,24 @@ def test_method_with_decorator():
             from_visitor(TabsAndIndentsVisitor(style))
         )
     )
+
+
+def test_multiline_comprehension_closing_bracket_aligns_with_its_opening_line():
+    style = IntelliJ.tabs_and_indents()
+    rewrite_run(
+        # language=python
+        python(
+            """\
+            x = [
+                i for i in y
+            ]
+            def f(y):
+                return [
+                    i
+                    for i in y  # c
+                ]
+            """
+        ),
+        spec=RecipeSpec()
+        .with_recipes(from_visitor(TabsAndIndentsVisitor(style)))
+    )
