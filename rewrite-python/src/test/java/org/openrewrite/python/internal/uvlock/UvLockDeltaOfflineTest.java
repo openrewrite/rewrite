@@ -412,6 +412,44 @@ class UvLockDeltaOfflineTest {
     }
 
     @Test
+    void platformScopedPackageKeepsOnlyTheWheelsItsReachabilityAdmits() {
+        // under sys_platform == 'win32' uv keeps winonly's win_amd64 wheel and drops the Linux and macOS ones
+        routeLocalIndex("off39-platform-scoped-wheels");
+        assertScenario("off39-platform-scoped-wheels");
+    }
+
+    @Test
+    void oldUvLockIsRewrittenWithCurrentMarkerForms() {
+        // uv 0.4.30's platform_system == 'Windows' is written as sys_platform == 'win32', and an index without upload times gives none
+        PythonExecutionContextView.view(ctx).setUvVersion("0.13.4");
+        routeLocalIndex("off40-old-uv-marker-rewrite");
+        assertScenario("off40-old-uv-marker-rewrite");
+    }
+
+    @Test
+    void oldUvLockIsRewrittenWithForksInSolveOrder() {
+        // uv solves the fork with the higher Python lower bound first and records the forks in that order
+        PythonExecutionContextView.view(ctx).setUvVersion("0.13.4");
+        routeLocalIndex("off41-old-uv-fork-order");
+        assertScenario("off41-old-uv-fork-order");
+    }
+
+    @Test
+    void oldUvLockPrunesWheelsUnderItsRewrittenMarkers() {
+        // platform_system == 'Linux' only rules out win_amd64 once rewritten as sys_platform == 'linux'; an older uv kept
+        // such a wheel (the before-lock gets one added, as such locks carry it), and uv 0.13.4 drops it
+        PythonExecutionContextView.view(ctx).setUvVersion("0.13.4");
+        routeLocalIndex("off42-old-uv-platform-wheels");
+        String linuxWheel = "    { url = \"https://index.example/simple/winonly/winonly-1.0-py3-none-manylinux_2_17_x86_64.whl\", hash = \"sha256:d8649c59ee72ac58495b2279059719b5639720f5806fef42500e1b24ebad23f5\" },\n";
+        String before = resource("off42-old-uv-platform-wheels/uv.lock.before")
+          .replace(linuxWheel, linuxWheel + "    { url = \"https://index.example/simple/winonly/winonly-1.0-py3-none-win_amd64.whl\", hash = \"sha256:492d19c44841b557a2e8241dadf72139b4001d476f332e82bb7481614034808c\" },\n");
+        assertThat(before).contains("win_amd64");
+        Result result = UvLockEngine.regenerate(resource("off42-old-uv-platform-wheels/pyproject.toml"), before, ctx);
+        assertThat(result.getErrorMessage()).isNull();
+        assertThat(result.getLockFileContent()).isEqualTo(resource("off42-old-uv-platform-wheels/uv.lock.after"));
+    }
+
+    @Test
     void markeredConstraintFailsLoud() {
         routeLocalIndex("off29-transitive-constraint");
         String pyproject = resource("off29-transitive-constraint/pyproject.toml")
