@@ -211,12 +211,17 @@ public final class PipenvLockEngine {
         // whole Pipfile. When non-null, entries the recipe left untouched are preserved as-is
         // so pre-existing Pipfile/lock drift in an unrelated package can't abort the edit.
         private final @Nullable Set<String> changedPackages;
+        private final Toml.@Nullable Document originalPipfile;
+        // The pre-edit declarations by lock category, when the original Pipfile is known
+        private final @Nullable Map<String, Map<String, PipfileEntry>> originalCategories;
 
         @SuppressWarnings("unchecked")
         Run(Toml.Document pipfile, Toml.@Nullable Document originalPipfile, Map<String, Object> lock,
             String oldLockContent, ExecutionContext ctx) {
             this.pipfile = pipfile;
+            this.originalPipfile = originalPipfile;
             this.changedPackages = changedPackages(originalPipfile, pipfile);
+            this.originalCategories = originalPipfile == null ? null : readPipfileCategories(originalPipfile);
             this.lock = lock;
             this.newline = oldLockContent.contains("\r\n") ? "\r\n" : "\n";
             this.http = HttpSenderExecutionContextView.view(ctx).getHttpSender();
@@ -498,11 +503,18 @@ public final class PipenvLockEngine {
                     }
                 }
 
-                // Top-level entries (the only ones carrying an "index" key) that vanished
-                // from the Pipfile category were removed.
+                // Top-level entries that vanished from the Pipfile category were removed. Only a
+                // bare-string declaration leaves an "index" key on its entry, so an inline-table
+                // declaration is recognized as top-level through the original Pipfile.
                 Set<String> pipfileCanonical = new HashSet<>();
                 for (String key : category.getValue().keySet()) {
                     pipfileCanonical.add(Pep508Requirement.canonicalize(key));
+                }
+                Set<String> originallyDeclared = new HashSet<>();
+                if (originalCategories != null && originalCategories.containsKey(lockCategory)) {
+                    for (String key : originalCategories.get(lockCategory).keySet()) {
+                        originallyDeclared.add(Pep508Requirement.canonicalize(key));
+                    }
                 }
                 for (Map.Entry<String, Object> lockEntry : lockEntries.entrySet()) {
                     Map<String, Object> e = entryMap(lockEntry.getValue());
@@ -510,7 +522,8 @@ public final class PipenvLockEngine {
                     if (changedPackages != null && !changedPackages.contains(canonical)) {
                         continue; // only remove a package the recipe actually removed
                     }
-                    if (e.containsKey("index") && !pipfileCanonical.contains(canonical)) {
+                    boolean topLevel = e.containsKey("index") || originallyDeclared.contains(canonical);
+                    if (topLevel && !pipfileCanonical.contains(canonical)) {
                         edits.add(new Edit(lockCategory, new PipfileEntry(lockEntry.getKey()),
                                 lockEntry.getKey(), Edit.Kind.REMOVAL));
                     }
@@ -1014,7 +1027,7 @@ public final class PipenvLockEngine {
         }
 
         private @Nullable String defaultIndexName() {
-            List<Map<String, Object>> sources = readPipfileSources();
+            List<Map<String, Object>> sources = readPipfileSources(pipfile);
             if (!sources.isEmpty()) {
                 return stringOrNull(sources.get(0).get("name"));
             }
@@ -1283,10 +1296,10 @@ public final class PipenvLockEngine {
         }
 
         private void rebuildMeta(Set<String> pipfileCategories) {
-            List<Map<String, Object>> pipfileSources = readPipfileSources();
+            List<Map<String, Object>> pipfileSources = readPipfileSources(pipfile);
             String hash = PipfileLockHash.hash(pipfile,
                     pipfileSources.isEmpty() ? lockMetaSources : null,
-                    PipfileLockHash.HashVariant.LEGACY);
+                    hashVariant());
 
             Map<String, Object> hashMap = new LinkedHashMap<>();
             hashMap.put("sha256", hash);
@@ -1315,11 +1328,28 @@ public final class PipenvLockEngine {
             }
         }
 
+        // the recorded hash tells which pipenv wrote the lock, and legacy wins when it matches neither
+        private PipfileLockHash.HashVariant hashVariant() {
+            if (originalPipfile == null) {
+                return PipfileLockHash.HashVariant.LEGACY;
+            }
+            Object recorded = lockMeta.get("hash") instanceof Map ? ((Map<?, ?>) lockMeta.get("hash")).get("sha256") : null;
+            if (!(recorded instanceof String)) {
+                return PipfileLockHash.HashVariant.LEGACY;
+            }
+            List<Map<String, Object>> fallback = readPipfileSources(originalPipfile).isEmpty() ? lockMetaSources : null;
+            if (recorded.equals(PipfileLockHash.hash(originalPipfile, fallback, PipfileLockHash.HashVariant.LEGACY))) {
+                return PipfileLockHash.HashVariant.LEGACY;
+            }
+            return recorded.equals(PipfileLockHash.hash(originalPipfile, fallback, PipfileLockHash.HashVariant.CANONICAL)) ?
+                    PipfileLockHash.HashVariant.CANONICAL : PipfileLockHash.HashVariant.LEGACY;
+        }
+
         /**
          * [[source]] entries as written (env placeholders unexpanded), with pipenv's
          * defaults populated: name from the URL host, verify_ssl from the URL scheme.
          */
-        private List<Map<String, Object>> readPipfileSources() {
+        private static List<Map<String, Object>> readPipfileSources(Toml.Document pipfile) {
             List<Map<String, Object>> sources = new ArrayList<>();
             for (TomlValue value : pipfile.getValues()) {
                 if (!(value instanceof Toml.Table)) {

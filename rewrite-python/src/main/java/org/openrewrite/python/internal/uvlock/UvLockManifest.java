@@ -17,15 +17,23 @@ package org.openrewrite.python.internal.uvlock;
 
 import lombok.Value;
 import lombok.With;
+import org.jspecify.annotations.Nullable;
 
 import java.util.List;
 
 /**
- * The {@code [manifest]} table, present only for workspaces.
+ * The {@code [manifest]} table: workspace members and the resolver and build constraints in force.
  */
 @Value
 @With
 public class UvLockManifest {
 
+    @Nullable
     List<String> members;
+
+    @Nullable
+    List<UvLockRequirement> constraints;
+
+    @Nullable
+    List<UvLockRequirement> buildConstraints;
 }

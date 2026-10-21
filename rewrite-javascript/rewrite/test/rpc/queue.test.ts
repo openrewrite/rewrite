@@ -73,7 +73,7 @@ describe("RPC queues", () => {
             {state: RpcObjectState.ADD, valueType: "org.openrewrite.rpc.RpcMarker", value: {"@c": "org.openrewrite.rpc.RpcMarker", "@ref": 1, id: "1", tool: "example"}},
             {state: RpcObjectState.ADD, value: null},
         ];
-        const queue = new RpcReceiveQueue(new Map(), undefined, async () => batch.splice(0), undefined, false);
+        const queue = new RpcReceiveQueue(new Map(), undefined, [batch.splice(0)], undefined, false);
 
         expect(await queue.receive(undefined)).toEqual({kind: "org.openrewrite.rpc.RpcMarker", id: "1", tool: "example"});
         expect(await queue.receive(undefined)).toBeNull();
@@ -123,7 +123,7 @@ describe("RPC queues", () => {
                 ]
             }
         }];
-        const q = new RpcReceiveQueue(new Map(), JS.Kind.CompilationUnit, async () => batch.splice(0), undefined, false);
+        const q = new RpcReceiveQueue(new Map(), JS.Kind.CompilationUnit, [batch.splice(0)], undefined, false);
 
         expect((await q.receive<NamedStyles>(undefined)).styles).toEqual([
             {kind: StyleKind.SpacesStyle, within: {kind: SpacesStyleDetailKind.SpacesStyleWithin, es6ImportExportBraces: true}},
@@ -145,19 +145,19 @@ describe("RPC queues", () => {
 
     function registerReplacementDocument() {
         RpcCodecs.registerCodec(document, {
-            async rpcReceive(before: any, q: RpcReceiveQueue) {
-                return {...before, leaf: await q.receive(before.leaf)};
+            rpcReceive(before: any, q: RpcReceiveQueue) {
+                return {...before, leaf: q.receive(before.leaf)};
             },
-            async rpcSend(after: any, q: RpcSendQueue) {
-                await q.getAndSend(after, d => d.leaf);
+            rpcSend(after: any, q: RpcSendQueue) {
+                q.getAndSend(after, d => d.leaf);
             }
         }, document);
         RpcCodecs.registerCodec(leaf, {
-            async rpcReceive(before: any, q: RpcReceiveQueue) {
-                return {...before, text: await q.receive(before.text)};
+            rpcReceive(before: any, q: RpcReceiveQueue) {
+                return {...before, text: q.receive(before.text)};
             },
-            async rpcSend(after: any, q: RpcSendQueue) {
-                await q.getAndSend(after, l => l.text);
+            rpcSend(after: any, q: RpcSendQueue) {
+                q.getAndSend(after, l => l.text);
             }
         }, document);
     }
@@ -170,7 +170,7 @@ describe("RPC queues", () => {
             {state: RpcObjectState.ADD, valueType: leaf},
             {state: RpcObjectState.ADD, value: "Goodbye"},
         ];
-        const q = new RpcReceiveQueue(new Map(), JS.Kind.CompilationUnit, async () => batch.splice(0), undefined, false);
+        const q = new RpcReceiveQueue(new Map(), JS.Kind.CompilationUnit, [batch.splice(0)], undefined, false);
 
         // when
         const received = await q.receive<any>({kind: JS.Kind.CompilationUnit});
@@ -187,7 +187,7 @@ describe("RPC queues", () => {
             {state: RpcObjectState.CHANGE},
             {state: RpcObjectState.CHANGE, value: "Goodbye"},
         ];
-        const q = new RpcReceiveQueue(new Map(), JS.Kind.CompilationUnit, async () => batch.splice(0), undefined, false);
+        const q = new RpcReceiveQueue(new Map(), JS.Kind.CompilationUnit, [batch.splice(0)], undefined, false);
 
         // when
         const received = await q.receive<any>({kind: document, leaf: {kind: leaf, text: "Hello"}});
@@ -213,13 +213,31 @@ describe("RPC queues", () => {
         ]);
     });
 
+    test("a codec that returns a Promise fails on either side instead of desynchronizing the stream", () => {
+        const kind = "test.AsyncCodecNode";
+        RpcCodecs.registerCodec(kind, {
+            async rpcReceive(before: any) {
+                return before;
+            },
+            async rpcSend() {
+            }
+        } as any);
+
+        expect(() => new RpcSendQueue(new ReferenceMap(), undefined, false).generate({kind}, undefined))
+            .toThrow(/must be synchronous/);
+
+        const batch = [{state: RpcObjectState.ADD, valueType: kind}, {state: RpcObjectState.END_OF_OBJECT}] as RpcObjectData[];
+        expect(() => new RpcReceiveQueue(new Map(), undefined, [batch], undefined, false).receive(undefined))
+            .toThrow(/must be synchronous/);
+    });
+
     test("reading past END_OF_OBJECT fails rather than re-serving the batch", async () => {
         const batch = await sendList(["A"], []);
-        const q = new RpcReceiveQueue(new Map(), undefined, async () => batch, undefined, false);
+        const q = new RpcReceiveQueue(new Map(), undefined, [batch], undefined, false);
 
         await q.receiveList<string>(undefined);
         expect((await q.take()).state).toBe(RpcObjectState.END_OF_OBJECT);
-        await expect(q.take()).rejects.toThrow(/past END_OF_OBJECT/);
+        expect(() => q.take()).toThrow(/past END_OF_OBJECT/);
     });
 
     test("asRef doesn't create a new instance", () => {
@@ -294,7 +312,7 @@ describe("RPC queues", () => {
         const batch = await sq.generate(afterWrapper, beforeWrapper);
         expect(batch.length).toBeGreaterThan(0);
 
-        const rq = new RpcReceiveQueue(new Map(), undefined, async () => batch, undefined, false);
+        const rq = new RpcReceiveQueue(new Map(), undefined, [batch], undefined, false);
         const received = await rq.receive(beforeWrapper) as Wrapper;
 
         // Verify the wrapper's id stayed the same
@@ -314,7 +332,7 @@ describe("RPC queues", () => {
         await sq.sendList(after, before, m => m.id);
         const batch = sq.finish();
 
-        const rq = new RpcReceiveQueue(new Map(), undefined, async () => batch, undefined, false);
+        const rq = new RpcReceiveQueue(new Map(), undefined, [batch], undefined, false);
         const received = await rq.receiveList(before);
 
         expect(received![0].version).toBe("8.0");
@@ -328,7 +346,7 @@ describe("RPC queues", () => {
 
         // when
         const batch = await new RpcSendQueue(new ReferenceMap(), JS.Kind.CompilationUnit, false).generate(parsed, undefined);
-        const received = await new RpcReceiveQueue(new Map(), JS.Kind.CompilationUnit, async () => batch, undefined, false)
+        const received = await new RpcReceiveQueue(new Map(), JS.Kind.CompilationUnit, [batch], undefined, false)
             .receive<JS.CompilationUnit>(undefined);
 
         // then
@@ -368,9 +386,9 @@ describe("RPC queues", () => {
         const emptyBatch = await sendList<string>([], undefined);
 
         // when
-        const first = await new RpcReceiveQueue(new Map(), undefined, async () => emptyBatch, undefined, false)
+        const first = await new RpcReceiveQueue(new Map(), undefined, [emptyBatch], undefined, false)
             .receiveList<string>(undefined);
-        const second = await new RpcReceiveQueue(new Map(), undefined, async () => emptyBatch, undefined, false)
+        const second = await new RpcReceiveQueue(new Map(), undefined, [emptyBatch], undefined, false)
             .receiveList<string>(undefined);
 
         // then
@@ -384,10 +402,10 @@ describe("RPC queues", () => {
         const batch: RpcObjectData[] = [
             {state: RpcObjectState.ADD, valueType: "com.example.UnknownMarker", value: undefined},
         ];
-        const rq = new RpcReceiveQueue(new Map(), undefined, async () => batch, undefined, false);
+        const rq = new RpcReceiveQueue(new Map(), undefined, [batch], undefined, false);
 
         // when / then
-        await expect(rq.receive(undefined)).rejects.toThrow(
+        expect(() => rq.receive(undefined)).toThrow(
             "No RPC codec registered on the TypeScript side for 'com.example.UnknownMarker'"
         );
     });
@@ -405,8 +423,8 @@ describe("RPC queues", () => {
         const parsed = (await parser.parse({text: source, sourcePath: "t.ts"}).next()).value as JS.CompilationUnit;
 
         // when
-        const batch = await new RpcSendQueue(new ReferenceMap(), JS.Kind.CompilationUnit, false).generate(parsed, undefined);
-        const received = await new RpcReceiveQueue(new Map(), JS.Kind.CompilationUnit, async () => [...batch], undefined, false)
+        const batch = new RpcSendQueue(new ReferenceMap(), JS.Kind.CompilationUnit, false).generate(parsed, undefined);
+        const received = new RpcReceiveQueue(new Map(), JS.Kind.CompilationUnit, [batch], undefined, false)
             .receive<JS.CompilationUnit>(undefined);
 
         // then
