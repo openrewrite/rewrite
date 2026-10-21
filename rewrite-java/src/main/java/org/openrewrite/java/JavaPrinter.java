@@ -472,16 +472,14 @@ public class JavaPrinter<P> extends JavaVisitor<PrintOutputCapture<P>> {
     }
 
     private static boolean hasError(Tree tree) {
-        AtomicBoolean isError = new AtomicBoolean(false);
-        new JavaIsoVisitor<AtomicBoolean>() {
+        return new JavaIsoVisitor<AtomicBoolean>() {
 
             @Override
             public Erroneous visitErroneous(Erroneous erroneous, AtomicBoolean atomicBoolean) {
                 atomicBoolean.set(true);
                 return erroneous;
             }
-        }.visit(tree, isError);
-        return isError.get();
+        }.reduce(tree, new AtomicBoolean(false)).get();
     }
 
     @Override

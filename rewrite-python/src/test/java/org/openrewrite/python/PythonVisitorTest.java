@@ -37,8 +37,7 @@ import static org.openrewrite.python.Assertions.python;
 class PythonVisitorTest implements RewriteTest {
 
     private static List<String> collectTypeNames(Py.CompilationUnit cu) {
-        List<String> names = new ArrayList<>();
-        new PythonVisitor<List<String>>() {
+        return new PythonVisitor<List<String>>() {
             @Override
             public <N extends NameTree> N visitTypeName(N nameTree, List<String> ns) {
                 // visitFieldAccess() calls visitTypeName() on the field access itself, the others on a child
@@ -46,8 +45,7 @@ class PythonVisitorTest implements RewriteTest {
                 ns.add(nameTree.getClass().getSimpleName() + ":" + nameTree.printTrimmed(parent));
                 return nameTree;
             }
-        }.visit(cu, names);
-        return names;
+        }.reduce(cu, new ArrayList<>());
     }
 
     @Test

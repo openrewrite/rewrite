@@ -83,14 +83,13 @@ class KTSTest implements RewriteTest {
             }
             """,
                 spec -> spec.afterRecipe(cu -> {
-                    var count = new AtomicInteger();
-                    new KotlinIsoVisitor<AtomicInteger>() {
+                    var count = new KotlinIsoVisitor<AtomicInteger>() {
                         @Override
                         public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, AtomicInteger i) {
                             i.incrementAndGet();
                             return super.visitMethodInvocation(method, i);
                         }
-                    }.visit(cu, count);
+                    }.reduce(cu, new AtomicInteger());
                     assertThat(count.get()).isEqualTo(7);
                 }))
         );

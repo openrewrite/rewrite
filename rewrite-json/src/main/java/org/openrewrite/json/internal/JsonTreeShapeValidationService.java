@@ -49,8 +49,7 @@ public class JsonTreeShapeValidationService implements TreeShapeValidationServic
 
     @Override
     public List<String> invalid(SourceFile sourceFile) {
-        List<String> invalid = new ArrayList<>();
-        new JsonIsoVisitor<List<String>>() {
+        return new JsonIsoVisitor<List<String>>() {
             @Override
             public Json.JsonObject visitObject(Json.JsonObject obj, List<String> found) {
                 Set<String> keys = new HashSet<>();
@@ -85,8 +84,7 @@ public class JsonTreeShapeValidationService implements TreeShapeValidationServic
                 }
                 return super.visitLiteral(literal, found);
             }
-        }.visit(sourceFile, invalid);
-        return invalid;
+        }.reduce(sourceFile, new ArrayList<>());
     }
 
     private static String key(JsonKey key) {
