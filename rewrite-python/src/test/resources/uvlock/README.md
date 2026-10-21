@@ -97,3 +97,5 @@ six==1.16.0 pin-down of `uv.lock.as-0.5.0` in the file's own revisionless style,
 
 File extensions are chosen so the license-header plugin skips them; do not add headers — the
 round-trip tests assert byte identity against these exact contents.
+
+`marker/uv-0.13.4-tree-rows.json` holds the `assert_simplifies`, `assert_true`, `assert_false`, `is_disjoint` and `implies` cases of uv 0.13.4's `crates/uv-pep508/src/marker/tree.rs`. `marker/uv-0.13.4-rendered-markers.tsv` pairs every distinct marker in the corpus locks with uv 0.13.4's rendering of it. Each marker was declared as `leaf ; <marker>` in its own dependency group of one probe project, and the rendering is that group's entry in `[package.metadata.requires-dev]` after `uv lock`. 19 of the 321 differ from their input because older releases wrote them.

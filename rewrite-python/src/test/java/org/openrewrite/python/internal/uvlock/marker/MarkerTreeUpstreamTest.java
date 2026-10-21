@@ -17,11 +17,14 @@ package org.openrewrite.python.internal.uvlock.marker;
 
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.MethodSource;
 
 import java.io.IOException;
 import java.io.InputStream;
+import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Stream;
@@ -29,9 +32,8 @@ import java.util.stream.Stream;
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**
- * uv's own marker tests, extracted from uv 0.13.4 {@code crates/uv-pep508/src/marker/tree.rs}
- * (its {@code assert_simplifies}, {@code assert_true}, {@code assert_false}, {@code is_disjoint} and
- * {@code implies} calls) into {@code uvlock/marker/uv-0.13.4-tree-rows.json}.
+ * Marker behavior recorded from uv 0.13.4: its own tests in {@code crates/uv-pep508/src/marker/tree.rs}, and
+ * how it renders every distinct marker found in the corpus locks (see {@code uvlock/README.md}).
  */
 class MarkerTreeUpstreamTest {
 
@@ -41,6 +43,24 @@ class MarkerTreeUpstreamTest {
             });
             return rows.stream();
         }
+    }
+
+    @Test
+    void rendersCorpusMarkersAsUv() throws Exception {
+        List<String> mismatches = new ArrayList<>();
+        int rows = 0;
+        try (InputStream in = MarkerTreeUpstreamTest.class.getResourceAsStream("/uvlock/marker/uv-0.13.4-rendered-markers.tsv")) {
+            for (String line : new String(in.readAllBytes(), StandardCharsets.UTF_8).split("\n")) {
+                String[] cols = line.split("\t");
+                rows++;
+                String rendered = m(new MarkerInterner(), cols[0]).toString();
+                if (!rendered.equals(cols[1])) {
+                    mismatches.add(cols[0] + "\n  uv:   " + cols[1] + "\n  port: " + rendered);
+                }
+            }
+        }
+        assertThat(rows).isEqualTo(321);
+        assertThat(mismatches).isEmpty();
     }
 
     private static MarkerTree m(MarkerInterner interner, String marker) throws MarkerParser.MarkerSyntaxException {
