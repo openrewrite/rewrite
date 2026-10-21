@@ -412,10 +412,10 @@ class UvLockDeltaOfflineTest {
     }
 
     @Test
-    void platformScopedPackageWithPlatformWheelsFailsLoud() {
-        // uv keeps only winonly's win_amd64 wheel under sys_platform == 'win32', a pruning the engine does not port yet
+    void platformScopedPackageKeepsOnlyTheWheelsItsReachabilityAdmits() {
+        // under sys_platform == 'win32' uv keeps winonly's win_amd64 wheel and drops the Linux and macOS ones
         routeLocalIndex("off39-platform-scoped-wheels");
-        assertFailsLoud("off39-platform-scoped-wheels", "winonly");
+        assertScenario("off39-platform-scoped-wheels");
     }
 
     @Test

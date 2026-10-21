@@ -216,8 +216,9 @@ rather than guess dependencies.
 
 - uv drops the wheels a package's reachability rules out: `winonly==1.0; sys_platform == 'win32'` keeps only
   `win_amd64` of its three platform wheels (`off39-platform-scoped-wheels/`, `uv-lock` `is_wheel_unreachable_for_marker`,
-  a disjointness test against one constant marker per platform and architecture). The engine fails loud on a
-  written package that every path reaches under a platform clause and that has platform-specific wheels.
+  a disjointness test against one constant marker per platform and architecture). uv rebuilds every package's
+  wheels this way on each write; the engine prunes every package likewise, and fails loud where a platform-scoped
+  package it did not resolve changes reachability, since uv would take its wheels from the index again.
 
 ## 9a. `[tool.uv] constraint-dependencies` (local-index scenarios, uv 0.13.4)
 

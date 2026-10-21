@@ -404,7 +404,7 @@ public final class UvLockEngine {
             }
             verifyDependents(rewritten);
             if (structural || migrating) {
-                refusePlatformPrunedWheels(rewritten);
+                prunePlatformWheels(rewritten);
             }
             if (pythonChanged && lowerBoundIncreased()) {
                 validatePinsAgainstPython(rewritten);
@@ -667,6 +667,10 @@ public final class UvLockEngine {
         }
 
         private int findRoot() {
+            return findRoot(packages);
+        }
+
+        private static int findRoot(List<UvLockPackage> packages) {
             int found = -1;
             for (int i = 0; i < packages.size(); i++) {
                 UvLockSource source = packages.get(i).getSource();
@@ -1312,23 +1316,56 @@ public final class UvLockEngine {
             }
         }
 
-        // uv drops the wheels a platform-scoped package's reachability rules out, which the engine does not port yet
-        private void refusePlatformPrunedWheels(Set<String> rewritten) {
-            List<UvLockPackage> candidates = new ArrayList<>();
+        /**
+         * uv writes every package's wheels less the ones its reachability rules out. An entry the run did
+         * not resolve keeps the wheels it has, so one whose platform-scoped reachability changed may be owed
+         * wheels back from the index, which fails loud.
+         */
+        private void prunePlatformWheels(Set<String> rewritten) {
+            boolean any = false;
             for (UvLockPackage pkg : packages) {
-                if ((migrating || rewritten.contains(pkg.getName())) && hasPlatformWheel(pkg)) {
-                    candidates.add(pkg);
-                }
+                any |= hasPlatformWheel(pkg);
             }
-            if (candidates.isEmpty()) {
+            if (!any) {
                 return;
             }
-            Set<Integer> scoped = UvLockReachability.platformScoped(packages, rootIndex, range);
-            for (UvLockPackage pkg : candidates) {
-                if (scoped == null || scoped.contains(packages.indexOf(pkg))) {
-                    throw new EngineFailure(Reason.RESOLUTION_REQUIRED, pkg.getName(),
-                            pkg.getName() + " is only reachable under a platform marker, and uv drops the wheels " +
-                                    "for the platforms it rules out, which the native engine does not reproduce");
+            UvLockReachability now = UvLockReachability.of(packages, rootIndex, range);
+            if (now == null) {
+                throw new EngineFailure(Reason.RESOLUTION_REQUIRED, null,
+                        "Pruning platform wheels by reachability is not supported for this lock's markers");
+            }
+            UvLockReachability before = null;
+            Map<String, Integer> beforeIndex = new HashMap<>();
+            List<UvLockPackage> original = lock.getPackages();
+            for (int i = 0; i < original.size(); i++) {
+                beforeIndex.put(original.get(i).getName() + '@' + original.get(i).getVersion(), i);
+            }
+            for (int i = 0; i < packages.size(); i++) {
+                UvLockPackage pkg = packages.get(i);
+                if (!hasPlatformWheel(pkg)) {
+                    continue;
+                }
+                Integer was = beforeIndex.get(pkg.getName() + '@' + pkg.getVersion());
+                if (!rewritten.contains(pkg.getName()) && was != null) {
+                    if (before == null) {
+                        before = UvLockReachability.of(original, findRoot(original), PyRange.parse(
+                                lock.getRequiresPython() != null ? lock.getRequiresPython() : ""));
+                    }
+                    if (before == null || (before.platformScoped(was) && !before.reachKey(was).equals(now.reachKey(i)))) {
+                        throw new EngineFailure(Reason.RESOLUTION_REQUIRED, pkg.getName(),
+                                "The platforms " + pkg.getName() + " is reachable on changed, so uv would take its wheels " +
+                                        "from the index again, which the native engine does not reproduce");
+                    }
+                }
+                List<UvLockArtifact> kept = new ArrayList<>();
+                for (UvLockArtifact wheel : pkg.getWheels()) {
+                    String filename = wheelFilename(wheel);
+                    if (filename == null || !now.wheelUnreachable(i, filename)) {
+                        kept.add(wheel);
+                    }
+                }
+                if (kept.size() != pkg.getWheels().size()) {
+                    packages.set(i, pkg.withWheels(kept.isEmpty() ? null : kept));
                 }
             }
         }
