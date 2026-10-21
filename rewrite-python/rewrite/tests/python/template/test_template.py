@@ -963,3 +963,73 @@ class TestTypeAttributedPatternMatching:
                 """,
             ),
         )
+
+
+def _kinds(tree) -> list:
+    kinds = []
+
+    class _Collector(PythonVisitor):
+        def visit(self, t, p, parent=None):
+            if t is not None:
+                kinds.append(type(t).__name__)
+            return super().visit(t, p, parent)
+
+    _Collector().visit(tree, None)
+    return kinds
+
+
+def _parse(source: str):
+    import ast
+    from rewrite.python._parser_visitor import ParserVisitor
+    return ParserVisitor(source, "expected.py", None).visit(ast.parse(source))
+
+
+class _ReplaceSize(Recipe):
+    def __init__(self, replacement: str):
+        self._replacement = replacement
+
+    @property
+    def name(self) -> str:
+        return "test.ReplaceSize"
+
+    @property
+    def display_name(self) -> str:
+        return "Replace size()"
+
+    @property
+    def description(self) -> str:
+        return "Replaces `x.size()` with a template over `x`."
+
+    def editor(self):
+        x = capture('x')
+        pat = pattern("{x}.size()", x=x)
+        tmpl = template(self._replacement, x=x)
+
+        class Visitor(PythonVisitor[ExecutionContext]):
+            def visit_method_invocation(self, method, p):
+                method = super().visit_method_invocation(method, p)
+                match = pat.match(method, self.cursor)
+                return tmpl.apply(self.cursor, values=match) if match else method
+        return Visitor()
+
+
+class TestTemplateApplySlotShape:
+    """The tree `apply` leaves behind has the node kinds a parse of the printed result has."""
+
+    @staticmethod
+    def _run(replacement: str, before: str, after: str) -> None:
+        def same_kinds_as_parse(cu):
+            assert _kinds(cu) == _kinds(_parse(after))
+
+        RecipeSpec(recipe=_ReplaceSize(replacement)).rewrite_run(
+            python(before, after, after_recipe=same_kinds_as_parse))
+
+    def test_replaced_call_in_an_expression_slot_stays_bare(self):
+        self._run("len({x})", "b = a.size()", "b = len(a)")
+
+        self._run("len({x})", "f(a.size())", "f(len(a))")
+
+    def test_replaced_statement_level_call_is_wrapped_only_when_not_a_statement(self):
+        self._run("len({x})", "a.size()", "len(a)")
+
+        self._run("{x} + 1", "a.size()", "a + 1")
