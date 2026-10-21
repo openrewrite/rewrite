@@ -604,6 +604,7 @@ class ScalaTypeMapping(typeFactory: JavaTypeFactory, typedTree: tpd.Tree,
         case tmr: TermRef => mapTermRef(tmr, sig)
         case tt: ThisType => mapType(tt.tref)
         case et: ExprType => mapType(et.resultType)
+        case at: AppliedType if at.isRepeatedParam => mapType(at.translateFromRepeated(toArray = false))
         case at: AppliedType => mapAppliedType(at, sig)
         case tp: TypeParamRef => mapGenericTypeVariable(tp, sig)
         case tb: TypeBounds => mapTypeBounds(tb, sig)
@@ -867,7 +868,7 @@ class ScalaTypeMapping(typeFactory: JavaTypeFactory, typedTree: tpd.Tree,
         val paramTypes: util.List[JavaType] = info.stripPoly match {
           case mt: MethodType =>
             val pts = new ArrayList[JavaType]()
-            mt.paramInfos.foreach(pt => pts.add(mapType(pt)))
+            mt.paramInfos.foreach(pt => pts.add(mapType(signatureBuilder.parameterType(sym, pt))))
             pts
           case _ => null
         }
@@ -891,7 +892,7 @@ class ScalaTypeMapping(typeFactory: JavaTypeFactory, typedTree: tpd.Tree,
     typeFactory.variableFor(sig, () => {
       val variable = new JavaType.Variable(null, flagsBits, sym.name.toString, null, null, null)
       val ownerType = try { variableOwner(sym) } catch { case _: Throwable => unknown }
-      val varType = try { mapType(sym.info) } catch { case _: Throwable => unknown }
+      val varType = try { mapType(signatureBuilder.parameterType(sym.owner, sym.info)) } catch { case _: Throwable => unknown }
       variable.unsafeSet(ownerType, varType, null.asInstanceOf[java.util.List[JavaType.FullyQualified]])
       variable
     })
@@ -932,6 +933,16 @@ class ScalaTypeMapping(typeFactory: JavaTypeFactory, typedTree: tpd.Tree,
     if (sym.is(Flags.Abstract)) bits |= Flag.Abstract.getBitMask
     if (sym.is(Flags.Final) || sym.is(Flags.Module)) bits |= Flag.Final.getBitMask
     if (sym.isStatic) bits |= Flag.Static.getBitMask
+    if (sym.isTerm && isVarargs(sym.info)) bits |= Flag.Varargs.getBitMask
     bits
+  }
+
+  /**
+   * Whether this is the type of a method whose last parameter is repeated, or of a repeated parameter.
+   * A method's type gives a repeated parameter as `<repeated>[T]`; the parameter itself is a `Seq[T] @Repeated`.
+   */
+  private def isVarargs(info: Type): Boolean = info.stripPoly match {
+    case mt: MethodType => mt.paramInfos.lastOption.exists(_.isRepeatedParam)
+    case tpe => tpe.isRepeatedParam || tpe.hasAnnotation(ctx.definitions.RepeatedAnnot)
   }
 }
