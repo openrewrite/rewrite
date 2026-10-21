@@ -789,6 +789,33 @@ class TestImportsInBlocks:
             )
         )
 
+    def test_a_submodule_import_another_import_binds_the_package_of_goes_once_nothing_spells_it(self, arm):
+        spec = RecipeSpec(recipe=from_visitor(_remove_import_visitor(arm, 'legacy.http')), type_attribution=False)
+        spec.rewrite_run(
+            python(
+                """
+                import legacy.http
+                import legacy
+                h = legacy.http.make_headers()
+                """,
+            )
+        )
+
+        spec.rewrite_run(
+            python(
+                """
+                import legacy.http
+                import legacy.auth
+                legacy.auth.login()
+                """,
+                """
+                import legacy.auth
+                legacy.auth.login()
+                """,
+                after_recipe=parse_shape("import legacy.auth\nlegacy.auth.login()\n"),
+            )
+        )
+
     def test_keep_import_when_emptying_would_lose_a_comment(self, arm):
         spec = RecipeSpec(recipe=from_visitor(
             _remove_import_visitor(arm, 'typing', 'List', only_if_unused=False)))
