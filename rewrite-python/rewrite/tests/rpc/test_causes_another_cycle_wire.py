@@ -66,7 +66,7 @@ def server():
     finally:
         server._marketplace = saved_marketplace
         server._prepared_recipes.clear()
-        server._prepared_editor_overrides.clear()
+        server._prepared_unwrapped_editors.clear()
         server._prepared_edit_preconditions.clear()
 
 

@@ -1331,7 +1331,7 @@ def handle_reset(params: dict) -> bool:
     remote_refs.clear()
     _prepared_recipes.clear()
     _delegating_recipes.clear()
-    _prepared_editor_overrides.clear()
+    _prepared_unwrapped_editors.clear()
     _prepared_edit_preconditions.clear()
     _execution_contexts.clear()
     _local_object_ids.clear()
@@ -1850,13 +1850,10 @@ _prepared_recipes: Dict[str, Any] = {}
 # resolves it here and answers with a delegatesTo response so the JVM runs the
 # real recipe natively.
 _delegating_recipes: Dict[str, Any] = {}
-# Cached bare-editor visitors keyed by prepared recipe id. Populated at
-# PrepareRecipe time when recipe.editor() returns a Preconditions.check
-# wrapper: we strip the wrapper, register the precondition's wire identity
-# in editPreconditions (so the host evaluates it Java-side), and store the
-# bare editor here. When BatchVisit / Visit dispatches edit:<id> back, we
-# return this bare editor so the precondition does not double-run.
-_prepared_editor_overrides: Dict[str, Any] = {}
+# Prepared recipe ids whose recipe.editor() is a Preconditions.check wrapper
+# with every precondition sent in editPreconditions. The host evaluates those,
+# so dispatching edit:<id> unwraps the editor to keep them from running twice.
+_prepared_unwrapped_editors: Set[str] = set()
 # Per-recipe-edit-phase precondition wire entries collected at PrepareRecipe
 # time from a Preconditions.check(...) wrapper around recipe.editor().
 _prepared_edit_preconditions: Dict[str, List[Dict[str, Any]]] = {}
@@ -1962,11 +1959,8 @@ def _prepare_instance(recipe, marketplace, accepts_causes_another_cycle: bool = 
 
     is_scanning = isinstance(recipe, ScanningRecipe)
 
-    # Introspect recipe.editor() once at prepare time. If the recipe wrapped its editor in
-    # Preconditions.check(...), we extract the precondition's wire identity (so the Java host can
-    # evaluate it locally and skip the visit RPC for non-matching files) and cache the bare editor
-    # (so a subsequent dispatch via _instantiate_visitor returns the unwrapped editor — otherwise
-    # the precondition would also run Python-side and double the cost).
+    # A Preconditions.check(...) wrapper around the editor is sent as editPreconditions, so the
+    # host can skip the visit RPC for files that don't match.
     edit_preconditions: List[Dict[str, Any]] = list(_get_preconditions(recipe, 'edit'))
     if not is_scanning:
         try:
@@ -1976,9 +1970,8 @@ def _prepare_instance(recipe, marketplace, accepts_causes_another_cycle: bool = 
         if editor_visitor is not None:
             extracted = _extract_preconditions_from_editor(editor_visitor)
             if extracted is not None:
-                bare_editor, wire_entries = extracted
-                _prepared_editor_overrides[prepared_id] = bare_editor
-                edit_preconditions.extend(wire_entries)
+                _prepared_unwrapped_editors.add(prepared_id)
+                edit_preconditions.extend(extracted[1])
     _prepared_edit_preconditions[prepared_id] = edit_preconditions
 
     response = {
@@ -2479,14 +2472,14 @@ def _instantiate_visitor(visitor_name: str, ctx, visitor_options: Optional[Dict[
             acc = _recipe_accumulators[recipe_id]
             return recipe.editor_with_data(acc)
 
-        # If the recipe wrapped its editor in Preconditions.check(...) and we
-        # captured the bare editor at PrepareRecipe time, return it here so
-        # the precondition does not double-run on the Python side. The host
-        # has already evaluated it via the editPreconditions wire slot.
-        override = _prepared_editor_overrides.get(recipe_id)
-        if override is not None:
-            return override
-        return recipe.editor()
+        # A fresh editor per dispatch, as in Recipe.run, so state an editor
+        # keeps on self does not carry over to the next file.
+        editor = recipe.editor()
+        if recipe_id in _prepared_unwrapped_editors:
+            extracted = _extract_preconditions_from_editor(editor)
+            if extracted is not None:
+                return extracted[0]
+        return editor
 
     elif visitor_name.startswith('scan:'):
         recipe_id = visitor_name[5:]
