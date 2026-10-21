@@ -20,6 +20,7 @@ import okhttp3.mockwebserver.MockResponse;
 import okhttp3.mockwebserver.MockWebServer;
 import okhttp3.mockwebserver.RecordedRequest;
 import okio.Buffer;
+import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -763,6 +764,68 @@ class PipenvLockEngineTest {
         assertThat(result.getFailure().getDetail())
                 .contains("No version matching ==9.9.9 is available")
                 .contains("may lag PyPI");
+    }
+
+    @Test
+    void upgradeMovesAPinItsNewVersionNoLongerAccepts() {
+        listing("requests",
+          wheel("requests-2.31.0-py3-none-any.whl", WHEEL_2310, ">=3.7"),
+          wheel("requests-2.33.0-py3-none-any.whl", "3".repeat(64), ">=3.8"));
+        metadata("requests-2.33.0-py3-none-any.whl", """
+          Metadata-Version: 2.1
+          Name: requests
+          Version: 2.33.0
+          Requires-Python: >=3.8
+          Requires-Dist: certifi>=2017.4.17
+          Requires-Dist: idna<4,>=3.8
+          """);
+        // the newest idna every live requirement accepts, not the newest listed
+        listing("idna",
+          wheel("idna-3.7-py3-none-any.whl", IDNA, ">=3.5"),
+          wheel("idna-3.10-py3-none-any.whl", "a".repeat(64), ">=3.6"),
+          wheel("idna-4.0-py3-none-any.whl", "b".repeat(64), ">=3.8"));
+        metadata("idna-3.10-py3-none-any.whl", """
+          Metadata-Version: 2.1
+          Name: idna
+          Version: 3.10
+          Requires-Python: >=3.6
+          """);
+        // every other pin's requirements bound the move, so certifi's are read too
+        listing("certifi", wheel("certifi-2024.2.2-py3-none-any.whl", CERTIFI, ">=3.6"));
+        metadata("certifi-2024.2.2-py3-none-any.whl", """
+          Metadata-Version: 2.1
+          Name: certifi
+          Version: 2024.2.2
+          """);
+        String pipfile = """
+          [[source]]
+          url = "https://pypi.org/simple"
+          verify_ssl = true
+          name = "pypi"
+
+          [packages]
+          requests = ">=2.33.0"
+
+          [requires]
+          python_version = "3.11"
+          """;
+
+        Result result = PipenvLockEngine.regenerate(pipfile, baseLock(), ctx);
+
+        assertThat(result.getErrorMessage()).isNull();
+        assertThat(compact(result.getLockFileContent())).contains(compact("""
+          "idna": {
+              "hashes": [
+                  "sha256:%s"
+              ],
+              "markers": "python_version >= '3.6'",
+              "version": "==3.10"
+          },""".formatted("a".repeat(64))))
+          .contains(compact("\"version\": \"==2.33.0\""));
+    }
+
+    private static String compact(@Nullable String json) {
+        return String.valueOf(json).replaceAll("\\s+", "");
     }
 
     @Test
