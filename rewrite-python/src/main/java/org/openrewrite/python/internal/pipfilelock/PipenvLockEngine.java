@@ -51,6 +51,7 @@ import org.openrewrite.toml.tree.TomlValue;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -62,6 +63,8 @@ import java.util.TreeSet;
 
 import static java.util.Collections.emptyList;
 import static java.util.Collections.emptyMap;
+import static java.util.Collections.singletonList;
+import static java.util.Collections.singletonMap;
 
 /**
  * Native {@code Pipfile.lock} regeneration with minimal-update semantics (ADR 0009,
@@ -178,7 +181,7 @@ public final class PipenvLockEngine {
 
     private static class Edit {
         enum Kind {
-            CHANGE, ATTRIBUTES, REMOVAL
+            CHANGE, ATTRIBUTES, REMOVAL, ADD
         }
 
         final String lockCategory;
@@ -214,6 +217,14 @@ public final class PipenvLockEngine {
         private final Toml.@Nullable Document originalPipfile;
         // The pre-edit declarations by lock category, when the original Pipfile is known
         private final @Nullable Map<String, Map<String, PipfileEntry>> originalCategories;
+        // The edited declarations by lock category
+        private Map<String, Map<String, PipfileEntry>> declaredCategories = emptyMap();
+        // Packages this run pinned at a version it chose, beyond the declared edit
+        private final Set<String> resolved = new TreeSet<>();
+        // Metadata of the versions this run moved packages to, by canonical name
+        private final Map<String, CoreMetadata> movedMetadata = new HashMap<>();
+        // Metadata of locked versions, by "name==version", null where it could not be read
+        private final Map<String, @Nullable CoreMetadata> pinnedMetadata = new HashMap<>();
 
         @SuppressWarnings("unchecked")
         Run(Toml.Document pipfile, Toml.@Nullable Document originalPipfile, Map<String, Object> lock,
@@ -253,6 +264,7 @@ public final class PipenvLockEngine {
                 return Result.failure(new Failure(Reason.UNSUPPORTED_ENTRY_TYPE, null, null,
                         "Pipfile contains a dependency entry the native engine cannot represent"));
             }
+            declaredCategories = pipfileCategories;
 
             List<Edit> edits = new ArrayList<>();
             Failure diffFailure = computeEdits(pipfileCategories, edits);
@@ -276,6 +288,9 @@ public final class PipenvLockEngine {
                     case ATTRIBUTES:
                         failure = applyAttributes(edit);
                         break;
+                    case ADD:
+                        failure = applyAdd(edit);
+                        break;
                     default:
                         failure = applyChange(edit);
                 }
@@ -284,6 +299,10 @@ public final class PipenvLockEngine {
                 }
             }
 
+            if (!resolved.isEmpty()) {
+                notes.add("MINIMAL_CHANGE: pinned " + String.join(", ", resolved) + " at the newest versions their " +
+                        "requirements accept and left every other entry as it was, where pipenv would re-resolve them");
+            }
             rebuildMeta(pipfileCategories.keySet());
             String content = PipfileLockWriter.write(lock, newline);
             return Result.success(content, notes.isEmpty() ? null : String.join("; ", notes));
@@ -467,9 +486,8 @@ public final class PipenvLockEngine {
                             return new Failure(Reason.UNSUPPORTED_ENTRY_TYPE, entry.keyAsWritten, null,
                                     "VCS/path/file/editable entries cannot be locked by the native engine");
                         }
-                        return new Failure(Reason.RESOLUTION_REQUIRED, entry.keyAsWritten, null,
-                                "Package is not in the existing lock; adding a package requires delta " +
-                                        "resolution, which the native engine does not yet support");
+                        edits.add(new Edit(lockCategory, entry, null, Edit.Kind.ADD));
+                        continue;
                     }
                     Map<String, Object> lockEntry = entryMap(lockEntries.get(lockKey));
                     String pinned = pinnedVersion(lockEntry);
@@ -721,17 +739,48 @@ public final class PipenvLockEngine {
                 if (md.failure != null || md.metadata == null) {
                     return md.failure;
                 }
-                Failure closureFailure = proveClosureUnchanged(pkg, md.metadata, entry, lockEntries);
+                movedMetadata.put(Pep508Requirement.canonicalize(pkg), md.metadata);
+                Failure closureFailure = ensureClosure(pkg, md.metadata, entry.extras, edit.lockCategory, new HashSet<>());
                 if (closureFailure != null) {
                     return closureFailure;
                 }
             }
 
-            Map<String, Object> newEntry = new LinkedHashMap<>(oldEntry);
+            Map<String, Object> newEntry = new LinkedHashMap<>(lockEntries.get(edit.lockKey) == null ? oldEntry :
+                    entryMap(lockEntries.get(edit.lockKey)));
             applyMarkers(newEntry, entry, null);
             applyExtras(newEntry, entry);
             applyIndex(newEntry, entry);
             lockEntries.put(edit.lockKey, newEntry);
+            return null;
+        }
+
+        /** A declaration the lock does not hold enters it under its Pipfile constraint, with its closure. */
+        private @Nullable Failure applyAdd(Edit edit) {
+            PipfileEntry entry = edit.entry;
+            PythonVersionSpecifierSet constraint = parseConstraint(entry.constraint);
+            if (constraint == null) {
+                return new Failure(Reason.RESOLUTION_REQUIRED, entry.keyAsWritten, null,
+                        "Unparseable version constraint: " + entry.constraint);
+            }
+            // a pin an earlier edit's closure added answers to the packages that edit moved as well
+            List<PythonVersionSpecifierSet> constraints = new ArrayList<>();
+            Failure unreadable = boundByRun(Pep508Requirement.canonicalize(entry.keyAsWritten), edit.lockCategory,
+                    constraints);
+            if (unreadable != null) {
+                return unreadable;
+            }
+            Failure failure = pin(entry.keyAsWritten, edit.lockCategory, null, constraints, entry.extras,
+                    new HashSet<>());
+            if (failure != null) {
+                return failure;
+            }
+            Map<String, Object> lockEntries = lockCategory(edit.lockCategory);
+            String lockKey = canonicalKeys(lockEntries).get(Pep508Requirement.canonicalize(entry.keyAsWritten));
+            Map<String, Object> added = new LinkedHashMap<>(entryMap(lockEntries.get(lockKey)));
+            applyExtras(added, entry);
+            applyIndex(added, entry);
+            lockEntries.put(lockKey, added);
             return null;
         }
 
@@ -771,7 +820,8 @@ public final class PipenvLockEngine {
             }
             CoreMetadata metadata = md.metadata;
 
-            Failure closureFailure = proveClosureUnchanged(pkg, metadata, entry, lockEntries);
+            movedMetadata.put(Pep508Requirement.canonicalize(pkg), metadata);
+            Failure closureFailure = ensureClosure(pkg, metadata, entry.extras, edit.lockCategory, new HashSet<>());
             if (closureFailure != null) {
                 return closureFailure;
             }
@@ -861,31 +911,44 @@ public final class PipenvLockEngine {
         }
 
         /**
-         * Every requirement of the new version — after marker filtering in the lock
-         * environment with the entry's requested extras — must be satisfied by an
-         * existing pin in the same category, or the closure is not provably unchanged.
+         * Every requirement of the package's new version, after marker filtering in the lock environment with its
+         * requested extras, is met in its category, moving a pin that no longer meets it (a cascade).
          */
-        private @Nullable Failure proveClosureUnchanged(String pkg, CoreMetadata metadata,
-                                                        PipfileEntry entry, Map<String, Object> lockEntries) {
-            Map<String, String> lockKeysByCanonical = canonicalKeys(lockEntries);
+        private @Nullable Failure ensureClosure(String pkg, CoreMetadata metadata, List<String> extras,
+                                                String category, Set<String> moving) {
+            moving.add(Pep508Requirement.canonicalize(pkg));
+            Map<String, Object> lockEntries = lockCategory(category);
             for (String raw : metadata.getRequiresDist()) {
                 Pep508Requirement requirement = Pep508Requirement.parse(raw);
                 if (requirement == null) {
                     return new Failure(Reason.RESOLUTION_REQUIRED, pkg, null,
                             "Unparseable requirement of the new version: " + raw);
                 }
-                if (!applies(requirement.getMarker(), entry.extras)) {
+                if (!applies(requirement.getMarker(), extras)) {
                     continue;
                 }
                 if (requirement.getUrl() != null) {
                     return new Failure(Reason.RESOLUTION_REQUIRED, pkg, null,
                             "The new version requires a direct URL dependency: " + raw);
                 }
-                String lockKey = lockKeysByCanonical.get(requirement.getCanonicalName());
+                String lockKey = canonicalKeys(lockEntries).get(requirement.getCanonicalName());
                 if (lockKey == null) {
-                    return new Failure(Reason.RESOLUTION_REQUIRED, pkg, null,
-                            "Requirement " + raw + " of the new version is not satisfied by the existing " +
-                                    "lock; delta resolution is not yet supported by the native engine");
+                    List<PythonVersionSpecifierSet> constraints = new ArrayList<>();
+                    if (requirement.getSpecifiers() != null) {
+                        constraints.add(requirement.getSpecifiers());
+                    }
+                    // the Pipfile may declare the package too, in an edit not applied yet
+                    Failure unreadable = boundByRun(requirement.getCanonicalName(), category, constraints);
+                    if (unreadable != null) {
+                        return unreadable;
+                    }
+                    // no pin in the lock can require a package the lock does not hold
+                    Failure added = pin(requirement.getName(), category, null, constraints,
+                            new ArrayList<>(requirement.getExtras()), moving);
+                    if (added != null) {
+                        return added;
+                    }
+                    continue;
                 }
                 Map<String, Object> depEntry = entryMap(lockEntries.get(lockKey));
                 if (!requirement.getExtras().isEmpty() && !recordedExtras(depEntry).containsAll(
@@ -894,8 +957,7 @@ public final class PipenvLockEngine {
                             "Requirement " + raw + " needs extras the existing pin of " + lockKey +
                                     " was not locked with; delta resolution is not yet supported");
                 }
-                String pinned = pinnedVersion(depEntry);
-                PythonVersion pinnedVersion = PythonVersion.parse(pinned);
+                PythonVersion pinnedVersion = PythonVersion.parse(pinnedVersion(depEntry));
                 if (pinnedVersion == null) {
                     if (requirement.getSpecifiers() != null && !requirement.getSpecifiers().isMatchAll()) {
                         return new Failure(Reason.RESOLUTION_REQUIRED, pkg, null,
@@ -904,14 +966,203 @@ public final class PipenvLockEngine {
                     }
                     continue;
                 }
-                if (requirement.getSpecifiers() != null &&
-                        !requirement.getSpecifiers().contains(pinnedVersion, true)) {
-                    return new Failure(Reason.RESOLUTION_REQUIRED, pkg, null,
-                            "Requirement " + raw + " of the new version is not satisfied by the pinned " +
-                                    lockKey + "==" + pinned + "; delta resolution is not yet supported");
+                if (requirement.getSpecifiers() != null && !requirement.getSpecifiers().contains(pinnedVersion, true)) {
+                    Failure moved = movePin(lockKey, category, moving);
+                    if (moved != null) {
+                        return moved;
+                    }
                 }
             }
             return null;
+        }
+
+        /** Moves a transitive pin to the newest version every live requirement on it accepts. */
+        private @Nullable Failure movePin(String lockKey, String category, Set<String> moving) {
+            if (moving.contains(Pep508Requirement.canonicalize(lockKey))) {
+                return new Failure(Reason.RESOLUTION_REQUIRED, lockKey, null,
+                        "Moving " + lockKey + " again within one cascade would need backtracking, which the " +
+                                "native engine does not do");
+            }
+            List<PythonVersionSpecifierSet> constraints = new ArrayList<>();
+            Failure gathered = gatherConstraints(Pep508Requirement.canonicalize(lockKey), category, constraints);
+            if (gathered != null) {
+                return gathered;
+            }
+            Map<String, Object> oldEntry = entryMap(lockCategory(category).get(lockKey));
+            return pin(lockKey, category, oldEntry, constraints, recordedExtrasList(oldEntry), moving);
+        }
+
+        /**
+         * Pins the package at the newest installable version the constraints accept, as a new entry or over the old
+         * one, and meets that version's requirements in turn.
+         */
+        private @Nullable Failure pin(String lockKey, String category, @Nullable Map<String, Object> oldEntry,
+                                      List<PythonVersionSpecifierSet> constraints, List<String> extras, Set<String> moving) {
+            String canonical = Pep508Requirement.canonicalize(lockKey);
+            PythonPackageIndex index;
+            PackageListing listing;
+            try {
+                index = selectIndex(oldEntry != null ? indexName(oldEntry) : null);
+                listing = client.listFiles(index, SimpleIndexClient.canonicalName(lockKey));
+            } catch (PythonIndexException e) {
+                return indexFailure(lockKey, e);
+            }
+            Map<PythonVersion, List<PackageFile>> byVersion = groupByVersion(listing, lockKey);
+            PythonVersion selected = null;
+            for (PythonVersion candidate : new TreeSet<>(byVersion.keySet()).descendingSet()) {
+                boolean acceptable = true;
+                for (PythonVersionSpecifierSet constraint : constraints) {
+                    acceptable &= constraint.contains(candidate);
+                }
+                if (acceptable && candidate.equals(selectVersion(singletonMap(candidate, byVersion.get(candidate)),
+                        PythonVersionSpecifierSet.parse("==" + candidate)))) {
+                    selected = candidate;
+                    break;
+                }
+            }
+            if (selected == null) {
+                return new Failure(Reason.RESOLUTION_CONFLICT, lockKey, index.getUrl(),
+                        "No installable version of " + lockKey + " satisfies every requirement on it in the lock");
+            }
+            List<PackageFile> files = byVersion.get(selected);
+            MetadataResult md = fetchMetadata(lockKey, index, files);
+            if (md.failure != null || md.metadata == null) {
+                return md.failure;
+            }
+            List<String> hashes = collectHashes(lockKey, index, selected.toString(), files);
+            if (hashes == null) {
+                return new Failure(Reason.HASH_UNAVAILABLE, lockKey, index.getUrl(),
+                        "The index lists a file of " + lockKey + " " + selected +
+                                " without a sha256 digest, and it could not be downloaded to hash");
+            }
+            Map<String, Object> newEntry = new LinkedHashMap<>();
+            if (oldEntry != null) {
+                newEntry.putAll(oldEntry);
+            } else if (!extras.isEmpty()) {
+                newEntry.put("extras", new ArrayList<>(new TreeSet<>(canonicalizeAll(new HashSet<>(extras)))));
+            }
+            newEntry.put("hashes", hashes);
+            PipfileEntry declared = declaredCategories.getOrDefault(category, emptyMap()).get(lockKey);
+            applyMarkers(newEntry, declared != null ? declared : new PipfileEntry(lockKey),
+                    md.metadata.getRequiresPython() != null ? md.metadata.getRequiresPython() : firstRequiresPython(files));
+            newEntry.put("version", "==" + selected);
+            putInOrder(lockCategory(category), oldEntry != null ? lockKey : canonical, newEntry);
+            resolved.add(canonical);
+            movedMetadata.put(canonical, md.metadata);
+            return ensureClosure(lockKey, md.metadata, extras, category, moving);
+        }
+
+        // pipenv lists a category's packages by name
+        private static void putInOrder(Map<String, Object> entries, String key, Map<String, Object> entry) {
+            if (entries.containsKey(key)) {
+                entries.put(key, entry);
+                return;
+            }
+            TreeMap<String, Object> sorted = new TreeMap<>(entries);
+            sorted.put(key, entry);
+            entries.clear();
+            entries.putAll(sorted);
+        }
+
+        /** The Pipfile's declaration of the package and every requirement on it from the category's other pins. */
+        /** The Pipfile's declaration of the package and the requirements of the packages this run moved. */
+        private @Nullable Failure boundByRun(String canonical, String category,
+                                             List<PythonVersionSpecifierSet> constraints) {
+            for (PipfileEntry declared : declaredCategories.getOrDefault(category, emptyMap()).values()) {
+                if (Pep508Requirement.canonicalize(declared.keyAsWritten).equals(canonical)) {
+                    PythonVersionSpecifierSet constraint = parseConstraint(declared.constraint);
+                    if (constraint == null) {
+                        return new Failure(Reason.RESOLUTION_REQUIRED, declared.keyAsWritten, null,
+                                "Unparseable version constraint: " + declared.constraint);
+                    }
+                    constraints.add(constraint);
+                }
+            }
+            for (CoreMetadata metadata : movedMetadata.values()) {
+                for (String raw : metadata.getRequiresDist()) {
+                    Pep508Requirement requirement = Pep508Requirement.parse(raw);
+                    if (requirement != null && requirement.getCanonicalName().equals(canonical) &&
+                            requirement.getSpecifiers() != null && applies(requirement.getMarker(), emptyList())) {
+                        constraints.add(requirement.getSpecifiers());
+                    }
+                }
+            }
+            return null;
+        }
+
+        private @Nullable Failure gatherConstraints(String canonical, String category,
+                                                    List<PythonVersionSpecifierSet> constraints) {
+            for (PipfileEntry declared : declaredCategories.getOrDefault(category, emptyMap()).values()) {
+                if (Pep508Requirement.canonicalize(declared.keyAsWritten).equals(canonical)) {
+                    PythonVersionSpecifierSet constraint = parseConstraint(declared.constraint);
+                    if (constraint == null) {
+                        return new Failure(Reason.RESOLUTION_REQUIRED, declared.keyAsWritten, null,
+                                "Unparseable version constraint: " + declared.constraint);
+                    }
+                    constraints.add(constraint);
+                }
+            }
+            for (Map.Entry<String, Object> other : lockCategory(category).entrySet()) {
+                String otherCanonical = Pep508Requirement.canonicalize(other.getKey());
+                if (otherCanonical.equals(canonical)) {
+                    continue;
+                }
+                Map<String, Object> otherEntry = entryMap(other.getValue());
+                CoreMetadata metadata = movedMetadata.containsKey(otherCanonical) ? movedMetadata.get(otherCanonical) :
+                        lockedMetadata(other.getKey(), otherEntry);
+                if (metadata == null) {
+                    if (pinnedVersion(otherEntry) == null || PythonVersion.parse(pinnedVersion(otherEntry)) == null) {
+                        continue; // a VCS/path pin has no fetchable metadata
+                    }
+                    return new Failure(Reason.RESOLUTION_REQUIRED, other.getKey(), null,
+                            "Metadata of " + other.getKey() + " could not be read to bound " + canonical);
+                }
+                for (String raw : metadata.getRequiresDist()) {
+                    Pep508Requirement requirement = Pep508Requirement.parse(raw);
+                    if (requirement != null && requirement.getCanonicalName().equals(canonical) &&
+                            requirement.getSpecifiers() != null && applies(requirement.getMarker(), recordedExtrasList(otherEntry))) {
+                        constraints.add(requirement.getSpecifiers());
+                    }
+                }
+            }
+            return null;
+        }
+
+        // an old sdist's requirements as setuptools recorded them, which bound a move but never pin anything
+        private @Nullable CoreMetadata eggInfoMetadata(String key, PythonVersion version, List<PackageFile> files) {
+            for (PackageFile file : files) {
+                DistFilename dist = DistFilename.parse(file.getFilename());
+                if (dist != null && dist.getType() == DistFilename.Type.SDIST) {
+                    List<String> requirements = SdistMetadataReader.eggInfoRequirements(http, file.getUrl());
+                    return requirements == null ? null : new CoreMetadata("1.0", key, version.toString(), null,
+                            requirements, null, emptyList(), emptyList());
+                }
+            }
+            return null;
+        }
+
+        private @Nullable CoreMetadata lockedMetadata(String key, Map<String, Object> lockEntry) {
+            String pinned = pinnedVersion(lockEntry);
+            PythonVersion version = PythonVersion.parse(pinned);
+            if (version == null) {
+                return null;
+            }
+            String cacheKey = Pep508Requirement.canonicalize(key) + "==" + version;
+            if (!pinnedMetadata.containsKey(cacheKey)) {
+                CoreMetadata metadata = null;
+                try {
+                    PythonPackageIndex index = selectIndex(indexName(lockEntry));
+                    List<PackageFile> files = filesOfVersion(client.listFiles(index, SimpleIndexClient.canonicalName(key)), key, version);
+                    metadata = files.isEmpty() ? null : fetchMetadata(key, index, files).metadata;
+                    if (metadata == null) {
+                        metadata = eggInfoMetadata(key, version, files);
+                    }
+                } catch (PythonIndexException e) {
+                    metadata = null;
+                }
+                pinnedMetadata.put(cacheKey, metadata);
+            }
+            return pinnedMetadata.get(cacheKey);
         }
 
         /**
