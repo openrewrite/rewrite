@@ -719,12 +719,13 @@ public class RecipeRunCycle<LSS extends LargeSourceSet> {
             }.visit(before, existing);
         }
         String recipeName = recipe.getName();
+        String recipeInstanceName = recipe.getInstanceName();
         return (SourceFile) new TreeVisitor<Tree, Integer>() {
             @Override
             public <M extends Marker> M visitMarker(Marker marker, Integer p) {
                 if (marker instanceof Markup && ((Markup) marker).getRecipeName() == null && !existing.contains(marker.getId())) {
                     //noinspection unchecked
-                    return (M) ((Markup) marker).withRecipeName(recipeName);
+                    return (M) ((Markup) marker).withRecipeName(recipeName).withRecipeInstanceName(recipeInstanceName);
                 }
                 return super.visitMarker(marker, p);
             }

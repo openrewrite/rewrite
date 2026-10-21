@@ -31,26 +31,30 @@ class MarkupSerializationTest {
     @Test
     void recipeNameSurvivesRoundTrip() throws Exception {
         for (Markup markup : List.<Markup>of(
-          new Markup.Error(randomId(), "m", "d", "org.example.A"),
-          new Markup.Warn(randomId(), "m", "d", "org.example.A"),
-          new Markup.Info(randomId(), "m", "d", "org.example.A"),
-          new Markup.Debug(randomId(), "m", "d", "org.example.A"))) {
+          new Markup.Error(randomId(), "m", "d", "org.example.A", "A `x`"),
+          new Markup.Warn(randomId(), "m", "d", "org.example.A", "A `x`"),
+          new Markup.Info(randomId(), "m", "d", "org.example.A", "A `x`"),
+          new Markup.Debug(randomId(), "m", "d", "org.example.A", "A `x`"))) {
             Markup read = mapper.readValue(mapper.writeValueAsString(markup), markup.getClass());
             assertThat(read.getRecipeName()).isEqualTo("org.example.A");
+            assertThat(read.getRecipeInstanceName()).isEqualTo("A `x`");
         }
     }
 
     @Test
     void markupSerializedBeforeRecipeNameExistedIsUnattributed() throws Exception {
-        ObjectNode json = mapper.valueToTree(new Markup.Warn(randomId(), "m", "d", "org.example.A"));
+        ObjectNode json = mapper.valueToTree(new Markup.Warn(randomId(), "m", "d", "org.example.A", "A `x`"));
         json.remove("recipeName");
-        assertThat(mapper.treeToValue(json, Markup.Warn.class).getRecipeName()).isNull();
+        json.remove("recipeInstanceName");
+        Markup.Warn read = mapper.treeToValue(json, Markup.Warn.class);
+        assertThat(read.getRecipeName()).isNull();
+        assertThat(read.getRecipeInstanceName()).isNull();
     }
 
     @Test
     void recipeNameDoesNotAffectEquality() {
         var id = randomId();
-        assertThat(new Markup.Warn(id, "m", "d", "org.example.A"))
-          .isEqualTo(new Markup.Warn(id, "m", "d", "org.example.B"));
+        assertThat(new Markup.Warn(id, "m", "d", "org.example.A", "A `x`"))
+          .isEqualTo(new Markup.Warn(id, "m", "d", "org.example.B", "B `y`"));
     }
 }

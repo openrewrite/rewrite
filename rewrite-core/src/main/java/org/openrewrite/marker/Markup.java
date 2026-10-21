@@ -59,6 +59,20 @@ public interface Markup extends Marker {
         return this;
     }
 
+    /**
+     * The {@link Recipe#getInstanceName() instance name} of the recipe that added this markup, which tells apart
+     * instances of the same recipe with different options, or {@code null} when unknown.
+     */
+    @Incubating(since = "8.94.0")
+    default @Nullable String getRecipeInstanceName() {
+        return null;
+    }
+
+    @Incubating(since = "8.94.0")
+    default Markup withRecipeInstanceName(@Nullable String recipeInstanceName) {
+        return this;
+    }
+
     @Override
     default String print(Cursor cursor, UnaryOperator<String> commentWrapper, boolean verbose) {
         if (verbose) {
@@ -107,7 +121,7 @@ public interface Markup extends Marker {
             RecipeRunCycle<?> cycle = ctx == null ? null : ctx.getMessage(ExecutionContext.CURRENT_CYCLE);
             Recipe recipe = cycle == null ? null : cycle.getCurrentRecipe();
             if (recipe != null) {
-                markup = markup.withRecipeName(recipe.getName());
+                markup = markup.withRecipeName(recipe.getName()).withRecipeInstanceName(recipe.getInstanceName());
             }
         }
         return t.withMarkers(t.getMarkers().compute(markup, (s1, s2) -> s1 == null ? s2 : s1));
@@ -128,24 +142,29 @@ public interface Markup extends Marker {
         @Nullable
         String recipeName;
 
+        @Nullable
+        String recipeInstanceName;
+
         public Error(UUID id, Throwable exception) {
             this.id = id;
             Throwable cause = exception instanceof RecipeRunException ? exception.getCause() : exception;
             this.message = cause.getMessage();
             this.detail = ExceptionUtils.sanitizeStackTrace(cause, RecipeScheduler.class);
             this.recipeName = null;
+            this.recipeInstanceName = null;
         }
 
         public Error(UUID id, String message, String detail) {
-            this(id, message, detail, null);
+            this(id, message, detail, null, null);
         }
 
         @JsonCreator
-        public Error(UUID id, String message, String detail, @Nullable String recipeName) {
+        public Error(UUID id, String message, String detail, @Nullable String recipeName, @Nullable String recipeInstanceName) {
             this.id = id;
             this.message = message;
             this.detail = detail;
             this.recipeName = recipeName;
+            this.recipeInstanceName = recipeInstanceName;
         }
 
         @Override
@@ -179,24 +198,29 @@ public interface Markup extends Marker {
         @Nullable
         String recipeName;
 
+        @Nullable
+        String recipeInstanceName;
+
         public Warn(UUID id, Throwable exception) {
             this.id = id;
             Throwable cause = exception instanceof RecipeRunException ? exception.getCause() : exception;
             this.message = cause.getMessage();
             this.detail = ExceptionUtils.sanitizeStackTrace(cause, RecipeScheduler.class);
             this.recipeName = null;
+            this.recipeInstanceName = null;
         }
 
         public Warn(UUID id, String message, String detail) {
-            this(id, message, detail, null);
+            this(id, message, detail, null, null);
         }
 
         @JsonCreator
-        public Warn(UUID id, String message, String detail, @Nullable String recipeName) {
+        public Warn(UUID id, String message, String detail, @Nullable String recipeName, @Nullable String recipeInstanceName) {
             this.id = id;
             this.message = message;
             this.detail = detail;
             this.recipeName = recipeName;
+            this.recipeInstanceName = recipeInstanceName;
         }
 
         @Override
@@ -231,16 +255,20 @@ public interface Markup extends Marker {
         @Nullable
         String recipeName;
 
+        @Nullable
+        String recipeInstanceName;
+
         public Info(UUID id, String message, @Nullable String detail) {
-            this(id, message, detail, null);
+            this(id, message, detail, null, null);
         }
 
         @JsonCreator
-        public Info(UUID id, String message, @Nullable String detail, @Nullable String recipeName) {
+        public Info(UUID id, String message, @Nullable String detail, @Nullable String recipeName, @Nullable String recipeInstanceName) {
             this.id = id;
             this.message = message;
             this.detail = detail;
             this.recipeName = recipeName;
+            this.recipeInstanceName = recipeInstanceName;
         }
 
         @Override
@@ -285,16 +313,20 @@ public interface Markup extends Marker {
         @Nullable
         String recipeName;
 
+        @Nullable
+        String recipeInstanceName;
+
         public Debug(UUID id, String message, @Nullable String detail) {
-            this(id, message, detail, null);
+            this(id, message, detail, null, null);
         }
 
         @JsonCreator
-        public Debug(UUID id, String message, @Nullable String detail, @Nullable String recipeName) {
+        public Debug(UUID id, String message, @Nullable String detail, @Nullable String recipeName, @Nullable String recipeInstanceName) {
             this.id = id;
             this.message = message;
             this.detail = detail;
             this.recipeName = recipeName;
+            this.recipeInstanceName = recipeInstanceName;
         }
 
         @Override

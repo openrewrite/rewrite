@@ -58,6 +58,7 @@ import java.util.concurrent.atomic.AtomicReference;
 import static java.util.Collections.emptyList;
 import static java.util.Collections.emptySet;
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.tuple;
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.openrewrite.scheduling.WorkingDirectoryExecutionContextView.WORKING_DIRECTORY_ROOT;
 import static org.openrewrite.test.RewriteTest.toRecipe;
@@ -503,6 +504,22 @@ class RecipeSchedulerTest implements RewriteTest {
     }
 
     @Test
+    void instancesOfTheSameRecipeAreToldApartByInstanceName() {
+        RecipeRun run = new RecipeScheduler().scheduleRun(
+          new CompositeRecipe(List.of(new WarnWithMessage("first"), new WarnWithMessage("second"))),
+          new InMemoryLargeSourceSet(List.of(PlainText.builder().text("hello").sourcePath(Path.of("hello.txt")).build())),
+          new InMemoryExecutionContext(), 3, 1);
+
+        SourceFile after = run.getChangeset().getAllResults().getFirst().getAfter();
+        assertThat(after).isNotNull();
+        assertThat(after.getMarkers().findAll(Markup.Warn.class))
+          .extracting(Markup::getMessage, Markup::getRecipeName, Markup::getRecipeInstanceName)
+          .containsExactlyInAnyOrder(
+            tuple("first", WarnWithMessage.class.getName(), "Warn with message `first`"),
+            tuple("second", WarnWithMessage.class.getName(), "Warn with message `second`"));
+    }
+
+    @Test
     void markupOutsideARecipeRunIsUnattributed() {
         PlainText text = Markup.warn(PlainText.builder().text("hello").build(), new IllegalStateException("careful"));
         assertThat(text.getMarkers().findFirst(Markup.Warn.class))
@@ -755,6 +772,27 @@ class ScanningWarnRecipe extends ScanningRecipe<AtomicInteger> {
             public PlainText visitText(PlainText text, ExecutionContext ctx) {
                 return "hello.txt".equals(text.getSourcePath().toString()) ?
                   Markup.warn(text, new IllegalStateException("careful")) : text;
+            }
+        };
+    }
+}
+
+@EqualsAndHashCode(callSuper = false)
+@Value
+class WarnWithMessage extends Recipe {
+    @Option(displayName = "Message", description = "The warning message.", example = "careful")
+    String message;
+
+    String displayName = "Warn with message";
+
+    String description = "Adds a warning with the given message to every text file.";
+
+    @Override
+    public TreeVisitor<?, ExecutionContext> getVisitor() {
+        return new PlainTextVisitor<>() {
+            @Override
+            public PlainText visitText(PlainText text, ExecutionContext ctx) {
+                return Markup.warn(text, new IllegalStateException(message));
             }
         };
     }

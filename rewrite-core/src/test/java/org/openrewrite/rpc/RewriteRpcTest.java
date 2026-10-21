@@ -20,6 +20,7 @@ import io.moderne.jsonrpc.JsonRpc;
 import io.moderne.jsonrpc.JsonRpcMethod;
 import io.moderne.jsonrpc.formatter.JsonMessageFormatter;
 import io.moderne.jsonrpc.handler.HeaderDelimitedMessageHandler;
+import lombok.EqualsAndHashCode;
 import lombok.SneakyThrows;
 import lombok.Value;
 import lombok.With;
@@ -822,7 +823,7 @@ class RewriteRpcTest implements RewriteTest {
 
     @Test
     void markupAddedByRpcRecipeIsAttributed() {
-        Recipe warn = client.prepareRecipe("org.openrewrite.rpc.RewriteRpcTest$WarningRpcRecipe", Map.of());
+        Recipe warn = client.prepareRecipe("org.openrewrite.rpc.RewriteRpcTest$WarningRpcRecipe", Map.of("message", "careful"));
 
         RecipeRun run = new RecipeScheduler().scheduleRun(
           new CompositeRecipe(List.of(warn, Recipe.noop())),
@@ -830,12 +831,15 @@ class RewriteRpcTest implements RewriteTest {
           new InMemoryExecutionContext(), 1, 1);
 
         assertThat(run.getChangeset().getAllResults().getFirst().getAfter().getMarkers().findFirst(Markup.Warn.class))
-          .hasValueSatisfying(w -> assertThat(w.getRecipeName()).isEqualTo(WarningRpcRecipe.class.getName()));
+          .hasValueSatisfying(w -> {
+              assertThat(w.getRecipeName()).isEqualTo(WarningRpcRecipe.class.getName());
+              assertThat(w.getRecipeInstanceName()).isEqualTo("Warning RPC recipe `careful`");
+          });
     }
 
     @Test
     void markupAddedInBatchIsAttributedWhenOneRecipeMadeChanges() {
-        Recipe warn = client.prepareRecipe("org.openrewrite.rpc.RewriteRpcTest$WarningRpcRecipe", Map.of());
+        Recipe warn = client.prepareRecipe("org.openrewrite.rpc.RewriteRpcTest$WarningRpcRecipe", Map.of("message", "careful"));
         Recipe noChange = client.prepareRecipe("org.openrewrite.text.FindAndReplace", Map.of("find", "absent", "replace", "x"));
 
         RecipeRun run = new RecipeScheduler().scheduleRun(
@@ -951,24 +955,22 @@ class RewriteRpcTest implements RewriteTest {
         }
     }
 
-    @SuppressWarnings("unused")
+    @EqualsAndHashCode(callSuper = false)
+    @Value
     public static class WarningRpcRecipe extends Recipe {
-        @Override
-        public String getDisplayName() {
-            return "Warning RPC recipe";
-        }
+        @Option(displayName = "Message", description = "The warning message.", example = "careful")
+        String message;
 
-        @Override
-        public String getDescription() {
-            return "Test recipe that adds a warning during visit.";
-        }
+        String displayName = "Warning RPC recipe";
+
+        String description = "Test recipe that adds a warning during visit.";
 
         @Override
         public TreeVisitor<?, ExecutionContext> getVisitor() {
             return new PlainTextVisitor<>() {
                 @Override
                 public PlainText visitText(PlainText text, ExecutionContext ctx) {
-                    return Markup.warn(text, new IllegalStateException("careful from RPC"));
+                    return Markup.warn(text, new IllegalStateException(message));
                 }
             };
         }
