@@ -638,7 +638,7 @@ public final class UvLockEngine {
             for (UvLockPackage pkg : withRecordedMarkers(pkgs)) {
                 UvLockPackage.UvLockPackageBuilder b = pkg.toBuilder()
                         .source(asConfigured(pkg.getSource()))
-                        .resolutionMarkers(currentForms(pkg.getName(), pkg.getResolutionMarkers()));
+                        .resolutionMarkers(inSolveOrder(currentForms(pkg.getName(), pkg.getResolutionMarkers())));
                 UvLockMetadata metadata = pkg.getMetadata();
                 if (metadata != null) {
                     Map<String, List<UvLockRequirement>> dev = null;

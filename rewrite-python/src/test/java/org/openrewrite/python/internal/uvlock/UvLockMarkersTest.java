@@ -47,6 +47,16 @@ class UvLockMarkersTest {
     }
 
     @Test
+    void aDisjunctionOfParenthesizedConjunctionsParses() {
+        // a fork marker uv writes for the PyPy and emscripten branches of one Python range
+        assertThat(UvLockMarkers.parseDisjunction(
+          "(python_full_version >= '3.15' and platform_python_implementation == 'PyPy') or " +
+          "(python_full_version >= '3.15' and sys_platform == 'emscripten')"))
+          .hasSize(2)
+          .allSatisfy(term -> assertThat(term).extracting(c -> c[0]).contains("python_full_version"));
+    }
+
+    @Test
     void parenthesizedConjunctionInsideATermFlattens() {
         assertThat(UvLockMarkers.parseDisjunction("(python_version >= '3.11' and sys_platform != 'win32') and extra == 'dev'"))
           .singleElement()
