@@ -428,7 +428,6 @@ class UvLockDeltaOfflineTest {
 
     @Test
     void oldUvLockIsRewrittenWithForksInSolveOrder() {
-        // uv solves the fork with the higher Python lower bound first and records the forks in that order
         PythonExecutionContextView.view(ctx).setUvVersion("0.13.4");
         routeLocalIndex("off41-old-uv-fork-order");
         assertScenario("off41-old-uv-fork-order");
@@ -436,8 +435,8 @@ class UvLockDeltaOfflineTest {
 
     @Test
     void oldUvLockPrunesWheelsUnderItsRewrittenMarkers() {
-        // platform_system == 'Linux' only rules out win_amd64 once rewritten as sys_platform == 'linux'; an older uv kept
-        // such a wheel (the before-lock gets one added, as such locks carry it), and uv 0.13.4 drops it
+        // platform_system == 'Linux' rules out win_amd64 only once rewritten as sys_platform == 'linux'.
+        // An older uv kept such a wheel, so the before-lock carries one, and uv 0.13.4 drops it.
         PythonExecutionContextView.view(ctx).setUvVersion("0.13.4");
         routeLocalIndex("off42-old-uv-platform-wheels");
         String linuxWheel = "    { url = \"https://index.example/simple/winonly/winonly-1.0-py3-none-manylinux_2_17_x86_64.whl\", hash = \"sha256:d8649c59ee72ac58495b2279059719b5639720f5806fef42500e1b24ebad23f5\" },\n";

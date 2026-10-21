@@ -219,7 +219,7 @@ final class UvLockMarkers {
         return result;
     }
 
-    // a parenthesized conjunction inside a conjunction flattens into it; a nested disjunction does not
+    // a parenthesized conjunction inside a conjunction flattens into it, and a nested disjunction yields no parse
     private static boolean addConjunction(String text, List<String[]> clauses) {
         String inner = stripWrappingParens(text);
         List<String> ors = splitTopLevel(inner, "or");

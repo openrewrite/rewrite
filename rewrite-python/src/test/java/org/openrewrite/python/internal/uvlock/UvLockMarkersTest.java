@@ -40,7 +40,6 @@ class UvLockMarkersTest {
 
     @Test
     void clausesRecordWithPythonFirstAndExtrasLast() {
-        // uv 0.13.4 prints python_full_version first, the other variables by name, and extra last
         assertThat(UvLockMarkers.recordMarker(
           "sys_platform == 'linux' and platform_machine == 'x86_64' and python_full_version < '3.13' and os_name == 'posix'",
           "extra == 'cli'"))
