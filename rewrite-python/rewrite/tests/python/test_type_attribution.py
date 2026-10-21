@@ -2909,6 +2909,58 @@ class TestSupertypeChainResolution:
 
 
 @requires_ty_types_cli
+@pytest.mark.parametrize('decorator', ['mock.patch.object(Request, "send")', 'mock.patch("m.Request.send")'])
+def test_a_class_decorated_into_a_union_is_typed_as_itself(decorator):
+    """A decorator read through a name bound twice types the decorated binding as a union,
+    which a class declaration, as the class it declares, never is."""
+    src = f'''
+        try:
+            from unittest import mock
+        except ImportError:
+            import mock
+
+
+        class Request:
+            def send(self): ...
+
+
+        @{decorator}
+        class TestBuildProxy:
+            pass
+    '''
+    cu, tmpdir, client = _parse_with_types({'m.py': src})
+    try:
+        declared = _collect_class_declarations(cu)['TestBuildProxy'].type
+        assert isinstance(declared, JavaType.Class)
+        assert declared.fully_qualified_name == 'm.TestBuildProxy'
+    finally:
+        _cleanup_parse(tmpdir, client)
+
+
+@requires_ty_types_cli
+@pytest.mark.parametrize('returned', ['int', '"Bar"'])
+def test_a_class_decorated_into_another_type_has_no_type(returned):
+    src = f'''
+        class Bar:
+            pass
+
+
+        def replace(c) -> {returned}:
+            ...
+
+
+        @replace
+        class Foo:
+            pass
+    '''
+    cu, tmpdir, client = _parse_with_types({'m.py': src})
+    try:
+        assert _collect_class_declarations(cu)['Foo'].type is None
+    finally:
+        _cleanup_parse(tmpdir, client)
+
+
+@requires_ty_types_cli
 class TestInheritedCallDeclaringType:
     """Attribution of a call to a method the receiver's class does not override."""
 
