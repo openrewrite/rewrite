@@ -336,6 +336,27 @@ class UvLockEngineTest {
         assertThat(http.requests).isEmpty();
     }
 
+    @Test
+    void declaredGroupsAreRecordedAsUvNormalizesThem() {
+        String pyproject = resource("f-dep-groups/pyproject.toml").replace("lint = [", "Lint = [");
+        Result result = UvLockEngine.regenerate(pyproject, resource("f-dep-groups/uv.lock"), ctx);
+        assertThat(result.getErrorMessage()).isNull();
+        assertThat(result.getLockFileContent()).isEqualTo(resource("f-dep-groups/uv.lock"));
+
+        result = UvLockEngine.regenerate(pyproject + "test_integration = []\n", resource("f-dep-groups/uv.lock"), ctx);
+        assertThat(result.getErrorMessage()).isNull();
+        assertThat(result.getLockFileContent()).contains("lint = [{ name = \"pyflakes\"").contains("\ntest-integration = []\n");
+
+        // an empty legacy dev-dependencies list still declares the dev group
+        String withEmptyDev = resource("g-optional-deps/uv.lock").replace("provides-extras = [\"cli\", \"yaml\"]\n",
+          "provides-extras = [\"cli\", \"yaml\"]\n\n[package.metadata.requires-dev]\ndev = []\n");
+        result = UvLockEngine.regenerate(resource("g-optional-deps/pyproject.toml") + "\n[tool.uv]\ndev-dependencies = []\n",
+          withEmptyDev, ctx);
+        assertThat(result.getErrorMessage()).isNull();
+        assertThat(result.getLockFileContent()).isEqualTo(withEmptyDev);
+        assertThat(http.requests).isEmpty();
+    }
+
     // ---- structured failures ----
 
     @Test
