@@ -46,10 +46,18 @@ public class UpdateScmFromGitOrigin extends Recipe {
     @Nullable
     Boolean addIfMissing;
 
+    @Option(displayName = "Update project URL",
+            description = "If set to `true`, the recipe will also update the project `<url>` of POMs whose parent is not in the same repository, " +
+                          "when the `<scm>` section references `${project.url}` or a `<scm>` URL shares its host. Defaults to `false`.",
+            required = false)
+    @Nullable
+    Boolean updateProjectUrl;
+
     String displayName = "Update SCM with Git origin";
 
     String description = "Updates or adds the Maven `<scm>` tag based on the Git remote origin. " +
-               "By default, only existing Source Control Management (SCM) sections are updated. Set `addIfMissing` to `true` to also add missing SCM sections to root POMs (POMs without a parent element).";
+               "By default, only existing Source Control Management (SCM) sections are updated. Set `addIfMissing` to `true` to also add missing SCM sections to root POMs (POMs without a parent element). " +
+               "Set `updateProjectUrl` to `true` to also update the project `<url>` when it points at the same repository.";
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
@@ -102,17 +110,47 @@ public class UpdateScmFromGitOrigin extends Recipe {
             @Override
             public Xml visitTag(Xml.Tag tag, ExecutionContext ctx) {
                 if ("project".equals(tag.getName())) {
-                    return super.visitTag(tag, ctx);
+                    Xml.Tag t = (Xml.Tag) super.visitTag(tag, ctx);
+                    if (Boolean.TRUE.equals(updateProjectUrl) && shouldUpdateProjectUrl(tag)) {
+                        t = updateChildUrl(t, "url", ctx);
+                    }
+                    return t;
                 } else if ("scm".equals(tag.getName())) {
                     // Update existing tags, preserving their URL structure
-                    tag = updateScmTag(tag, "url", ctx);
-                    tag = updateScmTag(tag, "connection", ctx);
-                    tag = updateScmTag(tag, "developerConnection", ctx);
+                    tag = updateChildUrl(tag, "url", ctx);
+                    tag = updateChildUrl(tag, "connection", ctx);
+                    tag = updateChildUrl(tag, "developerConnection", ctx);
                 }
                 return tag;
             }
 
-            private Xml.Tag updateScmTag(Xml.Tag tag, String tagName, ExecutionContext ctx) {
+            private boolean shouldUpdateProjectUrl(Xml.Tag project) {
+                if (getResolutionResult().parentPomIsProjectPom()) {
+                    return false;
+                }
+                String projectUrl = project.getChildValue("url").orElse("");
+                GitOrigin projectUrlOrigin = GitOrigin.parseGitUrl(projectUrl);
+                if (projectUrlOrigin == null || projectUrl.contains("${")) {
+                    return false;
+                }
+                Optional<Xml.Tag> scm = project.getChild("scm");
+                if (!scm.isPresent()) {
+                    return false;
+                }
+                for (String scmTagName : new String[]{"url", "connection", "developerConnection"}) {
+                    String scmUrl = scm.get().getChildValue(scmTagName).orElse("");
+                    if (scmUrl.contains("${project.url}")) {
+                        return true;
+                    }
+                    GitOrigin scmOrigin = GitOrigin.parseGitUrl(scmUrl.startsWith("scm:git:") ? scmUrl.substring("scm:git:".length()) : scmUrl);
+                    if (scmOrigin != null && scmOrigin.getHost().equals(projectUrlOrigin.getHost())) {
+                        return true;
+                    }
+                }
+                return false;
+            }
+
+            private Xml.Tag updateChildUrl(Xml.Tag tag, String tagName, ExecutionContext ctx) {
                 Optional<Xml.Tag> maybeChild = tag.getChild(tagName);
                 if (maybeChild.isPresent()) {
                     Xml.Tag childTag = maybeChild.get();
