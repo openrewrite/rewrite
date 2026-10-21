@@ -52,6 +52,7 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 import static java.util.Collections.emptyList;
+import static java.util.Collections.emptyMap;
 import static java.util.Collections.sort;
 import static java.util.stream.Collectors.toList;
 
@@ -304,6 +305,12 @@ public final class UvLockEngine {
 
             UvLockMetadata newMetadata = new UvLockMetadataBuilder(
                     pyproject, oldMetadata, indexes, indexPins, nonRegistrySources).build(project);
+            // uv leaves a lock alone while its metadata satisfies the manifest, whatever form it records,
+            // and writes the metadata fresh once anything else in the lock changes
+            UvLockMetadata freshMetadata = newMetadata;
+            if (satisfies(oldMetadata, newMetadata)) {
+                newMetadata = oldMetadata;
+            }
             boolean metadataEmpty = newMetadata.getRequiresDist() == null &&
                     newMetadata.getProvidesExtras() == null && newMetadata.getRequiresDev() == null;
             packages.set(rootIndex, root.toBuilder()
@@ -403,6 +410,10 @@ public final class UvLockEngine {
             if (written.equals(original)) {
                 return Result.success(written);
             }
+            if (newMetadata != freshMetadata) {
+                packages.set(rootIndex, packages.get(rootIndex).withMetadata(metadataEmpty ? null : freshMetadata));
+                updated = updated.withPackages(packages);
+            }
             if (writeRevision != null && (lock.getRevision() == null || lock.getRevision() < 3)) {
                 throw new EngineFailure(Reason.RESOLUTION_REQUIRED, null,
                         "uv " + uvVersion + " rewrites a lock below revision 3 in its own shape, " +
@@ -448,6 +459,63 @@ public final class UvLockEngine {
         }
 
         // ---- manifest reading ----
+
+        /**
+         * uv's satisfies check: requirements compared after normalization, and provides-extras as a set,
+         * or not at all in a lock from before the field existed (version 1 revision 1).
+         */
+        private boolean satisfies(UvLockMetadata recorded, UvLockMetadata declared) {
+            if (!requirementKeys(recorded.getRequiresDist()).equals(requirementKeys(declared.getRequiresDist()))) {
+                return false;
+            }
+            Map<String, List<UvLockRequirement>> recordedDev = recorded.getRequiresDev() != null ? recorded.getRequiresDev() : emptyMap();
+            Map<String, List<UvLockRequirement>> declaredDev = declared.getRequiresDev() != null ? declared.getRequiresDev() : emptyMap();
+            if (!recordedDev.keySet().equals(declaredDev.keySet())) {
+                return false;
+            }
+            for (String group : recordedDev.keySet()) {
+                if (!requirementKeys(recordedDev.get(group)).equals(requirementKeys(declaredDev.get(group)))) {
+                    return false;
+                }
+            }
+            boolean providesExtrasTracked = lock.getRevision() != null && lock.getRevision() >= 1;
+            return !providesExtrasTracked || new HashSet<>(orEmpty(recorded.getProvidesExtras()))
+                    .equals(new HashSet<>(orEmpty(declared.getProvidesExtras())));
+        }
+
+        private static List<String> orEmpty(@Nullable List<String> list) {
+            return list != null ? list : emptyList();
+        }
+
+        private static Map<String, Integer> requirementKeys(@Nullable List<UvLockRequirement> requirements) {
+            Map<String, Integer> keys = new HashMap<>();
+            for (UvLockRequirement r : requirements != null ? requirements : Collections.<UvLockRequirement>emptyList()) {
+                List<String> extras = new ArrayList<>(orEmpty(r.getExtras()));
+                sort(extras);
+                String key = r.getName() + '|' + extras + '|' + r.getMarker() + '|' + r.getIndex() + '|' + r.getUrl() + '|' +
+                        r.getGit() + '|' + r.getDirectory() + '|' + r.getEditable() + '|' + specifierKey(r.getSpecifier());
+                keys.merge(key, 1, Integer::sum);
+            }
+            return keys;
+        }
+
+        // versions compare with trailing zeros ignored, except under ~= and a star where they are significant
+        private static String specifierKey(@Nullable String specifier) {
+            if (specifier == null) {
+                return "";
+            }
+            List<String> parts = new ArrayList<>();
+            for (String part : specifier.split(",")) {
+                Matcher m = Pattern.compile("\\s*(~=|===|==|!=|<=|>=|<|>)\\s*(\\d+(?:\\.\\d+)*)\\s*").matcher(part);
+                if (m.matches() && !"~=".equals(m.group(1))) {
+                    parts.add(m.group(1) + m.group(2).replaceAll("(\\.0)+$", ""));
+                } else {
+                    parts.add(part.trim());
+                }
+            }
+            sort(parts);
+            return String.join(",", parts);
+        }
 
         private int findRoot() {
             int found = -1;
