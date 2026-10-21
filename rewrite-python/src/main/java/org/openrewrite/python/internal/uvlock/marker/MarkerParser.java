@@ -339,7 +339,7 @@ public final class MarkerParser {
                 continue;
             }
             PythonVersion version = PythonVersion.parse(part);
-            if (version == null) {
+            if (version == null || !MarkerExpression.fitsReleaseArithmetic(version)) {
                 return ignore("Expected PEP 440 versions to compare with " + key.display + ", found " + value);
             }
             versions.add(version);

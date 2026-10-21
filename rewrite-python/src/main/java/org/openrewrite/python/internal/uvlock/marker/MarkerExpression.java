@@ -219,7 +219,7 @@ public abstract class MarkerExpression {
         static @Nullable Specifier fromPattern(Op op, String pattern) {
             boolean star = pattern.endsWith(".*");
             String text = star ? pattern.substring(0, pattern.length() - 2) : pattern;
-            if (star && !text.matches("v?\\d+(\\.\\d+)*")) {
+            if (star && !text.matches("[ \\t\\n\\f\\r]*[vV]?(\\d+!)?\\d+(\\.\\d+)*")) {
                 return null;
             }
             PythonVersion version = PythonVersion.parse(text);
@@ -239,6 +239,9 @@ public abstract class MarkerExpression {
         }
 
         static @Nullable Specifier fromVersion(Op op, PythonVersion version) {
+            if (!fitsReleaseArithmetic(version)) {
+                return null;
+            }
             boolean localCompatible = op == Op.EQUAL || op == Op.EXACT_EQUAL || op == Op.NOT_EQUAL;
             if (version.getLocal() != null && !localCompatible) {
                 return null;
@@ -258,6 +261,16 @@ public abstract class MarkerExpression {
         public String toString() {
             return op.display + version + (op.isStar() ? ".*" : "");
         }
+    }
+
+    /** Whether every release segment has a successor, as uv's u64 segments stop short of their maximum. */
+    static boolean fitsReleaseArithmetic(PythonVersion version) {
+        for (long segment : version.getRelease()) {
+            if (segment == Long.MAX_VALUE) {
+                return false;
+            }
+        }
+        return true;
     }
 
     static PythonVersion releaseVersion(long[] release, int length) {
