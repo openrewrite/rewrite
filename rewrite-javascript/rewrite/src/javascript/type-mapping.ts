@@ -777,17 +777,24 @@ export class JavaScriptTypeMapping {
      * another file reading an exported binding reads a member of the module that declares it.
      */
     private requiredMember(declaration: ts.Node | undefined, location: ts.Node): { module: string, exportName: string } | undefined {
-        if (!declaration || declaration.getSourceFile() !== location.getSourceFile() ||
-            !(ts.getCombinedNodeFlags(declaration) & ts.NodeFlags.Const)) {
+        if (!declaration) {
             return undefined;
         }
+        const member = this.requiredMemberSyntax(declaration);
+        return member && declaration.getSourceFile() === location.getSourceFile() &&
+            ts.getCombinedNodeFlags(declaration) & ts.NodeFlags.Const ? member : undefined;
+    }
+
+    private requiredMemberSyntax(declaration: ts.Node): { module: string, exportName: string } | undefined {
         if (ts.isBindingElement(declaration) && !declaration.dotDotDotToken &&
             ts.isObjectBindingPattern(declaration.parent) && ts.isVariableDeclaration(declaration.parent.parent) &&
             declaration.parent.parent.initializer) {
-            const module = this.requiredModuleSpecifier(declaration.parent.parent.initializer);
             const property = declaration.propertyName ?? declaration.name;
-            return module && (ts.isIdentifier(property) || ts.isStringLiteral(property)) ?
-                {module, exportName: property.text} : undefined;
+            if (!ts.isIdentifier(property) && !ts.isStringLiteral(property)) {
+                return undefined;
+            }
+            const module = this.requiredModuleSpecifier(declaration.parent.parent.initializer);
+            return module ? {module, exportName: property.text} : undefined;
         }
         if (ts.isVariableDeclaration(declaration) && declaration.initializer &&
             ts.isPropertyAccessExpression(declaration.initializer) && ts.isIdentifier(declaration.initializer.name)) {
