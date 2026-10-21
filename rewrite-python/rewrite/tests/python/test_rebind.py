@@ -35,6 +35,8 @@ from rewrite.python.visitor import PythonVisitor
 from rewrite.recipe import Recipe
 from rewrite.test import RecipeSpec, dedent, from_visitor, python
 
+from ._parse_shape import parse_shape
+
 requires_ty = pytest.mark.skipif(shutil.which('ty-types') is None,
                                  reason="ty-types CLI is not installed")
 
@@ -523,3 +525,34 @@ def test_maybe_bind_answers_with_the_files_name_for_a_module():
     # type-checking import of `Client` binds the same member, so a runtime import may share its
     # name. `X` is claimed by the import queued for `a`.
     assert answers == ['h', 'h', 'json', None, 'Client', 'X', None]
+
+
+def test_moving_one_of_two_modules_leaves_the_other_a_bare_import():
+    after = '''
+        import sys
+        import pathlib
+        '''
+    RecipeSpec(recipe=ChangeImport(old_module='os', new_module='pathlib')).rewrite_run(
+        python(
+            '''
+            import os, sys
+            import pathlib
+            ''',
+            after,
+            after_recipe=parse_shape(after)))
+
+
+def test_a_dropped_imports_comment_moves_onto_the_reduced_import_after_it():
+    RecipeSpec(recipe=ChangeImport(old_module='os', new_module='pathlib')).rewrite_run(
+        python(
+            '''
+            # c
+            import os
+            import os, sys
+            import pathlib
+            ''',
+            '''
+            # c
+            import sys
+            import pathlib
+            '''))

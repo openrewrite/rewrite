@@ -17,11 +17,13 @@
 from dataclasses import dataclass
 from typing import List, Optional, Sequence, Set
 
+from rewrite import random_id
 from rewrite.java import J
 from rewrite.java.support_types import JContainer, JRightPadded, Statement
-from rewrite.java.tree import Identifier, If, Import, Space
+from rewrite.java.tree import Empty, Identifier, If, Import, Space
+from rewrite.markers import Markers
 from rewrite.python.binding_utils import is_reference
-from rewrite.python.import_utils import (get_qualid_name, get_name_string, get_alias_name,
+from rewrite.python.import_utils import (bare_import, get_qualid_name, get_name_string, get_alias_name,
                                          get_canonical_fqn, module_binding_name,
                                          module_exported_names, referenced_names,
                                          unconditional_body)
@@ -173,7 +175,11 @@ class RemoveImport(PythonVisitor):
     def _remove_import(self, cu: CompilationUnit) -> CompilationUnit:
         """Remove the import from the compilation unit."""
         kept = self._prune_statements(cu.padding.statements)
-        return cu if kept is None else cu.padding.replace(_statements=kept)
+        if kept is None:
+            return cu
+        # A parse of an empty module gives it one Empty statement.
+        return cu.padding.replace(_statements=kept or [
+            JRightPadded(Empty(random_id(), Space.EMPTY, Markers.EMPTY), Space.EMPTY, Markers.EMPTY)])
 
     def _prune_statements(self, padded_statements: Sequence[JRightPadded]) -> Optional[List[JRightPadded]]:
         """The statements with the import gone, or None to leave them as they are —
@@ -247,7 +253,7 @@ class RemoveImport(PythonVisitor):
             return None
         return imp
 
-    def _process_multi_import(self, multi: MultiImport) -> Optional[MultiImport]:
+    def _process_multi_import(self, multi: MultiImport) -> Import | MultiImport | None:
         """Process a MultiImport and return None to remove, modified, or original."""
         if self.name is None:
             # Removing entire module import
@@ -256,7 +262,7 @@ class RemoveImport(PythonVisitor):
             # Removing specific name from "from X import ..."
             return self._remove_name_from_import(multi)
 
-    def _remove_module_import(self, multi: MultiImport) -> Optional[MultiImport]:
+    def _remove_module_import(self, multi: MultiImport) -> Import | MultiImport | None:
         """Remove the import that binds the module itself."""
         if multi.from_ is not None:
             # This is a "from X import Y" statement
@@ -284,7 +290,7 @@ class RemoveImport(PythonVisitor):
         symbol re-exported through it): a member binds the member, not the module."""
         return get_canonical_fqn(imp) == self.module
 
-    def _remove_name_from_import(self, multi: MultiImport) -> Optional[MultiImport]:
+    def _remove_name_from_import(self, multi: MultiImport) -> Import | MultiImport | None:
         """Remove a specific name from a 'from X import a, b, c' statement.
 
         A member matches when written module and name match, or when its
@@ -306,7 +312,7 @@ class RemoveImport(PythonVisitor):
 
         return self._prune_names(multi, new_padded)
 
-    def _prune_names(self, multi: MultiImport, new_padded: list) -> Optional[MultiImport]:
+    def _prune_names(self, multi: MultiImport, new_padded: list) -> Import | MultiImport | None:
         """Rebuild ``multi`` with only ``new_padded`` names, preserving padding.
 
         Returns None when nothing is left, or the original when nothing was removed.
@@ -316,6 +322,8 @@ class RemoveImport(PythonVisitor):
             return None  # Remove entire statement
         if len(new_padded) == len(existing_padded):
             return multi
+        if multi.from_ is None and len(new_padded) == 1:
+            return bare_import(multi, new_padded[0].element)
 
         # Whatever separated the statement from its first name — nothing, or the line break
         # and indent of a parenthesized import — belongs to whichever name is first now.
