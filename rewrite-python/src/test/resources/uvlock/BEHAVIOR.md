@@ -150,10 +150,15 @@ rather than guess dependencies.
 - A new version activating an extra on an already-locked package (`reqlike 2.0` requiring
   `urlish[socks]`) keeps urlish's version and adds its `socks` group and that group's closure
   (`off21-upgrade-activates-extra/`).
-- An extra-gated requirement whose marker is a disjunction (`zeta; extra == 'fast' or extra == 'slow'`)
-  lands in each activated extra's group without a marker, next to the plain `extra == 'fast'` entries
-  (`off22-or-extras-marker/uv.lock.after`); the engine places only single-clause `extra ==` and-chains
-  and fails loud on any other shape.
+- An extra-gated marker is read per disjunct: `zeta; extra == 'fast' or extra == 'slow'` lands in each
+  activated extra's group without a marker, next to the plain `extra == 'fast'` entries
+  (`off22-or-extras-marker/`); `(sys_platform == 'win32') and extra == 'fast'` keeps the platform
+  clause as the entry marker, and a disjunction whose every term needs an unactivated extra
+  (`(sys_platform == 'emscripten' and extra == 'all') or (sys_platform == 'win32' and extra == 'all')`)
+  leaves no trace (`off23-extra-dnf-markers/`).
+- A term without an extra clause (`delta; extra == 'fast' or sys_platform == 'win32'`) is split by uv
+  into a base edge `sys_platform == 'win32'` and a group entry `sys_platform != 'win32'`
+  (`off24-extra-or-platform-marker/uv.lock.after`); the engine fails loud on that shape.
 
 ## 9. Which requirements bound a package (local-index scenarios, uv 0.10.11 and 0.13.4)
 

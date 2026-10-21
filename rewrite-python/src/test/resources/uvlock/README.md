@@ -56,9 +56,11 @@ bounds Python from above and does not fork. `off14-upgrade-drops-extra` and
 `[package.optional-dependencies]` groups follow activated extras (BEHAVIOR.md §8):
 `off19-extra-group-lockstep-upgrade` an upgrade through an activated extra whose group depends back on
 the package, `off20-transitive-add-with-extras` a transitive requirement with extras,
-`off21-upgrade-activates-extra` an upgrade that activates an extra on an already-locked package, and
-`off22-or-extras-marker` an extra disjunction the engine refuses (its `uv.lock.after` is real uv's
-output, kept for the record).
+`off21-upgrade-activates-extra` an upgrade that activates an extra on an already-locked package,
+`off22-or-extras-marker` a requirement gated on a disjunction of extras, `off23-extra-dnf-markers`
+parenthesized extra clauses next to a disjunction no edge activates, and `off24-extra-or-platform-marker`
+a marker mixing an extra with a platform clause, which the engine refuses (its `uv.lock.after` is real
+uv's output, kept for the record).
 
 `off16-tool-uv-dev-dependencies` (pypi.org) declares its dev group through the legacy `[tool.uv]
 dev-dependencies` list; uv's lock is byte-identical to the same list under `[dependency-groups]`.

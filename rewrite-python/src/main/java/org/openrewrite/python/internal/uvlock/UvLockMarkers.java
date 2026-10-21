@@ -124,45 +124,53 @@ final class UvLockMarkers {
     }
 
     /**
-     * Splits a marker into simple {@code var op 'value'} clauses joined by {@code and};
-     * null for anything richer (or-chains, parentheses, reversed operands).
+     * Splits a marker into simple {@code var op 'value'} clauses joined by {@code and}; null for
+     * anything richer (or-chains, reversed operands, nesting beyond one pair of parentheses).
      */
     static @Nullable List<String[]> parseSimpleAndChain(String marker) {
-        List<String> parts = splitTopLevelAnd(marker);
-        if (parts == null) {
-            return null;
-        }
-        List<String[]> clauses = new ArrayList<>(parts.size());
-        for (String part : parts) {
-            Matcher m = SIMPLE_CLAUSE.matcher(part);
-            if (!m.matches()) {
-                return null;
-            }
-            clauses.add(new String[]{m.group(1), m.group(2), m.group(4)});
-        }
-        return clauses;
+        List<List<String[]>> terms = parseDisjunction(marker);
+        return terms != null && terms.size() == 1 ? terms.get(0) : null;
     }
 
-    private static @Nullable List<String> splitTopLevelAnd(String marker) {
-        if (marker.indexOf('(') >= 0 || marker.indexOf(')') >= 0) {
+    /**
+     * Splits a marker into the and-chains of its top-level disjunction, each a list of simple
+     * clauses. One pair of parentheses may wrap a whole disjunct or a single clause.
+     */
+    static @Nullable List<List<String[]>> parseDisjunction(String marker) {
+        List<String> terms = splitTopLevel(marker, "or");
+        if (terms == null) {
             return null;
         }
+        List<List<String[]>> result = new ArrayList<>(terms.size());
+        for (String term : terms) {
+            List<String> parts = splitTopLevel(stripWrappingParens(term), "and");
+            if (parts == null) {
+                return null;
+            }
+            List<String[]> clauses = new ArrayList<>(parts.size());
+            for (String part : parts) {
+                Matcher m = SIMPLE_CLAUSE.matcher(stripWrappingParens(part));
+                if (!m.matches()) {
+                    return null;
+                }
+                clauses.add(new String[]{m.group(1), m.group(2), m.group(4)});
+            }
+            result.add(clauses);
+        }
+        return result;
+    }
+
+    // splits at the operator word outside quotes and parentheses; null when parentheses do not balance
+    private static @Nullable List<String> splitTopLevel(String marker, String operator) {
         List<String> parts = new ArrayList<>();
         StringBuilder current = new StringBuilder();
         char quote = 0;
-        String[] tokens = marker.split("(?<=\\s)|(?=\\s)");
-        // scan word tokens, honoring quoted strings, so "and"/"or" inside values are kept
-        int i = 0;
-        while (i < tokens.length) {
-            String token = tokens[i];
-            if (quote == 0 && ("and".equals(token))) {
+        int depth = 0;
+        for (String token : marker.split("(?<=\\s)|(?=\\s)")) {
+            if (quote == 0 && depth == 0 && operator.equals(token)) {
                 parts.add(current.toString());
                 current.setLength(0);
-                i++;
                 continue;
-            }
-            if (quote == 0 && "or".equals(token)) {
-                return null;
             }
             for (int c = 0; c < token.length(); c++) {
                 char ch = token.charAt(c);
@@ -170,13 +178,45 @@ final class UvLockMarkers {
                     quote = ch;
                 } else if (quote == ch) {
                     quote = 0;
+                } else if (quote == 0 && ch == '(') {
+                    depth++;
+                } else if (quote == 0 && ch == ')' && --depth < 0) {
+                    return null;
                 }
             }
             current.append(token);
-            i++;
+        }
+        if (depth != 0) {
+            return null;
         }
         parts.add(current.toString());
         return parts;
+    }
+
+    private static String stripWrappingParens(String text) {
+        String t = text.trim();
+        while (t.startsWith("(") && t.endsWith(")") && closesAtEnd(t)) {
+            t = t.substring(1, t.length() - 1).trim();
+        }
+        return t;
+    }
+
+    private static boolean closesAtEnd(String t) {
+        int depth = 0;
+        char quote = 0;
+        for (int i = 0; i < t.length(); i++) {
+            char ch = t.charAt(i);
+            if (quote == 0 && (ch == '\'' || ch == '"')) {
+                quote = ch;
+            } else if (quote == ch) {
+                quote = 0;
+            } else if (quote == 0 && ch == '(') {
+                depth++;
+            } else if (quote == 0 && ch == ')' && --depth == 0) {
+                return i == t.length() - 1;
+            }
+        }
+        return false;
     }
 
     /** Whether any clause bounds the Python version from below ({@code >=}, {@code >}, {@code ==}, {@code ~=}). */

@@ -1486,34 +1486,33 @@ public final class UvLockEngine {
                 int semi = raw.indexOf(';');
                 String rawMarker = requirement.getMarker() != null && semi >= 0 ?
                         raw.substring(semi + 1).trim() : null;
-                String group = null;
-                if (rawMarker != null && UvLockMarkers.referencesExtraVariable(rawMarker)) {
-                    String[] split = splitExtraClause(pkg, rawMarker);
-                    group = split[0];
-                    rawMarker = split[1];
-                }
-                if (group == null ? !withBase : !groups.contains(group)) {
-                    continue;
-                }
-                List<UvLockDependency> oldEdges = group == null ? oldPkg.getDependencies() :
-                        oldPkg.getOptionalDependencies() != null ? oldPkg.getOptionalDependencies().get(group) : null;
+                List<String[]> placements = rawMarker != null && UvLockMarkers.referencesExtraVariable(rawMarker) ?
+                        extraTerms(pkg, rawMarker) : Collections.singletonList(new String[]{null, rawMarker});
                 String target = requirement.getCanonicalName();
-                String marker = edgeMarker(pkg, target, rawMarker, oldEdges != null ? oldEdges : emptyList());
-                if (UvLockMarkers.DROP_EDGE.equals(marker)) {
-                    continue;
+                for (String[] placement : placements) {
+                    String group = placement[0];
+                    if (group == null ? !withBase : !groups.contains(group)) {
+                        continue;
+                    }
+                    List<UvLockDependency> oldEdges = group == null ? oldPkg.getDependencies() :
+                            oldPkg.getOptionalDependencies() != null ? oldPkg.getOptionalDependencies().get(group) : null;
+                    String marker = edgeMarker(pkg, target, placement[1], oldEdges != null ? oldEdges : emptyList());
+                    if (UvLockMarkers.DROP_EDGE.equals(marker)) {
+                        continue;
+                    }
+                    if (marker != null && markeredAddClosure.contains(pkg)) {
+                        throw new EngineFailure(Reason.RESOLUTION_REQUIRED, pkg,
+                                "Adding a conditional dependency whose closure has a marker-gated edge (" +
+                                        target + ") requires marker-space resolution, " +
+                                        "which the native engine does not support");
+                    }
+                    if (!seen.add(group + '\0' + target)) {
+                        throw new EngineFailure(Reason.RESOLUTION_REQUIRED, pkg,
+                                "Multiple requirements on " + target + " need marker-aware merging");
+                    }
+                    UvLockDependency edge = edgeTo(pkg, requirement, marker);
+                    (group == null ? edges.base : edges.groups.computeIfAbsent(group, k -> new ArrayList<>())).add(edge);
                 }
-                if (marker != null && markeredAddClosure.contains(pkg)) {
-                    throw new EngineFailure(Reason.RESOLUTION_REQUIRED, pkg,
-                            "Adding a conditional dependency whose closure has a marker-gated edge (" +
-                                    target + ") requires marker-space resolution, " +
-                                    "which the native engine does not support");
-                }
-                if (!seen.add(group + '\0' + target)) {
-                    throw new EngineFailure(Reason.RESOLUTION_REQUIRED, pkg,
-                            "Multiple requirements on " + target + " need marker-aware merging");
-                }
-                UvLockDependency edge = edgeTo(pkg, requirement, marker);
-                (group == null ? edges.base : edges.groups.computeIfAbsent(group, k -> new ArrayList<>())).add(edge);
             }
             edges.base.sort(Comparator.comparing(UvLockDependency::getName));
             for (List<UvLockDependency> entries : edges.groups.values()) {
@@ -1523,31 +1522,39 @@ public final class UvLockEngine {
         }
 
         /**
-         * Splits an extra-gated marker into the canonical extra and the remaining and-chain (null
-         * when nothing remains). Only a single {@code extra ==} clause has a reproducible place in
-         * the lock, so any other shape fails loud.
+         * Reads an extra-gated marker as a disjunction of and-chains carrying one {@code extra ==}
+         * clause each, and returns every term as its canonical extra plus the remaining and-chain
+         * (null when nothing remains). uv places such a term in its extra's group, so that is the
+         * only shape with a reproducible place in the lock; anything else fails loud.
          */
-        private String[] splitExtraClause(String pkg, String rawMarker) {
-            List<String[]> clauses = UvLockMarkers.parseSimpleAndChain(rawMarker);
-            String extra = null;
-            List<String> rest = new ArrayList<>();
-            boolean supported = clauses != null;
-            for (String[] clause : supported ? clauses : Collections.<String[]>emptyList()) {
-                if (!"extra".equals(clause[0])) {
-                    rest.add(clause[0] + " " + clause[1] + " " + quoteMarkerValue(clause[2]));
-                } else if (extra == null && "==".equals(clause[1])) {
-                    extra = Pep508Requirement.canonicalize(clause[2]);
-                } else {
+        private List<String[]> extraTerms(String pkg, String rawMarker) {
+            List<List<String[]>> terms = UvLockMarkers.parseDisjunction(rawMarker);
+            List<String[]> placements = new ArrayList<>();
+            boolean supported = terms != null;
+            for (List<String[]> term : supported ? terms : Collections.<List<String[]>>emptyList()) {
+                String extra = null;
+                List<String> rest = new ArrayList<>();
+                for (String[] clause : term) {
+                    if (!"extra".equals(clause[0])) {
+                        rest.add(clause[0] + " " + clause[1] + " " + quoteMarkerValue(clause[2]));
+                    } else if (extra == null && "==".equals(clause[1])) {
+                        extra = Pep508Requirement.canonicalize(clause[2]);
+                    } else {
+                        supported = false;
+                    }
+                }
+                if (extra == null) {
                     supported = false;
                 }
+                placements.add(new String[]{extra, rest.isEmpty() ? null : String.join(" and ", rest)});
             }
-            if (!supported || extra == null) {
+            if (!supported) {
                 throw new EngineFailure(Reason.RESOLUTION_REQUIRED, pkg,
-                        "Extra-gated requirement marker \"" + rawMarker + "\" is not an and-chain with a single " +
-                                "extra == clause; placing it in an optional-dependencies group is not supported by " +
+                        "Extra-gated requirement marker \"" + rawMarker + "\" is not a disjunction of and-chains with " +
+                                "one extra == clause each; placing it in optional-dependencies groups is not supported by " +
                                 "the native engine");
             }
-            return new String[]{extra, rest.isEmpty() ? null : String.join(" and ", rest)};
+            return placements;
         }
 
         private static String quoteMarkerValue(String value) {
@@ -1602,11 +1609,9 @@ public final class UvLockEngine {
                 if (semi < 0) {
                     continue;
                 }
-                List<String[]> clauses = UvLockMarkers.parseSimpleAndChain(raw.substring(semi + 1).trim());
-                if (clauses == null) {
-                    continue;
-                }
-                for (String[] clause : clauses) {
+                List<List<String[]>> terms = UvLockMarkers.parseDisjunction(raw.substring(semi + 1).trim());
+                for (String[] clause : terms == null ? Collections.<String[]>emptyList() :
+                        terms.stream().flatMap(List::stream).collect(java.util.stream.Collectors.toList())) {
                     if ("extra".equals(clause[0]) && "==".equals(clause[1])) {
                         gated.add(Pep508Requirement.canonicalize(clause[2]));
                     }

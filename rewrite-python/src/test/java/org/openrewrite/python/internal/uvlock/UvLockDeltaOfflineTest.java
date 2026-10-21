@@ -244,9 +244,25 @@ class UvLockDeltaOfflineTest {
     }
 
     @Test
-    void extraGatedRequirementOutsideAndChainFailsLoud() {
+    void extraDisjunctionLandsInEachActivatedGroup() {
+        // zeta; extra == 'fast' or extra == 'slow' joins group fast next to the plain extra == 'fast' entry
         routeLocalIndex("off22-or-extras-marker");
-        assertFailsLoud("off22-or-extras-marker", "gamma");
+        assertScenario("off22-or-extras-marker");
+    }
+
+    @Test
+    void parenthesizedExtraClausesAndUnactivatedDisjunctsRegenerate() {
+        // (sys_platform == 'win32') and extra == 'fast' keeps its platform clause; the all-gated DNF drops
+        routeLocalIndex("off23-extra-dnf-markers");
+        assertScenario("off23-extra-dnf-markers");
+        assertThat(http.requests).noneMatch(url -> url.contains("epsilon"));
+    }
+
+    @Test
+    void extraOrEnvironmentMarkerFailsLoud() {
+        // uv splits this marker into a base edge and a group entry with complementary platform markers
+        routeLocalIndex("off24-extra-or-platform-marker");
+        assertFailsLoud("off24-extra-or-platform-marker", "gamma");
     }
 
     @Test
