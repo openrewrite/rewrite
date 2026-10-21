@@ -455,20 +455,9 @@ public final class UvLockEngine {
          */
         private List<UvLockPackage> rewrittenWhole(List<UvLockPackage> pkgs) {
             List<UvLockPackage> out = new ArrayList<>(pkgs.size());
-            for (UvLockPackage pkg : pkgs) {
+            for (UvLockPackage pkg : withRecordedMarkers(pkgs)) {
                 UvLockPackage.UvLockPackageBuilder b = pkg.toBuilder()
-                        .resolutionMarkers(inSolveOrder(pkg.getResolutionMarkers()))
-                        .dependencies(recorded(pkg.getName(), pkg.getDependencies()));
-                if (pkg.getOptionalDependencies() != null) {
-                    Map<String, List<UvLockDependency>> groups = new LinkedHashMap<>();
-                    pkg.getOptionalDependencies().forEach((k, v) -> groups.put(k, recorded(pkg.getName(), v)));
-                    b.optionalDependencies(groups);
-                }
-                if (pkg.getDevDependencies() != null) {
-                    Map<String, List<UvLockDependency>> groups = new LinkedHashMap<>();
-                    pkg.getDevDependencies().forEach((k, v) -> groups.put(k, recorded(pkg.getName(), v)));
-                    b.devDependencies(groups);
-                }
+                        .resolutionMarkers(inSolveOrder(pkg.getResolutionMarkers()));
                 if (pkg.getSource().getType() == UvLockSource.Type.REGISTRY && pkg.getWheels() != null) {
                     List<UvLockArtifact> wheels = new ArrayList<>();
                     for (UvLockArtifact wheel : pkg.getWheels()) {
@@ -482,6 +471,25 @@ public final class UvLockEngine {
                 out.add(b.build());
             }
             return withUploadTimes(out);
+        }
+
+        private List<UvLockPackage> withRecordedMarkers(List<UvLockPackage> pkgs) {
+            List<UvLockPackage> out = new ArrayList<>(pkgs.size());
+            for (UvLockPackage pkg : pkgs) {
+                UvLockPackage.UvLockPackageBuilder b = pkg.toBuilder().dependencies(recorded(pkg.getName(), pkg.getDependencies()));
+                if (pkg.getOptionalDependencies() != null) {
+                    Map<String, List<UvLockDependency>> groups = new LinkedHashMap<>();
+                    pkg.getOptionalDependencies().forEach((k, v) -> groups.put(k, recorded(pkg.getName(), v)));
+                    b.optionalDependencies(groups);
+                }
+                if (pkg.getDevDependencies() != null) {
+                    Map<String, List<UvLockDependency>> groups = new LinkedHashMap<>();
+                    pkg.getDevDependencies().forEach((k, v) -> groups.put(k, recorded(pkg.getName(), v)));
+                    b.devDependencies(groups);
+                }
+                out.add(b.build());
+            }
+            return out;
         }
 
         private @Nullable List<UvLockDependency> recorded(String pkg, @Nullable List<UvLockDependency> edges) {
@@ -641,11 +649,20 @@ public final class UvLockEngine {
             for (UvLockRequirement r : requirements != null ? requirements : Collections.<UvLockRequirement>emptyList()) {
                 List<String> extras = new ArrayList<>(orEmpty(r.getExtras()));
                 sort(extras);
-                String key = r.getName() + '|' + extras + '|' + r.getMarker() + '|' + r.getIndex() + '|' + r.getUrl() + '|' +
+                String key = r.getName() + '|' + extras + '|' + normalizedMarker(r.getMarker()) + '|' + r.getIndex() + '|' + r.getUrl() + '|' +
                         r.getGit() + '|' + r.getDirectory() + '|' + r.getEditable() + '|' + specifierKey(r.getSpecifier());
                 keys.merge(key, 1, Integer::sum);
             }
             return keys;
+        }
+
+        // an older uv's recorded form and the current one denote the same marker
+        private static @Nullable String normalizedMarker(@Nullable String marker) {
+            if (marker == null) {
+                return null;
+            }
+            String recorded = UvLockMarkers.recordMarker(marker, null);
+            return recorded != null ? recorded : marker;
         }
 
         // versions compare with trailing zeros ignored, except under ~= and a star where they are significant
@@ -794,7 +811,7 @@ public final class UvLockEngine {
                 }
                 UvLockRequirement oldReq = oldReqs.get(0);
                 UvLockRequirement newReq = newReqs.get(0);
-                if (!Objects.equals(oldReq.getMarker(), newReq.getMarker())) {
+                if (!Objects.equals(normalizedMarker(oldReq.getMarker()), normalizedMarker(newReq.getMarker()))) {
                     throw new EngineFailure(Reason.RESOLUTION_REQUIRED, newReq.getName(),
                             "Changing a declaration's environment marker requires resolution");
                 }
@@ -1329,7 +1346,8 @@ public final class UvLockEngine {
             if (!any) {
                 return;
             }
-            UvLockReachability now = UvLockReachability.of(packages, rootIndex, range);
+            // a whole-lock rewrite judges reachability by the markers it is about to write
+            UvLockReachability now = UvLockReachability.of(migrating ? withRecordedMarkers(packages) : packages, rootIndex, range);
             if (now == null) {
                 throw new EngineFailure(Reason.RESOLUTION_REQUIRED, null,
                         "Pruning platform wheels by reachability is not supported for this lock's markers");
@@ -1348,7 +1366,7 @@ public final class UvLockEngine {
                 Integer was = beforeIndex.get(pkg.getName() + '@' + pkg.getVersion());
                 if (!rewritten.contains(pkg.getName()) && was != null) {
                     if (before == null) {
-                        before = UvLockReachability.of(original, findRoot(original), PyRange.parse(
+                        before = UvLockReachability.of(migrating ? withRecordedMarkers(original) : original, findRoot(original), PyRange.parse(
                                 lock.getRequiresPython() != null ? lock.getRequiresPython() : ""));
                     }
                     if (before == null || (before.platformScoped(was) && !before.reachKey(was).equals(now.reachKey(i)))) {

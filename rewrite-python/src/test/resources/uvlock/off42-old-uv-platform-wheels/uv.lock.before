@@ -1,0 +1,33 @@
+version = 1
+requires-python = ">=3.10"
+
+[[package]]
+name = "keeper"
+version = "1.0"
+source = { registry = "https://index.example/simple/" }
+wheels = [
+    { url = "https://index.example/simple/keeper/keeper-1.0-py3-none-any.whl", hash = "sha256:69b5705b9b71e898cd067240f4801725481689cec4f78cd9f2655947fac7ecc3" },
+]
+
+[[package]]
+name = "s55-old-uv-linux-platform-wheels"
+version = "0.1.0"
+source = { virtual = "." }
+dependencies = [
+    { name = "keeper" },
+    { name = "winonly", marker = "platform_system == 'Linux'" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "keeper", specifier = "==1.0" },
+    { name = "winonly", marker = "platform_system == 'Linux'", specifier = "==1.0" },
+]
+
+[[package]]
+name = "winonly"
+version = "1.0"
+source = { registry = "https://index.example/simple/" }
+wheels = [
+    { url = "https://index.example/simple/winonly/winonly-1.0-py3-none-manylinux_2_17_x86_64.whl", hash = "sha256:d8649c59ee72ac58495b2279059719b5639720f5806fef42500e1b24ebad23f5" },
+]

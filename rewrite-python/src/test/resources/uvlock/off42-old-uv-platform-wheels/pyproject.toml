@@ -1,0 +1,10 @@
+[project]
+name = "s55-old-uv-linux-platform-wheels"
+version = "0.1.0"
+requires-python = ">=3.10"
+dependencies = ["iniconfig==1.0", "keeper==1.0", "winonly==1.0; platform_system == 'Linux'"]
+
+[[tool.uv.index]]
+name = "local"
+url = "https://index.example/simple/"
+default = true

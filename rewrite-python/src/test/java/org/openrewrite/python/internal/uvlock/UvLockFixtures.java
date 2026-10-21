@@ -161,6 +161,8 @@ final class UvLockFixtures {
       "off40-old-uv-marker-rewrite/uv.lock.before",
       "off41-old-uv-fork-order/uv.lock.after",
       "off41-old-uv-fork-order/uv.lock.before",
+      "off42-old-uv-platform-wheels/uv.lock.after",
+      "off42-old-uv-platform-wheels/uv.lock.before",
       "off2-add-closure/uv.lock.after",
       "off2-add-closure/uv.lock.before",
       "off3-cascade-flake8/uv.lock.after",
