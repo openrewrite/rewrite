@@ -27,22 +27,31 @@ import java.util.regex.Pattern;
 
 /**
  * Port of brace-expansion with balanced-match, {@code a{b,c}d} to {@code abd acd}: 1.1.11 with 1.0.0, which minimatch
- * 3.0.4 calls in yarn 1.22.22, and 5.0.6 and 5.0.9 with 4.0.4, which minimatch 10.2.5 calls in npm 11.17.0 and in npm
- * 11.19.1. 5.0.7 expands as 5.0.6 does, without the depth of stack that 5.0.6 needs for a run of sets that do not
- * expand.
+ * 3.0.4 calls in yarn 1.22.22, and 5.0.6, 5.0.9 and 5.0.12 with 4.0.4, which minimatch 10.2.5 calls in npm 11.17.0,
+ * 11.19.1 and 11.21.1. 5.0.7 expands as 5.0.6 does, without the depth of stack that 5.0.6 needs for a run of sets that
+ * do not expand.
  */
 public final class BraceExpansion {
 
     public enum Release {
         V1_1_11,
         V5_0_6,
-        V5_0_9
+        V5_0_9,
+        V5_0_12;
+
+        // the constants are declared in release order
+        boolean atLeast(Release release) {
+            return compareTo(release) >= 0;
+        }
     }
 
     private static final int EXPANSION_MAX = 100_000;
 
     // 5.0.9 bounds the characters an expansion may hold at any point (CVE-2026-14257)
     private static final int EXPANSION_MAX_LENGTH = 4_000_000;
+
+    private static final int EXPANSION_MAX_DEPTH = 1_000;
+    private static final int EXPANSION_MAX_REWRITES = 1_000;
 
     private static final String ESC_SLASH = "\0SLASH\0";
     private static final String ESC_OPEN = "\0OPEN\0";
@@ -122,22 +131,29 @@ public final class BraceExpansion {
                 .replace(ESC_COMMA, ",").replace(ESC_PERIOD, ".");
     }
 
+    // 5.0.12's loop over the brace groups, whose parts are those every earlier release's recursion on the post finds
     private static List<String> parseCommaParts(String str) {
-        if (str.isEmpty()) {
-            return new ArrayList<>(Collections.singletonList(""));
+        List<String> parts = new ArrayList<>();
+        String carry = "";
+        while (true) {
+            Balanced m = balanced(str);
+            if (m == null) {
+                List<String> tail = new ArrayList<>(Arrays.asList(str.split(",", -1)));
+                tail.set(0, carry + tail.get(0));
+                parts.addAll(tail);
+                return parts;
+            }
+            List<String> p = new ArrayList<>(Arrays.asList(m.getPre().split(",", -1)));
+            p.set(0, carry + p.get(0));
+            p.set(p.size() - 1, p.get(p.size() - 1) + "{" + m.getBody() + "}");
+            if (m.getPost().isEmpty()) {
+                parts.addAll(p);
+                return parts;
+            }
+            carry = p.remove(p.size() - 1);
+            parts.addAll(p);
+            str = m.getPost();
         }
-        Balanced m = balanced(str);
-        if (m == null) {
-            return new ArrayList<>(Arrays.asList(str.split(",", -1)));
-        }
-        List<String> p = new ArrayList<>(Arrays.asList(m.getPre().split(",", -1)));
-        p.set(p.size() - 1, p.get(p.size() - 1) + "{" + m.getBody() + "}");
-        List<String> postParts = parseCommaParts(m.getPost());
-        if (!m.getPost().isEmpty()) {
-            p.set(p.size() - 1, p.get(p.size() - 1) + postParts.remove(0));
-            p.addAll(postParts);
-        }
-        return p;
     }
 
     public static List<String> expand(String str, Release release) {
@@ -147,8 +163,11 @@ public final class BraceExpansion {
         if (str.startsWith("{}")) {
             str = "\\{\\}" + str.substring(2);
         }
+        boolean bounded = release.atLeast(Release.V5_0_12);
+        int maxDepth = bounded ? EXPANSION_MAX_DEPTH : Integer.MAX_VALUE;
+        int maxRewrites = bounded ? EXPANSION_MAX_REWRITES : Integer.MAX_VALUE;
         List<String> out = new ArrayList<>();
-        for (String s : release == Release.V5_0_9 ? expand509(escapeBraces(str), true) :
+        for (String s : release.atLeast(Release.V5_0_9) ? expand509(escapeBraces(str), true, maxDepth, 0, maxRewrites) :
                 expand(escapeBraces(str), true, release)) {
             out.add(unescapeBraces(s));
         }
@@ -223,12 +242,16 @@ public final class BraceExpansion {
     }
 
     // 5.0.9's expand_: the top-level sets are combined left to right into one accumulator, and an empty result is
-    // dropped by the first set alone
-    private static List<String> expand509(String str, boolean isTop) {
+    // dropped by the first set alone. A string nested deeper than maxDepth is left as it is.
+    private static List<String> expand509(String str, boolean isTop, int maxDepth, int depth, int maxRewrites) {
+        if (depth > maxDepth) {
+            return Collections.singletonList(str);
+        }
         List<String> acc = new ArrayList<>(Collections.singletonList(""));
         List<String> literal = Collections.singletonList("");
         boolean dropEmpties = false;
         boolean firstGroup = true;
+        int rewrites = 0;
         while (true) {
             Balanced m = balanced(str);
             if (m == null) {
@@ -250,7 +273,9 @@ public final class BraceExpansion {
             boolean isSequence = isNumericSequence || isAlphaSequence;
             boolean isOptions = m.getBody().contains(",");
             if (!isSequence && !isOptions) {
-                if (COMMA_THEN_CLOSE_5_0_6.matcher(m.getPost()).find()) {
+                if (rewrites < maxRewrites &&
+                    COMMA_THEN_CLOSE_5_0_6.matcher(m.getPost()).find()) {
+                    rewrites++;
                     str = pre + "{" + m.getBody() + ESC_CLOSE + m.getPost();
                     isTop = true;
                     continue;
@@ -268,7 +293,7 @@ public final class BraceExpansion {
                 List<String> n = parseCommaParts(m.getBody());
                 if (n.size() == 1) {
                     List<String> embraced = new ArrayList<>();
-                    for (String e : expand509(n.get(0), false)) {
+                    for (String e : expand509(n.get(0), false, maxDepth, depth + 1, maxRewrites)) {
                         embraced.add("{" + e + "}");
                     }
                     n = embraced;
@@ -292,7 +317,7 @@ public final class BraceExpansion {
                 int valuesLength = 0;
                 outer:
                 for (String part : n) {
-                    for (String v : expand509(part, false)) {
+                    for (String v : expand509(part, false, maxDepth, depth + 1, maxRewrites)) {
                         if (dropsEmpties && v.isEmpty()) {
                             continue;
                         }
