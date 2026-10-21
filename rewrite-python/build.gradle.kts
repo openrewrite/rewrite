@@ -563,3 +563,30 @@ val printTestClasspath by tasks.registering {
 extensions.configure<LicenseExtension> {
     exclude("**/rewrite-python-version.txt")
 }
+
+// The lock regeneration test fixtures (recorded package-manager output) live in
+// openrewrite/rewrite-python-lock-fixtures. The latest main is fetched once into build/lock-fixtures and joins the
+// test classpath; `clean` picks up newer fixtures.
+val lockFixturesDir = layout.buildDirectory.dir("lock-fixtures")
+val syncLockFixtures = tasks.register("syncLockFixtures") {
+    outputs.dir(lockFixturesDir)
+    onlyIf { !lockFixturesDir.get().dir("lock").asFile.exists() }
+    doLast {
+        val archive = layout.buildDirectory.file("tmp/lock-fixtures-main.tar.gz").get().asFile
+        archive.parentFile.mkdirs()
+        uri("https://codeload.github.com/openrewrite/rewrite-python-lock-fixtures/tar.gz/refs/heads/main")
+            .toURL().openStream().use { input -> archive.outputStream().use { input.copyTo(it) } }
+        copy {
+            from(tarTree(resources.gzip(archive))) {
+                include("*/lock/**")
+                eachFile { path = path.substringAfter('/') }
+                includeEmptyDirs = false
+            }
+            into(lockFixturesDir)
+        }
+    }
+}
+tasks.named<ProcessResources>("processTestResources") {
+    dependsOn(syncLockFixtures)
+    from(lockFixturesDir)
+}

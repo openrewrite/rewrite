@@ -46,7 +46,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 /**
  * Expected {@code _meta.hash} values were recorded from the repo's python3 oracle
- * ({@code src/test/resources/pipfilelock/oracle.py hash}); tests never execute python.
+ * ({@code record/pipenv-oracle.py hash}); tests never execute python.
  */
 class PipenvLockEngineTest {
 

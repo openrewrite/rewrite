@@ -1,5 +1,0 @@
-Metadata-Version: 2.1
-Name: other
-Version: 1.0
-Summary: synthetic other
-Requires-Dist: reqlike<1.5
