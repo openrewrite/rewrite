@@ -132,7 +132,7 @@ Which name a moved binding takes:
 - An unaliased `from` import follows the new member's name. If the file spells that name for anything other than a module-scope import of that very member, it keeps its old name as an alias. A parameter or nested import of the name counts, since it would capture a renamed reference. So does an import or rebind queued earlier in the visit.
 - An unaliased `import m` follows the new module where nothing reads `m`, or where both names are single segments and the new one is free. Otherwise it keeps `m` as an alias. A dotted `import a.b` that is read refuses, since `a.b.x` has no counterpart.
 
-One call moves one binding, and a repeated call answers as the first did. A second import binding the member under another name stays, and so do its types. A member read through its module, as `m.member`, moves with it. A module-level import of the old module has the new one spelled through `maybe_bind`. An import in an `if` block gets the new module bound in that block.
+One call moves one binding, and a repeated call answers as the first did. A second import binding the member under another name stays, and so do its types. A member read through its module, as `m.member`, moves with it. So does one read through `import a.m`, `from a import m` or `import a`, as `a.m.member` or `m.member`. The old import stays while anything still reads through it. A module-level import of the old module has the new one spelled through `maybe_bind`. An import in an `if` block gets the new module bound in that block.
 
 What the attribution follows:
 

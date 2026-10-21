@@ -789,6 +789,18 @@ class TestImportsInBlocks:
             )
         )
 
+    def test_keep_a_read_submodule_import_another_import_binds_only_the_package_of(self, arm):
+        RecipeSpec(recipe=from_visitor(_remove_import_visitor(arm, 'legacy.http')),
+                   type_attribution=False).rewrite_run(
+            python(
+                """
+                import legacy.http
+                import legacy
+                h = legacy.http.make_headers()
+                """,
+            )
+        )
+
     def test_keep_import_when_emptying_would_lose_a_comment(self, arm):
         spec = RecipeSpec(recipe=from_visitor(
             _remove_import_visitor(arm, 'typing', 'List', only_if_unused=False)))

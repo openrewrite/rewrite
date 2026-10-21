@@ -19,7 +19,7 @@ knowing how the file imports.
 """
 
 import dataclasses
-from typing import Any, Dict, FrozenSet, List, NamedTuple, Optional, Set, Tuple
+from typing import Any, Dict, FrozenSet, Iterable, List, NamedTuple, Optional, Set, Tuple
 
 from rewrite import random_id
 from rewrite.java.support_types import Expression, JavaType, JContainer, JLeftPadded, JRightPadded, Statement
@@ -93,8 +93,9 @@ def maybe_rebind(visitor: TreeVisitor[Any, Any], from_module: str, to_module: st
                  alias: Optional[str] = None, declared_in: Optional[str] = None) -> Optional[str]:
     """Moves the file's binding of ``from_module``, or of its ``from_member``, to ``to_module``,
     and answers with the name a reference to it now spells. ``to_member`` defaults to
-    ``from_member``. A member read through a binding of its module, as ``m.member``, moves
-    with it. None, changing nothing, where the move cannot be expressed safely.
+    ``from_member``. A member read through a binding of its module or of a package above it, as
+    ``m.member`` or ``a.m.member``, moves with it. None, changing nothing, where the move cannot
+    be expressed safely.
 
     Every type in the file naming what moved is renamed, not re-resolved, so a moved member
     keeps its old declaration's signature. ``declared_in`` names the module defining the member
@@ -113,18 +114,16 @@ def maybe_rebind(visitor: TreeVisitor[Any, Any], from_module: str, to_module: st
     bindings = import_bindings(visitor)
     moved = next((b for b in bindings.for_module(from_module, from_member)
                   if b.member == from_member), None)
-    # `import a.b` binds `a`, so `a.member` reads the package, not the module.
-    through = None if from_member is None else next(
-        (b for b in bindings.for_module(from_module) if b.member is None and '.' not in _spelling(b)), None)
+    through, through_spelling, identities = (None, None, None) if from_member is None else _read_through(
+        cu, bindings, from_module, from_member)
 
     name = None
     if moved is not None:
         name = _rebinding_name(visitor, cu, moved, to_module, to_member, alias)
         if name is None or (name != moved.name and _match_outside_module_scope(cu, moved)):
             return None
-    identities = None if through is None else _member_reads(cu, through.name, from_member)
     spelled_module, new_module_import = None, False
-    if through is not None and identities is not None:
+    if through is not None:
         if through.guarded:
             # `_RebindImport` binds the new module in the block that binds the old one.
             spelled_module = to_module
@@ -138,7 +137,8 @@ def maybe_rebind(visitor: TreeVisitor[Any, Any], from_module: str, to_module: st
 
     answer = name if name is not None else f'{spelled_module}.{to_member}'
     visitor._after_visit.append(_RebindImport(from_module, from_member, to_module, to_member, moved, name,
-                                              through, spelled_module, new_module_import, identities or set(),
+                                              through, through_spelling, spelled_module, new_module_import,
+                                              identities or set(),
                                               declared_in, answer))
     return answer
 
@@ -308,23 +308,58 @@ def _module_scope_ids(cu: CompilationUnit) -> Set[Any]:
     return ids
 
 
-def _reads_through(cursor: Cursor, target: Any, name: Any, module_name: str, member: str) -> bool:
-    """Whether ``target.name`` at ``cursor`` reads ``member`` through the module-scope binding
-    ``module_name``, which no nearer scope redeclares."""
-    return (isinstance(target, Identifier) and target.simple_name == module_name
-            and isinstance(name, Identifier) and name.simple_name == member
-            and not _LOCALS.is_bound(cursor, module_name))
+def _module_path(binding: Binding) -> Optional[str]:
+    """The module ``binding``'s name stands for. ``import a.b`` binds the package ``a``, and
+    ``from a import b`` binds ``a.b`` where ``b`` is a submodule."""
+    if binding.member == '*':
+        return None
+    if binding.member is not None:
+        return binding.module + binding.member if binding.module.endswith('.') \
+            else f'{binding.module}.{binding.member}'
+    return binding.module if get_alias_name(binding.imp) is not None else binding.module.split('.')[0]
 
 
-def _member_reads(cu: CompilationUnit, module_name: str, member: str) -> Optional[Set[str]]:
-    """The canonical names the file's reads of ``module_name.member`` carry, or None where
+def _read_through(cu: CompilationUnit, bindings: Iterable[Binding], module: str,
+                  member: str) -> Tuple[Optional[Binding], Optional[str], Optional[Set[str]]]:
+    """The first binding the file reads ``module.member`` through, how those reads spell the
+    module, and the canonical names they carry. A binding of a parent package reaches the
+    module through its attributes, as ``import os`` reads ``os.path.join``."""
+    for b in bindings:
+        path = _module_path(b)
+        if path is not None and (module == path or module.startswith(path + '.')):
+            spelling = b.name + module[len(path):]
+            identities = _member_reads(cu, b.name, spelling, member)
+            if identities is not None:
+                return b, spelling, identities
+    return None, None, None
+
+
+def _name_path(tree: Any) -> Optional[str]:
+    """``tree`` as a dotted name, or None where it is not made of names alone."""
+    if isinstance(tree, Identifier):
+        return tree.simple_name
+    if isinstance(tree, FieldAccess):
+        target = _name_path(tree.target)
+        return None if target is None else f'{target}.{tree.name.simple_name}'
+    return None
+
+
+def _reads_through(cursor: Cursor, target: Any, name: Any, root: str, spelling: str, member: str) -> bool:
+    """Whether ``target.name`` at ``cursor`` reads ``member`` of the module ``spelling`` names,
+    through the module-scope binding ``root``, which no nearer scope redeclares."""
+    return (isinstance(name, Identifier) and name.simple_name == member
+            and _name_path(target) == spelling and not _LOCALS.is_bound(cursor, root))
+
+
+def _member_reads(cu: CompilationUnit, root: str, spelling: str, member: str) -> Optional[Set[str]]:
+    """The canonical names the file's reads of ``spelling.member`` carry, or None where
     nothing reads it."""
     found: Optional[Set[str]] = None
 
     class Reads(PythonVisitor[None]):
         def read(self, target: Any, name: Any, identity: Optional[str]) -> None:
             nonlocal found
-            if _reads_through(self.cursor, target, name, module_name, member):
+            if _reads_through(self.cursor, target, name, root, spelling, member):
                 found = found if found is not None else set()
                 if identity is not None and identity.rpartition('.')[2] == member:
                     found.add(identity)
@@ -517,8 +552,9 @@ class _RebindImport(PythonVisitor[Any]):
 
     def __init__(self, from_module: str, from_member: Optional[str], to_module: str,
                  to_member: Optional[str], moved: Optional[Binding], bound_name: Optional[str],
-                 through: Optional[Binding], spelled_module: Optional[str], new_module_import: bool,
-                 identities: Set[str], declared_in: Optional[str], answer: str) -> None:
+                 through: Optional[Binding], through_spelling: Optional[str], spelled_module: Optional[str],
+                 new_module_import: bool, identities: Set[str], declared_in: Optional[str],
+                 answer: str) -> None:
         super().__init__()
         self.key = (from_module, from_member)
         self.from_module = from_module
@@ -527,7 +563,8 @@ class _RebindImport(PythonVisitor[Any]):
         self.to_member = to_member
         self.local_name = moved.name if moved is not None else None
         self.bound_name = bound_name
-        self.through_name = through.name if through is not None else None
+        self.through = through
+        self.through_spelling = through_spelling
         self.through_at_module_level = through is not None and not through.guarded
         self.spelled_module = spelled_module
         self.new_module_import = new_module_import
@@ -563,8 +600,8 @@ class _RebindImport(PythonVisitor[Any]):
         if self.new_module_import:
             # RemoveImport keeps a read `import a` unless another import binds `a`, so `import a.b` goes first.
             maybe_add_import(self, AddImportOptions(module=self.to_module, only_if_referenced=False))
-        if self.rewrote_qualified:
-            maybe_remove_import(self, RemoveImportOptions(module=self.from_module))
+        if self.rewrote_qualified and self.through is not None:
+            maybe_remove_import(self, RemoveImportOptions(module=self.through.module, name=self.through.member))
         return result
 
     def _binds(self, stmt: Statement) -> bool:
@@ -640,11 +677,12 @@ class _RebindImport(PythonVisitor[Any]):
         return ident.replace(_simple_name=self.bound_name)
 
     def _reads_through(self, target: Any, name: Any) -> bool:
-        return (self.spelled_module is not None and self.through_name is not None
-                and self.from_member is not None
-                and _reads_through(self.cursor, target, name, self.through_name, self.from_member))
+        return (self.spelled_module is not None and self.through is not None
+                and self.through_spelling is not None and self.from_member is not None
+                and _reads_through(self.cursor, target, name, self.through.name, self.through_spelling,
+                                   self.from_member))
 
-    def _module_reference(self, target: Identifier) -> Expression:
+    def _module_reference(self, target: Expression) -> Expression:
         """The name tree reading the new module where ``target`` read the old one, each part
         typed as the module it names wherever ``target`` was typed. An alias names the module
         it binds."""
@@ -657,7 +695,10 @@ class _RebindImport(PythonVisitor[Any]):
             return None if target.type is None else moved_types.module(
                 target.type, self.to_module if aliased else name)
 
-        result: Expression = target.replace(_simple_name=parts[0], _type=typed(parts[0]))
+        root = target
+        while isinstance(root, FieldAccess):
+            root = root.target
+        result: Expression = root.replace(_simple_name=parts[0], _type=typed(parts[0]), prefix=target.prefix)
         for i in range(1, len(parts)):
             name = '.'.join(parts[:i + 1])
             result = FieldAccess(random_id(), Space.EMPTY, Markers.EMPTY, result.replace(prefix=Space.EMPTY),
@@ -762,8 +803,9 @@ class _RebindImport(PythonVisitor[Any]):
                              self._import_alias())
         # A block importing the old module binds the new one too where this rebind rewrote
         # references to it. RemoveImport drops the old import once nothing reads it.
-        if (self.rewrote_qualified and not self.through_at_module_level
-                and _binds_module(stmt, self.from_module)):
+        through = self.through
+        if (self.rewrote_qualified and through is not None and not self.through_at_module_level
+                and _binds(stmt, through.module, through.member, through.name)):
             return stmt, (self.to_module, None, None)
         return stmt, None
 

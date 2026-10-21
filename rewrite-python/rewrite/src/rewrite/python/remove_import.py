@@ -152,6 +152,10 @@ class RemoveImport(PythonVisitor):
             return False
         # Same module and same name means this *is* the import we were asked to remove.
         if self.name is None:
+            if from_name is None and alias is None and '.' in self.module:
+                # `import a.b` also loads the submodule `a.b`, so only an import of a module inside
+                # it stands in for it.
+                return qualid.startswith(self.module + '.')
             return from_name is not None or qualid != self.module
         return from_name != self.module or qualid != self.name
 
