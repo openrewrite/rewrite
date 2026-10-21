@@ -177,6 +177,17 @@ ADR: groups follow the extras live edges activate, and an extra-gated requiremen
 gate that needs a search algorithm, and building it means porting PubGrub's conflict resolution plus uv's conflict
 re-prioritization (`resolver/mod.rs:3087-3143`), since which package yields in a conflict is decided there.
 
+**Closed after the first corpus replay (2026-10-21).** Extra-gated markers read as a disjunction of and-chains
+with parentheses, the uv release stamp (item 8's `PythonExecutionContextView.setUvVersion`), direct adds with
+extras, changed declared extras, index-pinned adds, `[tool.uv] constraint-dependencies` (the
+UpgradeTransitiveDependencyVersion edit, which the engine had silently ignored), a declared upgrade bounded by
+its live dependents (a wrong-lock path), `[options.exclude-newer-package]` and `[manifest] build-constraints`
+read through, and `requires-python = "==3.X.*"` parsed with its real ceiling (wheel filtering, marker dropping).
+Writing as uv 0.13.4, 26 of the 29 corpus edits both tools performed were byte-identical before the last four
+of those landed; the residue is marker re-simplification on forked locks (uv 0.11.25+ drops edge markers its
+parent's reachability implies), a relative `exclude-newer` (time-dependent by construction), and recorded marker
+forms outside the catalogued subset.
+
 ### Poetry 2.4.1
 
 **How it resolves.** `poetry lock` without `--regenerate` is `Installer._do_refresh`: the solver is seeded with every
