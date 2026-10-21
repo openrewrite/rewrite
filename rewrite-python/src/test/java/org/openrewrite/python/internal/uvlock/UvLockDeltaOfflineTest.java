@@ -405,6 +405,13 @@ class UvLockDeltaOfflineTest {
     }
 
     @Test
+    void markerVersionsRecordAsUvRendersThem() {
+        // prerelease and trailing-zero segments go, python_version <= '3.11' becomes python_full_version < '3.12'
+        routeLocalIndex("off38-marker-version-forms");
+        assertScenario("off38-marker-version-forms");
+    }
+
+    @Test
     void markeredConstraintFailsLoud() {
         routeLocalIndex("off29-transitive-constraint");
         String pyproject = resource("off29-transitive-constraint/pyproject.toml")

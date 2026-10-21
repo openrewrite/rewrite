@@ -1,0 +1,10 @@
+[project]
+name = "s50-marker-version-forms-unforked"
+version = "0.1.0"
+requires-python = ">=3.10"
+dependencies = ["formsy==2.0"]
+
+[[tool.uv.index]]
+name = "local"
+url = "https://index.example/simple/"
+default = true

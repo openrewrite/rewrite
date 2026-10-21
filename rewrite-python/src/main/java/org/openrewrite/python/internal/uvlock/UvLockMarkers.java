@@ -41,8 +41,9 @@ final class UvLockMarkers {
             "\\s*([A-Za-z_][A-Za-z0-9_]*)\\s*(===|==|!=|<=|>=|<|>|~=|not\\s+in|in)\\s*(['\"])([^'\"]*)\\3\\s*");
     private static final Set<String> VERSION_VARS = new HashSet<>(Arrays.asList(
             "python_version", "python_full_version"));
-    private static final Set<String> LOWER_BOUND_OPERATORS = new HashSet<>(Arrays.asList(
-            ">=", ">", "==", "===", "~="));
+    // a clause with one of these cuts the requires-python range into environments uv forks on
+    private static final Set<String> FORKING_OPERATORS = new HashSet<>(Arrays.asList(
+            ">=", ">", "==", "===", "~=", "!="));
 
     private UvLockMarkers() {
     }
@@ -75,11 +76,11 @@ final class UvLockMarkers {
                 return null;
             }
             if (VERSION_VARS.contains(var)) {
-                // only >= and < survive the python_version -> python_full_version rename unchanged
-                if (!">=".equals(op) && !"<".equals(op)) {
+                String[] lowered = lowerVersionClause(var, op, value);
+                if (lowered == null) {
                     return null;
                 }
-                mapped.add(new String[]{"python_full_version", op, value});
+                mapped.add(lowered);
             } else if ("platform_system".equals(var) && ("==".equals(op) || "!=".equals(op))) {
                 // uv rewrites platform_system to sys_platform for the three OSes it maps;
                 // other values have no sys_platform equivalent, so fail loud (verified subset)
@@ -108,6 +109,71 @@ final class UvLockMarkers {
             parts.add(clause[0] + " " + clause[1] + " '" + clause[2] + "'");
         }
         return String.join(" and ", parts);
+    }
+
+    /**
+     * uv's recorded form of a Python version clause, or null outside the reproduced forms. A
+     * {@code python_version} comparison becomes the {@code python_full_version} interval it denotes.
+     * Values keep their release only, with trailing zeros trimmed except before a star.
+     */
+    static @Nullable String[] lowerVersionClause(String var, String op, String value) {
+        boolean wildcard = value.endsWith(".*");
+        PythonVersion v = PythonVersion.parse(wildcard ? value.substring(0, value.length() - 2) : value);
+        if (v == null || "~=".equals(op) || "===".equals(op)) {
+            return null;
+        }
+        long[] release = v.getRelease();
+        if ("python_full_version".equals(var)) {
+            return new String[]{var, op, wildcard ? releaseText(release, release.length) + ".*" : trimmed(release)};
+        }
+        if (wildcard) {
+            if (release.length == 1) {
+                return new String[]{"python_full_version", op, release[0] + ".*"};
+            }
+            for (int i = 2; i < release.length; i++) {
+                if (release[i] != 0) {
+                    return null;
+                }
+            }
+            return new String[]{"python_full_version", op, release[0] + "." + release[1] + ".*"};
+        }
+        int significant = significantLength(release);
+        if (significant > 2) {
+            return null;
+        }
+        long major = release[0];
+        long minor = significant == 2 ? release[1] : 0;
+        switch (op) {
+            case "==": return new String[]{"python_full_version", "==", major + "." + minor + ".*"};
+            case "!=": return new String[]{"python_full_version", "!=", major + "." + minor + ".*"};
+            case ">": return new String[]{"python_full_version", ">=", major + "." + (minor + 1)};
+            case "<=": return new String[]{"python_full_version", "<", major + "." + (minor + 1)};
+            case "<": case ">=": return new String[]{"python_full_version", op, trimmed(new long[]{major, minor})};
+            default: return null;
+        }
+    }
+
+    private static int significantLength(long[] release) {
+        int length = release.length;
+        while (length > 1 && release[length - 1] == 0) {
+            length--;
+        }
+        return length;
+    }
+
+    private static String trimmed(long[] release) {
+        return releaseText(release, significantLength(release));
+    }
+
+    private static String releaseText(long[] release, int length) {
+        StringBuilder b = new StringBuilder();
+        for (int i = 0; i < length; i++) {
+            if (i > 0) {
+                b.append('.');
+            }
+            b.append(release[i]);
+        }
+        return b.toString();
     }
 
     private static @Nullable String platformSystemToSysPlatform(String value) {
@@ -219,13 +285,13 @@ final class UvLockMarkers {
         return false;
     }
 
-    /** Whether any clause bounds the Python version from below ({@code >=}, {@code >}, {@code ==}, {@code ~=}). */
-    static boolean raisesPythonLowerBound(@Nullable List<String[]> clauses) {
+    /** Whether any clause splits the requires-python range, which uv forks on. */
+    static boolean splitsPythonRange(@Nullable List<String[]> clauses) {
         if (clauses == null) {
             return false;
         }
         for (String[] clause : clauses) {
-            if (VERSION_VARS.contains(clause[0]) && LOWER_BOUND_OPERATORS.contains(clause[1])) {
+            if (VERSION_VARS.contains(clause[0]) && FORKING_OPERATORS.contains(clause[1])) {
                 return true;
             }
         }

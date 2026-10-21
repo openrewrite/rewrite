@@ -53,6 +53,7 @@ import java.util.regex.Pattern;
 
 import static java.util.Collections.emptyList;
 import static java.util.Collections.sort;
+import static java.util.stream.Collectors.toList;
 
 /**
  * Native {@code uv.lock} regeneration with minimal-update semantics (ADR 0009): the old
@@ -275,11 +276,6 @@ public final class UvLockEngine {
                         "Workspace locks ([manifest] with members) are not supported by the native engine");
             }
             Integer writeRevision = configuredRevision();
-            if (writeRevision != null && (lock.getRevision() == null || lock.getRevision() < 3)) {
-                throw new EngineFailure(Reason.RESOLUTION_REQUIRED, null,
-                        "uv " + uvVersion + " rewrites a lock below revision 3 in its own shape, " +
-                                "which the native engine does not reproduce");
-            }
             packages = new ArrayList<>(lock.getPackages());
             rootIndex = findRoot();
             UvLockPackage root = packages.get(rootIndex);
@@ -407,9 +403,12 @@ public final class UvLockEngine {
             if (written.equals(original)) {
                 return Result.success(written);
             }
-            // a changed lock is written as a release from 0.11.25 on, which rewrites every edge marker under
-            // its parent's reachability. A revisionless or revision 1 and 2 lock keeps its own style.
-            if (lock.getRevision() != null && lock.getRevision() >= 3) {
+            if (writeRevision != null && (lock.getRevision() == null || lock.getRevision() < 3)) {
+                throw new EngineFailure(Reason.RESOLUTION_REQUIRED, null,
+                        "uv " + uvVersion + " rewrites a lock below revision 3 in its own shape, " +
+                                "which the native engine does not reproduce");
+            }
+            if (writesReachabilityMarkers()) {
                 if (lock.getSupportedMarkers() != null || lock.getRequiredMarkers() != null) {
                     throw new EngineFailure(Reason.RESOLUTION_REQUIRED, null,
                             "Changing a lock with restricted environments ([tool.uv] environments / " +
@@ -423,6 +422,16 @@ public final class UvLockEngine {
                 written = UvLockWriter.write(updated.withRevision(writeRevision));
             }
             return Result.success(written);
+        }
+
+        // uv simplifies edge markers under parent reachability from 0.11.25. Without a configured release,
+        // a revision-3-or-later lock is taken to be written by a release that does.
+        private boolean writesReachabilityMarkers() {
+            if (uvVersion != null) {
+                PythonVersion version = PythonVersion.parse(uvVersion);
+                return version != null && version.compareTo(PythonVersion.parse("0.11.25")) >= 0;
+            }
+            return lock.getRevision() != null && lock.getRevision() >= 3;
         }
 
         /** The revision the configured uv release writes, 5 from 0.12.22 on and 3 before, or null without a release. */
@@ -1050,28 +1059,19 @@ public final class UvLockEngine {
                     .build();
         }
 
-        /**
-         * Selects under the dependents' bounds as well, so a range edit lands where uv lands it. When
-         * nothing satisfies both, the dependents may be the ones about to move (a lockstep pair), so
-         * the declaration alone decides and {@link #verifyDependents} judges the outcome afterwards.
-         */
+        // dependents' bounds first, the declaration alone when the dependents are the ones moving (a lockstep pair)
         private @Nullable PythonVersion selectUnderDependents(Map<PythonVersion, List<PackageFile>> byVersion,
                                                               Change change, @Nullable PythonVersion pinned) {
             if (change.dependentBounds.isEmpty()) {
-                return selectVersion(byVersion, change, pinned);
+                return selectVersion(byVersion, change, change.constraints, pinned);
             }
-            List<PythonVersionSpecifierSet> declared = new ArrayList<>(change.constraints);
-            change.constraints.addAll(change.dependentBounds);
-            PythonVersion selected = selectVersion(byVersion, change, pinned);
-            change.constraints.clear();
-            change.constraints.addAll(declared);
-            return selected != null ? selected : selectVersion(byVersion, change, pinned);
+            List<PythonVersionSpecifierSet> bounded = new ArrayList<>(change.constraints);
+            bounded.addAll(change.dependentBounds);
+            PythonVersion selected = selectVersion(byVersion, change, bounded, pinned);
+            return selected != null ? selected : selectVersion(byVersion, change, change.constraints, pinned);
         }
 
-        /**
-         * Every live dependent this run left alone must still admit the version its target moved to.
-         * uv would revise that dependent or fail, and the greedy engine does neither.
-         */
+        // an untouched dependent the new version no longer satisfies is one uv would revise, which the engine does not
         private void verifyDependents(Set<String> rewritten) {
             Map<String, Set<String>> live = liveExtras();
             for (String name : rewritten) {
@@ -1355,11 +1355,7 @@ public final class UvLockEngine {
 
         // ---- [tool.uv] constraint-dependencies ----
 
-        /**
-         * Reads the manifest's constraints in the form uv records under {@code [manifest] constraints},
-         * a canonical name with a normalized specifier, sorted by name. Only that shape is reproduced,
-         * so extras, markers, URLs and duplicate names fail loud.
-         */
+        // only the plain name-and-specifier shape uv records under [manifest] constraints is reproduced
         private void readConstraintDependencies() {
             Toml.Table uv = UvLockToml.findTable(pyproject, "tool.uv");
             if (uv == null) {
@@ -1389,11 +1385,7 @@ public final class UvLockEngine {
                     PythonVersionSpecifierSet.parse(constraint.getSpecifier()) : null;
         }
 
-        /**
-         * uv rewrites {@code [manifest] constraints} (and resolves under the new set) only when the
-         * constraints on packages the lock holds differ from the recorded ones. Constraints that name
-         * no locked package leave an otherwise satisfied lock untouched.
-         */
+        // uv rewrites [manifest] constraints only when the ones on locked packages differ from those recorded
         private boolean constraintsChanged() {
             List<UvLockRequirement> recorded = lock.getManifest() != null && lock.getManifest().getConstraints() != null ?
                     lock.getManifest().getConstraints() : emptyList();
@@ -1523,11 +1515,11 @@ public final class UvLockEngine {
             return byVersion;
         }
 
-        private @Nullable PythonVersion selectVersion(Map<PythonVersion, List<PackageFile>> byVersion,
-                                                      Change change, PythonVersion pinned) {
+        private @Nullable PythonVersion selectVersion(Map<PythonVersion, List<PackageFile>> byVersion, Change change,
+                                                      List<PythonVersionSpecifierSet> constraints, PythonVersion pinned) {
             // Locked preference survives an index switch when the pinned version is listed there
             if (change.indexChanged && byVersion.containsKey(pinned) &&
-                    satisfiesAll(change.constraints, pinned) &&
+                    satisfiesAll(constraints, pinned) &&
                     versionAdmitsPython(byVersion.get(pinned))) {
                 return pinned;
             }
@@ -1535,7 +1527,7 @@ public final class UvLockEngine {
             for (Map.Entry<PythonVersion, List<PackageFile>> candidate : byVersion.entrySet()) {
                 PythonVersion version = candidate.getKey();
                 boolean satisfies = true;
-                for (PythonVersionSpecifierSet constraint : change.constraints) {
+                for (PythonVersionSpecifierSet constraint : constraints) {
                     if (!constraint.contains(version)) {
                         satisfies = false;
                         break;
@@ -1780,12 +1772,7 @@ public final class UvLockEngine {
             return edges;
         }
 
-        /**
-         * Reads an extra-gated marker as a disjunction of and-chains carrying one {@code extra ==}
-         * clause each, and returns every term as its canonical extra plus the remaining and-chain
-         * (null when nothing remains). uv places such a term in its extra's group, so that is the
-         * only shape with a reproducible place in the lock; anything else fails loud.
-         */
+        // each disjunct with one extra == clause goes to that extra's group, the rest of it as the entry marker
         private List<String[]> extraTerms(String pkg, String rawMarker) {
             List<List<String[]>> terms = UvLockMarkers.parseDisjunction(rawMarker);
             List<String[]> placements = new ArrayList<>();
@@ -1870,7 +1857,7 @@ public final class UvLockEngine {
                 }
                 List<List<String[]>> terms = UvLockMarkers.parseDisjunction(raw.substring(semi + 1).trim());
                 for (String[] clause : terms == null ? Collections.<String[]>emptyList() :
-                        terms.stream().flatMap(List::stream).collect(java.util.stream.Collectors.toList())) {
+                        terms.stream().flatMap(List::stream).collect(toList())) {
                     if ("extra".equals(clause[0]) && "==".equals(clause[1])) {
                         gated.add(Pep508Requirement.canonicalize(clause[2]));
                     }
@@ -1897,11 +1884,11 @@ public final class UvLockEngine {
                     return normalized;
                 }
                 String simplified = UvLockMarkers.simplifyClauses(range, clauses);
-                // uv forks the resolution where a surviving clause raises the Python lower bound
+                // uv forks the resolution where a surviving clause splits the Python range
                 if (simplified != null && !UvLockMarkers.DROP_EDGE.equals(simplified) &&
-                        UvLockMarkers.raisesPythonLowerBound(UvLockMarkers.parseSimpleAndChain(simplified))) {
+                        UvLockMarkers.splitsPythonRange(UvLockMarkers.parseSimpleAndChain(simplified))) {
                     throw new EngineFailure(Reason.RESOLUTION_REQUIRED, pkg,
-                            "Dependency marker \"" + rawMarker + "\" raises the Python lower bound, which forks " +
+                            "Dependency marker \"" + rawMarker + "\" splits the Python range, which forks " +
                                     "the resolution");
                 }
                 return simplified;

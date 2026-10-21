@@ -1,0 +1,8 @@
+Metadata-Version: 2.1
+Name: formsy
+Version: 2.0
+Summary: synthetic formsy
+Requires-Dist: p1; python_full_version < "3.11.0a6"
+Requires-Dist: p4; python_full_version < "3.11.0"
+Requires-Dist: p5; python_version <= "3.11"
+Requires-Dist: p9; python_full_version <= "3.12.1"

@@ -15,9 +15,9 @@
  */
 package org.openrewrite.python.internal.uvlock;
 
+import lombok.Value;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.python.internal.LockFileRegeneration.Reason;
-import org.openrewrite.python.internal.pep440.PythonVersion;
 
 import java.util.*;
 
@@ -28,16 +28,20 @@ import java.util.*;
  */
 final class UvLockReachability {
 
+    /** The most disjuncts a node's reachability may hold before the pass fails loud. */
     private static final int MAX_TERMS = 32;
-    private static final Set<String> PYTHON_VARS = new HashSet<>(Arrays.asList("python_version", "python_full_version"));
 
     private final List<UvLockPackage> packages;
     private final PyRange requiresPython;
-    private final Map<String, List<Term>> reach = new HashMap<>();
+    private final Map<String, List<Integer>> byName = new HashMap<>();
+    private final Map<Node, List<Term>> reach = new HashMap<>();
 
     private UvLockReachability(List<UvLockPackage> packages, PyRange requiresPython) {
         this.packages = packages;
         this.requiresPython = requiresPython;
+        for (int i = 0; i < packages.size(); i++) {
+            byName.computeIfAbsent(packages.get(i).getName(), k -> new ArrayList<>()).add(i);
+        }
     }
 
     static List<UvLockPackage> simplify(List<UvLockPackage> packages, int rootIndex, PyRange requiresPython) {
@@ -45,21 +49,51 @@ final class UvLockReachability {
         r.propagate(rootIndex);
         List<UvLockPackage> simplified = new ArrayList<>(packages.size());
         for (int i = 0; i < packages.size(); i++) {
-            simplified.add(r.simplifyEntry(i));
+            simplified.add(r.simplifyEntry(i, i == rootIndex));
         }
         return simplified;
     }
 
-    /** One conjunction of Python version clauses and equality atoms over the other marker variables. */
-    private static final class Term {
-        final List<String[]> pythonClauses = new ArrayList<>();
-        final Set<String> atoms = new LinkedHashSet<>();
+    /** A lock entry, or one of its extras, as a node of the reachability graph. */
+    @Value
+    private static class Node {
+        int index;
+        @Nullable String extra;
+    }
+
+    /** A clause over a marker variable other than the Python version, which only {@code ==} and {@code !=} compare. */
+    @Value
+    private static class Atom {
+        String var;
+        boolean equality;
+        String value;
+
+        boolean contradicts(Atom o) {
+            return var.equals(o.var) && (equality && o.equality ? !value.equals(o.value) :
+                    equality != o.equality && value.equals(o.value));
+        }
+
+        // var == 'x' implies var != 'y' for every other y
+        boolean implies(Atom o) {
+            return equals(o) || (var.equals(o.var) && equality && !o.equality && !value.equals(o.value));
+        }
+
+        @Override
+        public String toString() {
+            return var + (equality ? " == '" : " != '") + value + "'";
+        }
+    }
+
+    /** One conjunction of Python version clauses and atoms. */
+    @Value
+    private static class Term {
+        List<String[]> pythonClauses;
+        Set<Atom> atoms;
 
         @Nullable PyRange range(PyRange base) {
             PyRange r = base;
             for (String[] c : pythonClauses) {
-                PyRange clause = clauseRange(c);
-                r = clause == null ? null : r.intersect(clause);
+                r = r.intersect(clauseRange(c));
                 if (r == null) {
                     return null;
                 }
@@ -68,37 +102,18 @@ final class UvLockReachability {
         }
 
         @Nullable Term and(Term o) {
-            Term t = new Term();
-            t.pythonClauses.addAll(pythonClauses);
-            t.pythonClauses.addAll(o.pythonClauses);
-            t.atoms.addAll(atoms);
-            for (String atom : o.atoms) {
-                if (contradicts(atom)) {
-                    return null;
+            Set<Atom> atoms = new LinkedHashSet<>(this.atoms);
+            for (Atom atom : o.atoms) {
+                for (Atom mine : this.atoms) {
+                    if (mine.contradicts(atom)) {
+                        return null;
+                    }
                 }
-                t.atoms.add(atom);
+                atoms.add(atom);
             }
-            return t;
-        }
-
-        boolean contradicts(String atom) {
-            String var = atom.substring(0, atom.indexOf(' '));
-            boolean equality = atom.startsWith(var + " == ");
-            for (String mine : atoms) {
-                if (!mine.startsWith(var + " ")) {
-                    continue;
-                }
-                boolean mineEquality = mine.startsWith(var + " == ");
-                String value = atom.substring(atom.indexOf("'"));
-                String mineValue = mine.substring(mine.indexOf("'"));
-                if (equality && mineEquality && !value.equals(mineValue)) {
-                    return true;
-                }
-                if (equality != mineEquality && value.equals(mineValue)) {
-                    return true;
-                }
-            }
-            return false;
+            List<String[]> clauses = new ArrayList<>(pythonClauses);
+            clauses.addAll(o.pythonClauses);
+            return new Term(clauses, atoms);
         }
 
         String key() {
@@ -106,45 +121,33 @@ final class UvLockReachability {
             for (String[] c : pythonClauses) {
                 b.append(c[0]).append(c[1]).append(c[2]).append('|');
             }
-            return b + String.join("|", atoms);
+            return b.append(atoms).toString();
         }
     }
 
     // ---- parsing
 
-    private static @Nullable PyRange clauseRange(String[] clause) {
-        String var = clause[0];
-        String op = clause[1];
-        String value = clause[2];
-        if ("python_version".equals(var)) {
-            PythonVersion v = PythonVersion.parse(value);
-            if (v == null || v.getRelease().length != 2) {
-                throw unsupported("python_version clause " + op + " '" + value + "'");
-            }
-            PythonVersion next = PyRange.bumpLastRelease(v);
-            switch (op) {
-                case "<": return PyRange.parse("<" + value);
-                case "<=": return PyRange.parse("<" + next);
-                case ">=": return PyRange.parse(">=" + value);
-                case ">": return PyRange.parse(">=" + next);
-                case "==": return PyRange.parse(">=" + value + ",<" + next);
-                default: throw unsupported("python_version clause " + op);
-            }
+    // != only removes points from a range, so leaving the range whole for it stays sound
+    private static PyRange clauseRange(String[] clause) {
+        String[] lowered = UvLockMarkers.lowerVersionClause(clause[0], clause[1], clause[2]);
+        if (lowered == null) {
+            throw unsupported("Python version clause " + String.join(" ", clause));
         }
-        switch (op) {
-            case "<": case "<=": case ">=": case ">": case "~=":
-                return PyRange.parse(op + value);
-            case "==":
-                return value.endsWith(".*") ? PyRange.parse("==" + value) : PyRange.parse(">=" + value + ",<=" + value);
-            default:
-                throw unsupported("python_full_version clause " + op);
+        String op = lowered[1];
+        String value = lowered[2];
+        if ("!=".equals(op)) {
+            return new PyRange();
         }
+        if ("==".equals(op) && !value.endsWith(".*")) {
+            return PyRange.parse(">=" + value + ",<=" + value);
+        }
+        return PyRange.parse(op + value);
     }
 
     private static List<Term> dnf(@Nullable String marker) {
         List<Term> terms = new ArrayList<>();
         if (marker == null) {
-            terms.add(new Term());
+            terms.add(new Term(new ArrayList<>(), new LinkedHashSet<>()));
             return terms;
         }
         List<List<String[]>> parsed = UvLockMarkers.parseDisjunction(marker);
@@ -152,17 +155,18 @@ final class UvLockReachability {
             throw unsupported("marker \"" + marker + "\"");
         }
         for (List<String[]> chain : parsed) {
-            Term term = new Term();
+            List<String[]> python = new ArrayList<>();
+            Set<Atom> atoms = new LinkedHashSet<>();
             for (String[] clause : chain) {
-                if (PYTHON_VARS.contains(clause[0])) {
-                    term.pythonClauses.add(clause);
+                if ("python_version".equals(clause[0]) || "python_full_version".equals(clause[0])) {
+                    python.add(clause);
                 } else if ("==".equals(clause[1]) || "!=".equals(clause[1])) {
-                    term.atoms.add(clause[0] + " " + clause[1] + " '" + clause[2] + "'");
+                    atoms.add(new Atom(clause[0], "==".equals(clause[1]), clause[2]));
                 } else {
                     throw unsupported("marker \"" + marker + "\"");
                 }
             }
-            terms.add(term);
+            terms.add(new Term(python, atoms));
         }
         return terms;
     }
@@ -175,42 +179,25 @@ final class UvLockReachability {
     // ---- propagation
 
     private void propagate(int rootIndex) {
-        Deque<String> queue = new ArrayDeque<>();
-        reach.put(key(rootIndex, null), Collections.singletonList(new Term()));
-        queue.add(key(rootIndex, null));
+        Deque<Node> queue = new ArrayDeque<>();
+        Node root = new Node(rootIndex, null);
+        reach.put(root, new ArrayList<>(dnf(null)));
+        queue.add(root);
         while (!queue.isEmpty()) {
-            String node = queue.poll();
-            int index = Integer.parseInt(node.substring(0, node.indexOf('|')));
-            String extra = node.substring(node.indexOf('|') + 1);
-            UvLockPackage pkg = packages.get(index);
-            List<List<UvLockDependency>> lists = new ArrayList<>();
-            if (extra.isEmpty()) {
-                if (pkg.getDependencies() != null) {
-                    lists.add(pkg.getDependencies());
-                }
-                if (pkg.getDevDependencies() != null) {
-                    lists.addAll(pkg.getDevDependencies().values());
-                }
-                // the root's extras are all locked, so its groups are reachable with it
-                if (index == rootIndex && pkg.getOptionalDependencies() != null) {
-                    lists.addAll(pkg.getOptionalDependencies().values());
-                }
-            } else if (pkg.getOptionalDependencies() != null && pkg.getOptionalDependencies().get(extra) != null) {
-                lists.add(pkg.getOptionalDependencies().get(extra));
-            }
+            Node node = queue.poll();
             List<Term> parent = reach.get(node);
-            for (List<UvLockDependency> edges : lists) {
+            for (List<UvLockDependency> edges : edgeLists(node, rootIndex)) {
                 for (UvLockDependency edge : edges) {
                     List<Term> via = and(parent, dnf(edge.getMarker()));
                     int target = target(edge);
-                    List<String> children = new ArrayList<>();
-                    children.add(key(target, null));
+                    List<Node> children = new ArrayList<>();
+                    children.add(new Node(target, null));
                     if (edge.getExtra() != null) {
                         for (String e : edge.getExtra()) {
-                            children.add(key(target, e));
+                            children.add(new Node(target, e));
                         }
                     }
-                    for (String child : children) {
+                    for (Node child : children) {
                         if (or(child, via)) {
                             queue.add(child);
                         }
@@ -220,16 +207,33 @@ final class UvLockReachability {
         }
     }
 
-    private static String key(int index, @Nullable String extra) {
-        return index + "|" + (extra == null ? "" : extra);
+    private List<List<UvLockDependency>> edgeLists(Node node, int rootIndex) {
+        UvLockPackage pkg = packages.get(node.getIndex());
+        List<List<UvLockDependency>> lists = new ArrayList<>();
+        if (node.getExtra() != null) {
+            if (pkg.getOptionalDependencies() != null && pkg.getOptionalDependencies().get(node.getExtra()) != null) {
+                lists.add(pkg.getOptionalDependencies().get(node.getExtra()));
+            }
+            return lists;
+        }
+        if (pkg.getDependencies() != null) {
+            lists.add(pkg.getDependencies());
+        }
+        if (pkg.getDevDependencies() != null) {
+            lists.addAll(pkg.getDevDependencies().values());
+        }
+        // the root's extras are all locked, so its groups are reachable with it
+        if (node.getIndex() == rootIndex && pkg.getOptionalDependencies() != null) {
+            lists.addAll(pkg.getOptionalDependencies().values());
+        }
+        return lists;
     }
 
     private int target(UvLockDependency edge) {
         int found = -1;
-        for (int i = 0; i < packages.size(); i++) {
+        for (int i : byName.getOrDefault(edge.getName(), Collections.emptyList())) {
             UvLockPackage pkg = packages.get(i);
-            if (!pkg.getName().equals(edge.getName()) ||
-                    (edge.getVersion() != null && !edge.getVersion().equals(pkg.getVersion())) ||
+            if ((edge.getVersion() != null && !edge.getVersion().equals(pkg.getVersion())) ||
                     (edge.getSource() != null && !edge.getSource().equals(pkg.getSource()))) {
                 continue;
             }
@@ -260,7 +264,7 @@ final class UvLockReachability {
     }
 
     /** Adds the terms to the node's reachability and reports whether it grew. */
-    private boolean or(String node, List<Term> terms) {
+    private boolean or(Node node, List<Term> terms) {
         List<Term> existing = reach.computeIfAbsent(node, k -> new ArrayList<>());
         Set<String> keys = new HashSet<>();
         for (Term t : existing) {
@@ -281,13 +285,13 @@ final class UvLockReachability {
 
     // ---- simplification
 
-    private UvLockPackage simplifyEntry(int index) {
+    private UvLockPackage simplifyEntry(int index, boolean root) {
         UvLockPackage pkg = packages.get(index);
-        UvLockPackage.UvLockPackageBuilder b = pkg.toBuilder();
-        List<Term> own = reach.get(key(index, null));
+        List<Term> own = reach.get(new Node(index, null));
         if (own == null) {
             return pkg;
         }
+        UvLockPackage.UvLockPackageBuilder b = pkg.toBuilder();
         if (pkg.getDependencies() != null) {
             b.dependencies(simplifyList(pkg.getDependencies(), own));
         }
@@ -301,7 +305,7 @@ final class UvLockReachability {
         if (pkg.getOptionalDependencies() != null) {
             Map<String, List<UvLockDependency>> groups = new LinkedHashMap<>();
             for (Map.Entry<String, List<UvLockDependency>> e : pkg.getOptionalDependencies().entrySet()) {
-                List<Term> parent = reach.get(key(index, e.getKey()));
+                List<Term> parent = root ? own : reach.get(new Node(index, e.getKey()));
                 groups.put(e.getKey(), parent == null ? e.getValue() : simplifyList(e.getValue(), parent));
             }
             b.optionalDependencies(groups);
@@ -321,12 +325,11 @@ final class UvLockReachability {
     }
 
     /**
-     * The edge with its marker restricted to what the parent's reachability leaves undecided.
-     * A clause true under every reachable term goes, a term false under every one goes, and an
-     * edge with no term left is null. A multi-term marker only survives untouched.
+     * The edge with its marker restricted to what the parent's reachability leaves undecided, or null
+     * when no term survives. A clause every reachable term decides goes, and a multi-term marker only
+     * survives untouched.
      */
     private @Nullable UvLockDependency restrict(UvLockDependency edge, List<Term> parent) {
-        List<Term> terms = dnf(edge.getMarker());
         List<PyRange> ranges = new ArrayList<>();
         for (Term t : parent) {
             PyRange r = t.range(requiresPython);
@@ -339,10 +342,10 @@ final class UvLockReachability {
         }
         List<String> kept = new ArrayList<>();
         boolean changed = false;
-        for (Term term : terms) {
+        for (Term term : dnf(edge.getMarker())) {
             List<String> clauses = new ArrayList<>();
             boolean falseTerm = false;
-            for (String[] c : term.pythonClauses) {
+            for (String[] c : term.getPythonClauses()) {
                 boolean allTrue = true;
                 boolean allFalse = true;
                 for (PyRange r : ranges) {
@@ -357,19 +360,25 @@ final class UvLockReachability {
                 }
                 changed |= allTrue || allFalse;
             }
-            for (String atom : term.atoms) {
-                boolean allPresent = true;
+            for (Atom atom : term.getAtoms()) {
+                boolean allImplied = true;
                 boolean allContradicted = true;
                 for (Term t : parent) {
-                    allPresent &= t.atoms.contains(atom);
-                    allContradicted &= t.contradicts(atom);
+                    boolean implied = false;
+                    boolean contradicted = false;
+                    for (Atom given : t.getAtoms()) {
+                        implied |= given.implies(atom);
+                        contradicted |= given.contradicts(atom);
+                    }
+                    allImplied &= implied;
+                    allContradicted &= contradicted;
                 }
                 if (allContradicted) {
                     falseTerm = true;
-                } else if (!allPresent) {
-                    clauses.add(atom);
+                } else if (!allImplied) {
+                    clauses.add(atom.toString());
                 }
-                changed |= allPresent || allContradicted;
+                changed |= allImplied || allContradicted;
             }
             if (falseTerm) {
                 continue;
