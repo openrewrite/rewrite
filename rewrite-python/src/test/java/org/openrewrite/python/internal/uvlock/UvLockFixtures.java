@@ -23,9 +23,8 @@ import java.nio.charset.StandardCharsets;
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**
- * Fixtures under {@code src/test/resources/uvlock/} were generated with uv 0.10.11
- * (plus uv 0.5.0/0.7.0 for the {@code o-old-uv} variants); see the README.md there
- * for provenance. Contents are byte-exact reference outputs.
+ * Fixtures under {@code src/test/resources/uvlock/} are real uv output; the README.md there
+ * records which release produced each. Contents are byte-exact reference outputs.
  */
 final class UvLockFixtures {
 
@@ -67,6 +66,7 @@ final class UvLockFixtures {
       "l-flat-index/uv.lock",
       "m2-options/uv.lock",
       "m3-lexical/uv.lock",
+      "m4-exclude-newer-span/uv.lock",
       "n-normalization/uv.lock",
       "n2-inline-width/uv.lock",
       "o-old-uv/proj-0.5.0/uv.lock",
@@ -118,6 +118,13 @@ final class UvLockFixtures {
       "off17-python-upper-bound-marker/uv.lock.before",
       "off18-removed-extra-unbinds-cascade/uv.lock.after",
       "off18-removed-extra-unbinds-cascade/uv.lock.before",
+      "off19-extra-group-lockstep-upgrade/uv.lock.after",
+      "off19-extra-group-lockstep-upgrade/uv.lock.before",
+      "off20-transitive-add-with-extras/uv.lock.after",
+      "off20-transitive-add-with-extras/uv.lock.before",
+      "off21-upgrade-activates-extra/uv.lock.after",
+      "off21-upgrade-activates-extra/uv.lock.before",
+      "off22-or-extras-marker/uv.lock.before",
       "off2-add-closure/uv.lock.after",
       "off2-add-closure/uv.lock.before",
       "off3-cascade-flake8/uv.lock.after",

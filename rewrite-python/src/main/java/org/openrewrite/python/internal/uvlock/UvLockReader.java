@@ -258,8 +258,16 @@ public final class UvLockReader {
         int[] p = {0};
         Object value = parseValue(text, p);
         skipWhitespace(text, p);
+        boolean sentinel = "exclude-newer".equals(key) && UvLockOptions.RELATIVE_EXCLUDE_NEWER_TIMESTAMP.equals(value);
         if (p[0] != text.length()) {
-            throw new UvLockFormatException("Trailing content after value for key " + key + ": " + text.substring(p[0]));
+            String trailing = text.substring(p[0]);
+            if (sentinel && UvLockOptions.RELATIVE_EXCLUDE_NEWER_COMMENT.equals(trailing)) {
+                return value;
+            }
+            throw new UvLockFormatException("Trailing content after value for key " + key + ": " + trailing);
+        }
+        if (sentinel) {
+            throw new UvLockFormatException("The relative exclude-newer sentinel is missing uv's trailing comment");
         }
         return value;
     }
@@ -389,14 +397,21 @@ public final class UvLockReader {
 
     private static UvLockOptions toOptions(Map<String, Object> map) {
         String excludeNewer = null;
+        String excludeNewerSpan = null;
         for (Map.Entry<String, Object> e : map.entrySet()) {
             if ("exclude-newer".equals(e.getKey())) {
                 excludeNewer = stringValue(e.getKey(), e.getValue());
+            } else if ("exclude-newer-span".equals(e.getKey())) {
+                excludeNewerSpan = stringValue(e.getKey(), e.getValue());
             } else {
                 throw new UvLockFormatException("Unrecognized [options] key: " + e.getKey());
             }
         }
-        return new UvLockOptions(excludeNewer);
+        if ((excludeNewerSpan != null) != UvLockOptions.RELATIVE_EXCLUDE_NEWER_TIMESTAMP.equals(excludeNewer)) {
+            throw new UvLockFormatException("exclude-newer-span must accompany exactly the sentinel exclude-newer " +
+                    UvLockOptions.RELATIVE_EXCLUDE_NEWER_TIMESTAMP);
+        }
+        return new UvLockOptions(excludeNewer, excludeNewerSpan);
     }
 
     private static UvLockManifest toManifest(Map<String, Object> map) {

@@ -23,8 +23,8 @@ import java.nio.charset.StandardCharsets;
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**
- * Fixtures under {@code src/test/resources/pdmlock/} were generated with PDM 2.28.0 against live
- * pypi.org; see the README.md there for provenance. Contents are byte-exact reference outputs.
+ * Fixtures under {@code src/test/resources/pdmlock/} are real PDM output against live pypi.org;
+ * the README.md there records which release produced each. Contents are byte-exact reference outputs.
  */
 final class PdmLockFixtures {
 
@@ -36,7 +36,8 @@ final class PdmLockFixtures {
       "e-markers/pdm.lock",
       "f-git/pdm.lock",
       "g-upgrade/pdm.lock.before",
-      "g-upgrade/pdm.lock.after"
+      "g-upgrade/pdm.lock.after",
+      "h-lock-version-4-5-1/pdm.lock"
     };
 
     private PdmLockFixtures() {

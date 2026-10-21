@@ -1,0 +1,67 @@
+version = 1
+revision = 5
+requires-python = ">=3.10"
+
+[[package]]
+name = "beta"
+version = "1.0"
+source = { registry = "https://index.example/simple/" }
+dependencies = [
+    { name = "gamma", extra = ["fast"] },
+]
+wheels = [
+    { url = "https://index.example/simple/beta/beta-1.0-py3-none-any.whl", hash = "sha256:2fe15e5682c6e7b6cdf40e86b133d90c4532a6894d7cb5bc6315f76551f508b0" },
+]
+
+[[package]]
+name = "delta"
+version = "1.0"
+source = { registry = "https://index.example/simple/" }
+wheels = [
+    { url = "https://index.example/simple/delta/delta-1.0-py3-none-any.whl", hash = "sha256:6158b76431213382de2dcd929c6a5ee183ceaef44a7def3ca845ad793cb25a02" },
+]
+
+[[package]]
+name = "gamma"
+version = "1.0"
+source = { registry = "https://index.example/simple/" }
+wheels = [
+    { url = "https://index.example/simple/gamma/gamma-1.0-py3-none-any.whl", hash = "sha256:0aac330f0edfbe8e7d45a42abc944992ec91b3187d1d33e6f1a547be073a6cbd" },
+]
+
+[package.optional-dependencies]
+fast = [
+    { name = "delta" },
+    { name = "zeta" },
+]
+
+[[package]]
+name = "keeper"
+version = "1.0"
+source = { registry = "https://index.example/simple/" }
+wheels = [
+    { url = "https://index.example/simple/keeper/keeper-1.0-py3-none-any.whl", hash = "sha256:69b5705b9b71e898cd067240f4801725481689cec4f78cd9f2655947fac7ecc3" },
+]
+
+[[package]]
+name = "s28-or-extras-marker"
+version = "0.1.0"
+source = { virtual = "." }
+dependencies = [
+    { name = "beta" },
+    { name = "keeper" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "beta", specifier = "==1.0" },
+    { name = "keeper", specifier = "==1.0" },
+]
+
+[[package]]
+name = "zeta"
+version = "1.0"
+source = { registry = "https://index.example/simple/" }
+wheels = [
+    { url = "https://index.example/simple/zeta/zeta-1.0-py3-none-any.whl", hash = "sha256:81351a24543d9288413f28f2df292c7dbc9aa1c1d039e99f3135048886351e14" },
+]

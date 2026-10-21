@@ -850,6 +850,19 @@ class UvLockEngineTest {
           .contains("{ name = \"target\", extra = [\"alpha\", \"zeta\"] }");
     }
 
+    @Test
+    void relativeExcludeNewerReachesItsGate() {
+        // the fixture's [options] carries uv's commented sentinel line for a relative exclude-newer
+        Result result = UvLockEngine.regenerate(
+          resource("m4-exclude-newer-span/pyproject.toml").replace("six==1.16.0", "six==1.17.0"),
+          resource("m4-exclude-newer-span/uv.lock"),
+          ctx);
+        assertThat(result.isSuccess()).isFalse();
+        assertThat(result.getFailure().getReason()).isEqualTo(Reason.RESOLUTION_REQUIRED);
+        assertThat(result.getFailure().getDetail()).contains("exclude-newer");
+        assertThat(http.requests).isEmpty();
+    }
+
     // ---- lazy wheel metadata: listing advertises no PEP 658 sidecar ----
 
     @Test

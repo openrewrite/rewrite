@@ -1,0 +1,8 @@
+Metadata-Version: 2.1
+Name: gamma
+Version: 1.0
+Summary: synthetic gamma
+Provides-Extra: fast
+Provides-Extra: slow
+Requires-Dist: delta>=1; extra == "fast"
+Requires-Dist: zeta>=1; extra == "fast" or extra == "slow"

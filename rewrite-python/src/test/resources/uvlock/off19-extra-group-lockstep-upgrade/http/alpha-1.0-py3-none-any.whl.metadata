@@ -1,0 +1,6 @@
+Metadata-Version: 2.1
+Name: alpha
+Version: 1.0
+Summary: synthetic alpha
+Provides-Extra: c
+Requires-Dist: alphac==1.0; extra == "c"

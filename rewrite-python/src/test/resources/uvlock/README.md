@@ -52,6 +52,13 @@ dependency-group bound on a cascade target; `off18-removed-extra-unbinds-cascade
 activating declaration the same edit removes; `off17-python-upper-bound-marker` an edge marker that
 bounds Python from above and does not fork. `off14-upgrade-drops-extra` and
 `off15-python-lower-bound-marker` are fail-loud scenarios and carry no `uv.lock.after` (BEHAVIOR.md §10).
+`off19`–`off22` (uv 0.13.4, 2026-10-21, `revision = 5`) were built the same way and pin how
+`[package.optional-dependencies]` groups follow activated extras (BEHAVIOR.md §8):
+`off19-extra-group-lockstep-upgrade` an upgrade through an activated extra whose group depends back on
+the package, `off20-transitive-add-with-extras` a transitive requirement with extras,
+`off21-upgrade-activates-extra` an upgrade that activates an extra on an already-locked package, and
+`off22-or-extras-marker` an extra disjunction the engine refuses (its `uv.lock.after` is real uv's
+output, kept for the record).
 
 `off16-tool-uv-dev-dependencies` (pypi.org) declares its dev group through the legacy `[tool.uv]
 dev-dependencies` list; uv's lock is byte-identical to the same list under `[dependency-groups]`.
@@ -59,6 +66,12 @@ dev-dependencies` list; uv's lock is byte-identical to the same list under `[dep
 `z2-dynamic-version-root` by uv 0.10.11 for a project with `dynamic = ["version"]`, whose root entry
 carries no `version` key, and `z3-compatible-release-python` by uv 0.10.11 for
 `requires-python = "~=3.10"`, recorded as `>=3.10, <4`.
+
+`m4-exclude-newer-span` was recorded 2026-10-20 with uv 0.12.21 (macOS arm64, empty cache, live
+pypi.org) from a manifest declaring `[tool.uv] exclude-newer = "1 week"`: since 0.11.8 a relative
+value is written as the sentinel `exclude-newer = "0001-01-01T00:00:00Z"` followed by a trailing
+`#` comment, plus `exclude-newer-span = "P1W"`. 0.12.21 is the last release writing `revision = 3`;
+0.12.22 and later write `revision = 5` with the same `[options]` shape.
 
 `o-old-uv/proj-0.5.0/uv.lock.engine-edited` is the one ENGINE-DEFINED expectation in the corpus
 (real uv cannot produce it: it would rewrite the whole file at revision 3): the surgical

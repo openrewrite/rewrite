@@ -138,6 +138,22 @@ rather than guess dependencies.
 - The legacy `[tool.uv] dev-dependencies` list locks exactly like the same list under
   `[dependency-groups] dev` (`off16-tool-uv-dev-dependencies/uv.lock` was produced from the former; the
   latter gives a byte-identical file).
+- A non-root package's groups follow its activated extras (local-index scenarios, uv 0.13.4):
+  upgrading `alpha[c]` rebuilds group `c` from the new version's `extra == 'c'` requirements, an entry
+  keeping the rest of its and-chain as marker (`alphaw; extra == 'c' and sys_platform == 'win32'` →
+  `{ name = "alphaw", marker = "sys_platform == 'win32'" }`), and a group entry needing a newer version
+  cascades like a base edge, here in lockstep with alphac's `alpha==2.0`
+  (`off19-extra-group-lockstep-upgrade/`).
+- A transitive requirement with extras (`gamma[fast]`) records the extra on the edge and only the
+  activated group on gamma; the unactivated `slow` extra leaves no group and pulls nothing
+  (`off20-transitive-add-with-extras/`).
+- A new version activating an extra on an already-locked package (`reqlike 2.0` requiring
+  `urlish[socks]`) keeps urlish's version and adds its `socks` group and that group's closure
+  (`off21-upgrade-activates-extra/`).
+- An extra-gated requirement whose marker is a disjunction (`zeta; extra == 'fast' or extra == 'slow'`)
+  lands in each activated extra's group without a marker, next to the plain `extra == 'fast'` entries
+  (`off22-or-extras-marker/uv.lock.after`); the engine places only single-clause `extra ==` and-chains
+  and fails loud on any other shape.
 
 ## 9. Which requirements bound a package (local-index scenarios, uv 0.10.11 and 0.13.4)
 
@@ -171,8 +187,10 @@ rather than guess dependencies.
 ## 11. uv 0.13.4
 
 - Writes `revision = 5`; for every scenario in §9 and §10 the file is otherwise byte-identical to
-  uv 0.10.11's (`z-revision-5/uv.lock` is a 0.13.4 lock). Newer header material observed in the wild
-  (`[options] exclude-newer-span`, `[options.exclude-newer-package]`, `[manifest] build-constraints`) is
+  uv 0.10.11's (`z-revision-5/uv.lock` is a 0.13.4 lock). A relative `exclude-newer` is written as the
+  sentinel `0001-01-01T00:00:00Z` with a trailing comment plus `exclude-newer-span`
+  (`m4-exclude-newer-span/uv.lock`, since 0.11.8) and reads and writes back verbatim; other newer header
+  material observed in the wild (`[options.exclude-newer-package]`, `[manifest] build-constraints`) is
   still rejected key by key.
 - Rewrites a revision-3 file at revision 5 when anything changes, as §5 describes for older revisions.
 - Omits `version` on a root with `dynamic = ["version"]` (also 0.10.11: `z2-dynamic-version-root/uv.lock`).

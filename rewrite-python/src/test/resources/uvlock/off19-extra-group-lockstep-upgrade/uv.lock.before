@@ -1,0 +1,38 @@
+version = 1
+revision = 5
+requires-python = ">=3.10"
+
+[[package]]
+name = "alpha"
+version = "1.0"
+source = { registry = "https://index.example/simple/" }
+wheels = [
+    { url = "https://index.example/simple/alpha/alpha-1.0-py3-none-any.whl", hash = "sha256:e65e220f6d344463ff25644ab39c0dae2600239e539f589f5981f1f468371cdb" },
+]
+
+[package.optional-dependencies]
+c = [
+    { name = "alphac" },
+]
+
+[[package]]
+name = "alphac"
+version = "1.0"
+source = { registry = "https://index.example/simple/" }
+dependencies = [
+    { name = "alpha" },
+]
+wheels = [
+    { url = "https://index.example/simple/alphac/alphac-1.0-py3-none-any.whl", hash = "sha256:9bab40d41b384a1fb554d7d2bce4e2cfb9e918cf92ecb60b742507e19f7ae036" },
+]
+
+[[package]]
+name = "s25-extra-group-lockstep-upgrade"
+version = "0.1.0"
+source = { virtual = "." }
+dependencies = [
+    { name = "alpha", extra = ["c"] },
+]
+
+[package.metadata]
+requires-dist = [{ name = "alpha", extras = ["c"], specifier = "==1.0" }]

@@ -336,7 +336,7 @@ public final class UvLockEngine {
                 if (!cascadeQueue.isEmpty()) {
                     String target = cascadeQueue.poll();
                     if (!resolved.add(target)) {
-                        verifyCascadeSatisfied(target);
+                        structural |= revisitSettled(target);
                         continue;
                     }
                     Change cascade = new Change(target);
@@ -350,7 +350,7 @@ public final class UvLockEngine {
                 } else {
                     String target = additionQueue.poll();
                     if (!resolved.add(target)) {
-                        verifyCascadeSatisfied(target);
+                        structural |= revisitSettled(target);
                         continue;
                     }
                     resolveAddition(target, null);
@@ -840,7 +840,8 @@ public final class UvLockEngine {
                         "Locked version " + pkg.getVersion() + " is not a valid PEP 440 version");
             }
             if (!change.indexChanged && satisfiesAll(change.constraints, pinned)) {
-                return false; // locked-version preference: only the requires-dist line changes
+                // locked-version preference: the entry only changes if an extra was newly activated on it
+                return ensureActivatedGroups(index);
             }
             packages.set(index, resolveEntry(change, pinned, pkg));
             return true;
@@ -887,8 +888,9 @@ public final class UvLockEngine {
             }
             List<PackageFile> files = byVersion.get(selected);
             CoreMetadata metadata = fetchMetadata(change.canonicalName, listing.index, files);
-            requireActivatedExtrasStillDeclared(change.canonicalName, selected, metadata, base);
-            List<UvLockDependency> edges = buildEdges(change.canonicalName, metadata, base);
+            Set<String> activated = activatedExtras(change.canonicalName);
+            requireActivatedExtrasGated(change.canonicalName, selected.toString(), metadata, activated);
+            ResolvedEdges edges = buildEdges(change.canonicalName, metadata, base, activated, true);
 
             PackageFile sdistFile = null;
             List<PackageFile> wheelFiles = new ArrayList<>();
@@ -915,7 +917,8 @@ public final class UvLockEngine {
             return base.toBuilder()
                     .version(selected.toString())
                     .source(UvLockSource.registry(listing.index.getIndex().getUrl()))
-                    .dependencies(edges.isEmpty() ? null : edges)
+                    .dependencies(edges.base.isEmpty() ? null : edges.base)
+                    .optionalDependencies(edges.groups.isEmpty() ? null : edges.groups)
                     .sdist(sdistFile != null ? toArtifact(change.canonicalName, listing.index, sdistFile) : null)
                     .wheels(wheels.isEmpty() ? null : wheels)
                     .build();
@@ -1093,16 +1096,16 @@ public final class UvLockEngine {
         /**
          * A cascade rediscovered an already-settled package: safe only if its settled version
          * still satisfies the now-complete constraint set. Otherwise uv would backtrack, which
-         * the greedy engine does not.
+         * the greedy engine does not. An extra the new edge activates on it gets its group.
          */
-        private void verifyCascadeSatisfied(String target) {
+        private boolean revisitSettled(String target) {
             int index = findSinglePackage(target);
             if (index < 0) {
-                return;
+                return false;
             }
             PythonVersion version = PythonVersion.parse(packages.get(index).getVersion());
             if (version == null) {
-                return;
+                return false;
             }
             for (PythonVersionSpecifierSet constraint : gatherConstraints(target)) {
                 if (!constraint.contains(version, true)) {
@@ -1111,6 +1114,41 @@ public final class UvLockEngine {
                                     "already-updated package (backtracking), which the native engine does not support");
                 }
             }
+            return ensureActivatedGroups(index);
+        }
+
+        /**
+         * Builds the optional-dependencies groups of extras that live edges activate on a package
+         * but its entry lacks, from the metadata of its locked version. Recorded groups and the
+         * base edges stay untouched.
+         */
+        private boolean ensureActivatedGroups(int index) {
+            UvLockPackage pkg = packages.get(index);
+            Set<String> missing = new TreeSet<>(activatedExtras(pkg.getName()));
+            if (pkg.getOptionalDependencies() != null) {
+                missing.removeAll(pkg.getOptionalDependencies().keySet());
+            }
+            if (missing.isEmpty()) {
+                return false;
+            }
+            CoreMetadata metadata = pkg.getSource().getType() == UvLockSource.Type.REGISTRY ? metadataFor(pkg) : null;
+            if (metadata == null) {
+                throw new EngineFailure(Reason.RESOLUTION_REQUIRED, pkg.getName(),
+                        "Cannot read the metadata of " + pkg.getName() + " " + pkg.getVersion() +
+                                " to build its optional-dependencies groups " + missing);
+            }
+            requireActivatedExtrasGated(pkg.getName(), pkg.getVersion(), metadata, missing);
+            Map<String, List<UvLockDependency>> groups = new TreeMap<>();
+            if (pkg.getOptionalDependencies() != null) {
+                groups.putAll(pkg.getOptionalDependencies());
+            }
+            groups.putAll(buildEdges(pkg.getName(), metadata, pkg, missing, false).groups);
+            packages.set(index, pkg.toBuilder().optionalDependencies(groups).build());
+            return true;
+        }
+
+        private Set<String> activatedExtras(String pkg) {
+            return liveExtras().getOrDefault(pkg, Collections.emptySet());
         }
 
         private void checkNoUvResolutionOverrides(String pkg) {
@@ -1419,15 +1457,21 @@ public final class UvLockEngine {
             return metadata;
         }
 
+        /** The edges one version's requires-dist yields, split into the base list and one list per activated extra. */
+        private static final class ResolvedEdges {
+            final List<UvLockDependency> base = new ArrayList<>();
+            final Map<String, List<UvLockDependency>> groups = new TreeMap<>();
+        }
+
         /**
-         * Derives P's new dependency edges from its requires-dist. Every target must
-         * already be locked and satisfy the requirement at its pinned version; anything
-         * else needs delta resolution.
+         * Derives P's dependency edges from its requires-dist: the unconditional requirements
+         * when {@code withBase}, plus each requirement gated on one of {@code groups} as an
+         * entry of that extra's group. Targets the lock lacks, or holds at a version or without
+         * an extra the requirement needs, are queued for the greedy-forward drain.
          */
-        private List<UvLockDependency> buildEdges(String pkg, CoreMetadata metadata, UvLockPackage oldPkg) {
-            List<UvLockDependency> oldEdges = oldPkg.getDependencies() != null ?
-                    oldPkg.getDependencies() : emptyList();
-            List<UvLockDependency> edges = new ArrayList<>();
+        private ResolvedEdges buildEdges(String pkg, CoreMetadata metadata, UvLockPackage oldPkg,
+                                         Set<String> groups, boolean withBase) {
+            ResolvedEdges edges = new ResolvedEdges();
             Set<String> seen = new HashSet<>();
             for (String raw : metadata.getRequiresDist()) {
                 Pep508Requirement requirement = Pep508Requirement.parse(raw);
@@ -1442,74 +1486,114 @@ public final class UvLockEngine {
                 int semi = raw.indexOf(';');
                 String rawMarker = requirement.getMarker() != null && semi >= 0 ?
                         raw.substring(semi + 1).trim() : null;
+                String group = null;
                 if (rawMarker != null && UvLockMarkers.referencesExtraVariable(rawMarker)) {
-                    checkExtraGatedRequirementDroppable(pkg, oldPkg, raw);
+                    String[] split = splitExtraClause(pkg, rawMarker);
+                    group = split[0];
+                    rawMarker = split[1];
+                }
+                if (group == null ? !withBase : !groups.contains(group)) {
                     continue;
                 }
-                String marker = edgeMarker(pkg, requirement.getCanonicalName(), rawMarker, oldEdges);
+                List<UvLockDependency> oldEdges = group == null ? oldPkg.getDependencies() :
+                        oldPkg.getOptionalDependencies() != null ? oldPkg.getOptionalDependencies().get(group) : null;
+                String target = requirement.getCanonicalName();
+                String marker = edgeMarker(pkg, target, rawMarker, oldEdges != null ? oldEdges : emptyList());
                 if (UvLockMarkers.DROP_EDGE.equals(marker)) {
                     continue;
                 }
                 if (marker != null && markeredAddClosure.contains(pkg)) {
                     throw new EngineFailure(Reason.RESOLUTION_REQUIRED, pkg,
                             "Adding a conditional dependency whose closure has a marker-gated edge (" +
-                                    requirement.getCanonicalName() + ") requires marker-space resolution, " +
+                                    target + ") requires marker-space resolution, " +
                                     "which the native engine does not support");
                 }
-                String target = requirement.getCanonicalName();
-                if (!seen.add(target)) {
+                if (!seen.add(group + '\0' + target)) {
                     throw new EngineFailure(Reason.RESOLUTION_REQUIRED, pkg,
                             "Multiple requirements on " + target + " need marker-aware merging");
                 }
-                int targetIndex = findSinglePackage(target);
-                if (targetIndex < 0) {
-                    // T2 (ADR 0010): the requirement pulls in a package not yet in the lock; queue it
-                    // as a transitive addition and emit the version-agnostic edge
-                    if (!requirement.getExtras().isEmpty()) {
-                        throw new EngineFailure(Reason.RESOLUTION_REQUIRED, pkg,
-                                "Adding transitive " + target + " with extras is not yet supported by the native engine");
-                    }
-                    additionQueue.add(target);
-                    if (markeredAddClosure.contains(pkg)) {
-                        markeredAddClosure.add(target);
-                    }
-                    edges.add(new UvLockDependency(target, null, null, null, marker));
-                    continue;
-                }
-                UvLockPackage locked = packages.get(targetIndex);
-                PythonVersion lockedVersion = PythonVersion.parse(locked.getVersion());
-                if (requirement.getSpecifiers() != null && (lockedVersion == null ||
-                        !requirement.getSpecifiers().contains(lockedVersion, true))) {
-                    // greedy-forward cascade (ADR 0010 T1): the new version needs a newer <target>
-                    // than the pin; queue it to move and still emit the version-agnostic edge
-                    cascadeQueue.add(target);
-                }
-                List<String> extra = null;
-                if (!requirement.getExtras().isEmpty()) {
-                    extra = new ArrayList<>();
-                    for (String e : requirement.getExtras()) {
-                        String canonical = Pep508Requirement.canonicalize(e);
-                        if (locked.getOptionalDependencies() == null ||
-                                !locked.getOptionalDependencies().containsKey(canonical)) {
-                            throw new EngineFailure(Reason.RESOLUTION_REQUIRED, pkg,
-                                    "Requirement " + raw + " needs extra " + canonical + " that " + target +
-                                            " was not locked with");
-                        }
-                        extra.add(canonical);
-                    }
-                    // uv records edge extras sorted, unlike declared requires-dist extras (g3-multi-extras)
-                    sort(extra);
-                }
-                edges.add(new UvLockDependency(target, null, null, extra, marker));
+                UvLockDependency edge = edgeTo(pkg, requirement, marker);
+                (group == null ? edges.base : edges.groups.computeIfAbsent(group, k -> new ArrayList<>())).add(edge);
             }
-            edges.sort(Comparator.comparing(UvLockDependency::getName));
+            edges.base.sort(Comparator.comparing(UvLockDependency::getName));
+            for (List<UvLockDependency> entries : edges.groups.values()) {
+                entries.sort(Comparator.comparing(UvLockDependency::getName));
+            }
             return edges;
         }
 
-        // the rewritten entry keeps its optional-dependencies groups, so each must still gate a requirement
-        private void requireActivatedExtrasStillDeclared(String pkg, PythonVersion selected, CoreMetadata metadata,
-                                                        UvLockPackage base) {
-            if (base.getOptionalDependencies() == null) {
+        /**
+         * Splits an extra-gated marker into the canonical extra and the remaining and-chain (null
+         * when nothing remains). Only a single {@code extra ==} clause has a reproducible place in
+         * the lock, so any other shape fails loud.
+         */
+        private String[] splitExtraClause(String pkg, String rawMarker) {
+            List<String[]> clauses = UvLockMarkers.parseSimpleAndChain(rawMarker);
+            String extra = null;
+            List<String> rest = new ArrayList<>();
+            boolean supported = clauses != null;
+            for (String[] clause : supported ? clauses : Collections.<String[]>emptyList()) {
+                if (!"extra".equals(clause[0])) {
+                    rest.add(clause[0] + " " + clause[1] + " " + quoteMarkerValue(clause[2]));
+                } else if (extra == null && "==".equals(clause[1])) {
+                    extra = Pep508Requirement.canonicalize(clause[2]);
+                } else {
+                    supported = false;
+                }
+            }
+            if (!supported || extra == null) {
+                throw new EngineFailure(Reason.RESOLUTION_REQUIRED, pkg,
+                        "Extra-gated requirement marker \"" + rawMarker + "\" is not an and-chain with a single " +
+                                "extra == clause; placing it in an optional-dependencies group is not supported by " +
+                                "the native engine");
+            }
+            return new String[]{extra, rest.isEmpty() ? null : String.join(" and ", rest)};
+        }
+
+        private static String quoteMarkerValue(String value) {
+            return value.indexOf('\'') < 0 ? "'" + value + "'" : "\"" + value + "\"";
+        }
+
+        /**
+         * The edge for one requirement of P. A target the lock lacks is queued as a transitive
+         * addition (ADR 0010 T2); a locked target the requirement needs newer, or with an extra
+         * its entry lacks, is queued as a cascade (T1), which also builds the missing group once
+         * this edge is in place. The edge itself is version-agnostic either way.
+         */
+        private UvLockDependency edgeTo(String pkg, Pep508Requirement requirement, @Nullable String marker) {
+            String target = requirement.getCanonicalName();
+            List<String> extras = null;
+            if (!requirement.getExtras().isEmpty()) {
+                extras = new ArrayList<>();
+                for (String e : requirement.getExtras()) {
+                    extras.add(Pep508Requirement.canonicalize(e));
+                }
+                // uv records edge extras sorted, unlike declared requires-dist extras (g3-multi-extras)
+                sort(extras);
+            }
+            int targetIndex = findSinglePackage(target);
+            if (targetIndex < 0) {
+                additionQueue.add(target);
+                if (markeredAddClosure.contains(pkg)) {
+                    markeredAddClosure.add(target);
+                }
+                return new UvLockDependency(target, null, null, extras, marker);
+            }
+            UvLockPackage locked = packages.get(targetIndex);
+            PythonVersion lockedVersion = PythonVersion.parse(locked.getVersion());
+            boolean needsNewer = requirement.getSpecifiers() != null && (lockedVersion == null ||
+                    !requirement.getSpecifiers().contains(lockedVersion, true));
+            boolean lacksExtra = extras != null && (locked.getOptionalDependencies() == null ||
+                    !locked.getOptionalDependencies().keySet().containsAll(extras));
+            if (needsNewer || lacksExtra) {
+                cascadeQueue.add(target);
+            }
+            return new UvLockDependency(target, null, null, extras, marker);
+        }
+
+        // an activated extra that gates nothing makes uv drop the extra from the edge (off14), which is not reproduced
+        private void requireActivatedExtrasGated(String pkg, String version, CoreMetadata metadata, Set<String> extras) {
+            if (extras.isEmpty()) {
                 return;
             }
             Set<String> gated = new HashSet<>();
@@ -1528,33 +1612,11 @@ public final class UvLockEngine {
                     }
                 }
             }
-            for (String extra : base.getOptionalDependencies().keySet()) {
+            for (String extra : extras) {
                 if (!gated.contains(extra)) {
                     throw new EngineFailure(Reason.RESOLUTION_REQUIRED, pkg,
-                            pkg + " " + selected + " no longer gates any requirement on extra '" + extra +
-                                    "'. The native engine cannot rebuild optional-dependency groups.");
-                }
-            }
-        }
-
-        /**
-         * Extra-gated requirements of P vanish from the lock unless some edge activates
-         * the extra; verify no activation exists before dropping.
-         */
-        private void checkExtraGatedRequirementDroppable(String pkg, UvLockPackage oldPkg, String raw) {
-            if (oldPkg.getOptionalDependencies() != null) {
-                throw new EngineFailure(Reason.RESOLUTION_REQUIRED, pkg,
-                        "Rebuilding [package.optional-dependencies] groups is not supported by the native engine");
-            }
-            for (UvLockPackage other : packages) {
-                for (List<UvLockDependency> edges : allEdgeLists(other)) {
-                    for (UvLockDependency edge : edges) {
-                        if (edge.getName().equals(pkg) && edge.getExtra() != null) {
-                            throw new EngineFailure(Reason.RESOLUTION_REQUIRED, pkg,
-                                    "An edge activates an extra of " + pkg + "; rebuilding optional " +
-                                            "dependency groups is not supported (" + raw + ")");
-                        }
-                    }
+                            pkg + " " + version + " does not gate any requirement on extra '" + extra +
+                                    "', which an edge activates. The native engine cannot drop the extra from that edge.");
                 }
             }
         }
