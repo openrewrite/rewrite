@@ -75,7 +75,7 @@ def _in_statement_slot(coordinates: PythonCoordinates, cursor: Optional['Cursor'
     ambiguous = isinstance(target, Expression) and \
         not isinstance(target, (py.ExpressionStatement, py.StatementExpression))
     if not ambiguous or coordinates.mode != CoordinateMode.REPLACEMENT \
-            or cursor is None or cursor.value is not target:
+            or cursor is None or getattr(cursor.value, 'id', None) != target.id:
         return True
     # A node that is both, like a call, is a statement only where a statement list holds it.
     from .precedence import enclosing_tree
