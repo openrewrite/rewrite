@@ -28,7 +28,7 @@ import tempfile
 
 import pytest
 
-from rewrite import InMemoryExecutionContext
+from rewrite import InMemoryExecutionContext, random_id
 from rewrite.python._parser_visitor import ParserVisitor
 from rewrite.python.preconditions import uses_type
 from rewrite.python.search import UsesImport, UsesMethod, UsesType
@@ -114,10 +114,16 @@ def test_uses_import_reaches_import_in_except_block(cu):
 
 
 def test_tree_too_deep_to_visit_answers_no_match(caplog):
-    # One Py.Binary per concatenated fragment, so this nests deeper than the
-    # interpreter stack.
-    src = "x = " + " ".join(f'"s{i}"' for i in range(3000)) + "\n"
-    deep = ParserVisitor(src, "deep.py", None).visit(ast.parse(src))
+    # A parse balances concatenations, so the depth is built by hand.
+    src = "x = 'a' 'b'\n"
+    cu = ParserVisitor(src, "deep.py", None).visit(ast.parse(src))
+    statement = cu.padding.statements[0]
+    assignment = statement.element.padding.assignment
+    concatenation = assignment.element
+    for _ in range(3000):
+        concatenation = concatenation.replace(id=random_id(), left=concatenation)
+    deep = cu.padding.replace(_statements=[statement.replace(
+        _element=statement.element.padding.replace(_assignment=assignment.replace(_element=concatenation)))])
 
     with caplog.at_level(logging.WARNING, logger="rewrite.python.search"):
         assert not _matches(UsesImport("os"), deep)

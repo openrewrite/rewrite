@@ -2005,22 +2005,30 @@ class ParserVisitor(ast.NodeVisitor):
             raise ValueError(f"Unsupported operator: {op}")
         return self.__pad_left(self.__source_before(op_str), op)
 
-    @staticmethod
-    def _hoist_concat_prefix(node):
-        if not isinstance(node, py.Binary) or node.prefix != Space.EMPTY:
-            return node
-        leftmost = node
-        chain = []
-        while isinstance(leftmost.left, py.Binary):
-            chain.append(leftmost)
-            leftmost = leftmost.left
-        if leftmost.left.prefix == Space.EMPTY:
-            return node
-        prefix = leftmost.left.prefix
-        leftmost = leftmost.replace(left=leftmost.left.replace(prefix=Space.EMPTY))
-        for parent in reversed(chain):
-            leftmost = parent.replace(left=leftmost)
-        return leftmost.replace(prefix=prefix)
+    def _string_concatenation(self, parts: list[J], node: ast.AST) -> J:
+        """Join implicitly concatenated parts in a balanced tree, as a left-leaning one is as deep as it is long.
+
+        Each subtree carries the prefix of its leftmost part.
+        """
+        concatenation_type = self._type_mapping.type(node) if len(parts) > 1 else None
+
+        def join(lo: int, hi: int) -> J:
+            if hi - lo == 1:
+                return parts[lo]
+            mid = (lo + hi + 1) // 2
+            left = join(lo, mid)
+            return py.Binary(
+                random_id(),
+                left.prefix,
+                Markers.EMPTY,
+                left.replace(prefix=Space.EMPTY),
+                self.__pad_left(Space.EMPTY, py.Binary.Type.StringConcatenation),
+                None,
+                join(mid, hi),
+                concatenation_type
+            )
+
+        return join(0, len(parts))
 
     @staticmethod
     def _is_byte_string(tok_string: str) -> bool:
@@ -2042,7 +2050,7 @@ class ParserVisitor(ast.NodeVisitor):
         tok, _ = self._peek_significant_token()
 
         is_byte_string = self._is_byte_string(tok.string)
-        res = None
+        parts: list[J] = []
         is_first = True
 
         while tok.type in (token.STRING, FSTRING_START) and is_byte_string == self._is_byte_string(tok.string):
@@ -2072,19 +2080,7 @@ class ParserVisitor(ast.NodeVisitor):
             else:
                 current, tok = self.__map_literal(node, tok)
 
-            if res is None:
-                res = current
-            else:
-                res = py.Binary(
-                    random_id(),
-                    Space.EMPTY,
-                    Markers.EMPTY,
-                    res,
-                    self.__pad_left(Space.EMPTY, py.Binary.Type.StringConcatenation),
-                    None,
-                    current,
-                    self._type_mapping.type(node)
-                )
+            parts.append(current)
 
             is_first = False
 
@@ -2093,7 +2089,7 @@ class ParserVisitor(ast.NodeVisitor):
             if idx >= len(self._tokens) - 1 and tok.type == token.ENDMARKER:
                 break
 
-        return self._hoist_concat_prefix(res)
+        return self._string_concatenation(parts, node)
 
     def __map_literal_simple(self, node):
         """Map a non-string constant (numbers, None, True, False, Ellipsis)."""
@@ -2477,7 +2473,7 @@ class ParserVisitor(ast.NodeVisitor):
             return self.__map_fstring_as_literal(node, leading_prefix, tok)
 
         value_idx = 0
-        res = None
+        parts: list[J] = []
         is_first = True
         # Loop while we have STRING or FSTRING_START tokens to process
         # Note: AST merges adjacent strings, so we may have more tokens than AST values
@@ -2530,23 +2526,11 @@ class ParserVisitor(ast.NodeVisitor):
                 # No more f-strings or strings to process (should only happen for first element)
                 break
 
-            if res is None:
-                res = current
-            else:
-                res = py.Binary(
-                    random_id(),
-                    Space.EMPTY,
-                    Markers.EMPTY,
-                    res,
-                    self.__pad_left(Space.EMPTY, py.Binary.Type.StringConcatenation),
-                    None,
-                    current,
-                    self._type_mapping.type(node)
-                )
+            parts.append(current)
 
             is_first = False
 
-        return self._hoist_concat_prefix(res)
+        return self._string_concatenation(parts, node)
 
     def visit_TemplateStr(self, node):
         leading_prefix = self.__whitespace()
@@ -2556,7 +2540,7 @@ class ParserVisitor(ast.NodeVisitor):
             tok = self._advance_token()
 
         value_idx = 0
-        res = None
+        parts: list[J] = []
         is_first = True
         # Loop while we have STRING or TSTRING_START tokens to process
         while True:
@@ -2597,23 +2581,11 @@ class ParserVisitor(ast.NodeVisitor):
             else:
                 break
 
-            if res is None:
-                res = current
-            else:
-                res = py.Binary(
-                    random_id(),
-                    Space.EMPTY,
-                    Markers.EMPTY,
-                    res,
-                    self.__pad_left(Space.EMPTY, py.Binary.Type.StringConcatenation),
-                    None,
-                    current,
-                    self._type_mapping.type(node)
-                )
+            parts.append(current)
 
             is_first = False
 
-        return self._hoist_concat_prefix(res)
+        return self._string_concatenation(parts, node)
 
     def visit_FormattedValue(self, node):
         raise ValueError("This method should not be called directly")
@@ -3614,7 +3586,7 @@ class ParserVisitor(ast.NodeVisitor):
         fidelity but without structural access to the f-string internals.
         Handles implicit string concatenation (e.g. f"a" "b").
         """
-        res = None
+        parts: list[J] = []
         prefix = leading_prefix
         is_first = True
         while True:
@@ -3649,22 +3621,9 @@ class ParserVisitor(ast.NodeVisitor):
                 None,
                 JavaType.Primitive.String,
             )
-            if res is None:
-                res = current
-            else:
-                res = py.Binary(
-                    random_id(),
-                    Space.EMPTY,
-                    Markers.EMPTY,
-                    res,
-                    self.__pad_left(Space.EMPTY, py.Binary.Type.StringConcatenation),
-                    None,
-                    current,
-                    self._type_mapping.type(node)
-                )
+            parts.append(current)
             is_first = False
-        assert res is not None
-        return self._hoist_concat_prefix(res)
+        return self._string_concatenation(parts, node)
 
     def __consume_fstring_middles(self, _middle, raw: bool) -> \
             Tuple[str, str, Optional[List[j.Literal.UnicodeEscape]]]:
@@ -3806,6 +3765,7 @@ class ParserVisitor(ast.NodeVisitor):
                 if isinstance(value_inner, (ast.JoinedStr, _TemplateStr)):
                     joined = value_inner
                     nested, tok, inner_vi = self.__map_fstring(joined, Space.EMPTY, tok)
+                    nested_parts: list[J] = [nested]
 
                     # Handle concatenated f-strings/strings within this expression
                     while True:
@@ -3822,15 +3782,9 @@ class ParserVisitor(ast.NodeVisitor):
                                        else ast.Constant(value=ast.literal_eval(tok.string)))
                             right, tok = self.__map_literal(ast_val, tok)
                             right = right.replace(prefix=concat_prefix)
-                        nested = py.Binary(
-                            random_id(), Space.EMPTY, Markers.EMPTY,
-                            nested,
-                            self.__pad_left(Space.EMPTY, py.Binary.Type.StringConcatenation),
-                            None, right,
-                            self._type_mapping.type(node)
-                        )
+                        nested_parts.append(right)
 
-                    expr = self.__pad_right(self._hoist_concat_prefix(nested), Space.EMPTY)
+                    expr = self.__pad_right(self._string_concatenation(nested_parts, node), Space.EMPTY)
                 else:
                     expr = self.__pad_right(
                         self.__convert(value_inner),
