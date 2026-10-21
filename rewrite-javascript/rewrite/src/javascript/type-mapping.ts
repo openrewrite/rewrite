@@ -1218,7 +1218,9 @@ export class JavaScriptTypeMapping {
                     // A default import binds an `ImportClause`; its aliased symbol carries the internal
                     // name of the default export (e.g. `e` for express), so represent it as `<default>`.
                     // Named imports (`ImportSpecifier`) keep the original exported name.
-                    const isDefaultImport = exprSymbol?.declarations?.some(ts.isImportClause) ?? false;
+                    const exportName = this.importBinding(node.expression)?.exportName;
+                    const isDefaultImport = exportName === 'default' ||
+                        (exprSymbol?.declarations?.some(ts.isImportClause) ?? false);
                     if (isDefaultImport) {
                         methodName = '<default>';
                     } else if (aliasedSymbol?.declarations?.length) {
@@ -1226,7 +1228,7 @@ export class JavaScriptTypeMapping {
                     } else {
                         // A package without type declarations resolves the import to the checker's
                         // `unknown` symbol, so the exported name comes from the import itself.
-                        methodName = this.importBinding(node.expression)?.exportName ?? aliasedSymbol?.name ?? methodName;
+                        methodName = exportName ?? aliasedSymbol?.name ?? methodName;
                     }
                 } else if (this.requiredModuleOfExpression(node.expression)) {
                     // `const m = require('m'); m()` calls the module's default export.

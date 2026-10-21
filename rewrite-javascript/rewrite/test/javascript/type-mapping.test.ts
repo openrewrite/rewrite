@@ -2733,12 +2733,14 @@ describe('JavaScript type mapping', () => {
                         const viaProp = require('node:fs').truncateSync;
                         const {delimiter} = require('node:path');
                         const {sep: separator} = require('path');
+                        const {default: ok} = require('node:assert');
                         a.truncateSync(1);
                         truncateSync(1);
                         renamed(1);
                         viaProp(1);
                         delimiter.length;
                         separator.length;
+                        ok(true);
                     `,
                     //@formatter:off
                     `
@@ -2748,12 +2750,14 @@ describe('JavaScript type mapping', () => {
                         const viaProp = require('node:fs').truncateSync;
                         const {/*~~(path#delimiter)~~>*/delimiter} = require('node:path');
                         const {sep: /*~~(path#sep)~~>*/separator} = require('path');
+                        const {default: ok} = require('node:assert');
                         /*~~(fs#truncateSync)~~>*/a.truncateSync(1);
                         /*~~(fs#truncateSync)~~>*/truncateSync(1);
                         /*~~(fs#truncateSync)~~>*/renamed(1);
                         /*~~(fs#truncateSync)~~>*/viaProp(1);
                         /*~~(path#delimiter)~~>*/delimiter.length;
                         /*~~(path#sep)~~>*/separator.length;
+                        /*~~(assert#<default>)~~>*/ok(true);
                     `
                     //@formatter:on
                 )
