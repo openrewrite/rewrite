@@ -266,6 +266,36 @@ class UvLockDeltaOfflineTest {
     }
 
     @Test
+    void configuredUvReleaseStampsChangedLocksWithItsRevision() {
+        PythonExecutionContextView.view(ctx).setUvVersion("0.13.4");
+        routeLocalIndex("off18-removed-extra-unbinds-cascade");
+        Result result = UvLockEngine.regenerate(
+          resource("off18-removed-extra-unbinds-cascade/pyproject.toml"),
+          resource("off18-removed-extra-unbinds-cascade/uv.lock.before"),
+          ctx);
+        assertThat(result.getErrorMessage()).isNull();
+        assertThat(result.getLockFileContent()).isEqualTo(resource("off18-removed-extra-unbinds-cascade/uv.lock.after.uv-0.13.4"));
+    }
+
+    @Test
+    void configuredUvReleaseBelow0_12_22RestampsAtRevision3() {
+        PythonExecutionContextView.view(ctx).setUvVersion("0.12.21");
+        routeLocalIndex("off21-upgrade-activates-extra");
+        Result result = UvLockEngine.regenerate(
+          resource("off21-upgrade-activates-extra/pyproject.toml"),
+          resource("off21-upgrade-activates-extra/uv.lock.before"),
+          ctx);
+        assertThat(result.getErrorMessage()).isNull();
+        assertThat(result.getLockFileContent()).isEqualTo(resource("off21-upgrade-activates-extra/uv.lock.after.uv-0.12.21"));
+    }
+
+    @Test
+    void configuredUvReleaseLeavesUnchangedLockAlone() {
+        PythonExecutionContextView.view(ctx).setUvVersion("0.13.4");
+        assertUnchangedWithoutNetwork("off16-tool-uv-dev-dependencies");
+    }
+
+    @Test
     void upgradeRaisingPythonLowerBoundOnAnEdgeFailsLoud() {
         // uv forks at python_full_version >= '3.11' although every package resolves to one version
         routeLocalIndex("off15-python-lower-bound-marker");

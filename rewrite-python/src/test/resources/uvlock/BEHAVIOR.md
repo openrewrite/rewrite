@@ -197,5 +197,7 @@ rather than guess dependencies.
   (`m4-exclude-newer-span/uv.lock`, since 0.11.8) and reads and writes back verbatim; other newer header
   material observed in the wild (`[options.exclude-newer-package]`, `[manifest] build-constraints`) is
   still rejected key by key.
-- Rewrites a revision-3 file at revision 5 when anything changes, as §5 describes for older revisions.
+- Rewrites a revision-3 file at revision 5 when anything changes, as §5 describes for older revisions, and
+  the file is otherwise byte-identical (`off18-removed-extra-unbinds-cascade/uv.lock.after.uv-0.13.4`);
+  0.12.21 does the reverse to a revision-5 file (`off21-upgrade-activates-extra/uv.lock.after.uv-0.12.21`).
 - Omits `version` on a root with `dynamic = ["version"]` (also 0.10.11: `z2-dynamic-version-root/uv.lock`).

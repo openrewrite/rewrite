@@ -61,6 +61,9 @@ the package, `off20-transitive-add-with-extras` a transitive requirement with ex
 parenthesized extra clauses next to a disjunction no edge activates, and `off24-extra-or-platform-marker`
 a marker mixing an extra with a platform clause, which the engine refuses (its `uv.lock.after` is real
 uv's output, kept for the record).
+A `uv.lock.after.uv-<release>` file is the same edit relocked by that release from the same `uv.lock.before`
+(2026-10-21): 0.13.4 restamps the revision-3 `off18` lock at revision 5 and 0.12.21 restamps the
+revision-5 `off21` lock at revision 3, each otherwise byte-identical to `uv.lock.after`.
 
 `off16-tool-uv-dev-dependencies` (pypi.org) declares its dev group through the legacy `[tool.uv]
 dev-dependencies` list; uv's lock is byte-identical to the same list under `[dependency-groups]`.

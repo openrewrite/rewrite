@@ -21,6 +21,7 @@ import org.openrewrite.HttpSenderExecutionContextView;
 import org.openrewrite.InMemoryExecutionContext;
 import org.openrewrite.SourceFile;
 import org.openrewrite.ipc.http.HttpSender;
+import org.openrewrite.python.PythonExecutionContextView;
 import org.openrewrite.python.internal.Hashing;
 import org.openrewrite.python.internal.LockFileRegeneration.Failure;
 import org.openrewrite.python.internal.LockFileRegeneration.Reason;
@@ -217,6 +218,7 @@ public final class UvLockEngine {
         private final List<UvIndex> indexes;
         private final Map<String, List<String>> indexPins;
         private final Set<String> nonRegistrySources;
+        private final @Nullable String uvVersion;
 
         private List<UvLockPackage> packages;
         private int rootIndex;
@@ -248,6 +250,7 @@ public final class UvLockEngine {
             this.indexes = UvIndexDiscovery.discover(ctx, pyproject, null, Environment.SYSTEM);
             this.indexPins = UvIndexDiscovery.sourceIndexPins(pyproject);
             this.nonRegistrySources = UvLockMetadataBuilder.readNonRegistrySources(pyproject);
+            this.uvVersion = PythonExecutionContextView.view(ctx).getUvVersion();
         }
 
         Result regenerate() {
@@ -262,6 +265,12 @@ public final class UvLockEngine {
             if (lock.getManifest() != null) {
                 throw new EngineFailure(Reason.RESOLUTION_REQUIRED, null,
                         "Workspace locks ([manifest] with members) are not supported by the native engine");
+            }
+            Integer writeRevision = configuredRevision();
+            if (writeRevision != null && (lock.getRevision() == null || lock.getRevision() < 3)) {
+                throw new EngineFailure(Reason.RESOLUTION_REQUIRED, null,
+                        "uv " + uvVersion + " rewrites a lock below revision 3 in its own shape, " +
+                                "which the native engine does not reproduce");
             }
             packages = new ArrayList<>(lock.getPackages());
             rootIndex = findRoot();
@@ -365,7 +374,27 @@ public final class UvLockEngine {
                 validatePinsAgainstPython(rewritten);
             }
 
-            return Result.success(UvLockWriter.write(updated.withPackages(packages)));
+            updated = updated.withPackages(packages);
+            String written = UvLockWriter.write(updated);
+            // uv restamps a lock it changed with its own revision and leaves an unchanged one as it is
+            if (writeRevision != null && !writeRevision.equals(lock.getRevision()) &&
+                    !written.equals(UvLockWriter.write(lock))) {
+                written = UvLockWriter.write(updated.withRevision(writeRevision));
+            }
+            return Result.success(written);
+        }
+
+        /** The revision the configured uv release writes, 5 from 0.12.22 on and 3 before, or null without a release. */
+        private @Nullable Integer configuredRevision() {
+            if (uvVersion == null) {
+                return null;
+            }
+            PythonVersion version = PythonVersion.parse(uvVersion);
+            if (version == null) {
+                throw new EngineFailure(Reason.MALFORMED_MANIFEST, null,
+                        "Configured uv version is not a valid version: " + uvVersion);
+            }
+            return version.compareTo(PythonVersion.parse("0.12.22")) >= 0 ? 5 : 3;
         }
 
         // ---- manifest reading ----
