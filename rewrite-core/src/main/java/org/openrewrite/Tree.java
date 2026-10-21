@@ -106,7 +106,9 @@ public interface Tree {
     }
 
     default String print(TreeVisitor<?, PrintOutputCapture<Integer>> printer) {
-        return printer.reduce(this, new PrintOutputCapture<>(0)).getOut();
+        PrintOutputCapture<Integer> outputCapture = new PrintOutputCapture<>(0);
+        printer.visit(this, outputCapture);
+        return outputCapture.getOut();
     }
 
     default <P> String printTrimmed(P p, Cursor cursor) {
