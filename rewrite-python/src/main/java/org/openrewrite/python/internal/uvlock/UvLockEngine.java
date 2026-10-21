@@ -177,6 +177,8 @@ public final class UvLockEngine {
         final List<PythonVersionSpecifierSet> constraints = new ArrayList<>();
         @Nullable String pinnedIndexName;
         boolean indexChanged;
+        /** Root edges whose declared extras changed, keyed by dev group ("" for [project] dependencies). */
+        final Map<String, List<String>> rootEdgeExtras = new LinkedHashMap<>();
 
         Change(String canonicalName) {
             this.canonicalName = canonicalName;
@@ -201,11 +203,13 @@ public final class UvLockEngine {
         final @Nullable String devGroup;
         /** uv's recorded marker form for the root edge, or null for an unconditional add. */
         final @Nullable String marker;
+        final @Nullable List<String> extras;
 
-        Addition(String canonicalName, @Nullable String devGroup, @Nullable String marker) {
+        Addition(String canonicalName, @Nullable String devGroup, @Nullable String marker, @Nullable List<String> extras) {
             this.canonicalName = canonicalName;
             this.devGroup = devGroup;
             this.marker = marker;
+            this.extras = extras;
         }
     }
 
@@ -488,13 +492,11 @@ public final class UvLockEngine {
                         throw new EngineFailure(Reason.UNSUPPORTED_ENTRY_TYPE, added.getName(),
                                 "Git/path/editable dependency entries are not supported by the native engine");
                     }
-                    // T2 add (ADR 0010): resolve the new package and its closure. Extras, pinned
-                    // indexes, and optional-dependency groups on the added declaration are deferred
-                    // to a later increment.
-                    if (newReqs.size() > 1 || added.getIndex() != null ||
-                            (added.getExtras() != null && !added.getExtras().isEmpty()) || UvLockRequirements.extraGroupOf(added) != null) {
+                    // T2 add (ADR 0010): resolve the new package and its closure. A declaration under a
+                    // root optional-dependencies group is deferred to a later increment.
+                    if (newReqs.size() > 1 || UvLockRequirements.extraGroupOf(added) != null) {
                         throw new EngineFailure(Reason.RESOLUTION_REQUIRED, added.getName(),
-                                "Adding a dependency with extras or a pinned index is not yet " +
+                                "Adding a dependency under a [project.optional-dependencies] group is not yet " +
                                         "supported by the native engine");
                     }
                     // A python-version-gated add introduces a new fork boundary uv records as
@@ -505,7 +507,7 @@ public final class UvLockEngine {
                                 "Adding a dependency gated on the Python version alters the lock's fork " +
                                         "structure, which the native engine does not support");
                     }
-                    additions.add(new Addition(added.getName(), devGroup, added.getMarker()));
+                    additions.add(new Addition(added.getName(), devGroup, added.getMarker(), edgeExtras(added.getExtras())));
                     continue;
                 }
                 if (UvLockRequirements.rendered(oldReqs).equals(UvLockRequirements.rendered(newReqs))) {
@@ -521,11 +523,6 @@ public final class UvLockEngine {
                 }
                 UvLockRequirement oldReq = oldReqs.get(0);
                 UvLockRequirement newReq = newReqs.get(0);
-                if (!Objects.equals(oldReq.getExtras(), newReq.getExtras())) {
-                    throw new EngineFailure(Reason.RESOLUTION_REQUIRED, newReq.getName(),
-                            "Changing declared extras requires resolution, which the native engine " +
-                                    "does not yet support");
-                }
                 if (!Objects.equals(oldReq.getMarker(), newReq.getMarker())) {
                     throw new EngineFailure(Reason.RESOLUTION_REQUIRED, newReq.getName(),
                             "Changing a declaration's environment marker requires resolution");
@@ -548,6 +545,9 @@ public final class UvLockEngine {
                 if (!Objects.equals(oldReq.getIndex(), newReq.getIndex())) {
                     change.indexChanged = true;
                 }
+                if (!Objects.equals(oldReq.getExtras(), newReq.getExtras())) {
+                    change.rootEdgeExtras.put(devGroup == null ? "" : devGroup, edgeExtras(newReq.getExtras()));
+                }
             }
             for (List<UvLockRequirement> removed : oldByKey.values()) {
                 for (UvLockRequirement req : removed) {
@@ -559,6 +559,16 @@ public final class UvLockEngine {
                     removals.add(new Removal(req.getName(), extraGroup, devGroup));
                 }
             }
+        }
+
+        // uv records edge extras sorted, unlike declared requires-dist extras (g3-multi-extras)
+        private static @Nullable List<String> edgeExtras(@Nullable List<String> declared) {
+            if (declared == null || declared.isEmpty()) {
+                return null;
+            }
+            List<String> extras = new ArrayList<>(declared);
+            sort(extras);
+            return extras;
         }
 
         private static Map<String, List<UvLockRequirement>> byKey(@Nullable List<UvLockRequirement> section) {
@@ -868,11 +878,38 @@ public final class UvLockEngine {
                 throw new EngineFailure(Reason.MALFORMED_LOCK, change.canonicalName,
                         "Locked version " + pkg.getVersion() + " is not a valid PEP 440 version");
             }
+            boolean extrasChanged = updateRootEdgeExtras(change);
             if (!change.indexChanged && satisfiesAll(change.constraints, pinned)) {
                 // locked-version preference: the entry only changes if an extra was newly activated on it
-                return ensureActivatedGroups(index);
+                return ensureActivatedGroups(index) || extrasChanged;
             }
             packages.set(index, resolveEntry(change, pinned, pkg));
+            return true;
+        }
+
+        // the root edge records the declaration's extras, which is what activates the package's groups
+        private boolean updateRootEdgeExtras(Change change) {
+            if (change.rootEdgeExtras.isEmpty()) {
+                return false;
+            }
+            UvLockPackage root = packages.get(rootIndex);
+            UvLockPackage.UvLockPackageBuilder builder = root.toBuilder();
+            Map<String, List<UvLockDependency>> dev = root.getDevDependencies() != null ?
+                    new LinkedHashMap<>(root.getDevDependencies()) : new LinkedHashMap<>();
+            for (Map.Entry<String, List<String>> e : change.rootEdgeExtras.entrySet()) {
+                List<UvLockDependency> edges = e.getKey().isEmpty() ? root.getDependencies() : dev.get(e.getKey());
+                List<UvLockDependency> updated = new ArrayList<>();
+                for (UvLockDependency edge : edges != null ? edges : Collections.<UvLockDependency>emptyList()) {
+                    updated.add(edge.getName().equals(change.canonicalName) ? edge.withExtra(e.getValue()) : edge);
+                }
+                if (e.getKey().isEmpty()) {
+                    builder.dependencies(updated);
+                } else {
+                    dev.put(e.getKey(), updated);
+                    builder.devDependencies(dev);
+                }
+            }
+            packages.set(rootIndex, builder.build());
             return true;
         }
 
@@ -962,15 +999,15 @@ public final class UvLockEngine {
             if (direct != null && direct.marker != null) {
                 markeredAddClosure.add(name);
             }
+            if (direct != null) {
+                // the root edge goes in first: its extras are what activate the new entry's groups
+                addRootEdge(direct);
+            }
             Change select = new Change(name);
             select.constraints.addAll(gatherConstraints(name));
             List<String> pins = indexPins.get(name);
             select.pinnedIndexName = pins != null ? pins.get(0) : null;
-            UvLockPackage created = resolveEntry(select, null, UvLockPackage.builder().name(name).build());
-            insertSorted(created);
-            if (direct != null) {
-                addRootEdge(direct);
-            }
+            insertSorted(resolveEntry(select, null, UvLockPackage.builder().name(name).build()));
         }
 
         private void insertSorted(UvLockPackage pkg) {
@@ -985,7 +1022,7 @@ public final class UvLockEngine {
         private void addRootEdge(Addition addition) {
             UvLockPackage root = packages.get(rootIndex);
             UvLockPackage.UvLockPackageBuilder builder = root.toBuilder();
-            UvLockDependency edge = new UvLockDependency(addition.canonicalName, null, null, null, addition.marker);
+            UvLockDependency edge = new UvLockDependency(addition.canonicalName, null, null, addition.extras, addition.marker);
             if (addition.devGroup != null) {
                 Map<String, List<UvLockDependency>> groups = root.getDevDependencies() != null ?
                         new LinkedHashMap<>(root.getDevDependencies()) : new LinkedHashMap<>();

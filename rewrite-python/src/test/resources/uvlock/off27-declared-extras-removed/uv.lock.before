@@ -1,0 +1,35 @@
+version = 1
+revision = 5
+requires-python = ">=3.10"
+
+[[package]]
+name = "s33-declared-extras-removed"
+version = "0.1.0"
+source = { virtual = "." }
+dependencies = [
+    { name = "urlish", extra = ["socks"] },
+]
+
+[package.metadata]
+requires-dist = [{ name = "urlish", extras = ["socks"], specifier = "==1.26.0" }]
+
+[[package]]
+name = "socklike"
+version = "1.0"
+source = { registry = "https://index.example/simple/" }
+wheels = [
+    { url = "https://index.example/simple/socklike/socklike-1.0-py3-none-any.whl", hash = "sha256:4a801f6bb276aacbd7ea39be8328f9e454d1ffe973fd27aa481ca9932aa12f49" },
+]
+
+[[package]]
+name = "urlish"
+version = "1.26.0"
+source = { registry = "https://index.example/simple/" }
+wheels = [
+    { url = "https://index.example/simple/urlish/urlish-1.26.0-py3-none-any.whl", hash = "sha256:b93420cd26b5cf0651541f9cf98dbb70bdf40cbca707d4e6eda3b9f310316da7" },
+]
+
+[package.optional-dependencies]
+socks = [
+    { name = "socklike" },
+]

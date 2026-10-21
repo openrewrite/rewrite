@@ -1,0 +1,6 @@
+Metadata-Version: 2.1
+Name: urlish
+Version: 1.26.0
+Summary: synthetic urlish
+Provides-Extra: socks
+Requires-Dist: socklike>=1; extra == "socks"

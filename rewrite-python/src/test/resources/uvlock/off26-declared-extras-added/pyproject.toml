@@ -1,0 +1,10 @@
+[project]
+name = "s32-declared-extras-added"
+version = "0.1.0"
+requires-python = ">=3.10"
+dependencies = ["urlish[socks]==1.26.0"]
+
+[[tool.uv.index]]
+name = "local"
+url = "https://index.example/simple/"
+default = true

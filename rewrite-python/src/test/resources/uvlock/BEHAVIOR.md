@@ -156,6 +156,13 @@ rather than guess dependencies.
   clause as the entry marker, and a disjunction whose every term needs an unactivated extra
   (`(sys_platform == 'emscripten' and extra == 'all') or (sys_platform == 'win32' and extra == 'all')`)
   leaves no trace (`off23-extra-dnf-markers/`).
+- The root's declared extras work the same way: adding `reqlike[socks]` records `extra = ["socks"]` on the
+  root edge and the new entry's `socks` group (`off25-add-with-extras/`); turning a declared `urlish` into
+  `urlish[socks]` keeps its version and adds the group and its closure, and the reverse edit drops both
+  without consulting the index (`off26-declared-extras-added/`, `off27-declared-extras-removed/`).
+- An add pinned to a named index through `[tool.uv.sources]` resolves from that index alone, even when the
+  default index lists the package too, and records `index =` on its requires-dist entry
+  (`off28-add-pinned-index/`, two indexes under one host).
 - A term without an extra clause (`delta; extra == 'fast' or sys_platform == 'win32'`) is split by uv
   into a base edge `sys_platform == 'win32'` and a group entry `sys_platform != 'win32'`
   (`off24-extra-or-platform-marker/uv.lock.after`); the engine fails loud on that shape.

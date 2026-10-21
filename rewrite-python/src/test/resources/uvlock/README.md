@@ -60,7 +60,9 @@ the package, `off20-transitive-add-with-extras` a transitive requirement with ex
 `off22-or-extras-marker` a requirement gated on a disjunction of extras, `off23-extra-dnf-markers`
 parenthesized extra clauses next to a disjunction no edge activates, and `off24-extra-or-platform-marker`
 a marker mixing an extra with a platform clause, which the engine refuses (its `uv.lock.after` is real
-uv's output, kept for the record).
+uv's output, kept for the record), `off25-add-with-extras` a direct add with extras,
+`off26-declared-extras-added` and `off27-declared-extras-removed` a declaration gaining and losing its
+extras, and `off28-add-pinned-index` an add pinned to a second index (served under `http-alt/`).
 A `uv.lock.after.uv-<release>` file is the same edit relocked by that release from the same `uv.lock.before`
 (2026-10-21): 0.13.4 restamps the revision-3 `off18` lock at revision 5 and 0.12.21 restamps the
 revision-5 `off21` lock at revision 3, each otherwise byte-identical to `uv.lock.after`.

@@ -266,6 +266,42 @@ class UvLockDeltaOfflineTest {
     }
 
     @Test
+    void directAddWithExtrasBuildsTheActivatedGroup() {
+        routeLocalIndex("off25-add-with-extras");
+        assertScenario("off25-add-with-extras");
+    }
+
+    @Test
+    void addingExtrasToDeclarationAddsGroupAndRootEdgeExtra() {
+        routeLocalIndex("off26-declared-extras-added");
+        assertScenario("off26-declared-extras-added");
+    }
+
+    @Test
+    void removingExtrasFromDeclarationDropsGroupAndClosureWithoutNetwork() {
+        routeLocalIndex("off27-declared-extras-removed");
+        Result result = UvLockEngine.regenerate(
+          resource("off27-declared-extras-removed/pyproject.toml"),
+          resource("off27-declared-extras-removed/uv.lock.before"),
+          ctx);
+        assertThat(result.getErrorMessage()).isNull();
+        assertThat(result.getLockFileContent()).isEqualTo(resource("off27-declared-extras-removed/uv.lock.after"));
+        assertThat(http.requests).isEmpty();
+    }
+
+    @Test
+    void addWithPinnedIndexResolvesFromThatIndexOnly() {
+        // iniconfig 0.9 sits on the default index and 1.0 on alt; the [tool.uv.sources] pin selects alt
+        routeLocalIndex("off28-add-pinned-index");
+        PythonExecutionContextView.view(ctx).setPackageIndexes(List.of(
+          new PythonPackageIndex("local", "https://index.example/simple/", true, null, null, false),
+          new PythonPackageIndex("alt", "https://index.example/alt/simple/", true, null, null, false)));
+        http.routeDirectory("https://index.example/alt/simple/", "off28-add-pinned-index/http-alt/");
+        assertScenario("off28-add-pinned-index");
+        assertThat(http.requests).noneMatch(url -> url.equals("https://index.example/simple/iniconfig/"));
+    }
+
+    @Test
     void configuredUvReleaseStampsChangedLocksWithItsRevision() {
         PythonExecutionContextView.view(ctx).setUvVersion("0.13.4");
         routeLocalIndex("off18-removed-extra-unbinds-cascade");
