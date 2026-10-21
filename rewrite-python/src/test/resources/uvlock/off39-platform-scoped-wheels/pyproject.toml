@@ -1,0 +1,10 @@
+[project]
+name = "s51-platform-scoped-wheels"
+version = "0.1.0"
+requires-python = ">=3.10"
+dependencies = ["keeper==1.0", "winonly==1.0; sys_platform == 'win32'"]
+
+[[tool.uv.index]]
+name = "local"
+url = "https://index.example/simple/"
+default = true

@@ -155,6 +155,8 @@ final class UvLockFixtures {
       "off37-parent-reachability-markers/uv.lock.before",
       "off38-marker-version-forms/uv.lock.after",
       "off38-marker-version-forms/uv.lock.before",
+      "off39-platform-scoped-wheels/uv.lock.after",
+      "off39-platform-scoped-wheels/uv.lock.before",
       "off2-add-closure/uv.lock.after",
       "off2-add-closure/uv.lock.before",
       "off3-cascade-flake8/uv.lock.after",

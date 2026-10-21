@@ -210,6 +210,11 @@ rather than guess dependencies.
   order (`off35-exact-minor-wheel-filter/`); `python_version < '3.14'` is always true and vanishes from the
   edge, `python_version < '3.12'` never fires and takes its edge with it (`off36-exact-minor-marker-drop/`).
 
+- uv drops the wheels a package's reachability rules out: `winonly==1.0; sys_platform == 'win32'` keeps only
+  `win_amd64` of its three platform wheels (`off39-platform-scoped-wheels/`, `uv-lock` `is_wheel_unreachable_for_marker`,
+  a disjointness test against one constant marker per platform and architecture). The engine fails loud on a
+  written package that every path reaches under a platform clause and that has platform-specific wheels.
+
 ## 9a. `[tool.uv] constraint-dependencies` (local-index scenarios, uv 0.13.4)
 
 - A constraint bounds every resolution like a requirement without adding the package, and the lock

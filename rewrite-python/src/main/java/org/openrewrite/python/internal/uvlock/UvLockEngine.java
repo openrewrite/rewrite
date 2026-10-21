@@ -403,6 +403,9 @@ public final class UvLockEngine {
                 dropUnreachable();
             }
             verifyDependents(rewritten);
+            if (structural || migrating) {
+                refusePlatformPrunedWheels(rewritten);
+            }
             if (pythonChanged && lowerBoundIncreased()) {
                 validatePinsAgainstPython(rewritten);
             }
@@ -1217,6 +1220,40 @@ public final class UvLockEngine {
                     }
                 });
             }
+        }
+
+        // uv drops the wheels a platform-scoped package's reachability rules out, which the engine does not port yet
+        private void refusePlatformPrunedWheels(Set<String> rewritten) {
+            List<UvLockPackage> candidates = new ArrayList<>();
+            for (UvLockPackage pkg : packages) {
+                if ((migrating || rewritten.contains(pkg.getName())) && hasPlatformWheel(pkg)) {
+                    candidates.add(pkg);
+                }
+            }
+            if (candidates.isEmpty()) {
+                return;
+            }
+            Set<Integer> scoped = UvLockReachability.platformScoped(packages, rootIndex, range);
+            for (UvLockPackage pkg : candidates) {
+                if (scoped == null || scoped.contains(packages.indexOf(pkg))) {
+                    throw new EngineFailure(Reason.RESOLUTION_REQUIRED, pkg.getName(),
+                            pkg.getName() + " is only reachable under a platform marker, and uv drops the wheels " +
+                                    "for the platforms it rules out, which the native engine does not reproduce");
+                }
+            }
+        }
+
+        private static boolean hasPlatformWheel(UvLockPackage pkg) {
+            for (UvLockArtifact wheel : pkg.getWheels() != null ? pkg.getWheels() : Collections.<UvLockArtifact>emptyList()) {
+                String filename = wheelFilename(wheel);
+                if (filename != null) {
+                    String base = filename.substring(0, filename.length() - ".whl".length());
+                    if (!"any".equals(base.substring(base.lastIndexOf('-') + 1))) {
+                        return true;
+                    }
+                }
+            }
+            return false;
         }
 
         private interface RequirementVisitor {

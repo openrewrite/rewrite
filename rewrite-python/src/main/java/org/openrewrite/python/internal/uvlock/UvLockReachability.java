@@ -54,6 +54,40 @@ final class UvLockReachability {
         return simplified;
     }
 
+    private static final Set<String> PLATFORM_VARS = new HashSet<>(Arrays.asList(
+            "sys_platform", "platform_system", "os_name", "platform_machine"));
+
+    /**
+     * The entries every path to which carries a platform clause, so uv prunes their wheels for the
+     * platforms that clause rules out. Null when the lock's markers are outside the pass's algebra.
+     */
+    static @Nullable Set<Integer> platformScoped(List<UvLockPackage> packages, int rootIndex, PyRange requiresPython) {
+        UvLockReachability r = new UvLockReachability(packages, requiresPython);
+        try {
+            r.propagate(rootIndex);
+        } catch (EngineFailure e) {
+            return null;
+        }
+        Set<Integer> scoped = new HashSet<>();
+        for (Map.Entry<Node, List<Term>> e : r.reach.entrySet()) {
+            if (e.getKey().getExtra() != null || e.getValue().isEmpty()) {
+                continue;
+            }
+            boolean everyTermScoped = true;
+            for (Term t : e.getValue()) {
+                boolean termScoped = false;
+                for (Atom atom : t.getAtoms()) {
+                    termScoped |= PLATFORM_VARS.contains(atom.getVar());
+                }
+                everyTermScoped &= termScoped;
+            }
+            if (everyTermScoped) {
+                scoped.add(e.getKey().getIndex());
+            }
+        }
+        return scoped;
+    }
+
     /** A lock entry, or one of its extras, as a node of the reachability graph. */
     @Value
     private static class Node {

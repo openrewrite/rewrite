@@ -1,0 +1,22 @@
+version = 1
+revision = 5
+requires-python = ">=3.10"
+
+[[package]]
+name = "keeper"
+version = "1.0"
+source = { registry = "https://index.example/simple/" }
+wheels = [
+    { url = "https://index.example/simple/keeper/keeper-1.0-py3-none-any.whl", hash = "sha256:69b5705b9b71e898cd067240f4801725481689cec4f78cd9f2655947fac7ecc3" },
+]
+
+[[package]]
+name = "s51-platform-scoped-wheels"
+version = "0.1.0"
+source = { virtual = "." }
+dependencies = [
+    { name = "keeper" },
+]
+
+[package.metadata]
+requires-dist = [{ name = "keeper", specifier = "==1.0" }]

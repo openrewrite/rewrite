@@ -412,6 +412,13 @@ class UvLockDeltaOfflineTest {
     }
 
     @Test
+    void platformScopedPackageWithPlatformWheelsFailsLoud() {
+        // uv keeps only winonly's win_amd64 wheel under sys_platform == 'win32', a pruning the engine does not port yet
+        routeLocalIndex("off39-platform-scoped-wheels");
+        assertFailsLoud("off39-platform-scoped-wheels", "winonly");
+    }
+
+    @Test
     void markeredConstraintFailsLoud() {
         routeLocalIndex("off29-transitive-constraint");
         String pyproject = resource("off29-transitive-constraint/pyproject.toml")
