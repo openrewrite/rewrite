@@ -285,6 +285,27 @@ class UvLockEngineTest {
         assertThat(result.getLockFileContent()).isEqualTo(resource("o-old-uv/proj-0.5.0/uv.lock.engine-edited"));
     }
 
+    @Test
+    void configuredUvReleaseRefusesChangingPreRevision3Locks() {
+        // uv 0.13.4 would rewrite the whole 0.5.0-format file in its own shape, and leaves it alone unchanged
+        stubPypiSix();
+        PythonExecutionContextView.view(ctx).setUvVersion("0.13.4");
+        Result result = UvLockEngine.regenerate(
+          resource("o-old-uv/proj-0.5.0/pyproject.toml"),
+          resource("o-old-uv/proj-0.5.0/uv.lock.as-0.5.0"),
+          ctx);
+        assertThat(result.isSuccess()).isFalse();
+        assertThat(result.getFailure().getReason()).isEqualTo(Reason.RESOLUTION_REQUIRED);
+        assertThat(result.getFailure().getDetail()).contains("below revision 3");
+
+        Result unchanged = UvLockEngine.regenerate(
+          resource("o-old-uv/proj-0.5.0/pyproject.toml").replace("six==1.16.0", "six>=1.16"),
+          resource("o-old-uv/proj-0.5.0/uv.lock.as-0.5.0"),
+          ctx);
+        assertThat(unchanged.getErrorMessage()).isNull();
+        assertThat(unchanged.getLockFileContent()).isEqualTo(resource("o-old-uv/proj-0.5.0/uv.lock.as-0.5.0"));
+    }
+
     // ---- structured failures ----
 
     @Test

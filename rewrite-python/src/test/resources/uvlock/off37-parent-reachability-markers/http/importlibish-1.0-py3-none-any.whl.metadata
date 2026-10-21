@@ -1,0 +1,5 @@
+Metadata-Version: 2.1
+Name: importlibish
+Version: 1.0
+Summary: synthetic importlibish
+Requires-Dist: zippish; python_version < "3.12"

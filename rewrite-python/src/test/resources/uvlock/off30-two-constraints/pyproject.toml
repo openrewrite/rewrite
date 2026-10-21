@@ -1,0 +1,13 @@
+[project]
+name = "s36-two-constraints"
+version = "0.1.0"
+requires-python = ">=3.10"
+dependencies = ["reqlike>=1.0"]
+
+[tool.uv]
+constraint-dependencies = ["urlish>=2", "reqlike<1.5"]
+
+[[tool.uv.index]]
+name = "local"
+url = "https://index.example/simple/"
+default = true

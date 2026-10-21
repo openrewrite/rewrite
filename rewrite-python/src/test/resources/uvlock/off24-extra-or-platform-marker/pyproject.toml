@@ -1,0 +1,10 @@
+[project]
+name = "s30-extra-or-platform-marker"
+version = "0.1.0"
+requires-python = ">=3.10"
+dependencies = ["beta==1.0", "keeper==1.0"]
+
+[[tool.uv.index]]
+name = "local"
+url = "https://index.example/simple/"
+default = true

@@ -1,0 +1,17 @@
+[project]
+name = "s34-add-pinned-index"
+version = "0.1.0"
+requires-python = ">=3.10"
+dependencies = ["iniconfig>=0.9", "keeper==1.0"]
+
+[tool.uv.sources]
+iniconfig = { index = "alt" }
+
+[[tool.uv.index]]
+name = "local"
+url = "https://index.example/simple/"
+default = true
+
+[[tool.uv.index]]
+name = "alt"
+url = "https://index.example/alt/simple/"

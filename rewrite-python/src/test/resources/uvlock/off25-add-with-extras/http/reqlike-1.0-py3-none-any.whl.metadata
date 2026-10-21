@@ -1,0 +1,6 @@
+Metadata-Version: 2.1
+Name: reqlike
+Version: 1.0
+Summary: synthetic reqlike
+Provides-Extra: socks
+Requires-Dist: socklike>=1; extra == "socks"

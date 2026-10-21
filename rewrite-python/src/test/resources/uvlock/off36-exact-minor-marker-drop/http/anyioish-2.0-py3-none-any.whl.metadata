@@ -1,0 +1,6 @@
+Metadata-Version: 2.1
+Name: anyioish
+Version: 2.0
+Summary: synthetic anyioish
+Requires-Dist: typingish; python_version < "3.14"
+Requires-Dist: oldish; python_version < "3.12"

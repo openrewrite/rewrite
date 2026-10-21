@@ -56,9 +56,26 @@ bounds Python from above and does not fork. `off14-upgrade-drops-extra` and
 `[package.optional-dependencies]` groups follow activated extras (BEHAVIOR.md §8):
 `off19-extra-group-lockstep-upgrade` an upgrade through an activated extra whose group depends back on
 the package, `off20-transitive-add-with-extras` a transitive requirement with extras,
-`off21-upgrade-activates-extra` an upgrade that activates an extra on an already-locked package, and
-`off22-or-extras-marker` an extra disjunction the engine refuses (its `uv.lock.after` is real uv's
-output, kept for the record).
+`off21-upgrade-activates-extra` an upgrade that activates an extra on an already-locked package,
+`off22-or-extras-marker` a requirement gated on a disjunction of extras, `off23-extra-dnf-markers`
+parenthesized extra clauses next to a disjunction no edge activates, and `off24-extra-or-platform-marker`
+a marker mixing an extra with a platform clause, which the engine refuses (its `uv.lock.after` is real
+uv's output, kept for the record), `off25-add-with-extras` a direct add with extras,
+`off26-declared-extras-added` and `off27-declared-extras-removed` a declaration gaining and losing its
+extras, and `off28-add-pinned-index` an add pinned to a second index (served under `http-alt/`).
+`off29-transitive-constraint` and `off30-two-constraints` add `[tool.uv] constraint-dependencies`
+(the UpgradeTransitiveDependencyVersion edit); their `uv.lock.before` was locked against an index
+without the newer `urlish 2.5`, which was then published to the recorded index before the edit, so the
+constraint is what moves the pin (BEHAVIOR.md §9a). `off34-exclude-newer-package-and-build-constraints`
+(pypi.org, uv 0.13.4, 2026-10-21) carries `[options.exclude-newer-package]` and `[manifest] build-constraints`
+through a removal that touches neither; both are read and written verbatim. `off35-exact-minor-wheel-filter`
+and `off36-exact-minor-marker-drop` (local index, uv 0.13.4) lock under `requires-python = "==3.12.*"`; the
+former's index serves one synthetic wheel per tag listed in its `index.json`. `off37-parent-reachability-markers`
+is the one scenario whose `uv.lock.before` was written by uv 0.10.11 on purpose, since its edge markers are the
+unsimplified ones 0.13.4 rewrites (BEHAVIOR.md §4).
+A `uv.lock.after.uv-<release>` file is the same edit relocked by that release from the same `uv.lock.before`
+(2026-10-21): 0.13.4 restamps the revision-3 `off18` lock at revision 5 and 0.12.21 restamps the
+revision-5 `off21` lock at revision 3, each otherwise byte-identical to `uv.lock.after`.
 
 `off16-tool-uv-dev-dependencies` (pypi.org) declares its dev group through the legacy `[tool.uv]
 dev-dependencies` list; uv's lock is byte-identical to the same list under `[dependency-groups]`.

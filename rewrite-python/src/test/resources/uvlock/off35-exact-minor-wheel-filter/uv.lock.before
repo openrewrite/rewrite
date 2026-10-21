@@ -1,0 +1,25 @@
+version = 1
+revision = 5
+requires-python = "==3.12.*"
+
+[[package]]
+name = "s45-exact-minor-wheel-filter"
+version = "0.1.0"
+source = { virtual = "." }
+dependencies = [
+    { name = "tagged" },
+]
+
+[package.metadata]
+requires-dist = [{ name = "tagged", specifier = "==1.0" }]
+
+[[package]]
+name = "tagged"
+version = "1.0"
+source = { registry = "https://index.example/simple/" }
+wheels = [
+    { url = "https://index.example/simple/tagged/tagged-1.0-cp312-cp312-manylinux_2_17_x86_64.whl", hash = "sha256:80d442479a6904d9d2988b85a59fc09c1814bc70a764b09b566a164df23d2230" },
+    { url = "https://index.example/simple/tagged/tagged-1.0-cp313-abi3-manylinux_2_17_x86_64.whl", hash = "sha256:0d50ba268a0133d9651d8a993a3cff5d67afc8525f1cbd7c322cdbec01aaa79a" },
+    { url = "https://index.example/simple/tagged/tagged-1.0-cp39-abi3-manylinux_2_17_x86_64.whl", hash = "sha256:87bcec1e6120d4b4047ead741c553d0c7dd31b9442dee194151457e579187b5c" },
+    { url = "https://index.example/simple/tagged/tagged-1.0-py3-none-any.whl", hash = "sha256:877aee2fdbd207e4cfda93d29df4e6897ec34070a8ab69fdfc850031d11d2552" },
+]

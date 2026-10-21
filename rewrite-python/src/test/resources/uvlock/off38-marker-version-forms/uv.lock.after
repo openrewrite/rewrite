@@ -1,0 +1,60 @@
+version = 1
+revision = 5
+requires-python = ">=3.10"
+
+[[package]]
+name = "formsy"
+version = "2.0"
+source = { registry = "https://index.example/simple/" }
+dependencies = [
+    { name = "p1", marker = "python_full_version < '3.11'" },
+    { name = "p4", marker = "python_full_version < '3.11'" },
+    { name = "p5", marker = "python_full_version < '3.12'" },
+    { name = "p9", marker = "python_full_version <= '3.12.1'" },
+]
+wheels = [
+    { url = "https://index.example/simple/formsy/formsy-2.0-py3-none-any.whl", hash = "sha256:a8627b2771bff9af39419c876795a6321f987321a4010e1e324227091166f3c2" },
+]
+
+[[package]]
+name = "p1"
+version = "1.0"
+source = { registry = "https://index.example/simple/" }
+wheels = [
+    { url = "https://index.example/simple/p1/p1-1.0-py3-none-any.whl", hash = "sha256:36c1249d410cd038a3b9d755072836a11a8a5b09c6d9f8670527ea6a660d9d23" },
+]
+
+[[package]]
+name = "p4"
+version = "1.0"
+source = { registry = "https://index.example/simple/" }
+wheels = [
+    { url = "https://index.example/simple/p4/p4-1.0-py3-none-any.whl", hash = "sha256:ee8c074154673c104a5091cb1c9c51db3d8e33a5b3c4018340bbf2f60807312d" },
+]
+
+[[package]]
+name = "p5"
+version = "1.0"
+source = { registry = "https://index.example/simple/" }
+wheels = [
+    { url = "https://index.example/simple/p5/p5-1.0-py3-none-any.whl", hash = "sha256:cc40ddc4d4eb6a989bf9f673f5481f9d4266625b8bc2d7237930770c8ab9f897" },
+]
+
+[[package]]
+name = "p9"
+version = "1.0"
+source = { registry = "https://index.example/simple/" }
+wheels = [
+    { url = "https://index.example/simple/p9/p9-1.0-py3-none-any.whl", hash = "sha256:a860551a08f89c43f27945cc0ee5ef60736724c684888507555b3441932a9e30" },
+]
+
+[[package]]
+name = "s50-marker-version-forms-unforked"
+version = "0.1.0"
+source = { virtual = "." }
+dependencies = [
+    { name = "formsy" },
+]
+
+[package.metadata]
+requires-dist = [{ name = "formsy", specifier = "==2.0" }]

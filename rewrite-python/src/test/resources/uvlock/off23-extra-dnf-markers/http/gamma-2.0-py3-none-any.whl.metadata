@@ -1,0 +1,8 @@
+Metadata-Version: 2.1
+Name: gamma
+Version: 2.0
+Summary: synthetic gamma
+Provides-Extra: fast
+Provides-Extra: all
+Requires-Dist: delta>=1; (sys_platform == "win32") and extra == "fast"
+Requires-Dist: epsilon>=1; (sys_platform == "emscripten" and extra == "all") or (sys_platform == "win32" and extra == "all")

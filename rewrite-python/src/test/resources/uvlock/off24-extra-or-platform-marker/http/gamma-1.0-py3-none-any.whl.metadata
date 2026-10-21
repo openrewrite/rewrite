@@ -1,0 +1,6 @@
+Metadata-Version: 2.1
+Name: gamma
+Version: 1.0
+Summary: synthetic gamma
+Provides-Extra: fast
+Requires-Dist: delta>=1; extra == "fast" or sys_platform == "win32"

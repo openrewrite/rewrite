@@ -244,9 +244,212 @@ class UvLockDeltaOfflineTest {
     }
 
     @Test
-    void extraGatedRequirementOutsideAndChainFailsLoud() {
+    void extraDisjunctionLandsInEachActivatedGroup() {
+        // zeta; extra == 'fast' or extra == 'slow' joins group fast next to the plain extra == 'fast' entry
         routeLocalIndex("off22-or-extras-marker");
-        assertFailsLoud("off22-or-extras-marker", "gamma");
+        assertScenario("off22-or-extras-marker");
+    }
+
+    @Test
+    void parenthesizedExtraClausesAndUnactivatedDisjunctsRegenerate() {
+        // (sys_platform == 'win32') and extra == 'fast' keeps its platform clause; the all-gated DNF drops
+        routeLocalIndex("off23-extra-dnf-markers");
+        assertScenario("off23-extra-dnf-markers");
+        assertThat(http.requests).noneMatch(url -> url.contains("epsilon"));
+    }
+
+    @Test
+    void extraOrEnvironmentMarkerFailsLoud() {
+        // uv splits this marker into a base edge and a group entry with complementary platform markers
+        routeLocalIndex("off24-extra-or-platform-marker");
+        assertFailsLoud("off24-extra-or-platform-marker", "gamma");
+    }
+
+    @Test
+    void directAddWithExtrasBuildsTheActivatedGroup() {
+        routeLocalIndex("off25-add-with-extras");
+        assertScenario("off25-add-with-extras");
+    }
+
+    @Test
+    void addingExtrasToDeclarationAddsGroupAndRootEdgeExtra() {
+        routeLocalIndex("off26-declared-extras-added");
+        assertScenario("off26-declared-extras-added");
+    }
+
+    @Test
+    void removingExtrasFromDeclarationDropsGroupAndClosureWithoutNetwork() {
+        routeLocalIndex("off27-declared-extras-removed");
+        Result result = UvLockEngine.regenerate(
+          resource("off27-declared-extras-removed/pyproject.toml"),
+          resource("off27-declared-extras-removed/uv.lock.before"),
+          ctx);
+        assertThat(result.getErrorMessage()).isNull();
+        assertThat(result.getLockFileContent()).isEqualTo(resource("off27-declared-extras-removed/uv.lock.after"));
+        assertThat(http.requests).isEmpty();
+    }
+
+    @Test
+    void addWithPinnedIndexResolvesFromThatIndexOnly() {
+        // iniconfig 0.9 sits on the default index and 1.0 on alt; the [tool.uv.sources] pin selects alt
+        routeLocalIndex("off28-add-pinned-index");
+        PythonExecutionContextView.view(ctx).setPackageIndexes(List.of(
+          new PythonPackageIndex("local", "https://index.example/simple/", true, null, null, false),
+          new PythonPackageIndex("alt", "https://index.example/alt/simple/", true, null, null, false)));
+        http.routeDirectory("https://index.example/alt/simple/", "off28-add-pinned-index/http-alt/");
+        assertScenario("off28-add-pinned-index");
+        assertThat(http.requests).noneMatch(url -> url.equals("https://index.example/simple/iniconfig/"));
+    }
+
+    @Test
+    void constraintDependencyMovesTransitiveAndRecordsManifest() {
+        // the UpgradeTransitiveDependencyVersion edit: [tool.uv] constraint-dependencies = ["urlish==2.5"]
+        routeLocalIndex("off29-transitive-constraint");
+        assertScenario("off29-transitive-constraint");
+    }
+
+    @Test
+    void constraintsAreRecordedSortedAndBoundKeptPins() {
+        // reqlike<1.5 keeps reqlike at its pin although 1.5 is listed; urlish>=2 moves urlish
+        routeLocalIndex("off30-two-constraints");
+        assertScenario("off30-two-constraints");
+    }
+
+    @Test
+    void constraintOnPackageAbsentFromLockLeavesItUntouched() {
+        routeLocalIndex("off29-transitive-constraint");
+        String pyproject = resource("off29-transitive-constraint/pyproject.toml")
+          .replace("constraint-dependencies = [\"urlish==2.5\"]", "constraint-dependencies = [\"nothere>=3\"]");
+        Result result = UvLockEngine.regenerate(pyproject, resource("off29-transitive-constraint/uv.lock.before"), ctx);
+        assertThat(result.getErrorMessage()).isNull();
+        assertThat(result.getLockFileContent()).isEqualTo(resource("off29-transitive-constraint/uv.lock.before"));
+        assertThat(http.requests).isEmpty();
+    }
+
+    @Test
+    void declarationConflictingWithRecordedConstraintFailsAsConflict() {
+        // uv refuses reqlike>=1.5 against the recorded reqlike<1.5, so the listed 1.5 must not be picked
+        routeLocalIndex("off31-declaration-vs-constraint-conflict");
+        Result result = UvLockEngine.regenerate(
+          resource("off31-declaration-vs-constraint-conflict/pyproject.toml"),
+          resource("off31-declaration-vs-constraint-conflict/uv.lock.before"),
+          ctx);
+        assertThat(result.isSuccess()).isFalse();
+        assertThat(result.getFailure().getReason()).isEqualTo(Reason.RESOLUTION_CONFLICT);
+        assertThat(result.getFailure().getPackageName()).isEqualTo("reqlike");
+    }
+
+    @Test
+    void upgradePastADependentsBoundFailsAsConflict() {
+        // other==1.0 requires reqlike<1.5, so uv calls reqlike==1.5 unsatisfiable rather than moving it
+        routeLocalIndex("off32-upgrade-past-dependent-bound");
+        Result result = UvLockEngine.regenerate(
+          resource("off32-upgrade-past-dependent-bound/pyproject.toml"),
+          resource("off32-upgrade-past-dependent-bound/uv.lock.before"),
+          ctx);
+        assertThat(result.isSuccess()).isFalse();
+        assertThat(result.getFailure().getReason()).isEqualTo(Reason.RESOLUTION_REQUIRED);
+        assertThat(result.getFailure().getDetail()).contains("other 1.0 requires reqlike<1.5");
+    }
+
+    @Test
+    void rangeUpgradeLandsUnderTheDependentsBound() {
+        // other==1.0 requires reqlike<1.5, so reqlike>=1.2 resolves to 1.4 although 2.0 is listed
+        routeLocalIndex("off33-dependent-bound-shapes-selection");
+        assertScenario("off33-dependent-bound-shapes-selection");
+    }
+
+    @Test
+    void excludeNewerPackageAndBuildConstraintsPassThroughAnUnrelatedRemoval() {
+        Result result = UvLockEngine.regenerate(
+          resource("off34-exclude-newer-package-and-build-constraints/pyproject.toml"),
+          resource("off34-exclude-newer-package-and-build-constraints/uv.lock.before"),
+          ctx);
+        assertThat(result.getErrorMessage()).isNull();
+        assertThat(result.getLockFileContent()).isEqualTo(resource("off34-exclude-newer-package-and-build-constraints/uv.lock.after"));
+        assertThat(http.requests).isEmpty();
+    }
+
+    @Test
+    void selectingAVersionOfAnExcludeNewerPackageFailsLoud() {
+        String pyproject = resource("off34-exclude-newer-package-and-build-constraints/pyproject.toml")
+          .replace("six==1.17.0", "six==1.16.0");
+        Result result = UvLockEngine.regenerate(pyproject,
+          resource("off34-exclude-newer-package-and-build-constraints/uv.lock.before"), ctx);
+        assertThat(result.isSuccess()).isFalse();
+        assertThat(result.getFailure().getReason()).isEqualTo(Reason.RESOLUTION_REQUIRED);
+        assertThat(result.getFailure().getDetail()).contains("exclude-newer-package");
+        assertThat(http.requests).isEmpty();
+    }
+
+    @Test
+    void exactMinorRequiresPythonDropsWheelsTaggedOutsideIt() {
+        // ==3.12.* keeps cp312, the abi3 and py3 wheels, and drops cp311 and cp313
+        routeLocalIndex("off35-exact-minor-wheel-filter");
+        assertScenario("off35-exact-minor-wheel-filter");
+    }
+
+    @Test
+    void exactMinorRequiresPythonDropsMarkersItDecides() {
+        // under ==3.12.*, python_version < '3.14' is always true and python_version < '3.12' never fires
+        routeLocalIndex("off36-exact-minor-marker-drop");
+        assertScenario("off36-exact-minor-marker-drop");
+    }
+
+    @Test
+    void anyChangeDropsEdgeMarkersTheParentsReachabilityImplies() {
+        // a uv 0.10.11 lock: 0.13.4 drops caioish's fork markers and zippish's inherited python bound on any relock
+        PythonExecutionContextView.view(ctx).setUvVersion("0.13.4");
+        routeLocalIndex("off37-parent-reachability-markers");
+        assertScenario("off37-parent-reachability-markers");
+    }
+
+    @Test
+    void markerVersionsRecordAsUvRendersThem() {
+        // prerelease and trailing-zero segments go, python_version <= '3.11' becomes python_full_version < '3.12'
+        routeLocalIndex("off38-marker-version-forms");
+        assertScenario("off38-marker-version-forms");
+    }
+
+    @Test
+    void markeredConstraintFailsLoud() {
+        routeLocalIndex("off29-transitive-constraint");
+        String pyproject = resource("off29-transitive-constraint/pyproject.toml")
+          .replace("constraint-dependencies = [\"urlish==2.5\"]", "constraint-dependencies = [\"urlish==2.5; sys_platform == 'win32'\"]");
+        Result result = UvLockEngine.regenerate(pyproject, resource("off29-transitive-constraint/uv.lock.before"), ctx);
+        assertThat(result.isSuccess()).isFalse();
+        assertThat(result.getFailure().getReason()).isEqualTo(Reason.RESOLUTION_REQUIRED);
+        assertThat(result.getFailure().getPackageName()).isEqualTo("urlish");
+    }
+
+    @Test
+    void configuredUvReleaseStampsChangedLocksWithItsRevision() {
+        PythonExecutionContextView.view(ctx).setUvVersion("0.13.4");
+        routeLocalIndex("off18-removed-extra-unbinds-cascade");
+        Result result = UvLockEngine.regenerate(
+          resource("off18-removed-extra-unbinds-cascade/pyproject.toml"),
+          resource("off18-removed-extra-unbinds-cascade/uv.lock.before"),
+          ctx);
+        assertThat(result.getErrorMessage()).isNull();
+        assertThat(result.getLockFileContent()).isEqualTo(resource("off18-removed-extra-unbinds-cascade/uv.lock.after.uv-0.13.4"));
+    }
+
+    @Test
+    void configuredUvReleaseBelow0_12_22RestampsAtRevision3() {
+        PythonExecutionContextView.view(ctx).setUvVersion("0.12.21");
+        routeLocalIndex("off21-upgrade-activates-extra");
+        Result result = UvLockEngine.regenerate(
+          resource("off21-upgrade-activates-extra/pyproject.toml"),
+          resource("off21-upgrade-activates-extra/uv.lock.before"),
+          ctx);
+        assertThat(result.getErrorMessage()).isNull();
+        assertThat(result.getLockFileContent()).isEqualTo(resource("off21-upgrade-activates-extra/uv.lock.after.uv-0.12.21"));
+    }
+
+    @Test
+    void configuredUvReleaseLeavesUnchangedLockAlone() {
+        PythonExecutionContextView.view(ctx).setUvVersion("0.13.4");
+        assertUnchangedWithoutNetwork("off16-tool-uv-dev-dependencies");
     }
 
     @Test

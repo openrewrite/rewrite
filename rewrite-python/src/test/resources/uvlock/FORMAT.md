@@ -46,7 +46,13 @@ then, separated by blank lines, optional top-level tables in this order:
 
 - `[options]` — emitted only for non-default options; observed `exclude-newer = "2024-01-01T00:00:00Z"`
   (string, verbatim as passed) — `m2-options/uv.lock`.
-- `[manifest]` — only for workspaces; `members` is a **multiline sorted array** of member package
+- `[options.exclude-newer-package]` — a sub-table after `[options]` (which may then be an empty header), one
+  `name = "<timestamp>"` or `name = false` line per package, sorted by name
+  (`off34-exclude-newer-package-and-build-constraints/uv.lock.before`).
+- `[manifest]` — for workspaces, `[tool.uv] constraint-dependencies` and `build-constraint-dependencies`
+  (`build-constraints`, same entry shape, optionally with a `hashes` array last); `constraints` renders like
+  `requires-dist` (one entry inline, several multiline, sorted by name; `off30-two-constraints/uv.lock.after`)
+  and follows `members`, which is a **multiline sorted array** of member package
   names — `q-workspace/uv.lock`.
 
 Rules:
