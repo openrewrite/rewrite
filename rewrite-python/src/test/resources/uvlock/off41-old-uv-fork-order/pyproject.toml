@@ -1,0 +1,15 @@
+[project]
+name = "s53-old-uv-fork-order"
+version = "0.1.0"
+requires-python = ">=3.10"
+dependencies = [
+    "forky<2; python_version < '3.12'",
+    "forky>=2; python_version >= '3.12'",
+    "iniconfig==1.0",
+    "keeper==1.0",
+]
+
+[[tool.uv.index]]
+name = "local"
+url = "https://index.example/simple/"
+default = true

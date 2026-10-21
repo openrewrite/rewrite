@@ -1,0 +1,55 @@
+version = 1
+revision = 5
+requires-python = ">=3.10"
+
+[[package]]
+name = "colorish"
+version = "1.0"
+source = { registry = "https://index.example/simple/" }
+wheels = [
+    { url = "https://index.example/simple/colorish/colorish-1.0-py3-none-any.whl", hash = "sha256:231d137b01ecdeecbca3a2e7cf97c4f224ebb581b531ce364b261b609559aec6" },
+]
+
+[[package]]
+name = "forky"
+version = "1.0"
+source = { registry = "https://index.example/simple/" }
+dependencies = [
+    { name = "colorish", marker = "sys_platform == 'win32'" },
+]
+wheels = [
+    { url = "https://index.example/simple/forky/forky-1.0-py3-none-any.whl", hash = "sha256:9345f78f6426e6588651be202ab4b816f0e67ab2181e764897e5ebd20eb2bafb" },
+]
+
+[[package]]
+name = "iniconfig"
+version = "1.0"
+source = { registry = "https://index.example/simple/" }
+wheels = [
+    { url = "https://index.example/simple/iniconfig/iniconfig-1.0-py3-none-any.whl", hash = "sha256:1c665412a41536721424fed2c05ed12fc8f17f4bf3cf11b92e778786bac557cc" },
+]
+
+[[package]]
+name = "keeper"
+version = "1.0"
+source = { registry = "https://index.example/simple/" }
+wheels = [
+    { url = "https://index.example/simple/keeper/keeper-1.0-py3-none-any.whl", hash = "sha256:69b5705b9b71e898cd067240f4801725481689cec4f78cd9f2655947fac7ecc3" },
+]
+
+[[package]]
+name = "s52-old-uv-forked-rewrite"
+version = "0.1.0"
+source = { virtual = "." }
+dependencies = [
+    { name = "forky" },
+    { name = "iniconfig" },
+    { name = "keeper" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "forky" },
+    { name = "iniconfig", specifier = "==1.0" },
+    { name = "keeper", specifier = "==1.0" },
+]

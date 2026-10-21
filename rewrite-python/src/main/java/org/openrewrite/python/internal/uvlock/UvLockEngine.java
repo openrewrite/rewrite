@@ -421,8 +421,8 @@ public final class UvLockEngine {
                 updated = updated.withPackages(packages);
             }
             if (migrating) {
-                packages = withUploadTimes(packages);
-                updated = updated.withPackages(packages);
+                packages = rewrittenWhole(packages);
+                updated = updated.withPackages(packages).withResolutionMarkers(inSolveOrder(updated.getResolutionMarkers()));
             }
             if (writesReachabilityMarkers()) {
                 if (lock.getSupportedMarkers() != null || lock.getRequiredMarkers() != null) {
@@ -431,13 +431,12 @@ public final class UvLockEngine {
                                     "required-environments) is not supported by the native engine");
                 }
                 updated = updated.withPackages(UvLockReachability.simplify(packages, rootIndex, range));
-                written = UvLockWriter.write(updated);
             }
             // uv restamps a lock it changed with its own revision
             if (writeRevision != null && !writeRevision.equals(lock.getRevision())) {
-                written = UvLockWriter.write(updated.withRevision(writeRevision));
+                updated = updated.withRevision(writeRevision);
             }
-            return Result.success(written);
+            return Result.success(UvLockWriter.write(updated));
         }
 
         // uv simplifies edge markers under parent reachability from 0.11.25. Without a configured release,
@@ -450,7 +449,98 @@ public final class UvLockEngine {
             return lock.getRevision() != null && lock.getRevision() >= 3;
         }
 
-        /** Every registry artifact without an upload time gets the one its index lists. */
+        /**
+         * What a release writing the lock whole changes in entries the edit left alone: edge markers in
+         * its recorded form, wheels the Python range rules out dropped, and the upload times the index lists.
+         */
+        private List<UvLockPackage> rewrittenWhole(List<UvLockPackage> pkgs) {
+            List<UvLockPackage> out = new ArrayList<>(pkgs.size());
+            for (UvLockPackage pkg : pkgs) {
+                UvLockPackage.UvLockPackageBuilder b = pkg.toBuilder()
+                        .resolutionMarkers(inSolveOrder(pkg.getResolutionMarkers()))
+                        .dependencies(recorded(pkg.getName(), pkg.getDependencies()));
+                if (pkg.getOptionalDependencies() != null) {
+                    Map<String, List<UvLockDependency>> groups = new LinkedHashMap<>();
+                    pkg.getOptionalDependencies().forEach((k, v) -> groups.put(k, recorded(pkg.getName(), v)));
+                    b.optionalDependencies(groups);
+                }
+                if (pkg.getDevDependencies() != null) {
+                    Map<String, List<UvLockDependency>> groups = new LinkedHashMap<>();
+                    pkg.getDevDependencies().forEach((k, v) -> groups.put(k, recorded(pkg.getName(), v)));
+                    b.devDependencies(groups);
+                }
+                if (pkg.getSource().getType() == UvLockSource.Type.REGISTRY && pkg.getWheels() != null) {
+                    List<UvLockArtifact> wheels = new ArrayList<>();
+                    for (UvLockArtifact wheel : pkg.getWheels()) {
+                        String filename = wheelFilename(wheel);
+                        if (filename == null || wheelAdmittedByRange(filename)) {
+                            wheels.add(wheel);
+                        }
+                    }
+                    b.wheels(wheels.isEmpty() ? null : wheels);
+                }
+                out.add(b.build());
+            }
+            return withUploadTimes(out);
+        }
+
+        private @Nullable List<UvLockDependency> recorded(String pkg, @Nullable List<UvLockDependency> edges) {
+            if (edges == null) {
+                return null;
+            }
+            List<UvLockDependency> out = new ArrayList<>(edges.size());
+            for (UvLockDependency edge : edges) {
+                if (edge.getMarker() == null) {
+                    out.add(edge);
+                    continue;
+                }
+                String marker = UvLockMarkers.recordMarker(edge.getMarker(), null);
+                if (marker == null) {
+                    throw new EngineFailure(Reason.RESOLUTION_REQUIRED, pkg,
+                            "Rewriting the lock whole needs uv's current form of the marker \"" + edge.getMarker() + "\"");
+                }
+                out.add(edge.withMarker(marker));
+            }
+            return out;
+        }
+
+        // uv solves forks with higher Python lower bounds first and records them in solve order
+        private @Nullable List<String> inSolveOrder(@Nullable List<String> markers) {
+            if (markers == null || markers.size() < 2) {
+                return markers;
+            }
+            Map<String, PythonVersion> lower = new HashMap<>();
+            for (String marker : markers) {
+                List<String[]> clauses = UvLockMarkers.parseSimpleAndChain(marker);
+                if (clauses == null) {
+                    throw new EngineFailure(Reason.RESOLUTION_REQUIRED, null,
+                            "Ordering the fork marker \"" + marker + "\" is not supported by the native engine");
+                }
+                PyRange r = new PyRange();
+                for (String[] c : clauses) {
+                    String[] lowered = UvLockMarkers.lowerVersionClause(c[0], c[1], c[2]);
+                    if (lowered == null) {
+                        throw new EngineFailure(Reason.RESOLUTION_REQUIRED, null,
+                                "Ordering the fork marker \"" + marker + "\" is not supported by the native engine");
+                    }
+                    if (!"!=".equals(lowered[1])) {
+                        PyRange clause = PyRange.parse(lowered[1] + lowered[2]);
+                        PyRange both = r.intersect(clause);
+                        r = both != null ? both : r;
+                    }
+                }
+                lower.put(marker, r.lower);
+            }
+            List<String> sorted = new ArrayList<>(markers);
+            sorted.sort((a, b) -> {
+                PythonVersion la = lower.get(a);
+                PythonVersion lb = lower.get(b);
+                return la == null ? (lb == null ? 0 : 1) : lb == null ? -1 : lb.compareTo(la);
+            });
+            return sorted;
+        }
+
+        /** Every registry artifact without an upload time gets the one its index lists, where it lists one. */
         private List<UvLockPackage> withUploadTimes(List<UvLockPackage> pkgs) {
             List<UvLockPackage> out = new ArrayList<>(pkgs.size());
             for (UvLockPackage pkg : pkgs) {
@@ -495,13 +585,13 @@ public final class UvLockEngine {
                 return artifact;
             }
             PackageFile file = byFilename.get(artifact.getUrl().substring(artifact.getUrl().lastIndexOf('/') + 1));
-            String uploadTime = file != null ? formatUploadTime(file.getUploadTime()) : null;
-            if (uploadTime == null) {
+            if (file == null) {
                 throw new EngineFailure(Reason.RESOLUTION_REQUIRED, pkg.getName(),
-                        "uv " + uvVersion + " records an upload time for " + artifact.getUrl() +
-                                ", which the index does not list");
+                        "Rewriting the lock whole needs " + artifact.getUrl() + ", which the index no longer lists");
             }
-            return artifact.withUploadTime(uploadTime);
+            // uv records an upload time only where the index gives one
+            String uploadTime = formatUploadTime(file.getUploadTime());
+            return uploadTime == null ? artifact : artifact.withUploadTime(uploadTime);
         }
 
         /** The revision the configured uv release writes, 5 from 0.12.22 on and 3 before, or null without a release. */

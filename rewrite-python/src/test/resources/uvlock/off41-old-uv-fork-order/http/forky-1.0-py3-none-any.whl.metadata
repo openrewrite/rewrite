@@ -1,0 +1,6 @@
+Metadata-Version: 2.1
+Name: forky
+Version: 1.0
+Summary: synthetic forky
+Requires-Python: >=3.9
+Requires-Dist: colorish; platform_system == "Windows"

@@ -96,7 +96,11 @@ that keeps `[package.metadata]` in sync with pyproject.toml passes `--check` and
 
 With a configured uv release (`PythonExecutionContextView.setUvVersion`) the engine does what that release does:
 a changed lock below revision 3 is written at the release's revision with every artifact's upload time from its
-index, byte for byte `uv.lock.after-change-current-uv` above. Without one it keeps the lock's own style:
+index where it lists one, byte for byte `uv.lock.after-change-current-uv` above. The whole-lock write also gives
+every edge marker its current form (`platform_system == 'Windows'` becomes `sys_platform == 'win32'`), drops wheels
+the Python range rules out, and records forks in the order uv solves them, higher Python lower bound first
+(`off40-old-uv-marker-rewrite/`, `off41-old-uv-fork-order/`, both locked by uv 0.4.30 and relocked by 0.13.4).
+Without a configured release the engine keeps the lock's own style:
 
 **Engine consequence**: a Java surgical editor must (a) detect the lock's revision (absent/2/3) and
 emit the matching style for edited entries — same-revision edits must NOT add upload-time to a

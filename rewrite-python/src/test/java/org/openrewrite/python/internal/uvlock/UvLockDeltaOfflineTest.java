@@ -419,6 +419,22 @@ class UvLockDeltaOfflineTest {
     }
 
     @Test
+    void oldUvLockIsRewrittenWithCurrentMarkerForms() {
+        // uv 0.4.30's platform_system == 'Windows' is written as sys_platform == 'win32', and an index without upload times gives none
+        PythonExecutionContextView.view(ctx).setUvVersion("0.13.4");
+        routeLocalIndex("off40-old-uv-marker-rewrite");
+        assertScenario("off40-old-uv-marker-rewrite");
+    }
+
+    @Test
+    void oldUvLockIsRewrittenWithForksInSolveOrder() {
+        // uv solves the fork with the higher Python lower bound first and records the forks in that order
+        PythonExecutionContextView.view(ctx).setUvVersion("0.13.4");
+        routeLocalIndex("off41-old-uv-fork-order");
+        assertScenario("off41-old-uv-fork-order");
+    }
+
+    @Test
     void markeredConstraintFailsLoud() {
         routeLocalIndex("off29-transitive-constraint");
         String pyproject = resource("off29-transitive-constraint/pyproject.toml")
