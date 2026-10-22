@@ -3319,6 +3319,21 @@ describe('JavaScript type mapping', () => {
             });
         });
 
+        test('a call on a `this` typed as a member keyed by a lone surrogate is named by its escape', async () => {
+            const spec = new RecipeSpec();
+            await spec.rewriteRun({
+                //language=typescript
+                ...typescript(`const p = {'\\uDC00'() {}};\nconst g: (this: typeof p['\\uDC00']) => void = function () { this(); };`),
+                afterRecipe: (cu: JS.CompilationUnit) => {
+                    expect(loneSurrogateStrings(cu)).toEqual([]);
+                    const g = (cu.statements[1].element as J.VariableDeclarations).variables[0].element;
+                    const f = (g.initializer!.element as JS.StatementExpression).statement as J.MethodDeclaration;
+                    const call = (f.body!.statements[0].element as JS.ExpressionStatement).expression as JS.FunctionCall;
+                    expect(call.methodType?.name).toBe('\\uDC00');
+                }
+            });
+        });
+
         test('a reference to a variable bound to an object literal keeps the object type and its owning variable', async () => {
             const references: J.Identifier[] = [];
             const spec = new RecipeSpec();

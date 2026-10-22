@@ -1269,7 +1269,7 @@ export class JavaScriptTypeMapping {
                     }
                 }
             } else {
-                methodName = symbol.getName();
+                methodName = escapeLoneSurrogates(symbol.getName());
                 declaringType = Type.unknownType as Type.FullyQualified;
             }
 
