@@ -24,6 +24,7 @@ import org.openrewrite.SourceFile;
 import org.openrewrite.java.JavaParser;
 import org.openrewrite.java.MethodMatcher;
 import org.openrewrite.java.internal.JavaTypeCache;
+import org.openrewrite.java.search.FindMissingTypes;
 import org.openrewrite.java.tree.Flag;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaType;
@@ -1503,6 +1504,72 @@ class ScalaTypeAttributionTest implements RewriteTest {
 
                 // then
                 assertThat(matcher.matches(toString)).isTrue();
+            })
+          )
+        );
+    }
+
+    @Test
+    void unionTypesAreMappedToTheirJoin() {
+        rewriteRun(
+          scala(
+            """
+            package p
+            object U {
+              val a = Array("1", true)
+              val m = Map("id" -> "x", "f" -> Map("a" -> 1))
+              val u: String | Int = 1
+              def r(xs: List[Any]) = xs.map { case s: String => s; case i: Int => i }
+              def n(xs: List[String]) = xs.foreach { case null => 1; case v => v }
+              def j(b: Boolean) = if (b) new java.util.ArrayList[String] else new java.util.LinkedList[String]
+            }
+            """,
+            spec -> spec.afterRecipe(cu -> {
+                List<J.VariableDeclarations.NamedVariable> variables = findAll(cu, J.VariableDeclarations.NamedVariable.class, v -> true);
+                List<J.MethodInvocation> invocations = findAll(cu, J.MethodInvocation.class, m -> true);
+                List<J.MethodDeclaration> declarations = findAll(cu, J.MethodDeclaration.class, m -> true);
+                JavaType.Array aType = TypeUtils.asArray(find(cu, J.VariableDeclarations.NamedVariable.class, v -> v.getSimpleName().equals("a")).getType());
+                JavaType.Parameterized mType = TypeUtils.asParameterized(find(cu, J.VariableDeclarations.NamedVariable.class, v -> v.getSimpleName().equals("m")).getType());
+                JavaType uType = find(cu, J.VariableDeclarations.NamedVariable.class, v -> v.getSimpleName().equals("u")).getType();
+                JavaType.Method jType = find(cu, J.MethodDeclaration.class, m -> m.getSimpleName().equals("j")).getMethodType();
+                assertThat(FindMissingTypes.findMissingTypes(cu, false)).extracting(FindMissingTypes.MissingTypeResult::getPrintedTree).isEmpty();
+                assertThat(variables).allSatisfy(v -> {
+                    assertThat(TypeUtils.isWellFormedType(v.getType())).as(v.getSimpleName()).isTrue();
+                    assertThat(TypeUtils.isWellFormedType(v.getName().getType())).as(v.getSimpleName()).isTrue();
+                });
+                assertThat(invocations).allSatisfy(m -> assertThat(TypeUtils.isWellFormedType(m.getMethodType())).as(m.getSimpleName()).isTrue());
+                assertThat(declarations).allSatisfy(m -> assertThat(TypeUtils.isWellFormedType(m.getMethodType())).as(m.getSimpleName()).isTrue());
+                assertThat(aType).isNotNull();
+                assertThat(TypeUtils.isOfClassType(aType.getElemType(), "java.lang.Object")).isTrue();
+                assertThat(mType).isNotNull();
+                assertThat(TypeUtils.isOfClassType(mType.getTypeParameters().get(1), "java.lang.Object")).isTrue();
+                assertThat(TypeUtils.isOfClassType(uType, "java.lang.Object")).isTrue();
+                assertThat(TypeUtils.isOfClassType(jType.getReturnType(), "java.util.AbstractList")).isTrue();
+            })
+          )
+        );
+    }
+
+    @Test
+    void bindingOfExceptionAlternativesIsMultiCatch() {
+        rewriteRun(
+          scala(
+            """
+            object U {
+              def c(): Int = try 1 catch { case e1 @ (_: IllegalArgumentException | _: IllegalStateException) => e1.getMessage().length }
+            }
+            """,
+            spec -> spec.afterRecipe(cu -> {
+                List<J.Identifier> e1 = findAll(cu, J.Identifier.class, i -> i.getSimpleName().equals("e1"));
+                JavaType.Variable fieldType = e1.getFirst().getFieldType();
+                assertThat(FindMissingTypes.findMissingTypes(cu, false)).extracting(FindMissingTypes.MissingTypeResult::getPrintedTree).isEmpty();
+                assertThat(e1).hasSize(2).allSatisfy(i -> assertThat(i.getType()).isInstanceOf(JavaType.MultiCatch.class));
+                assertThat(fieldType).isNotNull();
+                assertThat(((JavaType.MultiCatch) fieldType.getType()).getThrowableTypes())
+                  .extracting(t -> ((JavaType.FullyQualified) t).getFullyQualifiedName())
+                  .containsExactly("java.lang.IllegalArgumentException", "java.lang.IllegalStateException");
+                assertThat(method(cu, "getMessage").getMethodType().getDeclaringType().getFullyQualifiedName())
+                  .isEqualTo("java.lang.Throwable");
             })
           )
         );
