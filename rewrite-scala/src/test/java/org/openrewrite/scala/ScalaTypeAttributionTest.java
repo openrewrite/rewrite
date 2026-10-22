@@ -24,6 +24,7 @@ import org.openrewrite.SourceFile;
 import org.openrewrite.java.JavaParser;
 import org.openrewrite.java.MethodMatcher;
 import org.openrewrite.java.internal.JavaTypeCache;
+import org.openrewrite.java.search.FindAnnotations;
 import org.openrewrite.java.search.FindMissingTypes;
 import org.openrewrite.java.tree.Flag;
 import org.openrewrite.java.tree.J;
@@ -1647,6 +1648,60 @@ class ScalaTypeAttributionTest implements RewriteTest {
     }
 
     @Test
+    void annotationNamesAreTyped() {
+        rewriteRun(
+          scala(
+            """
+            package p
+            import scala.annotation.tailrec
+            class B {
+              @transient val x = 1
+              @volatile var y = 2
+              @tailrec final def loop(i: Int): Int = if (i <= 0) 0 else loop(i - 1)
+              @throws[Exception] def t(): Unit = ()
+              @throws(classOf[Exception]) def c(): Unit = ()
+              @deprecated("x", "1") def d(): Unit = ()
+              @`deprecated` def q(): Unit = ()
+              @scala.annotation.nowarn def n(): Unit = ()
+              @Deprecated def j(): Unit = ()
+              @SuppressWarnings(Array("unused")) def w(): Unit = ()
+              def u(o: Any): Int = (o: @unchecked) match { case i: Int => i }
+            }
+            @SerialVersionUID(1L) class C(@transient val z: Int)
+            @deprecated object O
+            class D[@specialized T]
+            """,
+            spec -> spec.afterRecipe(cu -> {
+                List<String> annotationTypes = findAll(cu, J.Annotation.class, a -> true).stream()
+                  .map(a -> TypeUtils.asFullyQualified(a.getType()))
+                  .map(t -> t == null ? null : t.getFullyQualifiedName())
+                  .toList();
+                assertThat(annotationTypes).containsExactly(
+                  "scala.transient",
+                  "scala.volatile",
+                  "scala.annotation.tailrec",
+                  "scala.throws",
+                  "scala.throws",
+                  "scala.deprecated",
+                  "scala.deprecated",
+                  "scala.annotation.nowarn",
+                  "java.lang.Deprecated",
+                  "java.lang.SuppressWarnings",
+                  "scala.unchecked",
+                  "scala.SerialVersionUID",
+                  "scala.transient",
+                  "scala.deprecated",
+                  "scala.specialized"
+                );
+                assertThat(FindMissingTypes.findMissingTypes(cu, false))
+                  .extracting(FindMissingTypes.MissingTypeResult::getPrintedTree)
+                  .isEmpty();
+            })
+          )
+        );
+    }
+
+    @Test
     void javaStaticMethodIsSharedWithJavaParserThroughTypeCache() {
         // given
         JavaTypeCache typeCache = new JavaTypeCache();
@@ -1793,6 +1848,34 @@ class ScalaTypeAttributionTest implements RewriteTest {
                 assertThat(unionMembers(firstReturnType)).containsExactly("Node", "null");
                 assertThat(nextReturnType).isSameAs(firstReturnType);
             })
+          )
+        );
+    }
+
+    @Test
+    void findAnnotationsMatchesScalaAnnotations() {
+        rewriteRun(
+          spec -> spec.recipes(
+            new FindAnnotations("@scala.transient", false),
+            new FindAnnotations("@scala.annotation.tailrec", false)
+          ),
+          scala(
+            """
+            import scala.annotation.tailrec
+            class B {
+              @transient val x = 1
+              @tailrec final def loop(i: Int): Int = if (i <= 0) 0 else loop(i - 1)
+              @volatile var y = 2
+            }
+            """,
+            """
+            import scala.annotation.tailrec
+            class B {
+              /*~~>*/@transient val x = 1
+              /*~~>*/@tailrec final def loop(i: Int): Int = if (i <= 0) 0 else loop(i - 1)
+              @volatile var y = 2
+            }
+            """
           )
         );
     }
