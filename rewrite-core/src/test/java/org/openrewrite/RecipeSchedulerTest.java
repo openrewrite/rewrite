@@ -485,7 +485,7 @@ class RecipeSchedulerTest implements RewriteTest {
         Recipe capturing = toRecipe(() -> new PlainTextVisitor<>() {
             @Override
             public PlainText visitText(PlainText text, ExecutionContext ctx) {
-                duringRun.set(ExecutionContext.current());
+                duringRun.set(RecipeScheduler.currentContext());
                 return text;
             }
         });
@@ -495,7 +495,7 @@ class RecipeSchedulerTest implements RewriteTest {
           new InMemoryExecutionContext(), 1, 1);
 
         assertThat(duringRun.get()).isNotNull();
-        assertThat(ExecutionContext.current()).isNull();
+        assertThat(RecipeScheduler.currentContext()).isNull();
     }
 
     @Test

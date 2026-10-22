@@ -34,7 +34,15 @@ import static org.openrewrite.Recipe.PANIC;
 import static org.openrewrite.scheduling.WorkingDirectoryExecutionContextView.WORKING_DIRECTORY_ROOT;
 
 public class RecipeScheduler {
-    static final ThreadLocal<@Nullable ExecutionContext> CURRENT_CONTEXT = new ThreadLocal<>();
+    private static final ThreadLocal<@Nullable ExecutionContext> CURRENT_CONTEXT = new ThreadLocal<>();
+
+    /**
+     * The context of the recipe run executing on this thread, or {@code null} outside a recipe run.
+     */
+    @Incubating(since = "8.94.0")
+    public static @Nullable ExecutionContext currentContext() {
+        return CURRENT_CONTEXT.get();
+    }
 
     @Nullable
     private Supplier<Cursor> rootCursorProvider;

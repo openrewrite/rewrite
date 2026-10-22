@@ -17,6 +17,7 @@ package org.openrewrite.marker;
 
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Recipe;
+import org.openrewrite.RecipeScheduler;
 import org.openrewrite.scheduling.RecipeRunCycle;
 
 final class MarkupAttribution {
@@ -28,7 +29,7 @@ final class MarkupAttribution {
             return markup;
         }
         // Not CURRENT_RECIPE: putting a message on the context counts as a change by the running recipe
-        ExecutionContext ctx = ExecutionContext.current();
+        ExecutionContext ctx = RecipeScheduler.currentContext();
         RecipeRunCycle<?> cycle = ctx == null ? null : ctx.getMessage(ExecutionContext.CURRENT_CYCLE);
         Recipe recipe = cycle == null ? null : cycle.getCurrentRecipe();
         return recipe == null ? markup : markup.withRecipeName(recipe.getName()).withRecipeInstanceName(recipe.getInstanceName());
