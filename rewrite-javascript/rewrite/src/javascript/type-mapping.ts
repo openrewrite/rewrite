@@ -17,6 +17,7 @@ import ts from "typescript";
 import * as path from "path";
 import {Type} from "../java";
 import {moduleName, packageNameOf} from "./package-name";
+import {escapeLoneSurrogates} from "./parser-utils";
 import FUNCTION_TYPE_NAME = Type.FUNCTION_TYPE_NAME;
 import OBJECT_TYPE_NAME = Type.OBJECT_TYPE_NAME;
 
@@ -686,7 +687,7 @@ export class JavaScriptTypeMapping {
             kind: Type.Kind.Variable,
             flags: 0,
             name: (symbol.flags & ts.SymbolFlags.Alias && actualSymbol.declarations?.length ? undefined : binding?.exportName) ??
-                actualSymbol.getName(),
+                escapeLoneSurrogates(actualSymbol.getName()),
             owner: ownerType,
             type: mappedType,
             annotations: [],
@@ -1291,7 +1292,7 @@ export class JavaScriptTypeMapping {
                 return undefined;
             }
 
-            methodName = symbol.getName();
+            methodName = escapeLoneSurrogates(symbol.getName());
 
             // Get the declaring type (the class/interface that contains this method)
             const parent = node.parent;
@@ -1688,7 +1689,7 @@ export class JavaScriptTypeMapping {
                 const variable: Type.Variable = {
                     kind: Type.Kind.Variable,
                     flags: 0,
-                    name: prop.getName(),
+                    name: escapeLoneSurrogates(prop.getName()),
                     owner: classType,  // Cyclic reference to the containing class (already in cache)
                     type: this.getType(propType), // This will find classType in cache if it's recursive
                     annotations: [],
