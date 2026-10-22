@@ -76,16 +76,3 @@ recipeList:
       propertyName: archiveExtension
   - org.openrewrite.gradle.UsePropertyAssignmentSyntax:
       propertyName: archiveFileName
----
-type: specs.openrewrite.org/v1beta/recipe
-name: org.openrewrite.gradle.AddJUnitPlatformLauncher
-displayName: Add JUnit Platform Launcher
-description: Add the JUnit Platform Launcher to the buildscript dependencies.
-recipeList:
-  - org.openrewrite.gradle.AddDependency:
-      groupId: org.junit.platform
-      artifactId: junit-platform-launcher
-      version: 1.x
-      acceptTransitive: true
-      configuration: testRuntimeOnly
-      onlyIfUsing: org.junit.jupiter.api.Test
