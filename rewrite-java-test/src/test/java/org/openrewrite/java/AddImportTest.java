@@ -408,6 +408,24 @@ class AddImportTest implements RewriteTest {
     }
 
     @Test
+    void doNotAddImportIfOnlyReferencedByStaticImport() {
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new AddImport<>("java.util.Collections", null, true))),
+          java(
+            """
+              import java.util.List;
+
+              import static java.util.Collections.*;
+
+              class A {
+                  List<String> list = emptyList();
+              }
+              """
+          )
+        );
+    }
+
+    @Test
     void addImportInsertsNewMiddleBlock() {
         rewriteRun(
           spec -> spec.recipe(toRecipe(() -> new AddImport<>("java.util.List", null, false))),

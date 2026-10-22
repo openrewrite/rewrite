@@ -619,13 +619,8 @@ class ScalaTypeMapping(typeFactory: JavaTypeFactory, typedTree: tpd.Tree,
         case ci: ClassInfo =>
           // Use the class symbol's TypeRef signature to be consistent with TypeRef-based lookups.
           // This prevents creating duplicate JavaType.Class instances for the same type.
-          val rawFqn = ci.cls.fullName.toString
-          val fqn = if (rawFqn.endsWith("$")) rawFqn.dropRight(1) else rawFqn
-          val normalizedFqn = fqn match {
-            case "scala.Any" | "scala.AnyRef" => "java.lang.Object"
-            case other => other
-          }
-          mapClassType(ci.cls, normalizedFqn, normalizedFqn)
+          val fqn = signatureBuilder.classFqn(ci.cls)
+          mapClassType(ci.cls, fqn, fqn)
         case mt: MethodType => mapMethodResultType(mt)
         case pt: PolyType => mapMethodResultType(pt.resultType)
         case _ => unknown
@@ -679,14 +674,7 @@ class ScalaTypeMapping(typeFactory: JavaTypeFactory, typedTree: tpd.Tree,
       case _ =>
     }
 
-    // Strip trailing $ from Scala companion object names (e.g., Collections$ → Collections)
-    val baseFqn = if (fqn.endsWith("$")) fqn.dropRight(1) else fqn
-    val javaFqn = baseFqn match {
-      case "scala.Any" | "scala.AnyRef" => "java.lang.Object"
-      case other => other
-    }
-
-    mapClassType(sym, javaFqn, sig)
+    mapClassType(sym, signatureBuilder.classFqn(sym), sig)
   }
 
   private def mapTermRef(tmr: TermRef, sig: String): JavaType = {
