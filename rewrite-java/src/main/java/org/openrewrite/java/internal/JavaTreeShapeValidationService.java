@@ -96,8 +96,7 @@ public class JavaTreeShapeValidationService implements TreeShapeValidationServic
     }
 
     private static boolean hasAnnotations(Tree tree) {
-        AtomicBoolean found = new AtomicBoolean();
-        new TreeVisitor<Tree, AtomicBoolean>() {
+        return new TreeVisitor<Tree, AtomicBoolean>() {
             @Override
             public Tree preVisit(Tree t, AtomicBoolean f) {
                 if (t instanceof J.Annotation || t instanceof J.AnnotatedType) {
@@ -106,16 +105,14 @@ public class JavaTreeShapeValidationService implements TreeShapeValidationServic
                 }
                 return t;
             }
-        }.visit(tree, found);
-        return found.get();
+        }.reduce(tree, new AtomicBoolean()).get();
     }
 
     /**
      * The kinds of node in a tree in the order they are visited, without annotations and what holds them.
      */
     private static List<Class<?>> kindsWithoutAnnotations(Tree tree) {
-        List<Class<?>> kinds = new ArrayList<>();
-        new TreeVisitor<Tree, List<Class<?>>>() {
+        return new TreeVisitor<Tree, List<Class<?>>>() {
             @Override
             public Tree preVisit(Tree t, List<Class<?>> k) {
                 if (t instanceof J.Annotation || t instanceof J.Empty || t instanceof Javadoc) {
@@ -125,7 +122,6 @@ public class JavaTreeShapeValidationService implements TreeShapeValidationServic
                 }
                 return t;
             }
-        }.visit(tree, kinds);
-        return kinds;
+        }.reduce(tree, new ArrayList<>());
     }
 }

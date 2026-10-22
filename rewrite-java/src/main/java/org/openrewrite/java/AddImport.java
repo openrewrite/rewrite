@@ -176,11 +176,11 @@ public class AddImport<P> extends JavaIsoVisitor<P> {
                 // (which could include license headers and the like)
                 Space firstClassPrefix = cu.getClasses().get(0).getPrefix();
                 importToAdd = importToAdd.withPrefix(firstClassPrefix
-                        .withComments(ListUtils.map(firstClassPrefix.getComments(), comment -> comment instanceof Javadoc ? null : comment))
+                        .withComments(ListUtils.filter(firstClassPrefix.getComments(), comment -> !(comment instanceof Javadoc)))
                         .withWhitespace(""));
 
                 cu = cu.withClasses(ListUtils.mapFirst(cu.getClasses(), clazz ->
-                        clazz.withComments(ListUtils.map(clazz.getComments(), comment -> comment instanceof Javadoc ? comment : null))
+                        clazz.withComments(ListUtils.filter(clazz.getComments(), comment -> comment instanceof Javadoc))
                 ));
             }
 

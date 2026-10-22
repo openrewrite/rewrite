@@ -185,7 +185,7 @@ public class ExcludeDependency extends Recipe {
                     }
 
                     // Transitive match (null side = match anything).
-                    if (dep.getResolvedDependency().findDependency(effG, effA) == null) {
+                    if (dep.getResolvedDependencyWithTransitives().findDependency(effG, effA) == null) {
                         return m;
                     }
 
