@@ -21,6 +21,8 @@ import java.util.AbstractMap;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import java.util.Map;
 
 /**
@@ -112,7 +114,7 @@ public final class UvLockNormalization {
             if (clause.isEmpty()) {
                 throw new IllegalArgumentException("Empty clause in specifier: " + specifier);
             }
-            clauses.add(new AbstractMap.SimpleImmutableEntry<>(clauseVersion(clause), clause));
+            clauses.add(new AbstractMap.SimpleImmutableEntry<>(clauseVersion(clause), withNormalizedNumerals(clause)));
         }
         clauses.sort(Map.Entry.<PythonVersion, String>comparingByKey()
                 .thenComparing(e -> OPERATOR_ORDER.indexOf(clauseOperator(e.getValue()))));
@@ -122,6 +124,24 @@ public final class UvLockNormalization {
         }
         return sorted;
     }
+
+    /**
+     * PEP 440 writes every numeral of a version without leading zeros, and uv records that form, so a declared
+     * {@code >= 2024.06.19} is recorded as {@code >=2024.6.19} and {@code == 1.0.0rc01} as {@code ==1.0.0rc1}.
+     */
+    private static String withNormalizedNumerals(String clause) {
+        // a local version's own segments are recorded as given
+        int local = clause.indexOf('+');
+        String version = local < 0 ? clause : clause.substring(0, local);
+        Matcher m = NUMERAL.matcher(version);
+        StringBuffer out = new StringBuffer();
+        while (m.find()) {
+            m.appendReplacement(out, m.group().replaceFirst("^0+(?=\\d)", ""));
+        }
+        return m.appendTail(out) + (local < 0 ? "" : clause.substring(local));
+    }
+
+    private static final Pattern NUMERAL = Pattern.compile("\\d+");
 
     private static String clauseOperator(String clause) {
         int i = 0;

@@ -909,14 +909,13 @@ class ScalaTypeAttributionTest implements RewriteTest {
             }
             """,
             spec -> spec.afterRecipe(cu -> {
-                List<J.MethodInvocation> calls = new ArrayList<>();
-                new org.openrewrite.java.JavaIsoVisitor<List<J.MethodInvocation>>() {
+                List<J.MethodInvocation> calls = new org.openrewrite.java.JavaIsoVisitor<List<J.MethodInvocation>>() {
                     @Override
                     public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, List<J.MethodInvocation> found) {
                         found.add(method);
                         return super.visitMethodInvocation(method, found);
                     }
-                }.visit(cu, calls);
+                }.reduce(cu, new ArrayList<>());
 
                 List<J.MethodInvocation> ofG = calls.stream().filter(m -> m.getSimpleName().equals("g")).toList();
 
@@ -1546,8 +1545,7 @@ class ScalaTypeAttributionTest implements RewriteTest {
     }
 
     private static <T extends J> List<T> findAll(J cu, Class<T> type, Predicate<T> matching) {
-        List<T> found = new ArrayList<>();
-        new ScalaIsoVisitor<List<T>>() {
+        List<T> found = new ScalaIsoVisitor<List<T>>() {
             @Override
             public @Nullable J preVisit(J tree, List<T> acc) {
                 if (type.isInstance(tree) && matching.test(type.cast(tree))) {
@@ -1555,7 +1553,7 @@ class ScalaTypeAttributionTest implements RewriteTest {
                 }
                 return tree;
             }
-        }.visit(cu, found);
+        }.reduce(cu, new ArrayList<>());
         assertThat(found).as("%s matching in %s", type.getSimpleName(), cu.printTrimmed()).isNotEmpty();
         return found;
     }

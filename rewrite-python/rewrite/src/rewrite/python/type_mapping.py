@@ -1069,6 +1069,49 @@ class PythonTypeMapping:
 
         return None
 
+    def declared_class_type(self, node: ast.ClassDef, decorators: Sequence[ast.expr],
+                            enclosing_scopes: Sequence[ast.ClassDef | ast.FunctionDef |
+                                                       ast.AsyncFunctionDef]) -> Optional[JavaType.Class]:
+        """The class constructed by ``node``, distinct from the value its decorators bind."""
+        type_id = self._lookup_type_id(node)
+        if type_id is None:
+            return None
+
+        module_name = self._source_module_name()
+        class_path = '.'.join(
+            scope.name if isinstance(scope, ast.ClassDef) else f"<locals of function '{scope.name}'>"
+            for scope in enclosing_scopes
+        )
+        fqn = f"{module_name}.{class_path}" if module_name else class_path
+        reported = self._resolve_type(type_id)
+        candidates = reported.bounds if isinstance(reported, JavaType.Union) else [reported]
+        declared = next((
+            candidate for candidate in candidates
+            if isinstance(candidate, JavaType.Class) and candidate.fully_qualified_name == fqn
+        ), None)
+        if declared is None:
+            cache_key = fqn if module_name else f"{self._file_path}#{class_path}"
+            declared = self._create_class_type(fqn, cache_key=cache_key)
+
+        annotations = []
+        for decorator in decorators:
+            decorator_type = self.decorator_type(decorator)
+            if isinstance(decorator_type, JavaType.FullyQualified):
+                annotations.append(JavaType.Annotation(_type=decorator_type))
+        declared._annotations = annotations or None
+        return declared
+
+    def _source_module_name(self) -> Optional[str]:
+        """The module that owns declarations in this source, when ty exposes one."""
+        for _, (type_id, node_kind) in self._node_index.items():
+            if node_kind not in ('StmtClassDef', 'StmtFunctionDef', 'StmtAsyncFunctionDef'):
+                continue
+            descriptor = self._type_registry.get(type_id)
+            module_name = descriptor.get('moduleName') if descriptor else None
+            if module_name and module_name != 'builtins':
+                return _ALIASED_MODULES.get(module_name, module_name)
+        return None
+
     def is_field_specifier_call(self, node: ast.expr) -> bool:
         """Whether ty typed ``node`` as a dataclass field-specifier call, which it
         models as its ``dataclasses.Field`` marker rather than the call's value."""

@@ -95,8 +95,8 @@ public class RubyCommentService extends CommentService {
             return tree;
         }
         //noinspection DataFlowIssue
-        return ((J) tree).withComments(ListUtils.map(((J) tree).getComments(), c ->
-                c instanceof RubyTextComment && text.equals(body((RubyTextComment) c)) ? null : c));
+        return ((J) tree).withComments(ListUtils.filter(((J) tree).getComments(), c ->
+                !(c instanceof RubyTextComment && text.equals(body((RubyTextComment) c)))));
     }
 
     @Override

@@ -545,8 +545,6 @@ class TestAddImportLineBreaks:
                 "import sys\nfrom os import path\n\nx = 1\r\ny = 2\n",
             )
         )
-
-
 class TestAddImportGrouping:
     """Where the imports already sit in isort's sections, a new import joins its own."""
 

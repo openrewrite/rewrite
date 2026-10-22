@@ -145,8 +145,7 @@ public class JavaTypeMatchingValidationService implements TypeMatchingValidation
     }
 
     private static int unknownTypes(J.CompilationUnit cu) {
-        AtomicInteger unknown = new AtomicInteger();
-        new JavaIsoVisitor<AtomicInteger>() {
+        return new JavaIsoVisitor<AtomicInteger>() {
             @Override
             public J.Import visitImport(J.Import anImport, AtomicInteger unknown) {
                 // statically imported methods have no type of their own
@@ -168,13 +167,11 @@ public class JavaTypeMatchingValidationService implements TypeMatchingValidation
                 }
                 return tree;
             }
-        }.visit(cu, unknown);
-        return unknown.get();
+        }.reduce(cu, new AtomicInteger()).get();
     }
 
     private static List<String> calls(J.CompilationUnit cu) {
-        List<String> calls = new ArrayList<>();
-        new JavaIsoVisitor<List<String>>() {
+        List<String> calls = new JavaIsoVisitor<List<String>>() {
             @Override
             public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, List<String> calls) {
                 calls.add(method.getMethodType() == null ? "?" : MethodMatcher.methodPattern(method.getMethodType()));
@@ -187,7 +184,7 @@ public class JavaTypeMatchingValidationService implements TypeMatchingValidation
                 calls.add(constructor == null ? "?" : MethodMatcher.methodPattern(constructor));
                 return super.visitNewClass(newClass, calls);
             }
-        }.visit(cu, calls);
+        }.reduce(cu, new ArrayList<>());
         Collections.sort(calls);
         return calls;
     }

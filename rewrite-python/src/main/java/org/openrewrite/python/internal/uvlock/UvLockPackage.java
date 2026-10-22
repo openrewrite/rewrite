@@ -41,6 +41,10 @@ public class UvLockPackage {
 
     UvLockSource source;
 
+    /** The project's {@code [tool.uv] default-groups} other than {@code ["dev"]}: {@code "all"} or the groups' names. */
+    @Nullable
+    Object defaultGroups;
+
     /**
      * Present only on fork-duplicated packages; emitted multiline even for one element.
      */

@@ -451,8 +451,7 @@ public class AddContent extends Recipe {
 
     @SuppressWarnings("ConstantValue")
     private static boolean hasMissingValue(Hcl.ConfigFile configFile) {
-        AtomicBoolean missing = new AtomicBoolean();
-        new HclIsoVisitor<AtomicBoolean>() {
+        return new HclIsoVisitor<AtomicBoolean>() {
             @Override
             public Hcl.Attribute visitAttribute(Hcl.Attribute attribute, AtomicBoolean missing) {
                 if (attribute.getValue() == null) {
@@ -461,7 +460,6 @@ public class AddContent extends Recipe {
                 }
                 return super.visitAttribute(attribute, missing);
             }
-        }.visit(configFile, missing);
-        return missing.get();
+        }.reduce(configFile, new AtomicBoolean()).get();
     }
 }
