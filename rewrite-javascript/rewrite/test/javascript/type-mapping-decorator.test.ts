@@ -82,7 +82,6 @@ class User {
     }, 240000);
 
     test('an aliased decorator import resolves to the name the package exports', async () => {
-        // given
         const captured = new Map<string, string>();
         const spec = new RecipeSpec();
         spec.recipe = captureAnnotationTypes(captured);
@@ -97,7 +96,6 @@ class User {
 }
 `;
 
-        // when
         await withDir(async (repo) => {
             await spec.rewriteRun(
                 npm(repo.path,
@@ -112,7 +110,6 @@ class User {
             );
         }, {unsafeCleanup: true});
 
-        // then
         expect(captured.get('Table')).toBe('typeorm.Entity');
         expect(captured.get('Field')).toBe('typeorm.Column');
     }, 240000);
