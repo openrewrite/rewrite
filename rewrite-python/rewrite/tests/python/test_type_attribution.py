@@ -2939,7 +2939,7 @@ def test_a_class_decorated_into_a_union_is_typed_as_itself(decorator):
 
 @requires_ty_types_cli
 @pytest.mark.parametrize('returned', ['int', '"Bar"'])
-def test_a_class_decorated_into_another_type_has_no_type(returned):
+def test_a_class_decorated_into_another_type_is_typed_as_itself(returned):
     src = f'''
         class Bar:
             pass
@@ -2955,7 +2955,10 @@ def test_a_class_decorated_into_another_type_has_no_type(returned):
     '''
     cu, tmpdir, client = _parse_with_types({'m.py': src})
     try:
-        assert _collect_class_declarations(cu)['Foo'].type is None
+        declared = _collect_class_declarations(cu)['Foo'].type
+        assert isinstance(declared, JavaType.Class)
+        assert declared.fully_qualified_name == 'm.Foo'
+        assert [annotation.fully_qualified_name for annotation in declared._annotations] == ['m.replace']
     finally:
         _cleanup_parse(tmpdir, client)
 

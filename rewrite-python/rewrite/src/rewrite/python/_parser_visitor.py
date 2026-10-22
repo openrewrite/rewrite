@@ -173,6 +173,7 @@ class ParserVisitor(ast.NodeVisitor):
         )
         self._token_idx = 1  # Skip ENCODING token
         self._type_context_depth = 0
+        self._declaring_classes: List[str] = []
 
     def _byte_offset_to_char_offset(self, lineno: int, byte_offset: int) -> int:
         """Convert a byte offset to a character offset for a given line."""
@@ -549,6 +550,13 @@ class ParserVisitor(ast.NodeVisitor):
         else:
             interfaces = None
             self._token_idx = save_token_idx
+        self._declaring_classes.append(node.name)
+        try:
+            body = self.__convert_block(node.body)
+            declared_type = self._type_mapping.declared_class_type(
+                node, node.decorator_list, self._declaring_classes)
+        finally:
+            self._declaring_classes.pop()
         return j.ClassDeclaration(
             random_id(),
             prefix,
@@ -568,19 +576,9 @@ class ParserVisitor(ast.NodeVisitor):
             None,  # no `extends`, all in `implements`
             interfaces,
             None,
-            self.__convert_block(node.body),
-            self._declared_class_type(node)
+            body,
+            declared_type
         )
-
-    def _declared_class_type(self, node: ast.ClassDef) -> JavaType.FullyQualified | None:
-        """The class `node` declares. ty types the statement as the binding its decorators produce,
-        which may be a union holding the class, or another type altogether."""
-        reported = self._type_mapping.type(node)
-        for candidate in reported.bounds if isinstance(reported, JavaType.Union) else [reported]:
-            if (isinstance(candidate, (JavaType.Class, JavaType.Parameterized))
-                    and candidate.fully_qualified_name.rpartition('.')[2] == node.name):
-                return candidate
-        return None
 
     def visit_Delete(self, node):
         return py.Del(

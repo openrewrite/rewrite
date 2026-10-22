@@ -19,6 +19,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.openrewrite.java.tree.J;
+import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.test.RewriteTest;
 
 import java.util.List;
@@ -119,7 +120,13 @@ class ClassDeclarationTest implements RewriteTest {
                   .collect(toList());
                 assertThat(classes.get(1).getType()).isNotNull()
                   .satisfies(t -> assertThat(t.getClassName()).isEqualTo("TestBuildProxy"));
-                assertThat(classes.get(2).getType()).isNull();
+                assertThat(classes.get(2).getType()).isNotNull()
+                  .satisfies(t -> {
+                      assertThat(t.getClassName()).isEqualTo("Replaced");
+                      assertThat(t.getAnnotations())
+                        .extracting(JavaType.FullyQualified::getFullyQualifiedName)
+                        .containsExactly("file.replace");
+                  });
             })
           )
         );
