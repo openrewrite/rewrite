@@ -1315,6 +1315,51 @@ class UvLockEngineTest {
         assertThat(http.requests).isEmpty();
     }
 
+    @Test
+    void aChangedLockRecordsEachIndexAsItIsConfigured() {
+        PythonExecutionContextView.view(ctx).setUvVersion("0.13.4");
+        byte[] wheel = tinyWheel("six-1.18.0.dist-info", "Metadata-Version: 2.1\nName: six\nVersion: 1.18.0\n");
+        http.route("https://pypi.org/simple/six/", """
+          {"files": [
+            {"filename": "six-1.18.0-py2.py3-none-any.whl",
+             "url": "https://files.pythonhosted.org/lazy/six-1.18.0-py2.py3-none-any.whl",
+             "hashes": {"sha256": "9f7b21c8a5c48e271941bcbcca206c8e10ab1a624b2a60875bd0ab5a4ec53ec1"},
+             "size": %d,
+             "requires-python": ">=3.6"}
+          ]}
+          """.formatted(wheel.length));
+        http.route("https://files.pythonhosted.org/lazy/six-1.18.0-py2.py3-none-any.whl", wheel);
+        http.route("https://pypi.org/simple/iniconfig/", """
+          {"files": [
+            {"filename": "iniconfig-2.3.0-py3-none-any.whl",
+             "url": "https://files.pythonhosted.org/packages/01/ini/iniconfig-2.3.0-py3-none-any.whl",
+             "hashes": {"sha256": "f631c04d2c48c52b84d0d0549c99ff3859c98df65b3101406327ecc7d53fbf12"},
+             "size": 7484,
+             "requires-python": ">=3.8"}
+          ]}
+          """);
+        // a lock written against https://pypi.org/simple/ records the configured form once anything changes
+        String before = resource("i-minimal-update/uv.lock.v2")
+          .replace("https://pypi.org/simple\"", "https://pypi.org/simple/\"");
+        Result result = UvLockEngine.regenerate(
+          """
+            [project]
+            name = "fixture-i"
+            version = "0.1.0"
+            requires-python = ">=3.12"
+            dependencies = [
+                "six==1.18.0",
+                "iniconfig>=2.0",
+            ]
+            """,
+          before,
+          ctx);
+        assertThat(result.getErrorMessage()).isNull();
+        assertThat(result.getLockFileContent())
+          .contains("registry = \"https://pypi.org/simple\"")
+          .doesNotContain("registry = \"https://pypi.org/simple/\"");
+    }
+
     private static byte[] tinyWheel(String distInfoPrefix, String metadata) {
         try {
             ByteArrayOutputStream out = new ByteArrayOutputStream();

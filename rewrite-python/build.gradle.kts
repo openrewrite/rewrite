@@ -569,7 +569,7 @@ extensions.configure<LicenseExtension> {
 // The lock regeneration test fixtures (recorded package-manager output) live in
 // openrewrite/rewrite-python-lock-fixtures. The pinned commit is fetched into build/lock-fixtures and joins the test
 // classpath, and a change of pin fetches again. A change that needs new fixtures moves the pin with it.
-val lockFixturesCommit = "e900678acc6a4f57e835362edd7e90dfda6ed9b5"
+val lockFixturesCommit = "5df7238bbd48e362832bd7a1cbea2611b9681ded"
 val lockFixturesDir = layout.buildDirectory.dir("lock-fixtures")
 val lockFixturesFetched = layout.buildDirectory.file("tmp/lock-fixtures-commit")
 val syncLockFixtures = tasks.register("syncLockFixtures") {
