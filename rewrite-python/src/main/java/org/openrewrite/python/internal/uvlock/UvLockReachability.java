@@ -606,32 +606,43 @@ final class UvLockReachability {
      */
     private @Nullable UvLockDependency restrict(UvLockDependency edge, List<Term> parent) {
         try {
-            MarkerInterner interner = new MarkerInterner();
-            MarkerTree reachable = MarkerTree.trueIn(interner).negate();
-            for (Term term : parent) {
-                MarkerTree conjunction = MarkerTree.trueIn(interner);
-                for (String[] c : term.getPythonClauses()) {
-                    conjunction = conjunction.and(MarkerTree.parse(interner, c[0] + " " + c[1] + " '" + c[2] + "'"));
-                }
-                for (Atom atom : term.getAtoms()) {
-                    conjunction = conjunction.and(MarkerTree.parse(interner, atom.toString()));
-                }
-                reachable = reachable.or(conjunction);
-            }
-            Ranges.Bound<PythonVersion> lower = requiresPython.lower == null ? Ranges.Bound.unbounded() :
-                    requiresPython.lowerExclusive ? Ranges.Bound.excluded(requiresPython.lower) : Ranges.Bound.included(requiresPython.lower);
-            Ranges.Bound<PythonVersion> upper = requiresPython.upper == null ? Ranges.Bound.unbounded() :
-                    requiresPython.upperInclusive ? Ranges.Bound.included(requiresPython.upper) : Ranges.Bound.excluded(requiresPython.upper);
-            MarkerTree restricted = MarkerTree.parse(interner, requireNonNull(edge.getMarker()))
-                    .simplifyPythonVersions(lower, upper)
-                    .restrict(reachable.simplifyPythonVersions(lower, upper));
+            MarkerTree restricted = narrowed(new MarkerInterner(true), edge, parent);
             if (restricted.isFalse()) {
                 return null;
             }
             String marker = restricted.tryToString();
-            return Objects.equals(marker, edge.getMarker()) ? edge : edge.withMarker(marker);
+            if (Objects.equals(marker, edge.getMarker())) {
+                return edge;
+            }
+            if (edge.getMarker().equals(narrowed(new MarkerInterner(false), edge, parent).tryToString())) {
+                return edge;
+            }
+            return edge.withMarker(marker);
         } catch (MarkerParser.MarkerSyntaxException e) {
             throw unsupported("the marker \"" + edge.getMarker() + "\"");
         }
+    }
+
+    /** The edge's marker where the parent is reached, under the lock's Python range. */
+    private MarkerTree narrowed(MarkerInterner interner, UvLockDependency edge, List<Term> parent)
+            throws MarkerParser.MarkerSyntaxException {
+        MarkerTree reachable = MarkerTree.trueIn(interner).negate();
+        for (Term term : parent) {
+            MarkerTree conjunction = MarkerTree.trueIn(interner);
+            for (String[] c : term.getPythonClauses()) {
+                conjunction = conjunction.and(MarkerTree.parse(interner, c[0] + " " + c[1] + " '" + c[2] + "'"));
+            }
+            for (Atom atom : term.getAtoms()) {
+                conjunction = conjunction.and(MarkerTree.parse(interner, atom.toString()));
+            }
+            reachable = reachable.or(conjunction);
+        }
+        Ranges.Bound<PythonVersion> lower = requiresPython.lower == null ? Ranges.Bound.unbounded() :
+                requiresPython.lowerExclusive ? Ranges.Bound.excluded(requiresPython.lower) : Ranges.Bound.included(requiresPython.lower);
+        Ranges.Bound<PythonVersion> upper = requiresPython.upper == null ? Ranges.Bound.unbounded() :
+                requiresPython.upperInclusive ? Ranges.Bound.included(requiresPython.upper) : Ranges.Bound.excluded(requiresPython.upper);
+        return MarkerTree.parse(interner, requireNonNull(edge.getMarker()))
+                .simplifyPythonVersions(lower, upper)
+                .restrict(reachable.simplifyPythonVersions(lower, upper));
     }
 }

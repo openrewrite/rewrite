@@ -47,6 +47,21 @@ class UvLockMarkersTest {
     }
 
     @Test
+    void aMarkerPairingValuesThatNeverHoldTogetherIsKeptAsRecorded() {
+        String recorded = "(os_name == 'nt' and platform_machine != 'aarch64' and sys_platform == 'linux') or " +
+                          "(os_name == 'nt' and platform_python_implementation != 'CPython' and sys_platform == 'linux') or " +
+                          "(os_name == 'nt' and sys_platform != 'darwin' and sys_platform != 'linux')";
+        assertThat(UvLockMarkers.recordMarkerAsRecorded(recorded)).isEqualTo(recorded);
+
+        // a marker a declaration states is pruned, since no lock recorded it before uv pruned such a pair
+        assertThat(UvLockMarkers.recordMarker("os_name == 'nt' and sys_platform == 'linux'", null))
+                .isNotEqualTo("os_name == 'nt' and sys_platform == 'linux'");
+
+        assertThat(UvLockMarkers.recordMarker("python_version >= '3.9' and os_name == 'nt'", null))
+                .isEqualTo("python_full_version >= '3.9' and os_name == 'nt'");
+    }
+
+    @Test
     void aDisjunctionOfParenthesizedConjunctionsParses() {
         // a fork marker uv writes for the PyPy and emscripten branches of one Python range
         assertThat(UvLockMarkers.parseDisjunction(

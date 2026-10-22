@@ -740,7 +740,7 @@ public final class UvLockEngine {
                     out.add(edge);
                     continue;
                 }
-                String marker = UvLockMarkers.recordMarker(edge.getMarker(), null);
+                String marker = UvLockMarkers.recordMarkerAsRecorded(edge.getMarker());
                 if (marker == null) {
                     throw new EngineFailure(Reason.RESOLUTION_REQUIRED, pkg,
                             "Rewriting the lock whole needs uv's current form of the marker \"" + edge.getMarker() + "\"");

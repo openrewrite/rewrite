@@ -48,6 +48,27 @@ class UvLockReachabilityTest {
     }
 
     @Test
+    void anEdgePairingValuesThatNeverHoldTogetherKeepsItsRecordedMarker() {
+        UvLockPackage root = UvLockPackage.builder().name("root").version("0.1.0").source(UvLockSource.virtual("."))
+          .dependencies(singletonList(new UvLockDependency("a", null, null, null, null)))
+          .build();
+        UvLockPackage a = UvLockPackage.builder().name("a").version("1.0").source(UvLockSource.registry("https://index.example/simple/"))
+          .dependencies(List.of(
+            new UvLockDependency("b", null, null, null, "(os_name == 'nt' and platform_machine != 'aarch64' and sys_platform == 'linux') or (os_name == 'nt' and sys_platform != 'darwin' and sys_platform != 'linux')"),
+            new UvLockDependency("c", null, null, null, "python_full_version >= '3.9' and os_name == 'nt'")))
+          .build();
+        UvLockPackage b = UvLockPackage.builder().name("b").version("1.0").source(UvLockSource.registry("https://index.example/simple/")).build();
+        UvLockPackage c = UvLockPackage.builder().name("c").version("1.0").source(UvLockSource.registry("https://index.example/simple/")).build();
+
+        List<UvLockPackage> simplified = UvLockReachability.simplify(List.of(root, a, b, c), 0, PyRange.parse(">=3.10"), null);
+
+        // b's marker reads as uv recorded it, since only the pruning of nt with linux would change it
+        assertThat(simplified.get(1).getDependencies()).containsExactly(
+          new UvLockDependency("b", null, null, null, "(os_name == 'nt' and platform_machine != 'aarch64' and sys_platform == 'linux') or (os_name == 'nt' and sys_platform != 'darwin' and sys_platform != 'linux')"),
+          new UvLockDependency("c", null, null, null, "os_name == 'nt'"));
+    }
+
+    @Test
     void parentEqualityImpliesEdgeInequalityAndRootGroupsAreSimplified() {
         UvLockPackage root = UvLockPackage.builder().name("root").version("0.1.0").source(UvLockSource.virtual("."))
           .dependencies(singletonList(new UvLockDependency("a", null, null, null, "sys_platform == 'win32'")))
