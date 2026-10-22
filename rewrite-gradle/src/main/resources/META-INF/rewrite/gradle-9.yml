@@ -49,6 +49,8 @@ recipeList:
   - org.openrewrite.gradle.gradle9.UseRepositoryHandlerActionOverloads
   # The org.gradle.unsafe.isolated-projects* properties are deprecated in 9.7
   - org.openrewrite.gradle.gradle9.MigrateIsolatedProjectsProperties
+  # Archive tasks are reproducible by default since 9.0
+  - org.openrewrite.gradle.gradle9.RemoveReproducibleArchiveDefaults
 ---
 type: specs.openrewrite.org/v1beta/recipe
 name: org.openrewrite.gradle.gradle9.MigrateIsolatedProjectsProperties

@@ -36,7 +36,7 @@ public class RemovePmdTargetJdk extends Recipe {
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
         return Preconditions.check(new IsBuildGradle<>(),
-                new RemoveDeprecatedPropertyVisitor("targetJdk",
+                new RemovePropertyConfigurationVisitor("targetJdk",
                         token -> "Pmd".equals(token) || token.startsWith("pmd")));
     }
 }

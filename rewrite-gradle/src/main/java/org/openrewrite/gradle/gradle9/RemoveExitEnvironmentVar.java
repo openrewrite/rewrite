@@ -40,7 +40,7 @@ public class RemoveExitEnvironmentVar extends Recipe {
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
         return Preconditions.check(new IsBuildGradle<>(),
-                new RemoveDeprecatedPropertyVisitor("exitEnvironmentVar",
+                new RemovePropertyConfigurationVisitor("exitEnvironmentVar",
                         token -> token.toLowerCase(Locale.ROOT).endsWith("startscripts")));
     }
 }

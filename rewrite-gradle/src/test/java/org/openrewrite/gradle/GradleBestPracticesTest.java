@@ -16,6 +16,7 @@
 package org.openrewrite.gradle;
 
 import org.junit.jupiter.api.Test;
+import org.openrewrite.gradle.marker.GradleProject;
 import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
 
@@ -246,6 +247,62 @@ class GradleBestPracticesTest implements RewriteTest {
                   }
               }
               """),
+          properties(
+            //language=properties
+            """
+              org.gradle.caching=true
+              org.gradle.parallel=true
+              """,
+            spec -> spec.path("gradle.properties")
+          )
+        );
+    }
+
+    @Test
+    void applyNewBestPractices() {
+        rewriteRun(
+          buildGradle(
+            """
+              apply plugin: 'java-library'
+
+              if (plugins.hasPlugin('maven-publish')) {
+                  publishing {
+                      repositories {
+                          mavenLocal()
+                      }
+                  }
+              }
+
+              tasks.withType(AbstractArchiveTask).configureEach {
+                  preserveFileTimestamps = false
+                  reproducibleFileOrder = true
+              }
+              """,
+            """
+              plugins {
+                  id 'java-library'
+              }
+
+              pluginManager.withPlugin('maven-publish') {
+                  publishing {
+                      repositories {
+                          mavenLocal()
+                      }
+                  }
+              }
+              """,
+            spec -> spec.markers(GradleProject.builder().name("inventory-service").path(":").build())
+          ),
+          settingsGradle(
+            """
+              include 'api'
+              """,
+            """
+              rootProject.name = 'inventory-service'
+
+              include 'api'
+              """
+          ),
           properties(
             //language=properties
             """

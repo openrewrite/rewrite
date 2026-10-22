@@ -15,7 +15,6 @@
  */
 package org.openrewrite.gradle.gradle9;
 
-import lombok.RequiredArgsConstructor;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.Cursor;
 import org.openrewrite.ExecutionContext;
@@ -33,13 +32,10 @@ import java.util.function.Predicate;
 
 import static java.util.Arrays.asList;
 
-/**
- * Deletes a configuration property Gradle deprecated without offering a replacement, written as any of
- * {@code prop = value}, {@code prop value}, {@code prop.set(value)} or {@code setProp(value)}, and only where
- * {@code ownerToken} matches the surrounding configuration block that identifies the owning plugin or task.
- */
-@RequiredArgsConstructor
-class RemoveDeprecatedPropertyVisitor extends JavaVisitor<ExecutionContext> {
+/// Deletes a configuration property, written as any of `prop = value`, `prop value`, `prop.set(value)` or
+/// `setProp(value)`, and only where `ownerToken` matches the surrounding configuration block that identifies the
+/// owning plugin or task, and `valueMatcher` accepts the assigned value.
+class RemovePropertyConfigurationVisitor extends JavaVisitor<ExecutionContext> {
 
     private static final String REMOVED_STATEMENT = "removedDeprecatedProperty";
 
@@ -48,11 +44,23 @@ class RemoveDeprecatedPropertyVisitor extends JavaVisitor<ExecutionContext> {
 
     private final String propertyName;
     private final Predicate<String> ownerToken;
+    private final Predicate<Expression> valueMatcher;
+
+    RemovePropertyConfigurationVisitor(String propertyName, Predicate<String> ownerToken) {
+        this(propertyName, ownerToken, value -> true);
+    }
+
+    RemovePropertyConfigurationVisitor(String propertyName, Predicate<String> ownerToken,
+                                       Predicate<Expression> valueMatcher) {
+        this.propertyName = propertyName;
+        this.ownerToken = ownerToken;
+        this.valueMatcher = valueMatcher;
+    }
 
     @Override
     public @Nullable J visitAssignment(J.Assignment assignment, ExecutionContext ctx) {
         J.Assignment a = (J.Assignment) super.visitAssignment(assignment, ctx);
-        if (isDeletableStatement() && assignsProperty(a.getVariable())) {
+        if (isDeletableStatement() && assignsProperty(a.getVariable()) && valueMatcher.test(a.getAssignment())) {
             return deleteAndRecordRemoval();
         }
         return a;
@@ -62,7 +70,7 @@ class RemoveDeprecatedPropertyVisitor extends JavaVisitor<ExecutionContext> {
     public @Nullable J visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
         J.MethodInvocation m = (J.MethodInvocation) super.visitMethodInvocation(method, ctx);
         if (isDeletableStatement() && m.getArguments().size() == 1 && !(m.getArguments().get(0) instanceof J.Lambda) &&
-                setsProperty(m)) {
+                setsProperty(m) && valueMatcher.test(m.getArguments().get(0))) {
             return deleteAndRecordRemoval();
         }
         return deleteIfLeftEmptyByRemoval(m);
