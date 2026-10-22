@@ -303,17 +303,12 @@ class ScalaTypeAttributionTest implements RewriteTest {
             }
             """,
             spec -> spec.afterRecipe(cu -> {
-                // given
                 List<J.MethodInvocation> empties =
                   findAll(cu, J.MethodInvocation.class, m -> m.getSimpleName().equals("empty"));
-
-                // when
                 JavaType.Method listBufferEmpty = empties.get(0).getMethodType();
                 JavaType.Method seqEmpty = empties.get(1).getMethodType();
                 JavaType.Method setEmpty = empties.get(2).getMethodType();
                 JavaType.Method mapNewBuilder = method(cu, "newBuilder").getMethodType();
-
-                // then
                 assertThat(TypeUtils.toString(listBufferEmpty.getReturnType()))
                   .isEqualTo("scala.collection.mutable.ListBuffer<java.lang.String>");
                 assertThat(TypeUtils.toString(seqEmpty.getReturnType()))
@@ -353,15 +348,10 @@ class ScalaTypeAttributionTest implements RewriteTest {
             }
             """,
             spec -> spec.afterRecipe(cu -> {
-                // given
                 J.MethodInvocation boxEmpty = method(cu, "empty");
                 J.MethodInvocation pairsNewBuilder = method(cu, "newBuilder");
-
-                // when
                 JavaType.Method emptyType = boxEmpty.getMethodType();
                 JavaType.Method newBuilderType = pairsNewBuilder.getMethodType();
-
-                // then
                 assertThat(emptyType.getDeclaringType().getFullyQualifiedName()).isEqualTo("p.GenericCompanion");
                 assertThat(TypeUtils.toString(emptyType.getReturnType())).isEqualTo("p.Box<java.lang.String>");
                 assertThat(TypeUtils.toString(newBuilderType.getReturnType()))
@@ -383,13 +373,8 @@ class ScalaTypeAttributionTest implements RewriteTest {
             }
             """,
             spec -> spec.afterRecipe(cu -> {
-                // given
                 J.MethodDeclaration empty = find(cu, J.MethodDeclaration.class, m -> m.getSimpleName().equals("empty"));
-
-                // when
                 JavaType returnType = empty.getMethodType().getReturnType();
-
-                // then
                 assertThat(returnType).isInstanceOf(JavaType.GenericTypeVariable.class);
                 assertThat(((JavaType.GenericTypeVariable) returnType).getName()).isEqualTo("CC");
                 assertThat(((JavaType.GenericTypeVariable) returnType).getBounds()).isEmpty();
@@ -411,13 +396,8 @@ class ScalaTypeAttributionTest implements RewriteTest {
             }
             """,
             spec -> spec.afterRecipe(cu -> {
-                // given
                 J.MethodDeclaration from = find(cu, J.MethodDeclaration.class, m -> m.getSimpleName().equals("from"));
-
-                // when
                 JavaType returnType = from.getMethodType().getReturnType();
-
-                // then
                 assertThat(returnType).isInstanceOf(JavaType.GenericTypeVariable.class);
                 assertThat(((JavaType.GenericTypeVariable) returnType).getBounds())
                   .singleElement()
