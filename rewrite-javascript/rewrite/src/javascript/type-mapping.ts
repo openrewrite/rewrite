@@ -792,9 +792,10 @@ export class JavaScriptTypeMapping {
             if (!ts.isPropertyAccessExpression(initializer) && !ts.isElementAccessExpression(initializer)) {
                 return undefined;
             }
-            const module = this.loadedModule(initializer.expression);
-            const member = ts.isPropertyAccessExpression(initializer) ? initializer.name : initializer.argumentExpression;
-            return module ? this.memberBinding(module, member) : undefined;
+            const member = ts.isPropertyAccessExpression(initializer) ? initializer.name :
+                ts.isStringLiteralLike(initializer.argumentExpression) ? initializer.argumentExpression : undefined;
+            const module = member && this.loadedModule(initializer.expression);
+            return member && module ? this.memberBinding(module, member) : undefined;
         }
         if (ts.isBindingElement(declaration) && !declaration.dotDotDotToken &&
             ts.isObjectBindingPattern(declaration.parent) && ts.isVariableDeclaration(declaration.parent.parent) &&
@@ -810,7 +811,7 @@ export class JavaScriptTypeMapping {
         if (!ts.isIdentifier(name) && !ts.isStringLiteralLike(name)) {
             return undefined;
         }
-        return name.text === 'default' ? {module, kind: 'default'} : {module, kind: 'named', exportName: name.text};
+        return {module, kind: name.text === 'default' ? 'default' : 'named', exportName: name.text};
     }
 
     /**
@@ -1153,15 +1154,12 @@ export class JavaScriptTypeMapping {
 
                 // A `require()` result, and an import of a package without type declarations, is typed
                 // `any`, so nothing above identifies the module; the specifier in the call or import does.
-                if (declaringType === Type.unknownType) {
-                    const moduleName = this.moduleOfExpression(node.expression.expression);
-                    if (moduleName) {
-                        declaringType = {
-                            kind: Type.Kind.Class,
-                            flags: 0, // TODO - determine flags
-                            fullyQualifiedName: moduleName
-                        } as Type.FullyQualified;
-                    }
+                if (declaringType === Type.unknownType && receiverBinding && receiverBinding.kind !== 'named') {
+                    declaringType = {
+                        kind: Type.Kind.Class,
+                        flags: 0, // TODO - determine flags
+                        fullyQualifiedName: receiverBinding.module
+                    } as Type.FullyQualified;
                 }
 
                 // For string methods like 'hello'.split(), ensure we have a proper declaring type for primitives
@@ -1377,7 +1375,7 @@ export class JavaScriptTypeMapping {
             if (aliasedSymbol && aliasedSymbol !== symbol && symbol.declarations && symbol.declarations.length > 0) {
                 const binding = this.moduleBinding(symbol.declarations[0], symbol.declarations[0]);
                 if (binding) {
-                    return `${binding.module}.${binding.exportName ?? symbol.getName()}`;
+                    return `${binding.module}.${binding.kind === 'named' ? binding.exportName : symbol.getName()}`;
                 }
             }
         }

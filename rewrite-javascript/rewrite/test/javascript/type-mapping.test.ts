@@ -2835,6 +2835,40 @@ describe('JavaScript type mapping', () => {
             );
         });
 
+        test('a default member of a require() names the default export and a computed member names none', async () => {
+            const spec = new RecipeSpec();
+            spec.recipe = markTypes((node) => {
+                if (node?.kind === J.Kind.Identifier && ['dflt', 'computed'].includes((node as J.Identifier).simpleName)) {
+                    const fieldType = (node as J.Identifier).fieldType;
+                    return fieldType?.owner ?
+                        `${Type.FullyQualified.getFullyQualifiedName(fieldType.owner)}#${fieldType.name}` : null;
+                }
+                return null;
+            });
+
+            await spec.rewriteRun(
+                //language=typescript
+                typescript(
+                    `
+                        const key = 'delimiter';
+                        const {default: dflt} = require('node:path');
+                        const computed = require('node:path')[key];
+                        dflt.sep;
+                        computed.length;
+                    `,
+                    //@formatter:off
+                    `
+                        const key = 'delimiter';
+                        const {default: /*~~(path#default)~~>*/dflt} = require('node:path');
+                        const computed = require('node:path')[key];
+                        /*~~(path#default)~~>*/dflt.sep;
+                        computed.length;
+                    `
+                    //@formatter:on
+                )
+            );
+        });
+
         test('an import-equals require() binds the whole module', async () => {
             const spec = new RecipeSpec();
             spec.recipe = markTypes(declaringTypeAndName);
