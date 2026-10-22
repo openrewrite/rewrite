@@ -357,7 +357,11 @@ class ScalaTreeVisitor(
       throw unmappedException(lit)
     }
     val prefix = extractPrefix(lit.span)
-    val value = lit.const.value
+    val value = lit.const.value match {
+      case s: String => escapeLoneSurrogates(s)
+      case c: Character if Character.isSurrogate(c) => escapeLoneSurrogates(c.toString)
+      case v => v
+    }
     val valueSource = extractSource(lit.span)
     val javaType = constantToJavaType(lit.const)
     
@@ -370,6 +374,31 @@ class ScalaTreeVisitor(
       Collections.emptyList(),
       javaType
     )
+  }
+
+  /**
+   * Jackson's Smile writer rejects a lone surrogate, so the literal's value spells each one as its
+   * `\uXXXX` escape. A surrogate pair is a valid code point and stays decoded.
+   */
+  private def escapeLoneSurrogates(s: String): String = {
+    var sb: java.lang.StringBuilder = null
+    var i = 0
+    while (i < s.length) {
+      val c = s.charAt(i)
+      if (Character.isHighSurrogate(c) && i + 1 < s.length && Character.isLowSurrogate(s.charAt(i + 1))) {
+        if (sb != null) sb.append(c).append(s.charAt(i + 1))
+        i += 2
+      } else {
+        if (Character.isSurrogate(c)) {
+          if (sb == null) sb = new java.lang.StringBuilder(s.length + 5).append(s, 0, i)
+          sb.append("\\u").append(Integer.toHexString(c).toUpperCase)
+        } else if (sb != null) {
+          sb.append(c)
+        }
+        i += 1
+      }
+    }
+    if (sb == null) s else sb.toString
   }
   
   private def visitNumber(num: untpd.Number): J.Literal = {
