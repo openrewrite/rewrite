@@ -3,6 +3,7 @@ import contextlib
 import keyword
 import dataclasses
 import itertools
+import re
 import sys
 import token
 from argparse import ArgumentError
@@ -130,6 +131,12 @@ def _with_type(node: T, resolved: Optional[JavaType]) -> T:
     if getattr(node, 'type', None) is not None or not hasattr(node, '_type'):
         return node
     return replace_if_changed(node, _type=resolved)
+
+
+def _with_line_breaks_of(source: str, text: str) -> str:
+    """``text``, which the tokenizer read with every line break as ``\\n``, with the line breaks ``source`` has."""
+    line_breaks = iter(re.findall(r'\r\n|\r|\n', source))
+    return re.sub('\n', lambda _: next(line_breaks, '\n'), text)
 
 
 class ParserVisitor(ast.NodeVisitor):
@@ -284,8 +291,13 @@ class ParserVisitor(ast.NodeVisitor):
             else:
                 # Replace token string with original source text to preserve \r\n
                 original_text = self._source[tok_start:scan_end]
-                if original_text != tok.string and tok.type in (token.NEWLINE, token.NL, token.INDENT, token.STRING):
-                    tok = TokenInfo(tok.type, original_text, tok.start, tok.end, tok.line)
+                if original_text != tok.string:
+                    if tok.type in (token.NEWLINE, token.NL, token.INDENT, token.STRING):
+                        tok = TokenInfo(tok.type, original_text, tok.start, tok.end, tok.line)
+                    elif tok.type in (FSTRING_MIDDLE, TSTRING_MIDDLE) and '\r' in original_text:
+                        # The text has its braces undoubled, so only its line breaks are taken back.
+                        tok = TokenInfo(tok.type, _with_line_breaks_of(original_text, tok.string),
+                                        tok.start, tok.end, tok.line)
                 result.append(tok)
 
             # Track from/import context for ellipsis normalization
