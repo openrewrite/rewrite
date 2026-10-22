@@ -60,12 +60,23 @@ final class UvLockMarkers {
      * The marker as uv records it, by uv's own marker algebra. Null for a marker uv cannot parse, or one it ignores
      * entirely, which records no marker.
      */
+    /**
+     * The marker as uv records it where the lock already recorded it. A conjunction of values that never hold
+     * together is pruned by the algebra, so a marker only that pruning would change stands as the lock has it.
+     */
+    static @Nullable String recordMarkerAsRecorded(String recorded) {
+        try {
+            if (recorded.equals(MarkerTree.parse(new MarkerInterner(false), recorded).tryToString())) {
+                return recorded;
+            }
+        } catch (MarkerParser.MarkerSyntaxException e) {
+            return null;
+        }
+        return recordMarker(recorded, null);
+    }
+
     static @Nullable String recordMarker(String rawMarker, @Nullable String extraClause) {
         try {
-            if (extraClause == null && rawMarker.equals(MarkerTree
-                    .parse(new MarkerInterner(false), rawMarker).tryToString())) {
-                return rawMarker;
-            }
             MarkerInterner interner = new MarkerInterner();
             MarkerTree tree = MarkerTree.parse(interner, rawMarker);
             if (extraClause != null) {
