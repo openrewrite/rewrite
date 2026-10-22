@@ -77,10 +77,6 @@ final class UvLockMarkers {
 
     static @Nullable String recordMarker(String rawMarker, @Nullable String extraClause) {
         try {
-            if (extraClause == null && rawMarker.equals(MarkerTree
-                    .parse(new MarkerInterner(false), rawMarker).tryToString())) {
-                return rawMarker;
-            }
             MarkerInterner interner = new MarkerInterner();
             MarkerTree tree = MarkerTree.parse(interner, rawMarker);
             if (extraClause != null) {
