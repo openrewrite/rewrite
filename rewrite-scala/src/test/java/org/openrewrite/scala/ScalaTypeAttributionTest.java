@@ -28,6 +28,7 @@ import org.openrewrite.java.search.FindMissingTypes;
 import org.openrewrite.java.tree.Flag;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaType;
+import org.openrewrite.java.tree.Statement;
 import org.openrewrite.java.tree.TypeUtils;
 import org.openrewrite.scala.marker.EtaExpansion;
 import org.openrewrite.scala.marker.FunctionApplication;
@@ -1625,6 +1626,58 @@ class ScalaTypeAttributionTest implements RewriteTest {
 
                 // then
                 assertThat(matcher.matches(toString)).isTrue();
+            })
+          )
+        );
+    }
+
+    @Test
+    void javaStaticMethodIsSharedWithJavaParserThroughTypeCache() {
+        // given
+        JavaTypeCache typeCache = new JavaTypeCache();
+        ExecutionContext ctx = new InMemoryExecutionContext();
+        J scalaCu = (J) ScalaParser.builder().typeCache(typeCache).build().parse(ctx, """
+          class ScalaStatics {
+            val n = Integer.parseInt("1")
+            val s = String.format("%s", "a")
+          }
+          """).findFirst().orElseThrow();
+
+        // when
+        J.CompilationUnit javaCu = (J.CompilationUnit) JavaParser.fromJavaVersion().typeCache(typeCache).build().parse(ctx, """
+          class JavaStatics {
+              int n = Integer.parseInt("1");
+              String s = String.format("%s", "a");
+          }
+          """).findFirst().orElseThrow();
+
+        // then
+        List<Statement> fields = javaCu.getClasses().getFirst().getBody().getStatements();
+        J.MethodInvocation javaParseInt = (J.MethodInvocation) ((J.VariableDeclarations) fields.get(0)).getVariables().getFirst().getInitializer();
+        J.MethodInvocation javaFormat = (J.MethodInvocation) ((J.VariableDeclarations) fields.get(1)).getVariables().getFirst().getInitializer();
+        assertThat(javaParseInt.getMethodType()).isNotNull().isSameAs(method(scalaCu, "parseInt").getMethodType());
+        assertThat(javaFormat.getMethodType()).isNotNull().isSameAs(method(scalaCu, "format").getMethodType());
+    }
+
+    @Test
+    void classNameEndingInDollarKeepsItsDollar() {
+        rewriteRun(
+          scala(
+            """
+            class Dollar$
+            object Companion
+            class DollarHolder {
+              val d: Dollar$ = new Dollar$
+              val c = Companion
+            }
+            """,
+            spec -> spec.afterRecipe(cu -> {
+                J.ClassDeclaration dollarClass = find(cu, J.ClassDeclaration.class, c -> c.getSimpleName().equals("Dollar$"));
+                J.VariableDeclarations.NamedVariable d = find(cu, J.VariableDeclarations.NamedVariable.class, v -> v.getSimpleName().equals("d"));
+                J.VariableDeclarations.NamedVariable c = find(cu, J.VariableDeclarations.NamedVariable.class, v -> v.getSimpleName().equals("c"));
+                assertThat(TypeUtils.asFullyQualified(dollarClass.getType()).getFullyQualifiedName()).isEqualTo("Dollar$");
+                assertThat(TypeUtils.asFullyQualified(d.getType()).getFullyQualifiedName()).isEqualTo("Dollar$");
+                assertThat(TypeUtils.asFullyQualified(c.getType()).getFullyQualifiedName()).isEqualTo("Companion");
             })
           )
         );
