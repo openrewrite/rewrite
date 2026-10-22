@@ -632,7 +632,8 @@ class ScalaTypeMapping(typeFactory: JavaTypeFactory, typedTree: tpd.Tree,
   private def mapUnionType(ot: OrType, sig: String): JavaType = signatureBuilder.unionMembers(ot) match {
     case Nil => mapType(ctx.definitions.NothingType)
     case (_, only) :: Nil => mapType(only)
-    case members => typeFactory.multiCatchFor(sig, () => new JavaType.MultiCatch(members.map(m => mapType(m._2)).asJava))
+    case members => typeFactory.computeMultiCatch(sig, (union: JavaType.MultiCatch) =>
+      union.unsafeSet(members.map(m => Option(mapType(m._2)).getOrElse(unknown)).asJava))
   }
 
   /** Map a MethodType to its result type (for expressions that are method calls). */

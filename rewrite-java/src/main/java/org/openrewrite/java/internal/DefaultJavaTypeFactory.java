@@ -18,6 +18,7 @@ package org.openrewrite.java.internal;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.java.tree.JavaType;
 
+import java.util.List;
 import java.util.function.Consumer;
 import java.util.function.Supplier;
 
@@ -102,6 +103,19 @@ public class DefaultJavaTypeFactory implements JavaTypeFactory {
         return stub;
     }
 
+    @Override
+    public JavaType.MultiCatch computeMultiCatch(String signature,
+                                                 Consumer<JavaType.MultiCatch> initializer) {
+        JavaType.MultiCatch cached = cache.get(signature);
+        if (cached != null) {
+            return cached;
+        }
+        JavaType.MultiCatch stub = new JavaType.MultiCatch((List<JavaType>) null);
+        cache.put(signature, stub);
+        initializer.accept(stub);
+        return stub;
+    }
+
     // ---------------------------------------------------------------------
     // Atomic build ({@code *For})
     // ---------------------------------------------------------------------
@@ -153,18 +167,6 @@ public class DefaultJavaTypeFactory implements JavaTypeFactory {
             return cached;
         }
         JavaType.Intersection built = builder.get();
-        cache.put(signature, built);
-        return built;
-    }
-
-    @Override
-    public JavaType.MultiCatch multiCatchFor(String signature,
-                                             Supplier<JavaType.MultiCatch> builder) {
-        JavaType.MultiCatch cached = cache.get(signature);
-        if (cached != null) {
-            return cached;
-        }
-        JavaType.MultiCatch built = builder.get();
         cache.put(signature, built);
         return built;
     }

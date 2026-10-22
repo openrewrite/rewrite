@@ -42,13 +42,16 @@ import java.util.function.Supplier;
  *         <li>{@link #computeGenericTypeVariable} &mdash; type variable
  *             bounds can reference the variable itself
  *             ({@code <T extends Comparable<T>>}).</li>
+ *         <li>{@link #computeMultiCatch} &mdash; a union's alternative can
+ *             declare a member of that same union
+ *             ({@code class Node { def next: Node | Null }}).</li>
  *       </ul></li>
  *   <li><b>{@code *For} &mdash; atomic build.</b> The caller supplies a
  *       {@link Supplier} that returns a fully-constructed instance; the
  *       factory caches and returns it. No half-built object is ever
  *       observable through the cache. Used for variants without self-recursion
  *       on the same key: {@link #methodFor}, {@link #variableFor},
- *       {@link #arrayFor}, {@link #intersectionFor}, {@link #multiCatchFor}.</li>
+ *       {@link #arrayFor}, {@link #intersectionFor}.</li>
  * </ol>
  * <p>
  * Parser code that needs a canonical identity-stable {@link JavaType.Class}
@@ -157,6 +160,17 @@ public interface JavaTypeFactory {
             Consumer<JavaType.GenericTypeVariable> initializer);
 
     /**
+     * Cache-or-build for {@link JavaType.MultiCatch}, which also describes a union type.
+     * Mapping an alternative can reach the same union again, as a member of the
+     * alternative's class, so the stub is registered before the initializer runs.
+     *
+     * @param signature an opaque per-factory key from a {@link JavaTypeSignatureBuilder}
+     *                  built from the union's alternatives.
+     */
+    JavaType.MultiCatch computeMultiCatch(String signature,
+                                          Consumer<JavaType.MultiCatch> initializer);
+
+    /**
      * Build for {@link JavaType.Method} with cycle-breaking on the same key.
      * Unlike {@link #variableFor}/{@link #arrayFor}/{@link #intersectionFor},
      * a method's attribution can recurse back to its own signature: an
@@ -218,13 +232,4 @@ public interface JavaTypeFactory {
      */
     JavaType.Intersection intersectionFor(String signature,
                                           Supplier<JavaType.Intersection> builder);
-
-    /**
-     * Atomic build for {@link JavaType.MultiCatch}, which also describes a union type.
-     *
-     * @param signature an opaque per-factory key from a {@link JavaTypeSignatureBuilder}
-     *                  built from the union's alternatives.
-     */
-    JavaType.MultiCatch multiCatchFor(String signature,
-                                      Supplier<JavaType.MultiCatch> builder);
 }
