@@ -2964,6 +2964,36 @@ def test_a_class_decorated_into_another_type_is_typed_as_itself(returned):
 
 
 @requires_ty_types_cli
+def test_decorated_nested_classes_keep_their_declaration_scopes():
+    src = '''
+        def replace(c) -> int:
+            ...
+
+
+        class Outer:
+            @replace
+            class Nested:
+                pass
+
+            def method(self):
+                @replace
+                class Local:
+                    pass
+    '''
+    cu, tmpdir, client = _parse_with_types({'m.py': src})
+    try:
+        classes = _collect_class_declarations(cu)
+        nested = classes['Nested'].type
+        local = classes['Local'].type
+        assert isinstance(nested, JavaType.Class)
+        assert nested.fully_qualified_name == 'm.Outer.Nested'
+        assert isinstance(local, JavaType.Class)
+        assert local.fully_qualified_name == "m.Outer.<locals of function 'method'>.Local"
+    finally:
+        _cleanup_parse(tmpdir, client)
+
+
+@requires_ty_types_cli
 class TestInheritedCallDeclaringType:
     """Attribution of a call to a method the receiver's class does not override."""
 

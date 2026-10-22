@@ -173,7 +173,7 @@ class ParserVisitor(ast.NodeVisitor):
         )
         self._token_idx = 1  # Skip ENCODING token
         self._type_context_depth = 0
-        self._declaring_classes: List[str] = []
+        self._declaration_scopes: List[str] = []
 
     def _byte_offset_to_char_offset(self, lineno: int, byte_offset: int) -> int:
         """Convert a byte offset to a character offset for a given line."""
@@ -550,13 +550,13 @@ class ParserVisitor(ast.NodeVisitor):
         else:
             interfaces = None
             self._token_idx = save_token_idx
-        self._declaring_classes.append(node.name)
+        self._declaration_scopes.append(node.name)
         try:
             body = self.__convert_block(node.body)
             declared_type = self._type_mapping.declared_class_type(
-                node, node.decorator_list, self._declaring_classes)
+                node, node.decorator_list, self._declaration_scopes)
         finally:
-            self._declaring_classes.pop()
+            self._declaration_scopes.pop()
         return j.ClassDeclaration(
             random_id(),
             prefix,
@@ -2343,7 +2343,11 @@ class ParserVisitor(ast.NodeVisitor):
                 returns_tree,
                 getattr(returns_tree, 'type', None)
             )
-        body = self.__convert_block(node.body)
+        self._declaration_scopes.append(f"<locals of function '{node.name}'>")
+        try:
+            body = self.__convert_block(node.body)
+        finally:
+            self._declaration_scopes.pop()
 
         return j.MethodDeclaration(
             random_id(),
