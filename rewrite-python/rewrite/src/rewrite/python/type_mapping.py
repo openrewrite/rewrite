@@ -1070,14 +1070,18 @@ class PythonTypeMapping:
         return None
 
     def declared_class_type(self, node: ast.ClassDef, decorators: Sequence[ast.expr],
-                            enclosing_scopes: Sequence[str]) -> Optional[JavaType.Class]:
+                            enclosing_scopes: Sequence[ast.ClassDef | ast.FunctionDef |
+                                                       ast.AsyncFunctionDef]) -> Optional[JavaType.Class]:
         """The class constructed by ``node``, distinct from the value its decorators bind."""
         type_id = self._lookup_type_id(node)
         if type_id is None:
             return None
 
         module_name = self._source_module_name()
-        class_path = '.'.join(enclosing_scopes)
+        class_path = '.'.join(
+            scope.name if isinstance(scope, ast.ClassDef) else f"<locals of function '{scope.name}'>"
+            for scope in enclosing_scopes
+        )
         fqn = f"{module_name}.{class_path}" if module_name else class_path
         reported = self._resolve_type(type_id)
         candidates = reported.bounds if isinstance(reported, JavaType.Union) else [reported]
