@@ -11,10 +11,13 @@ permissions:
 
 jobs:
   dependency-submission:
+    if: github.event.workflow_run.conclusion == 'success'
     runs-on: ubuntu-latest
     steps:
       - name: Checkout sources
         uses: actions/checkout@v7
+        with:
+          ref: ${{ github.event.workflow_run.head_sha }}
       - uses: actions/setup-java@v5
         with:
           distribution: temurin
@@ -24,7 +27,10 @@ jobs:
       - name: Generate and submit dependency graph
         uses: gradle/actions/dependency-submission@v5
         env:
-          # Exclude all dependencies that originate solely in the 'buildSrc' project
+          # Attribute the released commit to main, the only ref Dependabot alerts are computed for
+          GITHUB_DEPENDENCY_GRAPH_SHA: ${{ github.event.workflow_run.head_sha }}
+          ORG_GRADLE_PROJECT_codegenomeUsername: ${{ secrets.CODEGENOME_USERNAME }}
+          ORG_GRADLE_PROJECT_codegenomePassword: ${{ secrets.CODEGENOME_TOKEN }}
           DEPENDENCY_GRAPH_EXCLUDE_PROJECTS: ':buildSrc'
-          # Exclude dependencies that are only resolved in test classpaths
-          DEPENDENCY_GRAPH_EXCLUDE_CONFIGURATIONS: '.*[Tt]est(Compile|Runtime)Classpath'
+          # Only what ships; plugin, tooling and test classpaths otherwise raise alerts for jars no consumer gets
+          DEPENDENCY_GRAPH_INCLUDE_CONFIGURATIONS: 'runtimeClasspath'
