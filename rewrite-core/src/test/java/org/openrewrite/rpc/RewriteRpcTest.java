@@ -20,6 +20,7 @@ import io.moderne.jsonrpc.JsonRpc;
 import io.moderne.jsonrpc.JsonRpcMethod;
 import io.moderne.jsonrpc.formatter.JsonMessageFormatter;
 import io.moderne.jsonrpc.handler.HeaderDelimitedMessageHandler;
+import lombok.EqualsAndHashCode;
 import lombok.SneakyThrows;
 import lombok.Value;
 import lombok.With;
@@ -820,6 +821,70 @@ class RewriteRpcTest implements RewriteTest {
           .isPresent();
     }
 
+    @Test
+    void markupAddedByRpcRecipeIsAttributed() {
+        Recipe warn = client.prepareRecipe("org.openrewrite.rpc.RewriteRpcTest$WarningRpcRecipe", Map.of("message", "careful"));
+
+        RecipeRun run = new RecipeScheduler().scheduleRun(
+          new CompositeRecipe(List.of(warn, Recipe.noop())),
+          new InMemoryLargeSourceSet(List.of(PlainText.builder().text("hello").sourcePath(Path.of("test.txt")).build())),
+          new InMemoryExecutionContext(), 1, 1);
+
+        assertThat(run.getChangeset().getAllResults().getFirst().getAfter().getMarkers().findFirst(Markup.Warn.class))
+          .hasValueSatisfying(w -> {
+              assertThat(w.getRecipeName()).isEqualTo(WarningRpcRecipe.class.getName());
+              assertThat(w.getRecipeInstanceName()).isEqualTo("Warning RPC recipe `careful`");
+          });
+    }
+
+    @Test
+    void attributionSurvivesALaterRpcRecipeEditingTheFile() {
+        Recipe changeText = client.prepareRecipe("org.openrewrite.text.ChangeText", Map.of("toText", "goodbye"));
+
+        RecipeRun run = new RecipeScheduler().scheduleRun(
+          new CompositeRecipe(List.of(new WarningRpcRecipe("careful"), changeText)),
+          new InMemoryLargeSourceSet(List.of(PlainText.builder().text("hello").sourcePath(Path.of("test.txt")).build())),
+          new InMemoryExecutionContext(), 1, 1);
+
+        PlainText after = (PlainText) run.getChangeset().getAllResults().getFirst().getAfter();
+        assertThat(after.getText()).isEqualTo("goodbye");
+        assertThat(after.getMarkers().findFirst(Markup.Warn.class))
+          .hasValueSatisfying(w -> {
+              assertThat(w.getRecipeName()).isEqualTo(WarningRpcRecipe.class.getName());
+              assertThat(w.getRecipeInstanceName()).isEqualTo("Warning RPC recipe `careful`");
+          });
+    }
+
+    @Test
+    void markupAddedInBatchIsAttributedWhenOneRecipeMadeChanges() {
+        Recipe warn = client.prepareRecipe("org.openrewrite.rpc.RewriteRpcTest$WarningRpcRecipe", Map.of("message", "careful"));
+        Recipe noChange = client.prepareRecipe("org.openrewrite.text.FindAndReplace", Map.of("find", "absent", "replace", "x"));
+
+        RecipeRun run = new RecipeScheduler().scheduleRun(
+          new CompositeRecipe(List.of(warn, noChange)),
+          new InMemoryLargeSourceSet(List.of(PlainText.builder().text("hello").sourcePath(Path.of("test.txt")).build())),
+          new InMemoryExecutionContext(), 1, 1);
+
+        assertThat(run.getChangeset().getAllResults().getFirst().getAfter().getMarkers().findFirst(Markup.Warn.class))
+          .hasValueSatisfying(w -> assertThat(w.getRecipeName()).isEqualTo(WarningRpcRecipe.class.getName()));
+    }
+
+    @Test
+    void batchFailureFlushedDuringALaterRecipeIsAttributedToTheBatchedRecipe() {
+        // the second recipe's precondition keeps it out of the batch, so the batch is flushed during its turn
+        Recipe throwing = client.prepareRecipe("org.openrewrite.rpc.RewriteRpcTest$ThrowingRpcRecipe", Map.of());
+        Recipe gatedOut = new RpcRecipe(client, "gated-out", Recipe.noop().getDescriptor(), "edit:gated-out",
+          TreeVisitor.noop(), null, null, List.of(), false);
+
+        RecipeRun run = new RecipeScheduler().scheduleRun(
+          new CompositeRecipe(List.of(throwing, gatedOut)),
+          new InMemoryLargeSourceSet(List.of(PlainText.builder().text("hello").sourcePath(Path.of("test.txt")).build())),
+          new InMemoryExecutionContext(), 1, 1);
+
+        assertThat(run.getChangeset().getAllResults().getFirst().getAfter().getMarkers().findFirst(Markup.Error.class))
+          .hasValueSatisfying(err -> assertThat(err.getRecipeName()).isEqualTo(ThrowingRpcRecipe.class.getName()));
+    }
+
     /**
      * Source files whose type the remote does not advertise via GetLanguages must
      * not be added to a BatchVisit. Without this gate the remote's receiver crashes
@@ -905,6 +970,27 @@ class RewriteRpcTest implements RewriteTest {
         public PlainText visitText(PlainText text, Integer p) {
             RewriteRpc serving = requireNonNull(RewriteRpc.current(), "expected the serving RewriteRpc to be discoverable");
             return (PlainText) requireNonNull(serving.visit(text, ChangeText.class.getName(), p));
+        }
+    }
+
+    @EqualsAndHashCode(callSuper = false)
+    @Value
+    public static class WarningRpcRecipe extends Recipe {
+        @Option(displayName = "Message", description = "The warning message.", example = "careful")
+        String message;
+
+        String displayName = "Warning RPC recipe";
+
+        String description = "Test recipe that adds a warning during visit.";
+
+        @Override
+        public TreeVisitor<?, ExecutionContext> getVisitor() {
+            return new PlainTextVisitor<>() {
+                @Override
+                public PlainText visitText(PlainText text, ExecutionContext ctx) {
+                    return Markup.warn(text, new IllegalStateException(message));
+                }
+            };
         }
     }
 
