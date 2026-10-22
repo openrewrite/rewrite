@@ -57,6 +57,19 @@ class TestChangeImport:
             )
         )
 
+    def test_crlf_line_breaks(self):
+        spec = RecipeSpec(recipe=ChangeImport(
+            old_module='typing',
+            old_name='Mapping',
+            new_module='collections.abc',
+        ))
+        spec.rewrite_run(
+            python(
+                "import os\r\nfrom typing import Mapping\r\n\r\nx: Mapping = {}\r\n",
+                "import os\r\nfrom collections.abc import Mapping\r\n\r\nx: Mapping = {}\r\n",
+            )
+        )
+
     def test_change_direct_import(self):
         """Change: import os -> import pathlib"""
         spec = RecipeSpec(recipe=ChangeImport(
