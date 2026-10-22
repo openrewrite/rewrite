@@ -227,10 +227,14 @@ class ScalaTypeMapping(typeFactory: JavaTypeFactory, typedTree: tpd.Tree,
     case _: Trees.TypeApply[?] | _: Trees.Select[?] | _: Trees.Ident[?] if tree.symbol == sym =>
       tree.tpe.widenSingleton match {
         case info: (MethodType | ExprType) if !info.isError => Some(info)
+        case value: ValueType if !value.isError && isParameterless(sym) => Some(ExprType(value))
         case _ => None
       }
     case _ => None
   }
+
+  private def isParameterless(sym: Symbol): Boolean =
+    sym.is(Flags.Method) && !sym.info.stripPoly.isInstanceOf[MethodType]
 
   /**
    * Whether the node refers to a method taking parameters, so that applying it calls the method
@@ -697,6 +701,7 @@ class ScalaTypeMapping(typeFactory: JavaTypeFactory, typedTree: tpd.Tree,
     val baseType = mapType(at.tycon) match {
       case p: JavaType.Parameterized => p.getType
       case fq: JavaType.FullyQualified => fq
+      case typeConstructor: JavaType.GenericTypeVariable => return typeConstructor
       case _ => return unknown
     }
 
@@ -727,9 +732,10 @@ class ScalaTypeMapping(typeFactory: JavaTypeFactory, typedTree: tpd.Tree,
 
         underlying match {
           case tb: TypeBounds =>
-            if (!(tb.hi =:= ctx.definitions.AnyType)) {
+            val hi = upperBoundOfKind(tb.hi)
+            if (!(hi =:= ctx.definitions.AnyType)) {
               bounds = new ArrayList[JavaType]()
-              val mapped = mapType(tb.hi)
+              val mapped = mapType(hi)
               if (mapped != null) bounds.add(mapped)
               resolvedVariance = JavaType.GenericTypeVariable.Variance.COVARIANT
             }
@@ -738,6 +744,12 @@ class ScalaTypeMapping(typeFactory: JavaTypeFactory, typedTree: tpd.Tree,
 
         gtv.unsafeSet(name, resolvedVariance, bounds)
       })
+  }
+
+  /** The upper bound of a type constructor `CC[X] <: Iterable[X]` is that of its applications, `Iterable[X]`. */
+  private def upperBoundOfKind(hi: Type): Type = hi match {
+    case lambda: HKTypeLambda => lambda.resType
+    case other => other
   }
 
   private def mapTypeBounds(tb: TypeBounds, sig: String): JavaType = {

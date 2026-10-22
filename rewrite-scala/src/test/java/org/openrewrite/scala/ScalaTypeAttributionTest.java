@@ -24,6 +24,7 @@ import org.openrewrite.SourceFile;
 import org.openrewrite.java.JavaParser;
 import org.openrewrite.java.MethodMatcher;
 import org.openrewrite.java.internal.JavaTypeCache;
+import org.openrewrite.java.search.FindMissingTypes;
 import org.openrewrite.java.tree.Flag;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaType;
@@ -35,6 +36,7 @@ import org.openrewrite.scala.marker.ImplicitConversion;
 import org.openrewrite.scala.marker.ImplicitImport;
 import org.openrewrite.scala.tree.S;
 import org.openrewrite.test.RewriteTest;
+import org.openrewrite.test.TypeValidation;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -281,6 +283,142 @@ class ScalaTypeAttributionTest implements RewriteTest {
                   .satisfies(elems -> assertThat(((JavaType.Parameterized) elems).getTypeParameters()).containsExactly(JavaType.Primitive.Int));
                 assertThat(TypeUtils.toString(listApply.getReturnType())).isEqualTo("scala.collection.immutable.List<java.lang.String>");
                 assertThat(setApply.getDeclaringType().getFullyQualifiedName()).isEqualTo("scala.collection.IterableFactory");
+            })
+          )
+        );
+    }
+
+    @Test
+    void parameterlessPolymorphicFactoryHasInstantiatedReturnType() {
+        rewriteRun(
+          scala(
+            """
+            package p
+            import scala.collection.mutable.ListBuffer
+            class D {
+              val lb = ListBuffer.empty[String]
+              val sq = Seq.empty[String]
+              val st = Set.empty[String]
+              val mb = Map.newBuilder[String, Any]
+            }
+            """,
+            spec -> spec.afterRecipe(cu -> {
+                // given
+                List<J.MethodInvocation> empties = findAll(cu, J.MethodInvocation.class, m -> m.getSimpleName().equals("empty"));
+
+                // when
+                JavaType.Method listBufferEmpty = empties.get(0).getMethodType();
+                JavaType.Method seqEmpty = empties.get(1).getMethodType();
+                JavaType.Method setEmpty = empties.get(2).getMethodType();
+                JavaType.Method mapNewBuilder = method(cu, "newBuilder").getMethodType();
+
+                // then
+                assertThat(TypeUtils.toString(listBufferEmpty.getReturnType()))
+                  .isEqualTo("scala.collection.mutable.ListBuffer<java.lang.String>");
+                assertThat(TypeUtils.toString(seqEmpty.getReturnType()))
+                  .isEqualTo("scala.collection.immutable.Seq<java.lang.String>");
+                assertThat(TypeUtils.toString(setEmpty.getReturnType()))
+                  .isEqualTo("scala.collection.immutable.Set<java.lang.String>");
+                assertThat(TypeUtils.toString(mapNewBuilder.getReturnType()))
+                  .isEqualTo("scala.collection.mutable.Builder<scala.Tuple2<java.lang.String, java.lang.Object>, scala.collection.immutable.Map<java.lang.String, java.lang.Object>>");
+                assertThat(FindMissingTypes.findMissingTypes(cu, false)).extracting(r -> r.getMessage() + ": " + r.getPrintedTree()).isEmpty();
+            })
+          )
+        );
+    }
+
+    @Test
+    void inheritedFactoryOfHigherKindedCompanionHasInstantiatedReturnType() {
+        rewriteRun(
+          scala(
+            """
+            package p
+            abstract class GenericCompanion[+CC[X]] {
+              def empty[A]: CC[A] = ???
+            }
+            abstract class GenMapFactory[CC[A, B]] {
+              def newBuilder[A, B]: Iterator[(A, CC[A, B])] = ???
+            }
+            class Box[A]
+            object Box extends GenericCompanion[Box]
+            class Pairs[A, B]
+            object Pairs extends GenMapFactory[Pairs]
+            class D {
+              val b = Box.empty[String]
+              val p = Pairs.newBuilder[String, Int]
+            }
+            """,
+            spec -> spec.afterRecipe(cu -> {
+                // given
+                J.MethodInvocation boxEmpty = method(cu, "empty");
+                J.MethodInvocation pairsNewBuilder = method(cu, "newBuilder");
+
+                // when
+                JavaType.Method emptyType = boxEmpty.getMethodType();
+                JavaType.Method newBuilderType = pairsNewBuilder.getMethodType();
+
+                // then
+                assertThat(emptyType.getDeclaringType().getFullyQualifiedName()).isEqualTo("p.GenericCompanion");
+                assertThat(TypeUtils.toString(emptyType.getReturnType())).isEqualTo("p.Box<java.lang.String>");
+                assertThat(TypeUtils.toString(newBuilderType.getReturnType()))
+                  .isEqualTo("scala.collection.Iterator<scala.Tuple2<java.lang.String, p.Pairs<java.lang.String, int>>>");
+                assertThat(TypeUtils.isWellFormedType(emptyType)).isTrue();
+                assertThat(TypeUtils.isWellFormedType(newBuilderType)).isTrue();
+            })
+          )
+        );
+    }
+
+    @Test
+    void declaredResultOfHigherKindedTypeParameterIsWellFormed() {
+        rewriteRun(
+          scala(
+            """
+            trait Factory[CC[_]] {
+              def empty[A]: CC[A]
+            }
+            """,
+            spec -> spec.afterRecipe(cu -> {
+                // given
+                J.MethodDeclaration empty = find(cu, J.MethodDeclaration.class, m -> m.getSimpleName().equals("empty"));
+
+                // when
+                JavaType returnType = empty.getMethodType().getReturnType();
+
+                // then
+                assertThat(returnType).isInstanceOf(JavaType.GenericTypeVariable.class);
+                assertThat(((JavaType.GenericTypeVariable) returnType).getName()).isEqualTo("CC");
+                assertThat(((JavaType.GenericTypeVariable) returnType).getBounds()).isEmpty();
+                assertThat(TypeUtils.isWellFormedType(empty.getMethodType())).isTrue();
+            })
+          )
+        );
+    }
+
+    @Test
+    void higherKindedTypeParameterIsBoundedByItsApplication() {
+        rewriteRun(
+          // the parser leaves the bound of a higher-kinded type parameter in its whitespace
+          spec -> spec.typeValidationOptions(TypeValidation.builder().allowNonWhitespaceInWhitespace(true).build()),
+          scala(
+            """
+            trait IterableFactory[CC[X] <: Iterable[X]] {
+              def from[A](it: Iterable[A]): CC[A]
+            }
+            """,
+            spec -> spec.afterRecipe(cu -> {
+                // given
+                J.MethodDeclaration from = find(cu, J.MethodDeclaration.class, m -> m.getSimpleName().equals("from"));
+
+                // when
+                JavaType returnType = from.getMethodType().getReturnType();
+
+                // then
+                assertThat(returnType).isInstanceOf(JavaType.GenericTypeVariable.class);
+                assertThat(((JavaType.GenericTypeVariable) returnType).getBounds())
+                  .singleElement()
+                  .satisfies(bound -> assertThat(TypeUtils.toString(bound)).isEqualTo("scala.collection.Iterable<X>"));
+                assertThat(TypeUtils.isWellFormedType(from.getMethodType())).isTrue();
             })
           )
         );
