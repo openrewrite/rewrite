@@ -4,7 +4,8 @@ Date: 2026-10-20
 
 ## Status
 
-Proposed
+Proposed. Amended 2026-10-21: Poetry and PDM regenerate through ports of their resolvers, and uv's marker
+algebra becomes a port, following [ADR 0013](0013-lock-regeneration-follows-each-package-manager.md).
 
 Amends [9. Native Python lock file regeneration](0009-native-python-lock-regeneration.md) (its Phase B) and
 [10. Native uv.lock delta resolution](0010-native-uv-lock-delta-resolution.md). Decides which package managers get a
@@ -368,3 +369,71 @@ decision should be taken explicitly rather than left to the deferral.
   fixtures.
 - The uv engine's reproduced marker forms are 0.10.11's, and 0.13.2's DNF cover can render the same Boolean function
   differently, so each form is re-recorded against the current release before it stays accepted.
+
+## Amendment 2026-10-21: follow ADR 0013 and port each resolver
+
+The Node engines went through the architecture Decision 1 chose and replaced it. ADR 0011 regenerated a Node lock
+with one shared resolver, a per-dependency proof that an edit leaves the tree unchanged, a byte-preserving patcher,
+and a refusal for every shape the proof could not express.
+
+ADR 0013 records 383 refusals on the npm path alone, and a recording of real npm that contradicted the proof's
+premise. Every Node package manager is now a Java port of its own resolver modules, with their names, control flow
+and iteration order, and writes the whole lock.
+
+The uv corpus loop of 2026-10-21 followed ADR 0011's curve. Each round closed a gap by reimplementing one more part of
+uv: marker lowering, extra-gated disjunctions, simplification under parent reachability, a declared upgrade bounded by
+its dependents, constraint handling. Each reimplementation covers a subset and refuses at its edge. Most of what remains
+is marker algebra that `uv-pep508` already defines.
+
+### Decision
+
+1. **Poetry and PDM are ports, not greedy engines.** This replaces Decision 1 for those two. Each upstream module the
+   lock depends on becomes one Java class named after it, with its control flow and iteration order, and its class
+   Javadoc names the file and release. For Poetry that is the mixology solver and the puzzle provider and solver
+   (about 4,000 lines), poetry-core's markers and constraints (about 4,300), and the locker. For PDM it is resolvelib's
+   resolution, PDM's resolver and providers, and dep-logic's markers (about 3,400 together), and the lockfile writer.
+   What both need from Python itself (dict ordering, `sorted` stability, `str` comparison, `json.dumps`) is ported
+   once in a shared package, as `EcmaScript` and `EventLoop` are for Node.
+2. **uv keeps greedy-forward selection, and its marker algebra becomes a port.** No corpus edit across 375 locks was
+   refused for backtracking, so a PubGrub port does not earn its cost yet, and Decision 1 stands for selection. The
+   marker module of `uv-pep508` (the decision diagram in `algebra.rs`, `simplify.rs`, `lowering.rs` and `tree.rs`,
+   about 7,000 lines) is ported as one library and replaces `UvLockMarkers` and `UvLockReachability`. The lock
+   construction in `uv-lock` (dependency simplification and serialization) follows it. PubGrub is reconsidered when
+   the corpus shows backtracking refusals.
+3. **One target release per manager, the newest reproduced.** A changed lock is written as that release writes it,
+   whatever stamp the lock carries, since a relock by any current release rewrites the whole file in its own shape and
+   most projects run a recent release. This replaces item 8's default of the lock's own stamp. It is a calculated
+   assumption, wrong for a project pinned to an older release, and that project's host names its release through
+   `PythonExecutionContextView` (`setUvVersion` for uv) or, once the parser records it, a marker beside
+   `PythonResolutionResult`. Releases are not swept one by one: goldens are recorded with the target release, and a
+   difference an older release shows is ported only when a host that names that release meets it.
+4. **A written lock is a fixpoint.** After writing, the engine runs again over the edited manifest and the lock it
+   wrote, with no index access, and fails if the result differs. This is the Python form of ADR 0013's
+   `LockOnlyInstall.verify`.
+5. **Scenarios live in `openrewrite/rewrite-python-lock-fixtures`**, as Node's live in
+   `openrewrite/rewrite-javascript-lock-fixtures`. The repository holds every manager's scenarios with an `expect`
+   line for each that is not byte-exact, the recorder scripts, and the corpus tools. The `rewrite-python` build
+   downloads a pinned commit of it and puts `lock/` on the test classpath, and a change that needs new recordings
+   moves the pin with it.
+6. **A refusal says what kind it is.** `RESOLUTION_REQUIRED` covers both "not ported yet" and "the engine cannot know".
+   The two are separated, so the corpus ranks work items apart from the true limits.
+
+Order: the fixtures wiring, then the `uv-pep508` marker port, then pipenv under item 7, then fork and backtracking
+support in the uv engine, then the fixpoint check. The Poetry and PDM ports follow later.
+
+7. **pipenv's contract is an install-correct minimal change.** No pipenv command makes a minimal update, and its
+   output depends on the locking machine (the pipenv 2026.6.2 section above), so byte identity with pipenv has no
+   fixed meaning. The engine edits only the closure an edit moves or adds, resolved greedily over the index in the
+   Linux lock environment it already uses, with every file's hash and `_meta.hash` recomputed. A lock it writes must
+   pass `pipenv verify` and `pipenv sync` in a clean Linux container with the Pipfile's Python, which the pipenv
+   corpus checks with the fixtures repository's `record/pipenv-install-oracle.sh`. Where pipenv would also move
+   unrelated packages, the engine does not. This replaces Decision 2's fail-loud stance for pipenv.
+
+### Consequences
+
+- Poetry and PDM regeneration covers what their resolvers do, at the cost of tracking two more upstreams release by
+  release.
+- The uv engine's marker handling stops growing by hand. Code written for marker forms since ADR 0010 is replaced, not
+  extended.
+- Adding a scenario means adding a directory to the fixtures repository, and a test expectation changes only when a
+  recording says so.
