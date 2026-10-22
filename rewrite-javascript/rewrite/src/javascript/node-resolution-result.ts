@@ -303,7 +303,8 @@ export function createNodeResolutionResultMarker(
      * out of sync for every subsequent file in the build.
      *
      * Shapes seen in the wild and what we do with them:
-     *  - object: pass through.
+     *  - object: keep the string-valued entries. Cordova nests an object
+     *      under `cordovaDependencies`, which npm does not read.
      *  - ["node >=0.6.0"]: split on the first space → {node: ">=0.6.0"}.
      *  - ["node", "rhino"]: bare names with no version. Preserve the
      *      engine list as {node: "*", rhino: "*"}.
@@ -328,7 +329,13 @@ export function createNodeResolutionResultMarker(
             return Object.keys(result).length > 0 ? result : undefined;
         }
         if (typeof engines !== 'object') return undefined;
-        return engines as Record<string, string>;
+        const result: Record<string, string> = {};
+        for (const [name, constraint] of Object.entries(engines)) {
+            if (typeof constraint === 'string') {
+                result[name] = constraint;
+            }
+        }
+        return result;
     }
 
     /**
