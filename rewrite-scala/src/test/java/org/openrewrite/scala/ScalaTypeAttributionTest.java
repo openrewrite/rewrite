@@ -304,7 +304,8 @@ class ScalaTypeAttributionTest implements RewriteTest {
             """,
             spec -> spec.afterRecipe(cu -> {
                 // given
-                List<J.MethodInvocation> empties = findAll(cu, J.MethodInvocation.class, m -> m.getSimpleName().equals("empty"));
+                List<J.MethodInvocation> empties =
+                  findAll(cu, J.MethodInvocation.class, m -> m.getSimpleName().equals("empty"));
 
                 // when
                 JavaType.Method listBufferEmpty = empties.get(0).getMethodType();
@@ -320,8 +321,11 @@ class ScalaTypeAttributionTest implements RewriteTest {
                 assertThat(TypeUtils.toString(setEmpty.getReturnType()))
                   .isEqualTo("scala.collection.immutable.Set<java.lang.String>");
                 assertThat(TypeUtils.toString(mapNewBuilder.getReturnType()))
-                  .isEqualTo("scala.collection.mutable.Builder<scala.Tuple2<java.lang.String, java.lang.Object>, scala.collection.immutable.Map<java.lang.String, java.lang.Object>>");
-                assertThat(FindMissingTypes.findMissingTypes(cu, false)).extracting(r -> r.getMessage() + ": " + r.getPrintedTree()).isEmpty();
+                  .isEqualTo("scala.collection.mutable.Builder<scala.Tuple2<java.lang.String, java.lang.Object>, " +
+                             "scala.collection.immutable.Map<java.lang.String, java.lang.Object>>");
+                assertThat(FindMissingTypes.findMissingTypes(cu, false))
+                  .extracting(r -> r.getMessage() + ": " + r.getPrintedTree())
+                  .isEmpty();
             })
           )
         );

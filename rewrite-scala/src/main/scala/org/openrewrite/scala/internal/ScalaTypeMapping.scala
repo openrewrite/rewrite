@@ -234,7 +234,9 @@ class ScalaTypeMapping(typeFactory: JavaTypeFactory, typedTree: tpd.Tree,
   }
 
   private def isParameterless(sym: Symbol): Boolean =
-    sym.is(Flags.Method) && !sym.info.stripPoly.isInstanceOf[MethodType]
+    sym.is(Flags.Method) && !takesParameters(sym.info)
+
+  private def takesParameters(info: Type): Boolean = info.stripPoly.isInstanceOf[MethodType]
 
   /**
    * Whether the node refers to a method taking parameters, so that applying it calls the method
@@ -245,7 +247,7 @@ class ScalaTypeMapping(typeFactory: JavaTypeFactory, typedTree: tpd.Tree,
       try node.own.tpe match {
         case ref: TermRef =>
           val alternatives = ref.denot.alternatives
-          alternatives.nonEmpty && alternatives.forall(d => d.symbol.is(Flags.Method) && d.info.stripPoly.isInstanceOf[MethodType])
+          alternatives.nonEmpty && alternatives.forall(d => d.symbol.is(Flags.Method) && takesParameters(d.info))
         case _ => false
       } catch {
         case _: Throwable => false
