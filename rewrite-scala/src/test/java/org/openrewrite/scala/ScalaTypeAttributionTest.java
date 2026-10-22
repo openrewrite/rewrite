@@ -1510,7 +1510,7 @@ class ScalaTypeAttributionTest implements RewriteTest {
     }
 
     @Test
-    void unionTypesAreMappedToTheirJoin() {
+    void inferredUnionTypesAreMultiCatch() {
         rewriteRun(
           scala(
             """
@@ -1518,10 +1518,9 @@ class ScalaTypeAttributionTest implements RewriteTest {
             object U {
               val a = Array("1", true)
               val m = Map("id" -> "x", "f" -> Map("a" -> 1))
-              val u: String | Int = 1
               def r(xs: List[Any]) = xs.map { case s: String => s; case i: Int => i }
               def n(xs: List[String]) = xs.foreach { case null => 1; case v => v }
-              def j(b: Boolean) = if (b) new java.util.ArrayList[String] else new java.util.LinkedList[String]
+              def k(b: Boolean) = if (b) "s" else 1
             }
             """,
             spec -> spec.afterRecipe(cu -> {
@@ -1530,8 +1529,7 @@ class ScalaTypeAttributionTest implements RewriteTest {
                 List<J.MethodDeclaration> declarations = findAll(cu, J.MethodDeclaration.class, m -> true);
                 JavaType.Array aType = TypeUtils.asArray(find(cu, J.VariableDeclarations.NamedVariable.class, v -> v.getSimpleName().equals("a")).getType());
                 JavaType.Parameterized mType = TypeUtils.asParameterized(find(cu, J.VariableDeclarations.NamedVariable.class, v -> v.getSimpleName().equals("m")).getType());
-                JavaType uType = find(cu, J.VariableDeclarations.NamedVariable.class, v -> v.getSimpleName().equals("u")).getType();
-                JavaType.Method jType = find(cu, J.MethodDeclaration.class, m -> m.getSimpleName().equals("j")).getMethodType();
+                JavaType.Method kType = find(cu, J.MethodDeclaration.class, m -> m.getSimpleName().equals("k")).getMethodType();
                 assertThat(FindMissingTypes.findMissingTypes(cu, false)).extracting(FindMissingTypes.MissingTypeResult::getPrintedTree).isEmpty();
                 assertThat(variables).allSatisfy(v -> {
                     assertThat(TypeUtils.isWellFormedType(v.getType())).as(v.getSimpleName()).isTrue();
@@ -1540,11 +1538,62 @@ class ScalaTypeAttributionTest implements RewriteTest {
                 assertThat(invocations).allSatisfy(m -> assertThat(TypeUtils.isWellFormedType(m.getMethodType())).as(m.getSimpleName()).isTrue());
                 assertThat(declarations).allSatisfy(m -> assertThat(TypeUtils.isWellFormedType(m.getMethodType())).as(m.getSimpleName()).isTrue());
                 assertThat(aType).isNotNull();
-                assertThat(TypeUtils.isOfClassType(aType.getElemType(), "java.lang.Object")).isTrue();
+                assertThat(unionMembers(aType.getElemType())).containsExactly("boolean", "java.lang.String");
                 assertThat(mType).isNotNull();
-                assertThat(TypeUtils.isOfClassType(mType.getTypeParameters().get(1), "java.lang.Object")).isTrue();
-                assertThat(TypeUtils.isOfClassType(uType, "java.lang.Object")).isTrue();
-                assertThat(TypeUtils.isOfClassType(jType.getReturnType(), "java.util.AbstractList")).isTrue();
+                assertThat(unionMembers(mType.getTypeParameters().get(1)))
+                  .containsExactly("java.lang.String", "scala.collection.immutable.Map<java.lang.String, int>");
+                assertThat(unionMembers(kType.getReturnType())).containsExactly("int", "java.lang.String");
+            })
+          )
+        );
+    }
+
+    @Test
+    void writtenUnionTypeIsMultiCatch() {
+        rewriteRun(
+          scala(
+            """
+            object U {
+              val u: String | Int = 1
+              val w: Int | String = 1
+              val lit: 1 | 2 = 1
+            }
+            """,
+            spec -> spec.afterRecipe(cu -> {
+                JavaType uType = find(cu, J.VariableDeclarations.NamedVariable.class, v -> v.getSimpleName().equals("u")).getType();
+                JavaType wType = find(cu, J.VariableDeclarations.NamedVariable.class, v -> v.getSimpleName().equals("w")).getType();
+                JavaType litType = find(cu, J.VariableDeclarations.NamedVariable.class, v -> v.getSimpleName().equals("lit")).getType();
+                List<S.UnionType> unionTrees = findAll(cu, S.UnionType.class, t -> true);
+                assertThat(FindMissingTypes.findMissingTypes(cu, false)).extracting(FindMissingTypes.MissingTypeResult::getPrintedTree).isEmpty();
+                assertThat(unionMembers(uType)).containsExactly("int", "java.lang.String");
+                assertThat(wType).isSameAs(uType);
+                assertThat(unionTrees.getFirst().getType()).isSameAs(uType);
+                assertThat(litType).isEqualTo(JavaType.Primitive.Int);
+            })
+          )
+        );
+    }
+
+    @Test
+    void nullTypeIsPrimitiveNull() {
+        rewriteRun(
+          scala(
+            """
+            object U {
+              val n: Null = null
+              val s: String | Null = null
+            }
+            """,
+            spec -> spec.afterRecipe(cu -> {
+                JavaType nType = find(cu, J.VariableDeclarations.NamedVariable.class, v -> v.getSimpleName().equals("n")).getType();
+                JavaType sType = find(cu, J.VariableDeclarations.NamedVariable.class, v -> v.getSimpleName().equals("s")).getType();
+                assertThat(FindMissingTypes.findMissingTypes(cu, false)).extracting(FindMissingTypes.MissingTypeResult::getPrintedTree).isEmpty();
+                assertThat(nType).isSameAs(JavaType.Primitive.Null);
+                assertThat(sType).isInstanceOf(JavaType.MultiCatch.class);
+                assertThat(((JavaType.MultiCatch) sType).getThrowableTypes())
+                  .satisfiesExactly(
+                    t -> assertThat(TypeUtils.isOfClassType(t, "java.lang.String")).isTrue(),
+                    t -> assertThat(t).isSameAs(JavaType.Primitive.Null));
             })
           )
         );
@@ -1563,16 +1612,20 @@ class ScalaTypeAttributionTest implements RewriteTest {
                 List<J.Identifier> e1 = findAll(cu, J.Identifier.class, i -> i.getSimpleName().equals("e1"));
                 JavaType.Variable fieldType = e1.getFirst().getFieldType();
                 assertThat(FindMissingTypes.findMissingTypes(cu, false)).extracting(FindMissingTypes.MissingTypeResult::getPrintedTree).isEmpty();
-                assertThat(e1).hasSize(2).allSatisfy(i -> assertThat(i.getType()).isInstanceOf(JavaType.MultiCatch.class));
+                assertThat(e1).hasSize(2).allSatisfy(i -> assertThat(unionMembers(i.getType()))
+                  .containsExactly("java.lang.IllegalArgumentException", "java.lang.IllegalStateException"));
                 assertThat(fieldType).isNotNull();
-                assertThat(((JavaType.MultiCatch) fieldType.getType()).getThrowableTypes())
-                  .extracting(t -> ((JavaType.FullyQualified) t).getFullyQualifiedName())
-                  .containsExactly("java.lang.IllegalArgumentException", "java.lang.IllegalStateException");
+                assertThat(fieldType.getType()).isSameAs(e1.getFirst().getType());
                 assertThat(method(cu, "getMessage").getMethodType().getDeclaringType().getFullyQualifiedName())
                   .isEqualTo("java.lang.Throwable");
             })
           )
         );
+    }
+
+    private static List<String> unionMembers(@Nullable JavaType type) {
+        assertThat(type).isInstanceOf(JavaType.MultiCatch.class);
+        return ((JavaType.MultiCatch) type).getThrowableTypes().stream().map(JavaType::toString).toList();
     }
 
     private static J.Identifier lambdaParameter(J cu, String name) {

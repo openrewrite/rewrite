@@ -48,7 +48,7 @@ import java.util.function.Supplier;
  *       factory caches and returns it. No half-built object is ever
  *       observable through the cache. Used for variants without self-recursion
  *       on the same key: {@link #methodFor}, {@link #variableFor},
- *       {@link #arrayFor}, {@link #intersectionFor}.</li>
+ *       {@link #arrayFor}, {@link #intersectionFor}, {@link #multiCatchFor}.</li>
  * </ol>
  * <p>
  * Parser code that needs a canonical identity-stable {@link JavaType.Class}
@@ -218,4 +218,13 @@ public interface JavaTypeFactory {
      */
     JavaType.Intersection intersectionFor(String signature,
                                           Supplier<JavaType.Intersection> builder);
+
+    /**
+     * Atomic build for {@link JavaType.MultiCatch}, which also describes a union type.
+     *
+     * @param signature an opaque per-factory key from a {@link JavaTypeSignatureBuilder}
+     *                  built from the union's alternatives.
+     */
+    JavaType.MultiCatch multiCatchFor(String signature,
+                                      Supplier<JavaType.MultiCatch> builder);
 }

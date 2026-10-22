@@ -156,4 +156,16 @@ public class DefaultJavaTypeFactory implements JavaTypeFactory {
         cache.put(signature, built);
         return built;
     }
+
+    @Override
+    public JavaType.MultiCatch multiCatchFor(String signature,
+                                             Supplier<JavaType.MultiCatch> builder) {
+        JavaType.MultiCatch cached = cache.get(signature);
+        if (cached != null) {
+            return cached;
+        }
+        JavaType.MultiCatch built = builder.get();
+        cache.put(signature, built);
+        return built;
+    }
 }

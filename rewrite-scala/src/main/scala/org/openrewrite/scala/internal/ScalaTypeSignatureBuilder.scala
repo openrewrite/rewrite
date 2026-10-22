@@ -61,7 +61,7 @@ class ScalaTypeSignatureBuilder(using ctx: Context) {
         case at: AndType =>
           signature(at.tp1) + " & " + signature(at.tp2)
         case ot: OrType =>
-          signature(join(ot))
+          unionMembers(ot).map(_._1).mkString(" | ")
         case NoType =>
           "{undefined}"
         case _ =>
@@ -190,13 +190,14 @@ class ScalaTypeSignatureBuilder(using ctx: Context) {
     else if (method.is(Flags.JavaDefined)) pt.translateParameterized(ctx.definitions.RepeatedParamClass, ctx.definitions.ArrayClass)
     else pt.translateFromRepeated(toArray = false)
 
-  /**
-   * The least class type a value of the union may have, as Java would see it: a union has
-   * no Java counterpart, so it is described by its join (`String | Int` is `Matchable`).
-   */
-  def join(ot: OrType): Type = ot.join match {
-    case _: OrType => ctx.definitions.ObjectType
-    case joined => joined
+  // Sorted so that `A | B` and `B | A` share one cache key.
+  def unionMembers(ot: OrType): List[(String, Type)] =
+    unionAlternatives(ot).map(t => signature(t) -> t).distinctBy(_._1).sortBy(_._1)
+
+  private def unionAlternatives(tpe: Type): List[Type] = tpe.dealias match {
+    case ot: OrType => unionAlternatives(ot.tp1) ++ unionAlternatives(ot.tp2)
+    case nothing if nothing.isExactlyNothing => Nil
+    case other => List(other)
   }
 
   def variableSignature(sym: Symbols.Symbol): String = {

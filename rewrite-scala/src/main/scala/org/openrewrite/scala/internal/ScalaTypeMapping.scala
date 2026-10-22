@@ -609,7 +609,7 @@ class ScalaTypeMapping(typeFactory: JavaTypeFactory, typedTree: tpd.Tree,
         case tp: TypeParamRef => mapGenericTypeVariable(tp, sig)
         case tb: TypeBounds => mapTypeBounds(tb, sig)
         case at: AndType => mapType(at.tp1)
-        case ot: OrType => mapType(signatureBuilder.join(ot))
+        case ot: OrType => mapUnionType(ot, sig)
         case ci: ClassInfo =>
           // Use the class symbol's TypeRef signature to be consistent with TypeRef-based lookups.
           // This prevents creating duplicate JavaType.Class instances for the same type.
@@ -627,6 +627,12 @@ class ScalaTypeMapping(typeFactory: JavaTypeFactory, typedTree: tpd.Tree,
     } catch {
       case _: Throwable => unknown
     }
+  }
+
+  private def mapUnionType(ot: OrType, sig: String): JavaType = signatureBuilder.unionMembers(ot) match {
+    case Nil => mapType(ctx.definitions.NothingType)
+    case (_, only) :: Nil => mapType(only)
+    case members => typeFactory.multiCatchFor(sig, () => new JavaType.MultiCatch(members.map(m => mapType(m._2)).asJava))
   }
 
   /** Map a MethodType to its result type (for expressions that are method calls). */
@@ -670,6 +676,7 @@ class ScalaTypeMapping(typeFactory: JavaTypeFactory, typedTree: tpd.Tree,
       case "scala.Double" => return JavaType.Primitive.Double
       case "scala.Boolean" => return JavaType.Primitive.Boolean
       case "scala.Unit" => return JavaType.Primitive.Void
+      case "scala.Null" => return JavaType.Primitive.Null
       case "scala.Matchable" => return mapType(ctx.definitions.ObjectType)
       case _ =>
     }
@@ -688,7 +695,7 @@ class ScalaTypeMapping(typeFactory: JavaTypeFactory, typedTree: tpd.Tree,
     val sym = tmr.symbol
     if (!sym.exists) return unknown
     val underlying = tmr.underlying
-    if (underlying != null && underlying != NoType) mapVariableInfo(underlying)
+    if (underlying != null && underlying != NoType) mapType(underlying)
     else unknown
   }
 
@@ -893,28 +900,10 @@ class ScalaTypeMapping(typeFactory: JavaTypeFactory, typedTree: tpd.Tree,
     typeFactory.variableFor(sig, () => {
       val variable = new JavaType.Variable(null, flagsBits, sym.name.toString, null, null, null)
       val ownerType = try { variableOwner(sym) } catch { case _: Throwable => unknown }
-      val varType = try { mapVariableInfo(signatureBuilder.parameterType(sym.owner, sym.info)) } catch { case _: Throwable => unknown }
+      val varType = try { mapType(signatureBuilder.parameterType(sym.owner, sym.info)) } catch { case _: Throwable => unknown }
       variable.unsafeSet(ownerType, varType, null.asInstanceOf[java.util.List[JavaType.FullyQualified]])
       variable
     })
-  }
-
-  /**
-   * A variable of a union of exceptions, such as `e` in `case e @ (_: A | _: B) =>`, is typed
-   * as Java types the parameter of a multi-catch.
-   */
-  private def mapVariableInfo(info: Type): JavaType = info.dealias match {
-    case ot: OrType =>
-      val alternatives = unionAlternatives(ot)
-      if (alternatives.forall(_.classSymbol.derivesFrom(ctx.definitions.ThrowableClass)))
-        new JavaType.MultiCatch(alternatives.map(mapType).asJava)
-      else mapType(ot)
-    case _ => mapType(info)
-  }
-
-  private def unionAlternatives(tpe: Type): List[Type] = tpe.dealias match {
-    case ot: OrType => unionAlternatives(ot.tp1) ++ unionAlternatives(ot.tp2)
-    case other => List(other)
   }
 
   /**
