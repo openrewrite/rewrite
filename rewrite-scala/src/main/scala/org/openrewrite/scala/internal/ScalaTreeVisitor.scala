@@ -77,7 +77,14 @@ class ScalaTreeVisitor(
   private var cursor = 0
   private var isInImportContext = false
   private var currentSyntheticParams: Set[String] = Set.empty
+  private var inPattern = false
   private val namedArgumentCalls = new java.util.IdentityHashMap[Trees.NamedArg[?], Trees.Apply[?]]()
+
+  private def patternContext[T](pattern: Boolean)(visit: => T): T = {
+    val saved = inPattern
+    inPattern = pattern
+    try visit finally inPattern = saved
+  }
 
   /** Look up JavaType by span (primary) or name (fallback). */
   private def typeFor(span: Spans.Span): JavaType = typeMapping.map(_.typeFor(span)).orNull
@@ -474,9 +481,16 @@ class ScalaTreeVisitor(
     
     if (isAnnotationPattern) {
       // This is an annotation - convert to J.Annotation
-      return visitAnnotation(app)
+      return patternContext(pattern = false)(visitAnnotation(app))
     }
-    
+
+    if (inPattern) app.fun match {
+      case sel: Trees.Select[?] if sel.name.toString == "<init>" =>
+      case id: Trees.Ident[?] if id.name.toString == "<init>" =>
+      case _: Trees.Ident[?] | _: Trees.Select[?] | _: Trees.TypeApply[?] => return visitExtractorPattern(app)
+      case _ =>
+    }
+
     app.fun match {
       case newTree: Trees.New[?] =>
         // This is a constructor call with arguments (shouldn't happen in Scala 3)
@@ -1612,6 +1626,7 @@ class ScalaTreeVisitor(
   }
   
   private def visitInfixOp(infixOp: untpd.InfixOp): J = {
+    if (inPattern) return visitInfixExtractorPattern(infixOp)
     val opName = infixOp.op.name.toString
 
     // Compound assignment like +=, -=, *=, etc. Must end with a single '=' and base
@@ -1830,6 +1845,75 @@ class ScalaTreeVisitor(
       JContainer.build(Space.EMPTY, args, Markers.EMPTY),
       methodTypeOfTree(infixOp)
     )
+  }
+
+  /**
+   * An extractor pattern `Some(v)`, `Array(x, y)` or `NonFatal(e)` is a call of the extractor's
+   * `unapply` or `unapplySeq` that matches rather than constructs, so it maps to a
+   * `J.DeconstructionPattern` like a Java record pattern instead of an invocation.
+   */
+  private def visitExtractorPattern(app: Trees.Apply[?]): J.DeconstructionPattern = {
+    val prefix = extractPrefix(app.span)
+    val deconstructor = withExtractorType(patternContext(pattern = false)(visitTree(app.fun)), methodTypeOfTree(app))
+
+    val openParen = positionOfNext("(")
+    val beforeParen = if (openParen > cursor) ScalaSpace.format(source, cursor, openParen) else Space.EMPTY
+    if (openParen >= 0) cursor = openParen + 1
+    val nested = new util.ArrayList[JRightPadded[J]]()
+    if (app.args.isEmpty) {
+      val closeParen = positionOfNext(")")
+      if (closeParen > cursor) {
+        nested.add(JRightPadded.build(new J.Empty(Tree.randomId(), ScalaSpace.format(source, cursor, closeParen), Markers.EMPTY)))
+      }
+    }
+    for ((arg, i) <- app.args.zipWithIndex) {
+      val pattern = visitTree(arg)
+      if (pattern == null) throw unmappedException(arg)
+      val argEnd = Math.max(cursor, Math.max(0, arg.span.end - offsetAdjustment))
+      val delimiter = positionOfNext(if (i == app.args.length - 1) ")" else ",", argEnd)
+      val after = if (delimiter > argEnd) ScalaSpace.format(source, argEnd, delimiter) else Space.EMPTY
+      if (delimiter >= 0) cursor = delimiter + 1
+      nested.add(JRightPadded.build(pattern).withAfter(after))
+    }
+    updateCursor(app.span.end)
+
+    new J.DeconstructionPattern(Tree.randomId(), prefix, Markers.EMPTY, deconstructor,
+      JContainer.build(beforeParen, nested, Markers.EMPTY), typeOfTree(app))
+  }
+
+  /** An infix extractor pattern such as `h :: t`, which matches `::(h, t)`. */
+  private def visitInfixExtractorPattern(infixOp: untpd.InfixOp): J.DeconstructionPattern = {
+    val prefix = extractPrefix(infixOp.span)
+    val left = visitTree(infixOp.left)
+    if (left == null) throw unmappedException(infixOp.left)
+
+    val opStart = Math.max(0, infixOp.op.span.start - offsetAdjustment)
+    val beforeOp = if (opStart > cursor) ScalaSpace.format(source, cursor, opStart) else Space.EMPTY
+    cursor = Math.max(cursor, Math.max(0, infixOp.op.span.end - offsetAdjustment))
+    val op = withExtractorType(
+      ident(infixOp.op.name.toString, beforeOp, quoted = isBacktickQuoted(infixOp.op.span)),
+      methodTypeOfTree(infixOp))
+
+    val right = visitTree(infixOp.right)
+    if (right == null) throw unmappedException(infixOp.right)
+    updateCursor(infixOp.span.end)
+
+    val nested = new util.ArrayList[JRightPadded[J]]()
+    nested.add(JRightPadded.build(left))
+    nested.add(JRightPadded.build(right))
+    new J.DeconstructionPattern(Tree.randomId(), prefix, Markers.build(Collections.singletonList(InfixNotation.create())),
+      op, JContainer.build(Space.EMPTY, nested, Markers.EMPTY), typeOfTree(infixOp))
+  }
+
+  /** An extractor name the typer left untyped, like the operator of `h :: t`, is typed by the owner of its `unapply`. */
+  private def withExtractorType(extractor: J, unapply: JavaType.Method): Expression = {
+    val extractorType = if (unapply == null) null else unapply.getDeclaringType
+    extractor match {
+      case id: J.Identifier if extractorType != null && (id.getType == null || id.getType.isInstanceOf[JavaType.Unknown]) =>
+        id.withType(extractorType)
+      case e: Expression => e
+      case _ => throw new IllegalStateException(s"Extractor did not map to an Expression: ${extractor.getClass.getName}")
+    }
   }
 
   private def visitParentheses(parens: untpd.Parens): J = {
@@ -7355,7 +7439,7 @@ class ScalaTreeVisitor(
     val ck = if (cursor < source.length) source.substring(cursor, Math.min(cursor + 20, source.length)) else ""
     val cki = positionOfNextIn(ck, "case", 0); if (cki >= 0) cursor = cursor + cki + 4
 
-    val patternJ = visitTree(caseDef.pat) match { case j: J => j; case null => ident("_", Space.format(" ")) }
+    val patternJ = patternContext(pattern = true)(visitTree(caseDef.pat)) match { case j: J => j; case null => ident("_", Space.format(" ")) }
 
     // Handle guard: `case x if condition =>`
     // Store space-before-if in label's after space so the printer can emit it.
@@ -8142,7 +8226,7 @@ class ScalaTreeVisitor(
       if (kind == S.For.Enumerator.Kind.Assignment && isGivenEnumeratorPat(lhsTree)) {
         lhs = buildGivenEnumeratorLhs(lhsTree)
       } else {
-        lhs = visitTree(lhsTree)
+        lhs = patternContext(pattern = true)(visitTree(lhsTree))
       }
     }
 
@@ -8484,7 +8568,7 @@ class ScalaTreeVisitor(
    * `S.FunctionType`. For other tree shapes, delegates to `visitTree` and accepts any result
    * that is already a `TypeTree`.
    */
-  private def visitTypeTree(tpt: Trees.Tree[?]): TypeTree = tpt match {
+  private def visitTypeTree(tpt: Trees.Tree[?]): TypeTree = patternContext(pattern = false)(tpt match {
     case f: untpd.Function => visitFunctionType(f)
     case po: untpd.PostfixOp if po.op != null && po.op.name.toString == "*" =>
       visitRepeatedType(po)
@@ -8497,7 +8581,7 @@ class ScalaTreeVisitor(
         case tt: TypeTree => tt
         case _ => null
       }
-  }
+  })
 
   /**
    * Type-level infix operators are parsed as an `untpd.InfixOp`. They are modeled
