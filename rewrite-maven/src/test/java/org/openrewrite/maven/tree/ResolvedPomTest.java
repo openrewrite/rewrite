@@ -32,6 +32,9 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Set;
+import java.util.TreeSet;
+import java.util.stream.Collectors;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -918,4 +921,134 @@ class ResolvedPomTest implements RewriteTest {
           .knownToExist(true)
           .build();
     }
+
+    @Test
+    void dependencyResolution() {
+        // A minimal, fully synthetic dependency graph exercising every interesting case for scope-bucket
+        // membership without a large, real-world transitive closure to enumerate:
+        //   app -[compile]-> lib -[runtime]-> runtime-transitive   (a transitive dependency that is
+        //                                                            "runtime" in its own pom, reached
+        //                                                            beneath a "compile" root)
+        //   app -[provided]-> provided-leaf   (a direct "provided" dependency also belongs on the
+        //                                      compile and test classpaths, but not runtime)
+        //   app -[runtime]->  runtime-leaf
+        //   app -[test]->     test-leaf
+        rewriteRun(
+          pomXml("""
+            <project>
+              <groupId>com.example</groupId>
+              <artifactId>app</artifactId>
+              <version>1</version>
+              <dependencies>
+                <dependency>
+                  <groupId>com.example</groupId>
+                  <artifactId>lib</artifactId>
+                  <version>1</version>
+                </dependency>
+                <dependency>
+                  <groupId>com.example</groupId>
+                  <artifactId>provided-leaf</artifactId>
+                  <version>1</version>
+                  <scope>provided</scope>
+                </dependency>
+                <dependency>
+                  <groupId>com.example</groupId>
+                  <artifactId>runtime-leaf</artifactId>
+                  <version>1</version>
+                  <scope>runtime</scope>
+                </dependency>
+                <dependency>
+                  <groupId>com.example</groupId>
+                  <artifactId>test-leaf</artifactId>
+                  <version>1</version>
+                  <scope>test</scope>
+                </dependency>
+              </dependencies>
+            </project>
+            """,
+            spec -> spec.path("pom.xml").afterRecipe(pom -> {
+                MavenResolutionResult resolution = pom.getMarkers().findFirst(MavenResolutionResult.class).orElseThrow();
+                assertThat(coordinates(resolution, Scope.Compile)).isEqualTo(Set.of(
+                  "com.example:lib:1",
+                  "com.example:provided-leaf:1"
+                ));
+                assertThat(coordinates(resolution, Scope.Provided)).isEqualTo(Set.of(
+                  "com.example:provided-leaf:1"
+                ));
+                assertThat(coordinates(resolution, Scope.Runtime)).isEqualTo(Set.of(
+                  "com.example:lib:1",
+                  "com.example:runtime-leaf:1",
+                  "com.example:runtime-transitive:1"
+                ));
+                assertThat(coordinates(resolution, Scope.Test)).isEqualTo(Set.of(
+                  "com.example:lib:1",
+                  "com.example:provided-leaf:1",
+                  "com.example:runtime-leaf:1",
+                  "com.example:runtime-transitive:1",
+                  "com.example:test-leaf:1"
+                ));
+            })
+          ),
+          pomXml("""
+            <project>
+              <groupId>com.example</groupId>
+              <artifactId>lib</artifactId>
+              <version>1</version>
+              <dependencies>
+                <dependency>
+                  <groupId>com.example</groupId>
+                  <artifactId>runtime-transitive</artifactId>
+                  <version>1</version>
+                  <scope>runtime</scope>
+                </dependency>
+              </dependencies>
+            </project>
+            """,
+            spec -> spec.path("lib/pom.xml")
+          ),
+          pomXml("""
+            <project>
+              <groupId>com.example</groupId>
+              <artifactId>runtime-transitive</artifactId>
+              <version>1</version>
+            </project>
+            """,
+            spec -> spec.path("runtime-transitive/pom.xml")
+          ),
+          pomXml("""
+            <project>
+              <groupId>com.example</groupId>
+              <artifactId>provided-leaf</artifactId>
+              <version>1</version>
+            </project>
+            """,
+            spec -> spec.path("provided-leaf/pom.xml")
+          ),
+          pomXml("""
+            <project>
+              <groupId>com.example</groupId>
+              <artifactId>runtime-leaf</artifactId>
+              <version>1</version>
+            </project>
+            """,
+            spec -> spec.path("runtime-leaf/pom.xml")
+          ),
+          pomXml("""
+            <project>
+              <groupId>com.example</groupId>
+              <artifactId>test-leaf</artifactId>
+              <version>1</version>
+            </project>
+            """,
+            spec -> spec.path("test-leaf/pom.xml")
+          )
+        );
+    }
+
+    private static Set<String> coordinates(MavenResolutionResult resolution, Scope scope) {
+        return resolution.getDependencies().get(scope).stream()
+          .map(d -> d.getGav().toString())
+          .collect(Collectors.toCollection(TreeSet::new));
+    }
+
 }

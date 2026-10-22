@@ -868,6 +868,49 @@ class ExcludeDependencyTest implements RewriteTest {
     }
 
     @Test
+    void secondExcludeSeesTransitivesAfterFirstChangesModel() {
+        rewriteRun(
+          spec -> spec.recipes(
+            new ExcludeDependency("commons-logging", "commons-logging", null),
+            new ExcludeDependency("commons-codec", "commons-codec", null)),
+          buildGradle(
+            """
+              plugins {
+                  id 'java-library'
+              }
+
+              repositories {
+                  mavenCentral()
+              }
+
+              dependencies {
+                  implementation 'org.apache.httpcomponents:httpclient:4.5.13'
+              }
+              """,
+            """
+              plugins {
+                  id 'java-library'
+              }
+
+              repositories {
+                  mavenCentral()
+              }
+
+              dependencies {
+                  implementation('org.apache.httpcomponents:httpclient:4.5.13') {
+                      exclude group: 'commons-logging', module: 'commons-logging'
+                      exclude group: 'commons-codec', module: 'commons-codec'
+                  }
+              }
+              """,
+            spec -> spec.afterRecipe(cu -> assertThat(resolved(cu, "compileClasspath"))
+              .doesNotContain("commons-logging:commons-logging", "commons-codec:commons-codec")
+              .contains("org.apache.httpcomponents:httpcore"))
+          )
+        );
+    }
+
+    @Test
     void validationFailsWhenBothCoordinatesAreOmitted() {
         assertThat(new ExcludeDependency(null, null, null).validate().isValid()).isFalse();
         assertThat(new ExcludeDependency("*", "*", null).validate().isValid()).isFalse();
