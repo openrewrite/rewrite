@@ -2909,6 +2909,91 @@ class TestSupertypeChainResolution:
 
 
 @requires_ty_types_cli
+@pytest.mark.parametrize('decorator', ['mock.patch.object(Request, "send")', 'mock.patch("m.Request.send")'])
+def test_a_class_decorated_into_a_union_is_typed_as_itself(decorator):
+    """A decorator read through a name bound twice types the decorated binding as a union,
+    which a class declaration, as the class it declares, never is."""
+    src = f'''
+        try:
+            from unittest import mock
+        except ImportError:
+            import mock
+
+
+        class Request:
+            def send(self): ...
+
+
+        @{decorator}
+        class TestBuildProxy:
+            pass
+    '''
+    cu, tmpdir, client = _parse_with_types({'m.py': src})
+    try:
+        declared = _collect_class_declarations(cu)['TestBuildProxy'].type
+        assert isinstance(declared, JavaType.Class)
+        assert declared.fully_qualified_name == 'm.TestBuildProxy'
+    finally:
+        _cleanup_parse(tmpdir, client)
+
+
+@requires_ty_types_cli
+@pytest.mark.parametrize('returned', ['int', '"Bar"'])
+def test_a_class_decorated_into_another_type_is_typed_as_itself(returned):
+    src = f'''
+        class Bar:
+            pass
+
+
+        def replace(c) -> {returned}:
+            ...
+
+
+        @replace
+        class Foo:
+            pass
+    '''
+    cu, tmpdir, client = _parse_with_types({'m.py': src})
+    try:
+        declared = _collect_class_declarations(cu)['Foo'].type
+        assert isinstance(declared, JavaType.Class)
+        assert declared.fully_qualified_name == 'm.Foo'
+        assert [annotation.fully_qualified_name for annotation in declared._annotations] == ['m.replace']
+    finally:
+        _cleanup_parse(tmpdir, client)
+
+
+@requires_ty_types_cli
+def test_decorated_nested_classes_keep_their_declaration_scopes():
+    src = '''
+        def replace(c) -> int:
+            ...
+
+
+        class Outer:
+            @replace
+            class Nested:
+                pass
+
+            def method(self):
+                @replace
+                class Local:
+                    pass
+    '''
+    cu, tmpdir, client = _parse_with_types({'m.py': src})
+    try:
+        classes = _collect_class_declarations(cu)
+        nested = classes['Nested'].type
+        local = classes['Local'].type
+        assert isinstance(nested, JavaType.Class)
+        assert nested.fully_qualified_name == 'm.Outer.Nested'
+        assert isinstance(local, JavaType.Class)
+        assert local.fully_qualified_name == "m.Outer.<locals of function 'method'>.Local"
+    finally:
+        _cleanup_parse(tmpdir, client)
+
+
+@requires_ty_types_cli
 class TestInheritedCallDeclaringType:
     """Attribution of a call to a method the receiver's class does not override."""
 

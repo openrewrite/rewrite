@@ -48,6 +48,7 @@ TSTRING_END = getattr(token, 'TSTRING_END', -7)
 # AST types for t-strings (Python 3.14+); sentinels on older versions
 _TemplateStr = getattr(ast, 'TemplateStr', type('_TemplateStr', (), {}))
 _Interpolation = getattr(ast, 'Interpolation', type('_Interpolation', (), {}))
+_DeclarationScope = ast.ClassDef | ast.FunctionDef | ast.AsyncFunctionDef
 
 # Token types to skip when looking for significant (non-whitespace) tokens
 _SKIP_TOKEN_TYPES = (token.NL, token.NEWLINE, token.INDENT, token.DEDENT,
@@ -173,6 +174,7 @@ class ParserVisitor(ast.NodeVisitor):
         )
         self._token_idx = 1  # Skip ENCODING token
         self._type_context_depth = 0
+        self._declaration_scopes: List[_DeclarationScope] = []
 
     def _byte_offset_to_char_offset(self, lineno: int, byte_offset: int) -> int:
         """Convert a byte offset to a character offset for a given line."""
@@ -549,6 +551,13 @@ class ParserVisitor(ast.NodeVisitor):
         else:
             interfaces = None
             self._token_idx = save_token_idx
+        self._declaration_scopes.append(node)
+        try:
+            body = self.__convert_block(node.body)
+            declared_type = self._type_mapping.declared_class_type(
+                node, node.decorator_list, self._declaration_scopes)
+        finally:
+            self._declaration_scopes.pop()
         return j.ClassDeclaration(
             random_id(),
             prefix,
@@ -568,8 +577,8 @@ class ParserVisitor(ast.NodeVisitor):
             None,  # no `extends`, all in `implements`
             interfaces,
             None,
-            self.__convert_block(node.body),
-            self._type_mapping.type(node)
+            body,
+            declared_type
         )
 
     def visit_Delete(self, node):
@@ -2331,7 +2340,11 @@ class ParserVisitor(ast.NodeVisitor):
                 returns_tree,
                 getattr(returns_tree, 'type', None)
             )
-        body = self.__convert_block(node.body)
+        self._declaration_scopes.append(node)
+        try:
+            body = self.__convert_block(node.body)
+        finally:
+            self._declaration_scopes.pop()
 
         return j.MethodDeclaration(
             random_id(),
