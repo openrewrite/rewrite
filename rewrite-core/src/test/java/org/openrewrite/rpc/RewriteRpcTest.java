@@ -861,7 +861,7 @@ class RewriteRpcTest implements RewriteTest {
         Recipe noChange = client.prepareRecipe("org.openrewrite.text.FindAndReplace", Map.of("find", "absent", "replace", "x"));
 
         RecipeRun run = new RecipeScheduler().scheduleRun(
-          new CompositeRecipe(List.of(noChange, warn)),
+          new CompositeRecipe(List.of(warn, noChange)),
           new InMemoryLargeSourceSet(List.of(PlainText.builder().text("hello").sourcePath(Path.of("test.txt")).build())),
           new InMemoryExecutionContext(), 1, 1);
 

@@ -55,7 +55,7 @@ public interface ExecutionContext extends RpcCodec<ExecutionContext> {
      */
     @Incubating(since = "8.94.0")
     static @Nullable ExecutionContext current() {
-        return RecipeScheduler.currentContext();
+        return RecipeScheduler.CURRENT_CONTEXT.get();
     }
 
     @Incubating(since = "7.20.0")

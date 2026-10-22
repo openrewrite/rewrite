@@ -21,7 +21,6 @@ import lombok.Value;
 import lombok.With;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.Cursor;
-import org.openrewrite.ExecutionContext;
 import org.openrewrite.Incubating;
 import org.openrewrite.Recipe;
 import org.openrewrite.RecipeScheduler;
@@ -31,7 +30,6 @@ import org.openrewrite.internal.RecipeRunException;
 import org.openrewrite.rpc.RpcCodec;
 import org.openrewrite.rpc.RpcReceiveQueue;
 import org.openrewrite.rpc.RpcSendQueue;
-import org.openrewrite.scheduling.RecipeRunCycle;
 
 import java.util.UUID;
 import java.util.function.UnaryOperator;
@@ -50,28 +48,22 @@ public interface Markup extends Marker {
      * The {@link Recipe#getName() name} of the recipe that added this markup, or {@code null} when unknown.
      */
     @Incubating(since = "8.94.0")
-    default @Nullable String getRecipeName() {
-        return null;
-    }
+    @Nullable
+    String getRecipeName();
 
     @Incubating(since = "8.94.0")
-    default Markup withRecipeName(@Nullable String recipeName) {
-        return this;
-    }
+    Markup withRecipeName(@Nullable String recipeName);
 
     /**
      * The {@link Recipe#getInstanceName() instance name} of the recipe that added this markup, which tells apart
      * instances of the same recipe with different options, or {@code null} when unknown.
      */
     @Incubating(since = "8.94.0")
-    default @Nullable String getRecipeInstanceName() {
-        return null;
-    }
+    @Nullable
+    String getRecipeInstanceName();
 
     @Incubating(since = "8.94.0")
-    default Markup withRecipeInstanceName(@Nullable String recipeInstanceName) {
-        return this;
-    }
+    Markup withRecipeInstanceName(@Nullable String recipeInstanceName);
 
     @Override
     default String print(Cursor cursor, UnaryOperator<String> commentWrapper, boolean verbose) {
@@ -115,16 +107,8 @@ public interface Markup extends Marker {
     }
 
     static <T extends Tree> T markup(T t, Markup markup) {
-        if (markup.getRecipeName() == null) {
-            // Not CURRENT_RECIPE: putting a message on the context counts as a change by the running recipe
-            ExecutionContext ctx = ExecutionContext.current();
-            RecipeRunCycle<?> cycle = ctx == null ? null : ctx.getMessage(ExecutionContext.CURRENT_CYCLE);
-            Recipe recipe = cycle == null ? null : cycle.getCurrentRecipe();
-            if (recipe != null) {
-                markup = markup.withRecipeName(recipe.getName()).withRecipeInstanceName(recipe.getInstanceName());
-            }
-        }
-        return t.withMarkers(t.getMarkers().compute(markup, (s1, s2) -> s1 == null ? s2 : s1));
+        Markup attributed = MarkupAttribution.attribute(markup);
+        return t.withMarkers(t.getMarkers().compute(attributed, (s1, s2) -> s1 == null ? s2 : s1));
     }
 
     @Value
@@ -176,10 +160,12 @@ public interface Markup extends Marker {
 
         @Override
         public Error rpcReceive(Error before, RpcReceiveQueue q) {
-            return before
+            Error after = before
                     .withId(q.receiveAndGet(before.getId(), UUID::fromString))
                     .withMessage(q.receive(before.getMessage()))
                     .withDetail(q.receive(before.getDetail()));
+            //noinspection ConstantValue
+            return before.getId() == null ? (Error) MarkupAttribution.attribute(after) : after;
         }
     }
 
@@ -232,10 +218,12 @@ public interface Markup extends Marker {
 
         @Override
         public Warn rpcReceive(Warn before, RpcReceiveQueue q) {
-            return before
+            Warn after = before
                     .withId(q.receiveAndGet(before.getId(), UUID::fromString))
                     .withMessage(q.receive(before.getMessage()))
                     .withDetail(q.receive(before.getDetail()));
+            //noinspection ConstantValue
+            return before.getId() == null ? (Warn) MarkupAttribution.attribute(after) : after;
         }
     }
 
@@ -290,10 +278,12 @@ public interface Markup extends Marker {
 
         @Override
         public Info rpcReceive(Info before, RpcReceiveQueue q) {
-            return before
+            Info after = before
                     .withId(q.receiveAndGet(before.getId(), UUID::fromString))
                     .withMessage(q.receive(before.getMessage()))
                     .withDetail(q.receive(before.getDetail()));
+            //noinspection ConstantValue
+            return before.getId() == null ? (Info) MarkupAttribution.attribute(after) : after;
         }
     }
 
@@ -348,10 +338,12 @@ public interface Markup extends Marker {
 
         @Override
         public Debug rpcReceive(Debug before, RpcReceiveQueue q) {
-            return before
+            Debug after = before
                     .withId(q.receiveAndGet(before.getId(), UUID::fromString))
                     .withMessage(q.receive(before.getMessage()))
                     .withDetail(q.receive(before.getDetail()));
+            //noinspection ConstantValue
+            return before.getId() == null ? (Debug) MarkupAttribution.attribute(after) : after;
         }
     }
 }

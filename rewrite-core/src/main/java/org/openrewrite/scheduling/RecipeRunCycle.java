@@ -361,8 +361,7 @@ public class RecipeRunCycle<LSS extends LargeSourceSet> {
                             return acc;
                         }
                         List<SourceFile> generated = new ArrayList<>(scanningRecipe.generate(scanningRecipe.getAccumulator(rootCursor, ctx), unmodifiableList(acc), ctx));
-                        generated.replaceAll(source -> addRecipesThatMadeChanges(recipeStack,
-                                recipe instanceof RpcRecipe ? attributeNewMarkup(null, source, recipe) : source));
+                        generated.replaceAll(source -> addRecipesThatMadeChanges(recipeStack, source));
                         Set<Path> seenInThisBatch = new HashSet<>();
                         generated.removeIf(source -> {
                             Path sourcePath = source.getSourcePath();
@@ -541,10 +540,6 @@ public class RecipeRunCycle<LSS extends LargeSourceSet> {
                     return src;
                 });
 
-                if (recipe instanceof RpcRecipe && after != null && after != src) {
-                    after = attributeNewMarkup(src, after, recipe);
-                }
-
                 if (after != src) {
                     recordChange(recipeStack);
                     recordSourceFileResultAndSearchResults(src, after, recipeStack, ctx);
@@ -639,7 +634,9 @@ public class RecipeRunCycle<LSS extends LargeSourceSet> {
         SourceFile fetched = source;
         if (anyModified) {
             try {
-                fetched = rpc.getObject(originalBefore.getId().toString(), DynamicDispatchRpcCodec.canonicalSourceFileType(originalBefore.getClass()));
+                // Markup received here is attributed in Markup.rpcReceive, which only knows the modifier when it's unique
+                fetched = allRecipeStack.attributedTo(modifiedCount == 1 ? soleModifier : null, () ->
+                        rpc.getObject(originalBefore.getId().toString(), DynamicDispatchRpcCodec.canonicalSourceFileType(originalBefore.getClass())));
                 if (fetched == null) {
                     // A batch reports its deletions in its results, so a missing tree here is one the remote lost.
                     throw new IllegalStateException("Remote reported " + originalBefore.getSourcePath() + " as modified but no longer holds it");
@@ -647,10 +644,6 @@ public class RecipeRunCycle<LSS extends LargeSourceSet> {
             } catch (Throwable t) {
                 return batchFailed(batch, originalBefore, source, t);
             }
-        }
-
-        if (modifiedCount == 1) {
-            fetched = attributeNewMarkup(originalBefore, fetched, soleModifier);
         }
 
         if (anyModified) {
@@ -700,36 +693,6 @@ public class RecipeRunCycle<LSS extends LargeSourceSet> {
         }
         batch.clear();
         return source;
-    }
-
-    /**
-     * Markup added by an RPC peer arrives through its codec rather than {@link Markup#markup}, so it is stamped here.
-     */
-    private static SourceFile attributeNewMarkup(@Nullable SourceFile before, SourceFile after, Recipe recipe) {
-        Set<UUID> existing = new HashSet<>();
-        if (before != null) {
-            new TreeVisitor<Tree, Set<UUID>>() {
-                @Override
-                public <M extends Marker> M visitMarker(Marker marker, Set<UUID> ids) {
-                    if (marker instanceof Markup) {
-                        ids.add(marker.getId());
-                    }
-                    return super.visitMarker(marker, ids);
-                }
-            }.visit(before, existing);
-        }
-        String recipeName = recipe.getName();
-        String recipeInstanceName = recipe.getInstanceName();
-        return (SourceFile) new TreeVisitor<Tree, Integer>() {
-            @Override
-            public <M extends Marker> M visitMarker(Marker marker, Integer p) {
-                if (marker instanceof Markup && ((Markup) marker).getRecipeName() == null && !existing.contains(marker.getId())) {
-                    //noinspection unchecked
-                    return (M) ((Markup) marker).withRecipeName(recipeName).withRecipeInstanceName(recipeInstanceName);
-                }
-                return super.visitMarker(marker, p);
-            }
-        }.visitNonNull(after, 0);
     }
 
     /**

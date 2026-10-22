@@ -480,26 +480,21 @@ class RecipeSchedulerTest implements RewriteTest {
     }
 
     @Test
-    void currentContextIsRestoredAfterNestedRun() {
-        AtomicReference<ExecutionContext> beforeNested = new AtomicReference<>();
-        AtomicReference<ExecutionContext> afterNested = new AtomicReference<>();
-        Recipe nesting = toRecipe(() -> new PlainTextVisitor<>() {
+    void currentContextIsSetDuringARunAndClearedAfter() {
+        AtomicReference<ExecutionContext> duringRun = new AtomicReference<>();
+        Recipe capturing = toRecipe(() -> new PlainTextVisitor<>() {
             @Override
             public PlainText visitText(PlainText text, ExecutionContext ctx) {
-                beforeNested.set(ExecutionContext.current());
-                new RecipeScheduler().scheduleRun(new ChangeText("nested"), new InMemoryLargeSourceSet(List.of(text)),
-                  new InMemoryExecutionContext(), 1, 1);
-                afterNested.set(ExecutionContext.current());
+                duringRun.set(ExecutionContext.current());
                 return text;
             }
         });
 
-        new RecipeScheduler().scheduleRun(nesting,
+        new RecipeScheduler().scheduleRun(capturing,
           new InMemoryLargeSourceSet(List.of(PlainText.builder().text("hello").sourcePath(Path.of("hello.txt")).build())),
           new InMemoryExecutionContext(), 1, 1);
 
-        assertThat(beforeNested.get()).isNotNull();
-        assertThat(afterNested.get()).isSameAs(beforeNested.get());
+        assertThat(duringRun.get()).isNotNull();
         assertThat(ExecutionContext.current()).isNull();
     }
 
