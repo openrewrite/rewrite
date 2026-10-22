@@ -33,12 +33,21 @@ from rewrite.python.add_import import (
     insert_member,
     maybe_add_import,
 )
-from rewrite.python.binding_utils import Binding, dotted_path, import_bindings, is_reference, resolves_in_scope
+from rewrite.python.binding_utils import (
+    Binding,
+    ImportBindings,
+    dotted_path,
+    import_bindings,
+    is_reference,
+    resolves_in_scope,
+)
 from rewrite.python.import_utils import (
+    bare_import,
     get_alias_name,
     get_canonical_fqn,
     get_name_string,
     get_qualid_name,
+    module_binding_name,
     module_scope_blocks,
     unconditional_body,
 )
@@ -92,8 +101,9 @@ def maybe_rebind(visitor: TreeVisitor[Any, Any], from_module: str, to_module: st
                  alias: Optional[str] = None, declared_in: Optional[str] = None) -> Optional[str]:
     """Moves the file's binding of ``from_module``, or of its ``from_member``, to ``to_module``,
     and answers with the name a reference to it now spells. ``to_member`` defaults to
-    ``from_member``. A member read through a binding of its module, as ``m.member``, moves
-    with it. None, changing nothing, where the move cannot be expressed safely.
+    ``from_member``. A member read through a binding of its module or of a package above it, as
+    ``m.member`` or ``a.m.member``, moves with it. None, changing nothing, where the move cannot
+    be expressed safely.
 
     Every type in the file naming what moved is renamed, not re-resolved, so a moved member
     keeps its old declaration's signature. ``declared_in`` names the module defining the member
@@ -112,18 +122,15 @@ def maybe_rebind(visitor: TreeVisitor[Any, Any], from_module: str, to_module: st
     bindings = import_bindings(visitor)
     moved = next((b for b in bindings.for_module(from_module, from_member)
                   if b.member == from_member), None)
-    # `import a.b` binds `a`, so `a.member` reads the package, not the module.
-    through = None if from_member is None else next(
-        (b for b in bindings.for_module(from_module) if b.member is None and '.' not in _spelling(b)), None)
+    through = None if from_member is None else _read_through(cu, bindings, from_module, from_member)
 
     name = None
     if moved is not None:
         name = _rebinding_name(visitor, cu, moved, to_module, to_member, alias)
         if name is None or (name != moved.name and _match_outside_module_scope(cu, moved)):
             return None
-    identities = None if through is None else _member_reads(cu, through.name, from_member)
     spelled_module, new_module_import = None, False
-    if through is not None and identities is not None:
+    if through is not None:
         if through.guarded:
             # `_RebindImport` binds the new module in the block that binds the old one.
             spelled_module = to_module
@@ -137,8 +144,7 @@ def maybe_rebind(visitor: TreeVisitor[Any, Any], from_module: str, to_module: st
 
     answer = name if name is not None else f'{spelled_module}.{to_member}'
     visitor._after_visit.append(_RebindImport(from_module, from_member, to_module, to_member, moved, name,
-                                              through, spelled_module, new_module_import, identities or set(),
-                                              declared_in, answer))
+                                              through, spelled_module, new_module_import, declared_in, answer))
     return answer
 
 
@@ -307,24 +313,94 @@ def _module_scope_ids(cu: CompilationUnit) -> Set[Any]:
     return ids
 
 
-def _reads_through(cursor: Cursor, target: Any, name: Any, module_name: str, member: str) -> bool:
-    """Whether ``target.name`` at ``cursor`` reads ``member`` through the module-scope binding
-    ``module_name``, which no nearer scope redeclares."""
-    return (isinstance(target, Identifier) and target.simple_name == module_name
-            and isinstance(name, Identifier) and name.simple_name == member
-            and not _LOCALS.is_bound(cursor, module_name))
+def _module_path(binding: Binding) -> Optional[str]:
+    """The module ``binding``'s name stands for. ``import a.b`` binds the package ``a``, and
+    ``from a import b`` binds ``a.b`` where ``b`` is a submodule."""
+    if binding.member == '*':
+        return None
+    if binding.member is not None:
+        return binding.module + binding.member if binding.module.endswith('.') \
+            else f'{binding.module}.{binding.member}'
+    return binding.module if get_alias_name(binding.imp) is not None else module_binding_name(binding.module)
 
 
-def _member_reads(cu: CompilationUnit, module_name: str, member: str) -> Optional[Set[str]]:
-    """The canonical names the file's reads of ``module_name.member`` carry, or None where
-    nothing reads it."""
-    found: Optional[Set[str]] = None
+def _within(module: str, path: str) -> bool:
+    return module == path or module.startswith(path + '.')
+
+
+class _ReadThrough(NamedTuple):
+    """The reads of a member through the names that reach its module."""
+
+    spellings: Dict[str, str]
+    """Each name read through, and how its reads spell the module."""
+
+    imports: Tuple[Binding, ...]
+    """The imports of those names that load the module or a package above it."""
+
+    identities: Set[str]
+    """The canonical names the reads carry."""
+
+    guarded: bool
+    """Whether every name read through is bound only in an ``if`` block."""
+
+
+def _read_through(cu: CompilationUnit, bindings: ImportBindings, module: str,
+                  member: str) -> Optional[_ReadThrough]:
+    """The reads of ``module.member`` through the names the file's imports bind, or None where
+    nothing reads it so. A binding of a parent package reaches the module through its
+    attributes, as ``import os`` reads ``os.path.join``. A name reaches it only while the import
+    holding it does, since a later import of the name shadows an earlier one."""
+    spellings: Dict[str, str] = {}
+    for name in {b.name for b in bindings}:
+        holder = bindings.for_name(name)
+        path = None if holder is None else _module_path(holder)
+        if path is not None and _within(module, path):
+            spellings[name] = name + module[len(path):]
+    reads = _member_reads(cu, spellings, member) if spellings else None
+    if reads is None:
+        return None
+    read_names, identities = reads
+    imports = tuple(b for b in bindings if b.name in read_names and _within(
+        module, b.module if b.member is None else _module_path(b) or ''))
+    guarded = all(holder.guarded for holder in map(bindings.for_name, read_names) if holder is not None)
+    return _ReadThrough({n: spellings[n] for n in read_names}, imports, identities, guarded)
+
+
+def _name_path(tree: Any) -> Optional[str]:
+    """``tree`` as a dotted name, or None where it is not made of names alone."""
+    if isinstance(tree, Identifier):
+        return tree.simple_name
+    if isinstance(tree, FieldAccess):
+        target = _name_path(tree.target)
+        return None if target is None else f'{target}.{tree.name.simple_name}'
+    return None
+
+
+def _reads_through(cursor: Cursor, target: Any, name: Any, spellings: Dict[str, str],
+                   member: str) -> Optional[str]:
+    """The module-scope name ``target.name`` at ``cursor`` reads ``member`` through, spelling
+    the module as ``spellings`` has it, or None. No nearer scope redeclares that name."""
+    if not isinstance(name, Identifier) or name.simple_name != member:
+        return None
+    path = _name_path(target)
+    root = None if path is None else path.split('.')[0]
+    if root is None or spellings.get(root) != path or _LOCALS.is_bound(cursor, root):
+        return None
+    return root
+
+
+def _member_reads(cu: CompilationUnit, spellings: Dict[str, str],
+                  member: str) -> Optional[Tuple[Set[str], Set[str]]]:
+    """The names the file reads ``member`` through, as ``_reads_through`` finds them, and the
+    canonical names those reads carry. None where nothing reads it."""
+    read_names: Set[str] = set()
+    found: Set[str] = set()
 
     class Reads(PythonVisitor[None]):
         def read(self, target: Any, name: Any, identity: Optional[str]) -> None:
-            nonlocal found
-            if _reads_through(self.cursor, target, name, module_name, member):
-                found = found if found is not None else set()
+            root = _reads_through(self.cursor, target, name, spellings, member)
+            if root is not None:
+                read_names.add(root)
                 if identity is not None and identity.rpartition('.')[2] == member:
                     found.add(identity)
 
@@ -347,7 +423,7 @@ def _member_reads(cu: CompilationUnit, module_name: str, member: str) -> Optiona
             return method
 
     Reads().visit(cu, None)
-    return found
+    return (read_names, found) if read_names else None
 
 
 def _match_outside_module_scope(cu: CompilationUnit, moved: Binding) -> bool:
@@ -388,7 +464,8 @@ def _binds_module(stmt: Statement, module: str) -> bool:
     return isinstance(stmt, Import) and get_qualid_name(stmt.qualid) == module
 
 
-def _without(multi: MultiImport, module: str, member: Optional[str], local: str) -> Optional[MultiImport]:
+def _without(multi: MultiImport, module: str, member: Optional[str],
+             local: str) -> Import | MultiImport | None:
     """``multi`` without what moves, or None where nothing would be left."""
     elements = multi.padding.names.padding.elements
     kept = [e for e in elements if not _moves(e.element, multi.from_, module, member, local)]
@@ -396,6 +473,8 @@ def _without(multi: MultiImport, module: str, member: Optional[str], local: str)
         return None
     if len(kept) == len(elements):
         return multi
+    if multi.from_ is None and len(kept) == 1:
+        return bare_import(multi, kept[0].element)
     if kept[0].element.prefix != Space.EMPTY:
         kept[0] = kept[0].replace(_element=kept[0].element.replace(prefix=Space.EMPTY))
     return multi.padding.replace(
@@ -513,8 +592,8 @@ class _RebindImport(PythonVisitor[Any]):
 
     def __init__(self, from_module: str, from_member: Optional[str], to_module: str,
                  to_member: Optional[str], moved: Optional[Binding], bound_name: Optional[str],
-                 through: Optional[Binding], spelled_module: Optional[str], new_module_import: bool,
-                 identities: Set[str], declared_in: Optional[str], answer: str) -> None:
+                 through: Optional[_ReadThrough], spelled_module: Optional[str], new_module_import: bool,
+                 declared_in: Optional[str], answer: str) -> None:
         super().__init__()
         self.key = (from_module, from_member)
         self.from_module = from_module
@@ -523,17 +602,17 @@ class _RebindImport(PythonVisitor[Any]):
         self.to_member = to_member
         self.local_name = moved.name if moved is not None else None
         self.bound_name = bound_name
-        self.through_name = through.name if through is not None else None
-        self.through_at_module_level = through is not None and not through.guarded
+        self.through = through
         self.spelled_module = spelled_module
         self.new_module_import = new_module_import
-        self.identities = identities
         self.declared_in = declared_in
         self.answer = answer
         self.moved_types: Optional[_MovedTypes] = None
         self.local_bindings = LocalBindings()
         self.rewrote_qualified = False
         self.old_at_module_level = False
+        self.dropped: Set[Any] = set()
+        self.replaced: Dict[Any, Any] = {}
 
     @property
     def _renaming(self) -> bool:
@@ -541,6 +620,8 @@ class _RebindImport(PythonVisitor[Any]):
 
     def visit_compilation_unit(self, cu: CompilationUnit, p: Any) -> Any:
         self.moved_types = self._moved_types(cu)
+        self.dropped.clear()
+        self.replaced.clear()
         self.old_at_module_level = any(
             self.local_name is not None and self._binds(stmt) for stmt in cu.statements)
         result = super().visit_compilation_unit(cu, p)
@@ -555,8 +636,9 @@ class _RebindImport(PythonVisitor[Any]):
         if self.new_module_import:
             # RemoveImport keeps a read `import a` unless another import binds `a`, so `import a.b` goes first.
             maybe_add_import(self, AddImportOptions(module=self.to_module, only_if_referenced=False))
-        if self.rewrote_qualified:
-            maybe_remove_import(self, RemoveImportOptions(module=self.from_module))
+        if self.rewrote_qualified and self.through is not None:
+            for b in self.through.imports:
+                maybe_remove_import(self, RemoveImportOptions(module=b.module, name=b.member))
         return result
 
     def _binds(self, stmt: Statement) -> bool:
@@ -580,7 +662,8 @@ class _RebindImport(PythonVisitor[Any]):
                 return _MovedTypes({})
             return _MovedTypes({self.from_module: owner}, (self.from_module, owner))
         old = {f'{self.from_module}.{self.from_member}'}
-        old.update(self.identities)
+        if self.through is not None:
+            old.update(self.through.identities)
         for b in import_bindings(cu):
             # A constant's import carries the type of its value, which names something else.
             canonical = get_canonical_fqn(b.imp)
@@ -599,7 +682,10 @@ class _RebindImport(PythonVisitor[Any]):
     def visit_import(self, import_: Import, p: Any) -> Any:
         if self.from_member is not None or self.local_name is None or not self._at_module_level():
             return import_
-        return None if self._binds(import_) else import_
+        if not self._binds(import_):
+            return import_
+        self.dropped.add(import_.id)
+        return None
 
     def visit_multi_import(self, multi: MultiImport, p: Any) -> Any:
         multi = super().visit_multi_import(multi, p)  # ty: ignore[invalid-assignment]  # visitor covariance
@@ -607,7 +693,12 @@ class _RebindImport(PythonVisitor[Any]):
             return multi
         if not self._binds(multi):
             return multi
-        return _without(multi, self.from_module, self.from_member, self.local_name)
+        reduced = _without(multi, self.from_module, self.from_member, self.local_name)
+        if reduced is None:
+            self.dropped.add(multi.id)
+        else:
+            self.replaced[multi.id] = reduced.id
+        return reduced
 
     def visit_identifier(self, ident: Identifier, p: Any) -> Any:
         # The position predicates match the cursor's nodes by identity, so they are asked of
@@ -624,11 +715,10 @@ class _RebindImport(PythonVisitor[Any]):
         return ident.replace(_simple_name=self.bound_name)
 
     def _reads_through(self, target: Any, name: Any) -> bool:
-        return (self.spelled_module is not None and self.through_name is not None
-                and self.from_member is not None
-                and _reads_through(self.cursor, target, name, self.through_name, self.from_member))
+        return (self.spelled_module is not None and self.through is not None and self.from_member is not None
+                and _reads_through(self.cursor, target, name, self.through.spellings, self.from_member) is not None)
 
-    def _module_reference(self, target: Identifier) -> Expression:
+    def _module_reference(self, target: Expression) -> Expression:
         """The name tree reading the new module where ``target`` read the old one, each part
         typed as the module it names wherever ``target`` was typed. An alias names the module
         it binds."""
@@ -641,7 +731,10 @@ class _RebindImport(PythonVisitor[Any]):
             return None if target.type is None else moved_types.module(
                 target.type, self.to_module if aliased else name)
 
-        result: Expression = target.replace(_simple_name=parts[0], _type=typed(parts[0]))
+        root = target
+        while isinstance(root, FieldAccess):
+            root = root.target
+        result: Expression = root.replace(_simple_name=parts[0], _type=typed(parts[0]), prefix=target.prefix)
         for i in range(1, len(parts)):
             name = '.'.join(parts[:i + 1])
             result = FieldAccess(random_id(), Space.EMPTY, Markers.EMPTY, result.replace(prefix=Space.EMPTY),
@@ -746,8 +839,9 @@ class _RebindImport(PythonVisitor[Any]):
                              self._import_alias())
         # A block importing the old module binds the new one too where this rebind rewrote
         # references to it. RemoveImport drops the old import once nothing reads it.
-        if (self.rewrote_qualified and not self.through_at_module_level
-                and _binds_module(stmt, self.from_module)):
+        through = self.through
+        if (self.rewrote_qualified and through is not None and through.guarded
+                and any(_binds(stmt, b.module, b.member, b.name) for b in through.imports)):
             return stmt, (self.to_module, None, None)
         return stmt, None
 
@@ -784,15 +878,13 @@ class _RebindImport(PythonVisitor[Any]):
     def _transfer_removed_prefixes(self, before: CompilationUnit, after: CompilationUnit) -> CompilationUnit:
         """Dropping a statement discards its prefix. When it is worth rescuing (see
         prefix_to_inherit) it goes to the next surviving statement, as RemoveImport does."""
-        removed_ids = ({p.element.id for p in before.padding.statements}
-                       - {p.element.id for p in after.padding.statements})
-        if not removed_ids:
+        if not self.dropped:
             return after
         inherited = None
         prefix_by_id = {}
         for index, padded in enumerate(before.padding.statements):
             stmt = padded.element
-            if stmt.id in removed_ids:
+            if stmt.id in self.dropped:
                 prefix = prefix_to_inherit(stmt, index)
                 if prefix is not None:
                     inherited = prefix
@@ -801,7 +893,7 @@ class _RebindImport(PythonVisitor[Any]):
                 # statement keeps its own separation, which AddImport relies on when it inserts
                 # the replacement import before it.
                 if inherited.comments or isinstance(stmt, (Import, MultiImport)):
-                    prefix_by_id[stmt.id] = inherited
+                    prefix_by_id[self.replaced.get(stmt.id, stmt.id)] = inherited
                 inherited = None
         if not prefix_by_id:
             return after

@@ -97,7 +97,7 @@ public class RemoveEmptyKeys extends Recipe {
             public Json.JsonObject visitObject(Json.JsonObject obj, ExecutionContext ctx) {
                 Json.JsonObject o = super.visitObject(obj, ctx);
                 List<JsonRightPadded<Json>> members = o.getPadding().getMembers();
-                List<JsonRightPadded<Json>> retained = ListUtils.map(members, m -> removable(m.getElement()) ? null : m);
+                List<JsonRightPadded<Json>> retained = ListUtils.filter(members, m -> !removable(m.getElement()));
                 if (retained != members) {
                     // the last member's trailing space is the whitespace before the closing brace
                     JsonRightPadded<Json> last = members.get(members.size() - 1);

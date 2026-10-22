@@ -46,8 +46,7 @@ public class YamlTreeShapeValidationService implements TreeShapeValidationServic
 
     @Override
     public List<String> invalid(SourceFile sourceFile) {
-        List<String> invalid = new ArrayList<>();
-        new YamlIsoVisitor<List<String>>() {
+        return new YamlIsoVisitor<List<String>>() {
             @Override
             public Yaml.Mapping visitMapping(Yaml.Mapping mapping, List<String> found) {
                 Set<String> keys = new HashSet<>();
@@ -59,7 +58,6 @@ public class YamlTreeShapeValidationService implements TreeShapeValidationServic
                 }
                 return super.visitMapping(mapping, found);
             }
-        }.visit(sourceFile, invalid);
-        return invalid;
+        }.reduce(sourceFile, new ArrayList<>());
     }
 }

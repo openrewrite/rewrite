@@ -37,7 +37,7 @@ from __future__ import annotations
 
 import fnmatch
 import logging
-from typing import Any, Optional, cast
+from typing import Any, Callable, Optional, cast
 
 from rewrite.java.support_types import J, JavaType
 from rewrite.java.tree import Import, MethodInvocation
@@ -46,6 +46,7 @@ from rewrite.python.import_utils import get_name_string, get_qualid_name
 from rewrite.python.method_matcher import MethodMatcher
 from rewrite.python.support_types import Py
 from rewrite.python.tree import MultiImport
+from rewrite.python.type_utils import fully_qualified_names_are_equal, is_of_type_with_name
 from rewrite.python.visitor import PythonVisitor
 from rewrite.tree import SourceFile, Tree
 from rewrite.visitor import Cursor, TreeVisitor
@@ -81,16 +82,20 @@ class IsSourceFile(TreeVisitor[Tree, Any]):
 
 
 class UsesType(TreeVisitor[Tree, Any]):
-    """Match files using a specific type, by walking the tree's
-    ``TypesInUse`` (when available) or the per-node type attribution.
+    """Match files using a type assignable to ``fully_qualified_type``, read
+    off the per-node type attribution.
 
-    Mirrors ``org.openrewrite.java.search.HasType``. ``fqn_pattern`` is
-    matched against fully-qualified type names via :func:`fnmatch.fnmatch`,
-    so ``java.util.*`` matches ``java.util.List`` etc.
+    Mirrors ``org.openrewrite.java.search.HasType``. The pattern is matched
+    against fully-qualified type names via :func:`fnmatch.fnmatch`, so
+    ``java.util.*`` matches ``java.util.List`` etc.
+
+    ``check_assignability`` is what ``HasType`` passes on as ``includeImplicit``.
+    It also counts the declaring, return and parameter types of called methods.
     """
 
-    def __init__(self, fully_qualified_type: str) -> None:
+    def __init__(self, fully_qualified_type: str, check_assignability: bool = False) -> None:
         self._pattern = fully_qualified_type
+        self._include_implicit = check_assignability
 
     def visit(
         self,
@@ -105,15 +110,7 @@ class UsesType(TreeVisitor[Tree, Any]):
         return tree
 
     def _tree_uses_type(self, tree: Tree, p: Any) -> bool:
-        # Prefer TypesInUse on the source file when present (cheap O(N))
-        types_in_use = getattr(tree, "types_in_use", None)
-        if types_in_use is not None:
-            types = getattr(types_in_use, "types_in_use", None) or getattr(
-                types_in_use, "types", None
-            )
-            if types is not None:
-                return any(_type_matches(t, self._pattern) for t in types)
-        return _TypeSearch(self._pattern).search(tree, p)
+        return _TypeSearch(self._pattern, self._include_implicit).search(tree, p)
 
 
 class UsesMethod(TreeVisitor[Tree, Any]):
@@ -218,11 +215,24 @@ def _fully_qualified_name(type_obj: Any) -> Optional[str]:
     return None
 
 
-def _type_matches(type_obj: Any, pattern: str) -> bool:
-    if isinstance(type_obj, JavaType.Union):
-        return any(_type_matches(member, pattern) for member in type_obj.bounds)
+def _supertype_matcher(pattern: str) -> Callable[[str], bool]:
+    """The name test for a type's supertypes.
+
+    is_of_type_with_name also asks it about the implicit root ``object``, which a glob
+    covers only by accident. A glob matches ``object`` only where the own-name test sees it.
+    """
+    if any(c in pattern for c in "*?["):
+        return lambda name: name != "object" and fnmatch.fnmatch(name, pattern)
+    return lambda name: fully_qualified_names_are_equal(pattern, name)
+
+
+def _type_matches(type_obj: Any, pattern: str, supertype_matcher: Callable[[str], bool]) -> bool:
+    if isinstance(type_obj, (JavaType.Union, JavaType.Intersection, JavaType.GenericTypeVariable)):
+        return any(_type_matches(member, pattern, supertype_matcher) for member in type_obj.bounds)
     fqn = _fully_qualified_name(type_obj)
-    return fqn is not None and fnmatch.fnmatch(fqn, pattern)
+    if fqn is not None and fnmatch.fnmatch(fqn, pattern):
+        return True
+    return is_of_type_with_name(type_obj, True, supertype_matcher)
 
 
 class _FindFirst(PythonVisitor[Any]):
@@ -262,10 +272,9 @@ class _FindFirst(PythonVisitor[Any]):
         try:
             self.visit(tree, p)
         except RecursionError:
-            # A tree deeper than the interpreter stack (generated data files
-            # nest thousands of implicit string concatenations) is one the gated
-            # visitor cannot edit either. Answering "no match" leaves no other
-            # trace of the file, hence the log line.
+            # A tree deeper than the interpreter stack is one the gated visitor
+            # cannot edit either. Answering "no match" leaves no other trace of
+            # the file, hence the log line.
             logger.warning(
                 "%s nests too deeply to search; treating it as no match",
                 getattr(tree, "source_path", tree),
@@ -275,15 +284,24 @@ class _FindFirst(PythonVisitor[Any]):
 
 
 class _TypeSearch(_FindFirst):
-    def __init__(self, pattern: str) -> None:
+    def __init__(self, pattern: str, include_implicit: bool = False) -> None:
         super().__init__()
         self._pattern = pattern
+        self._supertype_matcher = _supertype_matcher(pattern)
+        self._include_implicit = include_implicit
 
     def matches(self, tree: Tree) -> bool:
         # Read the attribution off any node that carries it: `Expression`
         # declares its own `type` alongside `TypedTree` rather than under it,
         # so a class check on either one alone misses the other's nodes.
-        return _type_matches(getattr(tree, "type", None), self._pattern)
+        if self._uses(getattr(tree, "type", None)):
+            return True
+        method = getattr(tree, "method_type", None) if self._include_implicit else None
+        return isinstance(method, JavaType.Method) and any(
+            self._uses(t) for t in (method.declaring_type, method.return_type, *method.parameter_types))
+
+    def _uses(self, type_obj: Any) -> bool:
+        return type_obj is not None and _type_matches(type_obj, self._pattern, self._supertype_matcher)
 
 
 class _MethodSearch(_FindFirst):

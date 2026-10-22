@@ -108,7 +108,7 @@ public class JavaSender : JavaVisitor<RpcSendQueue>
     public new virtual J PreVisit(J j, RpcSendQueue q)
     {
         q.GetAndSend(j, (J t) => t.Id);
-        q.GetAndSend(j, (J t) => t.Prefix, space => VisitSpace(GetValueNonNull<Space>(space), q));
+        q.GetAndSend(j, (J t) => SpaceRef(t.Prefix), space => VisitSpace(GetValueNonNull<Space>(space), q));
         q.GetAndSend(j, (J t) => Reference.AsRef(t.Markers));
         return j;
     }
@@ -204,7 +204,7 @@ public class JavaSender : JavaVisitor<RpcSendQueue>
     {
         q.GetAndSend(block, b => b.Static, s => VisitRightPadded(s, q));
         q.GetAndSendList(block, b => b.Statements, r => r.Element.Id, stmts => VisitRightPadded(stmts, q));
-        q.GetAndSend(block, b => b.End, space => VisitSpace(GetValueNonNull<Space>(space), q));
+        q.GetAndSend(block, b => SpaceRef(b.End), space => VisitSpace(GetValueNonNull<Space>(space), q));
         return block;
     }
 
@@ -375,7 +375,7 @@ public class JavaSender : JavaVisitor<RpcSendQueue>
     public override J VisitLambda(Lambda lambda, RpcSendQueue q)
     {
         q.GetAndSend(lambda, l => (J)l.Params, @params => Visit(@params, q));
-        q.GetAndSend(lambda, l => l.Arrow, arrow => VisitSpace(arrow, q));
+        q.GetAndSend(lambda, l => SpaceRef(l.Arrow), arrow => VisitSpace(GetValueNonNull<Space>(arrow), q));
         q.GetAndSend(lambda, l => l.Body, body => Visit(body, q));
         q.GetAndSend(lambda, l => AsRef(l.Type), type => VisitType(GetValueNonNull<JavaType>(type), q));
         return lambda;
@@ -453,7 +453,7 @@ public class JavaSender : JavaVisitor<RpcSendQueue>
     public override J VisitNewClass(NewClass newClass, RpcSendQueue q)
     {
         q.GetAndSend(newClass, n => n.Enclosing, enclosing => VisitRightPadded(enclosing, q));
-        q.GetAndSend(newClass, n => n.New, n2 => VisitSpace(n2, q));
+        q.GetAndSend(newClass, n => SpaceRef(n.New), n2 => VisitSpace(GetValueNonNull<Space>(n2), q));
         q.GetAndSend(newClass, n => n.Clazz, clazz => Visit(clazz, q));
         q.GetAndSend(newClass, n => n.Arguments, args => VisitContainer(args, q));
         q.GetAndSend(newClass, n => n.Body, body => Visit(body, q));
@@ -586,7 +586,7 @@ public class JavaSender : JavaVisitor<RpcSendQueue>
         q.GetAndSendList(variableDeclarations, v => v.LeadingAnnotations, m => m.Id, a => Visit(a, q));
         q.GetAndSendList(variableDeclarations, v => v.Modifiers, m => m.Id, m => Visit(m, q));
         q.GetAndSend(variableDeclarations, v => v.TypeExpression, type => Visit(type, q));
-        q.GetAndSend(variableDeclarations, v => v.Varargs, space => VisitSpace(GetValueNonNull<Space>(space), q));
+        q.GetAndSend(variableDeclarations, v => SpaceRef(v.Varargs), space => VisitSpace(GetValueNonNull<Space>(space), q));
         q.GetAndSendList(variableDeclarations, v => v.Variables, r => r.Element.Id, v => VisitRightPadded(v, q));
         return variableDeclarations;
     }
@@ -609,7 +609,7 @@ public class JavaSender : JavaVisitor<RpcSendQueue>
 
     public virtual void VisitLeftPadded<T>(JLeftPadded<T> left, RpcSendQueue q)
     {
-        q.GetAndSend(left, l => l.Before, space => VisitSpace(GetValueNonNull<Space>(space), q));
+        q.GetAndSend(left, l => SpaceRef(l.Before), space => VisitSpace(GetValueNonNull<Space>(space), q));
         var element = left.Element;
         if (element is J j)
         {
@@ -617,7 +617,7 @@ public class JavaSender : JavaVisitor<RpcSendQueue>
         }
         else if (element is Space)
         {
-            q.GetAndSend(left, l => l.Element, space => VisitSpace(GetValueNonNull<Space>(space), q));
+            q.GetAndSend(left, l => SpaceRef(l.Element), space => VisitSpace(GetValueNonNull<Space>(space), q));
         }
         else
         {
@@ -636,19 +636,19 @@ public class JavaSender : JavaVisitor<RpcSendQueue>
         }
         else if (element is Space)
         {
-            q.GetAndSend(right, r => r.Element, space => VisitSpace(GetValueNonNull<Space>(space), q));
+            q.GetAndSend(right, r => SpaceRef(r.Element), space => VisitSpace(GetValueNonNull<Space>(space), q));
         }
         else
         {
             q.GetAndSend(right, r => r.Element);
         }
-        q.GetAndSend(right, r => r.After, space => VisitSpace(GetValueNonNull<Space>(space), q));
+        q.GetAndSend(right, r => SpaceRef(r.After), space => VisitSpace(GetValueNonNull<Space>(space), q));
         q.GetAndSend(right, r => Reference.AsRef(r.Markers));
     }
 
     public virtual void VisitContainer<TJ>(JContainer<TJ> container, RpcSendQueue q) where TJ : J
     {
-        q.GetAndSend(container, c => c.Before, space => VisitSpace(GetValueNonNull<Space>(space), q));
+        q.GetAndSend(container, c => SpaceRef(c.Before), space => VisitSpace(GetValueNonNull<Space>(space), q));
         q.GetAndSendList(container, c => c.Elements, e =>
         {
             if (e.Element == null)
@@ -671,6 +671,16 @@ public class JavaSender : JavaVisitor<RpcSendQueue>
         parts.Reverse();
         return string.Join(" > ", parts);
     }
+
+    /// <summary>
+    /// A Space that <see cref="Space.Shared"/> has an instance for goes as a ref to that instance, so each
+    /// repeat is a ref-only message. Other values go as they are, since a ref stays in both peers'
+    /// tables for the whole connection.
+    /// </summary>
+    public static object? SpaceRef(object? value) =>
+        value is Space { Comments.Count: 0 } space && Space.Shared(space.Whitespace) is { } shared
+            ? AsRef(shared)
+            : value;
 
     public virtual void VisitSpace(Space space, RpcSendQueue q)
     {

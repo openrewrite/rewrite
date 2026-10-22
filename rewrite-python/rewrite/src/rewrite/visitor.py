@@ -25,7 +25,7 @@ class Cursor:
     ROOT_VALUE: ClassVar[str] = "root"
 
     def get_message(self, key: str, default_value: O) -> O:
-        return default_value if self.messages is None else cast(O, self.messages.get(key))
+        return default_value if self.messages is None else cast(O, self.messages.get(key, default_value))
 
     def put_message(self, key: str, value: object) -> None:
         messages = self.messages

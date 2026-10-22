@@ -17,6 +17,7 @@ import * as rpc from "vscode-jsonrpc/node";
 import {RpcObjectData, RpcObjectState, RpcSendQueue} from "../queue";
 import {ReferenceMap} from "../../reference";
 import {extractSourcePath, withMetrics} from "./metrics";
+import {PageAbortedError, type WorkerPageChannel} from "../worker-transport";
 
 export class AbortGetObject {
     constructor(readonly id: string) {
@@ -36,6 +37,7 @@ export class GetObject {
         batchSize: number,
         trace: () => boolean,
         metricsCsv?: string,
+        pageChannel?: WorkerPageChannel,
     ): void {
         const pendingData = new Map<string, { data: (RpcObjectData | undefined)[], offset: number }>();
         let latestTransfer: { id: string, refCount: number } | undefined;
@@ -56,6 +58,39 @@ export class GetObject {
                 return true;
             }
         );
+
+        if (pageChannel) {
+            // The main thread answers each GetObject with the next page this traversal hands over
+            pageChannel.onServe(async (request, sink) => {
+                const objId = request.id;
+                if (!localObjects.has(objId)) {
+                    sink([{state: RpcObjectState.DELETE}, {state: RpcObjectState.END_OF_OBJECT}]);
+                    return;
+                }
+                const objectOrGenerator = localObjects.get(objId)!;
+                if (typeof objectOrGenerator === 'function') {
+                    localObjects.set(objId, await objectOrGenerator(objId));
+                }
+                const after = localObjects.get(objId);
+                const before = remoteObjects.get(objId);
+                const savedRefCount = localRefs.snapshot();
+                latestTransfer = {id: objId, refCount: savedRefCount};
+                try {
+                    new RpcSendQueue(localRefs, request.sourceFileType, trace())
+                        .drainEvery(batchSize, sink)
+                        .generate(after, before);
+                    remoteObjects.set(objId, after);
+                } catch (e: any) {
+                    // An abort is rolled back by the AbortGetObject that follows it
+                    if (!(e instanceof PageAbortedError)) {
+                        remoteObjects.delete(objId);
+                        localRefs.rollbackTo(savedRefCount);
+                        latestTransfer = undefined;
+                    }
+                    throw e;
+                }
+            });
+        }
 
         connection.onRequest(
             new rpc.RequestType<GetObject, any, Error>("GetObject"),
@@ -92,7 +127,7 @@ export class GetObject {
                         const savedRefCount = localRefs.snapshot();
                         try {
                             pending = {
-                                data: await new RpcSendQueue(localRefs, request.sourceFileType, trace())
+                                data: new RpcSendQueue(localRefs, request.sourceFileType, trace())
                                     .generate(after, before),
                                 offset: 0
                             };

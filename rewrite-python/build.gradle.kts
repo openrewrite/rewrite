@@ -562,20 +562,29 @@ val printTestClasspath by tasks.registering {
 
 extensions.configure<LicenseExtension> {
     exclude("**/rewrite-python-version.txt")
+    // uv's own marker test cases, kept as JSON data
+    exclude("**/marker/uv-*-tree-rows.json")
 }
 
 // The lock regeneration test fixtures (recorded package-manager output) live in
-// openrewrite/rewrite-python-lock-fixtures. The latest main is fetched once into build/lock-fixtures and joins the
-// test classpath; `clean` picks up newer fixtures.
+// openrewrite/rewrite-python-lock-fixtures. The pinned commit is fetched into build/lock-fixtures and joins the test
+// classpath, and a change of pin fetches again. A change that needs new fixtures moves the pin with it.
+val lockFixturesCommit = "c3231458118bb94a0cab845bc39a268b2e93e2a9"
 val lockFixturesDir = layout.buildDirectory.dir("lock-fixtures")
+val lockFixturesFetched = layout.buildDirectory.file("tmp/lock-fixtures-commit")
 val syncLockFixtures = tasks.register("syncLockFixtures") {
+    inputs.property("commit", lockFixturesCommit)
     outputs.dir(lockFixturesDir)
-    onlyIf { !lockFixturesDir.get().dir("lock").asFile.exists() }
+    onlyIf {
+        val fetched = lockFixturesFetched.get().asFile
+        !fetched.exists() || fetched.readText() != lockFixturesCommit
+    }
     doLast {
-        val archive = layout.buildDirectory.file("tmp/lock-fixtures-main.tar.gz").get().asFile
+        val archive = layout.buildDirectory.file("tmp/lock-fixtures.tar.gz").get().asFile
         archive.parentFile.mkdirs()
-        uri("https://codeload.github.com/openrewrite/rewrite-python-lock-fixtures/tar.gz/refs/heads/main")
+        uri("https://codeload.github.com/openrewrite/rewrite-python-lock-fixtures/tar.gz/$lockFixturesCommit")
             .toURL().openStream().use { input -> archive.outputStream().use { input.copyTo(it) } }
+        delete(lockFixturesDir)
         copy {
             from(tarTree(resources.gzip(archive))) {
                 include("*/lock/**")
@@ -584,6 +593,7 @@ val syncLockFixtures = tasks.register("syncLockFixtures") {
             }
             into(lockFixturesDir)
         }
+        lockFixturesFetched.get().asFile.writeText(lockFixturesCommit)
     }
 }
 tasks.named<ProcessResources>("processTestResources") {

@@ -407,10 +407,19 @@ public final class UvLockReader {
     // ---- conversion of generic structures to the typed model ----
 
     private static UvLockOptions toOptions(Map<String, Object> map) {
+        String resolutionMode = null;
+        String prereleaseMode = null;
+        String forkStrategy = null;
         String excludeNewer = null;
         String excludeNewerSpan = null;
         for (Map.Entry<String, Object> e : map.entrySet()) {
-            if ("exclude-newer".equals(e.getKey())) {
+            if ("resolution-mode".equals(e.getKey())) {
+                resolutionMode = stringValue(e.getKey(), e.getValue());
+            } else if ("prerelease-mode".equals(e.getKey())) {
+                prereleaseMode = stringValue(e.getKey(), e.getValue());
+            } else if ("fork-strategy".equals(e.getKey())) {
+                forkStrategy = stringValue(e.getKey(), e.getValue());
+            } else if ("exclude-newer".equals(e.getKey())) {
                 excludeNewer = stringValue(e.getKey(), e.getValue());
             } else if ("exclude-newer-span".equals(e.getKey())) {
                 excludeNewerSpan = stringValue(e.getKey(), e.getValue());
@@ -418,11 +427,11 @@ public final class UvLockReader {
                 throw new UvLockFormatException("Unrecognized [options] key: " + e.getKey());
             }
         }
-        if ((excludeNewerSpan != null) != UvLockOptions.RELATIVE_EXCLUDE_NEWER_TIMESTAMP.equals(excludeNewer)) {
-            throw new UvLockFormatException("exclude-newer-span must accompany exactly the sentinel exclude-newer " +
-                    UvLockOptions.RELATIVE_EXCLUDE_NEWER_TIMESTAMP);
+        if (UvLockOptions.RELATIVE_EXCLUDE_NEWER_TIMESTAMP.equals(excludeNewer) && excludeNewerSpan == null ||
+                excludeNewerSpan != null && excludeNewer == null) {
+            throw new UvLockFormatException("exclude-newer-span must accompany the exclude-newer it stands for");
         }
-        return new UvLockOptions(excludeNewer, excludeNewerSpan, null);
+        return new UvLockOptions(resolutionMode, prereleaseMode, forkStrategy, excludeNewer, excludeNewerSpan, null);
     }
 
     private static Map<String, Object> toExcludeNewerPackage(Map<String, Object> map) {
@@ -437,22 +446,25 @@ public final class UvLockReader {
     private static UvLockManifest toManifest(Map<String, Object> map) {
         List<String> members = null;
         List<UvLockRequirement> constraints = null;
+        List<UvLockRequirement> overrides = null;
         List<UvLockRequirement> buildConstraints = null;
         for (Map.Entry<String, Object> e : map.entrySet()) {
             if ("members".equals(e.getKey())) {
                 members = stringList(e.getKey(), e.getValue());
             } else if ("constraints".equals(e.getKey())) {
                 constraints = toRequirements(e.getKey(), e.getValue());
+            } else if ("overrides".equals(e.getKey())) {
+                overrides = toRequirements(e.getKey(), e.getValue());
             } else if ("build-constraints".equals(e.getKey())) {
                 buildConstraints = toRequirements(e.getKey(), e.getValue());
             } else {
                 throw new UvLockFormatException("Unrecognized [manifest] key: " + e.getKey());
             }
         }
-        if (members == null && constraints == null && buildConstraints == null) {
+        if (members == null && constraints == null && overrides == null && buildConstraints == null) {
             throw new UvLockFormatException("[manifest] table has no recognized keys");
         }
-        return new UvLockManifest(members, constraints, buildConstraints);
+        return new UvLockManifest(members, constraints, overrides, buildConstraints);
     }
 
     private static UvLockPackage toPackage(RawPackage raw) {
@@ -460,6 +472,7 @@ public final class UvLockReader {
         String version = null;
         UvLockSource source = null;
         List<String> resolutionMarkers = null;
+        Object defaultGroups = null;
         List<UvLockDependency> dependencies = null;
         UvLockArtifact sdist = null;
         List<UvLockArtifact> wheels = null;
@@ -474,6 +487,8 @@ public final class UvLockReader {
                 source = toSource(v);
             } else if ("resolution-markers".equals(key)) {
                 resolutionMarkers = stringList(key, v);
+            } else if ("default-groups".equals(key)) {
+                defaultGroups = "all".equals(v) ? "all" : stringList(key, v);
             } else if ("dependencies".equals(key)) {
                 dependencies = toDependencies(key, v);
             } else if ("sdist".equals(key)) {
@@ -500,7 +515,7 @@ public final class UvLockReader {
         Map<String, List<UvLockDependency>> devDependencies = toDependencyGroups(raw.devDependencies);
         UvLockMetadata metadata = toMetadata(raw);
 
-        return new UvLockPackage(name, version, source, resolutionMarkers, dependencies, sdist, wheels,
+        return new UvLockPackage(name, version, source, defaultGroups, resolutionMarkers, dependencies, sdist, wheels,
                 optionalDependencies, devDependencies, metadata);
     }
 

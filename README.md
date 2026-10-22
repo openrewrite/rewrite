@@ -46,9 +46,9 @@ See how Moderne and OpenRewrite work in different ways to transform your code:
 
 [![Moderne](./doc/openrewrite_v_moderne.png)](https://www.youtube.com/watch?v=Q-ej2lCJHRs)
 
-Moderne also includes a [multi-repo command line interface (CLI)](https://docs.moderne.io/user-documentation/moderne-cli/getting-started/cli-intro) for building LSTs, running recipes locally, and developing custom recipes across many repositories.
+Moderne also includes a [multi-repo command line interface (CLI)](https://docs.moderne.io/user-documentation/moderne-cli/getting-started/cli-getting-started/) for building LSTs, running recipes locally, and developing custom recipes across many repositories.
 
-[![Moderne](./doc/moderne_cli.png)](https://www.youtube.com/watch?v=fdPX9e2vsFw)
+[![Moderne](./doc/moderne_cli.png)](https://www.youtube.com/watch?v=maZDbrvc3u0)
 
 Moderne runs a free [public service](https://www.moderne.io/try-moderne) for the benefit of tens of thousands of open source projects. To learn more about how Moderne can help your team, [contact us](https://www.moderne.io/contact-us).
 

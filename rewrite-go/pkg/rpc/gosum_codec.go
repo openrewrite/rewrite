@@ -35,7 +35,7 @@ func init() {
 
 func sendGoSum(gs *golang.GoSum, q *SendQueue) {
 	q.GetAndSend(gs, func(v any) any { return v.(*golang.GoSum).Ident.String() }, nil)
-	q.GetAndSend(gs, func(v any) any { return v.(*golang.GoSum).Prefix },
+	q.GetAndSend(gs, func(v any) any { return spaceRef(v.(*golang.GoSum).Prefix) },
 		func(v any) { sendSpace(v.(java.Space), q) })
 	q.GetAndSend(gs, func(v any) any { return AsRef(v.(*golang.GoSum).Markers) },
 		func(v any) { SendMarkersCodec(v.(java.Markers), q) })
@@ -48,14 +48,14 @@ func sendGoSum(gs *golang.GoSum, q *SendQueue) {
 		func(v any) []any { return goSumLineSlice(v.(*golang.GoSum).Lines) },
 		goSumLineRPID,
 		func(v any) { sendGoSumRightPadded(v, q) })
-	q.GetAndSend(gs, func(v any) any { return v.(*golang.GoSum).Eof },
+	q.GetAndSend(gs, func(v any) any { return spaceRef(v.(*golang.GoSum).Eof) },
 		func(v any) { sendSpace(v.(java.Space), q) })
 }
 
 func sendGoSumRightPadded(rp any, q *SendQueue) {
 	q.GetAndSend(rp, func(v any) any { return v.(java.RightPadded[*golang.GoSumLine]).Element },
 		func(v any) { sendGoSumLine(v.(*golang.GoSumLine), q) })
-	q.GetAndSend(rp, func(v any) any { return v.(java.RightPadded[*golang.GoSumLine]).After },
+	q.GetAndSend(rp, func(v any) any { return spaceRef(v.(java.RightPadded[*golang.GoSumLine]).After) },
 		func(v any) { sendSpace(v.(java.Space), q) })
 	q.GetAndSend(rp, func(v any) any { return AsRef(v.(java.RightPadded[*golang.GoSumLine]).Markers) },
 		func(v any) { SendMarkersCodec(v.(java.Markers), q) })
@@ -63,7 +63,7 @@ func sendGoSumRightPadded(rp any, q *SendQueue) {
 
 func sendGoSumLine(l *golang.GoSumLine, q *SendQueue) {
 	q.GetAndSend(l, func(v any) any { return v.(*golang.GoSumLine).Ident.String() }, nil)
-	q.GetAndSend(l, func(v any) any { return v.(*golang.GoSumLine).Prefix },
+	q.GetAndSend(l, func(v any) any { return spaceRef(v.(*golang.GoSumLine).Prefix) },
 		func(v any) { sendSpace(v.(java.Space), q) })
 	q.GetAndSend(l, func(v any) any { return AsRef(v.(*golang.GoSumLine).Markers) },
 		func(v any) { SendMarkersCodec(v.(java.Markers), q) })

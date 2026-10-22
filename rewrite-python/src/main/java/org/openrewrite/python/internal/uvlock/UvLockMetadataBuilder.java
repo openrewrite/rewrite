@@ -25,7 +25,9 @@ import org.openrewrite.python.internal.pep508.Pep508Requirement;
 import org.openrewrite.toml.tree.Toml;
 import org.openrewrite.toml.tree.TomlValue;
 
+import java.util.Arrays;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
@@ -88,24 +90,23 @@ final class UvLockMetadataBuilder {
      */
     static Set<String> readNonRegistrySources(Toml.Document pyproject) {
         Set<String> nonRegistry = new HashSet<>();
+        Toml.Table sources = UvLockToml.findTable(pyproject, "tool.uv.sources");
+        for (Toml sourceValue : sources != null ? sources.getValues() : Collections.<Toml>emptyList()) {
+            if (sourceValue instanceof Toml.KeyValue) {
+                Toml.KeyValue kv = (Toml.KeyValue) sourceValue;
+                String pkg = UvLockToml.keyName(kv);
+                if (pkg != null && !UvLockToml.hasIndexKey(kv.getValue())) {
+                    nonRegistry.add(Pep508Requirement.canonicalize(pkg));
+                }
+            }
+        }
         for (TomlValue value : pyproject.getValues()) {
             if (!(value instanceof Toml.Table)) {
                 continue;
             }
             Toml.Table table = (Toml.Table) value;
             String name = UvLockToml.tableName(table);
-            if ("tool.uv.sources".equals(name)) {
-                for (Toml sourceValue : table.getValues()) {
-                    if (!(sourceValue instanceof Toml.KeyValue)) {
-                        continue;
-                    }
-                    Toml.KeyValue kv = (Toml.KeyValue) sourceValue;
-                    String pkg = UvLockToml.keyName(kv);
-                    if (pkg != null && !UvLockToml.hasIndexKey(kv.getValue())) {
-                        nonRegistry.add(Pep508Requirement.canonicalize(pkg));
-                    }
-                }
-            } else if (name != null && name.startsWith("tool.uv.sources.")) {
+            if (name != null && name.startsWith("tool.uv.sources.")) {
                 String pkg = name.substring("tool.uv.sources.".length());
                 if (UvLockToml.literalString(table, "index") == null) {
                     nonRegistry.add(Pep508Requirement.canonicalize(UvLockToml.unquote(pkg)));
@@ -139,18 +140,9 @@ final class UvLockMetadataBuilder {
         }
         Toml.Table groups = UvLockToml.findTable(pyproject, "dependency-groups");
         if (groups != null) {
-            for (Toml value : groups.getValues()) {
-                if (!(value instanceof Toml.KeyValue)) {
-                    continue;
-                }
-                Toml.KeyValue kv = (Toml.KeyValue) value;
-                String group = UvLockToml.keyName(kv);
-                if (group == null || !(kv.getValue() instanceof Toml.Array)) {
-                    throw new EngineFailure(Reason.MALFORMED_MANIFEST, null,
-                            "Unreadable [dependency-groups] entry");
-                }
-                for (String spec : UvLockToml.stringArrayValues((Toml.Array) kv.getValue(), "dependency-groups")) {
-                    declared.add(toDeclared(spec, null, group));
+            for (Map.Entry<String, List<String>> group : UvLockToml.dependencyGroups(groups).entrySet()) {
+                for (String spec : group.getValue()) {
+                    declared.add(toDeclared(spec, null, group.getKey()));
                 }
             }
         }
@@ -170,7 +162,7 @@ final class UvLockMetadataBuilder {
             throw new EngineFailure(Reason.MALFORMED_MANIFEST, null,
                     "Unparseable dependency declaration: " + spec);
         }
-        if (requirement.getUrl() != null) {
+        if (requirement.getUrl() != null && !requirement.getUrl().startsWith("git+")) {
             throw new EngineFailure(Reason.UNSUPPORTED_ENTRY_TYPE, requirement.getCanonicalName(),
                     "Direct URL dependencies are not supported by the native engine: " + spec);
         }
@@ -216,11 +208,15 @@ final class UvLockMetadataBuilder {
             for (Toml value : groups.getValues()) {
                 if (value instanceof Toml.KeyValue) {
                     String group = UvLockToml.keyName((Toml.KeyValue) value);
-                    if (group != null && !requiresDev.containsKey(group)) {
-                        requiresDev.put(group, new ArrayList<>());
+                    if (group != null) {
+                        requiresDev.computeIfAbsent(Pep508Requirement.canonicalize(group), k -> new ArrayList<>());
                     }
                 }
             }
+        }
+        Toml.Table uv = UvLockToml.findTable(pyproject, "tool.uv");
+        if (uv != null && UvLockToml.hasKey(uv, "dev-dependencies")) {
+            requiresDev.computeIfAbsent("dev", k -> new ArrayList<>());
         }
         requiresDist.sort(Comparator.comparing(UvLockRequirement::getName));
         for (List<UvLockRequirement> group : requiresDev.values()) {
@@ -277,13 +273,34 @@ final class UvLockMetadataBuilder {
     }
 
     private UvLockRequirement buildRequirement(Declared decl) {
+        String url = decl.requirement.getUrl();
+        List<String> extras = null;
+        if (!decl.requirement.getExtras().isEmpty()) {
+            extras = new ArrayList<>();
+            for (String extra : decl.requirement.getExtras()) {
+                extras.add(Pep508Requirement.canonicalize(extra));
+            }
+        }
+        if (url != null) {
+            String git = recordedGit(url);
+            UvLockRequirement old = findOldRequirement(decl);
+            if (old != null && old.getGit() != null && (git == null ? sameGit(old.getGit(), url) : git.equals(old.getGit()))) {
+                return withDeclaredExtrasAndMarker(old, extras, decl);
+            }
+            if (git == null) {
+                throw new EngineFailure(Reason.UNSUPPORTED_ENTRY_TYPE, decl.canonicalName,
+                        "Recording the git dependency " + url + " is not supported by the native engine");
+            }
+            return new UvLockRequirement(decl.canonicalName, extras, null, resolveMetadataMarker(decl), null, null,
+                    null, git, null, null);
+        }
         if (nonRegistrySources.contains(decl.canonicalName)) {
             UvLockRequirement old = findOldRequirement(decl);
             if (old == null) {
                 throw new EngineFailure(Reason.UNSUPPORTED_ENTRY_TYPE, decl.canonicalName,
                         "Adding a git/path/editable dependency is not supported by the native engine");
             }
-            return old;
+            return withDeclaredExtrasAndMarker(old, extras, decl);
         }
         List<String> pins = indexPins.get(decl.canonicalName);
         if (pins != null && new HashSet<>(pins).size() > 1) {
@@ -294,17 +311,18 @@ final class UvLockMetadataBuilder {
             throw new EngineFailure(Reason.RESOLUTION_REQUIRED, decl.canonicalName,
                     "Marker-gated multi-index pins are not supported by the native engine");
         }
-        List<String> extras = null;
-        if (!decl.requirement.getExtras().isEmpty()) {
-            extras = new ArrayList<>();
-            for (String extra : decl.requirement.getExtras()) {
-                extras.add(Pep508Requirement.canonicalize(extra));
-            }
-        }
         String specifier = normalizeSpecifier(decl);
         String index = pins == null ? null : declaredIndexUrl(pins.get(0), decl.canonicalName);
         String marker = resolveMetadataMarker(decl);
         return new UvLockRequirement(decl.canonicalName, extras, null, marker, specifier, index, null, null, null, null);
+    }
+
+    // a source the lock records keeps its recorded form, while the declaration's extras and marker still count
+    private UvLockRequirement withDeclaredExtrasAndMarker(UvLockRequirement old, @Nullable List<String> extras,
+                                                          Declared decl) {
+        String marker = resolveMetadataMarker(decl);
+        return Objects.equals(extras, old.getExtras()) && Objects.equals(marker, old.getMarker()) ? old :
+                old.withExtras(extras).withMarker(marker);
     }
 
     private @Nullable String normalizeSpecifier(Declared decl) {
@@ -375,6 +393,69 @@ final class UvLockMetadataBuilder {
         Marker declaredMarker = Marker.parse(declaredText);
         Marker recordedMarker = Marker.parse(recorded);
         return declaredMarker != null && declaredMarker.equals(recordedMarker);
+    }
+
+    /**
+     * uv's recorded form of a {@code git+} URL: the repository URL with its revision and subdirectory as query
+     * parameters. Null when it carries both, whose order uv's form leaves open here.
+     */
+    static @Nullable String recordedGit(String url) {
+        String rest = url.substring("git+".length());
+        String subdirectory = null;
+        int hash = rest.indexOf('#');
+        if (hash >= 0) {
+            for (String part : rest.substring(hash + 1).split("&")) {
+                if (part.startsWith("subdirectory=")) {
+                    subdirectory = part.substring("subdirectory=".length());
+                } else if (!part.startsWith("egg=")) {
+                    return null;
+                }
+            }
+            rest = rest.substring(0, hash);
+        }
+        String rev = null;
+        int at = rest.lastIndexOf('@');
+        int hostEnd = rest.indexOf('/', rest.indexOf("://") + 3);
+        if (at > hostEnd && hostEnd > 0) {
+            rev = rest.substring(at + 1);
+            rest = rest.substring(0, at);
+            // uv percent-encodes a revision's slashes, a form not reproduced here
+            if (rev.indexOf('/') >= 0) {
+                return null;
+            }
+        }
+        if (rev != null && subdirectory != null) {
+            return null;
+        }
+        return rev != null ? rest + "?rev=" + rev : subdirectory != null ? rest + "?subdirectory=" + subdirectory : rest;
+    }
+
+    // the recorded form names the same repository, revision and subdirectory, in whichever order
+    private static boolean sameGit(String recorded, String url) {
+        String rest = url.substring("git+".length());
+        int hash = rest.indexOf('#');
+        String base = hash >= 0 ? rest.substring(0, hash) : rest;
+        int at = base.lastIndexOf('@');
+        String repository = at > base.indexOf("://") + 3 && base.indexOf('/', at) < 0 ? base.substring(0, at) : base;
+        int query = recorded.indexOf('?');
+        if (!(query >= 0 ? recorded.substring(0, query) : recorded).equals(repository)) {
+            return false;
+        }
+        Set<String> params = new HashSet<>(Arrays.asList((query >= 0 ? recorded.substring(query + 1) : "").split("&")));
+        if (at > base.indexOf("://") + 3 && base.indexOf('/', at) < 0) {
+            if (!params.remove("rev=" + base.substring(at + 1))) {
+                return false;
+            }
+        }
+        if (hash >= 0) {
+            for (String part : rest.substring(hash + 1).split("&")) {
+                if (part.startsWith("subdirectory=") && !params.remove(part)) {
+                    return false;
+                }
+            }
+        }
+        params.remove("");
+        return params.isEmpty();
     }
 
     private @Nullable UvLockRequirement findOldRequirement(Declared decl) {

@@ -162,7 +162,7 @@ class ScalaTypeSignatureBuilder(using ctx: Context) {
 
   /** The signature of the method with the given parameter and result types, as instantiated at a call. */
   def methodSignature(sym: Symbols.Symbol, info: Type): String = {
-    val owner = sym.owner.fullName.toString
+    val owner = methodOwnerFqn(sym.owner)
     val name = if (sym.isConstructor) "<constructor>" else sym.name.toString
     val returnType = info.finalResultType match {
       case NoType => "void"
@@ -189,6 +189,25 @@ class ScalaTypeSignatureBuilder(using ctx: Context) {
     if (!pt.isRepeatedParam) pt
     else if (method.is(Flags.JavaDefined)) pt.translateParameterized(ctx.definitions.RepeatedParamClass, ctx.definitions.ArrayClass)
     else pt.translateFromRepeated(toArray = false)
+
+  /** The FQN of a class: `object A` has the same class type as `class A`, and `scala.Any`/`scala.AnyRef` are `java.lang.Object`. */
+  def classFqn(sym: Symbols.Symbol): String = {
+    val fqn = sym.fullName.toString
+    val classFqn = if (sym.is(Flags.ModuleClass)) fqn.stripSuffix("$") else fqn
+    classFqn match {
+      case "scala.Any" | "scala.AnyRef" => "java.lang.Object"
+      case other => other
+    }
+  }
+
+  /**
+   * The owner of a method in its signature. Java statics live on a module class `X$` and are keyed under `X`
+   * like the Java parser does, while a Scala `object A` keeps its `$` so its methods don't collide with `class A`'s.
+   */
+  def methodOwnerFqn(owner: Symbols.Symbol): String = {
+    val fqn = owner.fullName.toString
+    if (owner.is(Flags.JavaDefined) && owner.is(Flags.ModuleClass)) fqn.stripSuffix("$") else fqn
+  }
 
   def variableSignature(sym: Symbols.Symbol): String = {
     val owner = sym.owner.fullName.toString

@@ -20,6 +20,7 @@ import okhttp3.mockwebserver.MockResponse;
 import okhttp3.mockwebserver.MockWebServer;
 import okhttp3.mockwebserver.RecordedRequest;
 import okio.Buffer;
+import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -439,7 +440,16 @@ class PipenvLockEngineTest {
     }
 
     @Test
-    void additionRequiresResolution() {
+    void addedDeclarationEntersTheLockWithItsIndex() {
+        listing("flask",
+          wheel("flask-3.0.3-py3-none-any.whl", "1".repeat(64), ">=3.8"),
+          sdist("flask-3.0.3.tar.gz", "2".repeat(64), ">=3.8"));
+        metadata("flask-3.0.3-py3-none-any.whl", """
+          Metadata-Version: 2.1
+          Name: Flask
+          Version: 3.0.3
+          Requires-Python: >=3.8
+          """);
         String pipfile = """
           [[source]]
           url = "https://pypi.org/simple"
@@ -456,9 +466,19 @@ class PipenvLockEngineTest {
 
         Result result = PipenvLockEngine.regenerate(pipfile, baseLock(), ctx);
 
-        assertThat(result.isSuccess()).isFalse();
-        assertThat(result.getFailure().getReason()).isEqualTo(Reason.RESOLUTION_REQUIRED);
-        assertThat(result.getFailure().getPackageName()).isEqualTo("flask");
+        assertThat(result.getErrorMessage()).isNull();
+        assertThat(result.getDetail()).contains("MINIMAL_CHANGE");
+        assertThat(compact(result.getLockFileContent())).contains(compact("""
+          "flask": {
+              "hashes": [
+                  "sha256:%s",
+                  "sha256:%s"
+              ],
+              "index": "pypi",
+              "markers": "python_version >= '3.8'",
+              "version": "==3.0.3"
+          },
+          "idna": {""".formatted("1".repeat(64), "2".repeat(64))));
     }
 
     @Test
@@ -647,9 +667,15 @@ class PipenvLockEngineTest {
     }
 
     @Test
-    void newlyAddedAbsentPackageStillFailsLoudUnderScoping() {
-        // With the original supplied, an ADD (flask absent from lock and freshly declared) IS in
-        // scope, so the native engine still fails loud rather than emit a lock missing the dependency.
+    void addedDeclarationIsInScopeWhenTheOriginalPipfileIsKnown() {
+        // scoping skips untouched packages, and a freshly declared one is touched, so it enters the lock
+        listing("flask", wheel("flask-3.0.3-py3-none-any.whl", "1".repeat(64), ">=3.8"));
+        metadata("flask-3.0.3-py3-none-any.whl", """
+          Metadata-Version: 2.1
+          Name: Flask
+          Version: 3.0.3
+          Requires-Python: >=3.8
+          """);
         String original = """
           [[source]]
           url = "https://pypi.org/simple"
@@ -678,9 +704,8 @@ class PipenvLockEngineTest {
 
         Result result = PipenvLockEngine.regenerate(edited, original, baseLock(), ctx);
 
-        assertThat(result.isSuccess()).isFalse();
-        assertThat(result.getFailure().getReason()).isEqualTo(Reason.RESOLUTION_REQUIRED);
-        assertThat(result.getFailure().getPackageName()).isEqualTo("flask");
+        assertThat(result.getErrorMessage()).isNull();
+        assertThat(compact(result.getLockFileContent())).contains(compact("\"version\": \"==3.0.3\""));
     }
 
     @Test
@@ -766,7 +791,7 @@ class PipenvLockEngineTest {
     }
 
     @Test
-    void newRequirementOutsideTheLockRequiresResolution() {
+    void upgradeMovesAPinItsNewVersionNoLongerAccepts() {
         listing("requests",
           wheel("requests-2.31.0-py3-none-any.whl", WHEEL_2310, ">=3.7"),
           wheel("requests-2.33.0-py3-none-any.whl", "3".repeat(64), ">=3.8"));
@@ -775,7 +800,26 @@ class PipenvLockEngineTest {
           Name: requests
           Version: 2.33.0
           Requires-Python: >=3.8
-          Requires-Dist: brand-new-package>=1.0
+          Requires-Dist: certifi>=2017.4.17
+          Requires-Dist: idna<4,>=3.8
+          """);
+        // the newest idna every live requirement accepts, not the newest listed
+        listing("idna",
+          wheel("idna-3.7-py3-none-any.whl", IDNA, ">=3.5"),
+          wheel("idna-3.10-py3-none-any.whl", "a".repeat(64), ">=3.6"),
+          wheel("idna-4.0-py3-none-any.whl", "b".repeat(64), ">=3.8"));
+        metadata("idna-3.10-py3-none-any.whl", """
+          Metadata-Version: 2.1
+          Name: idna
+          Version: 3.10
+          Requires-Python: >=3.6
+          """);
+        // every other pin's requirements bound the move, so certifi's are read too
+        listing("certifi", wheel("certifi-2024.2.2-py3-none-any.whl", CERTIFI, ">=3.6"));
+        metadata("certifi-2024.2.2-py3-none-any.whl", """
+          Metadata-Version: 2.1
+          Name: certifi
+          Version: 2024.2.2
           """);
         String pipfile = """
           [[source]]
@@ -792,10 +836,163 @@ class PipenvLockEngineTest {
 
         Result result = PipenvLockEngine.regenerate(pipfile, baseLock(), ctx);
 
+        assertThat(result.getErrorMessage()).isNull();
+        assertThat(compact(result.getLockFileContent())).contains(compact("""
+          "idna": {
+              "hashes": [
+                  "sha256:%s"
+              ],
+              "markers": "python_version >= '3.6'",
+              "version": "==3.10"
+          },""".formatted("a".repeat(64))))
+          .contains(compact("\"version\": \"==2.33.0\""));
+    }
+
+    private static String compact(@Nullable String json) {
+        return String.valueOf(json).replaceAll("\\s+", "");
+    }
+
+    @Test
+    void anOldSdistsEggInfoRequirementsBoundAMove() throws IOException {
+        listing("requests",
+          wheel("requests-2.31.0-py3-none-any.whl", WHEEL_2310, ">=3.7"),
+          wheel("requests-2.33.0-py3-none-any.whl", "3".repeat(64), ">=3.8"));
+        metadata("requests-2.33.0-py3-none-any.whl", """
+          Metadata-Version: 2.1
+          Name: requests
+          Version: 2.33.0
+          Requires-Python: >=3.8
+          Requires-Dist: idna<4,>=3.8
+          """);
+        listing("idna",
+          wheel("idna-3.7-py3-none-any.whl", IDNA, ">=3.5"),
+          wheel("idna-3.8-py3-none-any.whl", "8".repeat(64), ">=3.6"),
+          wheel("idna-3.10-py3-none-any.whl", "a".repeat(64), ">=3.6"));
+        metadata("idna-3.8-py3-none-any.whl", "Metadata-Version: 2.1\nName: idna\nVersion: 3.8\n");
+        metadata("idna-3.10-py3-none-any.whl", "Metadata-Version: 2.1\nName: idna\nVersion: 3.10\n");
+        // certifi's only distribution is an sdist whose PKG-INFO predates Requires-Dist
+        listing("certifi", sdist("certifi-2024.2.2.zip", CERTIFI, ">=3.6"));
+        String pipfile = """
+          [[source]]
+          url = "https://pypi.org/simple"
+          verify_ssl = true
+          name = "pypi"
+
+          [packages]
+          requests = ">=2.33.0"
+
+          [requires]
+          python_version = "3.11"
+          """;
+
+        byte[] noRequirements = zip("certifi-2024.2.2/PKG-INFO", "Metadata-Version: 1.1\nName: certifi\nVersion: 2024.2.2\n",
+          "certifi-2024.2.2/certifi.egg-info/PKG-INFO", "Metadata-Version: 1.1\nName: certifi\nVersion: 2024.2.2\n");
+        routes.put("/packages/certifi-2024.2.2.zip", () -> new MockResponse().setBody(new Buffer().write(noRequirements)));
+        Result result = PipenvLockEngine.regenerate(pipfile, baseLock(), ctx);
+        assertThat(result.getErrorMessage()).isNull();
+        assertThat(compact(result.getLockFileContent())).contains(compact("\"version\": \"==3.10\""));
+
+        byte[] boundsIdna = zip("certifi-2024.2.2/PKG-INFO", "Metadata-Version: 1.1\nName: certifi\nVersion: 2024.2.2\n",
+          "certifi-2024.2.2/certifi.egg-info/requires.txt", "idna<3.9\n\n[socks]\npysocks\n");
+        routes.put("/packages/certifi-2024.2.2.zip", () -> new MockResponse().setBody(new Buffer().write(boundsIdna)));
+        result = PipenvLockEngine.regenerate(pipfile, baseLock(), ctx);
+        assertThat(result.getErrorMessage()).isNull();
+        assertThat(compact(result.getLockFileContent())).contains(compact("\"version\": \"==3.8\""));
+    }
+
+    @Test
+    void newRequirementEntersTheLockWithItsClosure() {
+        listing("requests",
+          wheel("requests-2.31.0-py3-none-any.whl", WHEEL_2310, ">=3.7"),
+          wheel("requests-2.33.0-py3-none-any.whl", "3".repeat(64), ">=3.8"));
+        metadata("requests-2.33.0-py3-none-any.whl", """
+          Metadata-Version: 2.1
+          Name: requests
+          Version: 2.33.0
+          Requires-Python: >=3.8
+          Requires-Dist: brand-new-package>=1.0
+          """);
+        // 1.2 needs a newer Python than the lock's 3.11, so 1.1 is the newest that installs
+        listing("brand-new-package",
+          wheel("brand_new_package-1.1-py3-none-any.whl", "c".repeat(64), ">=3.9"),
+          sdist("brand_new_package-1.1.tar.gz", "d".repeat(64), ">=3.9"),
+          wheel("brand_new_package-1.2-py3-none-any.whl", "e".repeat(64), ">=3.12"));
+        // the lock environment is Linux, as pipenv's own on a Linux machine
+        metadata("brand_new_package-1.1-py3-none-any.whl", """
+          Metadata-Version: 2.1
+          Name: brand-new-package
+          Version: 1.1
+          Requires-Python: >=3.9
+          Requires-Dist: pywin32>=300; sys_platform == "win32"
+          """);
+        String pipfile = """
+          [[source]]
+          url = "https://pypi.org/simple"
+          verify_ssl = true
+          name = "pypi"
+
+          [packages]
+          requests = ">=2.33.0"
+
+          [requires]
+          python_version = "3.11"
+          """;
+
+        Result result = PipenvLockEngine.regenerate(pipfile, baseLock(), ctx);
+
+        assertThat(result.getErrorMessage()).isNull();
+        assertThat(compact(result.getLockFileContent())).contains(compact("""
+          "default": {
+              "brand-new-package": {
+                  "hashes": [
+                      "sha256:%s",
+                      "sha256:%s"
+                  ],
+                  "markers": "python_version >= '3.9'",
+                  "version": "==1.1"
+              },
+              "certifi": {""".formatted("c".repeat(64), "d".repeat(64))))
+          .doesNotContain("pywin32");
+    }
+
+    @Test
+    void addedDeclarationAndAMovedRequirementOnItBothBindItsPin() {
+        listing("requests",
+          wheel("requests-2.31.0-py3-none-any.whl", WHEEL_2310, ">=3.7"),
+          wheel("requests-2.33.0-py3-none-any.whl", "3".repeat(64), ">=3.8"));
+        metadata("requests-2.33.0-py3-none-any.whl", """
+          Metadata-Version: 2.1
+          Name: requests
+          Version: 2.33.0
+          Requires-Python: >=3.8
+          Requires-Dist: brand-new-package>=1.1
+          """);
+        listing("brand-new-package",
+          wheel("brand_new_package-1.0-py3-none-any.whl", "b".repeat(64), ">=3.9"),
+          wheel("brand_new_package-1.1-py3-none-any.whl", "c".repeat(64), ">=3.9"));
+        metadata("brand_new_package-1.0-py3-none-any.whl",
+          "Metadata-Version: 2.1\nName: brand-new-package\nVersion: 1.0\n");
+        metadata("brand_new_package-1.1-py3-none-any.whl",
+          "Metadata-Version: 2.1\nName: brand-new-package\nVersion: 1.1\n");
+        String pipfile = """
+          [[source]]
+          url = "https://pypi.org/simple"
+          verify_ssl = true
+          name = "pypi"
+
+          [packages]
+          requests = ">=2.33.0"
+          brand-new-package = "<1.1"
+
+          [requires]
+          python_version = "3.11"
+          """;
+
+        Result result = PipenvLockEngine.regenerate(pipfile, baseLock(), ctx);
+
+        // no version meets both requests' >=1.1 and the Pipfile's <1.1
         assertThat(result.isSuccess()).isFalse();
-        assertThat(result.getFailure().getReason()).isEqualTo(Reason.RESOLUTION_REQUIRED);
-        assertThat(result.getFailure().getPackageName()).isEqualTo("requests");
-        assertThat(result.getFailure().getDetail()).contains("brand-new-package");
+        assertThat(result.getFailure().getPackageName()).isEqualTo("brand-new-package");
     }
 
     @Test
@@ -1409,7 +1606,7 @@ class PipenvLockEngineTest {
     }
 
     @Test
-    void extrasAddedTriggersClosureProof() {
+    void extrasAddedBringTheirRequirementsIntoTheLock() {
         listing("requests",
           wheel("requests-2.31.0-py3-none-any.whl", WHEEL_2310, ">=3.7"),
           sdist("requests-2.31.0.tar.gz", SDIST_2310, ">=3.7"));
@@ -1421,6 +1618,12 @@ class PipenvLockEngineTest {
           Requires-Dist: certifi>=2017.4.17
           Requires-Dist: idna<4,>=2.5
           Requires-Dist: pysocks!=1.5.7,>=1.5.6; extra == 'socks'
+          """);
+        listing("pysocks", wheel("PySocks-1.7.1-py3-none-any.whl", "f".repeat(64), ">=2.7, !=3.0.*, !=3.1.*, !=3.2.*, !=3.3.*"));
+        metadata("PySocks-1.7.1-py3-none-any.whl", """
+          Metadata-Version: 2.1
+          Name: PySocks
+          Version: 1.7.1
           """);
         String pipfile = """
           [[source]]
@@ -1437,10 +1640,10 @@ class PipenvLockEngineTest {
 
         Result result = PipenvLockEngine.regenerate(pipfile, baseLock(), ctx);
 
-        assertThat(result.isSuccess()).isFalse();
-        assertThat(result.getFailure().getReason()).isEqualTo(Reason.RESOLUTION_REQUIRED);
-        assertThat(result.getFailure().getPackageName()).isEqualTo("requests");
-        assertThat(result.getFailure().getDetail()).contains("pysocks");
+        assertThat(result.getErrorMessage()).isNull();
+        assertThat(compact(result.getLockFileContent()))
+          .contains(compact("\"pysocks\": {\"hashes\": [\"sha256:" + "f".repeat(64) + "\"]"))
+          .contains(compact("\"extras\": [\"socks\"]"));
     }
 
     @Test
@@ -1637,12 +1840,15 @@ class PipenvLockEngineTest {
         return hex.toString();
     }
 
-    private static byte[] zip(String entryName, String content) throws IOException {
+    // entries as alternating names and contents
+    private static byte[] zip(String... entries) throws IOException {
         ByteArrayOutputStream out = new ByteArrayOutputStream();
         try (ZipOutputStream zip = new ZipOutputStream(out)) {
-            zip.putNextEntry(new ZipEntry(entryName));
-            zip.write(content.getBytes(StandardCharsets.UTF_8));
-            zip.closeEntry();
+            for (int i = 0; i < entries.length; i += 2) {
+                zip.putNextEntry(new ZipEntry(entries[i]));
+                zip.write(entries[i + 1].getBytes(StandardCharsets.UTF_8));
+                zip.closeEntry();
+            }
         }
         return out.toByteArray();
     }

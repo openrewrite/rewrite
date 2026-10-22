@@ -74,7 +74,7 @@ public sealed class NullSafe : Marker, IRpcCodec<NullSafe>, IEquatable<NullSafe>
     public void RpcSend(NullSafe after, RpcSendQueue q)
     {
         q.GetAndSend(after, m => m.Id);
-        q.GetAndSend(after, m => m.DotPrefix, s => new Rpc.JavaSender().VisitSpace(s, q));
+        q.GetAndSend(after, m => Rpc.JavaSender.SpaceRef(m.DotPrefix), s => new Rpc.JavaSender().VisitSpace(Rewrite.Core.Rpc.Reference.GetValueNonNull<Space>(s), q));
     }
 
     public NullSafe RpcReceive(NullSafe before, RpcReceiveQueue q) =>

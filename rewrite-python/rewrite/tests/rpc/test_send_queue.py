@@ -66,7 +66,7 @@ def test_change_to_a_padded_space_is_sent():
 
         q.send(after, before, lambda: visit(after, q))
 
-        assert {'state': 'CHANGE', 'valueType': None, 'value': '  '} in q.q
+        assert {'state': 'ADD', 'valueType': None, 'value': '  '} in q.q
 
 
 def test_int_value_serializes_as_a_number_at_any_magnitude():
