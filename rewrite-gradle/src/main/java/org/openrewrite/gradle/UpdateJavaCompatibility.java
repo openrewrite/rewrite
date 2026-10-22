@@ -178,8 +178,7 @@ public class UpdateJavaCompatibility extends Recipe {
 
     // Variables a compatibility assignment reads from; the version lives in their initializer, not the assignment.
     private Set<String> findCompatibilityVariables(Tree tree) {
-        Set<String> names = new HashSet<>();
-        new JavaIsoVisitor<Set<String>>() {
+        return new JavaIsoVisitor<Set<String>>() {
             @Override
             public J.Assignment visitAssignment(J.Assignment assignment, Set<String> names) {
                 if (assignment.getAssignment() instanceof J.Identifier && isCompatibilityAssignment(assignment)) {
@@ -187,8 +186,7 @@ public class UpdateJavaCompatibility extends Recipe {
                 }
                 return super.visitAssignment(assignment, names);
             }
-        }.visit(tree, names);
-        return names;
+        }.reduce(tree, new HashSet<>());
     }
 
     private G.CompilationUnit addGroovyCompatibilityType(G.CompilationUnit c, String targetCompatibilityType, Cursor scope) {

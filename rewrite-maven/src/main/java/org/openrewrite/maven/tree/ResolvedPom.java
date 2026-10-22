@@ -163,9 +163,9 @@ public class ResolvedPom {
     public ResolvedPom deduplicate() {
         Set<UniqueDependencyKey> uniqueDependencies = new LinkedHashSet<>(dependencyManagement.size());
         //noinspection DataFlowIssue
-        requestedDependencies = ListUtils.map(requestedDependencies,
+        requestedDependencies = ListUtils.filter(requestedDependencies,
                 d -> uniqueDependencies.add(
-                        new UniqueDependencyKey(d.getGav(), d.getType(), d.getClassifier(), d.getScope())) ? d : null);
+                        new UniqueDependencyKey(d.getGav(), d.getType(), d.getClassifier(), d.getScope())));
         return this;
     }
 
@@ -1028,7 +1028,7 @@ public class ResolvedPom {
         for (Dependency requestedDependency : getRequestedDependencies()) {
             Dependency d = getValues(requestedDependency, 0);
             Scope dScope = Scope.fromName(d.getScope());
-            if (dScope == scope || dScope.transitiveOf(scope) == scope) {
+            if (dScope.isDirectlyIncludedIn(scope)) {
                 // For direct dependencies that are duplicated, last declaration wins
                 // TODO: We could introduce a ResolutionStrategy to handle this differently for Gradle which uses highest version
                 rootDependencies.put(d.getGav().asGroupArtifact(), new DependencyAndDependent(requestedDependency, Scope.Compile, null, requestedDependency, this));

@@ -46,8 +46,7 @@ class CSharpVisitorCompletenessTest {
     }
 
     long visitorNewlines(SourceFile cu) {
-        AtomicInteger n = new AtomicInteger();
-        new CSharpVisitor<AtomicInteger>() {
+        return new CSharpVisitor<AtomicInteger>() {
             @Override
             public Space visitSpace(Space s, Space.Location l, AtomicInteger a) {
                 a.addAndGet((int) nl(s.getWhitespace()));
@@ -63,8 +62,7 @@ class CSharpVisitorCompletenessTest {
                 a.addAndGet((int) nl(lit.getValueSource()));
                 return super.visitLiteral(lit, a);
             }
-        }.visit(cu, n);
-        return n.get();
+        }.reduce(cu, new AtomicInteger()).get();
     }
 
     @Test

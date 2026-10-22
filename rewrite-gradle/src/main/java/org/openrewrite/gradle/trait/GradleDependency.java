@@ -133,8 +133,40 @@ public class GradleDependency implements Trait<J.MethodInvocation> {
     @With
     Cursor cursor;
 
+    /**
+     * May have no transitive dependencies; use {@link #getResolvedDependencyWithTransitives()} to walk them.
+     */
     @Getter
     ResolvedDependency resolvedDependency;
+
+    /**
+     * Like {@code getResolvedDependency()}, but with its transitive dependencies populated. When a recipe has marked
+     * the configuration for re-resolution, the matcher resolves it with
+     * {@link GradleDependencyConfiguration#getDirectResolvedShallow()}, which leaves them empty.
+     */
+    public ResolvedDependency getResolvedDependencyWithTransitives() {
+        if (!resolvedDependency.getDependencies().isEmpty() || resolvedDependency.getDepth() < 0) {
+            return resolvedDependency;
+        }
+        GradleProject gradleProject = getGradleProject(cursor);
+        GradleDependencyConfiguration gdc = getConfiguration(gradleProject, getTree());
+        if (gradleProject == null || gdc == null) {
+            return resolvedDependency;
+        }
+        List<GradleDependencyConfiguration> resolvable = gdc.isCanBeResolved() ?
+                singletonList(gdc) : gradleProject.configurationsExtendingFrom(gdc, true);
+        for (GradleDependencyConfiguration c : resolvable) {
+            if (!c.isCanBeResolved()) {
+                continue;
+            }
+            for (ResolvedDependency rd : c.getDirectResolved()) {
+                if (rd.getGroupId().equals(getGroupId()) && rd.getArtifactId().equals(getArtifactId())) {
+                    return rd.withRequested(resolvedDependency.getRequested());
+                }
+            }
+        }
+        return resolvedDependency;
+    }
 
     /**
      * Gets the resolved group ID of the dependency after Gradle's dependency resolution.
@@ -881,13 +913,8 @@ public class GradleDependency implements Trait<J.MethodInvocation> {
         } else if (m.getArguments().get(0) instanceof G.MapLiteral) {
             updated = m.withArguments(ListUtils.mapFirst(m.getArguments(), arg -> {
                 G.MapLiteral mapLiteral = (G.MapLiteral) arg;
-                return mapLiteral.withElements(ListUtils.map(mapLiteral.getElements(), entry -> {
-                    if (entry.getKey() instanceof J.Literal && "version".equals(((J.Literal) entry.getKey()).getValue())) {
-                        //noinspection DataFlowIssue
-                        return null;
-                    }
-                    return entry;
-                }));
+                return mapLiteral.withElements(ListUtils.filter(mapLiteral.getElements(), entry ->
+                  !(entry.getKey() instanceof J.Literal && "version".equals(((J.Literal) entry.getKey()).getValue()))));
             }));
         } else if (m.getArguments().get(0) instanceof G.MapEntry) {
             updated = m.withArguments(ListUtils.map(m.getArguments(), arg -> {
