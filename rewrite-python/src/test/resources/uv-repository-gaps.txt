@@ -2,7 +2,6 @@
 apache__gravitino__mcp-server__upgrade	refuses: RESOLUTION_REQUIRED
 apache__polaris-tools__mcp-server__upgrade	refuses: RESOLUTION_REQUIRED
 huggingface__carbon__upgrade	refuses: DYNAMIC_SDIST_METADATA
-jazzband__dj-database-url__group-upgrade	refuses: RESOLUTION_REQUIRED
 langchain-ai__langgraph-cua-py__upgrade	refuses: RESOLUTION_REQUIRED
 pydantic__talks__2026-02-monty__removal	refuses: RESOLUTION_REQUIRED
 pydantic__talks__2026-02-monty__upgrade	refuses: RESOLUTION_REQUIRED
