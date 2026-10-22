@@ -1646,21 +1646,21 @@ class ScalaTypeAttributionTest implements RewriteTest {
               @throws[Exception] def t(): Unit = ()
               @throws(classOf[Exception]) def c(): Unit = ()
               @deprecated("x", "1") def d(): Unit = ()
+              @`deprecated` def q(): Unit = ()
               @scala.annotation.nowarn def n(): Unit = ()
               @Deprecated def j(): Unit = ()
               @SuppressWarnings(Array("unused")) def w(): Unit = ()
               def u(o: Any): Int = (o: @unchecked) match { case i: Int => i }
             }
             @SerialVersionUID(1L) class C(@transient val z: Int)
+            @deprecated object O
+            class D[@specialized T]
             """,
             spec -> spec.afterRecipe(cu -> {
-                // when
                 List<String> annotationTypes = findAll(cu, J.Annotation.class, a -> true).stream()
                   .map(a -> TypeUtils.asFullyQualified(a.getType()))
                   .map(t -> t == null ? null : t.getFullyQualifiedName())
                   .toList();
-
-                // then
                 assertThat(annotationTypes).containsExactly(
                   "scala.transient",
                   "scala.volatile",
@@ -1668,12 +1668,15 @@ class ScalaTypeAttributionTest implements RewriteTest {
                   "scala.throws",
                   "scala.throws",
                   "scala.deprecated",
+                  "scala.deprecated",
                   "scala.annotation.nowarn",
                   "java.lang.Deprecated",
                   "java.lang.SuppressWarnings",
                   "scala.unchecked",
                   "scala.SerialVersionUID",
-                  "scala.transient"
+                  "scala.transient",
+                  "scala.deprecated",
+                  "scala.specialized"
                 );
                 assertThat(FindMissingTypes.findMissingTypes(cu, false))
                   .extracting(FindMissingTypes.MissingTypeResult::getPrintedTree)
@@ -1738,7 +1741,10 @@ class ScalaTypeAttributionTest implements RewriteTest {
     @Test
     void findAnnotationsMatchesScalaAnnotations() {
         rewriteRun(
-          spec -> spec.recipes(new FindAnnotations("@scala.transient", false), new FindAnnotations("@scala.annotation.tailrec", false)),
+          spec -> spec.recipes(
+            new FindAnnotations("@scala.transient", false),
+            new FindAnnotations("@scala.annotation.tailrec", false)
+          ),
           scala(
             """
             import scala.annotation.tailrec
