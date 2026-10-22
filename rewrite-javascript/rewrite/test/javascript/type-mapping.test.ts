@@ -3306,6 +3306,19 @@ describe('JavaScript type mapping', () => {
             expect(nested.members.map(m => [m.name, Type.signature(m.type)])).toEqual([['deep', 'boolean']]);
         });
 
+        test('a member keyed by a lone surrogate is named by its escape', async () => {
+            const spec = new RecipeSpec();
+            await spec.rewriteRun({
+                //language=typescript
+                ...typescript(`class K {'f\\uD800' = 1}\nconst c = {'o\\uD800': 1, 'm\\uDC00'() {}};`),
+                afterRecipe: (cu: JS.CompilationUnit) => {
+                    expect(loneSurrogateStrings(cu)).toEqual([]);
+                    const c = (cu.statements[1].element as J.VariableDeclarations).variables[0].element;
+                    expect((c.variableType!.type as Type.Class).members.map(m => m.name)).toEqual(['o\\uD800']);
+                }
+            });
+        });
+
         test('a reference to a variable bound to an object literal keeps the object type and its owning variable', async () => {
             const references: J.Identifier[] = [];
             const spec = new RecipeSpec();
@@ -3473,4 +3486,21 @@ function objectTypeOf(literals: J.NewClass[], memberName: string): Type.Class {
     });
     expect(match, `no object literal with a '${memberName}' member`).toBeDefined();
     return match!.constructorType!.returnType as Type.Class;
+}
+
+function loneSurrogateStrings(root: unknown): string[] {
+    const found: string[] = [];
+    const seen = new Set<object>();
+    const visit = (value: unknown) => {
+        if (typeof value === 'string') {
+            if (/[\uD800-\uDBFF](?![\uDC00-\uDFFF])|(?<![\uD800-\uDBFF])[\uDC00-\uDFFF]/.test(value)) {
+                found.push(value);
+            }
+        } else if (value && typeof value === 'object' && !seen.has(value)) {
+            seen.add(value);
+            Object.values(value).forEach(visit);
+        }
+    };
+    visit(root);
+    return found;
 }
