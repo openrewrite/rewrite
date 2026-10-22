@@ -287,7 +287,7 @@ public class AddImport<P> extends JavaIsoVisitor<P> {
     private Optional<JavaType> findTypeReference(JavaSourceFile compilationUnit) {
         if (member == null) {
             //Non-static imports, we just look for field accesses.
-            for (NameTree t : FindTypes.find(compilationUnit, fullyQualifiedName)) {
+            for (NameTree t : FindTypes.find(compilationUnit.withImports(emptyList()), fullyQualifiedName)) {
                 if (!(t instanceof J.FieldAccess) || !((J.FieldAccess) t).isFullyQualifiedClassReference(fullyQualifiedName)) {
                     Optional<JavaType> mayBeTypeReference = getTypeReference(t);
                     if (mayBeTypeReference.isPresent()) {

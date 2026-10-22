@@ -41,6 +41,20 @@ def test_statement_without_prefix():
     )
 
 
+def test_statement_without_prefix_in_a_crlf_file():
+    rewrite_run(
+        python(
+            "def foo():\r\n    print('a')\r\n",
+            "def foo():\r\n    print('a')\r\nprint('a')\r\n",
+        ),
+        spec=RecipeSpec()
+        .with_recipes(
+            from_visitor(DuplicateMethod()),
+            from_visitor(MinimumViableSpacingVisitor())
+        )
+    )
+
+
 def test_statement_with_semicolon():
     rewrite_run(
         # language=python

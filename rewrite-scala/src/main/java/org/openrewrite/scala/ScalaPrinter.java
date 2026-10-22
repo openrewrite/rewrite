@@ -38,6 +38,7 @@ import org.openrewrite.scala.marker.BlockArgument;
 import org.openrewrite.scala.marker.DottedMatch;
 import org.openrewrite.scala.marker.Implicit;
 import org.openrewrite.scala.marker.IndentedSyntax;
+import org.openrewrite.scala.marker.InfixNotation;
 import org.openrewrite.scala.marker.InfixTypeNotation;
 import org.openrewrite.scala.marker.SObject;
 import org.openrewrite.scala.marker.Semicolon;
@@ -1928,6 +1929,20 @@ public class ScalaPrinter<P> extends JavaPrinter<P> {
         }
         afterSyntax(interpolation, p);
         return interpolation;
+    }
+
+    @Override
+    public J visitDeconstructionPattern(J.DeconstructionPattern deconstructionPattern, PrintOutputCapture<P> p) {
+        List<JRightPadded<J>> operands = deconstructionPattern.getPadding().getNested().getPadding().getElements();
+        if (operands.size() != 2 || !deconstructionPattern.getMarkers().findFirst(InfixNotation.class).isPresent()) {
+            return super.visitDeconstructionPattern(deconstructionPattern, p);
+        }
+        beforeSyntax(deconstructionPattern, Space.Location.DECONSTRUCTION_PATTERN_PREFIX, p);
+        visitRightPadded(operands.subList(0, 1), JContainer.Location.DECONSTRUCTION_PATTERN_NESTED.getElementLocation(), "", p);
+        visit(deconstructionPattern.getDeconstructor(), p);
+        visitRightPadded(operands.subList(1, 2), JContainer.Location.DECONSTRUCTION_PATTERN_NESTED.getElementLocation(), "", p);
+        afterSyntax(deconstructionPattern, p);
+        return deconstructionPattern;
     }
 
     public J visitBinding(S.Binding binding, PrintOutputCapture<P> p) {

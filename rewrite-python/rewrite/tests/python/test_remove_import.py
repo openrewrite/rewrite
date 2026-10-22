@@ -1111,3 +1111,16 @@ class TestRemoveImportAllReExports:
                 """,
             )
         )
+
+
+class TestRemoveImportLineBreaks:
+    @pytest.mark.parametrize("module, name, before, after", [
+        pytest.param('os', None, "import os\r\nimport sys\r\n\r\nx = 1\r\n",
+                     "import sys\r\n\r\nx = 1\r\n", id='first-import'),
+        pytest.param('typing', 'List', "import os\r\nfrom typing import List, Dict\r\nx = 1\r\n",
+                     "import os\r\nfrom typing import Dict\r\nx = 1\r\n", id='member'),
+        pytest.param('os', None, "import os\r\n\r\nx = 1\r\n", "x = 1\r\n", id='only-import'),
+    ])
+    def test_crlf(self, arm, module, name, before, after):
+        RecipeSpec(recipe=from_visitor(_remove_import_visitor(arm, module, name, only_if_unused=False))).rewrite_run(
+            python(before, after))

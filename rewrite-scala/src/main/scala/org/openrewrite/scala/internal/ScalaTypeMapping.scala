@@ -227,10 +227,16 @@ class ScalaTypeMapping(typeFactory: JavaTypeFactory, typedTree: tpd.Tree,
     case _: Trees.TypeApply[?] | _: Trees.Select[?] | _: Trees.Ident[?] if tree.symbol == sym =>
       tree.tpe.widenSingleton match {
         case info: (MethodType | ExprType) if !info.isError => Some(info)
+        case value: ValueType if !value.isError && isParameterless(sym) => Some(ExprType(value))
         case _ => None
       }
     case _ => None
   }
+
+  private def isParameterless(sym: Symbol): Boolean =
+    sym.is(Flags.Method) && !takesParameters(sym.info)
+
+  private def takesParameters(info: Type): Boolean = info.stripPoly.isInstanceOf[MethodType]
 
   /**
    * Whether the node refers to a method taking parameters, so that applying it calls the method
@@ -241,7 +247,7 @@ class ScalaTypeMapping(typeFactory: JavaTypeFactory, typedTree: tpd.Tree,
       try node.own.tpe match {
         case ref: TermRef =>
           val alternatives = ref.denot.alternatives
-          alternatives.nonEmpty && alternatives.forall(d => d.symbol.is(Flags.Method) && d.info.stripPoly.isInstanceOf[MethodType])
+          alternatives.nonEmpty && alternatives.forall(d => d.symbol.is(Flags.Method) && takesParameters(d.info))
         case _ => false
       } catch {
         case _: Throwable => false
@@ -613,13 +619,8 @@ class ScalaTypeMapping(typeFactory: JavaTypeFactory, typedTree: tpd.Tree,
         case ci: ClassInfo =>
           // Use the class symbol's TypeRef signature to be consistent with TypeRef-based lookups.
           // This prevents creating duplicate JavaType.Class instances for the same type.
-          val rawFqn = ci.cls.fullName.toString
-          val fqn = if (rawFqn.endsWith("$")) rawFqn.dropRight(1) else rawFqn
-          val normalizedFqn = fqn match {
-            case "scala.Any" | "scala.AnyRef" => "java.lang.Object"
-            case other => other
-          }
-          mapClassType(ci.cls, normalizedFqn, normalizedFqn)
+          val fqn = signatureBuilder.classFqn(ci.cls)
+          mapClassType(ci.cls, fqn, fqn)
         case mt: MethodType => mapMethodResultType(mt)
         case pt: PolyType => mapMethodResultType(pt.resultType)
         case _ => unknown
@@ -682,14 +683,7 @@ class ScalaTypeMapping(typeFactory: JavaTypeFactory, typedTree: tpd.Tree,
       case _ =>
     }
 
-    // Strip trailing $ from Scala companion object names (e.g., Collections$ → Collections)
-    val baseFqn = if (fqn.endsWith("$")) fqn.dropRight(1) else fqn
-    val javaFqn = baseFqn match {
-      case "scala.Any" | "scala.AnyRef" => "java.lang.Object"
-      case other => other
-    }
-
-    mapClassType(sym, javaFqn, sig)
+    mapClassType(sym, signatureBuilder.classFqn(sym), sig)
   }
 
   private def mapTermRef(tmr: TermRef, sig: String): JavaType = {
@@ -706,6 +700,7 @@ class ScalaTypeMapping(typeFactory: JavaTypeFactory, typedTree: tpd.Tree,
     val baseType = mapType(at.tycon) match {
       case p: JavaType.Parameterized => p.getType
       case fq: JavaType.FullyQualified => fq
+      case typeConstructor: JavaType.GenericTypeVariable => return typeConstructor
       case _ => return unknown
     }
 
@@ -736,9 +731,10 @@ class ScalaTypeMapping(typeFactory: JavaTypeFactory, typedTree: tpd.Tree,
 
         underlying match {
           case tb: TypeBounds =>
-            if (!(tb.hi =:= ctx.definitions.AnyType)) {
+            val hi = upperBoundOfKind(tb.hi)
+            if (!(hi =:= ctx.definitions.AnyType)) {
               bounds = new ArrayList[JavaType]()
-              val mapped = mapType(tb.hi)
+              val mapped = mapType(hi)
               if (mapped != null) bounds.add(mapped)
               resolvedVariance = JavaType.GenericTypeVariable.Variance.COVARIANT
             }
@@ -747,6 +743,12 @@ class ScalaTypeMapping(typeFactory: JavaTypeFactory, typedTree: tpd.Tree,
 
         gtv.unsafeSet(name, resolvedVariance, bounds)
       })
+  }
+
+  /** The upper bound of a type constructor `CC[X] <: Iterable[X]` is that of its applications, `Iterable[X]`. */
+  private def upperBoundOfKind(hi: Type): Type = hi match {
+    case lambda: HKTypeLambda => lambda.resType
+    case other => other
   }
 
   private def mapTypeBounds(tb: TypeBounds, sig: String): JavaType = {
