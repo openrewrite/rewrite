@@ -35,6 +35,7 @@ class ExtractorPatternTest implements RewriteTest {
 
     private static List<J.DeconstructionPattern> deconstructionPatterns(J cu) {
         List<J.DeconstructionPattern> patterns = new ArrayList<>();
+        List<J.MethodInvocation> invocationsInPatterns = new ArrayList<>();
         new ScalaIsoVisitor<Integer>() {
             @Override
             public J.DeconstructionPattern visitDeconstructionPattern(J.DeconstructionPattern pattern, Integer p) {
@@ -44,12 +45,14 @@ class ExtractorPatternTest implements RewriteTest {
 
             @Override
             public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, Integer p) {
-                assertThat(getCursor().firstEnclosing(J.Case.class))
-                  .as("no method invocation in a pattern: %s", method)
-                  .isNull();
+                if (getCursor().firstEnclosing(J.DeconstructionPattern.class) != null) {
+                    invocationsInPatterns.add(method);
+                }
                 return super.visitMethodInvocation(method, p);
             }
         }.visit(cu, 0);
+        // ScalaVisitor swallows exceptions thrown while visiting a statement, so assert outside the visitor
+        assertThat(invocationsInPatterns).isEmpty();
         return patterns;
     }
 
@@ -129,6 +132,51 @@ class ExtractorPatternTest implements RewriteTest {
                 assertThat(patterns.get(4).getDeconstructor()).isInstanceOf(J.FieldAccess.class);
                 assertThat(patterns.get(8).getNested()).isEmpty();
             })
+          )
+        );
+    }
+
+    @Test
+    void typeAppliedExtractorPattern() {
+        rewriteRun(
+          scala(
+            """
+              object F {
+                case class Box[T](t: T)
+                def m(x: Any): Int = x match {
+                  case Box[Int](q) => q
+                  case _ => 0
+                }
+              }
+              """,
+            spec -> spec.afterRecipe(cu -> {
+                assertThat(FindMissingTypes.findMissingTypes(cu, false)).isEmpty();
+                List<J.DeconstructionPattern> patterns = deconstructionPatterns(cu);
+                assertThat(patterns).extracting(d -> print(cu, d)).containsExactly("Box[Int](q)");
+                assertThat(patterns.get(0).getDeconstructor()).isInstanceOf(J.ParameterizedType.class);
+            })
+          )
+        );
+    }
+
+    @Test
+    void extractorPatternWithTrailingComma() {
+        rewriteRun(
+          scala(
+            """
+              object F {
+                case class P(a: Int, b: Int)
+                def m(x: Any): Int = x match {
+                  case P(
+                    a,
+                    b ,
+                  ) => a
+                  case _ => 0
+                }
+              }
+              """,
+            spec -> spec.afterRecipe(cu -> assertThat(deconstructionPatterns(cu)).singleElement()
+              .satisfies(d -> assertThat(d.getNested()).hasSize(2)))
           )
         );
     }

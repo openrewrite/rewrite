@@ -1933,14 +1933,14 @@ public class ScalaPrinter<P> extends JavaPrinter<P> {
 
     @Override
     public J visitDeconstructionPattern(J.DeconstructionPattern deconstructionPattern, PrintOutputCapture<P> p) {
-        if (!deconstructionPattern.getMarkers().findFirst(InfixNotation.class).isPresent()) {
+        List<JRightPadded<J>> operands = deconstructionPattern.getPadding().getNested().getPadding().getElements();
+        if (operands.size() != 2 || !deconstructionPattern.getMarkers().findFirst(InfixNotation.class).isPresent()) {
             return super.visitDeconstructionPattern(deconstructionPattern, p);
         }
         beforeSyntax(deconstructionPattern, Space.Location.DECONSTRUCTION_PATTERN_PREFIX, p);
-        List<JRightPadded<J>> operands = deconstructionPattern.getPadding().getNested().getPadding().getElements();
         visitRightPadded(operands.subList(0, 1), JContainer.Location.DECONSTRUCTION_PATTERN_NESTED.getElementLocation(), "", p);
         visit(deconstructionPattern.getDeconstructor(), p);
-        visitRightPadded(operands.subList(1, operands.size()), JContainer.Location.DECONSTRUCTION_PATTERN_NESTED.getElementLocation(), "", p);
+        visitRightPadded(operands.subList(1, 2), JContainer.Location.DECONSTRUCTION_PATTERN_NESTED.getElementLocation(), "", p);
         afterSyntax(deconstructionPattern, p);
         return deconstructionPattern;
     }

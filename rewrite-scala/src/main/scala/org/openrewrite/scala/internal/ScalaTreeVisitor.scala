@@ -1854,7 +1854,12 @@ class ScalaTreeVisitor(
    */
   private def visitExtractorPattern(app: Trees.Apply[?]): J.DeconstructionPattern = {
     val prefix = extractPrefix(app.span)
-    val deconstructor = withExtractorType(patternContext(pattern = false)(visitTree(app.fun)), methodTypeOfTree(app))
+    val extractor = patternContext(pattern = false)(app.fun match {
+      case ta: Trees.TypeApply[?] => visitParameterizedType(ta, ta.fun, ta.args)
+      case fun => visitTree(fun)
+    })
+    if (extractor == null) throw unmappedException(app.fun)
+    val deconstructor = withExtractorType(extractor, methodTypeOfTree(app))
 
     val openParen = positionOfNext("(")
     val beforeParen = if (openParen > cursor) ScalaSpace.format(source, cursor, openParen) else Space.EMPTY
@@ -1870,10 +1875,18 @@ class ScalaTreeVisitor(
       val pattern = visitTree(arg)
       if (pattern == null) throw unmappedException(arg)
       val argEnd = Math.max(cursor, Math.max(0, arg.span.end - offsetAdjustment))
-      val delimiter = positionOfNext(if (i == app.args.length - 1) ")" else ",", argEnd)
-      val after = if (delimiter > argEnd) ScalaSpace.format(source, argEnd, delimiter) else Space.EMPTY
+      val isLast = i == app.args.length - 1
+      val delimiter = positionOfNext(if (isLast) ")" else ",", argEnd)
+      val trailingComma = if (isLast) positionOfNext(",", argEnd) else -1
+      val padded = if (trailingComma >= 0 && trailingComma < delimiter) {
+        val beforeComma = if (trailingComma > argEnd) ScalaSpace.format(source, argEnd, trailingComma) else Space.EMPTY
+        val after = if (delimiter > trailingComma + 1) ScalaSpace.format(source, trailingComma + 1, delimiter) else Space.EMPTY
+        new JRightPadded[J](pattern, after, Markers.EMPTY.add(TrailingComma.create(beforeComma)))
+      } else {
+        JRightPadded.build(pattern).withAfter(if (delimiter > argEnd) ScalaSpace.format(source, argEnd, delimiter) else Space.EMPTY)
+      }
       if (delimiter >= 0) cursor = delimiter + 1
-      nested.add(JRightPadded.build(pattern).withAfter(after))
+      nested.add(padded)
     }
     updateCursor(app.span.end)
 
@@ -6041,12 +6054,15 @@ class ScalaTreeVisitor(
     if (isWithIntersectionType(at)) {
       return visitWithIntersectionType(at)
     }
+    visitParameterizedType(at, at.tpt, at.args)
+  }
 
-    // AppliedTypeTree represents a parameterized type like List[String]
+  /** A parameterized type like `List[String]`, or the type-applied extractor `Box[Int]` of a pattern `Box[Int](q)`. */
+  private def visitParameterizedType(at: Trees.Tree[?], tpt: Trees.Tree[?], args: List[Trees.Tree[?]]): J.ParameterizedType = {
     val prefix = extractPrefix(at.span)
 
     // Visit the base type (e.g., List, Map, Option)
-    val clazz = visitTree(at.tpt) match {
+    val clazz = visitTree(tpt) match {
       case nt: NameTree => nt
       case _ => throw unmappedException(at)
     }
@@ -6080,13 +6096,13 @@ class ScalaTreeVisitor(
     // Process type arguments
     val typeArgs = new util.ArrayList[JRightPadded[Expression]]()
     
-    if (at.args.nonEmpty) {
+    if (args.nonEmpty) {
       // Position cursor right after the opening bracket so that the first arg's
       // own prefix-extraction picks up any whitespace between `[` and the arg.
       cursor = openBracketAbs + 1
 
-      for (i <- at.args.indices) {
-        val arg = at.args(i)
+      for (i <- args.indices) {
+        val arg = args(i)
         // Prefer the type-position helper so function types (`A => B`), tuple/union/
         // intersection types map to a TypeTree rather than being misread as expressions.
         val tt = visitTypeTree(arg)
@@ -6098,7 +6114,7 @@ class ScalaTreeVisitor(
         }
 
         // Extract trailing comma/space
-        val isLast = i == at.args.size - 1
+        val isLast = i == args.size - 1
         val afterSpace = if (isLast) {
           // Space before closing bracket
           val argEnd = Math.max(0, arg.span.end - offsetAdjustment)
@@ -6111,8 +6127,8 @@ class ScalaTreeVisitor(
         } else {
           // Look for comma and space after it
           val argEnd = Math.max(0, arg.span.end - offsetAdjustment)
-          val nextArgStart = if (i + 1 < at.args.size) {
-            Math.max(0, at.args(i + 1).span.start - offsetAdjustment)
+          val nextArgStart = if (i + 1 < args.size) {
+            Math.max(0, args(i + 1).span.start - offsetAdjustment)
           } else {
             closeBracketAbs
           }
