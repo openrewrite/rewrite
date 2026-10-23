@@ -667,15 +667,17 @@ public class UpgradeTransitiveDependencyVersion extends ScanningRecipe<UpgradeTr
             return super.visit(tree, ctx);
         }
 
-        // Skips properties gradle.properties defines, which UpdateProperties handles instead.
+        // Skips properties gradle.properties defines, which UpdateProperties handles instead. The script is checked as
+        // well as the scan, as in UpgradeDependencyVersion.
         private JavaSourceFile overrideBomProperties(JavaSourceFile cu, Map<String, GroupArtifact> bomProperties, ExecutionContext ctx) {
+            Set<String> declaredInScript = bomProperties.isEmpty() ? emptySet() : SpringBomProperty.declaredProperties(cu);
             for (Map.Entry<String, GroupArtifact> bomProperty : bomProperties.entrySet()) {
                 String name = bomProperty.getKey();
                 String version = acc.dependenciesToUpdate(dependencyMatcher).get(bomProperty.getValue());
                 if (version == null || acc.gradlePropertiesKeys.contains(name)) {
                     continue;
                 }
-                if (acc.declaredExtProperties.contains(name)) {
+                if (acc.declaredExtProperties.contains(name) || declaredInScript.contains(name)) {
                     cu = (JavaSourceFile) new ExtraProperty.Matcher().propertyName(name).matchVariableDeclarations(false)
                             .<ExecutionContext>asVisitor((property, c) -> property.withValue(version).getTree())
                             .visitNonNull(cu, ctx);

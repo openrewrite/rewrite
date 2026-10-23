@@ -1172,6 +1172,60 @@ class UpgradeTransitiveDependencyVersionTest implements RewriteTest {
     }
 
     @Test
+    void upgradesSharingABomPropertyDeclareItOnce() {
+        rewriteRun(
+          spec -> spec.recipes(
+            new UpgradeTransitiveDependencyVersion("org.apache.logging.log4j", "log4j-core", "2.17.1", null, null, null),
+            new UpgradeTransitiveDependencyVersion("org.apache.logging.log4j", "log4j-api", "2.17.1", null, null, null)
+          ),
+          buildGradle(
+            """
+              plugins {
+                  id 'java'
+                  id 'io.spring.dependency-management' version '1.1.7'
+              }
+
+              repositories {
+                  mavenCentral()
+              }
+
+              dependencyManagement {
+                  imports {
+                      mavenBom 'org.springframework.boot:spring-boot-dependencies:2.5.7'
+                  }
+              }
+
+              dependencies {
+                  implementation 'org.springframework.boot:spring-boot-starter-log4j2'
+              }
+              """,
+            """
+              plugins {
+                  id 'java'
+                  id 'io.spring.dependency-management' version '1.1.7'
+              }
+
+              ext['log4j2.version'] = '2.17.1'
+
+              repositories {
+                  mavenCentral()
+              }
+
+              dependencyManagement {
+                  imports {
+                      mavenBom 'org.springframework.boot:spring-boot-dependencies:2.5.7'
+                  }
+              }
+
+              dependencies {
+                  implementation 'org.springframework.boot:spring-boot-starter-log4j2'
+              }
+              """
+          )
+        );
+    }
+
+    @Test
     void useResolutionStrategyWithApplyFromWhenSpringDependencyManagementPluginIsPresent() {
         rewriteRun(
           buildGradle(
