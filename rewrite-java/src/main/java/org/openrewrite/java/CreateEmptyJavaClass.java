@@ -105,7 +105,8 @@ public class CreateEmptyJavaClass extends ScanningRecipe<AtomicBoolean> {
                     Optional<SourceFile> sourceFile = createEmptyClass().findFirst();
                     if (sourceFile.isPresent() && sourceFile.get() instanceof J.CompilationUnit) {
                         J.CompilationUnit newCu = (J.CompilationUnit) sourceFile.get();
-                        return cu.withClasses(newCu.getClasses()).withSourcePath(path);
+                        J.CompilationUnit overwritten = cu.withClasses(newCu.getClasses()).withSourcePath(path);
+                        return overwritten.printAll().equals(cu.printAll()) ? cu : overwritten;
                     }
                 }
 
