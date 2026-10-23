@@ -148,4 +148,37 @@ class ObjectDeclarationTest implements RewriteTest {
             )
         );
     }
+
+    @Test
+    void semicolonSeparatedMembers() {
+        rewriteRun(
+            scala(
+                """
+                object D { val v: Int = 2; def x = 1 }
+                """
+            )
+        );
+    }
+
+    @Test
+    void semicolonSeparatedNestedObject() {
+        rewriteRun(
+            scala(
+                """
+                object D { val v: Int = 2; object O { def x = 1 } }
+                """
+            )
+        );
+    }
+
+    @Test
+    void semicolonSeparatedMembersWithSpaceBeforeSemicolon() {
+        rewriteRun(
+            scala(
+                """
+                object D { val v = 2 ; def x = 1 ; }
+                """
+            )
+        );
+    }
 }

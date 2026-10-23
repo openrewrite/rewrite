@@ -4100,7 +4100,9 @@ class ScalaTreeVisitor(
         val visitedSpans = new java.util.HashSet[Int]()
         // Sort by source position to preserve source order (Dotty may reorder imports)
         val sortedBody = tmpl.body.sortBy(s => if (s.span.exists) s.span.start else Int.MaxValue)
-        sortedBody.foreach { stat =>
+        val objectEndForBody = if (md.span.exists) Math.max(0, md.span.end - offsetAdjustment) else source.length
+        for (idx <- sortedBody.indices) {
+          val stat = sortedBody(idx)
           val isSynth = stat.span.isSynthetic || {
             def containsTripleQuestion(t: Trees.Tree[?]): Boolean = t match {
               case sel: Trees.Select[?] => sel.name.toString == "$qmark$qmark$qmark" || sel.name.toString == "???" || containsTripleQuestion(sel.qualifier)
@@ -4112,11 +4114,19 @@ class ScalaTreeVisitor(
             containsTripleQuestion(stat)
           }
           if (stat.span.exists && !isSynth && visitedSpans.add(stat.span.start)) {
-            visitTree(stat) match {
-              case stmt: Statement => statements.add(JRightPadded.build(stmt))
-              case expr: Expression =>
-                statements.add(JRightPadded.build(new S.ExpressionStatement(Tree.randomId(), expr)))
-              case _ =>
+            val visitedStmt: Statement = visitTree(stat) match {
+              case stmt: Statement => stmt
+              case expr: Expression => new S.ExpressionStatement(Tree.randomId(), expr)
+              case _ => null
+            }
+            if (visitedStmt != null) {
+              val statEnd = Math.max(0, stat.span.end - offsetAdjustment)
+              val nextStart = sortedBody.drop(idx + 1)
+                .find(s => s.span.exists && !s.span.isSynthetic)
+                .map(s => Math.max(0, s.span.start - offsetAdjustment))
+                .getOrElse(objectEndForBody)
+              val (trailingSpace, rpMarkers) = consumeTrailingSemicolon(statEnd, nextStart)
+              statements.add(new JRightPadded[Statement](visitedStmt, trailingSpace, rpMarkers))
             }
           }
         }
