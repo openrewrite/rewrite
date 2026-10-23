@@ -499,10 +499,16 @@ class JavaScriptRewriteRpcTest implements RewriteTest {
     void runBatchedRecipesThatDelete() throws IOException {
         installRecipes();
         rewriteRun(
-          spec -> spec.recipes(
-            client().prepareRecipe("org.openrewrite.example.json.delete-file", Map.of("sourcePath", "tslint.json")),
-            client().prepareRecipe("org.openrewrite.example.npm.change-version", Map.of("version", "1.0.0"))
-          ),
+          spec -> spec
+            .recipes(
+              client().prepareRecipe("org.openrewrite.example.json.delete-file", Map.of("sourcePath", "tslint.json")),
+              client().prepareRecipe("org.openrewrite.example.npm.change-version", Map.of("version", "1.0.0"))
+            )
+            .dataTable(SourcesFileResults.Row.class, rows -> assertThat(rows)
+              .anySatisfy(row -> {
+                  assertThat(row.getSourcePath()).isEqualTo("tslint.json");
+                  assertThat(row.getAfterSourcePath()).isEmpty();
+              })),
           json(
             """
               {"rules": {"no-console": true}}
