@@ -18,13 +18,14 @@ package org.openrewrite.marker;
 import lombok.Value;
 import lombok.With;
 import org.jspecify.annotations.Nullable;
+import org.openrewrite.Heavyweight;
 
 import java.util.List;
 import java.util.UUID;
 
 @Value
 @With
-public class GitTree implements Marker {
+public class GitTree implements Marker, Heavyweight {
     UUID id;
 
     String commitId;

@@ -31,7 +31,7 @@ import static java.util.stream.StreamSupport.stream;
  * A cursor is linked path of LST elements that can be used to traverse down the tree towards the root.
  */
 @EqualsAndHashCode(exclude = "messages")
-public class Cursor {
+public class Cursor implements Heavyweight {
     public static final String ROOT_VALUE = "root";
 
     @Nullable
