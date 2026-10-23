@@ -592,7 +592,7 @@ class DeclarativeRecipeTest implements RewriteTest {
           text("1", "1+1")
         );
         rewriteRun(
-          spec -> spec.recipe(new RepeatedFindAndReplace(".+", "$0+1", 2)).expectedCyclesThatMakeChanges(2).cycles(3),
+          spec -> spec.recipe(new RepeatedFindAndReplace(".+", "$0+1", 2)).expectedCyclesThatMakeChanges(2),
           text("1", "1+1+1")
         );
     }

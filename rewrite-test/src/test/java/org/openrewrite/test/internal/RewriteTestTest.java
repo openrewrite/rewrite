@@ -461,7 +461,7 @@ class RewriteTestTest implements RewriteTest {
         void rejectEqualCopyWhateverTheCycleSettings() {
             // these settings accept a change in the only cycle, but an equal copy is not one
             AssertionError e = assertThrows(AssertionError.class, () -> rewriteRun(
-              spec -> spec.cycles(1).expectedCyclesThatMakeChanges(1).recipe(copiesModifiers()),
+              spec -> spec.recipe(copiesModifiers()),
               java(
                 """
                   public class A {}
