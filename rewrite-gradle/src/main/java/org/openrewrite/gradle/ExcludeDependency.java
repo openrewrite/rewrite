@@ -147,7 +147,7 @@ public class ExcludeDependency extends Recipe {
                 }
                 List<ExcludedDeclaration> excluded = new ArrayList<>();
                 Map<GroupArtifact, Set<String>> unexcluded = new HashMap<>();
-                Tree after = excludeVisitor(excluded, unexcluded).visit(tree, ctx);
+                Tree after = excludeVisitor(excluded, unexcluded).visit(tree, ctx, getCursor());
                 if (after == tree || !(after instanceof JavaSourceFile)) {
                     return after;
                 }
@@ -380,7 +380,7 @@ public class ExcludeDependency extends Recipe {
         String bodyIndent = declIndent + indentStep(cursor, declIndent);
         J.Lambda existingLambda = trailingLambda(m);
         if (existingLambda != null && existingLambda.getBody() instanceof J.Block) {
-            Statement excludeStmt = parseExcludeStatement(kotlinDsl, effG, effA, ctx);
+            Statement excludeStmt = parseExcludeStatement(cursor, kotlinDsl, effG, effA, ctx);
             J.Block body = (J.Block) existingLambda.getBody();
             Space indentPrefix;
             if (body.getStatements().isEmpty()) {
@@ -394,7 +394,7 @@ public class ExcludeDependency extends Recipe {
             J.Lambda newLambda = existingLambda.withBody(newBody);
             return m.withArguments(ListUtils.map(m.getArguments(), a -> a == existingLambda ? newLambda : a));
         }
-        J.Lambda freshLambda = parseFreshLambda(kotlinDsl, effG, effA, ctx);
+        J.Lambda freshLambda = parseFreshLambda(cursor, kotlinDsl, effG, effA, ctx);
         J.Block freshBody = (J.Block) freshLambda.getBody();
         freshLambda = freshLambda.withBody(freshBody
                 .withStatements(ListUtils.map(freshBody.getStatements(), st -> st.withPrefix(Space.format("\n" + bodyIndent))))
@@ -451,13 +451,13 @@ public class ExcludeDependency extends Recipe {
         return null;
     }
 
-    private Statement parseExcludeStatement(boolean kotlinDsl, @Nullable String effG, @Nullable String effA, ExecutionContext ctx) {
-        J.Lambda stubLambda = parseStubLambda(kotlinDsl, effG, effA, ctx);
+    private Statement parseExcludeStatement(Cursor cursor, boolean kotlinDsl, @Nullable String effG, @Nullable String effA, ExecutionContext ctx) {
+        J.Lambda stubLambda = parseStubLambda(cursor, kotlinDsl, effG, effA, ctx);
         return unwrapReturn(((J.Block) stubLambda.getBody()).getStatements().get(0));
     }
 
-    private J.Lambda parseFreshLambda(boolean kotlinDsl, @Nullable String effG, @Nullable String effA, ExecutionContext ctx) {
-        return parseStubLambda(kotlinDsl, effG, effA, ctx).withPrefix(Space.format(" "));
+    private J.Lambda parseFreshLambda(Cursor cursor, boolean kotlinDsl, @Nullable String effG, @Nullable String effA, ExecutionContext ctx) {
+        return parseStubLambda(cursor, kotlinDsl, effG, effA, ctx).withPrefix(Space.format(" "));
     }
 
     private static String groovyExcludeSyntax(@Nullable String g, @Nullable String a) {
@@ -480,15 +480,15 @@ public class ExcludeDependency extends Recipe {
         return "exclude(module = \"" + a + "\")";
     }
 
-    private J.Lambda parseStubLambda(boolean kotlinDsl, @Nullable String effG, @Nullable String effA, ExecutionContext ctx) {
+    private J.Lambda parseStubLambda(Cursor cursor, boolean kotlinDsl, @Nullable String effG, @Nullable String effA, ExecutionContext ctx) {
         String snippet =
                 "dependencies {\n" +
                         "    " + (kotlinDsl ? "implementation(\"x:x:1\")" : "implementation('x:x:1')") + " {\n" +
                         "        " + (kotlinDsl ? kotlinExcludeSyntax(effG, effA) : groovyExcludeSyntax(effG, effA)) + "\n" +
                         "    }\n" +
                         "}";
-        // GradleParser is slow, and the snippet only varies with the DSL, so parse it once per run.
-        Map<String, J.Lambda> cache = ctx.computeMessageIfAbsent(STUB_CACHE_KEY, k -> new HashMap<>());
+        // GradleParser is slow, and the snippet only varies with the DSL, so parse it once per cycle.
+        Map<String, J.Lambda> cache = cursor.getRoot().computeMessageIfAbsent(STUB_CACHE_KEY, k -> new HashMap<>());
         return cache.computeIfAbsent(snippet, s -> {
             J.MethodInvocation deps = (J.MethodInvocation) parseAsGradle(s, kotlinDsl, ctx).get(0);
             J.Lambda depsLambda = (J.Lambda) deps.getArguments().get(deps.getArguments().size() - 1);
