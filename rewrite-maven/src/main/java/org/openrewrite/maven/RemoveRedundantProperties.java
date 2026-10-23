@@ -29,7 +29,6 @@ import org.openrewrite.xml.RemoveContentVisitor;
 import org.openrewrite.xml.tree.Xml;
 
 import java.util.HashMap;
-import java.util.List;
 import java.util.Map;
 import java.util.regex.Pattern;
 
@@ -77,30 +76,16 @@ public class RemoveRedundantProperties extends Recipe {
     @Nullable
     Comparator onlyIfParentValueIs;
 
-    @Option(displayName = "Except",
-            description = "Property name glob expression patterns of properties that should never be removed.",
-            example = "java.version",
-            required = false)
-    @Nullable
-    List<String> except;
-
-    @Deprecated
-    public RemoveRedundantProperties(@Nullable String namePattern, @Nullable Boolean onlyIfValuesMatch) {
-        this(namePattern, onlyIfValuesMatch, null, null);
-    }
-
-    public RemoveRedundantProperties(@Nullable String namePattern, @Nullable Comparator onlyIfParentValueIs,
-                                     @Nullable List<String> except) {
-        this(namePattern, null, onlyIfParentValueIs, except);
+    public RemoveRedundantProperties(@Nullable String namePattern, @Nullable Comparator onlyIfParentValueIs) {
+        this(namePattern, null, onlyIfParentValueIs);
     }
 
     @JsonCreator
     private RemoveRedundantProperties(@Nullable String namePattern, @Nullable Boolean onlyIfValuesMatch,
-                                      @Nullable Comparator onlyIfParentValueIs, @Nullable List<String> except) {
+                                      @Nullable Comparator onlyIfParentValueIs) {
         this.namePattern = namePattern;
         this.onlyIfValuesMatch = onlyIfValuesMatch;
         this.onlyIfParentValueIs = onlyIfParentValueIs;
-        this.except = except;
     }
 
     public enum Comparator {
@@ -155,9 +140,7 @@ public class RemoveRedundantProperties extends Recipe {
             }
 
             private boolean isMatchingPropertyTag(Xml.Tag tag) {
-                return isPropertyTag() &&
-                        (isNullOrEmpty(namePattern) || matchesGlob(tag.getName(), namePattern)) &&
-                        (except == null || except.stream().noneMatch(pattern -> matchesGlob(tag.getName(), pattern)));
+                return isPropertyTag() && (isNullOrEmpty(namePattern) || matchesGlob(tag.getName(), namePattern));
             }
 
             private boolean hasMatchingValue(Xml.Tag tag, ExecutionContext ctx) {

@@ -30,7 +30,6 @@ import org.openrewrite.test.RewriteTest;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.util.List;
 
 import static org.openrewrite.Tree.randomId;
 import static org.openrewrite.java.Assertions.mavenProject;
@@ -40,7 +39,7 @@ class RemoveRedundantPropertiesTest implements RewriteTest {
 
     @Override
     public void defaults(RecipeSpec spec) {
-        spec.recipe(new RemoveRedundantProperties(null, null, null));
+        spec.recipe(new RemoveRedundantProperties(null, null));
     }
 
     @DocumentExample
@@ -199,7 +198,18 @@ class RemoveRedundantPropertiesTest implements RewriteTest {
     @Test
     void onlyRemoveIfValuesMatchEnabled() {
         rewriteRun(
-          spec -> spec.recipe(new RemoveRedundantProperties(null, true)),
+          spec -> spec.recipeFromYaml(
+            """
+              type: specs.openrewrite.org/v1beta/recipe
+              name: test.RemoveRedundantPropertiesIfValuesMatch
+              displayName: Remove redundant properties if values match
+              description: Uses the deprecated `onlyIfValuesMatch` option.
+              recipeList:
+                - org.openrewrite.maven.RemoveRedundantProperties:
+                    onlyIfValuesMatch: true
+              """,
+            "test.RemoveRedundantPropertiesIfValuesMatch"
+          ),
           mavenProject("parent",
             pomXml(
               """
@@ -256,7 +266,7 @@ class RemoveRedundantPropertiesTest implements RewriteTest {
     @Test
     void removeWithNamePattern() {
         rewriteRun(
-          spec -> spec.recipe(new RemoveRedundantProperties("*.version", null, null)),
+          spec -> spec.recipe(new RemoveRedundantProperties("*.version", null)),
           mavenProject("parent",
             pomXml(
               """
@@ -441,7 +451,7 @@ class RemoveRedundantPropertiesTest implements RewriteTest {
     @Test
     void removePropertyWithExpressionValue() {
         rewriteRun(
-          spec -> spec.recipe(new RemoveRedundantProperties(null, Comparator.EQ, null)),
+          spec -> spec.recipe(new RemoveRedundantProperties(null, Comparator.EQ)),
           mavenProject("parent",
             pomXml(
               """
@@ -742,7 +752,7 @@ class RemoveRedundantPropertiesTest implements RewriteTest {
     @Test
     void removeSuperPomDefaults() {
         rewriteRun(
-          spec -> spec.recipe(new RemoveRedundantProperties(null, Comparator.EQ, null))
+          spec -> spec.recipe(new RemoveRedundantProperties(null, Comparator.EQ))
             .allSources(source -> source.markers(new BuildTool(randomId(), BuildTool.Type.Maven, "3.10.0"))),
           pomXml(
             """
@@ -775,7 +785,7 @@ class RemoveRedundantPropertiesTest implements RewriteTest {
     @Test
     void keepValuesThatDifferFromSuperPomDefaults() {
         rewriteRun(
-          spec -> spec.recipe(new RemoveRedundantProperties(null, Comparator.EQ, null))
+          spec -> spec.recipe(new RemoveRedundantProperties(null, Comparator.EQ))
             .allSources(source -> source.markers(new BuildTool(randomId(), BuildTool.Type.Maven, "3.10.0"))),
           pomXml(
             """
@@ -797,7 +807,7 @@ class RemoveRedundantPropertiesTest implements RewriteTest {
     @Test
     void keepSuperPomDefaultsBeforeMaven3_10() {
         rewriteRun(
-          spec -> spec.recipe(new RemoveRedundantProperties(null, Comparator.EQ, null))
+          spec -> spec.recipe(new RemoveRedundantProperties(null, Comparator.EQ))
             .allSources(source -> source.markers(new BuildTool(randomId(), BuildTool.Type.Maven, "3.9.11"))),
           pomXml(
             """
@@ -818,7 +828,7 @@ class RemoveRedundantPropertiesTest implements RewriteTest {
     @Test
     void keepSuperPomDefaultsWithoutBuildToolMarker() {
         rewriteRun(
-          spec -> spec.recipe(new RemoveRedundantProperties(null, Comparator.EQ, null)),
+          spec -> spec.recipe(new RemoveRedundantProperties(null, Comparator.EQ)),
           pomXml(
             """
               <project>
@@ -837,7 +847,7 @@ class RemoveRedundantPropertiesTest implements RewriteTest {
     @Test
     void keepSuperPomDefaultThatOverridesParent() {
         rewriteRun(
-          spec -> spec.recipe(new RemoveRedundantProperties(null, Comparator.EQ, null))
+          spec -> spec.recipe(new RemoveRedundantProperties(null, Comparator.EQ))
             .allSources(source -> source.markers(new BuildTool(randomId(), BuildTool.Type.Maven, "3.10.0"))),
           mavenProject("parent",
             pomXml(
@@ -880,7 +890,7 @@ class RemoveRedundantPropertiesTest implements RewriteTest {
     @Test
     void removeOnlyPinsOlderThanParent() {
         rewriteRun(
-          spec -> spec.recipe(new RemoveRedundantProperties("*.version", Comparator.GTE, List.of("java.version"))),
+          spec -> spec.recipe(new RemoveRedundantProperties("*.version", Comparator.GTE)),
           pomXml(
             """
               <project>
@@ -892,7 +902,7 @@ class RemoveRedundantPropertiesTest implements RewriteTest {
                 </parent>
                 <artifactId>child</artifactId>
                 <properties>
-                  <java.version>11</java.version>
+                  <java.version>21</java.version>
                   <hibernate.version>5.2.10.Final</hibernate.version>
                   <assertj.version>3.24.2</assertj.version>
                   <h2.version>2.3.232</h2.version>
@@ -912,7 +922,7 @@ class RemoveRedundantPropertiesTest implements RewriteTest {
                 </parent>
                 <artifactId>child</artifactId>
                 <properties>
-                  <java.version>11</java.version>
+                  <java.version>21</java.version>
                   <lombok.version>1.18.40</lombok.version>
                   <jtds.version>${my-lib.version}</jtds.version>
                   <my-lib.version>1.0</my-lib.version>
@@ -926,7 +936,7 @@ class RemoveRedundantPropertiesTest implements RewriteTest {
     @Test
     void removeOnlyPinsNewerThanParent() {
         rewriteRun(
-          spec -> spec.recipe(new RemoveRedundantProperties(null, Comparator.LT, null)),
+          spec -> spec.recipe(new RemoveRedundantProperties(null, Comparator.LT)),
           mavenProject("parent",
             pomXml(
               """
@@ -986,7 +996,7 @@ class RemoveRedundantPropertiesTest implements RewriteTest {
     @Test
     void onlyCompareVersionValuesByOrder() {
         rewriteRun(
-          spec -> spec.recipe(new RemoveRedundantProperties(null, Comparator.GTE, null)),
+          spec -> spec.recipe(new RemoveRedundantProperties(null, Comparator.GTE)),
           mavenProject("parent",
             pomXml(
               """
@@ -1046,7 +1056,7 @@ class RemoveRedundantPropertiesTest implements RewriteTest {
     @Test
     void staleRootPinDoesNotShieldStaleModulePin() {
         rewriteRun(
-          spec -> spec.recipe(new RemoveRedundantProperties("*.version", Comparator.GTE, null)),
+          spec -> spec.recipe(new RemoveRedundantProperties("*.version", Comparator.GTE)),
           mavenProject("parent",
             pomXml(
               """
@@ -1126,7 +1136,7 @@ class RemoveRedundantPropertiesTest implements RewriteTest {
     @Test
     void compareModulePinWithNewerRootPin() {
         rewriteRun(
-          spec -> spec.recipe(new RemoveRedundantProperties("*.version", Comparator.GTE, null)),
+          spec -> spec.recipe(new RemoveRedundantProperties("*.version", Comparator.GTE)),
           mavenProject("parent",
             pomXml(
               """
@@ -1217,7 +1227,7 @@ class RemoveRedundantPropertiesTest implements RewriteTest {
 
         @Override
         public void defaults(RecipeSpec spec) {
-            spec.recipe(new RemoveRedundantProperties("*.version", Comparator.GTE, null))
+            spec.recipe(new RemoveRedundantProperties("*.version", Comparator.GTE))
               .executionContext(MavenExecutionContextView.view(new InMemoryExecutionContext(Throwable::printStackTrace))
                 .setLocalRepository(MavenRepository.builder()
                   .id("local")
