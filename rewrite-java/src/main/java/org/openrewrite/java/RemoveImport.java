@@ -18,6 +18,7 @@ package org.openrewrite.java;
 import com.fasterxml.jackson.annotation.JsonCreator;
 import lombok.EqualsAndHashCode;
 import org.jspecify.annotations.Nullable;
+import org.openrewrite.Tree;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.java.internal.FormatFirstClassPrefix;
 import org.openrewrite.java.marker.JavaSourceSet;
@@ -27,6 +28,7 @@ import org.openrewrite.java.tree.*;
 import org.openrewrite.style.Style;
 
 import java.util.*;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 
 import static org.openrewrite.Tree.randomId;
@@ -110,6 +112,11 @@ public class RemoveImport<P> extends JavaIsoVisitor<P> {
                 }
             }
 
+            if (typeUsed && !type.endsWith(".*") &&
+                    !namedInSource(cu, type.substring(Math.max(type.lastIndexOf('.'), type.lastIndexOf('$')) + 1))) {
+                typeUsed = false;
+            }
+
             JavaSourceFile c = cu;
 
             boolean keepImport = !force && (typeUsed || !otherTypesInPackageUsed.isEmpty() && type.endsWith(".*"));
@@ -182,6 +189,34 @@ public class RemoveImport<P> extends JavaIsoVisitor<P> {
         }
 
         return j;
+    }
+
+    /**
+     * Whether the source names {@code simpleName} outside its imports. A type that only the type attribution carries,
+     * such as the inferred type of a {@code var} or of a variable read, needs no import.
+     */
+    private static boolean namedInSource(JavaSourceFile cu, String simpleName) {
+        AtomicBoolean named = new AtomicBoolean();
+        new JavaIsoVisitor<AtomicBoolean>() {
+            @Override
+            public @Nullable J visit(@Nullable Tree tree, AtomicBoolean found) {
+                return found.get() ? (J) tree : super.visit(tree, found);
+            }
+
+            @Override
+            public J.Import visitImport(J.Import import_, AtomicBoolean found) {
+                return import_;
+            }
+
+            @Override
+            public J.Identifier visitIdentifier(J.Identifier identifier, AtomicBoolean found) {
+                if (simpleName.equals(identifier.getSimpleName())) {
+                    found.set(true);
+                }
+                return super.visitIdentifier(identifier, found);
+            }
+        }.visit(cu, named);
+        return named.get();
     }
 
     private long countTrailingLinebreaks(Space space) {
