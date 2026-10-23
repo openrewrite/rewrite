@@ -20,30 +20,24 @@ import lombok.Value;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Option;
-import org.openrewrite.ScanningRecipe;
+import org.openrewrite.Recipe;
 import org.openrewrite.TreeVisitor;
 import org.openrewrite.marker.GitProvenance;
 import org.openrewrite.maven.tree.MavenResolutionResult;
 import org.openrewrite.xml.AddToTagVisitor;
 import org.openrewrite.xml.ChangeTagValueVisitor;
-import org.openrewrite.xml.XPathMatcher;
 import org.openrewrite.xml.tree.Xml;
 
-import java.nio.file.Path;
-import java.util.*;
+import java.util.Objects;
+import java.util.Optional;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 import static org.openrewrite.internal.StringUtils.isNullOrEmpty;
-import static org.openrewrite.maven.tree.ResolvedPom.placeholderHelper;
 
 @Value
 @EqualsAndHashCode(callSuper = false)
-public class UpdateScmFromGitOrigin extends ScanningRecipe<GitOriginPropertyUsage> {
-
-    static final String[] SCM_URL_TAGS = {"url", "connection", "developerConnection"};
-
-    private static final XPathMatcher SCM_URL_MATCHER = new XPathMatcher("/project/scm/*");
+public class UpdateScmFromGitOrigin extends Recipe {
 
     @Option(displayName = "Add if missing",
             description = "If set to `true`, the recipe will add a `<scm>` section if it is missing. " +
@@ -55,31 +49,14 @@ public class UpdateScmFromGitOrigin extends ScanningRecipe<GitOriginPropertyUsag
     String displayName = "Update SCM with Git origin";
 
     String description = "Updates or adds the Maven `<scm>` tag based on the Git remote origin. " +
-               "By default, only existing Source Control Management (SCM) sections are updated. Set `addIfMissing` to `true` to also add missing SCM sections to root POMs (POMs without a parent element). " +
-               "SCM values that use placeholders are kept when they already resolve to the Git origin. Otherwise the backing property is updated " +
-               "when it is defined in the same POM and used nowhere else, or the new value is inlined.";
+               "By default, only existing Source Control Management (SCM) sections are updated. Set `addIfMissing` to `true` to also add missing SCM sections to root POMs (POMs without a parent element).";
 
     @Override
-    public GitOriginPropertyUsage getInitialValue(ExecutionContext ctx) {
-        return new GitOriginPropertyUsage();
-    }
-
-    @Override
-    public TreeVisitor<?, ExecutionContext> getScanner(GitOriginPropertyUsage acc) {
-        return acc.scanner(SCM_URL_MATCHER);
-    }
-
-    @Override
-    public TreeVisitor<?, ExecutionContext> getVisitor(GitOriginPropertyUsage acc) {
+    public TreeVisitor<?, ExecutionContext> getVisitor() {
         return new MavenVisitor<ExecutionContext>() {
 
             @SuppressWarnings("NotNullFieldNotInitialized")
             GitOrigin gitOrigin;
-
-            Map<String, String> propertyUpdates = new HashMap<>();
-
-            @Nullable
-            String projectUrl;
 
             @Override
             public Xml visitDocument(Xml.Document document, ExecutionContext ctx) {
@@ -125,45 +102,14 @@ public class UpdateScmFromGitOrigin extends ScanningRecipe<GitOriginPropertyUsag
             @Override
             public Xml visitTag(Xml.Tag tag, ExecutionContext ctx) {
                 if ("project".equals(tag.getName())) {
-                    projectUrl = tag.getChildValue("url").orElse(null);
-                    propertyUpdates = propertyUpdates(tag);
                     return super.visitTag(tag, ctx);
-                } else if ("properties".equals(tag.getName())) {
-                    for (Map.Entry<String, String> update : propertyUpdates.entrySet()) {
-                        Optional<Xml.Tag> property = tag.getChild(update.getKey());
-                        if (property.isPresent()) {
-                            tag = (Xml.Tag) new ChangeTagValueVisitor<>(property.get(), update.getValue())
-                                    .visitNonNull(tag, ctx, getCursor().getParentTreeCursor());
-                            maybeUpdateModel();
-                        }
-                    }
                 } else if ("scm".equals(tag.getName())) {
                     // Update existing tags, preserving their URL structure
-                    for (String scmTagName : SCM_URL_TAGS) {
-                        tag = updateScmTag(tag, scmTagName, ctx);
-                    }
+                    tag = updateScmTag(tag, "url", ctx);
+                    tag = updateScmTag(tag, "connection", ctx);
+                    tag = updateScmTag(tag, "developerConnection", ctx);
                 }
                 return tag;
-            }
-
-            private Map<String, String> propertyUpdates(Xml.Tag project) {
-                Map<String, String> updates = new HashMap<>();
-                Optional<Xml.Tag> scm = project.getChild("scm");
-                if (!scm.isPresent()) {
-                    return updates;
-                }
-                Path sourcePath = getCursor().firstEnclosingOrThrow(Xml.Document.class).getSourcePath();
-                for (String scmTagName : SCM_URL_TAGS) {
-                    String property = acc.safeToUpdate(scm.get().getChildValue(scmTagName).orElse(""), project, sourcePath);
-                    if (property != null) {
-                        String propertyValue = project.getChild("properties").flatMap(p -> p.getChildValue(property)).orElse("");
-                        String updatedValue = gitOrigin.replaceHostAndPath(propertyValue);
-                        if (!propertyValue.equals(updatedValue)) {
-                            updates.put(property, updatedValue);
-                        }
-                    }
-                }
-                return updates;
             }
 
             private Xml.Tag updateScmTag(Xml.Tag tag, String tagName, ExecutionContext ctx) {
@@ -171,32 +117,13 @@ public class UpdateScmFromGitOrigin extends ScanningRecipe<GitOriginPropertyUsag
                 if (maybeChild.isPresent()) {
                     Xml.Tag childTag = maybeChild.get();
                     String originalUrl = childTag.getValue().orElse("");
-                    String updatedUrl;
-                    if (placeholderHelper.hasPlaceholders(originalUrl)) {
-                        String resolvedUrl = resolvePlaceholders(originalUrl);
-                        if (resolvedUrl == null) {
-                            return tag;
-                        }
-                        String expectedUrl = gitOrigin.replaceHostAndPath(resolvedUrl);
-                        updatedUrl = resolvedUrl.equals(expectedUrl) ? originalUrl : expectedUrl;
-                    } else {
-                        updatedUrl = gitOrigin.replaceHostAndPath(originalUrl);
-                    }
+                    String updatedUrl = gitOrigin.replaceHostAndPath(originalUrl);
                     if (!originalUrl.equals(updatedUrl)) {
                         tag = (Xml.Tag) new ChangeTagValueVisitor<>(childTag, updatedUrl)
                                 .visitNonNull(tag, ctx, getCursor().getParentTreeCursor());
                     }
                 }
                 return tag;
-            }
-
-            private @Nullable String resolvePlaceholders(String value) {
-                return GitOriginPropertyUsage.resolve(value, getResolutionResult().getPom(), key -> {
-                    if ("project.url".equals(key) || "pom.url".equals(key)) {
-                        return projectUrl;
-                    }
-                    return propertyUpdates.get(key);
-                });
             }
         };
     }
