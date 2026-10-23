@@ -136,6 +136,10 @@ public enum DependencyManifest {
          */
         @Singular("requiresPython")
         List<String> requiresPython;
+
+        // declared so that javadoc, which reads the source before Lombok, finds it
+        public static class RequirementsBuilder {
+        }
     }
 
     /**
