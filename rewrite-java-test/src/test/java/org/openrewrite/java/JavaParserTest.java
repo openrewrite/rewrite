@@ -25,7 +25,9 @@ import org.openrewrite.InMemoryExecutionContext;
 import org.openrewrite.Issue;
 import org.openrewrite.SourceFile;
 import org.openrewrite.Tree;
+import org.openrewrite.java.format.NormalizeTabsOrSpaces;
 import org.openrewrite.java.search.FindCompileErrors;
+import org.openrewrite.java.style.IntelliJ;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.style.NamedStyles;
 import org.openrewrite.test.RewriteTest;
@@ -574,5 +576,37 @@ class JavaParserTest implements RewriteTest {
 
     private static SourceFile parse(JavaParser.Builder<? extends JavaParser, ?> builder, @Language("java") String source) {
         return builder.build().parse(new InMemoryExecutionContext(), source).findFirst().orElseThrow();
+    }
+
+    @Test
+    void tabsStyleOfOneCloneDoesNotReformatSourcesOfAnother() {
+        JavaParser.Builder<? extends JavaParser, ?> base = JavaParser.fromJavaVersion();
+        NamedStyles tabs = new NamedStyles(Tree.randomId(), "tabs", "tabs", null, emptySet(),
+          singletonList(IntelliJ.tabsAndIndents().withUseTabCharacter(true)));
+        rewriteRun(
+          spec -> spec.recipe(new NormalizeTabsOrSpaces()).parser(base.clone().styles(singletonList(tabs))),
+          java(
+            """
+              class A {
+                  int a;
+              }
+              """,
+            """
+              class A {
+              	int a;
+              }
+              """
+          )
+        );
+        rewriteRun(
+          spec -> spec.recipe(new NormalizeTabsOrSpaces()).parser(base.clone()),
+          java(
+            """
+              class B {
+                  int b;
+              }
+              """
+          )
+        );
     }
 }
