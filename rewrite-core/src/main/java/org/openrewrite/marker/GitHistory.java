@@ -19,6 +19,7 @@ import com.fasterxml.jackson.annotation.JsonIdentityInfo;
 import com.fasterxml.jackson.annotation.ObjectIdGenerators;
 import lombok.Value;
 import lombok.With;
+import org.openrewrite.Heavyweight;
 
 import java.time.Instant;
 import java.util.List;
@@ -29,7 +30,7 @@ import java.util.UUID;
  */
 @Value
 @With
-public class GitHistory implements Marker {
+public class GitHistory implements Marker, Heavyweight {
     UUID id;
 
     List<Author> authors;

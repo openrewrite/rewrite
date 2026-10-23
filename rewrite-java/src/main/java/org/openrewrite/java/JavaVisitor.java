@@ -23,6 +23,7 @@ import org.openrewrite.java.service.ImportService;
 import org.openrewrite.java.tree.*;
 import org.openrewrite.marker.Markers;
 
+import javax.annotation.CheckReturnValue;
 import java.util.*;
 
 @SuppressWarnings("unused")
@@ -63,14 +64,17 @@ public class JavaVisitor<P> extends TreeVisitor<J, P> {
         }
     }
 
+    @CheckReturnValue
     public <J2 extends J> J2 maybeAutoFormat(J2 before, J2 after, P p) {
         return maybeAutoFormat(before, after, p, getCursor().getParentTreeCursor());
     }
 
+    @CheckReturnValue
     public <J2 extends J> J2 maybeAutoFormat(J2 before, J2 after, P p, Cursor parent) {
         return maybeAutoFormat(before, after, null, p, parent);
     }
 
+    @CheckReturnValue
     public <J2 extends J> J2 maybeAutoFormat(J2 before, J2 after, @Nullable J stopAfter, P p, Cursor parent) {
         if (before != after) {
             return autoFormat(after, stopAfter, p, parent);
@@ -78,15 +82,18 @@ public class JavaVisitor<P> extends TreeVisitor<J, P> {
         return after;
     }
 
+    @CheckReturnValue
     public <J2 extends J> J2 autoFormat(J2 j, P p) {
         return autoFormat(j, p, getCursor().getParentTreeCursor());
     }
 
+    @CheckReturnValue
     public <J2 extends J> J2 autoFormat(J2 j, P p, Cursor parent) {
         return autoFormat(j, null, p, parent);
     }
 
     @SuppressWarnings({"ConstantConditions", "unchecked"})
+    @CheckReturnValue
     public <J2 extends J> J2 autoFormat(J2 j, @Nullable J stopAfter, P p, Cursor parent) {
         FormattingListener.beforeFormat(j, stopAfter, parent);
         JavaSourceFile cu = (j instanceof JavaSourceFile) ?

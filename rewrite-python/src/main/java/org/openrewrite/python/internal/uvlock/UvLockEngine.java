@@ -508,9 +508,10 @@ public final class UvLockEngine {
             }
             verifyDependents(rewritten);
             addProxyForks(rewritten);
-            List<String> forks = convergentForks(rewritten);
-            if (forks != null) {
-                updated = updated.withResolutionMarkers(forks);
+            List<String> addedForks = convergentForks(rewritten);
+            if (addedForks != null) {
+                refineEntryForks(addedForks);
+                updated = updated.withPackages(packages).withResolutionMarkers(addedForks);
             }
             if (structural && !writesCurrentMarkerForms()) {
                 prunePlatformWheels(rewritten);
@@ -598,6 +599,33 @@ public final class UvLockEngine {
         }
 
         // uv builds every lock with its packages sorted by id: name, then version with none first
+        /**
+         * A registry entry records the index as configured, so a lock written against
+         * {@code https://pypi.org/simple/} records {@code https://pypi.org/simple} once anything changes. An index
+         * the manifest does not configure keeps its recorded URL, since only its own configuration names it.
+         */
+        private UvLockSource asConfigured(UvLockSource source) {
+            if (source.getType() != UvLockSource.Type.REGISTRY || source.getValue() == null) {
+                return source;
+            }
+            String recorded = source.getValue();
+            String match = null;
+            for (UvIndex index : indexes) {
+                String configured = index.getIndex().getUrl();
+                if (configured.equals(recorded)) {
+                    return source;
+                }
+                if (match == null && withoutTrailingSlash(configured).equals(withoutTrailingSlash(recorded))) {
+                    match = configured;
+                }
+            }
+            return match == null ? source : UvLockSource.registry(match);
+        }
+
+        private static String withoutTrailingSlash(String url) {
+            return url.endsWith("/") ? url.substring(0, url.length() - 1) : url;
+        }
+
         private List<UvLockPackage> inUvOrder(List<UvLockPackage> pkgs) {
             List<UvLockPackage> sorted = new ArrayList<>(pkgs);
             sorted.sort(Comparator.comparing(UvLockPackage::getName).thenComparing(pkg ->
@@ -609,7 +637,8 @@ public final class UvLockEngine {
             List<UvLockPackage> out = new ArrayList<>(pkgs.size());
             for (UvLockPackage pkg : withRecordedMarkers(pkgs)) {
                 UvLockPackage.UvLockPackageBuilder b = pkg.toBuilder()
-                        .resolutionMarkers(currentForms(pkg.getName(), pkg.getResolutionMarkers()));
+                        .source(asConfigured(pkg.getSource()))
+                        .resolutionMarkers(inSolveOrder(currentForms(pkg.getName(), pkg.getResolutionMarkers())));
                 UvLockMetadata metadata = pkg.getMetadata();
                 if (metadata != null) {
                     Map<String, List<UvLockRequirement>> dev = null;
@@ -711,7 +740,7 @@ public final class UvLockEngine {
                     out.add(edge);
                     continue;
                 }
-                String marker = UvLockMarkers.recordMarker(edge.getMarker(), null);
+                String marker = UvLockMarkers.recordMarkerAsRecorded(edge.getMarker());
                 if (marker == null) {
                     throw new EngineFailure(Reason.RESOLUTION_REQUIRED, pkg,
                             "Rewriting the lock whole needs uv's current form of the marker \"" + edge.getMarker() + "\"");
@@ -3386,13 +3415,43 @@ public final class UvLockEngine {
          * The forks a converging split adds to an unforked lock without duplicating any package, or null for none.
          * That holds only while no package the run moved would take a newer version under a fork's narrower range.
          */
+        /**
+         * An entry recorded under a fork the run has since split holds for each new fork that falls inside it,
+         * which is how uv writes the entry once the resolution's forks are finer than its own.
+         */
+        private void refineEntryForks(List<String> forks) {
+            MarkerInterner interner = new MarkerInterner();
+            for (int i = 0; i < packages.size(); i++) {
+                List<String> recorded = packages.get(i).getResolutionMarkers();
+                if (recorded == null || forks.containsAll(recorded)) {
+                    continue;
+                }
+                List<String> refined = new ArrayList<>();
+                try {
+                    MarkerTree covered = MarkerTree.trueIn(interner).negate();
+                    for (String marker : recorded) {
+                        covered = covered.or(MarkerTree.parse(interner, marker));
+                    }
+                    for (String fork : forks) {
+                        if (MarkerTree.parse(interner, fork).and(covered.negate()).isFalse()) {
+                            refined.add(fork);
+                        }
+                    }
+                } catch (MarkerParser.MarkerSyntaxException e) {
+                    throw new EngineFailure(Reason.RESOLUTION_REQUIRED, packages.get(i).getName(),
+                            "Re-expressing " + packages.get(i).getName() + "'s forks needs its recorded markers");
+                }
+                if (refined.isEmpty()) {
+                    throw new EngineFailure(Reason.RESOLUTION_REQUIRED, packages.get(i).getName(),
+                            "The run's forks leave " + packages.get(i).getName() + " no fork of its own");
+                }
+                packages.set(i, packages.get(i).withResolutionMarkers(refined));
+            }
+        }
+
         private @Nullable List<String> convergentForks(Set<String> rewritten) {
             if (forks == null) {
                 return null;
-            }
-            if (lock.getResolutionMarkers() != null) {
-                throw new EngineFailure(Reason.RESOLUTION_REQUIRED, null,
-                        "Requirements that split the resolution add forks to a lock that is already forked");
             }
             for (String name : rewritten) {
                 if (entriesNamed(name) != 1) {

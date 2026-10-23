@@ -272,10 +272,9 @@ class _FindFirst(PythonVisitor[Any]):
         try:
             self.visit(tree, p)
         except RecursionError:
-            # A tree deeper than the interpreter stack (generated data files
-            # nest thousands of implicit string concatenations) is one the gated
-            # visitor cannot edit either. Answering "no match" leaves no other
-            # trace of the file, hence the log line.
+            # A tree deeper than the interpreter stack is one the gated visitor
+            # cannot edit either. Answering "no match" leaves no other trace of
+            # the file, hence the log line.
             logger.warning(
                 "%s nests too deeply to search; treating it as no match",
                 getattr(tree, "source_path", tree),

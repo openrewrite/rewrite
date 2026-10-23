@@ -50,6 +50,21 @@ public final class MarkerInterner {
     private final Map<Long, Integer> andCache = new HashMap<>();
     private @Nullable Integer exclusions;
 
+    /**
+     * Whether a conjunction of values that never hold together is false, as it is in uv's algebra. An interner built
+     * without it keeps such a conjunction. That tells a marker uv would rewrite from one only this pruning would
+     * change, which a lock written before uv pruned them still carries.
+     */
+    private final boolean pruneIncompatibleValues;
+
+    public MarkerInterner() {
+        this(true);
+    }
+
+    public MarkerInterner(boolean pruneIncompatibleValues) {
+        this.pruneIncompatibleValues = pruneIncompatibleValues;
+    }
+
     // ---- node ids
 
     static int not(int id) {
@@ -461,7 +476,7 @@ public final class MarkerInterner {
         }
         Node x = node(xi);
         Node y = node(yi);
-        boolean conflicts = x.getVar().isConflicting() && y.getVar().isConflicting();
+        boolean conflicts = pruneIncompatibleValues && x.getVar().isConflicting() && y.getVar().isConflicting();
         Variable func;
         Edges children;
         int cmp = x.getVar().compareTo(y.getVar());

@@ -31,6 +31,7 @@ import org.openrewrite.text.PlainText;
 import org.openrewrite.toml.tree.Toml;
 import org.opentest4j.TestAbortedException;
 
+import javax.annotation.CheckReturnValue;
 import java.io.File;
 import java.io.IOException;
 import java.net.URI;
@@ -45,6 +46,7 @@ import static java.util.Collections.emptyList;
 import static java.util.Collections.emptyMap;
 import static org.openrewrite.Tree.randomId;
 
+@CheckReturnValue
 public class Assertions {
 
     public static UncheckedConsumer<List<SourceFile>> withToolingApi(URI distributionUrl) {

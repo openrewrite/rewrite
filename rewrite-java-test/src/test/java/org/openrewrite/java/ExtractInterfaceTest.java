@@ -25,13 +25,12 @@ import java.util.Collection;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicReference;
 
-import static org.openrewrite.Tree.randomId;
 import static org.openrewrite.java.Assertions.java;
 
 class ExtractInterfaceTest implements RewriteTest {
 
     @AllArgsConstructor
-    private static class ExtractTestInterface extends ScanningRecipe<AtomicReference<J.CompilationUnit>> {
+    private static class ExtractTestInterface extends ScanningRecipe<AtomicReference<String>> {
         @Override
         public String getDisplayName() {
             return "Extract interface";
@@ -43,29 +42,31 @@ class ExtractInterfaceTest implements RewriteTest {
         }
 
         @Override
-        public AtomicReference<J.CompilationUnit> getInitialValue(ExecutionContext ctx) {
+        public AtomicReference<String> getInitialValue(ExecutionContext ctx) {
             return new AtomicReference<>();
         }
 
         @Override
-        public TreeVisitor<?, ExecutionContext> getScanner(AtomicReference<J.CompilationUnit> acc) {
+        public TreeVisitor<?, ExecutionContext> getScanner(AtomicReference<String> acc) {
             return new JavaIsoVisitor<>() {
                 @Override
                 public J.CompilationUnit visitCompilationUnit(J.CompilationUnit cu, ExecutionContext ctx) {
-                    acc.set(cu.withId(randomId()));
+                    acc.set(cu.printAll());
                     return cu;
                 }
             };
         }
 
         @Override
-        public Collection<? extends SourceFile> generate(AtomicReference<J.CompilationUnit> acc, ExecutionContext ctx) {
+        public Collection<? extends SourceFile> generate(AtomicReference<String> acc, ExecutionContext ctx) {
+            J.CompilationUnit cu = (J.CompilationUnit) JavaParser.fromJavaVersion().build().parse(acc.get())
+              .findFirst().orElseThrow();
             return List.of((SourceFile) new ExtractInterface.CreateInterface("org.openrewrite.interfaces.ITest")
-              .visitNonNull(acc.get(), ctx));
+              .visitNonNull(cu, ctx));
         }
 
         @Override
-        public TreeVisitor<?, ExecutionContext> getVisitor(AtomicReference<J.CompilationUnit> acc) {
+        public TreeVisitor<?, ExecutionContext> getVisitor(AtomicReference<String> acc) {
             return new ExtractInterface.ImplementAndAddOverrideAnnotations("org.openrewrite.interfaces.ITest");
         }
     }

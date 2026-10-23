@@ -35,15 +35,13 @@ import java.util.*;
  */
 final class UvLockReachability {
 
-    /** The most disjuncts a node's reachability may hold before the pass fails loud. */
-    private static final int MAX_TERMS = 32;
-
     private final List<UvLockPackage> packages;
     private final PyRange requiresPython;
     /** The lock's supported environments, under one of which the root is reachable, or null for every environment. */
     private final @Nullable List<String> environments;
     private final Map<String, List<Integer>> byName = new HashMap<>();
-    private final Map<Node, List<Term>> reach = new HashMap<>();
+    private final MarkerInterner interner = new MarkerInterner();
+    private final Map<Node, MarkerTree> reach = new HashMap<>();
 
     private UvLockReachability(List<UvLockPackage> packages, PyRange requiresPython, @Nullable List<String> environments) {
         this.packages = packages;
@@ -79,36 +77,28 @@ final class UvLockReachability {
 
     /** The entry's reachability, in a form two passes can compare. */
     String reachKey(int index) {
-        List<String> keys = new ArrayList<>();
-        for (Term t : reach.getOrDefault(new Node(index, null), Collections.emptyList())) {
-            keys.add(t.key());
-        }
-        Collections.sort(keys);
-        return keys.toString();
+        MarkerTree marker = reach.get(new Node(index, null));
+        return marker == null ? "" : String.valueOf(marker.tryToString());
     }
 
-    /** Whether every path to the entry carries a clause on the platform. */
+    /** Whether every path to the entry carries a clause on the platform, so some platform rules it out. */
     boolean platformScoped(int index) {
-        List<Term> terms = reach.get(new Node(index, null));
-        if (terms == null || terms.isEmpty()) {
+        MarkerTree marker = reach.get(new Node(index, null));
+        if (marker == null || marker.isFalse()) {
             return false;
         }
-        for (Term t : terms) {
-            boolean scoped = false;
-            for (Atom atom : t.getAtoms()) {
-                scoped |= PLATFORM_VARS.contains(atom.getVar());
-            }
-            if (!scoped) {
-                return false;
+        for (Os os : Os.values()) {
+            for (Arch arch : Arch.values()) {
+                if (OS_CLAUSES.containsKey(os) && MACHINES.containsKey(arch) &&
+                        marker.isDisjoint(constant(os, arch))) {
+                    return true;
+                }
             }
         }
-        return true;
+        return false;
     }
 
     // ---- wheels the reachability rules out (uv-lock is_wheel_unreachable_for_marker)
-
-    private static final Set<String> PLATFORM_VARS = new HashSet<>(Arrays.asList(
-            "sys_platform", "platform_system", "os_name", "platform_machine"));
 
     private enum Os { LINUX, WINDOWS, MACOS, ANDROID, IOS, OTHER }
 
@@ -181,14 +171,14 @@ final class UvLockReachability {
         }
     }
 
-    private static final Map<Os, Atom[]> OS_ATOMS = new HashMap<>();
+    private static final Map<Os, String[]> OS_CLAUSES = new HashMap<>();
     private static final Map<Arch, String[]> MACHINES = new HashMap<>();
 
     static {
-        OS_ATOMS.put(Os.LINUX, new Atom[]{new Atom("os_name", true, "posix"), new Atom("sys_platform", true, "linux")});
-        OS_ATOMS.put(Os.WINDOWS, new Atom[]{new Atom("os_name", true, "nt"), new Atom("sys_platform", true, "win32")});
-        OS_ATOMS.put(Os.MACOS, new Atom[]{new Atom("os_name", true, "posix"), new Atom("sys_platform", true, "darwin")});
-        OS_ATOMS.put(Os.ANDROID, new Atom[]{new Atom("sys_platform", true, "android")});
+        OS_CLAUSES.put(Os.LINUX, new String[]{"os_name == 'posix'", "sys_platform == 'linux'"});
+        OS_CLAUSES.put(Os.WINDOWS, new String[]{"os_name == 'nt'", "sys_platform == 'win32'"});
+        OS_CLAUSES.put(Os.MACOS, new String[]{"os_name == 'posix'", "sys_platform == 'darwin'"});
+        OS_CLAUSES.put(Os.ANDROID, new String[]{"sys_platform == 'android'"});
         MACHINES.put(Arch.ARM, new String[]{"aarch64", "arm64", "ARM64"});
         MACHINES.put(Arch.X86_64, new String[]{"x86_64", "amd64", "AMD64"});
         MACHINES.put(Arch.X86, new String[]{"i686", "i386", "win32", "x86"});
@@ -202,28 +192,28 @@ final class UvLockReachability {
     }
 
     // the constant marker for an OS, an architecture, or both, as a disjunction over machine aliases
-    private static List<Term> constant(@Nullable Os os, @Nullable Arch arch) {
-        List<Term> terms = new ArrayList<>();
-        for (String machine : arch != null ? MACHINES.get(arch) : new String[]{null}) {
-            Set<Atom> atoms = new LinkedHashSet<>();
-            if (os != null) {
-                atoms.addAll(Arrays.asList(OS_ATOMS.get(os)));
+    private MarkerTree constant(@Nullable Os os, @Nullable Arch arch) {
+        MarkerTree union = MarkerTree.trueIn(interner).negate();
+        try {
+            for (String machine : arch != null ? MACHINES.get(arch) : new String[]{null}) {
+                MarkerTree term = MarkerTree.trueIn(interner);
+                for (String clause : os != null ? OS_CLAUSES.get(os) : new String[0]) {
+                    term = term.and(MarkerTree.parse(interner, clause));
+                }
+                if (machine != null) {
+                    term = term.and(MarkerTree.parse(interner, "platform_machine == '" + machine + "'"));
+                }
+                union = union.or(term);
             }
-            if (machine != null) {
-                atoms.add(new Atom("platform_machine", true, machine));
-            }
-            terms.add(new Term(new ArrayList<>(), atoms));
+        } catch (MarkerParser.MarkerSyntaxException e) {
+            throw new IllegalStateException("platform constants are well formed", e);
         }
-        return terms;
-    }
-
-    private boolean disjoint(List<Term> reachTerms, List<Term> constant) {
-        return and(reachTerms, constant).isEmpty();
+        return union;
     }
 
     /** Whether the wheel's platform tags can never be installed where the entry is reachable. */
     boolean wheelUnreachable(int index, String filename) {
-        List<Term> marker = reach.get(new Node(index, null));
+        MarkerTree marker = reach.get(new Node(index, null));
         if (marker == null) {
             return false;
         }
@@ -245,19 +235,19 @@ final class UvLockReachability {
             return false;
         }
         // emulated x86_64 Python on Windows ARM64 installs win_amd64 wheels
-        if (platforms.contains(new Platform(Os.WINDOWS, Arch.X86_64)) && !disjoint(marker, constant(Os.WINDOWS, Arch.ARM))) {
+        if (platforms.contains(new Platform(Os.WINDOWS, Arch.X86_64)) && !marker.isDisjoint(constant(Os.WINDOWS, Arch.ARM))) {
             return false;
         }
         for (Os os : new Os[]{Os.LINUX, Os.WINDOWS, Os.MACOS, Os.ANDROID}) {
             if (allOs(platforms, os)) {
                 Arch arch = sharedArch(platforms, os);
-                if (disjoint(marker, constant(os, arch))) {
+                if (marker.isDisjoint(constant(os, arch))) {
                     return true;
                 }
             }
         }
         for (Arch arch : MACHINES.keySet()) {
-            if (allArch(platforms, arch) && disjoint(marker, constant(null, arch))) {
+            if (allArch(platforms, arch) && marker.isDisjoint(constant(null, arch))) {
                 return true;
             }
         }
@@ -301,119 +291,21 @@ final class UvLockReachability {
         @Nullable String extra;
     }
 
-    /** A clause over a marker variable other than the Python version, which only {@code ==} and {@code !=} compare. */
-    @Value
-    private static class Atom {
-        String var;
-        boolean equality;
-        String value;
-
-        boolean contradicts(Atom o) {
-            return var.equals(o.var) && (equality && o.equality ? !value.equals(o.value) :
-                    equality != o.equality && value.equals(o.value));
-        }
-
-        // var == 'x' implies var != 'y' for every other y
-        boolean implies(Atom o) {
-            return equals(o) || (var.equals(o.var) && equality && !o.equality && !value.equals(o.value));
-        }
-
-        @Override
-        public String toString() {
-            return var + (equality ? " == '" : " != '") + value + "'";
-        }
-    }
-
-    /** One conjunction of Python version clauses and atoms. */
-    @Value
-    private static class Term {
-        List<String[]> pythonClauses;
-        Set<Atom> atoms;
-
-        @Nullable PyRange range(PyRange base) {
-            PyRange r = base;
-            for (String[] c : pythonClauses) {
-                r = r.intersect(clauseRange(c));
-                if (r == null) {
-                    return null;
-                }
-            }
-            return r;
-        }
-
-        @Nullable Term and(Term o) {
-            Set<Atom> atoms = new LinkedHashSet<>(this.atoms);
-            for (Atom atom : o.atoms) {
-                for (Atom mine : this.atoms) {
-                    if (mine.contradicts(atom)) {
-                        return null;
-                    }
-                }
-                atoms.add(atom);
-            }
-            List<String[]> clauses = new ArrayList<>(pythonClauses);
-            clauses.addAll(o.pythonClauses);
-            return new Term(clauses, atoms);
-        }
-
-        String key() {
-            StringBuilder b = new StringBuilder();
-            for (String[] c : pythonClauses) {
-                b.append(c[0]).append(c[1]).append(c[2]).append('|');
-            }
-            return b.append(atoms).toString();
-        }
-    }
-
-    // ---- parsing
-
-    // != only removes points from a range, so leaving the range whole for it stays sound
-    private static PyRange clauseRange(String[] clause) {
-        String[] lowered = UvLockMarkers.lowerVersionClause(clause[0], clause[1], clause[2]);
-        if (lowered == null) {
-            throw unsupported("Python version clause " + String.join(" ", clause));
-        }
-        String op = lowered[1];
-        String value = lowered[2];
-        if ("!=".equals(op)) {
-            return new PyRange();
-        }
-        if ("==".equals(op) && !value.endsWith(".*")) {
-            return PyRange.parse(">=" + value + ",<=" + value);
-        }
-        return PyRange.parse(op + value);
-    }
-
-    private static List<Term> dnf(@Nullable String marker) {
-        List<Term> terms = new ArrayList<>();
-        if (marker == null) {
-            terms.add(new Term(new ArrayList<>(), new LinkedHashSet<>()));
-            return terms;
-        }
-        List<List<String[]>> parsed = UvLockMarkers.parseDisjunction(marker);
-        if (parsed == null) {
-            throw unsupported("marker \"" + marker + "\"");
-        }
-        for (List<String[]> chain : parsed) {
-            List<String[]> python = new ArrayList<>();
-            Set<Atom> atoms = new LinkedHashSet<>();
-            for (String[] clause : chain) {
-                if ("python_version".equals(clause[0]) || "python_full_version".equals(clause[0])) {
-                    python.add(clause);
-                } else if ("==".equals(clause[1]) || "!=".equals(clause[1])) {
-                    atoms.add(new Atom(clause[0], "==".equals(clause[1]), clause[2]));
-                } else {
-                    throw unsupported("marker \"" + marker + "\"");
-                }
-            }
-            terms.add(new Term(python, atoms));
-        }
-        return terms;
-    }
-
     private static EngineFailure unsupported(String what) {
         return new EngineFailure(Reason.RESOLUTION_REQUIRED, null,
                 "Simplifying dependency markers under reachability is not supported for " + what);
+    }
+
+    /** The marker as the algebra holds it, or true where an edge or environment states none. */
+    private MarkerTree marker(@Nullable String marker) {
+        if (marker == null) {
+            return MarkerTree.trueIn(interner);
+        }
+        try {
+            return MarkerTree.parse(interner, marker);
+        } catch (MarkerParser.MarkerSyntaxException e) {
+            throw unsupported("marker \"" + marker + "\"");
+        }
     }
 
     // ---- propagation
@@ -421,18 +313,18 @@ final class UvLockReachability {
     private void propagate(int rootIndex) {
         Deque<Node> queue = new ArrayDeque<>();
         Node root = new Node(rootIndex, null);
-        List<Term> seed = new ArrayList<>();
+        MarkerTree seed = MarkerTree.trueIn(interner).negate();
         for (String environment : environments != null ? environments : Collections.<String>singletonList(null)) {
-            seed.addAll(dnf(environment));
+            seed = seed.or(marker(environment));
         }
         reach.put(root, seed);
         queue.add(root);
         while (!queue.isEmpty()) {
             Node node = queue.poll();
-            List<Term> parent = reach.get(node);
+            MarkerTree parent = reach.get(node);
             for (List<UvLockDependency> edges : edgeLists(node, rootIndex)) {
                 for (UvLockDependency edge : edges) {
-                    List<Term> via = and(parent, dnf(edge.getMarker()));
+                    MarkerTree via = parent.and(marker(edge.getMarker()));
                     int target = target(edge);
                     List<Node> children = new ArrayList<>();
                     children.add(new Node(target, null));
@@ -442,7 +334,10 @@ final class UvLockReachability {
                         }
                     }
                     for (Node child : children) {
-                        if (or(child, via)) {
+                        MarkerTree was = reach.get(child);
+                        MarkerTree now = was == null ? via : was.or(via);
+                        if (!now.equals(was)) {
+                            reach.put(child, now);
                             queue.add(child);
                         }
                     }
@@ -493,77 +388,11 @@ final class UvLockReachability {
         return found;
     }
 
-    private List<Term> and(List<Term> a, List<Term> b) {
-        List<Term> out = new ArrayList<>();
-        Set<String> seen = new HashSet<>();
-        for (Term x : a) {
-            for (Term y : b) {
-                Term t = x.and(y);
-                if (t != null && t.range(requiresPython) != null && seen.add(t.key())) {
-                    out.add(t);
-                }
-            }
-        }
-        return out;
-    }
-
-    /** Adds the terms to the node's reachability and reports whether it grew. */
-    // a term another one already covers adds nothing, so the disjunction keeps only terms none covers
-    private boolean or(Node node, List<Term> terms) {
-        List<Term> existing = reach.computeIfAbsent(node, k -> new ArrayList<>());
-        boolean grew = false;
-        for (Term t : terms) {
-            boolean covered = false;
-            for (Term e : existing) {
-                if (e.key().equals(t.key()) || covers(e, t)) {
-                    covered = true;
-                    break;
-                }
-            }
-            if (covered) {
-                continue;
-            }
-            existing.removeIf(e -> covers(t, e));
-            existing.add(t);
-            grew = true;
-        }
-        if (existing.size() > MAX_TERMS) {
-            throw unsupported("a reachability marker with more than " + MAX_TERMS + " disjuncts");
-        }
-        return grew;
-    }
-
-    /**
-     * Whether every environment the inner term holds in, the outer one holds in too. A term with a != Python
-     * clause covers nothing, as its range stands for more than the clause admits.
-     */
-    private boolean covers(Term outer, Term inner) {
-        for (String[] clause : outer.getPythonClauses()) {
-            String[] lowered = UvLockMarkers.lowerVersionClause(clause[0], clause[1], clause[2]);
-            if (lowered == null || "!=".equals(lowered[1])) {
-                return false;
-            }
-        }
-        for (Atom atom : outer.getAtoms()) {
-            if (inner.getAtoms().stream().noneMatch(a -> a.implies(atom))) {
-                return false;
-            }
-        }
-        PyRange in = inner.range(requiresPython);
-        PyRange out = outer.range(requiresPython);
-        if (in == null) {
-            return true;
-        }
-        PyRange both = out == null ? null : out.intersect(in);
-        return both != null && Objects.equals(both.lower, in.lower) && both.lowerExclusive == in.lowerExclusive &&
-                Objects.equals(both.upper, in.upper) && both.upperInclusive == in.upperInclusive;
-    }
-
     // ---- simplification
 
     private UvLockPackage simplifyEntry(int index, boolean root) {
         UvLockPackage pkg = packages.get(index);
-        List<Term> own = reach.get(new Node(index, null));
+        MarkerTree own = reach.get(new Node(index, null));
         if (own == null) {
             return pkg;
         }
@@ -581,7 +410,7 @@ final class UvLockReachability {
         if (pkg.getOptionalDependencies() != null) {
             Map<String, List<UvLockDependency>> groups = new LinkedHashMap<>();
             for (Map.Entry<String, List<UvLockDependency>> e : pkg.getOptionalDependencies().entrySet()) {
-                List<Term> parent = root ? own : reach.get(new Node(index, e.getKey()));
+                MarkerTree parent = root ? own : reach.get(new Node(index, e.getKey()));
                 groups.put(e.getKey(), parent == null ? e.getValue() : simplifyList(e.getValue(), parent));
             }
             b.optionalDependencies(groups);
@@ -589,7 +418,7 @@ final class UvLockReachability {
         return b.build();
     }
 
-    private List<UvLockDependency> simplifyList(List<UvLockDependency> edges, List<Term> parent) {
+    private List<UvLockDependency> simplifyList(List<UvLockDependency> edges, MarkerTree parent) {
         List<UvLockDependency> out = new ArrayList<>(edges.size());
         for (UvLockDependency edge : edges) {
             UvLockDependency simplified = edge.getMarker() == null ? edge : restrict(edge, parent);
@@ -604,34 +433,38 @@ final class UvLockReachability {
      * The edge with its marker restricted by the parent's reachability, as uv-lock's
      * {@code simplify_dependency_marker} does, or null when the edge cannot fire where the parent is reachable.
      */
-    private @Nullable UvLockDependency restrict(UvLockDependency edge, List<Term> parent) {
+    private @Nullable UvLockDependency restrict(UvLockDependency edge, MarkerTree parent) {
         try {
-            MarkerInterner interner = new MarkerInterner();
-            MarkerTree reachable = MarkerTree.trueIn(interner).negate();
-            for (Term term : parent) {
-                MarkerTree conjunction = MarkerTree.trueIn(interner);
-                for (String[] c : term.getPythonClauses()) {
-                    conjunction = conjunction.and(MarkerTree.parse(interner, c[0] + " " + c[1] + " '" + c[2] + "'"));
-                }
-                for (Atom atom : term.getAtoms()) {
-                    conjunction = conjunction.and(MarkerTree.parse(interner, atom.toString()));
-                }
-                reachable = reachable.or(conjunction);
-            }
-            Ranges.Bound<PythonVersion> lower = requiresPython.lower == null ? Ranges.Bound.unbounded() :
-                    requiresPython.lowerExclusive ? Ranges.Bound.excluded(requiresPython.lower) : Ranges.Bound.included(requiresPython.lower);
-            Ranges.Bound<PythonVersion> upper = requiresPython.upper == null ? Ranges.Bound.unbounded() :
-                    requiresPython.upperInclusive ? Ranges.Bound.included(requiresPython.upper) : Ranges.Bound.excluded(requiresPython.upper);
-            MarkerTree restricted = MarkerTree.parse(interner, requireNonNull(edge.getMarker()))
-                    .simplifyPythonVersions(lower, upper)
-                    .restrict(reachable.simplifyPythonVersions(lower, upper));
+            MarkerTree restricted = narrowed(new MarkerInterner(true), edge, parent);
             if (restricted.isFalse()) {
                 return null;
             }
             String marker = restricted.tryToString();
-            return Objects.equals(marker, edge.getMarker()) ? edge : edge.withMarker(marker);
+            if (Objects.equals(marker, edge.getMarker())) {
+                return edge;
+            }
+            if (edge.getMarker().equals(narrowed(new MarkerInterner(false), edge, parent).tryToString())) {
+                return edge;
+            }
+            return edge.withMarker(marker);
         } catch (MarkerParser.MarkerSyntaxException e) {
             throw unsupported("the marker \"" + edge.getMarker() + "\"");
         }
+    }
+
+    /** The edge's marker where the parent is reached, under the lock's Python range. */
+    private MarkerTree narrowed(MarkerInterner interner, UvLockDependency edge, MarkerTree parent)
+            throws MarkerParser.MarkerSyntaxException {
+        // the pass holds each node's reachability in its own interner, so it crosses into this one as text
+        String text = parent.tryToString();
+        MarkerTree reachable = parent.isFalse() ? MarkerTree.trueIn(interner).negate() :
+                text == null ? MarkerTree.trueIn(interner) : MarkerTree.parse(interner, text);
+        Ranges.Bound<PythonVersion> lower = requiresPython.lower == null ? Ranges.Bound.unbounded() :
+                requiresPython.lowerExclusive ? Ranges.Bound.excluded(requiresPython.lower) : Ranges.Bound.included(requiresPython.lower);
+        Ranges.Bound<PythonVersion> upper = requiresPython.upper == null ? Ranges.Bound.unbounded() :
+                requiresPython.upperInclusive ? Ranges.Bound.included(requiresPython.upper) : Ranges.Bound.excluded(requiresPython.upper);
+        return MarkerTree.parse(interner, requireNonNull(edge.getMarker()))
+                .simplifyPythonVersions(lower, upper)
+                .restrict(reachable.simplifyPythonVersions(lower, upper));
     }
 }

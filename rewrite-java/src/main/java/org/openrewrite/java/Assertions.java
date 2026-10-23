@@ -34,6 +34,7 @@ import org.openrewrite.test.SourceSpecs;
 import org.openrewrite.test.TypeValidation;
 import org.openrewrite.test.UncheckedConsumer;
 
+import javax.annotation.CheckReturnValue;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
@@ -49,6 +50,7 @@ import static java.util.stream.Collectors.toList;
 import static org.openrewrite.test.SourceSpecs.dir;
 
 @SuppressWarnings("unused")
+@CheckReturnValue
 public class Assertions {
     private static final Map<Integer, JavaVersion> javaVersions = new ConcurrentHashMap<>();
     private static final Map<String, JavaProject> javaProjects = new ConcurrentHashMap<>();

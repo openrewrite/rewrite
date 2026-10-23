@@ -87,6 +87,13 @@ public class RpcRecipe extends ScanningRecipe<Integer> {
     }
 
     @Override
+    public String getInstanceName() {
+        // Not every peer sends an instance name (Python doesn't)
+        //noinspection ConstantValue
+        return descriptor.getInstanceName() != null ? descriptor.getInstanceName() : super.getInstanceName();
+    }
+
+    @Override
     public String getDescription() {
         return descriptor.getDescription();
     }

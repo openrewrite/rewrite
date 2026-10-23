@@ -421,6 +421,7 @@ class ScalaCompilerBridge {
     !startsWithAnnotation &&
     !trimmed.startsWith("//") &&
     !trimmed.startsWith("/*") &&
+    !trimmed.startsWith(";") &&
     trimmed.nonEmpty
   }
 }

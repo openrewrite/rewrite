@@ -331,3 +331,15 @@ def test_named_unicode_escape_beside_field_in_format_spec():
         r"""a = f"{x:{w}\N{BULLET}}"
 """
     ))
+
+
+@pytest.mark.parametrize('line_break', ['\r\n', '\r'], ids=['crlf', 'cr'])
+@pytest.mark.parametrize('source', [
+    'command = f"""get_addr {subnet}\n    --verbose"""\n',
+    "LOGGER.info(f'''Unsupported TLS {version}\n    for {ip}''')\n",
+    "LOGGER.error(f'''Answer for question \\\n{question} is incorrect''')\n",
+    "html = f'''\n    <td>{{{name}}}</td>\n    <td>{{literal}}</td>\n'''\n",
+    "x = f'''a {f'''b\n{c}'''}\n'''\n",
+], ids=['field-then-text', 'text-then-field', 'continuation', 'doubled-braces', 'nested'])
+def test_multiline_text_keeps_line_breaks(source: str, line_break: str):
+    RecipeSpec().rewrite_run(python(source.replace('\n', line_break)))

@@ -80,6 +80,28 @@ describe("ProjectParser exclusions", () => {
         }
     });
 
+    it("excludes a pnpm store that .gitignore leaves visible", async () => {
+        const tmpDir = await dir({unsafeCleanup: true});
+        try {
+            project(tmpDir.path);
+            write(tmpDir.path, "node_modules/.pnpm/highlight.js@11.0.0/node_modules/highlight.js/index.js");
+            expect(await discovered(tmpDir.path)).toEqual(["dist/keep.ts", "src/app.ts"]);
+        } finally {
+            await tmpDir.cleanup();
+        }
+    });
+
+    it("skips a directory that git lists under a source file name", async () => {
+        const tmpDir = await dir({unsafeCleanup: true});
+        try {
+            project(tmpDir.path);
+            fs.symlinkSync("src", path.join(tmpDir.path, "reveal.js"), "dir");
+            expect(await discovered(tmpDir.path)).toEqual(["dist/keep.ts", "src/app.ts"]);
+        } finally {
+            await tmpDir.cleanup();
+        }
+    });
+
     it("falls back to the default directory exclusions when walking without git", async () => {
         const tmpDir = await dir({unsafeCleanup: true});
         try {
