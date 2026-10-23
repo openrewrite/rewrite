@@ -22,6 +22,7 @@ import org.openrewrite.internal.StringUtils;
 import org.openrewrite.marker.Markers;
 import org.openrewrite.quark.Quark;
 
+import javax.annotation.CheckReturnValue;
 import java.util.UUID;
 import java.util.concurrent.ThreadLocalRandom;
 
@@ -44,8 +45,10 @@ public interface Tree extends Heavyweight {
 
     Markers getMarkers();
 
+    @CheckReturnValue
     <T extends Tree> T withMarkers(Markers markers);
 
+    @CheckReturnValue
     <T extends Tree> T withId(UUID id);
 
     /**
