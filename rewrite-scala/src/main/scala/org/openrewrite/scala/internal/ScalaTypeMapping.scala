@@ -30,6 +30,7 @@ import dotty.tools.dotc.util.Spans
 
 import org.openrewrite.java.internal.JavaTypeFactory
 import org.openrewrite.java.tree.{Flag, JavaType, TypeUtils}
+import org.openrewrite.scala.tree.Union
 
 import java.util
 import java.util.{ArrayList, Collections, IdentityHashMap}
@@ -633,7 +634,7 @@ class ScalaTypeMapping(typeFactory: JavaTypeFactory, typedTree: tpd.Tree,
   private def mapUnionType(ot: OrType, sig: String): JavaType = signatureBuilder.unionMembers(ot) match {
     case Nil => mapType(ctx.definitions.NothingType)
     case (_, only) :: Nil => mapType(only)
-    case members => typeFactory.computeMultiCatch(sig, (union: JavaType.MultiCatch) =>
+    case members => typeFactory.computeMultiCatch(sig, (union: Union) =>
       union.unsafeSet(members.map(m => Option(mapType(m._2)).getOrElse(unknown)).asJava))
   }
 
