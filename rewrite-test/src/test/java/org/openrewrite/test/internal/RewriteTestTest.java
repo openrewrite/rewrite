@@ -154,6 +154,15 @@ class RewriteTestTest implements RewriteTest {
     }
 
     @Test
+    void runVerificationCycleAfterExpectedCycles() {
+        AssertionError e = assertThrows(AssertionError.class, () -> rewriteRun(
+          spec -> spec.expectedCyclesThatMakeChanges(2).recipe(new AppendExclamationMark()),
+          text("a", "a!!")
+        ));
+        assertThat(e).hasMessageContaining("Expected recipe to complete in 2 cycles, but took at least one more cycle");
+    }
+
+    @Test
     void cursorValidation() {
         AssertionError e = assertThrows(AssertionError.class, () ->
           rewriteRun(
@@ -2904,6 +2913,26 @@ class DeletesObsoleteGeneratesPlaceholderThenFillsIt extends ScanningRecipe<Atom
                 }
                 // Filling only what the scan already saw defers it to the cycle after generation
                 return placeholderExists.get() && "placeholder".equals(text.getText()) ? text.withText("filled") : text;
+            }
+        };
+    }
+}
+
+@EqualsAndHashCode(callSuper = false)
+@NullMarked
+@Value
+class AppendExclamationMark extends Recipe {
+
+    String displayName = "Append an exclamation mark";
+
+    String description = "Appends an exclamation mark to every plain text file, in every cycle.";
+
+    @Override
+    public TreeVisitor<?, ExecutionContext> getVisitor() {
+        return new PlainTextVisitor<>() {
+            @Override
+            public PlainText visitText(PlainText text, ExecutionContext ctx) {
+                return text.withText(text.getText() + "!");
             }
         };
     }
