@@ -90,6 +90,8 @@ public class AddOrUpdateAnnotationAttribute extends Recipe {
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
         return Preconditions.check(new UsesType<>(annotationType, false), new JavaIsoVisitor<ExecutionContext>() {
+            private boolean fullyQualifiedEnumValue;
+
             @Override
             public J.Annotation visitAnnotation(J.Annotation original, ExecutionContext ctx) {
                 J.Annotation a = super.visitAnnotation(original, ctx);
@@ -99,10 +101,11 @@ public class AddOrUpdateAnnotationAttribute extends Recipe {
                 }
 
                 String newAttributeValue;
+                fullyQualifiedEnumValue = !isFullyQualifiedClass() && isFullyQualifiedEnumValue(a);
                 if (isFullyQualifiedClass()) {
                     maybeAddImport(attributeValue.substring(0, attributeValue.length() - 6));
                     newAttributeValue = attributeValue;
-                } else if (isFullyQualifiedEnumValue(a)) {
+                } else if (fullyQualifiedEnumValue) {
                     maybeAddImport(getEnumClassName(attributeValue), false);
                     newAttributeValue = getShortenedEnumValue(attributeValue);
                 } else {
@@ -152,12 +155,40 @@ public class AddOrUpdateAnnotationAttribute extends Recipe {
                 }
 
                 if (original != a) {
+                    maybeRemoveImportsOf(original.getArguments());
                     doAfterVisit(new SimplifySingleElementAnnotation().getVisitor());
                     if (isFullyQualifiedClass()) {
                         doAfterVisit(new ShortenFullyQualifiedTypeReferences().getVisitor());
                     }
                 }
                 return maybeAutoFormat(original, a, ctx);
+            }
+
+            private void maybeRemoveImportsOf(@Nullable List<Expression> replacedArguments) {
+                if (replacedArguments == null) {
+                    return;
+                }
+                Set<String> referenced = new LinkedHashSet<>();
+                JavaIsoVisitor<Set<String>> references = new JavaIsoVisitor<Set<String>>() {
+                    @Override
+                    public J.Identifier visitIdentifier(J.Identifier identifier, Set<String> names) {
+                        JavaType.Variable field = identifier.getFieldType();
+                        JavaType.FullyQualified owner = field == null ? null : TypeUtils.asFullyQualified(field.getOwner());
+                        JavaType.FullyQualified type = TypeUtils.asFullyQualified(identifier.getType());
+                        if (owner != null) {
+                            names.add(owner.getFullyQualifiedName() + "." + identifier.getSimpleName());
+                        } else if (field == null && type != null) {
+                            names.add(type.getFullyQualifiedName());
+                        }
+                        return identifier;
+                    }
+                };
+                for (Expression argument : replacedArguments) {
+                    references.visit(argument, referenced);
+                }
+                for (String name : referenced) {
+                    maybeRemoveImport(name);
+                }
             }
 
             private @Nullable Expression update(J.Assignment as, J.Annotation annotation, @Nullable String newAttributeValue) {
@@ -264,6 +295,12 @@ public class AddOrUpdateAnnotationAttribute extends Recipe {
                     builder
                             .javaParser(JavaParser.fromJavaVersion().dependsOn(String.format("package %s;\npublic interface %s {}\n", fqn.getPackageName(), fqn.getClassName())))
                             .imports(fqn.getFullyQualifiedName());
+                } else if (fullyQualifiedEnumValue) {
+                    JavaType.ShallowClass enumType = JavaType.ShallowClass.build(getEnumClassName(attributeValue));
+                    String constant = attributeValue.substring(attributeValue.lastIndexOf('.') + 1);
+                    builder
+                            .javaParser(JavaParser.fromJavaVersion().dependsOn(String.format("package %s;\npublic enum %s { %s }\n", enumType.getPackageName(), enumType.getClassName(), constant)))
+                            .imports(enumType.getFullyQualifiedName());
                 }
                 return builder.build();
             }

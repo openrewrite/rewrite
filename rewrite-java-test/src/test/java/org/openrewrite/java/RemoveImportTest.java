@@ -72,6 +72,52 @@ class RemoveImportTest implements RewriteTest {
     }
 
     @Test
+    void removeImportOfTypeTheSourceNeverNames() {
+        rewriteRun(
+          spec -> spec.recipe(removeImport("java.util.List")),
+          java(
+            """
+              import java.util.Collections;
+              import java.util.List;
+              class A {
+                 int size() {
+                    var strs = Collections.singletonList("test");
+                    return strs.size();
+                 }
+              }
+              """,
+            """
+              import java.util.Collections;
+              class A {
+                 int size() {
+                    var strs = Collections.singletonList("test");
+                    return strs.size();
+                 }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void leaveImportOfTypeOnlyJavadocNames() {
+        rewriteRun(
+          spec -> spec.recipe(removeImport("java.util.List")),
+          java(
+            """
+              import java.util.List;
+              class A {
+                 /** Returns a {@link List}. */
+                 Object list() {
+                    return null;
+                 }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
     void leaveWildcardImportIfRemovedTypeIsStillReferredTo() {
         rewriteRun(
           spec -> spec.recipe(removeImport("java.util.*")),

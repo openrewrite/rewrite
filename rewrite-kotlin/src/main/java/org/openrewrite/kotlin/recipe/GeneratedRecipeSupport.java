@@ -573,6 +573,11 @@ public final class GeneratedRecipeSupport {
                         result = restoreSubstitutedInteriors((J.MethodInvocation) result, substitutions);
                     }
                     J inserted = result.withPrefix(method.getPrefix());
+                    JavaType.Method replaced = method.getMethodType();
+                    if (replaced != null) {
+                        maybeRemoveImport(replaced.getDeclaringType());
+                        maybeRemoveImport(replaced.getDeclaringType().getFullyQualifiedName() + "." + replaced.getName());
+                    }
                     doAfterVisit(shortenTemplateTypes(this, inserted, substitutions));
                     return inserted;
                 }
