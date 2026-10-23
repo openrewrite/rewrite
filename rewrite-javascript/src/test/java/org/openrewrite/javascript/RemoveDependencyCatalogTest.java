@@ -86,7 +86,7 @@ class RemoveDependencyCatalogTest implements RewriteTest {
           }
           """;
         rewriteRun(
-          spec -> spec.recipe(new RemoveDependency("wrappy", null)).expectedCyclesThatMakeChanges(1),
+          spec -> spec.recipe(new RemoveDependency("wrappy", null)),
           packageJson(member, null, nodeResolutionResult(PackageManager.Pnpm), s -> s.path("packages/a/package.json")
             .noTrim().after(actual -> actual).afterRecipe(doc -> {
                 assertThat(doc.printAll(new PrintOutputCapture<>(0, PrintOutputCapture.MarkerPrinter.SANITIZED)))
@@ -115,7 +115,7 @@ class RemoveDependencyCatalogTest implements RewriteTest {
           }
           """;
         rewriteRun(
-          spec -> spec.recipe(new RemoveDependency("wrappy", null)).expectedCyclesThatMakeChanges(1),
+          spec -> spec.recipe(new RemoveDependency("wrappy", null)),
           packageJson(member, null, nodeResolutionResult(PackageManager.Pnpm), s -> s.path("packages/a/package.json")
             .noTrim().after(actual -> actual).afterRecipe(doc -> assertThat(doc.getMarkers()
               .findFirst(Markup.Warn.class)).hasValueSatisfying(w -> assertThat(w.getMessage())
@@ -218,7 +218,7 @@ class RemoveDependencyCatalogTest implements RewriteTest {
           }
           """;
         rewriteRun(
-          spec -> spec.recipe(new RemoveDependency("wrappy", null)).expectedCyclesThatMakeChanges(1),
+          spec -> spec.recipe(new RemoveDependency("wrappy", null)),
           packageJson(member, null, nodeResolutionResult(PackageManager.Pnpm), s -> s.path("packages/a/package.json")
             .noTrim().after(actual -> actual).afterRecipe(doc -> {
                 assertThat(doc.printAll(new PrintOutputCapture<>(0, PrintOutputCapture.MarkerPrinter.SANITIZED)))

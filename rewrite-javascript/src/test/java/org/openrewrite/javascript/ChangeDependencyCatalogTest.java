@@ -84,7 +84,6 @@ class ChangeDependencyCatalogTest implements RewriteTest {
     void declinedAndMarkedUntilItSettles(String value, String protocol, @Nullable String newVersion, String remedy) {
         rewriteRun(
           spec -> spec.recipe(new ChangeDependency("acme-logger", "acme-log", newVersion, null))
-            .expectedCyclesThatMakeChanges(1)
             .dataTable(NodeDependencyProtocolsSkipped.Row.class, rows -> {
                 assertThat(rows).hasSize(1);
                 assertThat(rows.get(0).getProtocol()).isEqualTo(protocol);
