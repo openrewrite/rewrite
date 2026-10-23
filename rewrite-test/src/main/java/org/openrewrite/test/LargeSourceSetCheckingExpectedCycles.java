@@ -33,6 +33,7 @@ class LargeSourceSetCheckingExpectedCycles extends InMemoryLargeSourceSet {
     private final int expectedCyclesThatMakeChanges;
     private final @Nullable AddedMarkers addedMarkers;
     private final @Nullable UnchangedTreeIdentity unchangedTreeIdentity;
+    private final @Nullable AccumulatorContents accumulatorContents;
     private int cyclesThatResultedInChanges = 0;
 
     /**
@@ -41,16 +42,18 @@ class LargeSourceSetCheckingExpectedCycles extends InMemoryLargeSourceSet {
     private Map<UUID, @Nullable SourceFile> lastCycleVersions = emptyMap();
 
     LargeSourceSetCheckingExpectedCycles(int expectedCyclesThatMakeChanges, List<SourceFile> ls) {
-        this(expectedCyclesThatMakeChanges, ls, null, null);
+        this(expectedCyclesThatMakeChanges, ls, null, null, null);
     }
 
     LargeSourceSetCheckingExpectedCycles(int expectedCyclesThatMakeChanges, List<SourceFile> ls,
                                          @Nullable AddedMarkers addedMarkers,
-                                         @Nullable UnchangedTreeIdentity unchangedTreeIdentity) {
+                                         @Nullable UnchangedTreeIdentity unchangedTreeIdentity,
+                                         @Nullable AccumulatorContents accumulatorContents) {
         super(ls);
         this.expectedCyclesThatMakeChanges = expectedCyclesThatMakeChanges;
         this.addedMarkers = addedMarkers;
         this.unchangedTreeIdentity = unchangedTreeIdentity;
+        this.accumulatorContents = accumulatorContents;
     }
 
     private LargeSourceSetCheckingExpectedCycles(LargeSourceSetCheckingExpectedCycles from, @Nullable Map<SourceFile, List<Recipe>> deletions, List<SourceFile> mapped) {
@@ -58,6 +61,7 @@ class LargeSourceSetCheckingExpectedCycles extends InMemoryLargeSourceSet {
         this.expectedCyclesThatMakeChanges = from.expectedCyclesThatMakeChanges;
         this.addedMarkers = from.addedMarkers;
         this.unchangedTreeIdentity = from.unchangedTreeIdentity;
+        this.accumulatorContents = from.accumulatorContents;
         this.cyclesThatResultedInChanges = from.cyclesThatResultedInChanges;
         this.lastCycleVersions = from.lastCycleVersions;
     }
@@ -65,6 +69,19 @@ class LargeSourceSetCheckingExpectedCycles extends InMemoryLargeSourceSet {
     @Nullable
     UnchangedTreeIdentity getUnchangedTreeIdentity() {
         return unchangedTreeIdentity;
+    }
+
+    @Nullable
+    AccumulatorContents getAccumulatorContents() {
+        return accumulatorContents;
+    }
+
+    @Override
+    public void setRecipe(List<Recipe> recipeStack) {
+        super.setRecipe(recipeStack);
+        if (accumulatorContents != null) {
+            accumulatorContents.ran(recipeStack.get(recipeStack.size() - 1));
+        }
     }
 
     @Override

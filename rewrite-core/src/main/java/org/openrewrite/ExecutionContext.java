@@ -33,7 +33,7 @@ import static java.util.Objects.requireNonNull;
  * Passes messages between individual visitors or parsing operations and allows errors to be propagated
  * back to the process controlling parsing or recipe execution.
  */
-public interface ExecutionContext extends RpcCodec<ExecutionContext> {
+public interface ExecutionContext extends RpcCodec<ExecutionContext>, Heavyweight {
     String CURRENT_CYCLE = "org.openrewrite.currentCycle";
     String CURRENT_RECIPE = "org.openrewrite.currentRecipe";
     String RUN_TIMEOUT = "org.openrewrite.runTimeout";

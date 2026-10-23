@@ -24,6 +24,7 @@ import lombok.*;
 import lombok.experimental.NonFinal;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.ExecutionContext;
+import org.openrewrite.Heavyweight;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.PropertyPlaceholderHelper;
 import org.openrewrite.maven.MavenDownloadingException;
@@ -53,7 +54,7 @@ import static org.openrewrite.internal.StringUtils.matchesGlob;
         "pluginRepositories", "requestedDependencies", "plugins", "pluginManagement", "subprojects"})
 @Getter
 @Builder
-public class ResolvedPom {
+public class ResolvedPom implements Heavyweight {
 
     public static final PropertyPlaceholderHelper placeholderHelper = new PropertyPlaceholderHelper("${", "}", null);
 

@@ -450,6 +450,7 @@ public interface RewriteTest extends SourceSpecs {
             addedMarkers = new AddedMarkers(beforeSourceFiles, parsersFor, relativeTo, ctx);
         }
         UnchangedTreeIdentity unchangedTreeIdentity = new UnchangedTreeIdentity();
+        AccumulatorContents accumulatorContents = quality.lightweightAccumulators() ? new AccumulatorContents() : null;
 
         LargeSourceSet lss;
         if (testMethodSpec.getSourceSet() != null) {
@@ -458,7 +459,7 @@ public interface RewriteTest extends SourceSpecs {
             lss = testClassSpec.getSourceSet().apply(runnableSourceFiles);
         } else {
             lss = new LargeSourceSetCheckingExpectedCycles(expectedCyclesThatMakeChanges, runnableSourceFiles,
-                    addedMarkers, unchangedTreeIdentity);
+                    addedMarkers, unchangedTreeIdentity, accumulatorContents);
         }
 
         recipeCtx = CursorValidatingExecutionContextView.view(recipeCtx)
@@ -481,6 +482,9 @@ public interface RewriteTest extends SourceSpecs {
             addedMarkers.assertNoneAdded(recipeRun.getChangeset().getAllResults());
         }
         unchangedTreeIdentity.assertNoneFound();
+        if (accumulatorContents != null) {
+            accumulatorContents.assertNoneFound();
+        }
         boolean probed = runner == RewriteRunner.IN_PROCESS && lss instanceof LargeSourceSetCheckingExpectedCycles;
         EmptySources emptySources = probed ?
                 new EmptySources(recipe, recipeRun.getChangeset().getAllResults()) : null;
