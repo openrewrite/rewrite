@@ -52,7 +52,11 @@ class ExtractInterfaceTest implements RewriteTest {
             return new JavaIsoVisitor<>() {
                 @Override
                 public J.CompilationUnit visitCompilationUnit(J.CompilationUnit cu, ExecutionContext ctx) {
-                    acc.set(cu.withId(randomId()));
+                    J.ClassDeclaration c = cu.getClasses().isEmpty() ? null : cu.getClasses().getFirst();
+                    // after the extraction the class implements the interface, so nothing is extracted again
+                    if (c != null && c.getKind() == J.ClassDeclaration.Kind.Type.Class && c.getImplements() == null) {
+                        acc.set(cu.withId(randomId()));
+                    }
                     return cu;
                 }
             };
@@ -60,8 +64,9 @@ class ExtractInterfaceTest implements RewriteTest {
 
         @Override
         public Collection<? extends SourceFile> generate(AtomicReference<J.CompilationUnit> acc, ExecutionContext ctx) {
-            return List.of((SourceFile) new ExtractInterface.CreateInterface("org.openrewrite.interfaces.ITest")
-              .visitNonNull(acc.get(), ctx));
+            return acc.get() == null ? List.of() :
+              List.of((SourceFile) new ExtractInterface.CreateInterface("org.openrewrite.interfaces.ITest")
+                .visitNonNull(acc.get(), ctx));
         }
 
         @Override
@@ -74,7 +79,7 @@ class ExtractInterfaceTest implements RewriteTest {
     @Test
     void extractInterface() {
         rewriteRun(
-          spec -> spec.recipe(new ExtractTestInterface()).cycles(1).expectedCyclesThatMakeChanges(1),
+          spec -> spec.recipe(new ExtractTestInterface()),
           java(
             """
               package org.openrewrite;

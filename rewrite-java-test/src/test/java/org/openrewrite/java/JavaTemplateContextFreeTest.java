@@ -167,12 +167,13 @@ class JavaTemplateContextFreeTest implements RewriteTest {
           spec -> spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {
               @Override
               public J.VariableDeclarations visitVariableDeclarations(J.VariableDeclarations multiVariable, ExecutionContext ctx) {
-                  if ("o".equals(multiVariable.getVariables().getFirst().getSimpleName())) {
+                  if ("o".equals(multiVariable.getVariables().getFirst().getSimpleName()) &&
+                      !(multiVariable.getTypeExpression() instanceof J.Identifier id && "var".equals(id.getSimpleName()))) {
                       return JavaTemplate.apply("var o = #{any()};", getCursor(), multiVariable.getCoordinates().replace(), multiVariable.getVariables().getFirst().getInitializer());
                   }
                   return multiVariable;
               }
-          })).cycles(1).expectedCyclesThatMakeChanges(1),
+          })),
           java(
             """
               import java.util.Optional;
@@ -210,7 +211,7 @@ class JavaTemplateContextFreeTest implements RewriteTest {
                   }
                   return super.visitMethodInvocation(method, executionContext);
               }
-          })).cycles(1).expectedCyclesThatMakeChanges(1),
+          })),
           java(
             """
               class Test<T extends Number> {
@@ -244,7 +245,7 @@ class JavaTemplateContextFreeTest implements RewriteTest {
                   }
                   return super.visitMethodInvocation(method, executionContext);
               }
-          })).cycles(1).expectedCyclesThatMakeChanges(1),
+          })),
           java(
             """
               class Test<T extends Number> {
@@ -273,12 +274,13 @@ class JavaTemplateContextFreeTest implements RewriteTest {
             .recipe(toRecipe(() -> new JavaIsoVisitor<>() {
               @Override
               public J.VariableDeclarations visitVariableDeclarations(J.VariableDeclarations multiVariable, ExecutionContext ctx) {
-                  if ("o".equals(multiVariable.getVariables().getFirst().getSimpleName())) {
+                  if ("o".equals(multiVariable.getVariables().getFirst().getSimpleName()) &&
+                      !(multiVariable.getTypeExpression() instanceof J.Identifier id && "var".equals(id.getSimpleName()))) {
                       return JavaTemplate.apply("var o = #{any()};", getCursor(), multiVariable.getCoordinates().replace(), multiVariable.getVariables().getFirst().getInitializer());
                   }
                   return multiVariable;
               }
-          })).cycles(1).expectedCyclesThatMakeChanges(1),
+          })),
           java(
             """
               import java.util.Map;
@@ -311,12 +313,13 @@ class JavaTemplateContextFreeTest implements RewriteTest {
             .recipe(toRecipe(() -> new JavaIsoVisitor<>() {
               @Override
               public J.VariableDeclarations visitVariableDeclarations(J.VariableDeclarations multiVariable, ExecutionContext ctx) {
-                  if ("o".equals(multiVariable.getVariables().getFirst().getSimpleName())) {
+                  if ("o".equals(multiVariable.getVariables().getFirst().getSimpleName()) &&
+                      !(multiVariable.getTypeExpression() instanceof J.Identifier id && "var".equals(id.getSimpleName()))) {
                       return JavaTemplate.apply("var o = #{any()};", getCursor(), multiVariable.getCoordinates().replace(), multiVariable.getVariables().getFirst().getInitializer());
                   }
                   return multiVariable;
               }
-          })).cycles(1).expectedCyclesThatMakeChanges(1),
+          })),
           java(
             """
               import java.util.Comparator;
@@ -351,12 +354,13 @@ class JavaTemplateContextFreeTest implements RewriteTest {
             .recipe(toRecipe(() -> new JavaIsoVisitor<>() {
               @Override
               public J.VariableDeclarations visitVariableDeclarations(J.VariableDeclarations multiVariable, ExecutionContext ctx) {
-                  if ("o".equals(multiVariable.getVariables().getFirst().getSimpleName())) {
+                  if ("o".equals(multiVariable.getVariables().getFirst().getSimpleName()) &&
+                      !(multiVariable.getTypeExpression() instanceof J.Identifier id && "var".equals(id.getSimpleName()))) {
                       return JavaTemplate.apply("var o = #{any()};", getCursor(), multiVariable.getCoordinates().replace(), multiVariable.getVariables().getFirst().getInitializer());
                   }
                   return multiVariable;
               }
-          })).cycles(1).expectedCyclesThatMakeChanges(1),
+          })),
           java(
             """
               import java.io.Serializable;
