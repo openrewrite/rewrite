@@ -18,6 +18,8 @@ package org.openrewrite.maven.internal;
 import com.ctc.wstx.stax.WstxInputFactory;
 import com.ctc.wstx.stax.WstxOutputFactory;
 import com.fasterxml.jackson.annotation.JsonAutoDetect;
+import com.fasterxml.jackson.annotation.JsonIdentityInfo;
+import com.fasterxml.jackson.annotation.ObjectIdGenerators;
 import com.fasterxml.jackson.core.JsonParser;
 import com.fasterxml.jackson.databind.DeserializationContext;
 import com.fasterxml.jackson.databind.DeserializationFeature;
@@ -31,6 +33,7 @@ import com.fasterxml.jackson.dataformat.xml.deser.FromXmlParser;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import com.fasterxml.jackson.module.paramnames.ParameterNamesModule;
 import org.jspecify.annotations.Nullable;
+import org.openrewrite.maven.MavenSettings;
 
 import javax.xml.stream.XMLInputFactory;
 import java.io.IOException;
@@ -53,6 +56,7 @@ public class MavenXmlMapper {
                 .constructorDetector(ConstructorDetector.USE_PROPERTIES_BASED)
                 .enable(FromXmlParser.Feature.EMPTY_ELEMENT_AS_NULL)
                 .defaultUseWrapper(false)
+                .addMixIn(MavenSettings.class, NoObjectId.class)
                 .build()
                 .registerModule(new ParameterNamesModule())
                 .disable(DeserializationFeature.ACCEPT_EMPTY_STRING_AS_NULL_OBJECT)
@@ -69,6 +73,7 @@ public class MavenXmlMapper {
 
         writeMapper = XmlMapper.builder(xmlFactory)
                 .defaultUseWrapper(false)
+                .addMixIn(MavenSettings.class, NoObjectId.class)
                 .build();
     }
 
@@ -81,6 +86,14 @@ public class MavenXmlMapper {
 
     public static ObjectMapper writeMapper() {
         return writeMapper;
+    }
+
+    /**
+     * Turns off the object identity that {@link MavenSettings} has in a serialized LST, since settings.xml has no
+     * {@code @ref}.
+     */
+    @JsonIdentityInfo(generator = ObjectIdGenerators.None.class)
+    private interface NoObjectId {
     }
 
     public static class StringTrimModule extends SimpleModule {
