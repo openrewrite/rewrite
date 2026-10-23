@@ -994,6 +994,65 @@ class RemoveRedundantPropertiesTest implements RewriteTest {
     }
 
     @Test
+    void removeEqualVersionsSpelledDifferently() {
+        rewriteRun(
+          spec -> spec.recipe(new RemoveRedundantProperties(null, Comparator.EQ)),
+          mavenProject("parent",
+            pomXml(
+              """
+                <project>
+                  <groupId>com.example</groupId>
+                  <artifactId>parent</artifactId>
+                  <version>1.0.0</version>
+                  <packaging>pom</packaging>
+                  <properties>
+                    <junit.version>5.9</junit.version>
+                    <spring.version>5.3.0</spring.version>
+                    <slf4j.version>2.0.7</slf4j.version>
+                  </properties>
+                  <modules>
+                    <module>child</module>
+                  </modules>
+                </project>
+                """
+            ),
+            mavenProject("child",
+              pomXml(
+                """
+                  <project>
+                    <parent>
+                      <groupId>com.example</groupId>
+                      <artifactId>parent</artifactId>
+                      <version>1.0.0</version>
+                    </parent>
+                    <artifactId>child</artifactId>
+                    <properties>
+                      <junit.version>5.9.0</junit.version>
+                      <spring.version>5.3.0.RELEASE</spring.version>
+                      <slf4j.version>2.0.8</slf4j.version>
+                    </properties>
+                  </project>
+                  """,
+                """
+                  <project>
+                    <parent>
+                      <groupId>com.example</groupId>
+                      <artifactId>parent</artifactId>
+                      <version>1.0.0</version>
+                    </parent>
+                    <artifactId>child</artifactId>
+                    <properties>
+                      <slf4j.version>2.0.8</slf4j.version>
+                    </properties>
+                  </project>
+                  """
+              )
+            )
+          )
+        );
+    }
+
+    @Test
     void onlyCompareVersionValuesByOrder() {
         rewriteRun(
           spec -> spec.recipe(new RemoveRedundantProperties(null, Comparator.GTE)),

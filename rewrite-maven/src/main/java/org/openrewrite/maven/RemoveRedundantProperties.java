@@ -213,7 +213,7 @@ public class RemoveRedundantProperties extends Recipe {
                 if (parentValue.equals(value)) {
                     return comparator == Comparator.EQ || comparator == Comparator.LTE || comparator == Comparator.GTE;
                 }
-                if (comparator == Comparator.EQ || !isVersion(parentValue) || !isVersion(value)) {
+                if (!isVersion(parentValue) || !isVersion(value)) {
                     return false;
                 }
                 int comparison = VERSION_COMPARATOR.compare(null, parentValue, value);
@@ -222,7 +222,7 @@ public class RemoveRedundantProperties extends Recipe {
                 } else if (comparison > 0) {
                     return comparator == Comparator.GT || comparator == Comparator.GTE;
                 }
-                return comparator == Comparator.LTE || comparator == Comparator.GTE;
+                return comparator == Comparator.EQ || comparator == Comparator.LTE || comparator == Comparator.GTE;
             }
 
             private boolean isVersion(String value) {
