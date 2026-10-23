@@ -27,12 +27,14 @@ import org.openrewrite.maven.tree.MavenResolutionResult;
 import org.openrewrite.maven.tree.Scope;
 import org.openrewrite.test.RewriteTest;
 import org.openrewrite.test.TypeValidation;
+import org.openrewrite.xml.XmlIsoVisitor;
 import org.openrewrite.xml.tree.Xml;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
 import java.util.Optional;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.maven.Assertions.pomXml;
@@ -57,9 +59,7 @@ class MavenDependencyFailuresTest implements RewriteTest {
                 MavenRepository.builder().id("central").uri("https://repo1.maven.org/maven2").knownToExist(true).build(),
                 MavenRepository.builder().id("jenkins").uri("https://repo.jenkins-ci.org/public").knownToExist(true).build()
               )))
-            .recipeExecutionContext(new InMemoryExecutionContext())
-            .cycles(1)
-            .expectedCyclesThatMakeChanges(1),
+            .recipeExecutionContext(new InMemoryExecutionContext()),
           pomXml(
             """
               <project>
@@ -87,8 +87,6 @@ class MavenDependencyFailuresTest implements RewriteTest {
             .executionContext(MavenExecutionContextView.view(new InMemoryExecutionContext())
               .setRepositories(List.of(MavenRepository.builder().id("jenkins").uri("https://repo.jenkins-ci.org/public").build())))
             .recipeExecutionContext(new InMemoryExecutionContext())
-            .cycles(1)
-            .expectedCyclesThatMakeChanges(1)
             .dataTable(MavenMetadataFailures.Row.class, failures ->
                 assertThat(failures.stream().map(MavenMetadataFailures.Row::getMavenRepositoryUri).distinct()).containsExactlyInAnyOrder("https://repo.maven.apache.org/maven2")),
           pomXml(
@@ -155,9 +153,7 @@ class MavenDependencyFailuresTest implements RewriteTest {
             .recipeExecutionContext(MavenExecutionContextView.view(new InMemoryExecutionContext())
               .setLocalRepository(mavenLocal)
               .setPomCache(new InMemoryMavenPomCache())
-            )
-            .cycles(1)
-            .expectedCyclesThatMakeChanges(1),
+            ),
           pomXml(
             """
               <project>
@@ -386,7 +382,17 @@ class MavenDependencyFailuresTest implements RewriteTest {
         return toRecipe(() -> new MavenIsoVisitor<>() {
             @Override
             public Xml.Document visitDocument(Xml.Document document, ExecutionContext ctx) {
-                if (document.getMarkers().findFirst(Markup.class).isEmpty()) {
+                // a failed update marks the tags it could not resolve, which stops the next cycle updating again
+                boolean warned = new XmlIsoVisitor<AtomicBoolean>() {
+                    @Override
+                    public Xml.Tag visitTag(Xml.Tag tag, AtomicBoolean found) {
+                        if (tag.getMarkers().findFirst(Markup.class).isPresent()) {
+                            found.set(true);
+                        }
+                        return super.visitTag(tag, found);
+                    }
+                }.reduce(document, new AtomicBoolean()).get();
+                if (!warned && document.getMarkers().findFirst(Markup.class).isEmpty()) {
                     maybeUpdateModel();
                 }
                 return document;
