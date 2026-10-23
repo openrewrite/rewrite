@@ -129,6 +129,11 @@ public class ChangeType extends Recipe implements RenamingRecipe {
                     if (used != cu) {
                         return used;
                     }
+                    // Fully qualified documentation-comment references are excluded from UsesType's
+                    // import-retention view, but they still need to be retargeted.
+                    if (cu.getTypesInUse().hasDocReference(oldFullyQualifiedTypeName)) {
+                        return SearchResult.found(cu);
+                    }
                     if (!Boolean.TRUE.equals(ignoreDefinition) &&
                             mayContainDefinition(cu, normalizedOldName) &&
                             containsClassDefinition(cu, oldFullyQualifiedTypeName)) {
@@ -341,8 +346,9 @@ public class ChangeType extends Recipe implements RenamingRecipe {
                 if (targetType instanceof JavaType.FullyQualified) {
                     J.FieldAccess fa = (J.FieldAccess) updateOuterClassTypes(TypeTree.build(((JavaType.FullyQualified) targetType).getFullyQualifiedName())
                             .withPrefix(fieldAccess.getPrefix()));
-                    if (getCursor().firstEnclosing(J.Import.class) == null) {
-                        // don't shorten qualified names in imports
+                    if (getCursor().firstEnclosing(J.Import.class) == null &&
+                            getCursor().firstEnclosing(Javadoc.class) == null) {
+                        // don't shorten qualified names in imports or Javadoc, where they need no import
                         fa = fa.withName(fa.getName().withType(targetType));
                         doAfterVisit(ShortenFullyQualifiedTypeReferences.modifyOnly(fa));
                     }
