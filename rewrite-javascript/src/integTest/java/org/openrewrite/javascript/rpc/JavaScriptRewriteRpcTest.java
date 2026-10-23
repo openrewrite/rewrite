@@ -36,6 +36,7 @@ import org.openrewrite.javascript.JavaScriptIsoVisitor;
 import org.openrewrite.javascript.JavaScriptParser;
 import org.openrewrite.javascript.style.Autodetect;
 import org.openrewrite.javascript.tree.JS;
+import org.openrewrite.json.JsonParser;
 import org.openrewrite.json.tree.Json;
 import org.openrewrite.marker.Markup;
 import org.openrewrite.marketplace.RecipeBundle;
@@ -43,6 +44,9 @@ import org.openrewrite.marketplace.RecipeBundleReader;
 import org.openrewrite.marketplace.RecipeBundleResolver;
 import org.openrewrite.marketplace.RecipeListing;
 import org.openrewrite.marketplace.RecipeMarketplace;
+import org.openrewrite.rpc.RpcRecipe;
+import org.openrewrite.rpc.request.BatchVisit;
+import org.openrewrite.rpc.request.BatchVisitResponse;
 import org.openrewrite.rpc.request.Print;
 import org.openrewrite.table.SourcesFileResults;
 import org.openrewrite.test.RecipeSpec;
@@ -495,16 +499,10 @@ class JavaScriptRewriteRpcTest implements RewriteTest {
     void runBatchedRecipesThatDelete() throws IOException {
         installRecipes();
         rewriteRun(
-          spec -> spec
-            .recipes(
-              client().prepareRecipe("org.openrewrite.example.json.delete-file", Map.of("sourcePath", "tslint.json")),
-              client().prepareRecipe("org.openrewrite.example.npm.change-version", Map.of("version", "1.0.0"))
-            )
-            .dataTable(SourcesFileResults.Row.class, rows -> assertThat(rows)
-              .anySatisfy(row -> {
-                  assertThat(row.getSourcePath()).isEqualTo("tslint.json");
-                  assertThat(row.getAfterSourcePath()).isEmpty();
-              })),
+          spec -> spec.recipes(
+            client().prepareRecipe("org.openrewrite.example.json.delete-file", Map.of("sourcePath", "tslint.json")),
+            client().prepareRecipe("org.openrewrite.example.npm.change-version", Map.of("version", "1.0.0"))
+          ),
           json(
             """
               {"rules": {"no-console": true}}
@@ -523,6 +521,29 @@ class JavaScriptRewriteRpcTest implements RewriteTest {
           )
         );
         assertThat(Files.readString(tempDir.resolve("rpc.log"))).contains("BatchVisit");
+    }
+
+    @Test
+    void treeDeletedInBatchVisitIsNotServedAfterwards() {
+        // given
+        installRecipes();
+        RpcRecipe delete = (RpcRecipe) client().prepareRecipe("org.openrewrite.example.json.delete-file",
+          Map.of("sourcePath", "tslint.json"));
+        Json.Document tslint = JsonParser.builder().build()
+          .parse("{\"rules\": {}}")
+          .map(sf -> (Json.Document) sf.withSourcePath(Path.of("tslint.json")))
+          .findFirst()
+          .orElseThrow();
+
+        // when
+        BatchVisitResponse response = client().batchVisit(tslint, new InMemoryExecutionContext(), null,
+          List.of(new BatchVisit.BatchVisitItem(delete.getEditVisitor(), null)));
+
+        // then
+        assertThat(response.getResults())
+          .singleElement()
+          .satisfies(r -> assertThat(r.isDeleted()).isTrue());
+        assertThat((Object) client().getObject(tslint.getId().toString(), Json.Document.class.getName())).isNull();
     }
 
     @Test
