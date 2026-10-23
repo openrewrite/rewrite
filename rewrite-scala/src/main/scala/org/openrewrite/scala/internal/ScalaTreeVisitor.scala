@@ -4935,6 +4935,13 @@ class ScalaTreeVisitor(
       }
     }
     
+    // Dotty closes an auxiliary constructor's body with a unit literal that spans no source,
+    // so dropping it leaves the cursor where the last statement ended.
+    val isSyntheticUnit = block.expr match {
+      case lit: Trees.Literal[?] => lit.const.tag == UnitTag
+      case _ => false
+    }
+
     val statements = new util.ArrayList[JRightPadded[Statement]]()
     if (hasBraces) {
       consumeEmptyStatements(blockEndAdj, statements)
@@ -4971,7 +4978,8 @@ class ScalaTreeVisitor(
             Math.max(0, block.span.end - offsetAdjustment) - 1
           }
           
-          var (trailingSpace, rpMarkers) = consumeTrailingSemicolon(statEnd, nextStart)
+          val semicolonLimit = if (i == block.stats.length - 1 && isSyntheticUnit) blockEndAdj else nextStart
+          var (trailingSpace, rpMarkers) = consumeTrailingSemicolon(statEnd, semicolonLimit)
           if (rpMarkers.getMarkers.isEmpty) {
             val trailStart = Math.max(statEnd, cursor)
             if (trailStart < nextStart && nextStart <= source.length) {
@@ -4986,13 +4994,6 @@ class ScalaTreeVisitor(
       }
     }
     
-    // Dotty closes an auxiliary constructor's body with a unit literal that spans no source,
-    // so dropping it leaves the cursor where the last statement ended.
-    val isSyntheticUnit = block.expr match {
-      case lit: Trees.Literal[?] => lit.const.tag == UnitTag
-      case _ => false
-    }
-
     // Handle the expression part of the block (if any)
     // Skip synthetic ??? added by compiler for procedure syntax
     val isSyntheticExpr = if (!block.expr.isEmpty && !isSyntheticUnit) {
@@ -5061,10 +5062,10 @@ class ScalaTreeVisitor(
             statements.add(new JRightPadded[Statement](stmt, trailingSpace, rpMarkers))
           case _ => // Skip
         }
-        if (hasBraces) {
-          consumeEmptyStatements(blockEndAdj, statements)
-        }
       }
+    }
+    if (hasBraces) {
+      consumeEmptyStatements(blockEndAdj, statements)
     }
     
     // Extract end padding before closing brace
@@ -7514,7 +7515,12 @@ class ScalaTreeVisitor(
     // Compute the end of the body's actual content from the AST (not from
     // the cursor, which may have overshot when Dotty's body span included
     // the `;` or part of the next case).
+    val isBracedBody = caseBodyJ != null && (caseBodyJ.getElement match {
+      case jb: J.Block => !jb.getMarkers.findFirst(classOf[OmitBraces]).isPresent
+      case _ => false
+    })
     val bodyContentEnd: Int = caseDef.body match {
+      case b: Trees.Block[?] if isBracedBody && b.span.exists => Math.max(0, b.span.end - offsetAdjustment)
       case b: Trees.Block[?] =>
         if (!b.expr.isEmpty && b.expr.span.exists) Math.max(0, b.expr.span.end - offsetAdjustment)
         else if (b.stats.nonEmpty && b.stats.last.span.exists) Math.max(0, b.stats.last.span.end - offsetAdjustment)
@@ -7529,9 +7535,10 @@ class ScalaTreeVisitor(
     // `;`, preserve it via a Semicolon marker on the JRightPadded wrapping
     // the case (e.g. `case a => x; case b => y`).
     var caseRpMarkers = Markers.EMPTY
-    val caseRpAfter = Space.EMPTY
+    var caseRpAfter = Space.EMPTY
     val nextNonWs = indexOfNextNonWhitespace(bodyContentEnd)
     if (nextNonWs < source.length && source.charAt(nextNonWs) == ';' && nextNonWs != lastConsumedSemicolon) {
+      caseRpAfter = ScalaSpace.format(source, bodyContentEnd, nextNonWs)
       caseRpMarkers = Markers.EMPTY.add(new Semicolon(Tree.randomId()))
       cursor = nextNonWs + 1
       lastConsumedSemicolon = nextNonWs

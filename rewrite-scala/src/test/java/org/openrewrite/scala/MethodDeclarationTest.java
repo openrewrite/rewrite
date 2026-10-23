@@ -1165,4 +1165,17 @@ class MethodDeclarationTest implements RewriteTest {
             )
         );
     }
+
+    @Test
+    void auxiliaryConstructorWithTrailingSemicolons() {
+        rewriteRun(
+            scala(
+                """
+                class A(x: Int) {
+                  def this() = { this(1);; }
+                }
+                """
+            )
+        );
+    }
 }
