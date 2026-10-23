@@ -78,6 +78,33 @@ class UpdateProjectUrlFromGitOriginTest implements RewriteTest {
     }
 
     @Test
+    void sshPortIsNotCarriedIntoProjectUrl() {
+        rewriteRun(
+          pomXml(
+            """
+              <project>
+                <modelVersion>4.0.0</modelVersion>
+                <groupId>com.mycompany.app</groupId>
+                <artifactId>my-app</artifactId>
+                <version>1</version>
+                <url>https://old-server.example.com/org/repo</url>
+              </project>
+              """,
+            """
+              <project>
+                <modelVersion>4.0.0</modelVersion>
+                <groupId>com.mycompany.app</groupId>
+                <artifactId>my-app</artifactId>
+                <version>1</version>
+                <url>https://new-server.example.com/username/repo</url>
+              </project>
+              """,
+            spec -> spec.markers(gitProvenance("ssh://git@new-server.example.com:7999/username/repo.git"))
+          )
+        );
+    }
+
+    @Test
     void scmProjectUrlReferencesAreKept() {
         rewriteRun(
           spec -> spec.recipes(new UpdateScmFromGitOrigin(null), new UpdateProjectUrlFromGitOrigin()),

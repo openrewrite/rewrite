@@ -45,13 +45,17 @@ public class UpdateProjectUrlFromGitOrigin extends Recipe {
 
             @Override
             public Xml visitDocument(Xml.Document document, ExecutionContext ctx) {
-                Optional<GitOrigin> maybeOrigin = document.getMarkers().findFirst(GitProvenance.class)
-                        .map(GitProvenance::getOrigin)
-                        .map(GitOrigin::parseGitUrl);
+                Optional<String> maybeOriginUrl = document.getMarkers().findFirst(GitProvenance.class)
+                        .map(GitProvenance::getOrigin);
+                Optional<GitOrigin> maybeOrigin = maybeOriginUrl.map(GitOrigin::parseGitUrl);
                 if (!maybeOrigin.isPresent() || getResolutionResult().parentPomIsProjectPom()) {
                     return document;
                 }
                 gitOrigin = maybeOrigin.get();
+                // An SSH/git protocol port does not apply to the web URL
+                if (!maybeOriginUrl.get().matches("^https?://.*")) {
+                    gitOrigin = new GitOrigin(gitOrigin.getHost().replaceFirst(":[0-9]+$", ""), gitOrigin.getPath());
+                }
                 return super.visitDocument(document, ctx);
             }
 
