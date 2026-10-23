@@ -31,6 +31,7 @@ import org.openrewrite.java.tree.JavaSourceFile;
 import java.util.Collection;
 import java.util.LinkedHashSet;
 import java.util.Set;
+import java.util.UUID;
 
 import static java.util.Collections.emptyList;
 
@@ -57,7 +58,8 @@ public class ClasspathTypeCounts extends ScanningRecipe<Set<ClasspathTypeCounts.
                     JavaProject javaProject = tree.getMarkers().findFirst(JavaProject.class).orElse(null);
                     JavaSourceSet sourceSet = tree.getMarkers().findFirst(JavaSourceSet.class).orElse(null);
                     if (javaProject != null && sourceSet != null) {
-                        acc.add(new ProjectSourceSet(javaProject, sourceSet));
+                        acc.add(new ProjectSourceSet(javaProject, sourceSet.getId(), sourceSet.getName(),
+                                sourceSet.getClasspath().size()));
                     }
                 }
                 stopAfterPreVisit();
@@ -71,8 +73,8 @@ public class ClasspathTypeCounts extends ScanningRecipe<Set<ClasspathTypeCounts.
         for (ProjectSourceSet projectSourceSet : acc) {
             counts.insertRow(ctx, new ClasspathTypeCount.Row(
                     projectSourceSet.getJavaProject().getProjectName(),
-                    projectSourceSet.getSourceSet().getName(),
-                    projectSourceSet.getSourceSet().getClasspath().size()
+                    projectSourceSet.getSourceSetName(),
+                    projectSourceSet.getClasspathSize()
             ));
         }
         return emptyList();
@@ -81,6 +83,8 @@ public class ClasspathTypeCounts extends ScanningRecipe<Set<ClasspathTypeCounts.
     @Value
     public static class ProjectSourceSet {
         JavaProject javaProject;
-        JavaSourceSet sourceSet;
+        UUID sourceSetId;
+        String sourceSetName;
+        int classpathSize;
     }
 }

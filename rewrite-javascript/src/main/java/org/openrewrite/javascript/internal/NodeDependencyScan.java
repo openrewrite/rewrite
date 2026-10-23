@@ -15,14 +15,19 @@
  */
 package org.openrewrite.javascript.internal;
 
+import lombok.Getter;
 import lombok.Value;
 import org.jspecify.annotations.Nullable;
-import org.openrewrite.PrintOutputCapture;
 import org.openrewrite.SourceFile;
+import org.openrewrite.Tree;
 import org.openrewrite.javascript.internal.lock.Spec;
 import org.openrewrite.javascript.marker.NodeResolutionResult;
 import org.openrewrite.javascript.marker.NodeResolutionResult.PackageManager;
 import org.openrewrite.javascript.marker.NodeRuntime;
+import org.openrewrite.json.JsonIsoVisitor;
+import org.openrewrite.json.tree.Json;
+import org.openrewrite.marker.Marker;
+import org.openrewrite.marker.Markers;
 import org.openrewrite.quark.Quark;
 import org.openrewrite.tree.ParseError;
 
@@ -35,7 +40,6 @@ import java.util.Collections;
 import java.util.Deque;
 import java.util.HashMap;
 import java.util.HashSet;
-import java.util.IdentityHashMap;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -66,16 +70,12 @@ public final class NodeDependencyScan {
         public final Set<Path> paths = new HashSet<>();
         /** Each package manager's answer to where it installs when run beside a package.json, by {@link #lockFor}. */
         final Map<Path, LockFileRegeneration.InstallRoot> installRoots = new HashMap<>();
-        /** A file read only beside a lock, uncopied until the scan ends and the locks its edits write are known. */
-        final Map<Path, SourceFile> besideLock = new HashMap<>();
+        /** A file read only beside a lock, kept until the scan ends and the locks its edits write are known. */
+        final Map<Path, String> besideLock = new HashMap<>();
         /** Each lock's importers by {@link #lockFor}, once asked for; null until then and while the scan goes on. */
         @Nullable Map<Path, List<Path>> importers;
         /** The package manager that installs each manifest, by {@link #packageManager}, once asked for. */
         final Map<Path, Optional<PackageManager>> packageManagers = new HashMap<>();
-        /** The package.json of each directory a scanned manifest's dependencies name, by that manifest. */
-        final Map<SourceFile, List<Path>> linkTargets = new IdentityHashMap<>();
-        /** Each scanned manifest's text. */
-        final Map<SourceFile, String> printed = new IdentityHashMap<>();
     }
 
     /**
@@ -114,7 +114,7 @@ public final class NodeDependencyScan {
             if (readAwayFromLock(name.toString())) {
                 acc.packageManagerFiles.put(path, sf.printAll());
             } else {
-                acc.besideLock.put(path, sf);
+                acc.besideLock.put(path, sf.printAll());
             }
         }
         return true;
@@ -169,8 +169,163 @@ public final class NodeDependencyScan {
     }
 
     public static final class ProjectState {
-        public @Nullable SourceFile capturedPackageJson;
+        public @Nullable Manifest capturedPackageJson;
         public @Nullable String capturedLockContent;
+    }
+
+    /**
+     * A package.json kept in place of its tree: its text, the dependencies it declares, and what the recipes read of
+     * its markers, which parsing the text again does not give back.
+     */
+    public static final class Manifest {
+        @Getter
+        private final Path path;
+
+        @Getter
+        private final String text;
+
+        private final boolean json;
+
+        /** Its dependency maps, by scope then name. */
+        @Getter
+        private final Map<String, Map<String, String>> declared;
+
+        /** Whether it holds a NodeResolutionResult. */
+        @Getter
+        private final boolean marked;
+
+        /** The package manager its NodeResolutionResult names. */
+        @Getter
+        private final @Nullable PackageManager packageManager;
+
+        private final @Nullable List<NodeResolutionResult.Npmrc> npmrcConfigs;
+
+        @Getter
+        private final @Nullable NodeRuntime runtime;
+
+        private final boolean resolves;
+
+        // the values its parser read string literals as, by how they are written, where that is not the text between
+        // their quotes: the TypeScript parser reads escapes, the Java one, which parses the text again, does not
+        private final Map<String, Object> escaped = new HashMap<>();
+
+        private @Nullable List<Path> linkTargets;
+
+        private Manifest(SourceFile packageJson, @Nullable String resolved) {
+            NodeResolutionResult marker = packageJson.getMarkers().findFirst(NodeResolutionResult.class).orElse(null);
+            this.path = packageJson.getSourcePath();
+            this.text = PackageJsonHelper.printed(packageJson);
+            this.json = packageJson instanceof Json.Document;
+            this.declared = PackageJsonHelper.declaredDependencies(packageJson);
+            this.marked = marker != null;
+            this.packageManager = marker == null ? null : marker.getPackageManager();
+            this.npmrcConfigs = marker == null ? null : marker.getNpmrcConfigs();
+            this.runtime = packageJson.getMarkers().findFirst(NodeRuntime.class).orElse(null);
+            this.resolves = resolved == null || resolves(marker, resolved);
+            if (json) {
+                new JsonIsoVisitor<Map<String, Object>>() {
+                    @Override
+                    public Json.Literal visitLiteral(Json.Literal literal, Map<String, Object> values) {
+                        String source = literal.getSource();
+                        if (literal.getValue() instanceof String && source.length() > 1 &&
+                            !source.substring(1, source.length() - 1).equals(literal.getValue())) {
+                            values.put(source, literal.getValue());
+                        }
+                        return literal;
+                    }
+                }.visit(packageJson, escaped);
+            }
+        }
+
+        public static Manifest of(SourceFile packageJson) {
+            return new Manifest(packageJson, null);
+        }
+
+        /**
+         * {@code packageJson} kept with whether its marker resolves {@code resolved}, as {@link #resolves()} answers.
+         */
+        public static Manifest of(SourceFile packageJson, @Nullable String resolved) {
+            return new Manifest(packageJson, resolved);
+        }
+
+        // whether the lock the marker records resolves name; true when it records no resolutions at all
+        private static boolean resolves(@Nullable NodeResolutionResult marker, String name) {
+            if (marker == null || marker.getResolvedDependencies().isEmpty()) {
+                return true;
+            }
+            for (NodeResolutionResult.ResolvedDependency resolved : marker.getResolvedDependencies()) {
+                if (name.equals(resolved.getName())) {
+                    return true;
+                }
+            }
+            return false;
+        }
+
+        /**
+         * Whether the lock its marker records resolves the package it was kept with; true when it records no
+         * resolutions at all, or none was asked about.
+         */
+        public boolean resolves() {
+            return resolves;
+        }
+
+        /**
+         * Its NodeResolutionResult made again with no more than the lock engine reads of it, the package manager and
+         * the npmrc files; null without one.
+         */
+        public @Nullable NodeResolutionResult marker() {
+            return marked ? new NodeResolutionResult(Tree.randomId(), null, null, null, path.toString(), null,
+                    emptyList(), emptyList(), emptyList(), emptyList(), emptyList(), emptyList(), packageManager, null,
+                    npmrcConfigs) : null;
+        }
+
+        /** Its text parsed again, with its NodeRuntime and {@link #marker()}; null when it is no JSON. */
+        public Json.@Nullable Document document() {
+            return document(text);
+        }
+
+        /** {@code text}, another revision of it, parsed as {@link #document()} is. */
+        public Json.@Nullable Document document(String text) {
+            Json.Document document = parse(text);
+            if (document == null) {
+                return null;
+            }
+            List<Marker> markers = new ArrayList<>(2);
+            NodeResolutionResult marker = marker();
+            if (marker != null) {
+                markers.add(marker);
+            }
+            if (runtime != null) {
+                markers.add(runtime);
+            }
+            return document.withMarkers(Markers.build(markers));
+        }
+
+        /**
+         * {@code text}, another revision of it, parsed with its string literals read as its own parser read them, and
+         * no markers; null when either is no JSON.
+         */
+        public Json.@Nullable Document parse(String text) {
+            Json.Document document = json ? PackageJsonHelper.parseJson(path, text) : null;
+            if (document == null || escaped.isEmpty()) {
+                return document;
+            }
+            return (Json.Document) new JsonIsoVisitor<Integer>() {
+                @Override
+                public Json.Literal visitLiteral(Json.Literal literal, Integer p) {
+                    Object value = escaped.get(literal.getSource());
+                    return value == null ? literal : literal.withValue(value);
+                }
+            }.visitNonNull(document, 0);
+        }
+
+        // the package.json of each directory in the repository that a dependency of the manifest names, once
+        List<Path> linkTargets() {
+            if (linkTargets == null) {
+                linkTargets = NodeDependencyScan.linkTargets(path, declared);
+            }
+            return linkTargets;
+        }
     }
 
     /** Note a lock the scan visits; it belongs to the package.json beside it. */
@@ -197,9 +352,9 @@ public final class NodeDependencyScan {
                 written.add(lock);
             }
         }
-        for (Map.Entry<Path, SourceFile> file : acc.besideLock.entrySet()) {
+        for (Map.Entry<Path, String> file : acc.besideLock.entrySet()) {
             if (readBesideOneOf(file.getKey(), written)) {
-                acc.packageManagerFiles.put(file.getKey(), file.getValue().printAll());
+                acc.packageManagerFiles.put(file.getKey(), file.getValue());
             }
         }
         acc.besideLock.clear();
@@ -265,8 +420,8 @@ public final class NodeDependencyScan {
     }
 
     private static @Nullable PackageManager packageManager(Accumulator acc, Path packageJsonPath, ProjectState ps) {
-        NodeResolutionResult marker = marker(ps);
-        PackageManager named = marker == null ? lockWriterBeside(acc, packageJsonPath) : marker.getPackageManager();
+        Manifest marked = marked(ps);
+        PackageManager named = marked == null ? lockWriterBeside(acc, packageJsonPath) : marked.getPackageManager();
         LockFileRegeneration own = LockFileRegeneration.forPackageManager(named);
         if (own != null && lockBeside(acc, packageJsonPath, own) != null) {
             return named;
@@ -275,8 +430,8 @@ public final class NodeDependencyScan {
         int segments = dir.toString().isEmpty() ? 0 : dir.getNameCount();
         for (int depth = 1; depth <= segments; depth++) {
             Path above = up(packageJsonPath, depth);
-            NodeResolutionResult aboveMarker = marker(acc.projects.get(above));
-            PackageManager pm = aboveMarker == null ? lockWriterBeside(acc, above) : aboveMarker.getPackageManager();
+            Manifest aboveMarked = marked(acc.projects.get(above));
+            PackageManager pm = aboveMarked == null ? lockWriterBeside(acc, above) : aboveMarked.getPackageManager();
             LockFileRegeneration regeneration = LockFileRegeneration.forPackageManager(pm);
             if (regeneration == null || lockBeside(acc, above, regeneration) == null) {
                 continue;
@@ -305,23 +460,24 @@ public final class NodeDependencyScan {
         return null;
     }
 
-    private static @Nullable NodeResolutionResult marker(@Nullable ProjectState ps) {
-        return ps == null || ps.capturedPackageJson == null ? null :
-                ps.capturedPackageJson.getMarkers().findFirst(NodeResolutionResult.class).orElse(null);
+    // the scanned manifest when it holds a NodeResolutionResult
+    private static @Nullable Manifest marked(@Nullable ProjectState ps) {
+        return ps == null || ps.capturedPackageJson == null || !ps.capturedPackageJson.isMarked() ? null :
+                ps.capturedPackageJson;
     }
 
     private static LockFileRegeneration.InstallRoot installRoot(Accumulator acc, Path packageJsonPath,
                                                                 ProjectState ps, @Nullable Path lock,
                                                                 LockFileRegeneration regeneration) {
-        NodeResolutionResult marker = marker(ps);
-        String manifest = print(acc, p -> null, packageJsonPath, ps);
+        Manifest captured = requireNonNull(ps.capturedPackageJson);
+        String manifest = print(p -> null, packageJsonPath, ps);
         ProjectFiles files = projectFiles(acc, p -> null, packageJsonPath, singletonMap(packageJsonPath, manifest),
                 regeneration.getPackageManager());
         return regeneration.installRoot(LockFileRegeneration.Request.builder()
                 .packageJson(manifest)
                 .lock(lock == null ? null : acc.locks.get(lock))
-                .marker(marker)
-                .runtime(requireNonNull(ps.capturedPackageJson).getMarkers().findFirst(NodeRuntime.class).orElse(null))
+                .marker(captured.marker())
+                .runtime(captured.getRuntime())
                 .packageJsonPath(packageJsonPath)
                 .manifests(files.getManifests())
                 .packageManagerFiles(files.getPackageManagerFiles())
@@ -377,11 +533,11 @@ public final class NodeDependencyScan {
             return emptyMap();
         }
         Map<Path, String> manifests = new LinkedHashMap<>();
-        manifests.put(root, print(acc, before, root, rootPs));
+        manifests.put(root, print(before, root, rootPs));
         Set<Path> rootDir = Collections.singleton(directory(root));
         for (Map.Entry<Path, ProjectState> project : acc.projects.entrySet()) {
             if (project.getValue().capturedPackageJson != null && under(directory(project.getKey()), rootDir)) {
-                manifests.putIfAbsent(project.getKey(), print(acc, before, project.getKey(), project.getValue()));
+                manifests.putIfAbsent(project.getKey(), print(before, project.getKey(), project.getValue()));
             }
         }
         return manifests;
@@ -458,7 +614,7 @@ public final class NodeDependencyScan {
             Path dir = directory(project.getKey());
             if (project.getValue().capturedPackageJson != null && !manifests.containsKey(project.getKey()) &&
                 (under(dir, roots) || above(dir, roots) || under(dir, ancestors))) {
-                files.put(project.getKey(), print(acc, before, project.getKey(), project.getValue()));
+                files.put(project.getKey(), print(before, project.getKey(), project.getValue()));
             }
         }
         linkTargets(acc, before, manifests.isEmpty() ? Collections.singleton(packageJsonPath) : manifests.keySet(),
@@ -477,8 +633,7 @@ public final class NodeDependencyScan {
             if (ps == null || ps.capturedPackageJson == null) {
                 continue;
             }
-            for (Path target : acc.linkTargets.computeIfAbsent(ps.capturedPackageJson,
-                    NodeDependencyScan::linkTargets)) {
+            for (Path target : ps.capturedPackageJson.linkTargets()) {
                 if (!followed.add(target)) {
                     continue;
                 }
@@ -487,7 +642,7 @@ public final class NodeDependencyScan {
                 }
                 ProjectState targetPs = acc.projects.get(target);
                 if (targetPs != null && targetPs.capturedPackageJson != null) {
-                    files.putIfAbsent(target, print(acc, before, target, targetPs));
+                    files.putIfAbsent(target, print(before, target, targetPs));
                     unfollowed.add(target);
                 }
             }
@@ -495,10 +650,10 @@ public final class NodeDependencyScan {
     }
 
     // the package.json of each directory in the repository that a dependency of the manifest names
-    private static List<Path> linkTargets(SourceFile manifest) {
+    private static List<Path> linkTargets(Path manifest, Map<String, Map<String, String>> declared) {
         List<Path> targets = new ArrayList<>();
-        Path dir = directory(manifest.getSourcePath());
-        for (Map<String, String> scope : PackageJsonHelper.declaredDependencies(manifest).values()) {
+        Path dir = directory(manifest);
+        for (Map<String, String> scope : declared.values()) {
             for (Map.Entry<String, String> dependency : scope.entrySet()) {
                 String value = dependency.getValue();
                 if (value.indexOf('/') < 0 && value.indexOf(':') < 0 && !value.startsWith(".")) {
@@ -546,11 +701,9 @@ public final class NodeDependencyScan {
     }
 
     // the manifest as the caller's recipe reads it, else as scanned
-    private static String print(Accumulator acc, Function<Path, @Nullable String> before, Path path,
-                                ProjectState ps) {
+    private static String print(Function<Path, @Nullable String> before, Path path, ProjectState ps) {
         String text = before.apply(path);
-        return text != null ? text : acc.printed.computeIfAbsent(requireNonNull(ps.capturedPackageJson),
-                scanned -> scanned.printAll(new PrintOutputCapture<>(0, PrintOutputCapture.MarkerPrinter.SANITIZED)));
+        return text != null ? text : requireNonNull(ps.capturedPackageJson).getText();
     }
 
     /**

@@ -28,6 +28,7 @@ import org.objectweb.asm.ClassReader;
 import org.objectweb.asm.ClassVisitor;
 import org.objectweb.asm.Opcodes;
 import org.openrewrite.ExecutionContext;
+import org.openrewrite.Heavyweight;
 import org.openrewrite.PathUtils;
 import org.openrewrite.SourceFile;
 import org.openrewrite.java.internal.JavaTypeCache;
@@ -52,7 +53,7 @@ import static org.openrewrite.internal.StringUtils.matchesGlob;
 @Value
 @EqualsAndHashCode(onlyExplicitlyIncluded = true)
 @With
-public class JavaSourceSet implements SourceSet {
+public class JavaSourceSet implements SourceSet, Heavyweight {
     @EqualsAndHashCode.Include
     UUID id;
 
