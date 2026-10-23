@@ -24,11 +24,13 @@ import org.openrewrite.java.JavaParser;
 import org.openrewrite.test.SourceSpec;
 import org.openrewrite.test.SourceSpecs;
 
+import javax.annotation.CheckReturnValue;
 import java.util.function.Consumer;
 
 import static org.openrewrite.java.Assertions.sourceSet;
 import static org.openrewrite.test.SourceSpecs.dir;
 
+@CheckReturnValue
 public class Assertions {
 
     private Assertions() {

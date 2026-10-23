@@ -40,6 +40,7 @@ import org.openrewrite.java.RemoveUnusedImports;
 import org.openrewrite.java.UseStaticImport;
 import org.openrewrite.java.format.AutoFormat;
 import org.openrewrite.java.format.AutoFormatVisitor;
+import org.openrewrite.java.marker.JavaProject;
 import org.openrewrite.java.marker.OmitParentheses;
 import org.openrewrite.java.search.FindAnnotations;
 import org.openrewrite.java.tree.J;
@@ -60,12 +61,17 @@ import org.openrewrite.yaml.YamlIsoVisitor;
 import org.openrewrite.yaml.tree.Yaml;
 
 import java.nio.file.Path;
+import java.util.AbstractMap;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicReference;
 
 import static java.util.Collections.emptyList;
 import static java.util.Comparator.comparing;
@@ -73,6 +79,7 @@ import static java.util.stream.Collectors.toList;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.openrewrite.Tree.randomId;
 import static org.openrewrite.groovy.Assertions.groovy;
 import static org.openrewrite.java.Assertions.java;
 import static org.openrewrite.java.Assertions.javaVersion;
@@ -2048,6 +2055,77 @@ class RewriteTestTest implements RewriteTest {
     }
 
     @Nested
+    class LightweightAccumulators {
+
+        @Test
+        void rejectSourceFileKeptInAccumulator() {
+            AssertionError e = assertThrows(AssertionError.class, () -> rewriteRun(
+              spec -> spec.recipe(new KeepsWhatItScans()),
+              text("foo", spec -> spec.path("foo.txt"))
+            ));
+            assertThat(e).hasMessageContaining("A ScanningRecipe's accumulator should keep the values the recipe needs")
+              .hasMessageContaining("org.openrewrite.test.internal.KeepsWhatItScans keeps\n" +
+                                    "    KeepsWhatItScans.Scanned.sourceFiles[foo.txt] -> PlainText foo.txt, after scanning")
+              .hasMessageContaining("lightweightAccumulators(false)");
+        }
+
+        @Test
+        void rejectHeavyweightMarkerKeptInAccumulator() {
+            AssertionError e = assertThrows(AssertionError.class, () -> rewriteRun(
+              spec -> spec.recipe(new KeepsHeavyweightMarker()),
+              text("foo", spec -> spec.markers(new Classpath(randomId(), List.of("a.jar"))))
+            ));
+            assertThat(e).hasMessageContaining("AtomicReference.get() -> Classpath, after scanning");
+        }
+
+        @Test
+        void rejectCursorKeptInAccumulator() {
+            AssertionError e = assertThrows(AssertionError.class, () -> rewriteRun(
+              spec -> spec.recipe(new KeepsCursor()),
+              text("foo")
+            ));
+            assertThat(e).hasMessageContaining("ArrayList[0] -> Cursor, after scanning");
+        }
+
+        @Test
+        void rejectSourceFileKeptWhileEditing() {
+            AssertionError e = assertThrows(AssertionError.class, () -> rewriteRun(
+              spec -> spec.recipe(new KeepsWhatItEdits()),
+              text("foo", spec -> spec.path("foo.txt"))
+            ));
+            assertThat(e).hasMessageContaining("ArrayList[0] -> PlainText foo.txt, after editing");
+        }
+
+        @Test
+        void rejectSourceFileKeptInCollectionOfItsOwn() {
+            AssertionError e = assertThrows(AssertionError.class, () -> rewriteRun(
+              spec -> spec.recipe(new KeepsWhatItScansInItsOwnMap()),
+              text("foo", spec -> spec.path("foo.txt"))
+            ));
+            assertThat(e).hasMessageContaining(
+              "KeepsWhatItScansInItsOwnMap.Index.files[foo.txt] -> PlainText foo.txt, after scanning");
+        }
+
+        @Test
+        void acceptValuesAndSmallMarkersKeptInAccumulator() {
+            rewriteRun(
+              spec -> spec.recipe(new KeepsPathsByProject()),
+              text("foo", spec -> spec.markers(new JavaProject(randomId(), "demo", null)))
+            );
+        }
+
+        @Test
+        void turnedOff() {
+            rewriteRun(
+              spec -> spec
+                .recipeQualityValidation(RecipeQualityValidation.builder().lightweightAccumulators(false).build())
+                .recipe(new KeepsWhatItScans()),
+              text("foo")
+            );
+        }
+    }
+
+    @Nested
     class RecipeValidation {
 
         @Test
@@ -2904,6 +2982,198 @@ class DeletesObsoleteGeneratesPlaceholderThenFillsIt extends ScanningRecipe<Atom
                 }
                 // Filling only what the scan already saw defers it to the cycle after generation
                 return placeholderExists.get() && "placeholder".equals(text.getText()) ? text.withText("filled") : text;
+            }
+        };
+    }
+}
+
+@Value
+@With
+class Classpath implements Marker, Heavyweight {
+    UUID id;
+    List<String> jars;
+}
+
+@EqualsAndHashCode(callSuper = false)
+@NullMarked
+@Value
+class KeepsWhatItScans extends ScanningRecipe<KeepsWhatItScans.Scanned> {
+
+    String displayName = "Keeps the source files it scans";
+
+    String description = "Keeps each source file it scans in its accumulator.";
+
+    static class Scanned {
+        final Map<Path, SourceFile> sourceFiles = new HashMap<>();
+    }
+
+    @Override
+    public Scanned getInitialValue(ExecutionContext ctx) {
+        return new Scanned();
+    }
+
+    @Override
+    public TreeVisitor<?, ExecutionContext> getScanner(Scanned acc) {
+        return new TreeVisitor<>() {
+            @Override
+            public @Nullable Tree visit(@Nullable Tree tree, ExecutionContext ctx) {
+                if (tree instanceof SourceFile s) {
+                    acc.sourceFiles.put(s.getSourcePath(), s);
+                }
+                return tree;
+            }
+        };
+    }
+}
+
+@EqualsAndHashCode(callSuper = false)
+@NullMarked
+@Value
+class KeepsWhatItScansInItsOwnMap extends ScanningRecipe<KeepsWhatItScansInItsOwnMap.Index> {
+
+    String displayName = "Keeps the source files it scans in a map of its own";
+
+    String description = "Keeps each source file it scans in an accumulator that is a map, which the check must not call.";
+
+    static class Index extends AbstractMap<Path, SourceFile> {
+        final Map<Path, SourceFile> files = new HashMap<>();
+
+        @Override
+        public Set<Entry<Path, SourceFile>> entrySet() {
+            throw new UnsupportedOperationException("The check ran code of the accumulator's own");
+        }
+    }
+
+    @Override
+    public Index getInitialValue(ExecutionContext ctx) {
+        return new Index();
+    }
+
+    @Override
+    public TreeVisitor<?, ExecutionContext> getScanner(Index acc) {
+        return new TreeVisitor<>() {
+            @Override
+            public @Nullable Tree visit(@Nullable Tree tree, ExecutionContext ctx) {
+                if (tree instanceof SourceFile s) {
+                    acc.files.put(s.getSourcePath(), s);
+                }
+                return tree;
+            }
+        };
+    }
+}
+
+@EqualsAndHashCode(callSuper = false)
+@NullMarked
+@Value
+class KeepsHeavyweightMarker extends ScanningRecipe<AtomicReference<@Nullable Classpath>> {
+
+    String displayName = "Keeps a heavyweight marker";
+
+    String description = "Keeps the classpath marker of a source file it scans in its accumulator.";
+
+    @Override
+    public AtomicReference<@Nullable Classpath> getInitialValue(ExecutionContext ctx) {
+        return new AtomicReference<>();
+    }
+
+    @Override
+    public TreeVisitor<?, ExecutionContext> getScanner(AtomicReference<@Nullable Classpath> acc) {
+        return new TreeVisitor<>() {
+            @Override
+            public @Nullable Tree visit(@Nullable Tree tree, ExecutionContext ctx) {
+                if (tree instanceof SourceFile s) {
+                    s.getMarkers().findFirst(Classpath.class).ifPresent(acc::set);
+                }
+                return tree;
+            }
+        };
+    }
+}
+
+@EqualsAndHashCode(callSuper = false)
+@NullMarked
+@Value
+class KeepsCursor extends ScanningRecipe<List<Cursor>> {
+
+    String displayName = "Keeps a cursor";
+
+    String description = "Keeps the cursor of each text it scans in its accumulator.";
+
+    @Override
+    public List<Cursor> getInitialValue(ExecutionContext ctx) {
+        return new ArrayList<>();
+    }
+
+    @Override
+    public TreeVisitor<?, ExecutionContext> getScanner(List<Cursor> acc) {
+        return new PlainTextVisitor<>() {
+            @Override
+            public PlainText visitText(PlainText text, ExecutionContext ctx) {
+                acc.add(getCursor());
+                return text;
+            }
+        };
+    }
+}
+
+@EqualsAndHashCode(callSuper = false)
+@NullMarked
+@Value
+class KeepsWhatItEdits extends ScanningRecipe<List<SourceFile>> {
+
+    String displayName = "Keeps the source files it edits";
+
+    String description = "Keeps each source file it visits in the edit phase in its accumulator.";
+
+    @Override
+    public List<SourceFile> getInitialValue(ExecutionContext ctx) {
+        return new ArrayList<>();
+    }
+
+    @Override
+    public TreeVisitor<?, ExecutionContext> getScanner(List<SourceFile> acc) {
+        return TreeVisitor.noop();
+    }
+
+    @Override
+    public TreeVisitor<?, ExecutionContext> getVisitor(List<SourceFile> acc) {
+        return new TreeVisitor<>() {
+            @Override
+            public @Nullable Tree visit(@Nullable Tree tree, ExecutionContext ctx) {
+                if (tree instanceof SourceFile s) {
+                    acc.add(s);
+                }
+                return tree;
+            }
+        };
+    }
+}
+
+@EqualsAndHashCode(callSuper = false)
+@NullMarked
+@Value
+class KeepsPathsByProject extends ScanningRecipe<Map<JavaProject, Set<Path>>> {
+
+    String displayName = "Keeps paths by project";
+
+    String description = "Keeps the path of each source file it scans in its accumulator, by project.";
+
+    @Override
+    public Map<JavaProject, Set<Path>> getInitialValue(ExecutionContext ctx) {
+        return new HashMap<>();
+    }
+
+    @Override
+    public TreeVisitor<?, ExecutionContext> getScanner(Map<JavaProject, Set<Path>> acc) {
+        return new TreeVisitor<>() {
+            @Override
+            public @Nullable Tree visit(@Nullable Tree tree, ExecutionContext ctx) {
+                if (tree instanceof SourceFile s) {
+                    s.getMarkers().findFirst(JavaProject.class).ifPresent(project ->
+                      acc.computeIfAbsent(project, p -> new HashSet<>()).add(s.getSourcePath()));
+                }
+                return tree;
             }
         };
     }

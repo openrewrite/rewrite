@@ -26,7 +26,7 @@ import java.util.UUID;
 import java.util.concurrent.ThreadLocalRandom;
 
 @JsonTypeInfo(use = JsonTypeInfo.Id.CLASS, property = "@c", include = JsonTypeInfo.As.PROPERTY)
-public interface Tree {
+public interface Tree extends Heavyweight {
 
     static UUID randomId() {
         ThreadLocalRandom r = ThreadLocalRandom.current();

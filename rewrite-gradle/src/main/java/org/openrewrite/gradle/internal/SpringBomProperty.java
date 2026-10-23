@@ -44,6 +44,7 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 import static java.util.Collections.emptyList;
+import static java.util.Collections.emptySet;
 
 /**
  * The Maven property through which a BOM imported by the {@code io.spring.dependency-management} plugin governs a
@@ -100,18 +101,16 @@ public class SpringBomProperty {
      * its managed version is not a single overridable {@code ${property}} placeholder. The BOMs the plugin actually
      * imported are preferred over {@code scriptBoms}, which are only what the scripts happen to say.
      */
-    public static @Nullable SpringBomProperty find(GradleProject gradleProject, List<GroupArtifactVersion> scriptBoms,
+    public static @Nullable SpringBomProperty find(Project project, List<GroupArtifactVersion> scriptBoms,
                                                    GroupArtifact ga, ExecutionContext ctx) {
-        SpringDependencyManagementPlugin plugin = gradleProject.getSpringDependencyManagementPlugin();
-        List<GroupArtifactVersion> boms = plugin == null || plugin.getImportedBoms().isEmpty() ?
-                scriptBoms : plugin.getImportedBoms();
-        List<MavenRepository> repositories = gradleProject.getMavenRepositories();
+        List<GroupArtifactVersion> boms = project.getImportedBoms().isEmpty() ? scriptBoms : project.getImportedBoms();
+        List<MavenRepository> repositories = project.getRepositories().getRepositories();
         MavenPomDownloader downloader = new MavenPomDownloader(ctx);
         for (GroupArtifactVersion bomGav : boms) {
             try {
                 Pom bom = downloader.download(bomGav, null, null, repositories);
                 String name = governingProperty(bom, ga, downloader, repositories);
-                if (name != null && honorsOverrideOf(plugin, name)) {
+                if (name != null && honorsOverrideOf(project.getImportedProperties(), name)) {
                     return new SpringBomProperty(name, governedBy(bom, name, downloader, repositories));
                 }
             } catch (MavenDownloadingException ignored) {
@@ -122,8 +121,8 @@ public class SpringBomProperty {
     }
 
     // An empty view means the plugin's state wasn't captured, not that it imported nothing.
-    private static boolean honorsOverrideOf(@Nullable SpringDependencyManagementPlugin plugin, String name) {
-        return plugin == null || plugin.getImportedProperties().isEmpty() || plugin.getImportedProperties().containsKey(name);
+    private static boolean honorsOverrideOf(Set<String> importedProperties, String name) {
+        return importedProperties.isEmpty() || importedProperties.contains(name);
     }
 
     private static @Nullable String governingProperty(Pom bom, GroupArtifact ga, MavenPomDownloader downloader,
@@ -181,17 +180,52 @@ public class SpringBomProperty {
     /**
      * The other governed artifacts some configuration resolves, keyed to the configurations resolving them.
      */
-    public Map<GroupArtifact, Set<String>> governedOnClasspath(GradleProject gradleProject, GroupArtifact except) {
+    public Map<GroupArtifact, Set<String>> governedOnClasspath(Project project, GroupArtifact except) {
         Map<GroupArtifact, Set<String>> onClasspath = new LinkedHashMap<>();
-        for (GradleDependencyConfiguration configuration : gradleProject.getConfigurations()) {
-            for (ResolvedDependency resolved : configuration.getResolved()) {
-                GroupArtifact ga = resolved.getGav().asGroupArtifact();
-                if (!ga.equals(except) && governed.contains(ga)) {
-                    onClasspath.computeIfAbsent(ga, k -> new HashSet<>()).add(configuration.getName());
+        project.getResolvingConfigurations().forEach((ga, configurations) -> {
+            if (!ga.equals(except) && governed.contains(ga)) {
+                onClasspath.put(ga, new HashSet<>(configurations));
+            }
+        });
+        return onClasspath;
+    }
+
+    /**
+     * What finding a governing property reads of a project, without the project's resolved dependency graph.
+     */
+    @Value
+    public static class Project {
+        ProjectRepositories repositories;
+
+        /**
+         * The BOMs the plugin imported, empty when the plugin isn't applied or its state wasn't captured.
+         */
+        List<GroupArtifactVersion> importedBoms;
+
+        /**
+         * The names of the properties the imported BOMs define, empty when the plugin's state wasn't captured.
+         */
+        Set<String> importedProperties;
+
+        /**
+         * The configurations that resolve each artifact, in the order the project's configurations resolve them.
+         */
+        Map<GroupArtifact, Set<String>> resolvingConfigurations;
+
+        public static Project of(GradleProject gradleProject) {
+            SpringDependencyManagementPlugin plugin = gradleProject.getSpringDependencyManagementPlugin();
+            Map<GroupArtifact, Set<String>> resolvingConfigurations = new LinkedHashMap<>();
+            for (GradleDependencyConfiguration configuration : gradleProject.getConfigurations()) {
+                for (ResolvedDependency resolved : configuration.getResolved()) {
+                    resolvingConfigurations.computeIfAbsent(resolved.getGav().asGroupArtifact(), k -> new HashSet<>())
+                            .add(configuration.getName());
                 }
             }
+            return new Project(ProjectRepositories.of(gradleProject),
+                    plugin == null ? emptyList() : plugin.getImportedBoms(),
+                    plugin == null ? emptySet() : new HashSet<>(plugin.getImportedProperties().keySet()),
+                    resolvingConfigurations);
         }
-        return onClasspath;
     }
 
     /**
