@@ -1217,8 +1217,8 @@ class RemoveRedundantPropertiesTest implements RewriteTest {
                   <version>1.0.0</version>
                   <packaging>pom</packaging>
                   <properties>
-                    <h2.version>2.4.240</h2.version>
-                    <derby.version>10.14.2.0</derby.version>
+                    <h2.version>2.4.240</h2.version> <!-- Spring Boot 3.5.4 manages 2.3.232 -->
+                    <derby.version>10.14.2.0</derby.version> <!-- Spring Boot 3.5.4 manages 10.16.1.1 -->
                     <corp-lib.version>3.0.0</corp-lib.version>
                   </properties>
                 </project>
