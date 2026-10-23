@@ -572,7 +572,28 @@ public class UpgradeTransitiveDependencyVersion extends ScanningRecipe<UpgradeTr
                                 .add(new GroupArtifactVersion(groupId, artifactId, newVersion));
                     }
                 }
-                return gp.addOrUpdateConstraints(configsToUpdate, ctx);
+                GradleProject updated = gp.addOrUpdateConstraints(configsToUpdate, ctx);
+                return SpringBomProperty.isPluginApplied(gp) ? overrideManagedVersions(updated, toUpdate, ctx) : updated;
+            }
+
+            /**
+             * The model records each version the dependency management plugin changes as a strict constraint on the
+             * resolvable configuration, which outranks one inherited from the declared configuration. The rule or BOM
+             * property override written for the plugin decides the version, so those strict constraints follow it.
+             */
+            private GradleProject overrideManagedVersions(GradleProject gp, Map<GroupArtifact, Map<String, String>> toUpdate, ExecutionContext ctx) {
+                return gp.mapConfigurations(conf -> conf.mapConstraints(constraint -> {
+                    Map<String, String> configs = toUpdate.get(new GroupArtifact(constraint.getGroupId(), constraint.getArtifactId()));
+                    if (configs == null || constraint.getStrictVersion() == null) {
+                        return constraint;
+                    }
+                    // One rule cannot carry a different version per configuration
+                    Set<String> versions = new HashSet<>(configs.values());
+                    if (versions.size() != 1 || versions.contains(constraint.getStrictVersion())) {
+                        return constraint;
+                    }
+                    return constraint.withStrictVersion(versions.iterator().next());
+                }, gp.getMavenRepositories(), ctx), ctx);
             }
         };
     }

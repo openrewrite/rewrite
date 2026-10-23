@@ -1172,6 +1172,65 @@ class UpgradeTransitiveDependencyVersionTest implements RewriteTest {
     }
 
     @Test
+    void resolutionRuleOverridesBomManagedVersion() {
+        rewriteRun(
+          spec -> spec.recipe(new UpgradeTransitiveDependencyVersion(
+            "org.springframework.boot", "spring-boot-autoconfigure", "2.5.8", null, null, null)),
+          buildGradle(
+            """
+              plugins {
+                  id 'java'
+                  id 'io.spring.dependency-management' version '1.1.7'
+              }
+
+              repositories {
+                  mavenCentral()
+              }
+
+              dependencyManagement {
+                  imports {
+                      mavenBom 'org.springframework.boot:spring-boot-dependencies:2.5.7'
+                  }
+              }
+
+              dependencies {
+
+                  implementation 'org.springframework.boot:spring-boot-starter:2.5.6'
+              }
+              """,
+            """
+              plugins {
+                  id 'java'
+                  id 'io.spring.dependency-management' version '1.1.7'
+              }
+
+              repositories {
+                  mavenCentral()
+              }
+
+              dependencyManagement {
+                  imports {
+                      mavenBom 'org.springframework.boot:spring-boot-dependencies:2.5.7'
+                  }
+              }
+              configurations.all {
+                  resolutionStrategy.eachDependency { details ->
+                      if (details.requested.group == 'org.springframework.boot' && details.requested.name == 'spring-boot-autoconfigure') {
+                          details.useVersion('2.5.8')
+                      }
+                  }
+              }
+
+              dependencies {
+
+                  implementation 'org.springframework.boot:spring-boot-starter:2.5.6'
+              }
+              """
+          )
+        );
+    }
+
+    @Test
     void upgradesSharingABomPropertyDeclareItOnce() {
         rewriteRun(
           spec -> spec.recipes(
