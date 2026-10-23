@@ -2,9 +2,9 @@ import {fromVisitor, RecipeSpec} from "../../src/test";
 import {text} from "../../src/text";
 import {json} from "../../src/json";
 import {ChangeText} from "../../fixtures/change-text";
-import {ExecutionContext, Recipe, ScanningRecipe, TreeVisitor} from "../../src";
+import {ExecutionContext, Recipe, ScanningRecipe, SourceFile, TreeVisitor} from "../../src";
 import {foundSearchResult, Marker, Markers, MarkersKind} from "../../src/markers";
-import {PlainText, PlainTextVisitor} from "../../src/text";
+import {PlainText, PlainTextParser, PlainTextVisitor} from "../../src/text";
 import {randomId} from "../../src/uuid";
 import {J} from "../../src/java";
 import {JavaScriptVisitor, JS, typescript} from "../../src/javascript";
@@ -120,6 +120,76 @@ describe("rewrite test", () => {
             sut.recipe = new GhostChangeRecipe();
             sut.allowEmptyDiff = true;
             await sut.rewriteRun(text("hello"));
+        });
+    });
+
+    describe("generated and deleted files", () => {
+        class GenerateText extends ScanningRecipe<{ exists: boolean }> {
+            name = "org.openrewrite.test.generate-text";
+            displayName = "Generate text";
+            description = "Generates `generated.txt` unless it exists.";
+
+            initialValue(_ctx: ExecutionContext): { exists: boolean } {
+                return {exists: false};
+            }
+
+            async scanner(acc: { exists: boolean }): Promise<TreeVisitor<any, ExecutionContext>> {
+                return new class extends PlainTextVisitor<ExecutionContext> {
+                    protected override async visitText(text: PlainText, _ctx: ExecutionContext): Promise<PlainText | undefined> {
+                        acc.exists ||= text.sourcePath === "generated.txt";
+                        return text;
+                    }
+                };
+            }
+
+            async generate(acc: { exists: boolean }, _ctx: ExecutionContext): Promise<SourceFile[]> {
+                if (acc.exists) {
+                    return [];
+                }
+                const generated: SourceFile[] = [];
+                for await (const file of new PlainTextParser().parse({text: "generated", sourcePath: "generated.txt"})) {
+                    generated.push(file);
+                }
+                return generated;
+            }
+        }
+
+        const deleteText = () => fromVisitor(new class extends PlainTextVisitor<ExecutionContext> {
+            protected override async visitText(_text: PlainText, _ctx: ExecutionContext): Promise<PlainText | undefined> {
+                return undefined;
+            }
+        });
+
+        test("a generated file alongside another source", () => {
+            const sut = new RecipeSpec();
+            sut.recipe = new GenerateText();
+            return sut.rewriteRun(
+                {...text("existing"), path: "existing.txt"},
+                {...text(null, "generated"), path: "generated.txt"}
+            );
+        });
+
+        test("after: null expects the file to be deleted", () => {
+            const sut = new RecipeSpec();
+            sut.recipe = deleteText();
+            return sut.rewriteRun(
+                {...text("doomed", null), path: "doomed.txt"}
+            );
+        });
+
+        test("after: null fails when the file is not deleted", async () => {
+            const sut = new RecipeSpec();
+            await expect(sut.rewriteRun(
+                {...text("kept", null), path: "kept.txt"}
+            )).rejects.toThrow("Expected recipe to delete");
+        });
+
+        test("a deletion fails a spec that expects no change", async () => {
+            const sut = new RecipeSpec();
+            sut.recipe = deleteText();
+            await expect(sut.rewriteRun(
+                {...text("doomed"), path: "doomed.txt"}
+            )).rejects.toThrow("deleted the file");
         });
     });
 
