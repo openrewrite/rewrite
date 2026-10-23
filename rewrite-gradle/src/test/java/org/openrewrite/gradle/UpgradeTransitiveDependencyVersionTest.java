@@ -1231,11 +1231,11 @@ class UpgradeTransitiveDependencyVersionTest implements RewriteTest {
     }
 
     @Test
-    void upgradesSharingABomPropertyDeclareItOnce() {
+    void upgradesSharingABomPropertyDeclareItOnceAtTheHigherVersion() {
         rewriteRun(
           spec -> spec.recipes(
             new UpgradeTransitiveDependencyVersion("org.apache.logging.log4j", "log4j-core", "2.17.1", null, null, null),
-            new UpgradeTransitiveDependencyVersion("org.apache.logging.log4j", "log4j-api", "2.17.1", null, null, null)
+            new UpgradeTransitiveDependencyVersion("org.apache.logging.log4j", "log4j-api", "2.17.0", null, null, null)
           ),
           buildGradle(
             """

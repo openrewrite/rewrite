@@ -481,11 +481,11 @@ class UpgradeDependencyVersionBomTest implements RewriteTest {
     }
 
     @Test
-    void upgradesSharingABomPropertyDeclareItOnce() {
+    void upgradesSharingABomPropertyDeclareItOnceAtTheHigherVersion() {
         rewriteRun(
           spec -> spec.recipes(
             new UpgradeDependencyVersion("org.apache.kafka", "kafka-clients", "2.8.1", null),
-            new UpgradeDependencyVersion("org.apache.kafka", "kafka-streams", "2.8.1", null)
+            new UpgradeDependencyVersion("org.apache.kafka", "kafka-streams", "2.8.0", null)
           ),
           buildGradle(
             """

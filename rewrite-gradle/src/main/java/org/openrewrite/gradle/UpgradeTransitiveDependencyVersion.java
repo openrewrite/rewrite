@@ -50,6 +50,7 @@ import org.openrewrite.maven.tree.ResolvedDependency;
 import org.openrewrite.properties.PropertiesVisitor;
 import org.openrewrite.properties.tree.Properties;
 import org.openrewrite.semver.DependencyMatcher;
+import org.openrewrite.semver.LatestRelease;
 import org.openrewrite.semver.Semver;
 
 import java.io.ByteArrayInputStream;
@@ -688,8 +689,8 @@ public class UpgradeTransitiveDependencyVersion extends ScanningRecipe<UpgradeTr
             return super.visit(tree, ctx);
         }
 
-        // Skips properties gradle.properties defines, which UpdateProperties handles instead. The script is checked as
-        // well as the scan, as in UpgradeDependencyVersion.
+        // Skips properties gradle.properties defines, which UpdateProperties handles instead. The script itself is read
+        // too, since the scan misses a declaration an earlier recipe made this cycle. A declaration is only ever raised.
         private JavaSourceFile overrideBomProperties(JavaSourceFile cu, Map<String, GroupArtifact> bomProperties, ExecutionContext ctx) {
             Set<String> declaredInScript = bomProperties.isEmpty() ? emptySet() : SpringBomProperty.declaredProperties(cu);
             for (Map.Entry<String, GroupArtifact> bomProperty : bomProperties.entrySet()) {
@@ -700,7 +701,8 @@ public class UpgradeTransitiveDependencyVersion extends ScanningRecipe<UpgradeTr
                 }
                 if (acc.declaredExtProperties.contains(name) || declaredInScript.contains(name)) {
                     cu = (JavaSourceFile) new ExtraProperty.Matcher().propertyName(name).matchVariableDeclarations(false)
-                            .<ExecutionContext>asVisitor((property, c) -> property.withValue(version).getTree())
+                            .<ExecutionContext>asVisitor((property, c) -> new LatestRelease(null).compare(null, property.getValue(), version) < 0 ?
+                                    property.withValue(version).getTree() : property.getTree())
                             .visitNonNull(cu, ctx);
                 } else {
                     cu = SpringBomProperty.addDeclaration(new Cursor(getCursor(), cu), name, version);

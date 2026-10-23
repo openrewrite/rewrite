@@ -925,7 +925,7 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
         /**
          * Declares each BOM property override the script does not set yet. Properties the script already sets are
          * updated in {@code postVisit}, and those defined in gradle.properties by {@code UpdateProperties}.
-         * The script is checked as well as the scan, since an earlier recipe in the same run may have declared it.
+         * The script itself is read too, since the scan misses a declaration an earlier recipe made this cycle.
          */
         private JavaSourceFile declareBomProperties(JavaSourceFile cu, ExecutionContext ctx) {
             if (gradleProject == null) {
