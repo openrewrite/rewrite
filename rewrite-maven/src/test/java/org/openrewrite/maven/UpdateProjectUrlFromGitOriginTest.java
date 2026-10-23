@@ -15,6 +15,7 @@
  */
 package org.openrewrite.maven;
 
+import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.DocumentExample;
 import org.openrewrite.marker.GitProvenance;
@@ -193,61 +194,82 @@ class UpdateProjectUrlFromGitOriginTest implements RewriteTest {
         );
     }
 
-    @Test
-    void propertyUrlIsUnchanged() {
-        rewriteRun(
-          pomXml(
-            """
-              <project>
-                <modelVersion>4.0.0</modelVersion>
-                <groupId>com.mycompany.app</groupId>
-                <artifactId>my-app</artifactId>
-                <version>1</version>
-                <properties>
-                  <site.url>https://old-server.example.com/org/repo</site.url>
-                </properties>
-                <url>${site.url}</url>
-              </project>
-              """,
-            spec -> spec.markers(gitProvenance("https://new-server.example.com/username/repo.git"))
-          )
-        );
-    }
+    @Nested
+    class NoChange {
 
-    @Test
-    void urlAlreadyMatches() {
-        rewriteRun(
-          pomXml(
-            """
-              <project>
-                <modelVersion>4.0.0</modelVersion>
-                <groupId>com.mycompany.app</groupId>
-                <artifactId>my-app</artifactId>
-                <version>1</version>
-                <url>https://new-server.example.com/username/repo</url>
-              </project>
-              """,
-            spec -> spec.markers(gitProvenance("git@new-server.example.com:username/repo.git"))
-          )
-        );
-    }
+        @Test
+        void propertyUrlIsUnchanged() {
+            rewriteRun(
+              pomXml(
+                """
+                  <project>
+                    <modelVersion>4.0.0</modelVersion>
+                    <groupId>com.mycompany.app</groupId>
+                    <artifactId>my-app</artifactId>
+                    <version>1</version>
+                    <properties>
+                      <site.url>https://old-server.example.com/org/repo</site.url>
+                    </properties>
+                    <url>${site.url}</url>
+                  </project>
+                  """,
+                spec -> spec.markers(gitProvenance("https://new-server.example.com/username/repo.git"))
+              )
+            );
+        }
 
-    @Test
-    void noGitOrigin() {
-        rewriteRun(
-          pomXml(
-            """
-              <project>
-                <modelVersion>4.0.0</modelVersion>
-                <groupId>com.mycompany.app</groupId>
-                <artifactId>my-app</artifactId>
-                <version>1</version>
-                <url>https://old-server.example.com/org/repo</url>
-              </project>
-              """,
-            spec -> spec.markers(gitProvenance(null))
-          )
-        );
+        @Test
+        void urlAlreadyMatches() {
+            rewriteRun(
+              pomXml(
+                """
+                  <project>
+                    <modelVersion>4.0.0</modelVersion>
+                    <groupId>com.mycompany.app</groupId>
+                    <artifactId>my-app</artifactId>
+                    <version>1</version>
+                    <url>https://new-server.example.com/username/repo</url>
+                  </project>
+                  """,
+                spec -> spec.markers(gitProvenance("git@new-server.example.com:username/repo.git"))
+              )
+            );
+        }
+
+        @Test
+        void noGitOrigin() {
+            rewriteRun(
+              pomXml(
+                """
+                  <project>
+                    <modelVersion>4.0.0</modelVersion>
+                    <groupId>com.mycompany.app</groupId>
+                    <artifactId>my-app</artifactId>
+                    <version>1</version>
+                    <url>https://old-server.example.com/org/repo</url>
+                  </project>
+                  """,
+                spec -> spec.markers(gitProvenance(null))
+              )
+            );
+        }
+
+        @Test
+        void noProjectUrl() {
+            rewriteRun(
+              pomXml(
+                """
+                  <project>
+                    <modelVersion>4.0.0</modelVersion>
+                    <groupId>com.mycompany.app</groupId>
+                    <artifactId>my-app</artifactId>
+                    <version>1</version>
+                  </project>
+                  """,
+                spec -> spec.markers(gitProvenance("https://new-server.example.com/username/repo.git"))
+              )
+            );
+        }
     }
 
     private GitProvenance gitProvenance(String origin) {
