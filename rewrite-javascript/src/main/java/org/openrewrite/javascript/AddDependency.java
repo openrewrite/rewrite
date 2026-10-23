@@ -105,7 +105,7 @@ public class AddDependency extends ScanningRecipe<NodeDependencyEdits> {
             return;
         }
         if (PackageJsonHelper.isNonObjectMember(pkg, targetScope())) {
-            declined(decision, "`" + targetScope() + "` is not an object, so " + packageName + " was not added");
+            declined(decision, ctx, "`" + targetScope() + "` is not an object, so " + packageName + " was not added");
             return;
         }
         PackageManager pm;
@@ -114,16 +114,16 @@ public class AddDependency extends ScanningRecipe<NodeDependencyEdits> {
             pm = decision.getPackageManager();
             catalogs = decision.catalogs();
         } catch (Rejected e) {
-            declined(decision, packageName + "@" + version + " was not added: " + e.getMessage());
+            declined(decision, ctx, packageName + "@" + version + " was not added: " + e.getMessage());
             return;
         }
         if (catalogs instanceof NodeCatalogs.Pnpm && catalogs.isFlowStyle()) {
-            declined(decision, packageName + "@" + version + " was not added: the catalogs in " + catalogs.getPath() +
-                             " are written in flow style, which is not read");
+            declined(decision, ctx, packageName + "@" + version + " was not added: the catalogs in " +
+                                    catalogs.getPath() + " are written in flow style, which is not read");
             return;
         }
         ManifestRules rules = LockFileRegeneration.manifestRules(pm);
-        String value = added(decision, rules, catalogs);
+        String value = added(decision, ctx, rules, catalogs);
         if (value != null) {
             decision.editManifest(doc -> !matchesAdd(doc) ? doc :
                     saved(rules, PackageJsonHelper.addDependency(doc, packageName, value, targetScope())));
@@ -141,25 +141,25 @@ public class AddDependency extends ScanningRecipe<NodeDependencyEdits> {
     }
 
     // what the release that runs writes, recorded: pnpm 9.15.9 the version, 10.34.6 and 11.2.2 by the catalogs
-    private @Nullable String added(NodeDependencyEdits.Decision decision, ManifestRules rules,
+    private @Nullable String added(NodeDependencyEdits.Decision decision, ExecutionContext ctx, ManifestRules rules,
                                    @Nullable NodeCatalogs catalogs) {
         PnpmRelease release;
         if (catalogs instanceof NodeCatalogs.Pnpm) {
-            SourceFile root = decision.manifestOf(catalogs.getPath().resolveSibling("package.json"));
+            String root = decision.manifestOf(ctx, catalogs.getPath().resolveSibling("package.json"));
             release = (root == null ? (NodeCatalogs.Pnpm) catalogs :
-                    ((NodeCatalogs.Pnpm) catalogs).forRoot(PackageJsonHelper.printed(root))).getRelease();
+                    ((NodeCatalogs.Pnpm) catalogs).forRoot(root)).getRelease();
         } else {
             release = PnpmRelease.of(rules, PackageJsonHelper.printed(decision.getManifest()), null);
         }
         if (release != null && release.declined() != null) {
-            declined(decision, packageName + "@" + version + " was not added: " + release.declined());
+            declined(decision, ctx, packageName + "@" + version + " was not added: " + release.declined());
             return null;
         }
         if (release != null && release.getMajor() == 9) {
             return version;
         }
         if (catalogs != null && catalogs.declined() != null) {
-            declined(decision, packageName + "@" + version + " was not added: " + catalogs.declined());
+            declined(decision, ctx, packageName + "@" + version + " was not added: " + catalogs.declined());
             return null;
         }
         ManifestRules.Saved saved;
@@ -167,21 +167,21 @@ public class AddDependency extends ScanningRecipe<NodeDependencyEdits> {
             saved = rules.added(packageName, version, catalogs == null ? null : catalogs.getSettings(),
                     release == null ? null : release.getVersion());
         } catch (Rejected e) {
-            declined(decision, packageName + "@" + version + " was not added: " + e.getMessage());
+            declined(decision, ctx, packageName + "@" + version + " was not added: " + e.getMessage());
             return null;
         }
         String catalog = saved.getCatalogName();
         if (catalog != null && !decision.editCatalogs(c -> c.withEntry(catalog, packageName, version))) {
-            declined(decision, packageName + "@" + version + " was not added: its catalog in " +
-                               requireNonNull(catalogs).getPath() + " cannot take the entry in place");
+            declined(decision, ctx, packageName + "@" + version + " was not added: its catalog in " +
+                                    requireNonNull(catalogs).getPath() + " cannot take the entry in place");
             return null;
         }
         return saved.getSpecifier();
     }
 
-    private static void declined(NodeDependencyEdits.Decision decision, String why) {
+    private static void declined(NodeDependencyEdits.Decision decision, ExecutionContext ctx, String why) {
         decision.warn(why);
-        decision.decline(why);
+        decision.decline(ctx, why);
     }
 
     private boolean matchesAdd(Json.Document pkg) {

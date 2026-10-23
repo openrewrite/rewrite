@@ -39,6 +39,8 @@ import org.openrewrite.text.PlainText;
 import org.openrewrite.yaml.YamlParser;
 import org.openrewrite.yaml.tree.Yaml;
 
+import java.lang.ref.Reference;
+import java.lang.ref.SoftReference;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayList;
@@ -46,7 +48,6 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
-import java.util.IdentityHashMap;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -63,7 +64,8 @@ import static org.openrewrite.Tree.randomId;
 
 /**
  * The dependency recipes' one engine: the scan, each manifest's decision this cycle (made in generate from the
- * documents as the earlier recipes leave them, and again at a visit that finds one otherwise), and what it writes.
+ * documents as the earlier recipes leave them, and again at a visit that finds one otherwise), and what it writes. It
+ * keeps the text of each file it reads, not its tree, from one source file to the next.
  */
 public final class NodeDependencyEdits implements PackageJsonHelper.FileEditor {
 
@@ -76,28 +78,39 @@ public final class NodeDependencyEdits implements PackageJsonHelper.FileEditor {
 
     public final NodeDependencyScan.Accumulator scan = new NodeDependencyScan.Accumulator();
     private final Rows rows;
+    private final @Nullable String resolved;
     private final Set<Object> inserted = new HashSet<>();
     private final Set<Path> failed = new HashSet<>();
-    private final Map<Path, SourceFile> yamlFiles = new HashMap<>();
+    private final Map<Path, String> yamlFiles = new HashMap<>();
     private final Map<Path, @Nullable ManagedFile> managed = new HashMap<>();
     private final Map<Path, @Nullable ManagedFile> managedOf = new HashMap<>();
     private final Map<Path, Rejected> rejected = new HashMap<>();
     private final Map<Path, Decision> decisions = new LinkedHashMap<>();
-    private final Map<Path, SourceFile> visited = new HashMap<>();
+    private final Map<Path, String> visited = new HashMap<>();
+    private final Map<Path, NodeDependencyScan.Manifest> visitedManifests = new HashMap<>();
     private final Map<Path, String> left = new LinkedHashMap<>();
     private final Map<Path, Regeneration> regenerations = new HashMap<>();
     private final Set<Path> warnedStale = new HashSet<>();
     private final Set<Path> generated = new HashSet<>();
-    private final Map<SourceFile, String> prints = new IdentityHashMap<>();
-    private final Map<SourceFile, SourceFile> editedManifests = new IdentityHashMap<>();
+    private final Map<Path, Map<String, String>> editedManifests = new HashMap<>();
     private int editedManifestsAt = -1;
     private final List<String> pending = new ArrayList<>();
     private @Nullable Decider decider;
+    private @Nullable SourceFile visiting;
     private int version;
     private boolean linked;
 
     public NodeDependencyEdits(Rows rows) {
+        this(rows, null);
+    }
+
+    /**
+     * An engine whose decisions ask whether each manifest's marker resolves {@code resolved}, by
+     * {@link Decision#resolves()}.
+     */
+    public NodeDependencyEdits(Rows rows, @Nullable String resolved) {
         this.rows = rows;
+        this.resolved = resolved;
     }
 
     /**
@@ -128,7 +141,7 @@ public final class NodeDependencyEdits implements PackageJsonHelper.FileEditor {
         Path p = sf.getSourcePath();
         String basename = String.valueOf(p.getFileName());
         if (sf instanceof Yaml.Documents && readsCatalogsFrom(basename)) {
-            yamlFiles.put(p, sf);
+            yamlFiles.put(p, print(sf));
         }
         if (NodeDependencyScan.capturePackageManagerFile(scan, sf)) {
             return;
@@ -141,7 +154,8 @@ public final class NodeDependencyEdits implements PackageJsonHelper.FileEditor {
         }
         // one parsed without its marker too: the package manager reads it, and a recipe that would edit it says so
         if (sf instanceof Json.Document && "package.json".equals(basename)) {
-            scan.projects.computeIfAbsent(p, k -> new NodeDependencyScan.ProjectState()).capturedPackageJson = sf;
+            scan.projects.computeIfAbsent(p, k -> new NodeDependencyScan.ProjectState()).capturedPackageJson =
+                    NodeDependencyScan.Manifest.of(sf, resolved);
         }
     }
 
@@ -170,7 +184,7 @@ public final class NodeDependencyEdits implements PackageJsonHelper.FileEditor {
         for (ManagedFile file : managed.values()) {
             if (file != null && file.created) {
                 NodeCatalogs output = output(file, current(ctx, file));
-                if (output != null && !print(output.getDocument()).isEmpty()) {
+                if (output != null && !output.print().isEmpty()) {
                     generated.add(file.path);
                     created.add(output.getDocument());
                 }
@@ -200,8 +214,13 @@ public final class NodeDependencyEdits implements PackageJsonHelper.FileEditor {
      * {@code packageJson} as the recipes before this one in the cycle leave it, as scanned.
      */
     public @Nullable SourceFile editedBefore(ExecutionContext ctx, Path packageJson) {
-        SourceFile captured = captured(packageJson);
-        return captured == null ? null : PackageJsonHelper.editedBefore(ctx, this, captured);
+        NodeDependencyScan.Manifest captured = captured(packageJson);
+        return captured == null ? null : captured.document(editedBeforeText(ctx, captured));
+    }
+
+    // a manifest's text as the recipes before this one in the cycle leave it, as scanned
+    private String editedBeforeText(ExecutionContext ctx, NodeDependencyScan.Manifest captured) {
+        return PackageJsonHelper.editedBefore(ctx, this, captured.getPath(), captured.getText());
     }
 
     /**
@@ -215,17 +234,17 @@ public final class NodeDependencyEdits implements PackageJsonHelper.FileEditor {
      * A manifest or package-manager file with this cycle's edits, and pnpm's cleanup of the catalogs they leave unused.
      */
     @Override
-    public SourceFile edit(ExecutionContext ctx, SourceFile file) {
-        ManagedFile managedFile = managed.get(file.getSourcePath());
-        if (managedFile != null && managedFile.editedFrom == file && managedFile.editedAt == version) {
+    public String edit(ExecutionContext ctx, Path path, String text) {
+        ManagedFile managedFile = managed.get(path);
+        if (managedFile != null && text.equals(managedFile.editedFrom) && managedFile.editedAt == version) {
             return requireNonNull(managedFile.edited);
         }
-        SourceFile edited = editedManifest(file);
-        if (managedFile != null && !(managedFile.scanned instanceof NodeCatalogs.Bun)) {
+        String edited = editedManifest(path, text);
+        if (managedFile != null && !managedFile.bun) {
             NodeCatalogs out = output(managedFile, managedFile.replay(managedFile.read(edited)));
-            managedFile.editedFrom = file;
+            managedFile.editedFrom = text;
             managedFile.editedAt = version;
-            managedFile.edited = out == null ? edited : out.getDocument();
+            managedFile.edited = out == null ? edited : out.print();
             return managedFile.edited;
         }
         return edited;
@@ -249,14 +268,19 @@ public final class NodeDependencyEdits implements PackageJsonHelper.FileEditor {
                 Path p = sf.getSourcePath();
                 pending.clear();
                 SourceFile out;
-                if (managed.get(p) != null && captured(p) == null) {
-                    out = visitManaged(ctx, requireNonNull(managed.get(p)), sf);
-                } else if (captured(p) != null) {
-                    out = visitManifest(ctx, sf);
-                } else if (scan.lockToPackage.containsKey(p)) {
-                    out = visitLock(ctx, sf);
-                } else {
-                    return tree;
+                visiting = sf;
+                try {
+                    if (managed.get(p) != null && captured(p) == null) {
+                        out = visitManaged(ctx, requireNonNull(managed.get(p)), sf);
+                    } else if (captured(p) != null) {
+                        out = visitManifest(ctx, sf);
+                    } else if (scan.lockToPackage.containsKey(p)) {
+                        out = visitLock(ctx, sf);
+                    } else {
+                        return tree;
+                    }
+                } finally {
+                    visiting = null;
                 }
                 for (String warning : pending) {
                     out = warn(out, warning);
@@ -268,33 +292,39 @@ public final class NodeDependencyEdits implements PackageJsonHelper.FileEditor {
 
     private SourceFile visitManaged(ExecutionContext ctx, ManagedFile file, SourceFile sf) {
         Path p = sf.getSourcePath();
+        String text = print(sf);
         if (!generated.contains(p)) {
-            visited.put(p, sf);
+            visited.put(p, text);
             for (Path manifest : new ArrayList<>(decisions.keySet())) {
                 if (managedOf(manifest) == file) {
                     decide(ctx, manifest, p);
                 }
             }
         }
-        SourceFile out = managedOut(ctx, file, sf);
-        left.put(p, print(out));
-        return print(out).equals(print(sf)) ? sf : out;
+        SourceFile out = managedOut(file, sf);
+        String leftAs = out == sf ? text : print(out);
+        left.put(p, leftAs);
+        return leftAs.equals(text) ? sf : out;
     }
 
     private SourceFile visitManifest(ExecutionContext ctx, SourceFile sf) {
         Path p = sf.getSourcePath();
-        visited.put(p, sf);
+        NodeDependencyScan.Manifest at = NodeDependencyScan.Manifest.of(sf, resolved);
+        visited.put(p, at.getText());
+        visitedManifests.put(p, at);
         decide(ctx, p, p);
         Decision decision = decisions.get(p);
         SourceFile out = sf;
         if (decision != null && !decision.withdrawn && (decision.manifestEdit != null || holdsCatalogEdits(p))) {
-            PackageJsonHelper.EditAndRegenerateResult r = regeneration(ctx, p).result;
-            if (r.getModifiedPackageJson() != null) {
-                out = r.getModifiedPackageJson();
+            Regeneration r = regeneration(ctx, p);
+            Json.Document edited = sf instanceof Json.Document ? editOf(p).apply((Json.Document) sf) : null;
+            if (edited != null && edited != sf) {
+                out = PackageJsonHelper.withResolvedDeps(PackageJsonHelper.refreshMarker(edited), r.result,
+                        r.installs);
             }
-            if (r.getRegenResult() != null && !r.getRegenResult().isSuccess()) {
-                failure(ctx, p, requireNonNull(r.getRegenResult().getFailure()));
-                out = warn(out, "lock regeneration failed: " + r.getRegenResult().getErrorMessage());
+            if (r.result != null && !r.result.isSuccess()) {
+                failure(ctx, p, requireNonNull(r.result.getFailure()));
+                out = warn(out, "lock regeneration failed: " + r.result.getErrorMessage());
             }
         }
         for (String warning : decision == null ? Collections.<String>emptySet() : decision.warnings) {
@@ -306,22 +336,22 @@ public final class NodeDependencyEdits implements PackageJsonHelper.FileEditor {
 
     private SourceFile visitLock(ExecutionContext ctx, SourceFile sf) {
         Path p = sf.getSourcePath();
-        visited.put(p, sf);
+        String text = print(sf);
+        visited.put(p, text);
         Path importer = importerOf(ctx, NodeDependencyScan.lockImporters(scan, p));
-        LockFileRegeneration.Result result = importer == null ? null :
-                regeneration(ctx, importer).result.getRegenResult();
+        LockFileRegeneration.Result result = importer == null ? null : regeneration(ctx, importer).result;
         SourceFile out = sf;
         if (result != null && result.isSuccess()) {
             String content = requireNonNull(result.getLockFileContent());
-            out = content.equals(print(sf)) ? sf : PackageJsonHelper.reparseLock(sf, content);
+            out = content.equals(text) ? sf : PackageJsonHelper.reparseLock(sf, content);
         } else if (result != null) {
             failure(ctx, requireNonNull(importer), requireNonNull(result.getFailure()));
             out = warn(sf, "lock regeneration failed: " + result.getErrorMessage());
         } else {
             String beside = writtenBeside(ctx, p);
-            out = beside == null || beside.equals(print(sf)) ? sf : PackageJsonHelper.reparseLock(sf, beside);
+            out = beside == null || beside.equals(text) ? sf : PackageJsonHelper.reparseLock(sf, beside);
         }
-        left.put(p, print(out));
+        left.put(p, out == sf ? text : print(out));
         return out;
     }
 
@@ -332,8 +362,7 @@ public final class NodeDependencyEdits implements PackageJsonHelper.FileEditor {
                 continue;
             }
             Path importer = importerOf(ctx, NodeDependencyScan.lockImporters(scan, lock));
-            LockFileRegeneration.Result result = importer == null ? null :
-                    regeneration(ctx, importer).result.getRegenResult();
+            LockFileRegeneration.Result result = importer == null ? null : regeneration(ctx, importer).result;
             String text = result == null ? null : result.getFiles().get(String.valueOf(p.getFileName()));
             if (text != null) {
                 return text;
@@ -354,7 +383,7 @@ public final class NodeDependencyEdits implements PackageJsonHelper.FileEditor {
         }
         for (int i = importers.size() - 1; i >= 0; i--) {
             Path importer = importers.get(i);
-            if (captured(importer) != null && regeneration(ctx, importer).result.getRegenResult() != null) {
+            if (captured(importer) != null && regeneration(ctx, importer).result != null) {
                 return importer;
             }
         }
@@ -364,35 +393,41 @@ public final class NodeDependencyEdits implements PackageJsonHelper.FileEditor {
     // decide path's edit from the revisions of its manifest and package-manager file before this recipe; at a visit
     // that finds them otherwise, the new decision stands unless a file written already says otherwise
     private void decide(ExecutionContext ctx, Path path, @Nullable Path changed) {
-        SourceFile manifest = before(ctx, path);
-        if (!(manifest instanceof Json.Document)) {
+        String text = before(ctx, path);
+        if (text == null) {
             return;
         }
         ManagedFile file = managedOf(path);
-        SourceFile base = file == null ? null : base(ctx, file);
+        String base = file == null ? null : base(ctx, file);
         Decision previous = decisions.get(path);
         if (previous != null && (previous.withdrawn ||
-                                 same(previous.manifest, manifest) && same(previous.base, base))) {
+                                 previous.text.equals(text) && Objects.equals(previous.base, base))) {
+            return;
+        }
+        Json.Document manifest = document(path, text);
+        if (manifest == null) {
             return;
         }
         Map<Path, String> previousOutputs = previous == null ? emptyMap() : outputs(ctx, previous);
-        Decision decision = new Decision(this, path, (Json.Document) manifest, base, ctx);
+        Decision decision = new Decision(this, path, manifest, text, base, requireNonNull(revision(path)));
         install(decision);
-        requireNonNull(decider).decide(decision, ctx);
-        if (decision.edits() && !manifest.getMarkers().findFirst(NodeResolutionResult.class).isPresent()) {
-            decision.manifestEdit = null;
-            decision.fileEdits.clear();
-            version++;
-            decision.decline(UNMARKED);
-        }
-        ManagedFile edited = decision.edits() ? managedOf(path) : null;
-        String cleanupDeclined = edited == null ? null : cleanupDeclined(edited);
-        if (cleanupDeclined != null) {
-            decision.manifestEdit = null;
-            decision.fileEdits.clear();
-            version++;
-            decision.warn(cleanupDeclined);
-            decision.decline(cleanupDeclined);
+        try {
+            requireNonNull(decider).decide(decision, ctx);
+            if (decision.edits() && !manifest.getMarkers().findFirst(NodeResolutionResult.class).isPresent()) {
+                decision.editNothing();
+                version++;
+                decision.decline(ctx, UNMARKED);
+            }
+            ManagedFile edited = decision.edits() ? managedOf(path) : null;
+            String cleanupDeclined = edited == null ? null : cleanupDeclined(edited);
+            if (cleanupDeclined != null) {
+                decision.editNothing();
+                version++;
+                decision.warn(cleanupDeclined);
+                decision.decline(ctx, cleanupDeclined);
+            }
+        } finally {
+            decision.manifest = null;
         }
         rebuild();
         if (previous == null || changed == null) {
@@ -411,7 +446,7 @@ public final class NodeDependencyEdits implements PackageJsonHelper.FileEditor {
             }
             return;
         }
-        Decision withdrawn = new Decision(this, path, (Json.Document) manifest, base, ctx);
+        Decision withdrawn = new Decision(this, path, null, text, base, decision.revision);
         withdrawn.withdrawn = true;
         install(withdrawn);
         rebuild();
@@ -435,14 +470,14 @@ public final class NodeDependencyEdits implements PackageJsonHelper.FileEditor {
     // the decision's own manifest and its package-manager file, as this cycle's decisions leave them now
     private Map<Path, String> outputs(ExecutionContext ctx, Decision decision) {
         Map<Path, String> out = new LinkedHashMap<>();
-        SourceFile manifest = before(ctx, decision.path);
+        String manifest = before(ctx, decision.path);
         if (manifest != null) {
-            out.put(decision.path, print(editedManifest(manifest)));
+            out.put(decision.path, editedManifest(decision.path, manifest));
         }
         ManagedFile file = managedOf(decision.path);
         if (file != null) {
             NodeCatalogs output = output(file, current(ctx, file));
-            out.put(file.path, output == null ? print(base(ctx, file)) : output.print());
+            out.put(file.path, output == null ? base(ctx, file) : output.print());
         }
         return out;
     }
@@ -451,7 +486,7 @@ public final class NodeDependencyEdits implements PackageJsonHelper.FileEditor {
     private List<Path> leftOtherwise(ExecutionContext ctx) {
         List<Path> otherwise = new ArrayList<>();
         for (Map.Entry<Path, String> file : new ArrayList<>(left.entrySet())) {
-            SourceFile at = visited.get(file.getKey());
+            String at = visited.get(file.getKey());
             String expected = at == null ? null : leftAs(ctx, file.getKey(), at);
             if (expected != null && !expected.equals(file.getValue())) {
                 otherwise.add(file.getKey());
@@ -460,25 +495,26 @@ public final class NodeDependencyEdits implements PackageJsonHelper.FileEditor {
         return otherwise;
     }
 
-    private @Nullable String leftAs(ExecutionContext ctx, Path path, SourceFile at) {
+    private @Nullable String leftAs(ExecutionContext ctx, Path path, String at) {
         ManagedFile file = managed.get(path);
         if (file != null && captured(path) == null) {
-            return print(managedOut(ctx, file, at));
+            NodeCatalogs output = output(file, at.equals(base(ctx, file)) ? file.current() :
+                    file.replay(file.read(at)));
+            return output == null ? at : output.print();
         }
         if (captured(path) != null) {
-            return print(editedManifest(at));
+            return editedManifest(path, at);
         }
         if (!scan.lockToPackage.containsKey(path)) {
             return null;
         }
         Path importer = importerOf(ctx, NodeDependencyScan.lockImporters(scan, path));
-        LockFileRegeneration.Result result = importer == null ? null :
-                regeneration(ctx, importer).result.getRegenResult();
+        LockFileRegeneration.Result result = importer == null ? null : regeneration(ctx, importer).result;
         if (result == null) {
             String beside = writtenBeside(ctx, path);
-            return beside == null ? print(at) : beside;
+            return beside == null ? at : beside;
         }
-        return result.isSuccess() ? result.getLockFileContent() : print(at);
+        return result.isSuccess() ? result.getLockFileContent() : at;
     }
 
     private void rebuild() {
@@ -498,25 +534,34 @@ public final class NodeDependencyEdits implements PackageJsonHelper.FileEditor {
     // importer's regeneration from the revisions before this recipe and this cycle's edits, again when they change
     private Regeneration regeneration(ExecutionContext ctx, Path importer) {
         NodeDependencyScan.ProjectState ps = requireNonNull(scan.projects.get(importer));
-        SourceFile pkg = requireNonNull(before(ctx, importer));
-        Decision decision = decisions.get(importer);
-        Function<Json.Document, Json.Document> manifestEdit = decision == null || decision.withdrawn ||
-                                                             decision.manifestEdit == null ? Function.identity() :
-                decision.manifestEdit;
-        Function<Json.Document, Json.Document> edit = doc -> withCatalogEdits(manifestEdit.apply(doc));
+        String pkg = requireNonNull(before(ctx, importer));
         NodeDependencyScan.ProjectFiles files = NodeDependencyScan.projectFiles(scan, p -> beforeText(ctx, p),
                 importer);
         Map<Path, String> edited = editedFiles(ctx, importer, files);
-        List<Object> inputs = Arrays.asList(print(pkg), print(edit.apply((Json.Document) pkg)), files,
-                edited);
+        List<Object> inputs = Arrays.asList(pkg, editedManifest(importer, pkg), files, edited);
         Regeneration last = regenerations.get(importer);
         if (last != null && last.inputs.equals(inputs)) {
             return last;
         }
-        Regeneration r = new Regeneration(inputs, PackageJsonHelper.editAndRegenerate(pkg, edit, edited,
-                ps.capturedLockContent, files, ctx));
+        Json.Document before = document(importer, pkg);
+        Json.Document after = before == null ? null : editOf(importer).apply(before);
+        Map<Path, String> changed = PackageJsonHelper.changedFiles(edited, files);
+        LockFileRegeneration.Result result = after == null || after == before && changed.isEmpty() ||
+                                             ps.capturedLockContent == null ? null :
+                PackageJsonHelper.regenerateLockContent(PackageJsonHelper.refreshMarker(after),
+                        ps.capturedLockContent, files, changed, ctx);
+        Regeneration r = new Regeneration(inputs, result, files.getPackageManager());
         regenerations.put(importer, r);
         return r;
+    }
+
+    // the edit this cycle's decision makes of a manifest, with the catalog edits of Bun's root manifest
+    private Function<Json.Document, Json.Document> editOf(Path packageJson) {
+        Decision decision = decisions.get(packageJson);
+        Function<Json.Document, Json.Document> manifestEdit = decision == null || decision.withdrawn ||
+                                                             decision.manifestEdit == null ? Function.identity() :
+                decision.manifestEdit;
+        return doc -> withCatalogEdits(manifestEdit.apply(doc));
     }
 
     // what this cycle's decisions change of the files a regeneration for packageJson reads besides it
@@ -526,17 +571,17 @@ public final class NodeDependencyEdits implements PackageJsonHelper.FileEditor {
         Set<Path> manifests = new LinkedHashSet<>(files.getManifests().keySet());
         manifests.addAll(files.getPackageManagerFiles().keySet());
         for (Path manifest : manifests) {
-            SourceFile before = manifest.equals(packageJson) || captured(manifest) == null ? null :
+            String before = manifest.equals(packageJson) || captured(manifest) == null ? null :
                     before(ctx, manifest);
-            String text = before == null ? null : print(editedManifest(before));
-            if (text != null && !text.equals(print(before))) {
+            String text = before == null ? null : editedManifest(manifest, before);
+            if (text != null && !text.equals(before)) {
                 edited.put(manifest, text);
             }
         }
         ManagedFile file = managedOf(packageJson);
-        if (file != null && !(file.scanned instanceof NodeCatalogs.Bun)) {
+        if (file != null && !file.bun) {
             NodeCatalogs output = output(file, current(ctx, file));
-            String base = print(base(ctx, file));
+            String base = base(ctx, file);
             if (output != null && !output.print().equals(base)) {
                 edited.put(file.path, output.print());
             }
@@ -547,35 +592,56 @@ public final class NodeDependencyEdits implements PackageJsonHelper.FileEditor {
     // the text before this recipe of a file the recipes edit, for what a regeneration reads; null for the scanned one
     private @Nullable String beforeText(ExecutionContext ctx, Path path) {
         if (captured(path) != null) {
-            return print(requireNonNull(before(ctx, path)));
+            return requireNonNull(before(ctx, path));
         }
         ManagedFile file = managed.get(path);
         if (file != null) {
-            return print(base(ctx, file));
+            return base(ctx, file);
         }
-        SourceFile yaml = visited.containsKey(path) ? visited.get(path) : yamlFiles.get(path);
-        return yaml == null ? null : print(visited.containsKey(path) ? yaml :
-                PackageJsonHelper.editedBefore(ctx, this, yaml));
-    }
-
-    // a manifest as this recipe last visited it, else as the recipes before this one leave it
-    private @Nullable SourceFile before(ExecutionContext ctx, Path packageJson) {
-        SourceFile at = visited.get(packageJson);
+        String at = visited.get(path);
         if (at != null) {
             return at;
         }
-        return editedBefore(ctx, packageJson);
+        String yaml = yamlFiles.get(path);
+        return yaml == null ? null : PackageJsonHelper.editedBefore(ctx, this, path, yaml);
     }
 
-    // a package-manager file before this recipe's edits: as visited, else as the recipes before this one leave it
-    private SourceFile base(ExecutionContext ctx, ManagedFile file) {
-        if (file.scanned instanceof NodeCatalogs.Bun) {
+    // a manifest's text as this recipe last visited it, else as the recipes before this one leave it
+    private @Nullable String before(ExecutionContext ctx, Path packageJson) {
+        String at = visited.get(packageJson);
+        if (at != null) {
+            return at;
+        }
+        NodeDependencyScan.Manifest captured = captured(packageJson);
+        return captured == null ? null : editedBeforeText(ctx, captured);
+    }
+
+    // a revision of a manifest, its text: the document being visited, else the text parsed again with what was kept
+    // of that revision's markers
+    private Json.@Nullable Document document(Path packageJson, String text) {
+        if (visiting != null && packageJson.equals(visiting.getSourcePath())) {
+            return visiting instanceof Json.Document ? (Json.Document) visiting : null;
+        }
+        NodeDependencyScan.Manifest revision = revision(packageJson);
+        return revision == null ? null : revision.document(text);
+    }
+
+    // the manifest whose markers a decision reads: as this recipe last visited it, else as scanned
+    private NodeDependencyScan.@Nullable Manifest revision(Path packageJson) {
+        NodeDependencyScan.Manifest at = visitedManifests.get(packageJson);
+        return at != null ? at : captured(packageJson);
+    }
+
+    // a package-manager file's text before this recipe's edits: as visited, else as the recipes before this one leave
+    // it
+    private String base(ExecutionContext ctx, ManagedFile file) {
+        if (file.bun) {
             file.rebase(requireNonNull(before(ctx, file.path)));
         } else {
-            SourceFile at = visited.get(file.path);
-            file.rebase(at != null ? at : PackageJsonHelper.editedBefore(ctx, this, file.scanned.getDocument()));
+            String at = visited.get(file.path);
+            file.rebase(at != null ? at : PackageJsonHelper.editedBefore(ctx, this, file.path, file.scanned));
         }
-        return file.base.getDocument();
+        return file.base;
     }
 
     private NodeCatalogs current(ExecutionContext ctx, ManagedFile file) {
@@ -584,9 +650,8 @@ public final class NodeDependencyEdits implements PackageJsonHelper.FileEditor {
     }
 
     // a package-manager file as visited with this cycle's edits, and pnpm's cleanup
-    private SourceFile managedOut(ExecutionContext ctx, ManagedFile file, SourceFile at) {
-        NodeCatalogs edited = at == base(ctx, file) ? file.current() : file.replay(file.read(at));
-        NodeCatalogs output = output(file, edited);
+    private SourceFile managedOut(ManagedFile file, SourceFile at) {
+        NodeCatalogs output = output(file, file.replay(file.read(at)));
         if (output == null) {
             return at;
         }
@@ -594,22 +659,31 @@ public final class NodeDependencyEdits implements PackageJsonHelper.FileEditor {
                 PackageJsonHelper.reparseLock(at, output.print());
     }
 
-    // a manifest with this cycle's edits, the same document for the same revision until a decision changes: every
+    // a manifest's text with this cycle's edits, the same for the same revision until a decision changes: every
     // regeneration asks for each manifest of its project
-    private SourceFile editedManifest(SourceFile file) {
+    private String editedManifest(Path path, String text) {
         if (editedManifestsAt != version) {
             editedManifests.clear();
             editedManifestsAt = version;
         }
-        SourceFile known = editedManifests.get(file);
+        Map<String, String> revisions = editedManifests.computeIfAbsent(path, k -> new HashMap<>());
+        String known = revisions.get(text);
         if (known != null) {
             return known;
         }
-        Decision decision = decisions.get(file.getSourcePath());
-        SourceFile edited = decision == null || decision.withdrawn || decision.manifestEdit == null ||
-                            !(file instanceof Json.Document) ? file : decision.manifestEdit.apply((Json.Document) file);
-        edited = edited instanceof Json.Document ? withCatalogEdits((Json.Document) edited) : edited;
-        editedManifests.put(file, edited);
+        Decision decision = decisions.get(path);
+        Function<Json.Document, Json.Document> manifestEdit = decision == null || decision.withdrawn ? null :
+                decision.manifestEdit;
+        ManagedFile file = managed.get(path);
+        String edited = text;
+        if (manifestEdit != null || file != null && file.bun && !file.ops.isEmpty()) {
+            NodeDependencyScan.Manifest revision = revision(path);
+            Json.Document doc = revision == null ? null : revision.parse(text);
+            if (doc != null) {
+                edited = print(withCatalogEdits(manifestEdit == null ? doc : manifestEdit.apply(doc)));
+            }
+        }
+        revisions.put(text, edited);
         return edited;
     }
 
@@ -677,18 +751,17 @@ public final class NodeDependencyEdits implements PackageJsonHelper.FileEditor {
         Path dir = file.path.getParent();
         Map<String, @Nullable Map<String, @Nullable Object>> projects = new LinkedHashMap<>();
         for (Map.Entry<Path, NodeDependencyScan.ProjectState> project : scan.projects.entrySet()) {
-            SourceFile captured = project.getValue().capturedPackageJson;
+            NodeDependencyScan.Manifest captured = project.getValue().capturedPackageJson;
             String at = captured == null ? null : under(dir, project.getKey());
             if (at == null) {
                 continue;
             }
             Decision decision = decisions.get(project.getKey());
-            SourceFile doc = decision != null ? decision.manifest : captured;
-            if (decision != null && !decision.withdrawn && decision.manifestEdit != null) {
-                doc = decision.manifestEdit.apply((Json.Document) doc);
-            }
             Map<String, @Nullable Object> manifest = new LinkedHashMap<>();
-            manifest.putAll(PackageJsonHelper.declaredDependencies(doc));
+            for (Map.Entry<String, Map<String, String>> scope : (decision != null ? decision.declared() :
+                    captured.getDeclared()).entrySet()) {
+                manifest.put(scope.getKey(), new LinkedHashMap<>(scope.getValue()));
+            }
             projects.put(at, manifest);
         }
         for (Path held : scan.paths) {
@@ -715,7 +788,7 @@ public final class NodeDependencyEdits implements PackageJsonHelper.FileEditor {
     // NodeCatalogs.Bun's root manifest with this cycle's catalog edits
     private Json.Document withCatalogEdits(Json.Document doc) {
         ManagedFile file = managed.get(doc.getSourcePath());
-        if (file == null || file.ops.isEmpty() || !(file.scanned instanceof NodeCatalogs.Bun)) {
+        if (file == null || file.ops.isEmpty() || !file.bun) {
             return doc;
         }
         return (Json.Document) file.replay(file.read(doc)).getDocument();
@@ -743,17 +816,23 @@ public final class NodeDependencyEdits implements PackageJsonHelper.FileEditor {
 
     private @Nullable ManagedFile managedAt(Path path, PackageManager pm) {
         if (!managed.containsKey(path)) {
-            SourceFile document = yamlFiles.containsKey(path) ? yamlFiles.get(path) : captured(path);
-            NodeCatalogs catalogs = document == null ? null : NodeCatalogs.read(pm, document, rootBeside(path));
-            managed.put(path, catalogs == null ? null : new ManagedFile(catalogs, false));
+            String yaml = yamlFiles.get(path);
+            NodeDependencyScan.Manifest root = yaml == null ? captured(path) : null;
+            Function<String, @Nullable SourceFile> parse = root != null ? root::parse :
+                    text -> PackageJsonHelper.parseYaml(path, text);
+            String scanned = yaml != null ? yaml : root == null ? null : root.getText();
+            SourceFile document = scanned == null ? null : parse.apply(scanned);
+            String rootManifest = rootBeside(path);
+            NodeCatalogs catalogs = document == null ? null : NodeCatalogs.read(pm, document, rootManifest);
+            managed.put(path, catalogs == null ? null : new ManagedFile(catalogs, parse, rootManifest, false));
         }
         return managed.get(path);
     }
 
     // the package.json beside a package-manager file, as scanned, which names the release that writes the file
     private @Nullable String rootBeside(Path file) {
-        SourceFile root = captured(file.resolveSibling("package.json"));
-        return root == null ? null : print(root);
+        NodeDependencyScan.Manifest root = captured(file.resolveSibling("package.json"));
+        return root == null ? null : root.getText();
     }
 
     // a file beside the manifest the host does not hold, which the decision's edits create
@@ -763,10 +842,11 @@ public final class NodeDependencyEdits implements PackageJsonHelper.FileEditor {
         if (file == null && !scan.paths.contains(path)) {
             SourceFile empty = YamlParser.builder().build().parse(ctx, "").findFirst().orElse(null);
             ManifestRules rules = writes(name);
+            String rootManifest = rootBeside(path);
             NodeCatalogs catalogs = empty == null || rules == null ? null :
-                    NodeCatalogs.read(rules, empty.withSourcePath(path), rootBeside(path));
+                    NodeCatalogs.read(rules, empty.withSourcePath(path), rootManifest);
             if (catalogs != null) {
-                file = new ManagedFile(catalogs, true);
+                file = new ManagedFile(catalogs, text -> PackageJsonHelper.parseYaml(path, text), rootManifest, true);
                 managed.put(path, file);
                 managedOf.clear();
                 rejected.clear();
@@ -804,8 +884,9 @@ public final class NodeDependencyEdits implements PackageJsonHelper.FileEditor {
             return PackageManager.YarnBerry;
         }
         Path bun = file(PackageManager.Bun, packageJson);
-        SourceFile root = bun == null ? null : captured(bun);
-        NodeCatalogs catalogs = root == null ? null : NodeCatalogs.read(PackageManager.Bun, root);
+        NodeDependencyScan.Manifest root = bun == null ? null : captured(bun);
+        Json.Document document = root == null ? null : root.parse(root.getText());
+        NodeCatalogs catalogs = document == null ? null : NodeCatalogs.read(PackageManager.Bun, document);
         return catalogs != null && !catalogs.getCatalogs().isEmpty() ? PackageManager.Bun : null;
     }
 
@@ -818,8 +899,8 @@ public final class NodeDependencyEdits implements PackageJsonHelper.FileEditor {
         }
         for (Path dir = packageJson.getParent(); ; dir = dir.getParent()) {
             Path candidate = dir == null ? Paths.get(name) : dir.resolve(name);
-            SourceFile manifest = captured(candidate);
-            if (manifest != null ? rules.catalogsAt(print(manifest)) != null :
+            NodeDependencyScan.Manifest manifest = captured(candidate);
+            if (manifest != null ? rules.catalogsAt(manifest.getText()) != null :
                     yamlFiles.containsKey(candidate) || managed.get(candidate) != null) {
                 return candidate;
             }
@@ -829,7 +910,7 @@ public final class NodeDependencyEdits implements PackageJsonHelper.FileEditor {
         }
     }
 
-    private @Nullable SourceFile captured(Path packageJson) {
+    private NodeDependencyScan.@Nullable Manifest captured(Path packageJson) {
         NodeDependencyScan.ProjectState ps = scan.projects.get(packageJson);
         return ps == null ? null : ps.capturedPackageJson;
     }
@@ -839,9 +920,9 @@ public final class NodeDependencyEdits implements PackageJsonHelper.FileEditor {
     private @Nullable PackageManager named(@Nullable Path dir) {
         SpecUtils.Lookup lookup = SpecUtils.loadSpec("", dir == null ? 0 : dir.getNameCount(), up -> {
             Path at = (dir == null ? Paths.get(up) : dir.resolve(up)).normalize();
-            SourceFile manifest = captured(at.toString().isEmpty() ? Paths.get("package.json") :
+            NodeDependencyScan.Manifest manifest = captured(at.toString().isEmpty() ? Paths.get("package.json") :
                     at.resolve("package.json"));
-            return manifest == null ? null : print(manifest);
+            return manifest == null ? null : manifest.getText();
         }, path -> false, HostEnvironment.UNKNOWN);
         Object raw = lookup.getRawPmSpec();
         if ("bun".equals(raw) || raw instanceof String && ((String) raw).startsWith("bun@")) {
@@ -862,12 +943,8 @@ public final class NodeDependencyEdits implements PackageJsonHelper.FileEditor {
         return Markup.markup(tree, new Markup.Warn(randomId(), message, null));
     }
 
-    private boolean same(@Nullable SourceFile a, @Nullable SourceFile b) {
-        return a == b || a != null && b != null && print(a).equals(print(b));
-    }
-
-    private String print(SourceFile document) {
-        return prints.computeIfAbsent(document, PackageJsonHelper::printed);
+    private static String print(SourceFile document) {
+        return PackageJsonHelper.printed(document);
     }
 
     /**
@@ -893,31 +970,41 @@ public final class NodeDependencyEdits implements PackageJsonHelper.FileEditor {
      */
     public static final class Decision {
         private final NodeDependencyEdits acc;
-        private final ExecutionContext ctx;
 
         @Getter
         private final Path path;
 
-        /**
-         * The manifest decided from.
-         */
-        @Getter
-        private final Json.Document manifest;
+        // the manifest decided from, while the decision is made
+        private Json.@Nullable Document manifest;
 
-        private final @Nullable SourceFile base;
+        // the texts of the manifest and its package-manager file decided from, and what was kept of the manifest's
+        // markers
+        private final String text;
+        private final @Nullable String base;
+        private final NodeDependencyScan.Manifest revision;
+
         private @Nullable Function<Json.Document, Json.Document> manifestEdit;
+        private @Nullable Map<String, Map<String, String>> declared;
         private final List<UnaryOperator<NodeCatalogs>> fileEdits = new ArrayList<>();
         private final Set<String> warnings = new LinkedHashSet<>();
         private @Nullable String description;
         private boolean withdrawn;
 
-        private Decision(NodeDependencyEdits acc, Path path, Json.Document manifest, @Nullable SourceFile base,
-                         ExecutionContext ctx) {
+        private Decision(NodeDependencyEdits acc, Path path, Json.@Nullable Document manifest, String text,
+                         @Nullable String base, NodeDependencyScan.Manifest revision) {
             this.acc = acc;
             this.path = path;
             this.manifest = manifest;
+            this.text = text;
             this.base = base;
-            this.ctx = ctx;
+            this.revision = revision;
+        }
+
+        /**
+         * The manifest decided from, while the decision is made.
+         */
+        public Json.Document getManifest() {
+            return requireNonNull(manifest);
         }
 
         /**
@@ -934,10 +1021,11 @@ public final class NodeDependencyEdits implements PackageJsonHelper.FileEditor {
         }
 
         /**
-         * Another manifest as the recipes before this one leave it; null when the scan holds none there.
+         * Another manifest's text as the recipes before this one leave it; null when the scan holds none there.
          */
-        public @Nullable SourceFile manifestOf(Path packageJson) {
-            return acc.editedBefore(ctx, packageJson);
+        public @Nullable String manifestOf(ExecutionContext ctx, Path packageJson) {
+            NodeDependencyScan.Manifest captured = acc.captured(packageJson);
+            return captured == null ? null : acc.editedBeforeText(ctx, captured);
         }
 
         /**
@@ -948,9 +1036,18 @@ public final class NodeDependencyEdits implements PackageJsonHelper.FileEditor {
             return acc.packageManager(path);
         }
 
+        /**
+         * Whether the lock the manifest's marker records resolves the package the engine asks about; true when it
+         * records no resolutions at all.
+         */
+        public boolean resolves() {
+            return revision.resolves();
+        }
+
         public void editManifest(Function<Json.Document, Json.Document> edit) {
             Function<Json.Document, Json.Document> before = manifestEdit;
             manifestEdit = before == null ? edit : before.andThen(edit);
+            declared = null;
             acc.version++;
         }
 
@@ -965,7 +1062,8 @@ public final class NodeDependencyEdits implements PackageJsonHelper.FileEditor {
          * Edit the file {@code name} beside the manifest, which the package manager reads, creating it when the host
          * holds none there; false, editing nothing, when the edit cannot be made in place.
          */
-        public boolean editFileBeside(String name, Function<NodeCatalogs, @Nullable NodeCatalogs> edit) {
+        public boolean editFileBeside(ExecutionContext ctx, String name,
+                                      Function<NodeCatalogs, @Nullable NodeCatalogs> edit) {
             ManagedFile file = acc.managedOf(path);
             if (file == null || !file.path.equals(path.resolveSibling(name))) {
                 file = acc.created(ctx, path, name);
@@ -1007,7 +1105,7 @@ public final class NodeDependencyEdits implements PackageJsonHelper.FileEditor {
         /**
          * Record an edit not made, or not made as asked, and why, once a cycle.
          */
-        public void decline(String reason) {
+        public void decline(ExecutionContext ctx, String reason) {
             if (acc.inserted.add(Collections.singletonList(path + "\n" + reason))) {
                 acc.rows.declined(ctx, path, reason);
             }
@@ -1016,7 +1114,7 @@ public final class NodeDependencyEdits implements PackageJsonHelper.FileEditor {
         /**
          * Record that the decision depends on what the engine cannot know, as a failure of the manifest's lock.
          */
-        public void cannotKnow(CannotKnow what) {
+        public void cannotKnow(ExecutionContext ctx, CannotKnow what) {
             acc.failure(ctx, path, LockOnlyInstall.cannotKnow(what));
         }
 
@@ -1039,69 +1137,148 @@ public final class NodeDependencyEdits implements PackageJsonHelper.FileEditor {
         private boolean edits() {
             return manifestEdit != null || !fileEdits.isEmpty();
         }
+
+        // the edits undone, as when they cannot be made
+        private void editNothing() {
+            manifestEdit = null;
+            declared = null;
+            fileEdits.clear();
+        }
+
+        // the dependencies the manifest declares as the decision leaves it, for pnpm's cleanup of unused catalogs
+        private Map<String, Map<String, String>> declared() {
+            if (declared == null) {
+                Json.Document doc = manifest != null ? manifest : revision.parse(text);
+                if (doc != null && !withdrawn && manifestEdit != null) {
+                    doc = manifestEdit.apply(doc);
+                }
+                declared = doc == null ? new LinkedHashMap<>() : PackageJsonHelper.declaredDependencies(doc);
+            }
+            return declared;
+        }
     }
 
     // what a regeneration read, and its result
     private static final class Regeneration {
         final List<Object> inputs;
-        final PackageJsonHelper.EditAndRegenerateResult result;
+        final LockFileRegeneration.@Nullable Result result;
 
-        Regeneration(List<Object> inputs, PackageJsonHelper.EditAndRegenerateResult result) {
+        // the package manager that installs the manifest where its marker names another; null for the marker's
+        final @Nullable PackageManager installs;
+
+        Regeneration(List<Object> inputs, LockFileRegeneration.@Nullable Result result,
+                     @Nullable PackageManager installs) {
             this.inputs = inputs;
             this.result = result;
+            this.installs = installs;
         }
     }
 
     // a package-manager file the decisions edit (pnpm-workspace.yaml, .yarnrc.yml, or Bun's root manifest), as
-    // scanned or created, its revision before this recipe, and the edits decided on it in decision order
+    // scanned or created, its revision before this recipe, and the edits decided on it in decision order; the
+    // catalogs of a revision hold its tree, so they are kept only while memory allows and read again from its text
     private static final class ManagedFile {
         final Path path;
-        final NodeCatalogs scanned;
+        final String scanned;
         final boolean created;
+        final boolean bun;
+        final ManifestRules rules;
+        final @Nullable String rootManifest;
         final List<UnaryOperator<NodeCatalogs>> ops = new ArrayList<>();
-        NodeCatalogs base;
-        NodeCatalogs current;
+        String base;
         int applied;
 
+        // a revision's text parsed as the host parsed the file
+        final Function<String, @Nullable SourceFile> parse;
+
+        Reference<@Nullable NodeCatalogs> scannedCatalogs;
+        Reference<@Nullable NodeCatalogs> baseCatalogs;
+        Reference<@Nullable NodeCatalogs> current;
+
         @Nullable
-        SourceFile editedFrom;
+        String editedFrom;
 
         int editedAt = -1;
 
         @Nullable
-        SourceFile edited;
+        String edited;
 
-        ManagedFile(NodeCatalogs scanned, boolean created) {
-            this.path = scanned.getPath();
-            this.scanned = scanned;
+        ManagedFile(NodeCatalogs catalogs, Function<String, @Nullable SourceFile> parse,
+                    @Nullable String rootManifest, boolean created) {
+            this.path = catalogs.getPath();
+            this.scanned = catalogs.print();
             this.created = created;
+            this.bun = catalogs instanceof NodeCatalogs.Bun;
+            this.rules = catalogs.getRules();
+            this.rootManifest = rootManifest;
+            this.parse = parse;
             this.base = scanned;
-            this.current = scanned;
+            this.scannedCatalogs = new SoftReference<>(catalogs);
+            this.baseCatalogs = scannedCatalogs;
+            this.current = scannedCatalogs;
+        }
+
+        // the catalogs as scanned or created
+        NodeCatalogs scanned() {
+            NodeCatalogs catalogs = scannedCatalogs.get();
+            if (catalogs == null) {
+                catalogs = requireNonNull(NodeCatalogs.read(rules, requireNonNull(parse.apply(scanned)),
+                        rootManifest));
+                scannedCatalogs = new SoftReference<>(catalogs);
+            }
+            return catalogs;
         }
 
         // a revision another recipe may have read as plain text
         NodeCatalogs read(SourceFile revision) {
-            if (revision == scanned.getDocument()) {
-                return scanned;
+            NodeCatalogs catalogs = scanned();
+            return catalogs.reread(revision.getClass() == catalogs.getDocument().getClass() ? revision :
+                    PackageJsonHelper.reparseLock(catalogs.getDocument(), PackageJsonHelper.printed(revision)));
+        }
+
+        NodeCatalogs read(String revision) {
+            NodeCatalogs at = revision.equals(base) ? baseCatalogs.get() : null;
+            if (at != null) {
+                return at;
             }
-            if (revision == base.getDocument()) {
-                return base;
+            NodeCatalogs catalogs = scanned();
+            if (revision.equals(scanned)) {
+                return catalogs;
             }
-            return scanned.reread(revision.getClass() == scanned.getDocument().getClass() ? revision :
-                    PackageJsonHelper.reparseLock(scanned.getDocument(), PackageJsonHelper.printed(revision)));
+            SourceFile document = parse.apply(revision);
+            return catalogs.reread(document == null ? catalogs.getDocument() : document);
         }
 
         NodeCatalogs current() {
-            while (applied < ops.size()) {
-                current = ops.get(applied++).apply(current);
+            NodeCatalogs cached = current.get();
+            NodeCatalogs at = cached;
+            if (at == null) {
+                at = base();
+                applied = 0;
             }
-            return current;
+            while (applied < ops.size()) {
+                at = ops.get(applied++).apply(at);
+            }
+            if (at != cached) {
+                current = new SoftReference<>(at);
+            }
+            return at;
         }
 
-        void rebase(SourceFile before) {
-            if (before != base.getDocument()) {
-                base = read(before);
-                current = base;
+        private NodeCatalogs base() {
+            NodeCatalogs at = baseCatalogs.get();
+            if (at == null) {
+                at = read(base);
+                baseCatalogs = new SoftReference<>(at);
+            }
+            return at;
+        }
+
+        void rebase(String before) {
+            if (!before.equals(base)) {
+                base = before;
+                baseCatalogs = new SoftReference<>(null);
+                current = baseCatalogs;
                 applied = 0;
             }
         }
@@ -1109,13 +1286,13 @@ public final class NodeDependencyEdits implements PackageJsonHelper.FileEditor {
         void append(UnaryOperator<NodeCatalogs> op, NodeCatalogs result) {
             current();
             ops.add(op);
-            current = result;
+            current = new SoftReference<>(result);
             applied = ops.size();
         }
 
         void reset() {
             ops.clear();
-            current = base;
+            current = baseCatalogs;
             applied = 0;
         }
 

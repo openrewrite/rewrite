@@ -102,9 +102,12 @@ public class RemoveDependency extends ScanningRecipe<RemoveDependency.Accumulato
     }
 
     static class ProjectState {
-        @Nullable SourceFile capturedDepsFile;
+        /**
+         * The edit of the deps file as scanned, used when its lock file is visited first.
+         */
+        PyProjectHelper.@Nullable DepsEdit capturedEdit;
         @Nullable String capturedLockContent;
-        @Nullable SourceFile modifiedDepsFile;
+        boolean computed;
         LockFileRegeneration.@Nullable Result regenResult;
         boolean failureRecorded;
     }
@@ -160,7 +163,8 @@ public class RemoveDependency extends ScanningRecipe<RemoveDependency.Accumulato
                 PythonDependencyFile trait = matcher.get(getCursor()).orElse(null);
                 if (trait != null) {
                     ProjectState ps = acc.projects.computeIfAbsent(sourcePath, k -> new ProjectState());
-                    ps.capturedDepsFile = sourceFile;
+                    ps.capturedEdit = matchesRemoveDependency(trait) ?
+                            PyProjectHelper.DepsEdit.of(trait, removal()) : null;
                 }
                 return tree;
             }
@@ -170,6 +174,11 @@ public class RemoveDependency extends ScanningRecipe<RemoveDependency.Accumulato
     private boolean matchesRemoveDependency(PythonDependencyFile trait) {
         return PyProjectHelper.findDependencyInScope(
                 trait.getMarker(), packageName, scope, groupName) != null;
+    }
+
+    private Function<PythonDependencyFile, PythonDependencyFile> removal() {
+        Set<String> removals = singleton(packageName);
+        return t -> t.withRemovedDependencies(removals, scope, groupName);
     }
 
     @Override
@@ -189,17 +198,16 @@ public class RemoveDependency extends ScanningRecipe<RemoveDependency.Accumulato
                 ProjectState ps = acc.projects.get(sourcePath);
                 if (ps != null) {
                     PythonDependencyFile trait = matcher.get(getCursor()).orElse(null);
-                    if (trait != null && matchesRemoveDependency(trait)) {
-                        ensureComputed(ps, trait, ctx);
-                    }
-                    if (ps.modifiedDepsFile != null) {
-                        SourceFile out = ps.modifiedDepsFile;
+                    SourceFile modified = trait != null && (ps.computed || matchesRemoveDependency(trait)) ?
+                            edit(ps, trait, ctx) : null;
+                    if (modified != null) {
+                        SourceFile out = modified;
                         if (ps.regenResult != null && !ps.regenResult.isSuccess()) {
                             recordFailure(ctx, ps, sourcePath);
                             out = Markup.warn(out, new RuntimeException(
                                     "lock regeneration failed: " + ps.regenResult.getErrorMessage()));
                         }
-                        PyProjectHelper.putLiveDepsTree(ctx, sourcePath, out);
+                        PyProjectHelper.putLiveDeps(ctx, sourcePath, modified.printAll(), ps.regenResult);
                         return out;
                     }
                 }
@@ -212,20 +220,19 @@ public class RemoveDependency extends ScanningRecipe<RemoveDependency.Accumulato
                 if (lockPs == null) {
                     return tree;
                 }
-                if (lockPs.modifiedDepsFile == null) {
+                if (!lockPs.computed) {
+                    PyProjectHelper.DepsEdit depsEdit = lockPs.capturedEdit;
                     SourceFile depsTree = PyProjectHelper.getLiveDepsTree(ctx, depsPath);
-                    if (depsTree == null) {
-                        depsTree = lockPs.capturedDepsFile;
-                    }
                     if (depsTree != null) {
                         Cursor synth = new Cursor(new Cursor(null, Cursor.ROOT_VALUE), depsTree);
                         PythonDependencyFile trait = matcher.get(synth).orElse(null);
-                        if (trait != null && matchesRemoveDependency(trait)) {
-                            ensureComputed(lockPs, trait, ctx);
-                            if (lockPs.modifiedDepsFile != null) {
-                                PyProjectHelper.putLiveDepsTree(ctx, depsPath, lockPs.modifiedDepsFile);
-                            }
-                        }
+                        depsEdit = trait != null && matchesRemoveDependency(trait) ?
+                                PyProjectHelper.DepsEdit.of(trait, removal()) : null;
+                    }
+                    if (depsEdit != null) {
+                        lockPs.computed = true;
+                        lockPs.regenResult = depsEdit.regenerate(lockPs.capturedLockContent, ctx);
+                        PyProjectHelper.putLiveDeps(ctx, depsPath, depsEdit.getModifiedContent(), lockPs.regenResult);
                     }
                 }
                 if (lockPs.regenResult != null) {
@@ -246,19 +253,17 @@ public class RemoveDependency extends ScanningRecipe<RemoveDependency.Accumulato
                 return tree;
             }
 
-            private void ensureComputed(ProjectState ps, PythonDependencyFile trait, ExecutionContext ctx) {
-                if (ps.modifiedDepsFile != null) {
-                    return;
+            private @Nullable SourceFile edit(ProjectState ps, PythonDependencyFile trait, ExecutionContext ctx) {
+                if (ps.computed) {
+                    return PyProjectHelper.edit(trait, removal(), ps.regenResult);
                 }
-                Set<String> removals = singleton(packageName);
-                Function<PythonDependencyFile, PythonDependencyFile> editFn =
-                        t -> t.withRemovedDependencies(removals, scope, groupName);
                 PyProjectHelper.EditAndRegenerateResult r =
-                        PyProjectHelper.editAndRegenerate(trait, editFn, ps.capturedLockContent, ctx);
+                        PyProjectHelper.editAndRegenerate(trait, removal(), ps.capturedLockContent, ctx);
                 if (r.isChanged()) {
-                    ps.modifiedDepsFile = r.getModifiedDepsFile();
+                    ps.computed = true;
                     ps.regenResult = r.getRegenResult();
                 }
+                return r.getModifiedDepsFile();
             }
         };
     }
