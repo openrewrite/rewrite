@@ -489,6 +489,470 @@ describe('AddImport visitor', () => {
                 )
             );
         });
+
+        test("a 'use client' directive stays first in a file without imports", async () => {
+            const spec = new RecipeSpec();
+            spec.recipe = fromVisitor(new AddImport({module: 'react', member: 'useState', onlyIfReferenced: false}));
+
+            //language=typescript
+            await spec.rewriteRun(
+                typescript(
+                    `
+                        'use client';
+
+                        export function Counter() {
+                            return useState(0);
+                        }
+                    `,
+                    `
+                        'use client';
+
+                        import {useState} from 'react';
+
+                        export function Counter() {
+                            return useState(0);
+                        }
+                    `
+                )
+            );
+        });
+
+        test("maybeAddImport keeps a 'use server' directive first", async () => {
+            const spec = new RecipeSpec();
+            spec.recipe = fromVisitor(new class extends JavaScriptVisitor<any> {
+                override async visitJsCompilationUnit(cu: JS.CompilationUnit, p: any): Promise<J | undefined> {
+                    maybeAddImport(this, {module: 'react', member: 'cache', onlyIfReferenced: false});
+                    return cu;
+                }
+            });
+
+            //language=typescript
+            await spec.rewriteRun(
+                typescript(
+                    `
+                        'use server';
+
+                        export async function save(id: string) {
+                            return cache(id);
+                        }
+                    `,
+                    `
+                        'use server';
+
+                        import {cache} from 'react';
+
+                        export async function save(id: string) {
+                            return cache(id);
+                        }
+                    `
+                )
+            );
+        });
+
+        test('a directive under a header comment stays ahead of the import', async () => {
+            const spec = new RecipeSpec();
+            spec.recipe = fromVisitor(new AddImport({module: 'react', member: 'use', onlyIfReferenced: false}));
+
+            //language=typescript
+            await spec.rewriteRun(
+                typescript(
+                    `
+                        // Copyright Acme
+                        "use client";
+                        export default function Page(props: {data: Promise<string>}) {
+                            return use(props.data);
+                        }
+                    `,
+                    `
+                        // Copyright Acme
+                        "use client";
+                        import {use} from "react";
+
+                        export default function Page(props: {data: Promise<string>}) {
+                            return use(props.data);
+                        }
+                    `
+                )
+            );
+        });
+
+        test('every directive of the prologue stays ahead of the import, and so does a shebang', async () => {
+            const spec = new RecipeSpec();
+            spec.recipe = fromVisitor(new AddImport({module: 'react', member: 'useId', onlyIfReferenced: false}));
+
+            //language=typescript
+            await spec.rewriteRun(
+                typescript(
+                    `
+                        'use strict';
+                        'use client';
+
+                        export const id = useId();
+                    `,
+                    `
+                        'use strict';
+                        'use client';
+
+                        import {useId} from 'react';
+
+                        export const id = useId();
+                    `
+                ),
+                typescript(
+                    `
+                        'use strict';
+
+                        export const id = useId();
+                    `,
+                    `
+                        'use strict';
+
+                        import {useId} from 'react';
+
+                        export const id = useId();
+                    `
+                ),
+                // The formatter gives the import a line break of its own, though the shebang ends with one
+                typescript(
+                    `
+                        #!/usr/bin/env node
+                        console.log(useId());
+                    `,
+                    `
+                        #!/usr/bin/env node
+
+                        import {useId} from 'react';
+
+                        console.log(useId());
+                    `
+                )
+            );
+        });
+
+        test('the import follows the spacing after the directive and gets a blank line before the code', async () => {
+            const spec = new RecipeSpec();
+            spec.recipe = fromVisitor(new AddImport({module: 'react', member: 'useState', onlyIfReferenced: false}));
+
+            //language=typescript
+            await spec.rewriteRun(
+                typescript(
+                    `
+                        'use client';
+                        // The counter
+                        export function Counter() {
+                            return useState(0);
+                        }
+                    `,
+                    `
+                        'use client';
+                        import {useState} from 'react';
+
+                        // The counter
+                        export function Counter() {
+                            return useState(0);
+                        }
+                    `
+                )
+            );
+        });
+
+        test('an import after a directive goes after the existing imports, as before', async () => {
+            const spec = new RecipeSpec();
+            spec.recipe = fromVisitor(new AddImport({module: 'next/navigation', member: 'useRouter', onlyIfReferenced: false}));
+
+            //language=typescript
+            await spec.rewriteRun(
+                typescript(
+                    `
+                        'use client';
+                        import {useState} from 'react';
+
+                        export function Counter() {
+                            return [useState(0), useRouter()];
+                        }
+                    `,
+                    `
+                        'use client';
+                        import {useState} from 'react';
+                        import {useRouter} from 'next/navigation';
+
+                        export function Counter() {
+                            return [useState(0), useRouter()];
+                        }
+                    `
+                )
+            );
+        });
+
+        test('a parenthesized or template string is no directive, so the import goes first as in a file without one', async () => {
+            const spec = new RecipeSpec();
+            spec.recipe = fromVisitor(new AddImport({module: 'react', member: 'useId', onlyIfReferenced: false}));
+
+            //language=typescript
+            await spec.rewriteRun(
+                typescript(
+                    `
+                        ('use client');
+
+                        export const id = useId();
+                    `,
+                    `
+                        import {useId} from 'react';
+
+                        ('use client');
+
+                        export const id = useId();
+                    `
+                ),
+                typescript(
+                    `
+                        \`use client\`;
+
+                        export const id = useId();
+                    `,
+                    `
+                        import {useId} from 'react';
+
+                        \`use client\`;
+
+                        export const id = useId();
+                    `
+                ),
+                typescript(
+                    `
+                        export const id = useId();
+                    `,
+                    `
+                        import {useId} from 'react';
+
+                        export const id = useId();
+                    `
+                )
+            );
+        });
+
+        test('a triple-slash directive after a shebang stays ahead of the import', async () => {
+            const spec = new RecipeSpec();
+            spec.recipe = fromVisitor(new AddImport({module: 'react', member: 'useState', onlyIfReferenced: false}));
+
+            //language=typescript
+            await spec.rewriteRun(
+                typescript(
+                    `
+                        #!/usr/bin/env node
+                        /// <reference types="node" />
+
+                        export const c = useState(0);
+                    `,
+                    `
+                        #!/usr/bin/env node
+                        /// <reference types="node" />
+
+                        import {useState} from 'react';
+
+                        export const c = useState(0);
+                    `
+                )
+            );
+        });
+
+        test('the comments up to the last triple-slash directive go ahead of the import, in their order', async () => {
+            const spec = new RecipeSpec();
+            spec.recipe = fromVisitor(new AddImport({module: 'react', member: 'useState', onlyIfReferenced: false}));
+
+            //language=typescript
+            await spec.rewriteRun(
+                typescript(
+                    `
+                        #!/usr/bin/env node
+                        /*
+                         * Copyright Acme
+                         */
+                        /// <reference types="node" />
+                        export const c = useState(0);
+                    `,
+                    `
+                        #!/usr/bin/env node
+                        /*
+                         * Copyright Acme
+                         */
+                        /// <reference types="node" />
+                        import {useState} from 'react';
+
+                        export const c = useState(0);
+                    `
+                ),
+                typescript(
+                    `
+                        #!/usr/bin/env node
+                        /// <amd-module name="x" />
+                        /// <amd-dependency path="y" />
+                        /// <reference types="node" />
+                        /// <reference lib="es2022" />
+                        export const c = useState(0);
+                    `,
+                    `
+                        #!/usr/bin/env node
+                        /// <amd-module name="x" />
+                        /// <amd-dependency path="y" />
+                        /// <reference types="node" />
+                        /// <reference lib="es2022" />
+                        import {useState} from 'react';
+
+                        export const c = useState(0);
+                    `
+                ),
+                typescript(
+                    `
+                        #!/usr/bin/env node
+                        /// <amd-dependency path="x" />
+                        export const c = useState(0);
+                    `,
+                    `
+                        #!/usr/bin/env node
+                        /// <amd-dependency path="x" />
+                        import {useState} from 'react';
+
+                        export const c = useState(0);
+                    `
+                )
+            );
+        });
+
+        test('a plain /// comment, or a //// one TypeScript does not read, stays with the statement', async () => {
+            const spec = new RecipeSpec();
+            spec.recipe = fromVisitor(new AddImport({module: 'react', member: 'useState', onlyIfReferenced: false}));
+
+            //language=typescript
+            await spec.rewriteRun(
+                // The formatter gives the import a line break of its own, though the shebang ends with one
+                typescript(
+                    `
+                        #!/usr/bin/env node
+                        /// plain
+                        export const c = useState(0);
+                    `,
+                    `
+                        #!/usr/bin/env node
+
+                        import {useState} from 'react';
+
+                        /// plain
+                        export const c = useState(0);
+                    `
+                ),
+                typescript(
+                    `
+                        #!/usr/bin/env node
+                        //// <reference types="node" />
+                        export const c = useState(0);
+                    `,
+                    `
+                        #!/usr/bin/env node
+
+                        import {useState} from 'react';
+
+                        //// <reference types="node" />
+                        export const c = useState(0);
+                    `
+                )
+            );
+        });
+
+        test('a comment after the last triple-slash directive stays with the statement it documents', async () => {
+            const spec = new RecipeSpec();
+            spec.recipe = fromVisitor(new AddImport({module: 'react', member: 'useState', onlyIfReferenced: false}));
+
+            //language=typescript
+            await spec.rewriteRun(
+                typescript(
+                    `
+                        #!/usr/bin/env node
+                        /// <reference types="node" />
+
+                        /** The counter's initial state. */
+                        export const c = useState(0);
+                    `,
+                    `
+                        #!/usr/bin/env node
+                        /// <reference types="node" />
+
+                        import {useState} from 'react';
+
+                        /** The counter's initial state. */
+                        export const c = useState(0);
+                    `
+                )
+            );
+        });
+
+        test("a triple-slash directive after 'use client' stays ahead of the import too", async () => {
+            const spec = new RecipeSpec();
+            spec.recipe = fromVisitor(new AddImport({module: 'react', member: 'useState', onlyIfReferenced: false}));
+
+            //language=typescript
+            await spec.rewriteRun(
+                typescript(
+                    `
+                        'use client';
+                        /// <reference types="node" />
+
+                        export const c = useState(0);
+                    `,
+                    `
+                        'use client';
+                        /// <reference types="node" />
+
+                        import {useState} from 'react';
+
+                        export const c = useState(0);
+                    `
+                )
+            );
+        });
+
+        test('a triple-slash directive the import does not go behind is left where it is', async () => {
+            const spec = new RecipeSpec();
+            spec.recipe = fromVisitor(new AddImport({module: 'react', member: 'useState', onlyIfReferenced: false}));
+
+            //language=typescript
+            await spec.rewriteRun(
+                typescript(
+                    `
+                        /// <reference types="node" />
+
+                        export const c = useState(0);
+                    `,
+                    `
+                        /// <reference types="node" />
+
+                        import {useState} from 'react';
+
+                        export const c = useState(0);
+                    `
+                ),
+                typescript(
+                    `
+                        'use client';
+
+                        export const a = 1;
+
+                        /// <reference types="node" />
+                        export const c = useState(a);
+                    `,
+                    `
+                        'use client';
+
+                        import {useState} from 'react';
+
+                        export const a = 1;
+
+                        /// <reference types="node" />
+                        export const c = useState(a);
+                    `
+                )
+            );
+        });
     });
 
     describe('merging imports from same module', () => {
@@ -956,6 +1420,55 @@ describe('AddImport visitor', () => {
                         import {readFile} from 'fs';
 
                         const fs = require('fs');
+                    `
+                )
+            );
+        });
+
+        test("a require joins the leading requires after any directive, not only 'use strict'", async () => {
+            const spec = new RecipeSpec();
+            spec.recipe = fromVisitor(new AddImport({module: 'fs', member: 'readFile', onlyIfReferenced: false}));
+
+            //language=javascript
+            await spec.rewriteRun(
+                javascript(
+                    `
+                        "use client";
+                        "use strict";
+                        const other = require('other');
+
+                        readFile(other);
+                    `,
+                    `
+                        "use client";
+                        "use strict";
+                        const other = require('other');
+                        const {readFile} = require('fs');
+
+                        readFile(other);
+                    `
+                )
+            );
+        });
+
+        test('a triple-slash directive after a shebang stays ahead of a new require', async () => {
+            const spec = new RecipeSpec();
+            spec.recipe = fromVisitor(new AddImport({module: 'fs', member: 'readFile', onlyIfReferenced: false}));
+
+            //language=javascript
+            await spec.rewriteRun(
+                javascript(
+                    `
+                        #!/usr/bin/env node
+                        /// <reference types="node" />
+                        module.exports = readFile;
+                    `,
+                    `
+                        #!/usr/bin/env node
+                        /// <reference types="node" />
+                        const {readFile} = require('fs');
+
+                        module.exports = readFile;
                     `
                 )
             );

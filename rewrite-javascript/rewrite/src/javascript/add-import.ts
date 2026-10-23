@@ -1,5 +1,5 @@
 import {JavaScriptVisitor} from "./visitor";
-import {ElementRemovalFormatter, emptySpace, isIdentifier, J, rightPadded, singleSpace, space, Statement, TrailingComma, Type} from "../java";
+import {Comment, ElementRemovalFormatter, emptySpace, isIdentifier, J, rightPadded, singleSpace, space, Statement, TextComment, TrailingComma, Type} from "../java";
 import {isObjectBindingPattern, JS, JSX} from "./tree";
 import {randomId, UUID} from "../uuid";
 import {TypeVisitor} from "../java/type-visitor";
@@ -908,24 +908,24 @@ export class AddImport<P> extends JavaScriptVisitor<P> {
                 ? markers({kind: J.Markers.Semicolon, id: randomId()})
                 : emptyMarkers;
 
-            if (insertionIndex === 0) {
-                // Insert at the beginning
+            if (insertionIndex === prologueLength(compilationUnit)) {
+                // The file has no import yet, so the new one opens its body, after any shebang and
+                // directives. It takes the place of the statement it goes before, along with the
+                // triple-slash directives in front of it, and the statement keeps its other comments
+                // and gets a blank line of its own.
                 // The `after` space should be empty since any semicolon is printed after it
-                // The spacing comes from updating the next statement's prefix
-                const updatedStatements = compilationUnit.statements.length > 0
-                    ? [
-                        rightPadded(newImport, emptySpace, semicolonMarkers),
-                        {
-                            ...compilationUnit.statements[0],
-                            element: compilationUnit.statements[0].element
-                                ? {...compilationUnit.statements[0].element, prefix: space("\n\n")}
-                                : undefined
-                        } as J.RightPadded<Statement>,
-                        ...compilationUnit.statements.slice(1)
-                    ]
-                    : [rightPadded(newImport, emptySpace, semicolonMarkers)];
-
-                draft.statements = updatedStatements;
+                const next = compilationUnit.statements[insertionIndex];
+                draft.statements = [
+                    ...compilationUnit.statements.slice(0, insertionIndex),
+                    rightPadded(newImport, emptySpace, semicolonMarkers),
+                    ...(next ? [{
+                        ...next,
+                        element: next.element
+                            ? {...next.element, prefix: splitAtBodyStart(next.element.prefix).behind}
+                            : undefined
+                    } as J.RightPadded<Statement>] : []),
+                    ...compilationUnit.statements.slice(insertionIndex + 1)
+                ];
             } else {
                 // Insert after existing imports
                 const before = compilationUnit.statements.slice(0, insertionIndex);
@@ -1728,19 +1728,12 @@ export class AddImport<P> extends JavaScriptVisitor<P> {
      * Determine the appropriate spacing before the import statement
      */
     private determineImportPrefix(compilationUnit: JS.CompilationUnit, insertionIndex: number): J.Space {
-        // If inserting at the beginning (index 0), use the prefix of the first statement
-        // but only the whitespace part (preserve comments on the original first statement)
-        if (insertionIndex === 0 && compilationUnit.statements.length > 0) {
-            const firstPrefix = compilationUnit.statements[0].element?.prefix;
-            if (firstPrefix) {
-                // Keep only whitespace, not comments
-                return {
-                    kind: J.Kind.Space,
-                    comments: [],
-                    whitespace: firstPrefix.whitespace
-                };
-            }
-            return emptySpace;
+        // If the import opens the file's body, at the beginning or after a shebang and directives,
+        // use the prefix of the statement it goes before: its whitespace, and its comments up to the
+        // last triple-slash directive, which has to stay ahead of the import (the rest stay on that statement)
+        if (insertionIndex === prologueLength(compilationUnit) && insertionIndex < compilationUnit.statements.length) {
+            const nextPrefix = compilationUnit.statements[insertionIndex].element?.prefix;
+            return nextPrefix ? splitAtBodyStart(nextPrefix).ahead : emptySpace;
         }
 
         // If inserting after other statements, ensure we have at least one newline
@@ -1769,8 +1762,8 @@ export class AddImport<P> extends JavaScriptVisitor<P> {
             return lastImportIndex + 1;
         }
 
-        // No imports found, insert at the beginning
-        return 0;
+        // No imports found, insert at the beginning of the body
+        return prologueLength(compilationUnit);
     }
 
 
@@ -1817,14 +1810,71 @@ function newIdentifier(name: string): J.Identifier {
     };
 }
 
-function isUseStrict(statement: J | undefined): boolean {
+/**
+ * A quoted string standing as a statement of its own, such as `'use strict'`, `'use client'` or
+ * `'use server'`: a directive, where it opens the file. A parenthesized string or a template literal
+ * is an ordinary expression.
+ */
+function isDirective(statement: J | undefined): boolean {
     const expression = statement?.kind === JS.Kind.ExpressionStatement ? (statement as JS.ExpressionStatement).expression : statement;
-    return expression?.kind === J.Kind.Literal && (expression as J.Literal).value === 'use strict';
+    return quoteOf(expression) !== undefined;
+}
+
+/**
+ * How many statements open `cu` ahead of its body: a shebang, then the directive prologue. A directive
+ * applies only as long as nothing else goes before it, so a statement the file gains goes after them.
+ */
+function prologueLength(cu: JS.CompilationUnit): number {
+    const statements = cu.statements;
+    let length = 0;
+    while (length < statements.length &&
+        (statements[length].element?.kind === JS.Kind.Shebang || isDirective(statements[length].element))) {
+        length++;
+    }
+    return length;
+}
+
+/**
+ * The prefix of the statement a new import or require goes before at the start of the file's body,
+ * split between the two. The new statement takes the whitespace and the comments up to the last
+ * triple-slash directive, since TypeScript reads one only among the comments that lead the file
+ * (`processCommentPragmas` scans the leading comment ranges, nothing after the first statement). The
+ * statement keeps its other comments, a plain `///` one among them, after a blank line of its own.
+ */
+function splitAtBodyStart(prefix: J.Space): {ahead: J.Space; behind: J.Space} {
+    let ahead = prefix.comments.length;
+    while (ahead > 0 && !isTripleSlashDirective(prefix.comments[ahead - 1])) {
+        ahead--;
+    }
+    return {
+        ahead: {kind: J.Kind.Space, whitespace: prefix.whitespace, comments: prefix.comments.slice(0, ahead)},
+        behind: {...prefix, whitespace: "\n\n", comments: prefix.comments.slice(ahead)}
+    };
+}
+
+const TRIPLE_SLASH_DIRECTIVES = ['<reference', '<amd-module', '<amd-dependency'];
+
+/**
+ * A triple-slash directive: `/// <reference … />`, `/// <amd-module … />` or `/// <amd-dependency … />`.
+ * TypeScript recognises one by `tripleSlashDirectivePrefixRegex`, `^///\s*<`, so a fourth slash, as in
+ * `//// <reference … />`, makes it an ordinary comment.
+ */
+function isTripleSlashDirective(comment: Comment): boolean {
+    if (comment.kind !== J.Kind.TextComment || (comment as TextComment).multiline) {
+        return false;
+    }
+    // The parser keeps a line comment's text without its leading `//`
+    const text = (comment as TextComment).text;
+    if (!text.startsWith('/')) {
+        return false;
+    }
+    const rest = text.slice(1).trimStart();
+    return TRIPLE_SLASH_DIRECTIVES.some(directive => rest.startsWith(directive));
 }
 
 /**
  * `cu` with `statement` after its last top-level `require`. A file with none takes it first,
- * after a `'use strict'` directive, which has to open the file to apply.
+ * after a shebang and any directives, which have to open the file to apply.
  */
 function withRequireStatement(cu: JS.CompilationUnit, statement: Statement): JS.CompilationUnit {
     const statements = cu.statements;
@@ -1845,13 +1895,15 @@ function withRequireStatement(cu: JS.CompilationUnit, statement: Statement): JS.
     if (next === undefined) {
         return {...cu, statements: [...statements, {...padded, element: {...statement, prefix: space(at === 0 ? "" : "\n\n")}}]};
     }
-    // The new statement takes the place of the one it goes before, which gets a blank line of its own.
+    // The new statement takes the place of the one it goes before, along with the triple-slash
+    // directives in front of it, and that statement gets a blank line of its own.
+    const {ahead, behind} = splitAtBodyStart(next.prefix);
     return {
         ...cu,
         statements: [
             ...statements.slice(0, at),
-            {...padded, element: {...statement, prefix: space(next.prefix.whitespace)}},
-            {...statements[at], element: {...next, prefix: {...next.prefix, whitespace: "\n\n"}}},
+            {...padded, element: {...statement, prefix: ahead}},
+            {...statements[at], element: {...next, prefix: behind}},
             ...statements.slice(at + 1)
         ]
     };
@@ -1892,16 +1944,12 @@ export function requireBinds(
 }
 
 /**
- * Where the file's leading requires start, after a shebang and `'use strict'`, and end. Every
+ * Where the file's leading requires start, after a shebang and any directives, and end. Every
  * top-level statement after them runs once they are initialised, so a binding placed there is read after it.
  */
 function leadingRequires(cu: JS.CompilationUnit): {start: number; end: number} {
     const statements = cu.statements;
-    let start = 0;
-    while (start < statements.length &&
-        (statements[start].element?.kind === JS.Kind.Shebang || isUseStrict(statements[start].element))) {
-        start++;
-    }
+    const start = prologueLength(cu);
     let end = start;
     while (end < statements.length && isRequireStatement(statements[end].element)) {
         end++;
