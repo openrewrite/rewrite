@@ -49,9 +49,7 @@ public class Cursor {
 
     public Cursor(@Nullable Cursor parent, Object value, @Nullable Map<String, Object> messages) {
         if (parent != null) {
-            if (parent.value == value) {
-                throw new IllegalArgumentException(sameElementMessage(value, true));
-            }
+            assert parent.value != value : sameElementMessage(value, true);
             assert !sameId(parent.value, value) : sameElementMessage(value, false);
         }
         this.parent = parent;
