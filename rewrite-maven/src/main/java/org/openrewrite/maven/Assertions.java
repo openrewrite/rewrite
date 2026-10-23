@@ -29,6 +29,7 @@ import org.openrewrite.test.TypeValidation;
 import org.openrewrite.xml.tree.Xml;
 import org.opentest4j.AssertionFailedError;
 
+import javax.annotation.CheckReturnValue;
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.nio.file.Files;
@@ -40,6 +41,7 @@ import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.junit.jupiter.api.Assertions.fail;
 import static org.openrewrite.maven.tree.MavenRepository.MAVEN_LOCAL_DEFAULT;
 
+@CheckReturnValue
 public class Assertions {
     private Assertions() {
     }
