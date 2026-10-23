@@ -146,7 +146,6 @@ class RewriteTestTest implements RewriteTest {
     void generatedAndDeletedFilesAreNotCountedAsChangedAgainInLaterCycles() {
         rewriteRun(
           spec -> spec.recipe(new DeletesObsoleteGeneratesPlaceholderThenFillsIt())
-            .cycles(3)
             .expectedCyclesThatMakeChanges(2),
           text("obsolete", null, spec -> spec.path("obsolete.txt")),
           text(null, "filled", spec -> spec.path("placeholder.txt"))

@@ -311,7 +311,6 @@ class MergeYamlTest implements RewriteTest {
     void insertYaml() {
         rewriteRun(
           spec -> spec
-            .cycles(2)
             .recipe(new MergeYaml(
               "$.spec",
               //language=yaml
