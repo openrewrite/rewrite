@@ -30,6 +30,7 @@ import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.util.Base64;
 import java.util.Comparator;
+import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.stream.Stream;
@@ -283,7 +284,7 @@ public class DependencyWorkspace {
 
     /**
      * Gets or creates a workspace directory for a setuptools project (setup.cfg / setup.py).
-     * Uses {@code uv pip install <projectDir>} to install the project and its dependencies.
+     * Uses {@code uv pip install -r <projectDir>/setup.py} to install the project's dependencies.
      * Returns null (graceful degradation) when uv is unavailable.
      *
      * @param manifestContent The setup.cfg (or setup.py) content for hashing
@@ -297,7 +298,7 @@ public class DependencyWorkspace {
 
     /**
      * Gets or creates a workspace directory for a setuptools project (setup.cfg / setup.py).
-     * Uses {@code uv pip install <projectDir>} to install the project and its dependencies.
+     * Uses {@code uv pip install -r <projectDir>/setup.py} to install the project's dependencies.
      * Returns null (graceful degradation) when uv is unavailable.
      *
      * @param manifestContent The setup.cfg (or setup.py) content for hashing
@@ -334,7 +335,8 @@ public class DependencyWorkspace {
         // block the final Files.move into place; remove it before rebuilding.
         cleanupDirectory(workspaceDir);
 
-        if (projectDir == null || !Files.isDirectory(projectDir)) {
+        // uv only recognizes a setuptools project by its setup.py, also when setup.cfg declares the metadata
+        if (projectDir == null || !Files.isRegularFile(projectDir.resolve("setup.py"))) {
             return null;
         }
 
@@ -348,8 +350,16 @@ public class DependencyWorkspace {
                 // Create virtualenv
                 runCommandWithPath(tempDir, uvPath, environment, "venv");
 
-                // Install from the project directory
-                runCommandWithPath(tempDir, uvPath, environment, "pip", "install", projectDir.toString());
+                // Resolving the requirements runs setuptools' egg_info, which writes <name>.egg-info into
+                // the project's package_dir unless DIST_EXTRA_CONFIG, read after the project's own setup.cfg,
+                // points egg_base elsewhere.
+                Path eggBase = Files.createDirectory(tempDir.resolve("egg-info"));
+                Path distExtraConfig = tempDir.resolve("dist-extra.cfg");
+                Files.write(distExtraConfig, ("[egg_info]\negg_base = " + eggBase + "\n").getBytes(StandardCharsets.UTF_8));
+                Map<String, String> installEnvironment = new HashMap<>(environment);
+                installEnvironment.put("DIST_EXTRA_CONFIG", distExtraConfig.toString());
+                runCommandWithPath(tempDir, uvPath, installEnvironment, "pip", "install", "-r",
+                        projectDir.resolve("setup.py").toString());
 
                 // Capture freeze output BEFORE installing ty
                 PackageManagerExecutor.RunResult freezeResult = PackageManagerExecutor.UV.run(tempDir, uvPath, environment, "pip", "freeze");

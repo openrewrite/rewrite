@@ -38,7 +38,7 @@ import static org.openrewrite.Tree.randomId;
 /**
  * Parser for setup.cfg files that delegates to {@link PlainTextParser} and attaches a
  * {@link PythonResolutionResult} marker with dependency metadata resolved via
- * {@code uv pip install <projectDir>} and {@code uv pip freeze}.
+ * {@code uv pip install -r setup.py} and {@code uv pip freeze}.
  */
 public class SetupCfgParser implements Parser {
 
