@@ -339,8 +339,6 @@ class SingletonTest implements RewriteTest {
 
         rewriteRun(
           spec -> spec
-            .cycles(1)
-            .expectedCyclesThatMakeChanges(0)
             .recipe(recipe)
             .validateRecipeSerialization(false)
             .afterRecipe(run -> assertThat(CountingScanRecipe.SCAN_COUNT.get())

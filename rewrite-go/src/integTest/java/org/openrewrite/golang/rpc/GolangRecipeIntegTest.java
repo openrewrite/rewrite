@@ -135,7 +135,7 @@ class GolangRecipeIntegTest implements RewriteTest {
                   }
                   return super.visitSwitch(switch_, ctx);
               }
-          })).expectedCyclesThatMakeChanges(0).cycles(1),
+          })),
           go(
             """
               package main
