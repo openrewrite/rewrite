@@ -212,6 +212,7 @@ class ChangeDependencyCatalogTest implements RewriteTest {
         rewriteRun(
           spec -> spec.recipes(new AddDependency("left-pad", "^1.3.0", null),
               new ChangeDependency("left-pad", "pad-left", "^2.0.0", null))
+            // the addition restores what the change of the previous cycle renamed away
             .cycles(1).expectedCyclesThatMakeChanges(1),
           packageJson("""
             {

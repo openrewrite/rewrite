@@ -265,6 +265,7 @@ class RemoveDependencyCatalogTest implements RewriteTest {
         rewriteRun(
           spec -> spec.recipes(new AddDependency("left-pad", "^1.3.0", null),
               new AddDependency("right-pad", "^1.0.0", null), new RemoveDependency("left-pad", null))
+            // the addition restores what the removal of the previous cycle took away
             .cycles(1).expectedCyclesThatMakeChanges(1),
           packageJson("""
             {

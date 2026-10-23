@@ -622,6 +622,7 @@ class AddPropertyTest implements RewriteTest {
           spec -> spec.recipes(
             new AddProperty("key", "value", null, false),
             new AddProperty("key", "v", null, false)
+            // the two steps set the property to different values in every cycle
           ).cycles(1).expectedCyclesThatMakeChanges(1),
           pomXml(
             """
