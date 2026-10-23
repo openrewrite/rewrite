@@ -605,4 +605,31 @@ class MatchTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void semicolonAfterBracedCaseBody() {
+        rewriteRun(
+          scala(
+            """
+            object O {
+              def f(x: Int) = x match { case 1 => { 1 }; case _ => 2 }
+            }
+            """
+          )
+        );
+    }
+
+    @Test
+    void semicolonBetweenCasesOnNextLine() {
+        rewriteRun(
+          scala(
+            """
+            object O {
+              def f(x: Int) = x match { case 1 => 1
+                ; case _ => 2 }
+            }
+            """
+          )
+        );
+    }
 }
