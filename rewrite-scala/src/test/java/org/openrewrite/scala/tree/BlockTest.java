@@ -121,4 +121,63 @@ class BlockTest implements RewriteTest {
             )
         );
     }
+
+    @Test
+    void semicolonOnNextLineInBlock() {
+        rewriteRun(
+            scala(
+                """
+                object O {
+                  def f = {
+                    val a = 1
+                    ; a
+                  }
+                }
+                """
+            )
+        );
+    }
+
+    @Test
+    void leadingEmptyStatementInBlock() {
+        rewriteRun(
+            scala(
+                """
+                object O {
+                  def f = { ; val a = 1; a }
+                }
+                """
+            )
+        );
+    }
+
+    @Test
+    void emptyStatementInBlock() {
+        rewriteRun(
+            scala(
+                """
+                object O {
+                  def f = { val a = 1;; a }
+                }
+                """
+            )
+        );
+    }
+
+    @Test
+    void semicolonAfterCommentOnNextLine() {
+        rewriteRun(
+            scala(
+                """
+                object O {
+                  def f = {
+                    val a = 1
+                    // c
+                    ; a
+                  }
+                }
+                """
+            )
+        );
+    }
 }

@@ -46,7 +46,7 @@ class CursorTest {
         var cursor = new Cursor(null, t);
 
         assertThatThrownBy(() -> new Cursor(cursor, t))
-          .isInstanceOf(IllegalArgumentException.class)
+          .isInstanceOf(AssertionError.class)
           .hasMessageContaining("is a cursor on the same PlainText")
           .hasMessageContaining("getCursor().getParentOrThrow()");
         assertThatThrownBy(() -> new Cursor(cursor, t.withText("changed")))

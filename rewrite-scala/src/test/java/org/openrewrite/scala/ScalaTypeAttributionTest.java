@@ -21,6 +21,7 @@ import org.junit.jupiter.api.Timeout;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.InMemoryExecutionContext;
 import org.openrewrite.SourceFile;
+import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.JavaParser;
 import org.openrewrite.java.MethodMatcher;
 import org.openrewrite.java.internal.JavaTypeCache;
@@ -730,7 +731,7 @@ class ScalaTypeAttributionTest implements RewriteTest {
                 assertThat(global.getMarkers().findFirst(ImplicitImport.class)).isPresent();
                 JavaType.Method globalMethod = (JavaType.Method) global.getQualid().getType();
                 assertThat(globalMethod.getName()).isEqualTo("global");
-                assertThat(globalMethod.getDeclaringType().getFullyQualifiedName()).isEqualTo("scala.concurrent.ExecutionContext$.Implicits");
+                assertThat(globalMethod.getDeclaringType().getFullyQualifiedName()).isEqualTo("scala.concurrent.ExecutionContext$Implicits");
 
                 J.Import future = importOf(cu, "Future");
                 assertThat(TypeUtils.asFullyQualified(future.getQualid().getType()).getFullyQualifiedName()).isEqualTo("scala.concurrent.Future");
@@ -756,7 +757,7 @@ class ScalaTypeAttributionTest implements RewriteTest {
                 assertThat(iv.getMarkers().findFirst(ImplicitImport.class)).isPresent();
 
                 J.Import io = importOf(cu, "IO");
-                assertThat(TypeUtils.asFullyQualified(io.getQualid().getType()).getFullyQualifiedName()).isEqualTo("Defaults$.IO");
+                assertThat(TypeUtils.asFullyQualified(io.getQualid().getType()).getFullyQualifiedName()).isEqualTo("Defaults$IO");
                 assertThat(io.getQualid().getName().getFieldType().getName()).isEqualTo("IO");
                 assertThat(io.getMarkers().findFirst(ImplicitImport.class)).isPresent();
 
@@ -793,7 +794,7 @@ class ScalaTypeAttributionTest implements RewriteTest {
                 assertThat(future.getArguments()).singleElement().satisfies(arg -> {
                     JavaType.Method global = (JavaType.Method) arg;
                     assertThat(global.getName()).isEqualTo("global");
-                    assertThat(global.getDeclaringType().getFullyQualifiedName()).isEqualTo("scala.concurrent.ExecutionContext$.Implicits");
+                    assertThat(global.getDeclaringType().getFullyQualifiedName()).isEqualTo("scala.concurrent.ExecutionContext$Implicits");
                 });
 
                 J.MethodInvocation explicit = find(cu, J.MethodInvocation.class, m -> m.getArguments().getFirst() instanceof J.Literal l && Integer.valueOf(2).equals(l.getValue()));
@@ -1853,6 +1854,28 @@ class ScalaTypeAttributionTest implements RewriteTest {
     }
 
     @Test
+    void nestedJavaClassHasBinaryName() {
+        rewriteRun(
+          scala(
+            """
+            class EntryHost {
+              val entry: java.util.Map.Entry[String, Int] = null
+              val key = entry.getKey()
+            }
+            """,
+            spec -> spec.afterRecipe(cu -> {
+                JavaType entry = variable(cu, "entry").getType();
+                J.MethodInvocation getKey = method(cu, "getKey");
+                assertThat(TypeUtils.asFullyQualified(entry).getFullyQualifiedName()).isEqualTo("java.util.Map$Entry");
+                assertThat(TypeUtils.isOfClassType(entry, "java.util.Map$Entry")).isTrue();
+                assertThat(getKey.getMethodType().getDeclaringType().getFullyQualifiedName()).isEqualTo("java.util.Map$Entry");
+                assertThat(new MethodMatcher("java.util.Map$Entry getKey()").matches(getKey)).isTrue();
+            })
+          )
+        );
+    }
+
+    @Test
     void findAnnotationsMatchesScalaAnnotations() {
         rewriteRun(
           spec -> spec.recipes(
@@ -1885,6 +1908,87 @@ class ScalaTypeAttributionTest implements RewriteTest {
         return ((JavaType.MultiCatch) type).getThrowableTypes().stream().map(JavaType::toString).toList();
     }
 
+    @Test
+    void nestedScalaClassHasBinaryName() {
+        rewriteRun(
+          scala(
+            """
+            class Outer {
+              class Inner
+              object Nested {
+                class Deep
+              }
+            }
+            object Holder {
+              class Member
+            }
+            class NestedHost(o: Outer) {
+              val inner: o.Inner = null
+              val nested = o.Nested
+              val deep: o.Nested.Deep = null
+              val member: Holder.Member = null
+            }
+            """,
+            spec -> spec.afterRecipe(cu -> {
+                JavaType inner = variable(cu, "inner").getType();
+                JavaType nested = variable(cu, "nested").getType();
+                JavaType deep = variable(cu, "deep").getType();
+                JavaType member = variable(cu, "member").getType();
+                assertThat(TypeUtils.asFullyQualified(inner).getFullyQualifiedName()).isEqualTo("Outer$Inner");
+                assertThat(TypeUtils.asFullyQualified(nested).getFullyQualifiedName()).isEqualTo("Outer$Nested");
+                assertThat(TypeUtils.asFullyQualified(deep).getFullyQualifiedName()).isEqualTo("Outer$Nested$Deep");
+                assertThat(TypeUtils.asFullyQualified(member).getFullyQualifiedName()).isEqualTo("Holder$Member");
+            })
+          )
+        );
+    }
+
+    @Test
+    void localVariablesOfOverloadsAreDistinct() {
+        rewriteRun(
+          scala(
+            """
+            class Overloads {
+              def m(a: Int): Unit = { val x = a }
+              def m(a: String): Unit = { val x = a }
+            }
+            """,
+            spec -> spec.afterRecipe(cu -> {
+                List<J.VariableDeclarations.NamedVariable> params = findAll(cu, J.VariableDeclarations.NamedVariable.class, v -> v.getSimpleName().equals("a"));
+                List<J.VariableDeclarations.NamedVariable> locals = findAll(cu, J.VariableDeclarations.NamedVariable.class, v -> v.getSimpleName().equals("x"));
+                assertThat(params).extracting(v -> TypeUtils.toString(v.getVariableType().getType())).containsExactly("int", "java.lang.String");
+                assertThat(locals).extracting(v -> TypeUtils.toString(v.getVariableType().getType())).containsExactly("int", "java.lang.String");
+                assertThat(locals.get(0).getVariableType().getOwner()).isNotSameAs(locals.get(1).getVariableType().getOwner());
+            })
+          )
+        );
+    }
+
+    @Test
+    void nestedJavaClassMethodsAreSharedWithJavaParserThroughTypeCache() {
+        // given
+        JavaTypeCache typeCache = new JavaTypeCache();
+        ExecutionContext ctx = new InMemoryExecutionContext();
+        J scalaCu = (J) ScalaParser.builder().typeCache(typeCache).build().parse(ctx, """
+          class ScalaNested {
+            val c = java.util.Map.Entry.comparingByKey[String, Integer]()
+            def k(e: java.util.Map.Entry[String, Integer]) = e.getKey()
+          }
+          """).findFirst().orElseThrow();
+
+        // when
+        J.CompilationUnit javaCu = (J.CompilationUnit) JavaParser.fromJavaVersion().typeCache(typeCache).build().parse(ctx, """
+          class JavaNested {
+              Object c = java.util.Map.Entry.<String, Integer>comparingByKey();
+              Object k(java.util.Map.Entry<String, Integer> e) { return e.getKey(); }
+          }
+          """).findFirst().orElseThrow();
+
+        // then
+        assertThat(javaMethod(javaCu, "comparingByKey").getMethodType()).isNotNull().isSameAs(method(scalaCu, "comparingByKey").getMethodType());
+        assertThat(javaMethod(javaCu, "getKey").getMethodType()).isNotNull().isSameAs(method(scalaCu, "getKey").getMethodType());
+    }
+
     private static J.Identifier lambdaParameter(J cu, String name) {
         return findAll(cu, J.Lambda.class, l -> true).stream()
           .flatMap(l -> l.getParameters().getParameters().stream())
@@ -1913,8 +2017,24 @@ class ScalaTypeAttributionTest implements RewriteTest {
         return find(cu, J.Import.class, i -> i.getQualid().getSimpleName().equals(name));
     }
 
+    private static J.VariableDeclarations.NamedVariable variable(J cu, String name) {
+        return find(cu, J.VariableDeclarations.NamedVariable.class, v -> v.getSimpleName().equals(name));
+    }
+
     private static J.MethodInvocation method(J cu, String name) {
         return find(cu, J.MethodInvocation.class, m -> m.getSimpleName().equals(name));
+    }
+
+    private static J.MethodInvocation javaMethod(J.CompilationUnit cu, String name) {
+        return new JavaIsoVisitor<List<J.MethodInvocation>>() {
+            @Override
+            public J.MethodInvocation visitMethodInvocation(J.MethodInvocation m, List<J.MethodInvocation> acc) {
+                if (m.getSimpleName().equals(name)) {
+                    acc.add(m);
+                }
+                return super.visitMethodInvocation(m, acc);
+            }
+        }.reduce(cu, new ArrayList<>()).getFirst();
     }
 
     private static <T extends J> T find(J cu, Class<T> type, Predicate<T> matching) {

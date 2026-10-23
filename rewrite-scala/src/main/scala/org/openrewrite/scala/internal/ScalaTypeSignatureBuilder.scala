@@ -99,8 +99,7 @@ class ScalaTypeSignatureBuilder(using ctx: Context) {
     if (!sym.exists) return tr.show
     if (sym.isTypeParam) return typeVariableSignature(sym.name.toString, tr.underlying)
 
-    val fqn = sym.fullName.toString
-    mapScalaFqnToJava(fqn)
+    mapScalaFqnToJava(binaryName(sym))
   }
 
   private def termRefSignature(tmr: TermRef): String = {
@@ -200,9 +199,9 @@ class ScalaTypeSignatureBuilder(using ctx: Context) {
     case other => List(other)
   }
 
-  /** The FQN of a class: `object A` has the same class type as `class A`, and `scala.Any`/`scala.AnyRef` are `java.lang.Object`. */
+  /** The FQN of a class by its JVM binary name (`Outer$Inner`): `object A` has the same class type as `class A`, and `scala.Any`/`scala.AnyRef` are `java.lang.Object`. */
   def classFqn(sym: Symbols.Symbol): String = {
-    val fqn = sym.fullName.toString
+    val fqn = binaryName(sym)
     val classFqn = if (sym.is(Flags.ModuleClass)) fqn.stripSuffix("$") else fqn
     classFqn match {
       case "scala.Any" | "scala.AnyRef" => "java.lang.Object"
@@ -215,13 +214,23 @@ class ScalaTypeSignatureBuilder(using ctx: Context) {
    * like the Java parser does, while a Scala `object A` keeps its `$` so its methods don't collide with `class A`'s.
    */
   def methodOwnerFqn(owner: Symbols.Symbol): String = {
-    val fqn = owner.fullName.toString
+    val fqn = binaryName(owner)
     if (owner.is(Flags.JavaDefined) && owner.is(Flags.ModuleClass)) fqn.stripSuffix("$") else fqn
   }
 
   def variableSignature(sym: Symbols.Symbol): String = {
-    val owner = sym.owner.fullName.toString
+    val owner =
+      if (sym.owner.isClass) binaryName(sym.owner)
+      else if (sym.owner.is(Flags.Method)) methodSignature(sym.owner)
+      else sym.owner.fullName.toString
     owner + "{name=" + sym.name.toString + "}"
+  }
+
+  /** `flatName` leaves out the package, and joins a nested class to a module class owner without a doubled `$`. */
+  private def binaryName(sym: Symbols.Symbol): String = {
+    val pkg = sym.enclosingPackageClass
+    if (pkg.isEffectiveRoot) sym.flatName.toString
+    else pkg.fullName.toString + "." + sym.flatName
   }
 
   def variableSignature(name: String): String = {
