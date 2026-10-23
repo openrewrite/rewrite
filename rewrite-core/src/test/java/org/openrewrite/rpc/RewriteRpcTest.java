@@ -50,6 +50,7 @@ import org.openrewrite.marker.RecipesThatMadeChanges;
 import org.openrewrite.rpc.request.GetObject;
 import org.openrewrite.rpc.request.GetObjectResponse;
 import org.openrewrite.rpc.request.Print;
+import org.openrewrite.text.FindAndReplace;
 import org.openrewrite.text.PlainText;
 import org.openrewrite.text.PlainTextVisitor;
 
@@ -756,14 +757,13 @@ class RewriteRpcTest implements RewriteTest {
      */
     @Test
     void sameRpcBatchFollowedByNonRpcRecipe() {
-        Recipe rpc1 = client.prepareRecipe("org.openrewrite.text.ChangeText", Map.of("toText", "from-rpc"));
-        Recipe local = new org.openrewrite.text.ChangeText("from-local");
+        Recipe rpc1 = client.prepareRecipe("org.openrewrite.text.FindAndReplace", Map.of("find", "hello", "replace", "from-rpc"));
+        Recipe local = new FindAndReplace("from-rpc", "from-local", null, null, null, null, null, null);
 
         rewriteRun(
           spec -> spec
             .recipe(new CompositeRecipe(List.of(rpc1, local)))
-            .validateRecipeSerialization(false)
-            .expectedCyclesThatMakeChanges(2), // each ChangeText overwrites the other in every cycle
+            .validateRecipeSerialization(false),
           text(
             "hello",
             "from-local"
