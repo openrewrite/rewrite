@@ -24,10 +24,12 @@ import org.openrewrite.test.SourceSpec;
 import org.openrewrite.test.SourceSpecs;
 import org.openrewrite.test.TypeValidation;
 
+import javax.annotation.CheckReturnValue;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.function.Consumer;
 
+@CheckReturnValue
 public class Assertions {
     private Assertions() {
     }

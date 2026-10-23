@@ -36,6 +36,7 @@ import org.openrewrite.test.TypeValidation;
 import org.openrewrite.test.UncheckedConsumer;
 import org.opentest4j.AssertionFailedError;
 
+import javax.annotation.CheckReturnValue;
 import java.util.*;
 import java.util.function.Consumer;
 
@@ -49,6 +50,7 @@ import static org.openrewrite.java.tree.TypeUtils.isWellFormedType;
 import static org.openrewrite.test.SourceSpecs.dir;
 
 @SuppressWarnings({"unused", "unchecked", "OptionalGetWithoutIsPresent", "DataFlowIssue"})
+@CheckReturnValue
 public final class Assertions {
 
     private Assertions() {
