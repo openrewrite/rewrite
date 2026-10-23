@@ -181,4 +181,42 @@ class ObjectDeclarationTest implements RewriteTest {
             )
         );
     }
+
+    @Test
+    void semicolonOnNextLine() {
+        rewriteRun(
+            scala(
+                """
+                object O {
+                  val a = 1
+                  ; val b = 2
+                }
+                """
+            )
+        );
+    }
+
+    @Test
+    void emptyStatementBetweenMembers() {
+        rewriteRun(
+            scala(
+                """
+                object O { val a = 1;; val b = 2 }
+                """
+            )
+        );
+    }
+
+    @Test
+    void bracelessBodyWithTrailingSemicolons() {
+        rewriteRun(
+            scala(
+                """
+                object O:
+                  val a = 1;
+                  val b = 2;
+                """
+            )
+        );
+    }
 }

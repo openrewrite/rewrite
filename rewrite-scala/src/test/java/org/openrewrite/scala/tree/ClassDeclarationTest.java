@@ -651,4 +651,29 @@ class ClassDeclarationTest implements RewriteTest {
             )
         );
     }
+
+    @Test
+    void semicolonOnNextLine() {
+        rewriteRun(
+            scala(
+                """
+                class C {
+                  val a = 1
+                  ; val b = 2
+                }
+                """
+            )
+        );
+    }
+
+    @Test
+    void emptyStatementBetweenMembers() {
+        rewriteRun(
+            scala(
+                """
+                class C { val a = 1;; val b = 2 }
+                """
+            )
+        );
+    }
 }

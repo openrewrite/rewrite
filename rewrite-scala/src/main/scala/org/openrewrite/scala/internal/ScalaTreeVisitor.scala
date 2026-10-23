@@ -75,6 +75,7 @@ class ScalaTreeVisitor(
 )(implicit ctx: Context) {
 
   private var cursor = 0
+  private var lastConsumedSemicolon = -1
   private var isInImportContext = false
   private var currentSyntheticParams: Set[String] = Set.empty
   private var inPattern = false
@@ -2474,15 +2475,20 @@ class ScalaTreeVisitor(
 
           // Convert body statements
           val statementPaddings = new util.ArrayList[JRightPadded[Statement]]()
+          val bodyEnd = if (newTree.span.exists) Math.max(0, newTree.span.end - offsetAdjustment) else source.length
+          if (!isBraceless) {
+            consumeEmptyStatements(bodyEnd, statementPaddings)
+          }
 
-          bodyStatements.foreach { stmt =>
-            val stmtJ = visitTree(stmt)
-            if (stmtJ.isInstanceOf[Statement]) {
-              statementPaddings.add(new JRightPadded[Statement](
-                stmtJ.asInstanceOf[Statement],
-                Space.EMPTY,
-                Markers.EMPTY
-              ))
+          for (idx <- bodyStatements.indices) {
+            val stmt = bodyStatements(idx)
+            visitTree(stmt) match {
+              case stmtJ: Statement =>
+                val nextStart = if (idx + 1 < bodyStatements.size) {
+                  Math.max(0, bodyStatements(idx + 1).span.start - offsetAdjustment)
+                } else bodyEnd
+                addStatement(statementPaddings, stmtJ, Math.max(0, stmt.span.end - offsetAdjustment), nextStart)
+              case _ =>
             }
           }
 
@@ -4101,6 +4107,7 @@ class ScalaTreeVisitor(
         // Sort by source position to preserve source order (Dotty may reorder imports)
         val sortedBody = tmpl.body.sortBy(s => if (s.span.exists) s.span.start else Int.MaxValue)
         val objectEndForBody = if (md.span.exists) Math.max(0, md.span.end - offsetAdjustment) else source.length
+        consumeEmptyStatements(objectEndForBody, statements)
         for (idx <- sortedBody.indices) {
           val stat = sortedBody(idx)
           val isSynth = stat.span.isSynthetic || {
@@ -4125,8 +4132,7 @@ class ScalaTreeVisitor(
                 .find(s => s.span.exists && !s.span.isSynthetic)
                 .map(s => Math.max(0, s.span.start - offsetAdjustment))
                 .getOrElse(objectEndForBody)
-              val (trailingSpace, rpMarkers) = consumeTrailingSemicolon(statEnd, nextStart)
-              statements.add(new JRightPadded[Statement](visitedStmt, trailingSpace, rpMarkers))
+              addStatement(statements, visitedStmt, statEnd, nextStart)
             }
           }
         }
@@ -4930,7 +4936,9 @@ class ScalaTreeVisitor(
     }
     
     val statements = new util.ArrayList[JRightPadded[Statement]]()
-
+    if (hasBraces) {
+      consumeEmptyStatements(blockEndAdj, statements)
+    }
 
     // Visit all statements in the block
     for (i <- block.stats.indices) {
@@ -4963,42 +4971,17 @@ class ScalaTreeVisitor(
             Math.max(0, block.span.end - offsetAdjustment) - 1
           }
           
-          var trailingSpace = Space.EMPTY
-          var rpMarkers = Markers.EMPTY
-          val trailStart = Math.max(statEnd, cursor)
-          if (trailStart > 0 && trailStart <= source.length && source.charAt(trailStart - 1) == ';') {
-            // A `;` already absorbed into the statement's span, which the forward scan
-            // below can't see — same recognition and cursor catch-up as
-            // consumeTrailingSemicolon (which documents the Dotty span behavior).
-            rpMarkers = Markers.EMPTY.add(new Semicolon(Tree.randomId()))
-            cursor = Math.max(cursor, trailStart)
-          } else if (trailStart < nextStart && nextStart <= source.length) {
-            val between = source.substring(trailStart, nextStart)
-            // An explicit ';' separator appears before any newline and with only
-            // horizontal whitespace between it and the preceding statement.
-            val semiIdx = {
-              var idx = -1
-              var j = 0
-              while (idx < 0 && j < between.length) {
-                val c = between.charAt(j)
-                if (c == ';') idx = j
-                else if (c == '\n' || c == '\r') j = between.length
-                else if (c != ' ' && c != '\t') j = between.length
-                else j += 1
-              }
-              idx
-            }
-            if (semiIdx >= 0) {
-              trailingSpace = if (semiIdx > 0) Space.format(between.substring(0, semiIdx)) else Space.EMPTY
-              rpMarkers = Markers.EMPTY.add(new Semicolon(Tree.randomId()))
-              cursor = trailStart + semiIdx + 1
-            } else {
-              trailingSpace = Space.format(between)
+          var (trailingSpace, rpMarkers) = consumeTrailingSemicolon(statEnd, nextStart)
+          if (rpMarkers.getMarkers.isEmpty) {
+            val trailStart = Math.max(statEnd, cursor)
+            if (trailStart < nextStart && nextStart <= source.length) {
+              trailingSpace = Space.format(source.substring(trailStart, nextStart))
               cursor = nextStart
             }
           }
 
           statements.add(new JRightPadded[Statement](stmt, trailingSpace, rpMarkers))
+          consumeEmptyStatements(nextStart, statements)
         case _ => // Skip non-statement nodes
       }
     }
@@ -5077,6 +5060,9 @@ class ScalaTreeVisitor(
             val (trailingSpace, rpMarkers) = trailingSemicolon()
             statements.add(new JRightPadded[Statement](stmt, trailingSpace, rpMarkers))
           case _ => // Skip
+        }
+        if (hasBraces) {
+          consumeEmptyStatements(blockEndAdj, statements)
         }
       }
     }
@@ -5639,6 +5625,7 @@ class ScalaTreeVisitor(
           // Sort by source position to preserve source order
           val sortedBody = template.body.sortBy(s => if (s.span.exists) s.span.start else Int.MaxValue)
           val classEndForBody = if (td.span.exists) Math.max(0, td.span.end - offsetAdjustment) else source.length
+          consumeEmptyStatements(classEndForBody, statements)
           for (idx <- sortedBody.indices) {
             val stat = sortedBody(idx)
             val isSyntheticStat = stat.span.isSynthetic || {
@@ -5675,8 +5662,7 @@ class ScalaTreeVisitor(
                     }
                     ns
                   }
-                  val (trailingSpace, rpMarkers) = consumeTrailingSemicolon(statEnd, nextStart)
-                  statements.add(new JRightPadded[Statement](visitedStmt, trailingSpace, rpMarkers))
+                  addStatement(statements, visitedStmt, statEnd, nextStart)
                 }
               }
             }
@@ -7545,9 +7531,10 @@ class ScalaTreeVisitor(
     var caseRpMarkers = Markers.EMPTY
     val caseRpAfter = Space.EMPTY
     val nextNonWs = indexOfNextNonWhitespace(bodyContentEnd)
-    if (nextNonWs < source.length && source.charAt(nextNonWs) == ';') {
+    if (nextNonWs < source.length && source.charAt(nextNonWs) == ';' && nextNonWs != lastConsumedSemicolon) {
       caseRpMarkers = Markers.EMPTY.add(new Semicolon(Tree.randomId()))
       cursor = nextNonWs + 1
+      lastConsumedSemicolon = nextNonWs
     }
 
     val statementsContainer: JContainer[Statement] =
@@ -7968,6 +7955,10 @@ class ScalaTreeVisitor(
     val stmts = new util.ArrayList[JRightPadded[Statement]]()
     import scala.jdk.CollectionConverters.*
     val refList = rtt.refinements.asJava
+    val refinementEnd = Math.max(0, rtt.span.end - offsetAdjustment)
+    if (braceIdx >= 0) {
+      consumeEmptyStatements(refinementEnd, stmts)
+    }
     var i = 0
     while (i < refList.size) {
       val ref = refList.get(i)
@@ -7978,11 +7969,14 @@ class ScalaTreeVisitor(
         case _ => throw new UnsupportedOperationException(
           s"Refinement member did not produce a Statement: ${ref.getClass.getSimpleName}")
       }
-      stmts.add(JRightPadded.build(stmt))
+      val nextStart = if (i + 1 < refList.size && refList.get(i + 1).span.exists) {
+        Math.max(0, refList.get(i + 1).span.start - offsetAdjustment)
+      } else refinementEnd
+      addStatement(stmts, stmt, Math.max(0, ref.span.end - offsetAdjustment), nextStart)
       i += 1
     }
 
-    val endPos = Math.max(0, rtt.span.end - offsetAdjustment)
+    val endPos = refinementEnd
     val remaining = if (cursor < endPos && endPos <= source.length) source.substring(cursor, endPos) else ""
     val closeIdx = remaining.lastIndexOf('}')
     val endSpace = if (closeIdx > 0) Space.format(remaining.substring(0, closeIdx)) else Space.EMPTY
@@ -8171,6 +8165,9 @@ class ScalaTreeVisitor(
     }
 
     val methodStmts = new util.ArrayList[JRightPadded[Statement]]()
+    if (!isExtBraceless) {
+      consumeEmptyStatements(extEnd, methodStmts)
+    }
     val methods = ext.methods.asJava
     var i = 0
     while (i < methods.size) {
@@ -8180,7 +8177,8 @@ class ScalaTreeVisitor(
         case _ => throw new UnsupportedOperationException(
           s"Extension method did not produce a Statement: ${m.getClass.getSimpleName}")
       }
-      methodStmts.add(JRightPadded.build(mStmt))
+      val nextStart = if (i + 1 < methods.size) Math.max(0, methods.get(i + 1).span.start - offsetAdjustment) else extEnd
+      addStatement(methodStmts, mStmt, Math.max(0, m.span.end - offsetAdjustment), nextStart)
       i += 1
     }
 
@@ -9342,14 +9340,10 @@ class ScalaTreeVisitor(
   }
 
   /**
-   * Skip whitespace and Scala comments (`/* ... */` and `//`) and return the
-   * position of the next significant character. Returns `source.length` if no
-   * such character exists.
-   */
-  /**
    * After visiting a statement that ended at `statEnd`, detect an explicit `;`
-   * separator on the same line and consume it. Returns the JRightPadded
-   * trailing space and markers; advances `cursor`.
+   * separator before `nextStart` and consume it. Only whitespace and comments may
+   * precede it, possibly spanning lines. Returns the JRightPadded trailing space
+   * and markers; advances `cursor`.
    */
   private def consumeTrailingSemicolon(statEnd: Int, nextStart: Int): (Space, Markers) = {
     val trailStart = Math.max(statEnd, cursor)
@@ -9358,33 +9352,61 @@ class ScalaTreeVisitor(
     // forward scan below would miss it, dropping the explicit separator on print.
     // Recognize that already-absorbed `;` here so it is preserved via the marker.
     if (trailStart > 0 && trailStart <= source.length && source.charAt(trailStart - 1) == ';') {
+      // A nested statement list (e.g. a braceless body) may already own this `;`.
+      if (lastConsumedSemicolon == trailStart - 1) {
+        return (Space.EMPTY, Markers.EMPTY)
+      }
       // The cursor may still sit before the `;` when the statement visit didn't
       // consume its full span — move past it so it doesn't leak into whitespace.
       cursor = Math.max(cursor, trailStart)
+      lastConsumedSemicolon = trailStart - 1
       return (Space.EMPTY, Markers.EMPTY.add(new Semicolon(Tree.randomId())))
     }
-    if (trailStart >= nextStart || nextStart > source.length) {
+    val limit = Math.min(nextStart, source.length)
+    if (trailStart >= limit) {
       return (Space.EMPTY, Markers.EMPTY)
     }
-    val between = source.substring(trailStart, nextStart)
-    var semiIdx = -1
-    var j = 0
-    while (semiIdx < 0 && j < between.length) {
-      val c = between.charAt(j)
-      if (c == ';') semiIdx = j
-      else if (c == '\n' || c == '\r') j = between.length
-      else if (c != ' ' && c != '\t') j = between.length
-      else j += 1
-    }
-    if (semiIdx >= 0) {
-      val trailing = if (semiIdx > 0) Space.format(between.substring(0, semiIdx)) else Space.EMPTY
-      cursor = trailStart + semiIdx + 1
-      (trailing, Markers.EMPTY.add(new Semicolon(Tree.randomId())))
+    val semiIdx = indexOfNextNonWhitespace(trailStart)
+    if (semiIdx < limit && source.charAt(semiIdx) == ';') {
+      cursor = semiIdx + 1
+      lastConsumedSemicolon = semiIdx
+      (ScalaSpace.format(source, trailStart, semiIdx), Markers.EMPTY.add(new Semicolon(Tree.randomId())))
     } else {
       (Space.EMPTY, Markers.EMPTY)
     }
   }
 
+  /**
+   * Consume each further `;` before `limit` as an empty statement, as Java models `;;`.
+   */
+  private[internal] def consumeEmptyStatements(limit: Int, statements: util.List[JRightPadded[Statement]]): Unit = {
+    val end = Math.min(limit, source.length)
+    var semiIdx = indexOfNextNonWhitespace(cursor)
+    while (semiIdx < end && source.charAt(semiIdx) == ';') {
+      val empty = new J.Empty(Tree.randomId(), ScalaSpace.format(source, cursor, semiIdx), Markers.EMPTY)
+      statements.add(new JRightPadded[Statement](empty, Space.EMPTY, Markers.EMPTY.add(new Semicolon(Tree.randomId()))))
+      cursor = semiIdx + 1
+      lastConsumedSemicolon = semiIdx
+      semiIdx = indexOfNextNonWhitespace(cursor)
+    }
+  }
+
+  /**
+   * Add `stmt` to `statements` along with its `;` separator and any empty statements
+   * that follow it before `nextStart`.
+   */
+  private[internal] def addStatement(statements: util.List[JRightPadded[Statement]], stmt: Statement,
+                                     statEnd: Int, nextStart: Int): Unit = {
+    val (trailingSpace, rpMarkers) = consumeTrailingSemicolon(statEnd, nextStart)
+    statements.add(new JRightPadded[Statement](stmt, trailingSpace, rpMarkers))
+    consumeEmptyStatements(nextStart, statements)
+  }
+
+  /**
+   * Skip whitespace and Scala comments (`/* ... */` and `//`) and return the
+   * position of the next significant character. Returns `source.length` if no
+   * such character exists.
+   */
   private def indexOfNextNonWhitespace(startFrom: Int = cursor): Int = {
     var i = startFrom
     while (i < source.length) {
