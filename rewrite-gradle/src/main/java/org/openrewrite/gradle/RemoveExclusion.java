@@ -122,8 +122,11 @@ public class RemoveExclusion extends Recipe {
     private static boolean endsWithEmptyClosure(J.MethodInvocation method) {
         List<Expression> args = method.getArguments();
         Expression last = args.isEmpty() ? null : args.get(args.size() - 1);
-        return last instanceof J.Lambda &&
-               ((J.Lambda) last).getBody() instanceof J.Block &&
-               ((J.Block) ((J.Lambda) last).getBody()).getStatements().isEmpty();
+        if (!(last instanceof J.Lambda) || !(((J.Lambda) last).getBody() instanceof J.Block)) {
+            return false;
+        }
+        J.Block body = (J.Block) ((J.Lambda) last).getBody();
+        // A closure still holding a comment is kept, so that no comment is silently deleted
+        return body.getStatements().isEmpty() && body.getEnd().getComments().isEmpty();
     }
 }

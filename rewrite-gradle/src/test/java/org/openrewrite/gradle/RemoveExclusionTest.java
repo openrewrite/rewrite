@@ -77,6 +77,29 @@ class RemoveExclusionTest implements RewriteTest {
     }
 
     @Test
+    void keepsClosureWithComment() {
+        rewriteRun(
+          buildGradle(
+            """
+              dependencies {
+                  implementation('org.springframework.boot:spring-boot-starter-web:3.5.0') {
+                      exclude group: 'org.springframework.boot', module: 'spring-boot-starter-tomcat'
+                      // keep in sync with the parent build
+                  }
+              }
+              """,
+            """
+              dependencies {
+                  implementation('org.springframework.boot:spring-boot-starter-web:3.5.0') {
+                      // keep in sync with the parent build
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
     void configurationExclusion() {
         rewriteRun(
           buildGradle(
