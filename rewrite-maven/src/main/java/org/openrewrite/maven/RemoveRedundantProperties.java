@@ -24,6 +24,7 @@ import org.openrewrite.marker.BuildTool;
 import org.openrewrite.maven.internal.MavenPomDownloader;
 import org.openrewrite.maven.tree.MavenResolutionResult;
 import org.openrewrite.maven.tree.ResolvedGroupArtifactVersion;
+import org.openrewrite.maven.tree.Version;
 import org.openrewrite.semver.LatestRelease;
 import org.openrewrite.xml.RemoveContentVisitor;
 import org.openrewrite.xml.tree.Xml;
@@ -42,7 +43,6 @@ import static org.openrewrite.internal.StringUtils.matchesGlob;
 public class RemoveRedundantProperties extends Recipe {
     private static final Map<String, String> SUPER_POM_DEFAULTS = new HashMap<>();
     private static final Pattern VERSION = Pattern.compile("\\d+(\\.\\d+)*([.-][\\w.-]*)?");
-    private static final LatestRelease VERSION_COMPARATOR = new LatestRelease(null);
 
     static {
         SUPER_POM_DEFAULTS.put("project.build.sourceEncoding", "UTF-8");
@@ -216,7 +216,7 @@ public class RemoveRedundantProperties extends Recipe {
                 if (!isVersion(parentValue) || !isVersion(value)) {
                     return false;
                 }
-                int comparison = VERSION_COMPARATOR.compare(null, parentValue, value);
+                int comparison = new Version(parentValue).compareTo(new Version(value));
                 if (comparison < 0) {
                     return comparator == Comparator.LT || comparator == Comparator.LTE;
                 } else if (comparison > 0) {
@@ -243,7 +243,7 @@ public class RemoveRedundantProperties extends Recipe {
                 return getCursor().firstEnclosingOrThrow(Xml.Document.class).getMarkers()
                         .findFirst(BuildTool.class)
                         .filter(buildTool -> buildTool.getType() == BuildTool.Type.Maven)
-                        .map(buildTool -> VERSION_COMPARATOR.compare(null, buildTool.getVersion(), "3.10.0") >= 0)
+                        .map(buildTool -> new LatestRelease(null).compare(null, buildTool.getVersion(), "3.10.0") >= 0)
                         .orElse(false);
             }
         };
