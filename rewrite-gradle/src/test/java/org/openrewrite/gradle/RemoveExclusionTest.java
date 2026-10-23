@@ -251,6 +251,50 @@ class RemoveExclusionTest implements RewriteTest {
         }
 
         @Test
+        void moduleFromVariable() {
+            rewriteRun(
+              buildGradle(
+                """
+                  def excluded = 'spring-boot-starter-jetty'
+                  dependencies {
+                      implementation('org.springframework.boot:spring-boot-starter-web:3.5.0') {
+                          exclude group: 'org.springframework.boot', module: excluded
+                      }
+                  }
+                  """
+              )
+            );
+        }
+
+        @Test
+        void groupFromGString() {
+            rewriteRun(
+              buildGradle(
+                """
+                  def g = 'com.acme'
+                  configurations.all {
+                      exclude group: "${g}", module: 'spring-boot-starter-tomcat'
+                  }
+                  """
+              )
+            );
+        }
+
+        @Test
+        void kotlinModuleFromVariable() {
+            rewriteRun(
+              buildGradleKts(
+                """
+                  val excluded = "spring-boot-starter-jetty"
+                  configurations.all {
+                      exclude(group = "org.springframework.boot", module = excluded)
+                  }
+                  """
+              )
+            );
+        }
+
+        @Test
         void fileExcludeOfCopyTask() {
             rewriteRun(
               buildGradle(

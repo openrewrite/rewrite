@@ -20,6 +20,7 @@ import lombok.Value;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
 import org.openrewrite.gradle.internal.RemoveStatementsVisitor;
+import org.openrewrite.groovy.tree.G;
 import org.openrewrite.java.tree.Expression;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.kotlin.tree.K;
@@ -92,6 +93,9 @@ public class RemoveExclusion extends Recipe {
                 if (!"exclude".equals(method.getSimpleName())) {
                     return false;
                 }
+                if (hasNonLiteralArgument(method)) {
+                    return false;
+                }
                 boolean kotlinDsl = getCursor().firstEnclosing(K.CompilationUnit.class) != null;
                 String group = extractNamedArg(method, "group", kotlinDsl);
                 String module = extractNamedArg(method, "module", kotlinDsl);
@@ -101,6 +105,18 @@ public class RemoveExclusion extends Recipe {
                 return groupMatches && moduleMatches && named;
             }
         });
+    }
+
+    // A group or module that isn't a literal could be anything, so it must not match like a left-out one
+    private static boolean hasNonLiteralArgument(J.MethodInvocation method) {
+        for (Expression arg : method.getArguments()) {
+            Expression value = arg instanceof G.MapEntry ? ((G.MapEntry) arg).getValue() :
+                    arg instanceof J.Assignment ? ((J.Assignment) arg).getAssignment() : arg;
+            if (!(value instanceof J.Literal)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     private static boolean endsWithEmptyClosure(J.MethodInvocation method) {
