@@ -35,7 +35,7 @@ class UpdateProjectUrlFromGitOriginTest implements RewriteTest {
 
     @DocumentExample
     @Test
-    void scmReferencesProjectUrl() {
+    void updatesProjectUrl() {
         rewriteRun(
           pomXml(
             """
@@ -114,7 +114,7 @@ class UpdateProjectUrlFromGitOriginTest implements RewriteTest {
     }
 
     @Test
-    void projectUrlSharesHostWithScm() {
+    void updatesProjectUrlWithoutScm() {
         rewriteRun(
           pomXml(
             """
@@ -124,9 +124,6 @@ class UpdateProjectUrlFromGitOriginTest implements RewriteTest {
                 <artifactId>my-app</artifactId>
                 <version>1</version>
                 <url>https://old-server.example.com/org/repo</url>
-                <scm>
-                  <url>https://old-server.example.com/org/repo</url>
-                </scm>
               </project>
               """,
             """
@@ -136,9 +133,6 @@ class UpdateProjectUrlFromGitOriginTest implements RewriteTest {
                 <artifactId>my-app</artifactId>
                 <version>1</version>
                 <url>https://new-server.example.com/username/repo</url>
-                <scm>
-                  <url>https://old-server.example.com/org/repo</url>
-                </scm>
               </project>
               """,
             spec -> spec.markers(gitProvenance("https://new-server.example.com/username/repo.git"))
@@ -209,7 +203,7 @@ class UpdateProjectUrlFromGitOriginTest implements RewriteTest {
     }
 
     @Test
-    void projectUrlOnDifferentHostIsUnchanged() {
+    void updatesPropertyOnlyUsedByProjectUrl() {
         rewriteRun(
           pomXml(
             """
@@ -218,10 +212,22 @@ class UpdateProjectUrlFromGitOriginTest implements RewriteTest {
                 <groupId>com.mycompany.app</groupId>
                 <artifactId>my-app</artifactId>
                 <version>1</version>
-                <url>https://docs.example.com/my-app</url>
-                <scm>
-                  <url>https://old-server.example.com/org/repo</url>
-                </scm>
+                <properties>
+                  <site.url>https://old-server.example.com/org/repo</site.url>
+                </properties>
+                <url>${site.url}</url>
+              </project>
+              """,
+            """
+              <project>
+                <modelVersion>4.0.0</modelVersion>
+                <groupId>com.mycompany.app</groupId>
+                <artifactId>my-app</artifactId>
+                <version>1</version>
+                <properties>
+                  <site.url>https://new-server.example.com/username/repo</site.url>
+                </properties>
+                <url>${site.url}</url>
               </project>
               """,
             spec -> spec.markers(gitProvenance("https://new-server.example.com/username/repo.git"))
@@ -230,7 +236,7 @@ class UpdateProjectUrlFromGitOriginTest implements RewriteTest {
     }
 
     @Test
-    void propertyProjectUrlIsUnchanged() {
+    void inlinesPropertyUsedElsewhere() {
         rewriteRun(
           pomXml(
             """
@@ -244,6 +250,126 @@ class UpdateProjectUrlFromGitOriginTest implements RewriteTest {
                 </properties>
                 <url>${site.url}</url>
                 <scm>
+                  <url>${site.url}</url>
+                </scm>
+              </project>
+              """,
+            """
+              <project>
+                <modelVersion>4.0.0</modelVersion>
+                <groupId>com.mycompany.app</groupId>
+                <artifactId>my-app</artifactId>
+                <version>1</version>
+                <properties>
+                  <site.url>https://old-server.example.com/org/repo</site.url>
+                </properties>
+                <url>https://new-server.example.com/username/repo</url>
+                <scm>
+                  <url>${site.url}</url>
+                </scm>
+              </project>
+              """,
+            spec -> spec.markers(gitProvenance("https://new-server.example.com/username/repo.git"))
+          )
+        );
+    }
+
+    @Test
+    void inlinesProjectPlaceholder() {
+        rewriteRun(
+          pomXml(
+            """
+              <project>
+                <modelVersion>4.0.0</modelVersion>
+                <groupId>com.mycompany.app</groupId>
+                <artifactId>my-app</artifactId>
+                <version>1</version>
+                <url>https://old-server.example.com/org/${project.artifactId}</url>
+              </project>
+              """,
+            """
+              <project>
+                <modelVersion>4.0.0</modelVersion>
+                <groupId>com.mycompany.app</groupId>
+                <artifactId>my-app</artifactId>
+                <version>1</version>
+                <url>https://new-server.example.com/username/my-app</url>
+              </project>
+              """,
+            spec -> spec.markers(gitProvenance("https://new-server.example.com/username/my-app.git"))
+          )
+        );
+    }
+
+    @Test
+    void keepsPlaceholderThatAlreadyMatches() {
+        rewriteRun(
+          pomXml(
+            """
+              <project>
+                <modelVersion>4.0.0</modelVersion>
+                <groupId>com.mycompany.app</groupId>
+                <artifactId>my-app</artifactId>
+                <version>1</version>
+                <url>https://new-server.example.com/username/${project.artifactId}</url>
+              </project>
+              """,
+            spec -> spec.markers(gitProvenance("https://new-server.example.com/username/my-app.git"))
+          )
+        );
+    }
+
+    @Test
+    void unresolvablePlaceholderIsUnchanged() {
+        rewriteRun(
+          pomXml(
+            """
+              <project>
+                <modelVersion>4.0.0</modelVersion>
+                <groupId>com.mycompany.app</groupId>
+                <artifactId>my-app</artifactId>
+                <version>1</version>
+                <url>${undefined.url}</url>
+              </project>
+              """,
+            spec -> spec.markers(gitProvenance("https://new-server.example.com/username/repo.git"))
+          )
+        );
+    }
+
+    @Test
+    void scmKeepsReferencesWhenPropertyUpdated() {
+        rewriteRun(
+          spec -> spec.recipes(new UpdateProjectUrlFromGitOrigin(), new UpdateScmFromGitOrigin(null)),
+          pomXml(
+            """
+              <project>
+                <modelVersion>4.0.0</modelVersion>
+                <groupId>com.mycompany.app</groupId>
+                <artifactId>my-app</artifactId>
+                <version>1</version>
+                <properties>
+                  <site.url>https://old-server.example.com/org/repo</site.url>
+                </properties>
+                <url>${site.url}</url>
+                <scm>
+                  <developerConnection>scm:git:${project.url}.git</developerConnection>
+                  <url>${project.url}</url>
+                </scm>
+              </project>
+              """,
+            """
+              <project>
+                <modelVersion>4.0.0</modelVersion>
+                <groupId>com.mycompany.app</groupId>
+                <artifactId>my-app</artifactId>
+                <version>1</version>
+                <properties>
+                  <site.url>https://new-server.example.com/username/repo</site.url>
+                </properties>
+                <url>${site.url}</url>
+                <scm>
+                  <developerConnection>scm:git:${project.url}.git</developerConnection>
                   <url>${project.url}</url>
                 </scm>
               </project>

@@ -39,7 +39,7 @@ import static org.openrewrite.maven.tree.ResolvedPom.placeholderHelper;
 
 @Value
 @EqualsAndHashCode(callSuper = false)
-public class UpdateScmFromGitOrigin extends ScanningRecipe<UpdateScmFromGitOrigin.Accumulator> {
+public class UpdateScmFromGitOrigin extends ScanningRecipe<GitOriginPropertyUsage> {
 
     static final String[] SCM_URL_TAGS = {"url", "connection", "developerConnection"};
 
@@ -59,46 +59,18 @@ public class UpdateScmFromGitOrigin extends ScanningRecipe<UpdateScmFromGitOrigi
                "SCM values that use placeholders are kept when they already resolve to the Git origin. Otherwise the backing property is updated " +
                "when it is defined in the same POM and used nowhere else, or the new value is inlined.";
 
-    public static class Accumulator {
-        final Set<String> propertiesUsedOutsideScm = new HashSet<>();
-        final Map<String, Set<Path>> propertiesUsedInScm = new HashMap<>();
+    @Override
+    public GitOriginPropertyUsage getInitialValue(ExecutionContext ctx) {
+        return new GitOriginPropertyUsage();
     }
 
     @Override
-    public Accumulator getInitialValue(ExecutionContext ctx) {
-        return new Accumulator();
+    public TreeVisitor<?, ExecutionContext> getScanner(GitOriginPropertyUsage acc) {
+        return acc.scanner(SCM_URL_MATCHER);
     }
 
     @Override
-    public TreeVisitor<?, ExecutionContext> getScanner(Accumulator acc) {
-        return new MavenIsoVisitor<ExecutionContext>() {
-            @Override
-            public Xml.Tag visitTag(Xml.Tag tag, ExecutionContext ctx) {
-                Xml.Tag t = super.visitTag(tag, ctx);
-                Optional<String> value = t.getValue();
-                if (value.isPresent()) {
-                    boolean inScm = SCM_URL_MATCHER.matches(getCursor());
-                    for (String property : placeholderHelper.getPlaceholders(value.get())) {
-                        if (inScm) {
-                            acc.propertiesUsedInScm.computeIfAbsent(property, k -> new HashSet<>()).add(getCursor().firstEnclosingOrThrow(Xml.Document.class).getSourcePath());
-                        } else {
-                            acc.propertiesUsedOutsideScm.add(property);
-                        }
-                    }
-                }
-                return t;
-            }
-
-            @Override
-            public Xml.Attribute visitAttribute(Xml.Attribute attribute, ExecutionContext ctx) {
-                acc.propertiesUsedOutsideScm.addAll(placeholderHelper.getPlaceholders(attribute.getValueAsString()));
-                return super.visitAttribute(attribute, ctx);
-            }
-        };
-    }
-
-    @Override
-    public TreeVisitor<?, ExecutionContext> getVisitor(Accumulator acc) {
+    public TreeVisitor<?, ExecutionContext> getVisitor(GitOriginPropertyUsage acc) {
         return new MavenVisitor<ExecutionContext>() {
 
             @SuppressWarnings("NotNullFieldNotInitialized")
@@ -174,31 +146,21 @@ public class UpdateScmFromGitOrigin extends ScanningRecipe<UpdateScmFromGitOrigi
                 return tag;
             }
 
-            // Properties that make up a whole SCM value, are defined in this POM, and are used nowhere else
             private Map<String, String> propertyUpdates(Xml.Tag project) {
                 Map<String, String> updates = new HashMap<>();
                 Optional<Xml.Tag> scm = project.getChild("scm");
-                Optional<Xml.Tag> properties = project.getChild("properties");
-                if (!scm.isPresent() || !properties.isPresent()) {
+                if (!scm.isPresent()) {
                     return updates;
                 }
                 Path sourcePath = getCursor().firstEnclosingOrThrow(Xml.Document.class).getSourcePath();
                 for (String scmTagName : SCM_URL_TAGS) {
-                    String value = scm.get().getChildValue(scmTagName).orElse("");
-                    List<String> placeholders = placeholderHelper.getPlaceholders(value);
-                    if (placeholders.size() != 1 || !value.equals("${" + placeholders.get(0) + "}")) {
-                        continue;
-                    }
-                    String property = placeholders.get(0);
-                    String propertyValue = properties.get().getChildValue(property).orElse(null);
-                    if (propertyValue == null || placeholderHelper.hasPlaceholders(propertyValue) ||
-                        acc.propertiesUsedOutsideScm.contains(property) ||
-                        !Collections.singleton(sourcePath).equals(acc.propertiesUsedInScm.get(property))) {
-                        continue;
-                    }
-                    String updatedValue = gitOrigin.replaceHostAndPath(propertyValue);
-                    if (!propertyValue.equals(updatedValue)) {
-                        updates.put(property, updatedValue);
+                    String property = acc.safeToUpdate(scm.get().getChildValue(scmTagName).orElse(""), project, sourcePath);
+                    if (property != null) {
+                        String propertyValue = project.getChild("properties").flatMap(p -> p.getChildValue(property)).orElse("");
+                        String updatedValue = gitOrigin.replaceHostAndPath(propertyValue);
+                        if (!propertyValue.equals(updatedValue)) {
+                            updates.put(property, updatedValue);
+                        }
                     }
                 }
                 return updates;
@@ -229,18 +191,12 @@ public class UpdateScmFromGitOrigin extends ScanningRecipe<UpdateScmFromGitOrigi
             }
 
             private @Nullable String resolvePlaceholders(String value) {
-                String resolved = placeholderHelper.replacePlaceholders(value, key -> {
-                    if (propertyUpdates.containsKey(key)) {
-                        return propertyUpdates.get(key);
-                    }
+                return GitOriginPropertyUsage.resolve(value, getResolutionResult().getPom(), key -> {
                     if ("project.url".equals(key) || "pom.url".equals(key)) {
                         return projectUrl;
                     }
-                    String placeholder = "${" + key + "}";
-                    String propertyValue = getResolutionResult().getPom().getValue(placeholder);
-                    return placeholder.equals(propertyValue) ? null : propertyValue;
+                    return propertyUpdates.get(key);
                 });
-                return placeholderHelper.hasPlaceholders(resolved) ? null : resolved;
             }
         };
     }

@@ -18,11 +18,12 @@ package org.openrewrite.maven;
 import lombok.EqualsAndHashCode;
 import lombok.Value;
 import org.openrewrite.ExecutionContext;
-import org.openrewrite.Recipe;
+import org.openrewrite.ScanningRecipe;
 import org.openrewrite.TreeVisitor;
 import org.openrewrite.marker.GitProvenance;
 import org.openrewrite.maven.UpdateScmFromGitOrigin.GitOrigin;
 import org.openrewrite.xml.ChangeTagValueVisitor;
+import org.openrewrite.xml.XPathMatcher;
 import org.openrewrite.xml.tree.Xml;
 
 import java.util.Optional;
@@ -31,59 +32,70 @@ import static org.openrewrite.maven.tree.ResolvedPom.placeholderHelper;
 
 @Value
 @EqualsAndHashCode(callSuper = false)
-public class UpdateProjectUrlFromGitOrigin extends Recipe {
+public class UpdateProjectUrlFromGitOrigin extends ScanningRecipe<GitOriginPropertyUsage> {
+
+    private static final XPathMatcher PROJECT_URL_MATCHER = new XPathMatcher("/project/url");
 
     String displayName = "Update project URL with Git origin";
 
-    String description = "Updates the Maven project `<url>` based on the Git remote origin, when it points at the same repository. " +
-               "The URL is considered to point at the repository when the `<scm>` section references `${project.url}`, " +
-               "or when a `<scm>` URL shares its host. Only POMs whose parent is not in the same repository are updated. " +
+    String description = "Updates the Maven project `<url>` based on the Git remote origin. " +
+               "Only POMs whose parent is not in the same repository are updated. " +
+               "A `<url>` that uses placeholders is kept when it already resolves to the Git origin. Otherwise the backing property is updated " +
+               "when it is defined in the same POM and used nowhere else, or the new value is inlined. " +
                "Run this before `org.openrewrite.maven.UpdateScmFromGitOrigin` so `<scm>` references to `${project.url}` resolve to the updated URL.";
 
     @Override
-    public TreeVisitor<?, ExecutionContext> getVisitor() {
+    public GitOriginPropertyUsage getInitialValue(ExecutionContext ctx) {
+        return new GitOriginPropertyUsage();
+    }
+
+    @Override
+    public TreeVisitor<?, ExecutionContext> getScanner(GitOriginPropertyUsage acc) {
+        return acc.scanner(PROJECT_URL_MATCHER);
+    }
+
+    @Override
+    public TreeVisitor<?, ExecutionContext> getVisitor(GitOriginPropertyUsage acc) {
         return new MavenIsoVisitor<ExecutionContext>() {
             @Override
             public Xml.Tag visitTag(Xml.Tag tag, ExecutionContext ctx) {
                 if (!PROJECT_MATCHER.matches(getCursor()) || getResolutionResult().parentPomIsProjectPom()) {
                     return tag;
                 }
-                GitOrigin gitOrigin = getCursor().firstEnclosingOrThrow(Xml.Document.class).getMarkers()
+                Xml.Document document = getCursor().firstEnclosingOrThrow(Xml.Document.class);
+                GitOrigin gitOrigin = document.getMarkers()
                         .findFirst(GitProvenance.class)
                         .map(GitProvenance::getOrigin)
                         .map(GitOrigin::parseGitUrl)
                         .orElse(null);
                 Optional<Xml.Tag> url = tag.getChild("url");
-                if (gitOrigin == null || !url.isPresent() || !pointsAtRepository(tag)) {
+                if (gitOrigin == null || !url.isPresent()) {
                     return tag;
                 }
                 String originalUrl = url.get().getValue().orElse("");
-                String updatedUrl = gitOrigin.replaceHostAndPath(originalUrl);
-                if (originalUrl.equals(updatedUrl)) {
+                if (!placeholderHelper.hasPlaceholders(originalUrl)) {
+                    return changeValue(tag, url.get(), gitOrigin.replaceHostAndPath(originalUrl), ctx);
+                }
+
+                String resolvedUrl = GitOriginPropertyUsage.resolve(originalUrl, getResolutionResult().getPom(), key -> null);
+                if (resolvedUrl == null || resolvedUrl.equals(gitOrigin.replaceHostAndPath(resolvedUrl))) {
                     return tag;
                 }
-                return (Xml.Tag) new ChangeTagValueVisitor<>(url.get(), updatedUrl)
-                        .visitNonNull(tag, ctx, getCursor().getParentOrThrow());
+                String property = acc.safeToUpdate(originalUrl, tag, document.getSourcePath());
+                if (property != null) {
+                    Xml.Tag propertyTag = tag.getChild("properties").flatMap(p -> p.getChild(property)).orElseThrow(IllegalStateException::new);
+                    maybeUpdateModel();
+                    return changeValue(tag, propertyTag, gitOrigin.replaceHostAndPath(resolvedUrl), ctx);
+                }
+                return changeValue(tag, url.get(), gitOrigin.replaceHostAndPath(resolvedUrl), ctx);
             }
 
-            private boolean pointsAtRepository(Xml.Tag project) {
-                String projectUrl = project.getChildValue("url").orElse("");
-                GitOrigin projectUrlOrigin = GitOrigin.parseGitUrl(projectUrl);
-                Optional<Xml.Tag> scm = project.getChild("scm");
-                if (projectUrlOrigin == null || placeholderHelper.hasPlaceholders(projectUrl) || !scm.isPresent()) {
-                    return false;
+            private Xml.Tag changeValue(Xml.Tag project, Xml.Tag tag, String value, ExecutionContext ctx) {
+                if (value.equals(tag.getValue().orElse(""))) {
+                    return project;
                 }
-                for (String scmTagName : UpdateScmFromGitOrigin.SCM_URL_TAGS) {
-                    String scmUrl = scm.get().getChildValue(scmTagName).orElse("");
-                    if (scmUrl.contains("${project.url}")) {
-                        return true;
-                    }
-                    GitOrigin scmOrigin = GitOrigin.parseGitUrl(scmUrl.startsWith("scm:git:") ? scmUrl.substring("scm:git:".length()) : scmUrl);
-                    if (scmOrigin != null && scmOrigin.getHost().equals(projectUrlOrigin.getHost())) {
-                        return true;
-                    }
-                }
-                return false;
+                return (Xml.Tag) new ChangeTagValueVisitor<>(tag, value)
+                        .visitNonNull(project, ctx, getCursor().getParentOrThrow());
             }
         };
     }
