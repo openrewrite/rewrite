@@ -95,7 +95,8 @@ public class CreatePropertiesFile extends ScanningRecipe<AtomicBoolean> {
                     if (sourceFiles.isPresent()) {
                         SourceFile sourceFile = sourceFiles.get();
                         if (sourceFile instanceof Properties.File) {
-                            return file.withContent(((Properties.File) sourceFile).getContent());
+                            Properties.File overwritten = file.withContent(((Properties.File) sourceFile).getContent());
+                            return overwritten.printAll().equals(file.printAll()) ? file : overwritten;
                         }
                     }
                 }
