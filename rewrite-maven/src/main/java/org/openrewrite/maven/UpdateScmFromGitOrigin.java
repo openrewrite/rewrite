@@ -20,24 +20,30 @@ import lombok.Value;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Option;
-import org.openrewrite.Recipe;
+import org.openrewrite.ScanningRecipe;
 import org.openrewrite.TreeVisitor;
 import org.openrewrite.marker.GitProvenance;
 import org.openrewrite.maven.tree.MavenResolutionResult;
 import org.openrewrite.xml.AddToTagVisitor;
 import org.openrewrite.xml.ChangeTagValueVisitor;
+import org.openrewrite.xml.XPathMatcher;
 import org.openrewrite.xml.tree.Xml;
 
-import java.util.Objects;
-import java.util.Optional;
+import java.nio.file.Path;
+import java.util.*;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 import static org.openrewrite.internal.StringUtils.isNullOrEmpty;
+import static org.openrewrite.maven.tree.ResolvedPom.placeholderHelper;
 
 @Value
 @EqualsAndHashCode(callSuper = false)
-public class UpdateScmFromGitOrigin extends Recipe {
+public class UpdateScmFromGitOrigin extends ScanningRecipe<UpdateScmFromGitOrigin.Accumulator> {
+
+    static final String[] SCM_URL_TAGS = {"url", "connection", "developerConnection"};
+
+    private static final XPathMatcher SCM_URL_MATCHER = new XPathMatcher("/project/scm/*");
 
     @Option(displayName = "Add if missing",
             description = "If set to `true`, the recipe will add a `<scm>` section if it is missing. " +
@@ -46,25 +52,62 @@ public class UpdateScmFromGitOrigin extends Recipe {
     @Nullable
     Boolean addIfMissing;
 
-    @Option(displayName = "Update project URL",
-            description = "If set to `true`, the recipe will also update the project `<url>` of POMs whose parent is not in the same repository, " +
-                          "when the `<scm>` section references `${project.url}` or a `<scm>` URL shares its host. Defaults to `false`.",
-            required = false)
-    @Nullable
-    Boolean updateProjectUrl;
-
     String displayName = "Update SCM with Git origin";
 
     String description = "Updates or adds the Maven `<scm>` tag based on the Git remote origin. " +
                "By default, only existing Source Control Management (SCM) sections are updated. Set `addIfMissing` to `true` to also add missing SCM sections to root POMs (POMs without a parent element). " +
-               "Set `updateProjectUrl` to `true` to also update the project `<url>` when it points at the same repository.";
+               "SCM values that use placeholders are kept when they already resolve to the Git origin. Otherwise the backing property is updated " +
+               "when it is defined in the same POM and used nowhere else, or the new value is inlined.";
+
+    public static class Accumulator {
+        final Set<String> propertiesUsedOutsideScm = new HashSet<>();
+        final Map<String, Set<Path>> propertiesUsedInScm = new HashMap<>();
+    }
 
     @Override
-    public TreeVisitor<?, ExecutionContext> getVisitor() {
+    public Accumulator getInitialValue(ExecutionContext ctx) {
+        return new Accumulator();
+    }
+
+    @Override
+    public TreeVisitor<?, ExecutionContext> getScanner(Accumulator acc) {
+        return new MavenIsoVisitor<ExecutionContext>() {
+            @Override
+            public Xml.Tag visitTag(Xml.Tag tag, ExecutionContext ctx) {
+                Xml.Tag t = super.visitTag(tag, ctx);
+                Optional<String> value = t.getValue();
+                if (value.isPresent()) {
+                    boolean inScm = SCM_URL_MATCHER.matches(getCursor());
+                    for (String property : placeholderHelper.getPlaceholders(value.get())) {
+                        if (inScm) {
+                            acc.propertiesUsedInScm.computeIfAbsent(property, k -> new HashSet<>()).add(getCursor().firstEnclosingOrThrow(Xml.Document.class).getSourcePath());
+                        } else {
+                            acc.propertiesUsedOutsideScm.add(property);
+                        }
+                    }
+                }
+                return t;
+            }
+
+            @Override
+            public Xml.Attribute visitAttribute(Xml.Attribute attribute, ExecutionContext ctx) {
+                acc.propertiesUsedOutsideScm.addAll(placeholderHelper.getPlaceholders(attribute.getValueAsString()));
+                return super.visitAttribute(attribute, ctx);
+            }
+        };
+    }
+
+    @Override
+    public TreeVisitor<?, ExecutionContext> getVisitor(Accumulator acc) {
         return new MavenVisitor<ExecutionContext>() {
 
             @SuppressWarnings("NotNullFieldNotInitialized")
             GitOrigin gitOrigin;
+
+            Map<String, String> propertyUpdates = new HashMap<>();
+
+            @Nullable
+            String projectUrl;
 
             @Override
             public Xml visitDocument(Xml.Document document, ExecutionContext ctx) {
@@ -110,58 +153,94 @@ public class UpdateScmFromGitOrigin extends Recipe {
             @Override
             public Xml visitTag(Xml.Tag tag, ExecutionContext ctx) {
                 if ("project".equals(tag.getName())) {
-                    Xml.Tag t = (Xml.Tag) super.visitTag(tag, ctx);
-                    if (Boolean.TRUE.equals(updateProjectUrl) && shouldUpdateProjectUrl(tag)) {
-                        t = updateChildUrl(t, "url", ctx);
+                    projectUrl = tag.getChildValue("url").orElse(null);
+                    propertyUpdates = propertyUpdates(tag);
+                    return super.visitTag(tag, ctx);
+                } else if ("properties".equals(tag.getName())) {
+                    for (Map.Entry<String, String> update : propertyUpdates.entrySet()) {
+                        Optional<Xml.Tag> property = tag.getChild(update.getKey());
+                        if (property.isPresent()) {
+                            tag = (Xml.Tag) new ChangeTagValueVisitor<>(property.get(), update.getValue())
+                                    .visitNonNull(tag, ctx, getCursor().getParentTreeCursor());
+                            maybeUpdateModel();
+                        }
                     }
-                    return t;
                 } else if ("scm".equals(tag.getName())) {
                     // Update existing tags, preserving their URL structure
-                    tag = updateChildUrl(tag, "url", ctx);
-                    tag = updateChildUrl(tag, "connection", ctx);
-                    tag = updateChildUrl(tag, "developerConnection", ctx);
+                    for (String scmTagName : SCM_URL_TAGS) {
+                        tag = updateScmTag(tag, scmTagName, ctx);
+                    }
                 }
                 return tag;
             }
 
-            private boolean shouldUpdateProjectUrl(Xml.Tag project) {
-                if (getResolutionResult().parentPomIsProjectPom()) {
-                    return false;
-                }
-                String projectUrl = project.getChildValue("url").orElse("");
-                GitOrigin projectUrlOrigin = GitOrigin.parseGitUrl(projectUrl);
-                if (projectUrlOrigin == null || projectUrl.contains("${")) {
-                    return false;
-                }
+            // Properties that make up a whole SCM value, are defined in this POM, and are used nowhere else
+            private Map<String, String> propertyUpdates(Xml.Tag project) {
+                Map<String, String> updates = new HashMap<>();
                 Optional<Xml.Tag> scm = project.getChild("scm");
-                if (!scm.isPresent()) {
-                    return false;
+                Optional<Xml.Tag> properties = project.getChild("properties");
+                if (!scm.isPresent() || !properties.isPresent()) {
+                    return updates;
                 }
-                for (String scmTagName : new String[]{"url", "connection", "developerConnection"}) {
-                    String scmUrl = scm.get().getChildValue(scmTagName).orElse("");
-                    if (scmUrl.contains("${project.url}")) {
-                        return true;
+                Path sourcePath = getCursor().firstEnclosingOrThrow(Xml.Document.class).getSourcePath();
+                for (String scmTagName : SCM_URL_TAGS) {
+                    String value = scm.get().getChildValue(scmTagName).orElse("");
+                    List<String> placeholders = placeholderHelper.getPlaceholders(value);
+                    if (placeholders.size() != 1 || !value.equals("${" + placeholders.get(0) + "}")) {
+                        continue;
                     }
-                    GitOrigin scmOrigin = GitOrigin.parseGitUrl(scmUrl.startsWith("scm:git:") ? scmUrl.substring("scm:git:".length()) : scmUrl);
-                    if (scmOrigin != null && scmOrigin.getHost().equals(projectUrlOrigin.getHost())) {
-                        return true;
+                    String property = placeholders.get(0);
+                    String propertyValue = properties.get().getChildValue(property).orElse(null);
+                    if (propertyValue == null || placeholderHelper.hasPlaceholders(propertyValue) ||
+                        acc.propertiesUsedOutsideScm.contains(property) ||
+                        !Collections.singleton(sourcePath).equals(acc.propertiesUsedInScm.get(property))) {
+                        continue;
+                    }
+                    String updatedValue = gitOrigin.replaceHostAndPath(propertyValue);
+                    if (!propertyValue.equals(updatedValue)) {
+                        updates.put(property, updatedValue);
                     }
                 }
-                return false;
+                return updates;
             }
 
-            private Xml.Tag updateChildUrl(Xml.Tag tag, String tagName, ExecutionContext ctx) {
+            private Xml.Tag updateScmTag(Xml.Tag tag, String tagName, ExecutionContext ctx) {
                 Optional<Xml.Tag> maybeChild = tag.getChild(tagName);
                 if (maybeChild.isPresent()) {
                     Xml.Tag childTag = maybeChild.get();
                     String originalUrl = childTag.getValue().orElse("");
-                    String updatedUrl = gitOrigin.replaceHostAndPath(originalUrl);
+                    String updatedUrl;
+                    if (placeholderHelper.hasPlaceholders(originalUrl)) {
+                        String resolvedUrl = resolvePlaceholders(originalUrl);
+                        if (resolvedUrl == null) {
+                            return tag;
+                        }
+                        String expectedUrl = gitOrigin.replaceHostAndPath(resolvedUrl);
+                        updatedUrl = resolvedUrl.equals(expectedUrl) ? originalUrl : expectedUrl;
+                    } else {
+                        updatedUrl = gitOrigin.replaceHostAndPath(originalUrl);
+                    }
                     if (!originalUrl.equals(updatedUrl)) {
                         tag = (Xml.Tag) new ChangeTagValueVisitor<>(childTag, updatedUrl)
                                 .visitNonNull(tag, ctx, getCursor().getParentTreeCursor());
                     }
                 }
                 return tag;
+            }
+
+            private @Nullable String resolvePlaceholders(String value) {
+                String resolved = placeholderHelper.replacePlaceholders(value, key -> {
+                    if (propertyUpdates.containsKey(key)) {
+                        return propertyUpdates.get(key);
+                    }
+                    if ("project.url".equals(key) || "pom.url".equals(key)) {
+                        return projectUrl;
+                    }
+                    String placeholder = "${" + key + "}";
+                    String propertyValue = getResolutionResult().getPom().getValue(placeholder);
+                    return placeholder.equals(propertyValue) ? null : propertyValue;
+                });
+                return placeholderHelper.hasPlaceholders(resolved) ? null : resolved;
             }
         };
     }
