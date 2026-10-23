@@ -24,6 +24,7 @@ import lombok.EqualsAndHashCode;
 import lombok.SneakyThrows;
 import lombok.Value;
 import lombok.With;
+import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Disabled;
@@ -44,9 +45,12 @@ import org.openrewrite.config.OptionDescriptor;
 import org.openrewrite.config.RecipeDescriptor;
 import org.openrewrite.internal.RecipeLoader;
 import org.openrewrite.marketplace.*;
+import org.openrewrite.table.SourcesFileResults;
 import org.openrewrite.table.TextMatches;
 import org.openrewrite.test.RewriteTest;
 import org.openrewrite.marker.RecipesThatMadeChanges;
+import org.openrewrite.rpc.request.BatchVisit;
+import org.openrewrite.rpc.request.BatchVisitResponse;
 import org.openrewrite.rpc.request.GetObject;
 import org.openrewrite.rpc.request.GetObjectResponse;
 import org.openrewrite.rpc.request.Print;
@@ -822,6 +826,49 @@ class RewriteRpcTest implements RewriteTest {
     }
 
     @Test
+    void batchedDeletionIsRecordedAsSourceFileResult() {
+        // given
+        Recipe delete = client.prepareRecipe("org.openrewrite.rpc.RewriteRpcTest$DeletingRpcRecipe", Map.of());
+        Recipe noChange = client.prepareRecipe("org.openrewrite.text.FindAndReplace", Map.of("find", "absent", "replace", "x"));
+        var source = PlainText.builder().text("hello").sourcePath(Path.of("test.txt")).build();
+
+        // when
+        RecipeRun run = new RecipeScheduler().scheduleRun(
+          new CompositeRecipe(List.of(delete, noChange)),
+          new InMemoryLargeSourceSet(List.of(source)), new InMemoryExecutionContext(), 1, 1);
+
+        // then
+        assertThat(run.getChangeset().getAllResults())
+          .singleElement()
+          .satisfies(r -> assertThat(r.getAfter()).isNull());
+        List<SourcesFileResults.Row> rows = run.getDataTableRows(SourcesFileResults.class);
+        assertThat(rows)
+          .singleElement()
+          .satisfies(row -> {
+              assertThat(row.getSourcePath()).isEqualTo("test.txt");
+              assertThat(row.getAfterSourcePath()).isEmpty();
+              assertThat(row.getRecipe()).isEqualTo(DeletingRpcRecipe.class.getName());
+          });
+    }
+
+    @Test
+    void treeDeletedInBatchVisitIsNotServedAfterwards() {
+        // given
+        RpcRecipe delete = (RpcRecipe) client.prepareRecipe("org.openrewrite.rpc.RewriteRpcTest$DeletingRpcRecipe", Map.of());
+        var source = PlainText.builder().text("hello").sourcePath(Path.of("test.txt")).build();
+
+        // when
+        BatchVisitResponse response = client.batchVisit(source, new InMemoryExecutionContext(), null,
+          List.of(new BatchVisit.BatchVisitItem(delete.getEditVisitor(), null)));
+
+        // then
+        assertThat(response.getResults())
+          .singleElement()
+          .satisfies(r -> assertThat(r.isDeleted()).isTrue());
+        assertThat((Object) client.getObject(source.getId().toString(), PlainText.class.getName())).isNull();
+    }
+
+    @Test
     void markupAddedByRpcRecipeIsAttributed() {
         Recipe warn = client.prepareRecipe("org.openrewrite.rpc.RewriteRpcTest$WarningRpcRecipe", Map.of("message", "careful"));
 
@@ -1012,6 +1059,29 @@ class RewriteRpcTest implements RewriteTest {
                 @Override
                 public PlainText visitText(PlainText text, ExecutionContext ctx) {
                     throw new RuntimeException("boom from RPC");
+                }
+            };
+        }
+    }
+
+    @SuppressWarnings("unused")
+    public static class DeletingRpcRecipe extends Recipe {
+        @Override
+        public String getDisplayName() {
+            return "Deleting RPC recipe";
+        }
+
+        @Override
+        public String getDescription() {
+            return "Test recipe that deletes every plain text file.";
+        }
+
+        @Override
+        public TreeVisitor<?, ExecutionContext> getVisitor() {
+            return new PlainTextVisitor<>() {
+                @Override
+                public @Nullable PlainText visitText(PlainText text, ExecutionContext ctx) {
+                    return null;
                 }
             };
         }
