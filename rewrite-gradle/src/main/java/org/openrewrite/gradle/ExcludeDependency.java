@@ -350,7 +350,7 @@ public class ExcludeDependency extends Recipe {
                 Boolean.FALSE.equals(((J.Literal) assn.getAssignment()).getValue());
     }
 
-    private static @Nullable String extractNamedArg(J.MethodInvocation method, String name, boolean kotlinDsl) {
+    static @Nullable String extractNamedArg(J.MethodInvocation method, String name, boolean kotlinDsl) {
         for (Expression arg : method.getArguments()) {
             if (!kotlinDsl && arg instanceof G.MapEntry) {
                 G.MapEntry entry = (G.MapEntry) arg;
