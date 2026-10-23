@@ -99,7 +99,7 @@ public class RequirementsTxtParser implements Parser {
             Path originalFilePath = relativeTo == null ? null : relativeTo.resolve(text.getSourcePath());
             Path env = installedEnv;
             if (installsEnv) {
-                env = DependencyWorkspace.install(DependencyManifest.REQUIREMENTS,
+                env = DependencyWorkspace.install(DependencyManifest.RequirementsFiles,
                         setupPy -> DependencyManifest.ofRequirementsFile(text.getText(), originalFilePath,
                                 subprocessEnvironment, setupPy),
                         DependencyWorkspace.Options.builder().environment(subprocessEnvironment).build()).getEnv();

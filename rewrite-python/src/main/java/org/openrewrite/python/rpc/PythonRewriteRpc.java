@@ -340,9 +340,9 @@ public class PythonRewriteRpc extends RewriteRpc {
         boolean setupPyAlone = Files.exists(projectPath.resolve("setup.py")) &&
                                !Files.exists(projectPath.resolve("setup.cfg"));
         if (env != null && setupPyAlone &&
-            (manifest == DependencyManifest.SETUP_PY || !Files.exists(projectPath.resolve("pyproject.toml")))) {
+            (manifest == DependencyManifest.SetupPy || !Files.exists(projectPath.resolve("pyproject.toml")))) {
             PythonResolutionResult marker = createSetupPyMarker(projectPath, relativeTo, env,
-                    manifest == DependencyManifest.SETUP_PY);
+                    manifest == DependencyManifest.SetupPy);
             if (marker != null) {
                 final PythonResolutionResult finalMarker = marker;
                 rpcStream = rpcStream.map(sf -> {
@@ -571,7 +571,7 @@ public class PythonRewriteRpc extends RewriteRpc {
         }
 
         Path pipfilePath = projectPath.resolve("Pipfile");
-        if (manifest == DependencyManifest.PIPFILE) {
+        if (manifest == DependencyManifest.Pipfile) {
             Parser.Input pipfileInput = Parser.Input.fromFile(pipfilePath);
             result = Stream.concat(result, new PipfileParser(env).parseInputs(
                     singletonList(pipfileInput), effectiveRelativeTo, ctx));
@@ -586,15 +586,15 @@ public class PythonRewriteRpc extends RewriteRpc {
         }
 
         Path setupCfgPath = projectPath.resolve("setup.cfg");
-        boolean installedFromSetuptools = manifest == DependencyManifest.SETUP_PY ||
-                                          manifest == DependencyManifest.SETUP_CFG;
+        boolean installedFromSetuptools = manifest == DependencyManifest.SetupPy ||
+                                          manifest == DependencyManifest.SetupCfg;
         if (Files.exists(setupCfgPath) && (installedFromSetuptools || !hasPyproject && !Files.exists(pipfilePath))) {
             Parser.Input input = Parser.Input.fromFile(setupCfgPath);
             result = Stream.concat(result, new SetupCfgParser(installedFromSetuptools ? env : null).parseInputs(
                     singletonList(input), effectiveRelativeTo, ctx));
         }
 
-        if (manifest == DependencyManifest.REQUIREMENTS) {
+        if (manifest == DependencyManifest.RequirementsFiles) {
             RequirementsTxtParser reqsParser = new RequirementsTxtParser(env);
             try (Stream<Path> entries = Files.list(projectPath)) {
                 List<Parser.Input> reqInputs = new ArrayList<>();

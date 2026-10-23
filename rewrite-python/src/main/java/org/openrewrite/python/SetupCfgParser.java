@@ -97,7 +97,7 @@ public class SetupCfgParser implements Parser {
             if (installsEnv && projectDir != null) {
                 Path dir = projectDir;
                 DependencyManifest manifest = Files.isRegularFile(dir.resolve("setup.py")) ?
-                        DependencyManifest.SETUP_PY : DependencyManifest.SETUP_CFG;
+                        DependencyManifest.SetupPy : DependencyManifest.SetupCfg;
                 env = DependencyWorkspace.install(manifest,
                         setupPy -> manifest.read(dir, relativeTo, subprocessEnvironment, setupPy),
                         DependencyWorkspace.Options.builder().environment(subprocessEnvironment).build()).getEnv();

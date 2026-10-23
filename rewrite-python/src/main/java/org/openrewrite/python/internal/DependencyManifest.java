@@ -54,11 +54,11 @@ import static java.util.stream.Collectors.toList;
  * dependency environment is installed from out of the same parse that computes the manifest's marker.
  */
 public enum DependencyManifest {
-    PYPROJECT("pyproject.toml"),
-    PIPFILE("Pipfile"),
-    REQUIREMENTS("requirements files"),
-    SETUP_PY("setup.py"),
-    SETUP_CFG("setup.cfg");
+    PyProjectToml("pyproject.toml"),
+    Pipfile("Pipfile"),
+    RequirementsFiles("requirements files"),
+    SetupPy("setup.py"),
+    SetupCfg("setup.cfg");
 
     private static final Pattern REQUIREMENTS_OPTION = Pattern.compile(
             "(?<option>-[rcef]|--requirement|--constraint|--editable|--find-links)(?:\\s*=\\s*|\\s+)?(?<value>\\S+).*");
@@ -151,21 +151,21 @@ public enum DependencyManifest {
         Toml.Document pyproject = parse(new TomlParser(), projectDir.resolve("pyproject.toml"), null);
         PythonResolutionResult marker = pyproject == null ? null : PythonDependencyParser.createMarker(pyproject, null);
         if (marker != null && !pyprojectRoots(marker, new UvSettings(pyproject), emptyList()).isEmpty()) {
-            return PYPROJECT;
+            return PyProjectToml;
         }
         if (Files.isRegularFile(projectDir.resolve("Pipfile"))) {
-            return PIPFILE;
+            return Pipfile;
         }
         if (!requirementsFiles(projectDir).isEmpty()) {
-            return REQUIREMENTS;
+            return RequirementsFiles;
         }
         if (Files.isRegularFile(projectDir.resolve("setup.py"))) {
-            return SETUP_PY;
+            return SetupPy;
         }
         if (Files.isRegularFile(projectDir.resolve("setup.cfg"))) {
-            return SETUP_CFG;
+            return SetupCfg;
         }
-        return marker != null ? PYPROJECT : null;
+        return marker != null ? PyProjectToml : null;
     }
 
     /**
@@ -180,12 +180,12 @@ public enum DependencyManifest {
     private Requirements read(Path projectDir, @Nullable Path boundary, Map<String, String> environment,
                               SetupPyReader setupPy, List<String> extras) {
         switch (this) {
-            case PYPROJECT:
+            case PyProjectToml:
                 return pyproject(projectDir, boundary, environment, extras);
-            case PIPFILE:
+            case Pipfile:
                 return pipfile(projectDir, boundary, environment);
-            case REQUIREMENTS:
-                Requirements.RequirementsBuilder requirements = Requirements.builder().manifest(REQUIREMENTS);
+            case RequirementsFiles:
+                Requirements.RequirementsBuilder requirements = Requirements.builder().manifest(RequirementsFiles);
                 Set<Path> visited = new HashSet<>();
                 for (Path file : requirementsFiles(projectDir)) {
                     Path absolute = file.toAbsolutePath().normalize();
@@ -194,9 +194,9 @@ public enum DependencyManifest {
                     }
                 }
                 return requirements.build();
-            case SETUP_PY:
-                return Requirements.builder().manifest(SETUP_PY).roots(setupPy.read(projectDir, extras)).build();
-            case SETUP_CFG:
+            case SetupPy:
+                return Requirements.builder().manifest(SetupPy).roots(setupPy.read(projectDir, extras)).build();
+            case SetupCfg:
             default:
                 Path setupCfg = projectDir.resolve("setup.cfg");
                 return ofSetupCfg(Files.isRegularFile(setupCfg) ? readString(setupCfg) : "", projectDir);
@@ -204,13 +204,13 @@ public enum DependencyManifest {
     }
 
     /**
-     * The requirements of a single requirements file, read as {@link #REQUIREMENTS} reads each of a project's.
+     * The requirements of a single requirements file, read as {@link #RequirementsFiles} reads each of a project's.
      *
      * @param file where the file sits on disk, which its includes and local paths are relative to
      */
     public static Requirements ofRequirementsFile(String content, @Nullable Path file, Map<String, String> environment,
                                                   SetupPyReader setupPy) {
-        Requirements.RequirementsBuilder requirements = Requirements.builder().manifest(REQUIREMENTS);
+        Requirements.RequirementsBuilder requirements = Requirements.builder().manifest(RequirementsFiles);
         Set<Path> visited = new HashSet<>();
         Path absolute = file == null ? null : file.toAbsolutePath().normalize();
         if (absolute != null) {
@@ -245,7 +245,7 @@ public enum DependencyManifest {
             }
         }
         roots.removeIf(root -> localPath(root) != null);
-        Requirements.RequirementsBuilder requirements = Requirements.builder().manifest(SETUP_CFG).roots(roots);
+        Requirements.RequirementsBuilder requirements = Requirements.builder().manifest(SetupCfg).roots(roots);
         String pythonRequires = options.get("python_requires");
         if (pythonRequires != null) {
             requirements.requiresPython(pythonRequires.trim());
@@ -365,7 +365,7 @@ public enum DependencyManifest {
                                           List<String> extras) {
         Toml.Document pyproject = parse(new PyProjectTomlParser(), projectDir.resolve("pyproject.toml"), boundary);
         PythonResolutionResult marker = marker(pyproject);
-        Requirements.RequirementsBuilder requirements = Requirements.builder().manifest(PYPROJECT);
+        Requirements.RequirementsBuilder requirements = Requirements.builder().manifest(PyProjectToml);
         if (pyproject == null || marker == null) {
             return requirements.build();
         }
@@ -385,7 +385,7 @@ public enum DependencyManifest {
     private static Requirements pipfile(Path projectDir, @Nullable Path boundary, Map<String, String> environment) {
         Toml.Document pipfile = parse(new PipfileParser(), projectDir.resolve("Pipfile"), boundary);
         PythonResolutionResult marker = marker(pipfile);
-        Requirements.RequirementsBuilder requirements = Requirements.builder().manifest(PIPFILE);
+        Requirements.RequirementsBuilder requirements = Requirements.builder().manifest(Pipfile);
         if (pipfile == null || marker == null) {
             return requirements.build();
         }
@@ -551,9 +551,9 @@ public enum DependencyManifest {
         }
         Toml.Document pyproject = parse(new TomlParser(), projectDir.resolve("pyproject.toml"), null);
         PythonResolutionResult marker = pyproject == null ? null : PythonDependencyParser.createMarker(pyproject, null);
-        DependencyManifest manifest = marker != null && !marker.getDependencies().isEmpty() ? PYPROJECT :
-                Files.isRegularFile(projectDir.resolve("setup.py")) ? SETUP_PY :
-                        Files.isRegularFile(projectDir.resolve("setup.cfg")) ? SETUP_CFG : null;
+        DependencyManifest manifest = marker != null && !marker.getDependencies().isEmpty() ? PyProjectToml :
+                Files.isRegularFile(projectDir.resolve("setup.py")) ? SetupPy :
+                        Files.isRegularFile(projectDir.resolve("setup.cfg")) ? SetupCfg : null;
         if (manifest == null) {
             return;
         }

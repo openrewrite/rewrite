@@ -44,30 +44,30 @@ class DependencyManifestTest {
         write("requirements.txt", "six\n");
         write("pyproject.toml", "[tool.poetry.dependencies]\nsix = \"*\"\n");
         write("poetry.lock", "");
-        assertThat(choose(dir)).isEqualTo(REQUIREMENTS);
+        assertThat(choose(dir)).isEqualTo(RequirementsFiles);
 
         write("pyproject.toml", "[project]\nname = \"demo\"\ndependencies = [\"six\"]\n");
-        assertThat(choose(dir)).isEqualTo(PYPROJECT);
+        assertThat(choose(dir)).isEqualTo(PyProjectToml);
     }
 
     @Test
     void pyprojectWithoutListedDependenciesDefersToTheOtherManifests() throws IOException {
         write("pyproject.toml", "[project]\nname = \"demo\"\ndynamic = [\"dependencies\"]\n");
         write("setup.py", "from setuptools import setup; setup()\n");
-        assertThat(choose(dir)).isEqualTo(SETUP_PY);
+        assertThat(choose(dir)).isEqualTo(SetupPy);
 
         write("requirements-dev.txt", "pytest\n");
-        assertThat(choose(dir)).isEqualTo(REQUIREMENTS);
+        assertThat(choose(dir)).isEqualTo(RequirementsFiles);
 
         write("Pipfile", "[packages]\nsix = \"*\"\n");
-        assertThat(choose(dir)).isEqualTo(PIPFILE);
+        assertThat(choose(dir)).isEqualTo(Pipfile);
     }
 
     @Test
     void projectTableAloneGetsAnEnvWithoutRootsButToolSettingsAloneGetNone() throws IOException {
         write("pyproject.toml", "[project]\nname = \"demo\"\n");
-        assertThat(choose(dir)).isEqualTo(PYPROJECT);
-        assertThat(PYPROJECT.read(dir, null, emptyMap(), NO_SETUP_PY).getRoots()).isEmpty();
+        assertThat(choose(dir)).isEqualTo(PyProjectToml);
+        assertThat(PyProjectToml.read(dir, null, emptyMap(), NO_SETUP_PY).getRoots()).isEmpty();
 
         write("pyproject.toml", "[tool.ruff]\nline-length = 100\n");
         assertThat(choose(dir)).isNull();
@@ -101,7 +101,7 @@ class DependencyManifestTest {
           explicit = true
           """);
 
-        Requirements requirements = PYPROJECT.read(dir, null, emptyMap(), NO_SETUP_PY);
+        Requirements requirements = PyProjectToml.read(dir, null, emptyMap(), NO_SETUP_PY);
         assertThat(requirements.getRoots()).containsExactly("requests[socks]>=2.28", "pytest");
         assertThat(requirements.getExcludes()).containsExactly("member", "torch");
         assertThat(requirements.getIndexes()).containsExactly("https://pkgs.example.com/simple");
@@ -132,7 +132,7 @@ class DependencyManifestTest {
           source = { registry = "https://pypi.org/simple" }
           """);
 
-        Requirements requirements = PYPROJECT.read(dir, null, emptyMap(), NO_SETUP_PY);
+        Requirements requirements = PyProjectToml.read(dir, null, emptyMap(), NO_SETUP_PY);
         assertThat(requirements.getRoots()).containsExactly("six");
         assertThat(requirements.getConstraints()).containsExactly("six==1.16.0");
     }
@@ -174,7 +174,7 @@ class DependencyManifestTest {
           }
           """);
 
-        Requirements requirements = PIPFILE.read(dir, null, singletonMap("PRIVATE_TOKEN", "secret"), NO_SETUP_PY);
+        Requirements requirements = Pipfile.read(dir, null, singletonMap("PRIVATE_TOKEN", "secret"), NO_SETUP_PY);
         assertThat(requirements.getRoots()).containsExactly(
           "requests", "django>=4.2", "pywin32 ; sys_platform == 'win32'",
           "uvloop ; (python_version < '3.9' or sys_platform == 'linux') and (platform_machine == 'x86_64')",
@@ -183,7 +183,7 @@ class DependencyManifestTest {
         assertThat(requirements.getIndexes()).containsExactly("private=https://secret@pkgs.example.com/simple");
         assertThat(requirements.getRequiresPython()).containsExactly("==3.11.*");
 
-        assertThatThrownBy(() -> PIPFILE.read(dir, null, emptyMap(), NO_SETUP_PY))
+        assertThatThrownBy(() -> Pipfile.read(dir, null, emptyMap(), NO_SETUP_PY))
           .hasMessageContaining("${PRIVATE_TOKEN}")
           .hasMessageNotContaining("pkgs.example.com");
     }
@@ -205,7 +205,7 @@ class DependencyManifestTest {
           test = ["pytest-mock"]
           """);
 
-        Requirements requirements = REQUIREMENTS.read(dir, null, emptyMap(), NO_SETUP_PY);
+        Requirements requirements = RequirementsFiles.read(dir, null, emptyMap(), NO_SETUP_PY);
         assertThat(requirements.getRoots()).containsExactly(
           "click",
           "pytest-mock",
@@ -233,7 +233,7 @@ class DependencyManifestTest {
           docs = sphinx
           """);
 
-        Requirements requirements = SETUP_CFG.read(dir, null, emptyMap(), NO_SETUP_PY);
+        Requirements requirements = SetupCfg.read(dir, null, emptyMap(), NO_SETUP_PY);
         assertThat(requirements.getRoots()).containsExactly("requests>=2.28", "colorama; sys_platform == \"win32\"");
         assertThat(requirements.getRequiresPython()).containsExactly(">=3.9");
     }
