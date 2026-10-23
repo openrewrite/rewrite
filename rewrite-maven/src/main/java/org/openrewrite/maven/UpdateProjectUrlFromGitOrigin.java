@@ -22,14 +22,15 @@ import org.openrewrite.Recipe;
 import org.openrewrite.TreeVisitor;
 import org.openrewrite.marker.GitProvenance;
 import org.openrewrite.maven.UpdateScmFromGitOrigin.GitOrigin;
-import org.openrewrite.xml.ChangeTagValueVisitor;
 import org.openrewrite.xml.tree.Xml;
 
-import java.util.Optional;
+import java.util.regex.Pattern;
 
 @Value
 @EqualsAndHashCode(callSuper = false)
 public class UpdateProjectUrlFromGitOrigin extends Recipe {
+
+    private static final Pattern PORT = Pattern.compile(":[0-9]+$");
 
     String displayName = "Update project URL with Git origin";
 
@@ -39,41 +40,26 @@ public class UpdateProjectUrlFromGitOrigin extends Recipe {
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
         return new MavenVisitor<ExecutionContext>() {
-
-            @SuppressWarnings("NotNullFieldNotInitialized")
-            GitOrigin gitOrigin;
-
             @Override
             public Xml visitDocument(Xml.Document document, ExecutionContext ctx) {
-                Optional<String> maybeOriginUrl = document.getMarkers().findFirst(GitProvenance.class)
-                        .map(GitProvenance::getOrigin);
-                Optional<GitOrigin> maybeOrigin = maybeOriginUrl.map(GitOrigin::parseGitUrl);
-                if (!maybeOrigin.isPresent() || getResolutionResult().parentPomIsProjectPom()) {
+                Xml.Tag project = document.getRoot();
+                String originalUrl = project.getChildValue("url").orElse(null);
+                String originUrl = document.getMarkers().findFirst(GitProvenance.class)
+                        .map(GitProvenance::getOrigin)
+                        .orElse(null);
+                if (originalUrl == null || originUrl == null || getResolutionResult().parentPomIsProjectPom()) {
                     return document;
                 }
-                gitOrigin = maybeOrigin.get();
-                // An SSH/git protocol port does not apply to the web URL
-                if (!maybeOriginUrl.get().matches("^https?://.*")) {
-                    gitOrigin = new GitOrigin(gitOrigin.getHost().replaceFirst(":[0-9]+$", ""), gitOrigin.getPath());
+                GitOrigin gitOrigin = GitOrigin.parseGitUrl(originUrl);
+                if (gitOrigin == null) {
+                    return document;
                 }
-                return super.visitDocument(document, ctx);
-            }
-
-            @Override
-            public Xml visitTag(Xml.Tag tag, ExecutionContext ctx) {
-                if (!"project".equals(tag.getName())) {
-                    return tag;
+                if (!originUrl.startsWith("http://") && !originUrl.startsWith("https://")) {
+                    // An SSH port does not apply to the web URL
+                    gitOrigin = new GitOrigin(PORT.matcher(gitOrigin.getHost()).replaceFirst(""), gitOrigin.getPath());
                 }
-                Optional<Xml.Tag> maybeUrl = tag.getChild("url");
-                if (maybeUrl.isPresent()) {
-                    String originalUrl = maybeUrl.get().getValue().orElse("");
-                    String updatedUrl = gitOrigin.replaceHostAndPath(originalUrl);
-                    if (!originalUrl.equals(updatedUrl)) {
-                        return new ChangeTagValueVisitor<>(maybeUrl.get(), updatedUrl)
-                                .visitNonNull(tag, ctx, getCursor().getParentTreeCursor());
-                    }
-                }
-                return tag;
+                String updatedUrl = gitOrigin.replaceHostAndPath(originalUrl);
+                return originalUrl.equals(updatedUrl) ? document : document.withRoot(project.withChildValue("url", updatedUrl));
             }
         };
     }
