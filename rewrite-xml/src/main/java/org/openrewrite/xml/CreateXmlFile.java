@@ -92,6 +92,9 @@ public class CreateXmlFile extends ScanningRecipe<AtomicBoolean> {
                     if (StringUtils.isBlank(fileContents)) {
                         return document.withProlog(null).withRoot(null);
                     }
+                    if (document.printAll().equals(fileContents)) {
+                        return document;
+                    }
                     Optional<SourceFile> sourceFiles = XmlParser.builder().build()
                             .parse(fileContents)
                             .findFirst();
@@ -99,10 +102,11 @@ public class CreateXmlFile extends ScanningRecipe<AtomicBoolean> {
                         SourceFile sourceFile = sourceFiles.get();
                         if (sourceFile instanceof Xml.Document) {
                             Xml.Document newXmlDocument = (Xml.Document) sourceFile;
-                            Xml.Document overwritten = document
+                            return document
+                                    .withPrefix(newXmlDocument.getPrefix())
                                     .withProlog(newXmlDocument.getProlog())
-                                    .withRoot(newXmlDocument.getRoot());
-                            return overwritten.printAll().equals(document.printAll()) ? document : overwritten;
+                                    .withRoot(newXmlDocument.getRoot())
+                                    .withEof(newXmlDocument.getEof());
                         }
                     }
                 }

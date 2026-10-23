@@ -89,14 +89,20 @@ public class CreatePropertiesFile extends ScanningRecipe<AtomicBoolean> {
                     if (StringUtils.isBlank(fileContents)) {
                         return file.withContent(emptyList());
                     }
+                    if (file.printAll().equals(fileContents)) {
+                        return file;
+                    }
                     Optional<SourceFile> sourceFiles = PropertiesParser.builder().build()
                             .parse(fileContents)
                             .findFirst();
                     if (sourceFiles.isPresent()) {
                         SourceFile sourceFile = sourceFiles.get();
                         if (sourceFile instanceof Properties.File) {
-                            Properties.File overwritten = file.withContent(((Properties.File) sourceFile).getContent());
-                            return overwritten.printAll().equals(file.printAll()) ? file : overwritten;
+                            Properties.File newFile = (Properties.File) sourceFile;
+                            return file
+                                    .withPrefix(newFile.getPrefix())
+                                    .withContent(newFile.getContent())
+                                    .withEof(newFile.getEof());
                         }
                     }
                 }

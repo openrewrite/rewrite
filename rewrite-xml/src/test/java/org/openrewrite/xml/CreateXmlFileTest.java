@@ -75,7 +75,7 @@ class CreateXmlFileTest implements RewriteTest {
               <before/>
               """,
             fileContents,
-            spec -> spec.path("test/test.xml")
+            spec -> spec.path("test/test.xml").noTrim()
           )
         );
     }
