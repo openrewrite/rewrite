@@ -33,7 +33,8 @@ import static org.assertj.core.api.Assertions.fail;
 
 /**
  * Finds the {@link Heavyweight} objects, such as trees, that ScanningRecipe accumulators keep. An accumulator lives
- * from the first source file scanned until the cycle ends.
+ * from the first source file scanned until the cycle ends. The walk reads fields and JDK collections, and runs no
+ * code of the recipe's own.
  */
 final class AccumulatorContents {
     /**
@@ -44,6 +45,13 @@ final class AccumulatorContents {
     private static final int MAX_PATHS = 5;
 
     private static final Pattern KEY_OR_INDEX = Pattern.compile("\\[[^\\]]*]");
+
+    /**
+     * JDK superclasses that keep no elements, so that a collection extending one keeps them in fields of its own.
+     */
+    private static final Set<Class<?>> SKELETONS = new HashSet<>(Arrays.asList(Object.class,
+            AbstractCollection.class, AbstractList.class, AbstractSequentialList.class, AbstractSet.class,
+            AbstractQueue.class, AbstractMap.class));
 
     private enum Kind {RETAINED, LEAF, COLLECTION, MAP, ENTRY, ARRAY, OPTIONAL, ATOMIC_REFERENCE, OBJECT}
 
@@ -57,6 +65,10 @@ final class AccumulatorContents {
                 return Kind.LEAF;
             } else if (type.isArray()) {
                 return type.getComponentType().isPrimitive() ? Kind.LEAF : Kind.ARRAY;
+            } else if ((Collection.class.isAssignableFrom(type) || Map.class.isAssignableFrom(type) ||
+                        Map.Entry.class.isAssignableFrom(type)) && !keepsElementsInJdk(type)) {
+                // read by its fields, since calling a collection class of the recipe's own runs its code
+                return Kind.OBJECT;
             } else if (Collection.class.isAssignableFrom(type)) {
                 return Kind.COLLECTION;
             } else if (Map.class.isAssignableFrom(type)) {
@@ -160,17 +172,16 @@ final class AccumulatorContents {
          * Breadth first, so that the path to what the accumulator keeps is a short one.
          */
         void walk(Object acc) {
-            visit(acc, AddedMarkers.typeName(acc.getClass()));
+            visit(acc, null, AddedMarkers.typeName(acc.getClass()));
             while (!queue.isEmpty()) {
                 Node node = queue.poll();
                 Object value = node.getValue();
-                String path = node.getPath();
                 switch (KINDS.get(value.getClass())) {
                     case COLLECTION:
                         int i = 0;
                         for (Object element : (Collection<?>) value) {
                             if (walks(element)) {
-                                visit(element, path + "[" + i + "]");
+                                visit(element, node, i);
                             }
                             i++;
                         }
@@ -178,38 +189,35 @@ final class AccumulatorContents {
                     case MAP:
                         for (Map.Entry<?, ?> entry : ((Map<?, ?>) value).entrySet()) {
                             if (walks(entry.getKey()) || walks(entry.getValue())) {
-                                String entryPath = path + "[" + key(entry.getKey()) + "]";
-                                visit(entry.getKey(), entryPath);
-                                visit(entry.getValue(), entryPath);
+                                Key key = new Key(entry.getKey());
+                                visit(entry.getKey(), node, key);
+                                visit(entry.getValue(), node, key);
                             }
                         }
                         break;
                     case ENTRY:
                         Map.Entry<?, ?> entry = (Map.Entry<?, ?>) value;
-                        visit(entry.getKey(), path + ".key");
-                        visit(entry.getValue(), path + ".value");
+                        visit(entry.getKey(), node, ".key");
+                        visit(entry.getValue(), node, ".value");
                         break;
                     case ARRAY:
                         for (int j = 0; j < Array.getLength(value); j++) {
                             Object element = Array.get(value, j);
                             if (walks(element)) {
-                                visit(element, path + "[" + j + "]");
+                                visit(element, node, j);
                             }
                         }
                         break;
                     case OPTIONAL:
-                        visit(((Optional<?>) value).orElse(null), path + ".get()");
+                        visit(((Optional<?>) value).orElse(null), node, ".get()");
                         break;
                     case ATOMIC_REFERENCE:
-                        visit(((AtomicReference<?>) value).get(), path + ".get()");
+                        visit(((AtomicReference<?>) value).get(), node, ".get()");
                         break;
                     default:
                         for (Field field : FIELDS.get(value.getClass())) {
                             try {
-                                Object fieldValue = field.get(value);
-                                if (walks(fieldValue)) {
-                                    visit(fieldValue, path + "." + field.getName());
-                                }
+                                visit(field.get(value), node, field);
                             } catch (IllegalAccessException ignored) {
                                 // a field that can't be read can't be walked
                             }
@@ -218,20 +226,24 @@ final class AccumulatorContents {
             }
         }
 
-        private void visit(@Nullable Object value, String path) {
+        /**
+         * @param step how the parent reaches the value: a field, an index, a {@link Key} or the text of the step
+         */
+        private void visit(@Nullable Object value, @Nullable Node parent, Object step) {
             if (!walks(value)) {
                 return;
             }
             if (KINDS.get(value.getClass()) == Kind.RETAINED) {
-                found(path, value);
+                found(new Node(value, parent, step));
             } else if (budget > 0 && visited.add(value)) {
                 budget--;
-                queue.add(new Node(value, path));
+                queue.add(new Node(value, parent, step));
             }
         }
 
-        private void found(String path, Object value) {
-            String what = describe(value);
+        private void found(Node node) {
+            String path = node.path();
+            String what = describe(node.getValue());
             findings.computeIfAbsent(recipe, r -> new LinkedHashMap<>()).putIfAbsent(
                     KEY_OR_INDEX.matcher(path).replaceAll("[]") + " -> " + what, new Finding(path, what, when));
         }
@@ -271,6 +283,18 @@ final class AccumulatorContents {
         return s.length() > 60 ? s.substring(0, 60) + "..." : s;
     }
 
+    /**
+     * Whether a collection is a JDK class or extends one that keeps its elements, so that only its methods can read
+     * them.
+     */
+    private static boolean keepsElementsInJdk(Class<?> type) {
+        Class<?> jdk = type;
+        while (!isJdk(jdk)) {
+            jdk = jdk.getSuperclass();
+        }
+        return jdk == type || !SKELETONS.contains(jdk);
+    }
+
     private static boolean isJdk(Class<?> type) {
         String name = type.getName();
         return name.startsWith("java.") || name.startsWith("javax.") || name.startsWith("jdk.") ||
@@ -302,10 +326,35 @@ final class AccumulatorContents {
                 .toString();
     }
 
+    /**
+     * An object the walk reached, with the way there, which is only spelled out for a finding so that the walk calls
+     * no {@code toString()} of the recipe's own.
+     */
     @Value
     private static class Node {
         Object value;
-        String path;
+
+        @Nullable
+        Node parent;
+
+        Object step;
+
+        String path() {
+            Deque<String> steps = new ArrayDeque<>();
+            for (Node node = this; node != null; node = node.parent) {
+                steps.push(node.step instanceof Field ? "." + ((Field) node.step).getName() :
+                        node.step instanceof Integer ? "[" + node.step + "]" :
+                                node.step instanceof Key ? "[" + key(((Key) node.step).getKey()) + "]" :
+                                        (String) node.step);
+            }
+            return String.join("", steps);
+        }
+    }
+
+    @Value
+    private static class Key {
+        @Nullable
+        Object key;
     }
 
     @Value

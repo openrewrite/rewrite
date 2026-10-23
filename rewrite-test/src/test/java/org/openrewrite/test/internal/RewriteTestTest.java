@@ -61,6 +61,7 @@ import org.openrewrite.yaml.YamlIsoVisitor;
 import org.openrewrite.yaml.tree.Yaml;
 
 import java.nio.file.Path;
+import java.util.AbstractMap;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
@@ -2096,6 +2097,16 @@ class RewriteTestTest implements RewriteTest {
         }
 
         @Test
+        void rejectSourceFileKeptInCollectionOfItsOwn() {
+            AssertionError e = assertThrows(AssertionError.class, () -> rewriteRun(
+              spec -> spec.recipe(new KeepsWhatItScansInItsOwnMap()),
+              text("foo", spec -> spec.path("foo.txt"))
+            ));
+            assertThat(e).hasMessageContaining(
+              "KeepsWhatItScansInItsOwnMap.Index.files[foo.txt] -> PlainText foo.txt, after scanning");
+        }
+
+        @Test
         void acceptValuesAndSmallMarkersKeptInAccumulator() {
             rewriteRun(
               spec -> spec.recipe(new KeepsPathsByProject()),
@@ -3008,6 +3019,43 @@ class KeepsWhatItScans extends ScanningRecipe<KeepsWhatItScans.Scanned> {
             public @Nullable Tree visit(@Nullable Tree tree, ExecutionContext ctx) {
                 if (tree instanceof SourceFile s) {
                     acc.sourceFiles.put(s.getSourcePath(), s);
+                }
+                return tree;
+            }
+        };
+    }
+}
+
+@EqualsAndHashCode(callSuper = false)
+@NullMarked
+@Value
+class KeepsWhatItScansInItsOwnMap extends ScanningRecipe<KeepsWhatItScansInItsOwnMap.Index> {
+
+    String displayName = "Keeps the source files it scans in a map of its own";
+
+    String description = "Keeps each source file it scans in an accumulator that is a map, which the check must not call.";
+
+    static class Index extends AbstractMap<Path, SourceFile> {
+        final Map<Path, SourceFile> files = new HashMap<>();
+
+        @Override
+        public Set<Entry<Path, SourceFile>> entrySet() {
+            throw new UnsupportedOperationException("The check ran code of the accumulator's own");
+        }
+    }
+
+    @Override
+    public Index getInitialValue(ExecutionContext ctx) {
+        return new Index();
+    }
+
+    @Override
+    public TreeVisitor<?, ExecutionContext> getScanner(Index acc) {
+        return new TreeVisitor<>() {
+            @Override
+            public @Nullable Tree visit(@Nullable Tree tree, ExecutionContext ctx) {
+                if (tree instanceof SourceFile s) {
+                    acc.files.put(s.getSourcePath(), s);
                 }
                 return tree;
             }
