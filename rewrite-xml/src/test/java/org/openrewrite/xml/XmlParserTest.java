@@ -36,6 +36,7 @@ import org.openrewrite.tree.ParseError;
 import org.openrewrite.xml.tree.Xml;
 
 import java.nio.file.Path;
+import java.util.List;
 import java.util.stream.Stream;
 
 import static org.assertj.core.api.AssertionsForClassTypes.assertThat;
@@ -434,6 +435,68 @@ class XmlParserTest implements RewriteTest {
         assertThat(parsed.printAll()).isEqualTo(source);
         assertThat(parsed.getMarkers().findFirst(ParseExceptionResult.class).orElseThrow().getMessage())
           .contains("Malformed attribute");
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {
+      "<root><a></b></root>",
+      "<table><tr><td><label><details><summary>Request</summary></label></td></tr></table>",
+      "<root><a>",
+      "<root><a></a>",
+    })
+    void unbalancedTagsAreNotSilentlyAccepted(String source) {
+        SourceFile parsed = XmlParser.builder().build()
+          .parse(new InMemoryExecutionContext(t -> {
+          }), source)
+          .findFirst().orElseThrow();
+        assertThat(parsed).isInstanceOf(ParseError.class);
+        assertThat(parsed.printAll()).isEqualTo(source);
+        assertThat(parsed.getMarkers().findFirst(ParseExceptionResult.class).orElseThrow().getMessage())
+          .containsAnyOf("Mismatched closing tag", "Unclosed element");
+    }
+
+    @Test
+    void mismatchedClosingTagNamesBothPositions() {
+        SourceFile parsed = XmlParser.builder().build()
+          .parse(new InMemoryExecutionContext(t -> {
+          }), "<table>\n  <tr><td><label>\n    <details><summary>Request</summary>\n  </label></td></tr>\n</table>")
+          .findFirst().orElseThrow();
+        assertThat(parsed.getMarkers().findFirst(ParseExceptionResult.class).orElseThrow().getMessage())
+          .contains("Mismatched closing tag </label> at line 4, column 3 for <details> opened at line 3, column 5");
+    }
+
+    @Test
+    void malformedAttributeIsReportedOverTheUnbalancedTagsItCauses() {
+        SourceFile parsed = XmlParser.builder().build()
+          .parseInputs(List.of(Input.fromString(Path.of("head.html"), """
+            <head>
+            <link rel="icon" href="favicon.png">
+            <link rel="alternate" title="{{ partial "docs/title" . }}">
+            </head>
+            """)), null, new InMemoryExecutionContext(t -> {
+          }))
+          .findFirst().orElseThrow();
+        assertThat(parsed.getMarkers().findFirst(ParseExceptionResult.class).orElseThrow().getMessage())
+          .contains("Malformed attribute in head.html at line 3");
+    }
+
+    @Test
+    void htmlClosingTagsMatchIgnoringCase() {
+        rewriteRun(
+          xml(
+            "<TABLE><TR><TD>cell</td></tr></table>",
+            spec -> spec.path("legacy.jsp")
+          )
+        );
+    }
+
+    @Test
+    void xmlClosingTagsMatchCaseSensitively() {
+        SourceFile parsed = XmlParser.builder().build()
+          .parse(new InMemoryExecutionContext(t -> {
+          }), "<Root></root>")
+          .findFirst().orElseThrow();
+        assertThat(parsed).isInstanceOf(ParseError.class);
     }
 
     @Test
