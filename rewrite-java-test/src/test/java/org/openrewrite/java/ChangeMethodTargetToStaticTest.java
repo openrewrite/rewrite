@@ -17,6 +17,7 @@ package org.openrewrite.java;
 
 import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
+import org.junitpioneer.jupiter.ExpectedToFail;
 import org.openrewrite.Issue;
 import org.openrewrite.test.RewriteTest;
 
@@ -178,6 +179,94 @@ class ChangeMethodTargetToStaticTest implements RewriteTest {
                      A.method();
                      A a = new A();
                      A.method();
+                 }
+              }
+              """
+          )
+        );
+    }
+
+    @ExpectedToFail("Deleting the read of a statically imported field also deletes the class initialization of its declaring class (JLS 12.4.1)")
+    @Test
+    void staticallyImportedFieldReceiverNotChanged() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeMethodTargetToStatic("a.A stat()", "b.B", null, null, false)),
+          java(
+            """
+              package a;
+              public class A {
+                 public void stat() {}
+              }
+              """
+          ),
+          java(
+            """
+              package b;
+              public class B {
+                 public static void stat() {}
+              }
+              """
+          ),
+          java(
+            """
+              package holder;
+              import a.A;
+              public class Holder {
+                 public static final A INSTANCE = new A();
+                 static {
+                     System.setProperty("holder.initialized", "true");
+                 }
+              }
+              """
+          ),
+          java(
+            """
+              import static holder.Holder.INSTANCE;
+
+              class C {
+                 public void test() {
+                     INSTANCE.stat();
+                 }
+              }
+              """
+          )
+        );
+    }
+
+    @ExpectedToFail("Collapsing a chain where the pattern matches both calls drops the intermediate call's arguments and their side effects")
+    @Test
+    void chainedCallsNotCollapsedWhenArgumentsWouldBeDropped() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeMethodTargetToStatic("a.A *(..)", "b.B", null, null, false)),
+          java(
+            """
+              package a;
+              public class A {
+                 public A combine(String s) { return this; }
+                 public String value() { return "x"; }
+              }
+              """
+          ),
+          java(
+            """
+              package b;
+              public class B {
+                 public static B combine(String s) { return null; }
+                 public static String value() { return "x"; }
+              }
+              """
+          ),
+          java(
+            """
+              import a.A;
+
+              class C {
+                 String test(A legacy) {
+                     return legacy.combine(argument()).value();
+                 }
+
+                 String argument() {
+                     return "arg";
                  }
               }
               """
