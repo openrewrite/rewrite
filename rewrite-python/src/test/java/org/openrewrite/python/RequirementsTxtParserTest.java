@@ -152,6 +152,20 @@ class RequirementsTxtParserTest {
     }
 
     @Test
+    void anEnvWithoutPackagesLeavesTheFileWithoutAMarker(@TempDir Path tempDir) throws Exception {
+        Files.writeString(tempDir.resolve("requirements.txt"), "six ; python_version < '3.0'\n");
+        Path venv = tempDir.resolve(".venv");
+        Files.createDirectories(venv.resolve("lib/python3.12/site-packages"));
+
+        SourceFile parsed = new RequirementsTxtParser(venv).parseInputs(
+                singletonList(Parser.Input.fromFile(tempDir.resolve("requirements.txt"))), tempDir,
+                new InMemoryExecutionContext()).findFirst().orElseThrow();
+
+        assertThat(parsed.getMarkers().findFirst(ParseExceptionResult.class)).isEmpty();
+        assertThat(parsed.getMarkers().findFirst(PythonResolutionResult.class)).isEmpty();
+    }
+
+    @Test
     void markerContainsDependenciesFromFreeze() {
         assumeTrue(PackageManagerExecutor.UV.find() != null, "uv is not installed");
 

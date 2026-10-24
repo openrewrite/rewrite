@@ -114,8 +114,7 @@ public class RequirementsTxtParser implements Parser {
 
             List<ResolvedDependency> resolvedDeps = InstalledEnvParser.parse(env);
             if (resolvedDeps.isEmpty()) {
-                return sf.withMarkers(sf.getMarkers().add(ParseExceptionResult.build(this, new UnsupportedOperationException(),
-                        "Failed to create the PythonResolutionResult: no resolved dependencies.")));
+                return sf;
             }
 
             List<Dependency> deps = declaredDependencies(resolvedDeps,
