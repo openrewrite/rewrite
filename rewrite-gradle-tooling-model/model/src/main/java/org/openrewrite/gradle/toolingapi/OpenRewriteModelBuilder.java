@@ -37,18 +37,11 @@ import java.util.List;
 public class OpenRewriteModelBuilder {
 
     /**
-     * The public repositories the bundled init script resolves the Tooling API plugin from, after the local one.
-     */
-    static final String PUBLIC_REPOSITORIES =
-            "        maven { url = uri(\"https://central.sonatype.com/repository/maven-snapshots\") }\n" +
-            "        mavenCentral()\n";
-
-    /**
      * Build an OpenRewriteModel for a project directory, using the default Gradle init script bundled within this jar.
      * The included init script accesses public artifact repositories (Maven Central, Nexus Snapshots) to be able to
-     * download rewrite dependencies, so public repositories must be accessible for this to work, or the mirror that
-     * {@code REWRITE_GRADLE_MIRROR_URL}, {@code REWRITE_GRADLE_MIRROR_USERNAME} and {@code REWRITE_GRADLE_MIRROR_PASSWORD}
-     * name, which takes their place.
+     * download rewrite dependencies, so public repositories must be accessible for this to work. If
+     * {@code REWRITE_GRADLE_MIRROR_URL}, {@code REWRITE_GRADLE_MIRROR_USERNAME} and
+     * {@code REWRITE_GRADLE_MIRROR_PASSWORD} are all set, it downloads them from that mirror instead.
      */
     public static OpenRewriteModel forProjectDirectory(File projectDir, @Nullable File buildFile) throws IOException {
         return forProjectDirectory(projectDir, buildFile, null);
@@ -140,10 +133,7 @@ public class OpenRewriteModelBuilder {
                             throw new IllegalStateException("Expected to find init.gradle on the classpath");
                         }
                         byte[] bytes = readAllBytes(is);
-                        resolvedInitScript = throughMirror(new String(bytes, StandardCharsets.UTF_8),
-                                System.getenv("REWRITE_GRADLE_MIRROR_URL"),
-                                System.getenv("REWRITE_GRADLE_MIRROR_USERNAME"),
-                                System.getenv("REWRITE_GRADLE_MIRROR_PASSWORD"));
+                        resolvedInitScript = new String(bytes, StandardCharsets.UTF_8);
                     }
                 }
             } else {
@@ -210,26 +200,6 @@ public class OpenRewriteModelBuilder {
                 "    __rewriteAddMirror(project.buildscript.repositories)\n" +
                 "    __rewriteAddMirror(project.repositories)\n" +
                 "}\n";
-    }
-
-    /**
-     * The bundled init script with the mirror that {@link #mirrorScriptSnippet()} routes the build through in place
-     * of its public repositories, so that the Tooling API plugin, which every model build resolves again, comes from
-     * the mirror too, which carries both: Maven Central rate-limits by address. Unchanged without a URL, username and
-     * password for the mirror.
-     */
-    static String throughMirror(String initScript, @Nullable String url, @Nullable String username, @Nullable String password) {
-        if (url == null || username == null || password == null || url.isEmpty() || username.isEmpty() || password.isEmpty()) {
-            return initScript;
-        }
-        return initScript.replace(PUBLIC_REPOSITORIES,
-                "        maven {\n" +
-                "            url = uri('" + escapeGroovy(url) + "')\n" +
-                "            credentials {\n" +
-                "                username = '" + escapeGroovy(username) + "'\n" +
-                "                password = '" + escapeGroovy(password) + "'\n" +
-                "            }\n" +
-                "        }\n");
     }
 
     private static String escapeGroovy(String s) {
