@@ -60,6 +60,121 @@ class FindAnnotationsTest implements RewriteTest {
         );
     }
 
+    @Issue("https://github.com/openrewrite/rewrite/issues/9260")
+    @Test
+    void matchMetaAnnotationParametersAgainstMetaAnnotation() {
+        rewriteRun(
+          spec -> spec.recipe(new FindAnnotations("@com.example.Meta(\"foo\")", true)),
+          java(
+            """
+              package com.example;
+              public @interface Meta { String value(); }
+              """
+          ),
+          java(
+            """
+              package com.example;
+              @Meta("foo") public @interface Foo { String value() default ""; }
+              """,
+            """
+              package com.example;
+              /*~~>*/@Meta("foo") public @interface Foo { String value() default ""; }
+              """
+          ),
+          java(
+            """
+              package com.example;
+              @Meta("bar") public @interface Bar { String value() default ""; }
+              """
+          ),
+          java(
+            """
+              import com.example.*;
+              @Foo class A {}
+              @Bar class B {}
+              @Bar("foo") class C {}
+              @Bar("baz") class D {}
+              """,
+            """
+              import com.example.*;
+              /*~~>*/@Foo class A {}
+              @Bar class B {}
+              @Bar("foo") class C {}
+              @Bar("baz") class D {}
+              """
+          )
+        );
+    }
+
+    @Test
+    void matchTransitiveMetaAnnotationParameters() {
+        rewriteRun(
+          spec -> spec.recipe(new FindAnnotations("@com.example.Meta(name=\"foo\", kind=com.example.Kind.B, types=java.lang.String.class, size=2)", true)),
+          java(
+            """
+              package com.example;
+              public enum Kind { A, B }
+              """
+          ),
+          java(
+            """
+              package com.example;
+              public @interface Meta {
+                  String name();
+                  Kind kind();
+                  Class<?>[] types();
+                  int size();
+              }
+              """
+          ),
+          java(
+            """
+              package com.example;
+              @Meta(name = "bar", kind = Kind.B, types = String.class, size = 2)
+              public @interface Bar {}
+              """
+          ),
+          java(
+            """
+              package com.example;
+              @Bar
+              @Meta(name = "foo", kind = Kind.B, types = {Integer.class, String.class}, size = 2)
+              public @interface Foo {}
+              """,
+            """
+              package com.example;
+              @Bar
+              /*~~>*/@Meta(name = "foo", kind = Kind.B, types = {Integer.class, String.class}, size = 2)
+              public @interface Foo {}
+              """
+          ),
+          java(
+            """
+              package com.example;
+              @Foo
+              public @interface Composed {}
+              """,
+            """
+              package com.example;
+              /*~~>*/@Foo
+              public @interface Composed {}
+              """
+          ),
+          java(
+            """
+              import com.example.*;
+              @Composed class A {}
+              @Bar class B {}
+              """,
+            """
+              import com.example.*;
+              /*~~>*/@Composed class A {}
+              @Bar class B {}
+              """
+          )
+        );
+    }
+
     @Issue("https://github.com/openrewrite/rewrite/issues/357")
     @SuppressWarnings("NewClassNamingConvention")
     @Test
