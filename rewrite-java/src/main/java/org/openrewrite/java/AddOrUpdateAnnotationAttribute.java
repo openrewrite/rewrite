@@ -90,7 +90,7 @@ public class AddOrUpdateAnnotationAttribute extends Recipe {
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
         return Preconditions.check(new UsesType<>(annotationType, false), new JavaIsoVisitor<ExecutionContext>() {
-            private boolean fullyQualifiedEnumValue;
+            private JavaType.@Nullable FullyQualified enumType;
 
             @Override
             public J.Annotation visitAnnotation(J.Annotation original, ExecutionContext ctx) {
@@ -99,13 +99,17 @@ public class AddOrUpdateAnnotationAttribute extends Recipe {
                         !(a.getType() instanceof JavaType.ShallowClass || findMethod(a, attributeName()).isPresent())) {
                     return a;
                 }
+                enumType = attributeEnumType(a);
+                J.Annotation updated = addOrUpdate(original, a, ctx);
+                return updated == a || enumType == null ? updated : typeEnumConstants(updated, enumType);
+            }
 
+            private J.Annotation addOrUpdate(J.Annotation original, J.Annotation a, ExecutionContext ctx) {
                 String newAttributeValue;
-                fullyQualifiedEnumValue = !isFullyQualifiedClass() && isFullyQualifiedEnumValue(a);
                 if (isFullyQualifiedClass()) {
                     maybeAddImport(attributeValue.substring(0, attributeValue.length() - 6));
                     newAttributeValue = attributeValue;
-                } else if (fullyQualifiedEnumValue) {
+                } else if (isFullyQualifiedEnumValue(a)) {
                     maybeAddImport(getEnumClassName(attributeValue), false);
                     newAttributeValue = getShortenedEnumValue(attributeValue);
                 } else {
@@ -295,12 +299,8 @@ public class AddOrUpdateAnnotationAttribute extends Recipe {
                     builder
                             .javaParser(JavaParser.fromJavaVersion().dependsOn(String.format("package %s;\npublic interface %s {}\n", fqn.getPackageName(), fqn.getClassName())))
                             .imports(fqn.getFullyQualifiedName());
-                } else if (fullyQualifiedEnumValue) {
-                    JavaType.ShallowClass enumType = JavaType.ShallowClass.build(getEnumClassName(attributeValue));
-                    String constant = attributeValue.substring(attributeValue.lastIndexOf('.') + 1);
-                    builder
-                            .javaParser(JavaParser.fromJavaVersion().dependsOn(String.format("package %s;\npublic enum %s { %s }\n", enumType.getPackageName(), enumType.getClassName(), constant)))
-                            .imports(enumType.getFullyQualifiedName());
+                } else if (enumType != null) {
+                    builder.imports(TypeUtils.toFullyQualifiedName(enumType.getFullyQualifiedName()));
                 }
                 return builder.build();
             }
@@ -349,7 +349,7 @@ public class AddOrUpdateAnnotationAttribute extends Recipe {
                 initializer.add(existingLiteral.withPrefix(SINGLE_SPACE));
                 // Add new values, skipping duplicates
                 for (String attribute : newValues) {
-                    if (!attributeNameOrValIsAlreadyPresent(initializer, singleton(attribute))) {
+                    if (initializer.stream().noneMatch(it -> elementMatches(it, attribute))) {
                         initializer.add(newElement(annotation, attribute));
                     }
                 }
@@ -366,7 +366,7 @@ public class AddOrUpdateAnnotationAttribute extends Recipe {
                 initializer.add(existingFieldAccess.withPrefix(SINGLE_SPACE));
                 // Add new values, skipping duplicates - use template for non-string values
                 for (String attribute : newValues) {
-                    if (!attributeNameOrValIsAlreadyPresent(initializer, singleton(attribute))) {
+                    if (initializer.stream().noneMatch(it -> elementMatches(it, attribute))) {
                         String templateValue = attribute;
                         // For FQ classes, add stub so type info is resolved and use FQ name in template
                         if (isFullyQualifiedClass()) {
@@ -403,15 +403,11 @@ public class AddOrUpdateAnnotationAttribute extends Recipe {
         if (attributeValue == null || attributeValue.endsWith(".class") || attributeValue.contains(",")) {
             return false;
         }
-        if (!attributeValue.matches("[\\w.$]+") || !attributeIsEnum(annotation)) {
+        JavaType.FullyQualified enumType = attributeEnumType(annotation);
+        if (!attributeValue.matches("[\\w.$]+") || enumType == null || attributeValue.lastIndexOf('.') <= 0) {
             return false;
         }
-        int lastDot = attributeValue.lastIndexOf('.');
-        if (lastDot <= 0) {
-            return false;
-        }
-        String enumClassName = attributeValue.substring(0, lastDot);
-        return enumClassName.contains(".");
+        return TypeUtils.toFullyQualifiedName(enumType.getFullyQualifiedName()).equals(getEnumClassName(attributeValue));
     }
 
     private static String getEnumClassName(String fqn) {
@@ -453,7 +449,7 @@ public class AddOrUpdateAnnotationAttribute extends Recipe {
         if (TRUE.equals(appendArray)) {
             List<Expression> newItemsList = new ArrayList<>();
             for (String attribute : attributeList) {
-                if (attributeNameOrValIsAlreadyPresent(initializerList, singleton(attribute))) {
+                if (initializerList.stream().anyMatch(it -> elementMatches(it, attribute))) {
                     continue;
                 }
                 newItemsList.add(newElement.apply(attribute));
@@ -468,7 +464,7 @@ public class AddOrUpdateAnnotationAttribute extends Recipe {
             if (i >= attributeList.size()) {
                 return null;
             }
-            if (attributeNameOrValIsAlreadyPresent(it, singleton(attributeList.get(i)))) {
+            if (elementMatches(it, attributeList.get(i))) {
                 return it;
             }
             return newElement.apply(attributeList.get(i)).withPrefix(it.getPrefix());
@@ -550,11 +546,76 @@ public class AddOrUpdateAnnotationAttribute extends Recipe {
                 .orElse(false);
     }
 
-    private boolean attributeIsEnum(J.Annotation annotation) {
+    private JavaType.@Nullable FullyQualified attributeEnumType(J.Annotation annotation) {
         return findMethod(annotation, attributeName())
-                .map(it -> it.getReturnType() instanceof JavaType.FullyQualified &&
-                           ((JavaType.FullyQualified) it.getReturnType()).getKind() == JavaType.FullyQualified.Kind.Enum)
-                .orElse(false);
+                .map(it -> it.getReturnType() instanceof JavaType.Array ?
+                        ((JavaType.Array) it.getReturnType()).getElemType() : it.getReturnType())
+                .map(TypeUtils::asFullyQualified)
+                .filter(it -> it.getKind() == JavaType.FullyQualified.Kind.Enum)
+                .orElse(null);
+    }
+
+    /**
+     * The template's parser sees only the JDK, so it leaves the constants of any other enum untyped.
+     */
+    private J.Annotation typeEnumConstants(J.Annotation annotation, JavaType.FullyQualified enumType) {
+        return annotation.withArguments(ListUtils.map(annotation.getArguments(), argument -> {
+            if (argument instanceof J.Assignment) {
+                J.Assignment assignment = (J.Assignment) argument;
+                return assignment.getVariable() instanceof J.Identifier &&
+                       attributeName().equals(((J.Identifier) assignment.getVariable()).getSimpleName()) ?
+                        assignment.withAssignment(typeEnumValue(assignment.getAssignment(), enumType)) : assignment;
+            }
+            return "value".equals(attributeName()) ? typeEnumValue(argument, enumType) : argument;
+        }));
+    }
+
+    private static Expression typeEnumValue(Expression value, JavaType.FullyQualified enumType) {
+        if (value instanceof J.NewArray) {
+            J.NewArray array = (J.NewArray) value;
+            return array.withInitializer(ListUtils.map(array.getInitializer(), element -> typeEnumValue(element, enumType)));
+        }
+        if (value instanceof J.Identifier) {
+            J.Identifier identifier = (J.Identifier) value;
+            JavaType.Variable constant = findMember(enumType, identifier.getSimpleName());
+            return constant == null ? identifier : identifier.withType(constant.getType()).withFieldType(constant);
+        }
+        if (value instanceof J.FieldAccess) {
+            J.FieldAccess fieldAccess = (J.FieldAccess) value;
+            JavaType.Variable constant = findMember(enumType, fieldAccess.getSimpleName());
+            Expression target = typeReference(fieldAccess.getTarget(), enumType);
+            return constant == null || target == null ? fieldAccess : fieldAccess.withTarget(target)
+                    .withType(constant.getType())
+                    .withName(fieldAccess.getName().withType(constant.getType()).withFieldType(constant));
+        }
+        return value;
+    }
+
+    /**
+     * The reference typed as {@code type}, or null when it names another type.
+     */
+    private static @Nullable Expression typeReference(Expression reference, JavaType.FullyQualified type) {
+        String simpleName = type.getClassName().substring(type.getClassName().lastIndexOf('.') + 1);
+        if (reference instanceof J.Identifier) {
+            return simpleName.equals(((J.Identifier) reference).getSimpleName()) ? reference.withType(type) : null;
+        }
+        if (!(reference instanceof J.FieldAccess) || !simpleName.equals(((J.FieldAccess) reference).getSimpleName())) {
+            return null;
+        }
+        J.FieldAccess fieldAccess = (J.FieldAccess) reference;
+        JavaType.FullyQualified owner = type.getOwningClass();
+        Expression target = owner == null ? fieldAccess.getTarget() : typeReference(fieldAccess.getTarget(), owner);
+        return target == null ? null :
+                fieldAccess.withTarget(target).withType(type).withName(fieldAccess.getName().withType(type));
+    }
+
+    private static JavaType.@Nullable Variable findMember(JavaType.FullyQualified type, String name) {
+        for (JavaType.Variable member : type.getMembers()) {
+            if (member.getName().equals(name)) {
+                return member;
+            }
+        }
+        return null;
     }
 
     private static Optional<JavaType.Method> findMethod(J.Annotation annotation, String methodName) {
@@ -604,5 +665,13 @@ public class AddOrUpdateAnnotationAttribute extends Recipe {
             return (initializer == null && attributeValue == null) || (initializer != null && attributeNameOrValIsAlreadyPresent(initializer, values));
         }
         return false;
+    }
+
+    /**
+     * A bare constant matches as an array element, though as an argument it is the implicit {@code value} attribute.
+     */
+    private boolean elementMatches(Expression element, String value) {
+        return element instanceof J.Identifier ? value.equals(((J.Identifier) element).getSimpleName()) :
+                attributeNameOrValIsAlreadyPresent(element, singleton(value));
     }
 }
