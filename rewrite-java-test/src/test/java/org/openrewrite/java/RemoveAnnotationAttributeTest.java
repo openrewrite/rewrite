@@ -117,4 +117,51 @@ class RemoveAnnotationAttributeTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void removeImportsOfRemovedValue() {
+        rewriteRun(
+          spec -> spec
+            .parser(JavaParser.fromJavaVersion()
+              .dependsOn(
+                """
+                  import java.util.concurrent.TimeUnit;
+
+                  @interface Timed {
+                      TimeUnit rateUnit();
+                  }
+                  """
+              )
+            )
+            .recipe(new RemoveAnnotationAttribute("Timed", "rateUnit")),
+          java(
+            """
+              import java.util.concurrent.TimeUnit;
+
+              @Timed(rateUnit = TimeUnit.SECONDS)
+              class A {
+              }
+              """,
+            """
+              @Timed
+              class A {
+              }
+              """
+          ),
+          java(
+            """
+              import static java.util.concurrent.TimeUnit.SECONDS;
+
+              @Timed(rateUnit = SECONDS)
+              class B {
+              }
+              """,
+            """
+              @Timed
+              class B {
+              }
+              """
+          )
+        );
+    }
 }

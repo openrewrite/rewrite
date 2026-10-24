@@ -90,10 +90,11 @@ public class RemoveAnnotationAttribute extends Recipe {
 
                     return arg;
                 }));
-                if (a != withoutAttribute &&
-                        withoutAttribute.getArguments() != null &&
-                        withoutAttribute.getArguments().size() == 1) {
-                    doAfterVisit(SimplifySingleElementAnnotation.modifyOnly(withoutAttribute));
+                if (a != withoutAttribute) {
+                    AddOrUpdateAnnotationAttribute.namesReferencedBy(a.getArguments()).forEach(this::maybeRemoveImport);
+                    if (withoutAttribute.getArguments() != null && withoutAttribute.getArguments().size() == 1) {
+                        doAfterVisit(SimplifySingleElementAnnotation.modifyOnly(withoutAttribute));
+                    }
                 }
                 return withoutAttribute;
             }
