@@ -160,9 +160,10 @@ public class OpenRewriteModelBuilder {
     /**
      * When the env vars {@code MAVEN_CENTRAL_MIRROR_URL}, {@code MAVEN_CENTRAL_MIRROR_USERNAME}, and
      * {@code MAVEN_CENTRAL_MIRROR_PASSWORD} are all set, returns a Groovy init-script fragment that
-     * points every Maven Central repository the embedded Gradle build declares at that mirror instead,
-     * with its credentials. Other repositories, and the plugin portal Gradle adds on its own, stay as
-     * the build files declare them. If any var is missing, returns the empty string.
+     * points the embedded Gradle build's Maven Central and Gradle plugin portal repositories at that
+     * mirror instead, with its credentials, including the portal Gradle adds on its own when a build
+     * names no plugin repository. Other repositories stay as the build files declare them. If any var
+     * is missing, returns the empty string.
      */
     private static String mirrorScriptSnippet() {
         String url = System.getenv("MAVEN_CENTRAL_MIRROR_URL");
@@ -178,7 +179,7 @@ public class OpenRewriteModelBuilder {
                 // configureEach also reaches the repositories the build files add after these hooks run
                 "def __rewriteUseMirror = { repositories ->\n" +
                 "    repositories.withType(MavenArtifactRepository).configureEach { repo ->\n" +
-                "        if (repo.url?.host in ['repo.maven.apache.org', 'repo1.maven.org']) {\n" +
+                "        if (repo.url?.host in ['repo.maven.apache.org', 'repo1.maven.org', 'plugins.gradle.org']) {\n" +
                 "            repo.url = __rewriteMirrorUrl\n" +
                 "            repo.credentials {\n" +
                 "                it.username = __rewriteMirrorUser\n" +
@@ -192,6 +193,13 @@ public class OpenRewriteModelBuilder {
                 "        __rewriteUseMirror(settings.pluginManagement.repositories)\n" +
                 "        try { __rewriteUseMirror(settings.buildscript.repositories) } catch (Throwable ignored) {}\n" +
                 "        try { __rewriteUseMirror(settings.dependencyResolutionManagement.repositories) } catch (Throwable ignored) {}\n" +
+                "    }\n" +
+                // When a build names no plugin repository, Gradle adds the portal itself, where the hook above
+                // can't see it; naming it here lets the hook point it at the mirror
+                "    gradle.settingsEvaluated { settings ->\n" +
+                "        if (settings.pluginManagement.repositories.isEmpty()) {\n" +
+                "            settings.pluginManagement.repositories.gradlePluginPortal()\n" +
+                "        }\n" +
                 "    }\n" +
                 "} catch (Throwable ignored) {}\n" +
                 "gradle.beforeProject { project ->\n" +
