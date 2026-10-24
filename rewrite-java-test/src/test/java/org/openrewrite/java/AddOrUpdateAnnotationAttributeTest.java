@@ -2779,6 +2779,55 @@ class AddOrUpdateAnnotationAttributeTest implements RewriteTest {
         );
     }
 
+    @Test
+    void addAttributeNextToImplicitValueOfTheSameConstant() {
+        rewriteRun(
+          spec -> spec.recipe(new AddOrUpdateAnnotationAttribute(
+            "org.example.Foo",
+            "kinds",
+            "TWO",
+            null,
+            null,
+            null
+          )),
+          java(
+            """
+              package org.example;
+              public @interface Foo {
+                  Values[] kinds() default {};
+                  Values value();
+              }
+              """
+          ),
+          java(
+            """
+              package org.example;
+              public enum Values { ONE, TWO }
+              """
+          ),
+          java(
+            """
+              import org.example.Foo;
+
+              import static org.example.Values.TWO;
+
+              @Foo(TWO)
+              public class A {
+              }
+              """,
+            """
+              import org.example.Foo;
+
+              import static org.example.Values.TWO;
+
+              @Foo(kinds = TWO, value = TWO)
+              public class A {
+              }
+              """
+          )
+        );
+    }
+
     private static void assertArrayElementsAreValuesConstants(J.CompilationUnit cu) {
         var values = (J.NewArray) cu.getClasses().getFirst().getLeadingAnnotations().getFirst().getArguments().getFirst();
         assertThat(values.getInitializer()).allSatisfy(value -> {

@@ -349,7 +349,7 @@ public class AddOrUpdateAnnotationAttribute extends Recipe {
                 initializer.add(existingLiteral.withPrefix(SINGLE_SPACE));
                 // Add new values, skipping duplicates
                 for (String attribute : newValues) {
-                    if (!attributeNameOrValIsAlreadyPresent(initializer, singleton(attribute))) {
+                    if (initializer.stream().noneMatch(it -> elementMatches(it, attribute))) {
                         initializer.add(newElement(annotation, attribute));
                     }
                 }
@@ -366,7 +366,7 @@ public class AddOrUpdateAnnotationAttribute extends Recipe {
                 initializer.add(existingFieldAccess.withPrefix(SINGLE_SPACE));
                 // Add new values, skipping duplicates - use template for non-string values
                 for (String attribute : newValues) {
-                    if (!attributeNameOrValIsAlreadyPresent(initializer, singleton(attribute))) {
+                    if (initializer.stream().noneMatch(it -> elementMatches(it, attribute))) {
                         String templateValue = attribute;
                         // For FQ classes, add stub so type info is resolved and use FQ name in template
                         if (isFullyQualifiedClass()) {
@@ -449,7 +449,7 @@ public class AddOrUpdateAnnotationAttribute extends Recipe {
         if (TRUE.equals(appendArray)) {
             List<Expression> newItemsList = new ArrayList<>();
             for (String attribute : attributeList) {
-                if (attributeNameOrValIsAlreadyPresent(initializerList, singleton(attribute))) {
+                if (initializerList.stream().anyMatch(it -> elementMatches(it, attribute))) {
                     continue;
                 }
                 newItemsList.add(newElement.apply(attribute));
@@ -464,7 +464,7 @@ public class AddOrUpdateAnnotationAttribute extends Recipe {
             if (i >= attributeList.size()) {
                 return null;
             }
-            if (attributeNameOrValIsAlreadyPresent(it, singleton(attributeList.get(i)))) {
+            if (elementMatches(it, attributeList.get(i))) {
                 return it;
             }
             return newElement.apply(attributeList.get(i)).withPrefix(it.getPrefix());
@@ -592,8 +592,7 @@ public class AddOrUpdateAnnotationAttribute extends Recipe {
     }
 
     /**
-     * The reference typed as {@code type}, or null when it names another type. It may qualify the simple name with
-     * the outer classes and the package, and the package segments keep the types they have.
+     * The reference typed as {@code type}, or null when it names another type.
      */
     private static @Nullable Expression typeReference(Expression reference, JavaType.FullyQualified type) {
         String simpleName = type.getClassName().substring(type.getClassName().lastIndexOf('.') + 1);
@@ -649,8 +648,6 @@ public class AddOrUpdateAnnotationAttribute extends Recipe {
             }
         } else if (e instanceof J.Literal) {
             return values.contains(((J.Literal) e).getValue() + "");
-        } else if (e instanceof J.Identifier) {
-            return values.contains(((J.Identifier) e).getSimpleName());
         } else if (e instanceof J.FieldAccess) {
             J.FieldAccess fa = (J.FieldAccess) e;
             String fullString = fa.toString();
@@ -668,5 +665,13 @@ public class AddOrUpdateAnnotationAttribute extends Recipe {
             return (initializer == null && attributeValue == null) || (initializer != null && attributeNameOrValIsAlreadyPresent(initializer, values));
         }
         return false;
+    }
+
+    /**
+     * A bare constant matches as an array element, though as an argument it is the implicit {@code value} attribute.
+     */
+    private boolean elementMatches(Expression element, String value) {
+        return element instanceof J.Identifier ? value.equals(((J.Identifier) element).getSimpleName()) :
+                attributeNameOrValIsAlreadyPresent(element, singleton(value));
     }
 }
