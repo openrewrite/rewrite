@@ -34,12 +34,24 @@ final class EffectiveRepositoryAssertions {
      * place.
      */
     static String mavenCentral() {
-        String url = System.getenv("MAVEN_CENTRAL_MIRROR_URL");
-        if (isNullOrEmpty(url) || isNullOrEmpty(System.getenv("MAVEN_CENTRAL_MIRROR_USERNAME")) ||
+        return mirrorOr("https://repo.maven.apache.org/maven2/");
+    }
+
+    /**
+     * The Gradle plugin portal's URL as the model builds see it: with MAVEN_CENTRAL_MIRROR_* set, they use the mirror
+     * in its place too.
+     */
+    static String gradlePluginPortal() {
+        return mirrorOr("https://plugins.gradle.org/m2");
+    }
+
+    private static String mirrorOr(String url) {
+        String mirror = System.getenv("MAVEN_CENTRAL_MIRROR_URL");
+        if (isNullOrEmpty(mirror) || isNullOrEmpty(System.getenv("MAVEN_CENTRAL_MIRROR_USERNAME")) ||
             isNullOrEmpty(System.getenv("MAVEN_CENTRAL_MIRROR_PASSWORD"))) {
-            return "https://repo.maven.apache.org/maven2/";
+            return url;
         }
-        return url;
+        return mirror;
     }
 
     /**
