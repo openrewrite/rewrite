@@ -104,53 +104,68 @@ class MavenPomDownloaderTest implements RewriteTest {
      * Effective Maven settings take precedence over the local effective build POM.
      */
     @Test
-    void repositoryOrder() {
-        var ctx = MavenExecutionContextView.view(new InMemoryExecutionContext());
-        ctx.setMavenSettings(MavenSettings.parse(Parser.Input.fromString(Path.of("settings.xml"),
-          //language=xml
-          """
-            <settings>
-              <profiles>
-                <profile>
-                    <id>customize-repos</id>
-                    <repositories>
-                        <repository>
-                            <id>settings-provided</id>
-                            <url>https://repo.clojars.org</url>
-                        </repository>
-                    </repositories>
-                </profile>
-              </profiles>
-              <activeProfiles>
-                <activeProfile>customize-repos</activeProfile>
-              </activeProfiles>
-            </settings>
-            """
-        ), ctx));
+    void repositoryOrder() throws IOException {
+        // Local servers rather than live repositories, which normalizeRepository() would probe over the network.
+        // oss.sonatype.org, used here before, now redirects to Maven Central.
+        try (var settingsRepo = new MockWebServer(); var pomRepo = new MockWebServer()) {
+            Dispatcher ok = new Dispatcher() {
+                @Override
+                public MockResponse dispatch(RecordedRequest request) {
+                    return new MockResponse().setResponseCode(200);
+                }
+            };
+            settingsRepo.setDispatcher(ok);
+            pomRepo.setDispatcher(ok);
+            settingsRepo.start();
+            pomRepo.start();
 
-        rewriteRun(
-          pomXml(
-            //language=xml
-            """
-              <project>
-                  <groupId>org.openrewrite.test</groupId>
-                  <artifactId>foo</artifactId>
-                  <version>0.1.0-SNAPSHOT</version>
-                  <repositories>
-                      <repository>
-                          <id>local-provided</id>
-                          <url>https://oss.sonatype.org/content/repositories/releases</url>
-                      </repository>
-                  </repositories>
-              </project>
-              """,
-            spec -> spec.beforeRecipe(pom -> {
-                MavenResolutionResult result = pom.getMarkers().findFirst(MavenResolutionResult.class).orElseThrow();
-                assertThat(StreamSupport.stream(new MavenPomDownloader(ctx).distinctNormalizedRepositories(result.getPom().getRepositories(), result.getPom(), null).spliterator(), false)
-                  .map(MavenRepository::getId))
-                  .containsExactly("settings-provided", "local-provided");
-            }))
-        );
+            var ctx = MavenExecutionContextView.view(new InMemoryExecutionContext());
+            ctx.setMavenSettings(MavenSettings.parse(Parser.Input.fromString(Path.of("settings.xml"),
+              //language=xml
+              """
+                <settings>
+                  <profiles>
+                    <profile>
+                        <id>customize-repos</id>
+                        <repositories>
+                            <repository>
+                                <id>settings-provided</id>
+                                <url>%s</url>
+                            </repository>
+                        </repositories>
+                    </profile>
+                  </profiles>
+                  <activeProfiles>
+                    <activeProfile>customize-repos</activeProfile>
+                  </activeProfiles>
+                </settings>
+                """.formatted(settingsRepo.url("/maven/"))
+            ), ctx));
+
+            rewriteRun(
+              pomXml(
+                //language=xml
+                """
+                  <project>
+                      <groupId>org.openrewrite.test</groupId>
+                      <artifactId>foo</artifactId>
+                      <version>0.1.0-SNAPSHOT</version>
+                      <repositories>
+                          <repository>
+                              <id>local-provided</id>
+                              <url>%s</url>
+                          </repository>
+                      </repositories>
+                  </project>
+                  """.formatted(pomRepo.url("/maven/")),
+                spec -> spec.beforeRecipe(pom -> {
+                    MavenResolutionResult result = pom.getMarkers().findFirst(MavenResolutionResult.class).orElseThrow();
+                    assertThat(StreamSupport.stream(new MavenPomDownloader(ctx).distinctNormalizedRepositories(result.getPom().getRepositories(), result.getPom(), null).spliterator(), false)
+                      .map(MavenRepository::getId))
+                      .containsExactly("settings-provided", "local-provided");
+                }))
+            );
+        }
     }
 
     @Issue("https://github.com/openrewrite/rewrite/issues/8682")
