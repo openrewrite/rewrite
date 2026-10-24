@@ -38,12 +38,13 @@ import java.util.concurrent.atomic.AtomicReference;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.openrewrite.maven.MavenSettingsAutoLoadingExtension.withMavenCentralMirror;
 
 class MavenArtifactDownloaderTest {
 
     @Test
     void downloadDependencies(@TempDir Path tempDir) {
-        ExecutionContext ctx = new InMemoryExecutionContext(Throwable::printStackTrace);
+        ExecutionContext ctx = withMavenCentralMirror(new InMemoryExecutionContext(Throwable::printStackTrace));
         MavenArtifactCache artifactCache = new LocalMavenArtifactCache(tempDir);
         MavenArtifactDownloader downloader = new MavenArtifactDownloader(
           artifactCache, null, ctx.getOnError(), ctx);
@@ -90,7 +91,7 @@ class MavenArtifactDownloaderTest {
 
     @Test
     void downloadDependenciesWithClassifier(@TempDir Path tempDir) {
-        ExecutionContext ctx = new InMemoryExecutionContext(Throwable::printStackTrace);
+        ExecutionContext ctx = withMavenCentralMirror(new InMemoryExecutionContext(Throwable::printStackTrace));
         MavenArtifactCache artifactCache = new LocalMavenArtifactCache(tempDir);
         MavenArtifactDownloader downloader = new MavenArtifactDownloader(
           artifactCache, null, ctx.getOnError(), ctx);
