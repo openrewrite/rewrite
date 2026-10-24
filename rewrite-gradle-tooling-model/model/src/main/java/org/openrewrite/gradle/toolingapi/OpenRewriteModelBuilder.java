@@ -158,16 +158,16 @@ public class OpenRewriteModelBuilder {
     }
 
     /**
-     * When the env vars {@code REWRITE_GRADLE_MIRROR_URL}, {@code REWRITE_GRADLE_MIRROR_USERNAME}, and
-     * {@code REWRITE_GRADLE_MIRROR_PASSWORD} are all set, returns a Groovy init-script fragment that
+     * When the env vars {@code MAVEN_CENTRAL_MIRROR_URL}, {@code MAVEN_CENTRAL_MIRROR_USERNAME}, and
+     * {@code MAVEN_CENTRAL_MIRROR_PASSWORD} are all set, returns a Groovy init-script fragment that
      * points every Maven Central repository the embedded Gradle build declares at that mirror instead,
      * with its credentials. Other repositories, and the plugin portal Gradle adds on its own, stay as
      * the build files declare them. If any var is missing, returns the empty string.
      */
     private static String mirrorScriptSnippet() {
-        String url = System.getenv("REWRITE_GRADLE_MIRROR_URL");
-        String user = System.getenv("REWRITE_GRADLE_MIRROR_USERNAME");
-        String pass = System.getenv("REWRITE_GRADLE_MIRROR_PASSWORD");
+        String url = System.getenv("MAVEN_CENTRAL_MIRROR_URL");
+        String user = System.getenv("MAVEN_CENTRAL_MIRROR_USERNAME");
+        String pass = System.getenv("MAVEN_CENTRAL_MIRROR_PASSWORD");
         if (url == null || user == null || pass == null || url.isEmpty() || user.isEmpty() || pass.isEmpty()) {
             return "";
         }

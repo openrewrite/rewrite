@@ -30,13 +30,13 @@ final class EffectiveRepositoryAssertions {
     }
 
     /**
-     * Maven Central's URL as the model builds see it: with REWRITE_GRADLE_MIRROR_* set, as on CI, they use the
-     * mirror in its place.
+     * Maven Central's URL as the model builds see it: with MAVEN_CENTRAL_MIRROR_* set, they use the mirror in its
+     * place.
      */
     static String mavenCentral() {
-        String url = System.getenv("REWRITE_GRADLE_MIRROR_URL");
-        if (isNullOrEmpty(url) || isNullOrEmpty(System.getenv("REWRITE_GRADLE_MIRROR_USERNAME")) ||
-            isNullOrEmpty(System.getenv("REWRITE_GRADLE_MIRROR_PASSWORD"))) {
+        String url = System.getenv("MAVEN_CENTRAL_MIRROR_URL");
+        if (isNullOrEmpty(url) || isNullOrEmpty(System.getenv("MAVEN_CENTRAL_MIRROR_USERNAME")) ||
+            isNullOrEmpty(System.getenv("MAVEN_CENTRAL_MIRROR_PASSWORD"))) {
             return "https://repo.maven.apache.org/maven2/";
         }
         return url;
