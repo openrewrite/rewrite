@@ -129,11 +129,11 @@ public class ExcludeDependency extends Recipe {
                         artifactId, ExcludeDependency::isExactOrBareWildcard));
     }
 
-    private static boolean isExactOrBareWildcard(@Nullable String v) {
+    static boolean isExactOrBareWildcard(@Nullable String v) {
         return v == null || effective(v) == null || COORDINATE.matcher(v).matches();
     }
 
-    private static @Nullable String effective(@Nullable String v) {
+    static @Nullable String effective(@Nullable String v) {
         return (v == null || v.isEmpty() || "*".equals(v)) ? null : v;
     }
 
@@ -350,7 +350,7 @@ public class ExcludeDependency extends Recipe {
                 Boolean.FALSE.equals(((J.Literal) assn.getAssignment()).getValue());
     }
 
-    private static @Nullable String extractNamedArg(J.MethodInvocation method, String name, boolean kotlinDsl) {
+    static @Nullable String extractNamedArg(J.MethodInvocation method, String name, boolean kotlinDsl) {
         for (Expression arg : method.getArguments()) {
             if (!kotlinDsl && arg instanceof G.MapEntry) {
                 G.MapEntry entry = (G.MapEntry) arg;
