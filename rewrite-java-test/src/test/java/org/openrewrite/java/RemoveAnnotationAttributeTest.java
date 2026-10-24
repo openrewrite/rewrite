@@ -119,16 +119,18 @@ class RemoveAnnotationAttributeTest implements RewriteTest {
     }
 
     @Test
-    void removeImportsOfRemovedValue() {
+    void removeOnlyImportsOfRemovedValue() {
         rewriteRun(
           spec -> spec
             .parser(JavaParser.fromJavaVersion()
               .dependsOn(
                 """
+                  import java.time.temporal.ChronoUnit;
                   import java.util.concurrent.TimeUnit;
 
                   @interface Timed {
                       TimeUnit rateUnit();
+                      ChronoUnit durationUnit() default ChronoUnit.MILLIS;
                   }
                   """
               )
@@ -150,14 +152,18 @@ class RemoveAnnotationAttributeTest implements RewriteTest {
           ),
           java(
             """
-              import static java.util.concurrent.TimeUnit.SECONDS;
+              import java.util.concurrent.TimeUnit;
 
-              @Timed(rateUnit = SECONDS)
+              import static java.time.temporal.ChronoUnit.*;
+
+              @Timed(rateUnit = TimeUnit.SECONDS, durationUnit = MILLIS)
               class B {
               }
               """,
             """
-              @Timed
+              import static java.time.temporal.ChronoUnit.*;
+
+              @Timed(durationUnit = MILLIS)
               class B {
               }
               """

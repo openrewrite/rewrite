@@ -155,7 +155,13 @@ public class AddOrUpdateAnnotationAttribute extends Recipe {
                 }
 
                 if (original != a) {
-                    namesReferencedBy(original.getArguments()).forEach(this::maybeRemoveImport);
+                    List<Expression> kept = a.getArguments() == null ? emptyList() : a.getArguments();
+                    for (Expression arg : requireNonNull(original.getArguments())) {
+                        // Compare instances, since an updated argument keeps its id
+                        if (kept.stream().noneMatch(k -> k == arg)) {
+                            RemoveImport.namesReferencedBy(arg).forEach(this::maybeRemoveImport);
+                        }
+                    }
                     doAfterVisit(new SimplifySingleElementAnnotation().getVisitor());
                     if (isFullyQualifiedClass()) {
                         doAfterVisit(new ShortenFullyQualifiedTypeReferences().getVisitor());
@@ -358,35 +364,6 @@ public class AddOrUpdateAnnotationAttribute extends Recipe {
                 return template.withInitializer(initializer);
             }
         });
-    }
-
-    /**
-     * The types and fields the annotation arguments reference, named as {@link JavaVisitor#maybeRemoveImport(String)}
-     * takes them.
-     */
-    static Set<String> namesReferencedBy(@Nullable List<Expression> arguments) {
-        Set<String> referenced = new LinkedHashSet<>();
-        if (arguments == null) {
-            return referenced;
-        }
-        JavaIsoVisitor<Set<String>> references = new JavaIsoVisitor<Set<String>>() {
-            @Override
-            public J.Identifier visitIdentifier(J.Identifier identifier, Set<String> names) {
-                JavaType.Variable field = identifier.getFieldType();
-                JavaType.FullyQualified owner = field == null ? null : TypeUtils.asFullyQualified(field.getOwner());
-                JavaType.FullyQualified type = TypeUtils.asFullyQualified(identifier.getType());
-                if (owner != null) {
-                    names.add(owner.getFullyQualifiedName() + "." + identifier.getSimpleName());
-                } else if (field == null && type != null) {
-                    names.add(type.getFullyQualifiedName());
-                }
-                return identifier;
-            }
-        };
-        for (Expression argument : arguments) {
-            references.visit(argument, referenced);
-        }
-        return referenced;
     }
 
     private boolean isFullyQualifiedClass() {
