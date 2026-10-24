@@ -220,7 +220,30 @@ public class FindMissingTypes extends Recipe {
                 // A different object in one implies a type has changed, either in the method signature or deeper in the type tree.
                 md = SearchResult.found(md, "MethodDeclaration#name#type is not the same instance as the MethodType of MethodDeclaration.");
             }
+            TypeTree returnTypeExpression = md.getReturnTypeExpression();
+            if (type != null && returnTypeExpression != null && isKnown(returnTypeExpression.getType()) && isKnown(type.getReturnType()) &&
+                    !TypeUtils.isOfType(returnTypeExpression.getType(), stripDimensions(type.getReturnType(), md.getDimensionsAfterName().size()))) {
+                md = SearchResult.found(md, "MethodDeclaration#returnTypeExpression type does not match the return type of the MethodType");
+            }
             return super.visitMethodDeclaration(md, ctx);
+        }
+
+        private static boolean isKnown(@Nullable JavaType type) {
+            return type != null && !(type instanceof JavaType.Unknown);
+        }
+
+        /**
+         * The return type expression of {@code byte toByteArray()[]} is {@code byte},
+         * because its dimensions follow the parameter list.
+         */
+        private static @Nullable JavaType stripDimensions(JavaType type, int dimensions) {
+            for (int i = 0; i < dimensions; i++) {
+                if (!(type instanceof JavaType.Array)) {
+                    return null;
+                }
+                type = ((JavaType.Array) type).getElemType();
+            }
+            return type;
         }
 
         @Override
@@ -272,6 +295,12 @@ public class FindMissingTypes extends Recipe {
             if (p.getClazz() instanceof J.Identifier && p.getClazz().getType() != null &&
                     !(p.getClazz().getType() instanceof JavaType.Class || p.getClazz().getType() instanceof JavaType.Unknown)) {
                 p = SearchResult.found(p, "ParameterizedType#clazz is J.Identifier and the type is is not JavaType$Class.");
+            }
+            JavaType.FullyQualified ownType = TypeUtils.asFullyQualified(p.getType());
+            JavaType.FullyQualified clazzType = TypeUtils.asFullyQualified(p.getClazz().getType());
+            if (ownType != null && clazzType != null &&
+                    !TypeUtils.fullyQualifiedNamesAreEqual(ownType.getFullyQualifiedName(), clazzType.getFullyQualifiedName())) {
+                p = SearchResult.found(p, "ParameterizedType#clazz type does not match the raw type of ParameterizedType#type");
             }
             return p;
         }
