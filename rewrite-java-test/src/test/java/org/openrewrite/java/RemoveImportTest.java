@@ -169,6 +169,51 @@ class RemoveImportTest implements RewriteTest {
         );
     }
 
+    @Test
+    void unfoldStarImportOnlyIntoTypesTheSourceNames() {
+        rewriteRun(
+          spec -> spec.recipe(removeImport("java.nio.charset.CodingErrorAction")),
+          java(
+            """
+              import java.nio.charset.*;
+              class A {
+                 Object utf8 = StandardCharsets.UTF_8;
+                 CharsetDecoder decoder;
+              }
+              """,
+            """
+              import java.nio.charset.CharsetDecoder;
+              import java.nio.charset.StandardCharsets;
+              class A {
+                 Object utf8 = StandardCharsets.UTF_8;
+                 CharsetDecoder decoder;
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void unfoldStarImportIntoOuterTypeOfQualifiedNestedType() {
+        rewriteRun(
+          spec -> spec.recipe(removeImport("java.util.List")),
+          java(
+            """
+              import java.util.*;
+              class A {
+                 Map.Entry<String, String> entry;
+              }
+              """,
+            """
+              import java.util.Map;
+              class A {
+                 Map.Entry<String, String> entry;
+              }
+              """
+          )
+        );
+    }
+
     @Issue("https://github.com/openrewrite/rewrite/issues/919")
     @Test
     void leaveStarImportInPlaceIfFiveOrMoreTypesStillReferredTo() {
