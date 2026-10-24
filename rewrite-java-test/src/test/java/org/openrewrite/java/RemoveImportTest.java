@@ -17,13 +17,16 @@ package org.openrewrite.java;
 
 import org.junit.jupiter.api.Test;
 import org.openrewrite.DocumentExample;
+import org.openrewrite.ExecutionContext;
 import org.openrewrite.Issue;
 import org.openrewrite.Recipe;
 import org.openrewrite.java.style.ImportLayoutStyle;
+import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.style.NamedStyles;
 import org.openrewrite.test.RecipeQualityValidation;
 import org.openrewrite.test.RewriteTest;
+import org.openrewrite.test.TypeValidation;
 
 import static java.util.Collections.emptySet;
 import static java.util.Collections.singletonList;
@@ -197,6 +200,36 @@ class RemoveImportTest implements RewriteTest {
     void unfoldStarImportIntoOuterTypeOfQualifiedNestedType() {
         rewriteRun(
           spec -> spec.recipe(removeImport("java.util.List")),
+          java(
+            """
+              import java.util.*;
+              class A {
+                 Map.Entry<String, String> entry;
+              }
+              """,
+            """
+              import java.util.Map;
+              class A {
+                 Map.Entry<String, String> entry;
+              }
+              """
+          )
+        );
+
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {
+              @Override
+              public J.Import visitImport(J.Import import_, ExecutionContext ctx) {
+                  maybeRemoveImport("java.util.List");
+                  return import_;
+              }
+
+              @Override
+              public J.Identifier visitIdentifier(J.Identifier identifier, ExecutionContext ctx) {
+                  // only the nested type is attributed
+                  return "Map".equals(identifier.getSimpleName()) ? identifier.withType(null) : identifier;
+              }
+          })).afterTypeValidationOptions(TypeValidation.none()),
           java(
             """
               import java.util.*;

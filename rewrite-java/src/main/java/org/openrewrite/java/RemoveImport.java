@@ -39,6 +39,8 @@ public class RemoveImport<P> extends JavaIsoVisitor<P> {
 
     private final String owner;
 
+    private final String simpleName;
+
     @EqualsAndHashCode.Include
     private final boolean force;
 
@@ -50,6 +52,7 @@ public class RemoveImport<P> extends JavaIsoVisitor<P> {
     public RemoveImport(String type, boolean force) {
         this.type = type;
         this.owner = type.substring(0, Math.max(0, type.lastIndexOf('.')));
+        this.simpleName = type.substring(Math.max(type.lastIndexOf('.'), type.lastIndexOf('$')) + 1);
         this.force = force;
     }
 
@@ -61,15 +64,19 @@ public class RemoveImport<P> extends JavaIsoVisitor<P> {
             JavaSourceFile cu = (JavaSourceFile) tree;
             ImportLayoutStyle importLayoutStyle = Style.from(ImportLayoutStyle.class, cu, IntelliJ::importLayout);
 
-            boolean typeUsed = false;
             Set<String> otherTypesInPackageUsed = new TreeSet<>();
 
             Set<String> methodsAndFieldsUsed = new HashSet<>();
             Set<String> otherMethodsAndFieldsInTypeUsed = new TreeSet<>();
             Set<String> originalImports = new HashSet<>();
+            boolean starImportOfOwner = false;
             for (J.Import cuImport : cu.getImports()) {
                 if (cuImport.getQualid().getType() != null) {
                     originalImports.add(((JavaType.FullyQualified) cuImport.getQualid().getType()).getFullyQualifiedName().replace("$", "."));
+                }
+                if (!cuImport.isStatic() && "*".equals(cuImport.getClassName()) &&
+                        cuImport.getPackageName().equals(owner)) {
+                    starImportOfOwner = true;
                 }
             }
 
@@ -87,7 +94,7 @@ public class RemoveImport<P> extends JavaIsoVisitor<P> {
                     if (TypeUtils.fullyQualifiedNamesAreEqual(declaringType, type)) {
                         methodsAndFieldsUsed.add(method.getName());
                     } else if (declaringType.equals(owner)) {
-                        if (method.getName().equals(type.substring(type.lastIndexOf('.') + 1))) {
+                        if (method.getName().equals(simpleName)) {
                             methodsAndFieldsUsed.add(method.getName());
                         } else {
                             otherMethodsAndFieldsInTypeUsed.add(method.getName());
@@ -96,30 +103,34 @@ public class RemoveImport<P> extends JavaIsoVisitor<P> {
                 }
             }
 
+            boolean typeInUse = false;
             for (JavaType javaType : cu.getTypesInUse().getTypesInUse()) {
                 if (javaType instanceof JavaType.FullyQualified) {
                     JavaType.FullyQualified fullyQualified = (JavaType.FullyQualified) javaType;
                     if (TypeUtils.fullyQualifiedNamesAreEqual(fullyQualified.getFullyQualifiedName(), type)) {
-                        typeUsed = true;
+                        typeInUse = true;
                     } else if (TypeUtils.fullyQualifiedNamesAreEqual(fullyQualified.getFullyQualifiedName(), owner) ||
                             TypeUtils.fullyQualifiedNamesAreEqual(fullyQualified.getPackageName(), owner)) {
-                        if (!originalImports.contains(fullyQualified.getFullyQualifiedName().replace("$", "."))) {
-                            otherTypesInPackageUsed.add(fullyQualified.getClassName());
+                        // A package star import provides only top-level types, so a nested type such as Map.Entry
+                        // is a candidate through its top-level class.
+                        String className = fullyQualified.getClassName();
+                        int firstDot = className.indexOf('.');
+                        String topLevelClassName = firstDot < 0 ? className : className.substring(0, firstDot);
+                        String topLevelType = fullyQualified.getPackageName() + "." + topLevelClassName;
+                        if (!TypeUtils.fullyQualifiedNamesAreEqual(topLevelType, type) &&
+                                !originalImports.contains(topLevelType)) {
+                            otherTypesInPackageUsed.add(topLevelClassName);
                         }
                     }
                 }
             }
 
-            if (typeUsed || !otherTypesInPackageUsed.isEmpty()) {
-                Set<String> namesInSource = namesInSource(cu);
-                if (!type.endsWith(".*") &&
-                        !namesInSource.contains(type.substring(Math.max(type.lastIndexOf('.'), type.lastIndexOf('$')) + 1))) {
-                    typeUsed = false;
-                }
-                // A package star import provides only top-level names, so a nested class name such as Map.Entry is
-                // never retained.
-                otherTypesInPackageUsed.retainAll(namesInSource);
-            }
+            // The names only confirm an attributed type or its alias and filter a star import's unfold candidates.
+            boolean typeImportMayStay = !force && typeInUse;
+            Set<String> namesInSource = typeImportMayStay || starImportOfOwner && !otherTypesInPackageUsed.isEmpty() ?
+                    namesInSource(cu) : Collections.emptySet();
+            boolean typeUsed = typeImportMayStay && namesInSource.contains(simpleName);
+            otherTypesInPackageUsed.retainAll(namesInSource);
 
             JavaSourceFile c = cu;
 
@@ -133,6 +144,7 @@ public class RemoveImport<P> extends JavaIsoVisitor<P> {
                 }
 
                 String typeName = import_.getTypeName();
+                J.Identifier alias = import_.getAlias();
                 if (import_.isStatic()) {
                     String imported = import_.getQualid().getSimpleName();
                     if (TypeUtils.fullyQualifiedNamesAreEqual(typeName + "." + imported, type) && (force || !methodsAndFieldsUsed.contains(imported))) {
@@ -151,6 +163,11 @@ public class RemoveImport<P> extends JavaIsoVisitor<P> {
                         }
                     } else if (TypeUtils.fullyQualifiedNamesAreEqual(typeName, type) && !methodsAndFieldsUsed.contains(imported)) {
                         // e.g. remove java.util.Collections.emptySet when type is java.util.Collections
+                        spaceForNextImport.set(import_.getPrefix());
+                        return null;
+                    }
+                } else if (alias != null && TypeUtils.fullyQualifiedNamesAreEqual(typeName, type)) {
+                    if (!typeImportMayStay || !namesInSource.contains(alias.getSimpleName())) {
                         spaceForNextImport.set(import_.getPrefix());
                         return null;
                     }
@@ -199,7 +216,7 @@ public class RemoveImport<P> extends JavaIsoVisitor<P> {
      * The simple names the source writes outside its imports. A type that only the type attribution carries,
      * such as the inferred type of a {@code var} or of a variable read, needs no import.
      */
-    private static Set<String> namesInSource(JavaSourceFile cu) {
+    static Set<String> namesInSource(JavaSourceFile cu) {
         return new JavaIsoVisitor<Set<String>>() {
             @Override
             public J.Import visitImport(J.Import import_, Set<String> names) {
