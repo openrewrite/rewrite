@@ -1287,13 +1287,14 @@ class RemoveRedundantPropertiesTest implements RewriteTest {
         @Override
         public void defaults(RecipeSpec spec) {
             spec.recipe(new RemoveRedundantProperties("*.version", Comparator.GTE))
-              .executionContext(MavenExecutionContextView.view(new InMemoryExecutionContext(Throwable::printStackTrace))
-                .setLocalRepository(MavenRepository.builder()
-                  .id("local")
-                  .uri(localRepository.toUri().toString())
-                  .snapshots(false)
-                  .knownToExist(true)
-                  .build()));
+              .executionContext(MavenSettingsAutoLoadingExtension.withMavenCentralMirror(
+                MavenExecutionContextView.view(new InMemoryExecutionContext(Throwable::printStackTrace))
+                  .setLocalRepository(MavenRepository.builder()
+                    .id("local")
+                    .uri(localRepository.toUri().toString())
+                    .snapshots(false)
+                    .knownToExist(true)
+                    .build())));
         }
 
         @Test
