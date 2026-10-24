@@ -40,8 +40,8 @@ public class OpenRewriteModelBuilder {
      * Build an OpenRewriteModel for a project directory, using the default Gradle init script bundled within this jar.
      * The included init script accesses public artifact repositories (Maven Central, Nexus Snapshots) to be able to
      * download rewrite dependencies, so public repositories must be accessible for this to work. If
-     * {@code REWRITE_GRADLE_MIRROR_URL}, {@code REWRITE_GRADLE_MIRROR_USERNAME} and
-     * {@code REWRITE_GRADLE_MIRROR_PASSWORD} are all set, it downloads them from that mirror instead.
+     * {@code MAVEN_CENTRAL_MIRROR_URL}, {@code MAVEN_CENTRAL_MIRROR_USERNAME} and
+     * {@code MAVEN_CENTRAL_MIRROR_PASSWORD} are all set, it downloads them from that mirror instead.
      */
     public static OpenRewriteModel forProjectDirectory(File projectDir, @Nullable File buildFile) throws IOException {
         return forProjectDirectory(projectDir, buildFile, null);
