@@ -1436,6 +1436,45 @@ class AddOrUpdateAnnotationAttributeTest implements RewriteTest {
         );
     }
 
+    @Test
+    void keepStarImportOfKeptArgument() {
+        rewriteRun(
+          spec -> spec.recipe(new AddOrUpdateAnnotationAttribute("org.example.Foo", "name", "new", null, false, null)),
+          java(
+            """
+              package org.example;
+
+              import java.util.concurrent.TimeUnit;
+
+              public @interface Foo {
+                  String name() default "";
+                  TimeUnit unit() default TimeUnit.SECONDS;
+              }
+              """
+          ),
+          java(
+            """
+              import org.example.Foo;
+
+              import static java.util.concurrent.TimeUnit.*;
+
+              @Foo(name = "old", unit = MILLISECONDS)
+              public class A {
+              }
+              """,
+            """
+              import org.example.Foo;
+
+              import static java.util.concurrent.TimeUnit.*;
+
+              @Foo(name = "new", unit = MILLISECONDS)
+              public class A {
+              }
+              """
+          )
+        );
+    }
+
     @Disabled("There is no way to determine right now to determine whether the `attributeValue` is meant as constant or as String value")
     @Test
     void updateConstantWithConstant() {

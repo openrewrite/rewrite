@@ -342,4 +342,39 @@ public class RemoveImport<P> extends JavaIsoVisitor<P> {
         // Fall back to creating a ShallowClass
         return JavaType.ShallowClass.build(fqn);
     }
+
+    /**
+     * The names to pass to {@link JavaVisitor#maybeRemoveImport(String)} for the types outside {@code java.lang} and
+     * the static members {@code tree} references, such as {@code java.util.List} or
+     * {@code java.util.Collections.emptyList}.
+     */
+    static Set<String> namesReferencedBy(J tree) {
+        return new JavaIsoVisitor<Set<String>>() {
+            @Override
+            public @Nullable JavaType visitType(@Nullable JavaType javaType, Set<String> names) {
+                if (javaType instanceof JavaType.Class) {
+                    JavaType.Class type = (JavaType.Class) javaType;
+                    if (!"java.lang".equals(type.getPackageName())) {
+                        names.add(type.getFullyQualifiedName());
+                    }
+                } else if (javaType instanceof JavaType.Variable) {
+                    JavaType.Variable variable = (JavaType.Variable) javaType;
+                    if (variable.hasFlags(Flag.Static) && variable.getOwner() instanceof JavaType.Class) {
+                        JavaType.Class owner = (JavaType.Class) variable.getOwner();
+                        names.add(owner.getFullyQualifiedName() + "." + variable.getName());
+                    }
+                }
+                return super.visitType(javaType, names);
+            }
+
+            @Override
+            public J.MethodInvocation visitMethodInvocation(J.MethodInvocation mi, Set<String> names) {
+                if (mi.getMethodType() != null && mi.getMethodType().hasFlags(Flag.Static) && mi.getSelect() == null) {
+                    JavaType.FullyQualified receiverType = mi.getMethodType().getDeclaringType();
+                    names.add(receiverType.getFullyQualifiedName() + "." + mi.getSimpleName());
+                }
+                return super.visitMethodInvocation(mi, names);
+            }
+        }.reduce(tree, new HashSet<>());
+    }
 }
