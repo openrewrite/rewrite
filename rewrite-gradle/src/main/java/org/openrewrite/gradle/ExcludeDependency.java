@@ -129,11 +129,11 @@ public class ExcludeDependency extends Recipe {
                         artifactId, ExcludeDependency::isExactOrBareWildcard));
     }
 
-    private static boolean isExactOrBareWildcard(@Nullable String v) {
+    static boolean isExactOrBareWildcard(@Nullable String v) {
         return v == null || effective(v) == null || COORDINATE.matcher(v).matches();
     }
 
-    private static @Nullable String effective(@Nullable String v) {
+    static @Nullable String effective(@Nullable String v) {
         return (v == null || v.isEmpty() || "*".equals(v)) ? null : v;
     }
 
