@@ -15,8 +15,12 @@
  */
 package org.openrewrite.config;
 
+import com.fasterxml.jackson.databind.BeanDescription;
+import com.fasterxml.jackson.databind.DeserializationConfig;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.PropertyName;
 import com.fasterxml.jackson.databind.exc.InvalidTypeIdException;
+import com.fasterxml.jackson.databind.introspect.BeanPropertyDefinition;
 import lombok.Getter;
 import org.intellij.lang.annotations.Language;
 import org.jspecify.annotations.Nullable;
@@ -28,6 +32,7 @@ import org.openrewrite.marketplace.RecipeBundle;
 import org.openrewrite.marketplace.RecipeBundleResolver;
 import org.openrewrite.marketplace.RecipeListing;
 import org.openrewrite.marketplace.RecipeMarketplace;
+import org.openrewrite.rpc.RpcRecipe;
 import org.openrewrite.style.NamedStyles;
 import org.openrewrite.style.Style;
 import org.yaml.snakeyaml.LoaderOptions;
@@ -38,6 +43,8 @@ import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.UncheckedIOException;
+import java.lang.reflect.Constructor;
+import java.lang.reflect.Parameter;
 import java.net.URI;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
@@ -390,8 +397,11 @@ public class YamlResourceLoader implements ResourceLoader {
             Object recipeArgs = nameAndConfig.getValue();
             try {
                 if (recipeArgs instanceof Map) {
+                    Map<String, Object> options = (Map<String, Object>) recipeArgs;
                     try {
-                        addRecipe.accept(recipeLoader.apply(recipeName, (Map<String, Object>) recipeArgs));
+                        Recipe recipe = recipeLoader.apply(recipeName, options);
+                        addRecipe.accept(recipe);
+                        validateOptionNames(recipeName, recipe, options, addValidation);
                     } catch (IllegalArgumentException e) {
                         if (e.getCause() instanceof InvalidTypeIdException) {
                             addInvalidRecipeValidation(
@@ -442,6 +452,61 @@ public class YamlResourceLoader implements ResourceLoader {
                     "is an object type that isn't recognized as a recipe.",
                     null));
         }
+    }
+
+    private void validateOptionNames(String recipeName, Recipe recipe, Map<String, Object> options,
+                                     Consumer<Validated<Object>> addValidation) {
+        if (recipe instanceof RpcRecipe) {
+            return;
+        }
+        Set<String> optionNames = emptySet();
+        Set<String> ignoredNames = emptySet();
+        if (!(recipe instanceof DeclarativeRecipe)) {
+            try {
+                DeserializationConfig config = mapper.getDeserializationConfig();
+                BeanDescription description = config.introspect(mapper.constructType(recipe.getClass()));
+                if (config.getDefaultPropertyIgnorals(recipe.getClass(), description.getClassInfo()).getIgnoreUnknown() ||
+                    description.findAnySetterAccessor() != null) {
+                    return;
+                }
+                optionNames = optionNames(recipe.getClass(), description);
+                ignoredNames = description.getIgnoredPropertyNames();
+            } catch (RuntimeException | LinkageError e) {
+                // Introspection resolves member signatures that construction never touched, so failing
+                // here must not invalidate a recipe that loaded fine
+                return;
+            }
+        }
+        for (Map.Entry<String, Object> option : options.entrySet()) {
+            if (!optionNames.contains(option.getKey()) && !ignoredNames.contains(option.getKey())) {
+                addValidation.accept(invalid(
+                        recipeName + "." + option.getKey(),
+                        option.getValue(),
+                        optionNames.isEmpty() ?
+                                "is not an option of this recipe, which takes no options" :
+                                "is not an option of this recipe; valid options are: " + String.join(", ", optionNames)));
+            }
+        }
+    }
+
+    private static Set<String> optionNames(Class<?> recipeClass, BeanDescription description) {
+        Set<String> names = new LinkedHashSet<>();
+        for (Constructor<?> constructor : recipeClass.getConstructors()) {
+            for (Parameter parameter : constructor.getParameters()) {
+                if (parameter.isNamePresent()) {
+                    names.add(parameter.getName());
+                }
+            }
+        }
+        for (BeanPropertyDefinition property : description.findProperties()) {
+            if (property.couldDeserialize() && property.getPrimaryMember().getDeclaringClass() != Recipe.class) {
+                names.add(property.getName());
+                for (PropertyName alias : property.findAliases()) {
+                    names.add(alias.getSimpleName());
+                }
+            }
+        }
+        return names;
     }
 
     private void addInvalidRecipeValidation(Consumer<Validated<Object>> addValidation, String recipeName,

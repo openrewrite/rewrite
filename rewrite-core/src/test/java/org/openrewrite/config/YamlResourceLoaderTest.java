@@ -212,6 +212,34 @@ class YamlResourceLoaderTest implements RewriteTest {
     }
 
     @Test
+    void unknownOptionIsReportedAsValidationError() {
+        Environment env = Environment.builder()
+          .load(new YamlResourceLoader(new ByteArrayInputStream(
+            //language=yml
+            """
+              type: specs.openrewrite.org/v1beta/recipe
+              name: test.ChangeTextToHello
+              displayName: Change text to hello
+              recipeList:
+                  - org.openrewrite.text.ChangeText:
+                      toText: Hello!
+                      toTxt: Hello?
+              """.getBytes()
+          ), URI.create("rewrite.yml"), new Properties()))
+          .build();
+
+        Recipe recipe = env.activateRecipes("test.ChangeTextToHello");
+
+        assertThat(recipe.validateAll())
+          .flatMap(Validated::failures)
+          .singleElement()
+          .satisfies(failure -> {
+              assertThat(failure.getProperty()).isEqualTo("org.openrewrite.text.ChangeText.toTxt");
+              assertThat(failure.getMessage()).isEqualTo("is not an option of this recipe; valid options are: toText");
+          });
+    }
+
+    @Test
     void maintainers() {
         Environment env = Environment.builder()
           .load(new YamlResourceLoader(new ByteArrayInputStream(
