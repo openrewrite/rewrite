@@ -15,6 +15,7 @@
  */
 package org.openrewrite.java;
 
+import com.google.errorprone.annotations.CanIgnoreReturnValue;
 import org.intellij.lang.annotations.Language;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.ExecutionContext;
@@ -227,10 +228,12 @@ public class Assertions {
         return srcSmokeTestJava(spec -> sourceSet(spec, "smokeTest"), javaSources);
     }
 
+    @CanIgnoreReturnValue
     public static SourceSpec<?> version(SourceSpec<?> sourceSpec, int version) {
         return sourceSpec.markers(javaVersion(version));
     }
 
+    @CanIgnoreReturnValue
     public static SourceSpecs version(SourceSpecs sourceSpec, int version) {
         for (SourceSpec<?> spec : sourceSpec) {
             spec.markers(javaVersion(version));
@@ -242,10 +245,12 @@ public class Assertions {
      * Attach a {@link JavaVersion} where the compiling JDK ({@code createdBy}) may differ from the
      * {@code -source}/{@code --release} bytecode level, e.g. JDK 23 producing Java 8 bytecode.
      */
+    @CanIgnoreReturnValue
     public static SourceSpec<?> version(SourceSpec<?> sourceSpec, int createdByMajor, int sourceCompatibility, int targetCompatibility) {
         return sourceSpec.markers(javaVersion(createdByMajor, sourceCompatibility, targetCompatibility));
     }
 
+    @CanIgnoreReturnValue
     public static SourceSpecs version(SourceSpecs sourceSpec, int createdByMajor, int sourceCompatibility, int targetCompatibility) {
         for (SourceSpec<?> spec : sourceSpec) {
             spec.markers(javaVersion(createdByMajor, sourceCompatibility, targetCompatibility));
@@ -253,10 +258,12 @@ public class Assertions {
         return sourceSpec;
     }
 
+    @CanIgnoreReturnValue
     public static SourceSpec<?> project(SourceSpec<?> sourceSpec, String projectName) {
         return sourceSpec.markers(javaProject(projectName));
     }
 
+    @CanIgnoreReturnValue
     public static SourceSpec<?> sourceSet(SourceSpec<?> sourceSpec, String sourceSet) {
         sourceSpec.markers(javaSourceSet(sourceSet));
         return sourceSpec;

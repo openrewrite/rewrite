@@ -15,6 +15,7 @@
  */
 package org.openrewrite.python.tree;
 
+import com.google.errorprone.annotations.CanIgnoreReturnValue;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.java.tree.Comment;
@@ -60,6 +61,7 @@ public final class PySpace {
         }
 
         @SuppressWarnings("UnusedReturnValue")
+        @CanIgnoreReturnValue
         public SpaceBuilder addWhitespace(String whitespace) {
             if (whitespaceBuilder == null) {
                 whitespaceBuilder = new StringBuilder();
@@ -69,6 +71,7 @@ public final class PySpace {
         }
 
         @SuppressWarnings("UnusedReturnValue")
+        @CanIgnoreReturnValue
         public SpaceBuilder addComment(String commentWithHash) {
             finishComment();
             nextComment = commentWithHash;
@@ -85,6 +88,7 @@ public final class PySpace {
             return space;
         }
 
+        @CanIgnoreReturnValue
         public SpaceBuilder reset() {
             this.initialWhitespace = null;
             this.whitespaceBuilder.setLength(0);

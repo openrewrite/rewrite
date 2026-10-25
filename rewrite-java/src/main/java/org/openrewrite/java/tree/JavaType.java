@@ -16,6 +16,7 @@
 package org.openrewrite.java.tree;
 
 import com.fasterxml.jackson.annotation.*;
+import com.google.errorprone.annotations.CanIgnoreReturnValue;
 import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.Value;
@@ -58,6 +59,7 @@ public interface JavaType {
         return this;
     }
 
+    @CanIgnoreReturnValue
     default JavaType unsafeSetManagedReference(Integer id) {
         return this;
     }
@@ -157,11 +159,13 @@ public interface JavaType {
             return new MultiCatch(throwableTypesArray);
         }
 
+        @CanIgnoreReturnValue
         public MultiCatch unsafeSet(@Nullable List<JavaType> throwableTypes) {
             this.throwableTypes = arrayOrNullIfEmpty(throwableTypes, EMPTY_JAVA_TYPE_ARRAY);
             return this;
         }
 
+        @CanIgnoreReturnValue
         public MultiCatch unsafeSet(JavaType[] throwableTypes) {
             this.throwableTypes = ListUtils.nullIfEmpty(throwableTypes);
             return this;
@@ -203,11 +207,13 @@ public interface JavaType {
             return new Intersection(boundsArray);
         }
 
+        @CanIgnoreReturnValue
         public Intersection unsafeSet(@Nullable List<JavaType> bounds) {
             this.bounds = arrayOrNullIfEmpty(bounds, EMPTY_JAVA_TYPE_ARRAY);
             return this;
         }
 
+        @CanIgnoreReturnValue
         public Intersection unsafeSet(JavaType[] bounds) {
             this.bounds = ListUtils.nullIfEmpty(bounds);
             return this;
@@ -580,11 +586,13 @@ public interface JavaType {
         }
 
         @Override
+        @CanIgnoreReturnValue
         public Class unsafeSetManagedReference(Integer id) {
             this.managedReference = id;
             return this;
         }
 
+        @CanIgnoreReturnValue
         public Class unsafeSet(@Nullable List<JavaType> typeParameters, @Nullable FullyQualified supertype, @Nullable FullyQualified owningClass,
                                @Nullable List<FullyQualified> annotations, @Nullable List<FullyQualified> interfaces,
                                @Nullable List<Variable> members, @Nullable List<Method> methods) {
@@ -599,6 +607,7 @@ public interface JavaType {
             return this;
         }
 
+        @CanIgnoreReturnValue
         public Class unsafeSet(JavaType @Nullable [] typeParameters, @Nullable FullyQualified supertype, @Nullable FullyQualified owningClass,
                                FullyQualified @Nullable [] annotations, FullyQualified @Nullable [] interfaces,
                                Variable @Nullable [] members, Method @Nullable [] methods) {
@@ -613,6 +622,7 @@ public interface JavaType {
             return this;
         }
 
+        @CanIgnoreReturnValue
         public Class unsafeSet(long flags, Kind kind, String fullyQualifiedName, @Nullable List<JavaType> typeParameters,
                                @Nullable FullyQualified supertype, @Nullable FullyQualified owningClass,
                                @Nullable List<FullyQualified> annotations, @Nullable List<FullyQualified> interfaces,
@@ -844,6 +854,7 @@ public interface JavaType {
             }
         }
 
+        @CanIgnoreReturnValue
         public JavaType.Annotation unsafeSet(FullyQualified type, ElementValue @Nullable [] values) {
             this.type = type;
             this.values = values;
@@ -910,11 +921,13 @@ public interface JavaType {
         }
 
         @Override
+        @CanIgnoreReturnValue
         public Parameterized unsafeSetManagedReference(Integer id) {
             this.managedReference = id;
             return this;
         }
 
+        @CanIgnoreReturnValue
         public Parameterized unsafeSet(@Nullable FullyQualified type, @Nullable List<JavaType> typeParameters) {
             assert type != this;
             this.type = unknownIfNull(type);
@@ -922,6 +935,7 @@ public interface JavaType {
             return this;
         }
 
+        @CanIgnoreReturnValue
         public Parameterized unsafeSet(@Nullable FullyQualified type, JavaType @Nullable [] typeParameters) {
             assert type != this;
             this.type = unknownIfNull(type);
@@ -1058,11 +1072,13 @@ public interface JavaType {
         }
 
         @Override
+        @CanIgnoreReturnValue
         public GenericTypeVariable unsafeSetManagedReference(@Nullable Integer id) {
             this.managedReference = id;
             return this;
         }
 
+        @CanIgnoreReturnValue
         public GenericTypeVariable unsafeSet(String name, Variance variance, @Nullable List<JavaType> bounds) {
             this.name = name;
             this.variance = variance;
@@ -1070,6 +1086,7 @@ public interface JavaType {
             return this;
         }
 
+        @CanIgnoreReturnValue
         public GenericTypeVariable unsafeSet(String name, Variance variance, JavaType @Nullable [] bounds) {
             this.name = name;
             this.variance = variance;
@@ -1143,11 +1160,13 @@ public interface JavaType {
         }
 
         @Override
+        @CanIgnoreReturnValue
         public Array unsafeSetManagedReference(Integer id) {
             this.managedReference = id;
             return this;
         }
 
+        @CanIgnoreReturnValue
         public Array unsafeSet(JavaType elemType, FullyQualified @Nullable [] annotations) {
             this.elemType = unknownIfNull(elemType);
             this.annotations = ListUtils.nullIfEmpty(annotations);
@@ -1423,11 +1442,13 @@ public interface JavaType {
         }
 
         @Override
+        @CanIgnoreReturnValue
         public Method unsafeSetManagedReference(Integer id) {
             this.managedReference = id;
             return this;
         }
 
+        @CanIgnoreReturnValue
         public Method unsafeSet(@Nullable FullyQualified declaringType,
                                 @Nullable JavaType returnType,
                                 @Nullable List<JavaType> parameterTypes,
@@ -1441,6 +1462,7 @@ public interface JavaType {
             return this;
         }
 
+        @CanIgnoreReturnValue
         public Method unsafeSet(@Nullable FullyQualified declaringType,
                                 @Nullable JavaType returnType,
                                 JavaType @Nullable [] parameterTypes,
@@ -1455,6 +1477,7 @@ public interface JavaType {
             return this;
         }
 
+        @CanIgnoreReturnValue
         public Method unsafeSet(String name, long flagsBitMap,
                                 @Nullable FullyQualified declaringType,
                                 @Nullable JavaType returnType,
@@ -1765,11 +1788,13 @@ public interface JavaType {
         }
 
         @Override
+        @CanIgnoreReturnValue
         public Variable unsafeSetManagedReference(Integer id) {
             this.managedReference = id;
             return this;
         }
 
+        @CanIgnoreReturnValue
         public Variable unsafeSet(String name, long flagsBitMap, JavaType owner, @Nullable JavaType type,
                                   FullyQualified @Nullable [] annotations) {
             this.name = name;
@@ -1780,6 +1805,7 @@ public interface JavaType {
             return this;
         }
 
+        @CanIgnoreReturnValue
         public Variable unsafeSet(JavaType owner, @Nullable JavaType type,
                                   @Nullable List<FullyQualified> annotations) {
             this.owner = owner;
@@ -1788,6 +1814,7 @@ public interface JavaType {
             return this;
         }
 
+        @CanIgnoreReturnValue
         public Variable unsafeSet(JavaType owner, @Nullable JavaType type,
                                   FullyQualified @Nullable [] annotations) {
             this.owner = owner;

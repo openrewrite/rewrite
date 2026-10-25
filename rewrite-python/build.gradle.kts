@@ -32,6 +32,7 @@ dependencies {
     implementation("io.moderne:jsonrpc:latest.release")
     implementation(project(":rewrite-maven"))
 
+    compileOnly("com.google.errorprone:error_prone_annotations:latest.release")
     compileOnly(project(":rewrite-test"))
 
     testImplementation(project(":rewrite-test"))
