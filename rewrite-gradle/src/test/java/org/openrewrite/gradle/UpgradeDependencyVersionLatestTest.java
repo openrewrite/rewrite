@@ -97,6 +97,7 @@ class UpgradeDependencyVersionLatestTest implements RewriteTest {
           .name("implementation")
           .isCanBeResolved(true)
           .isTransitive(true)
+          .extendsFrom(List.of())
           .requested(List.of(requested))
           .directResolved(List.of(resolved))
           .build();
@@ -132,6 +133,9 @@ class UpgradeDependencyVersionLatestTest implements RewriteTest {
                   """;
             } else if (path.contains("/com/example/my-lib/") && path.endsWith(".pom")) {
                 String version = path.substring(path.lastIndexOf("/my-lib-") + "/my-lib-".length(), path.length() - 4);
+                if (!List.of("1.0.0", "2.0.0", "2.0.0-jre", "2.5.0-android", "3.0.0-RC1").contains(version)) {
+                    return new MockHttpSender(404).send(request);
+                }
                 body = """
                   <project>
                     <modelVersion>4.0.0</modelVersion>
