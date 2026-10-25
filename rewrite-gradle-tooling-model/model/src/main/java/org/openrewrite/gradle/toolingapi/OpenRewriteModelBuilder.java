@@ -160,10 +160,10 @@ public class OpenRewriteModelBuilder {
     /**
      * When the env vars {@code MAVEN_CENTRAL_MIRROR_URL}, {@code MAVEN_CENTRAL_MIRROR_USERNAME}, and
      * {@code MAVEN_CENTRAL_MIRROR_PASSWORD} are all set, returns a Groovy init-script fragment that
-     * points the embedded Gradle build's Maven Central and Gradle plugin portal repositories at that
-     * mirror instead, with its credentials, including the portal Gradle adds on its own when a build
-     * names no plugin repository. Other repositories stay as the build files declare them. If any var
-     * is missing, returns the empty string.
+     * points the embedded Gradle build's Maven Central, Sonatype snapshot and Gradle plugin portal
+     * repositories at that mirror instead, with its credentials, including the portal Gradle adds on
+     * its own when a build names no plugin repository. Other repositories stay as the build files
+     * declare them. If any var is missing, returns the empty string.
      */
     private static String mirrorScriptSnippet() {
         String url = System.getenv("MAVEN_CENTRAL_MIRROR_URL");
@@ -179,7 +179,8 @@ public class OpenRewriteModelBuilder {
                 // configureEach also reaches the repositories the build files add after these hooks run
                 "def __rewriteUseMirror = { repositories ->\n" +
                 "    repositories.withType(MavenArtifactRepository).configureEach { repo ->\n" +
-                "        if (repo.url?.host in ['repo.maven.apache.org', 'repo1.maven.org', 'plugins.gradle.org']) {\n" +
+                "        if (repo.url?.host in ['repo.maven.apache.org', 'repo1.maven.org', 'plugins.gradle.org',\n" +
+                "                'central.sonatype.com', 'oss.sonatype.org', 's01.oss.sonatype.org']) {\n" +
                 "            repo.url = __rewriteMirrorUrl\n" +
                 "            repo.credentials {\n" +
                 "                it.username = __rewriteMirrorUser\n" +
