@@ -80,7 +80,7 @@ public final class PipenvLockEngine {
     private static final Set<String> UNSUPPORTED_ENTRY_KEYS = new HashSet<>(Arrays.asList(
             "git", "hg", "svn", "bzr", "path", "file", "editable", "ref", "subdirectory"));
 
-    private static final List<String> MARKER_KEYS = Arrays.asList(
+    public static final List<String> MARKER_KEYS = Arrays.asList(
             "os_name", "sys_platform", "platform_machine");
 
     private PipenvLockEngine() {
