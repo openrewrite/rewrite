@@ -73,8 +73,8 @@ class UpgradeDependencyVersionLatestTest implements RewriteTest {
           spec -> spec.recipe(new UpgradeDependencyVersion("com.example", "my-lib", selector, versionPattern, null, null))
             .executionContext(repositoryContext())
             .cycles(2).expectedCyclesThatMakeChanges(1),
-          pomXml(before, before.replace("<artifactId>my-lib</artifactId>\n        <version>1.0.0</version>",
-            "<artifactId>my-lib</artifactId>\n        <version>" + expected + "</version>"))
+          pomXml(before, before.replace("<artifactId>my-lib</artifactId>\n      <version>1.0.0</version>",
+            "<artifactId>my-lib</artifactId>\n      <version>" + expected + "</version>"))
         );
     }
 
