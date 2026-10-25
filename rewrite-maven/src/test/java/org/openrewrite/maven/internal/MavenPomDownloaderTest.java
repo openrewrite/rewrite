@@ -67,38 +67,6 @@ import static org.openrewrite.maven.tree.MavenRepository.MAVEN_CENTRAL;
 @SuppressWarnings({"HttpUrlsUsage"})
 class MavenPomDownloaderTest implements RewriteTest {
 
-    @Test
-    void ossSonatype() {
-        var ctx = new InMemoryExecutionContext();
-        MavenRepository ossSonatype = MavenRepository.builder()
-          .id("oss")
-          .uri("https://central.sonatype.com/repository/maven-snapshots/")
-          .snapshots(true)
-          .build();
-        MavenRepository repo = new MavenPomDownloader(ctx).normalizeRepository(ossSonatype,
-          MavenExecutionContextView.view(ctx), null);
-        assertThat(repo).isNotNull().extracting((MavenRepository::getUri)).isEqualTo(ossSonatype.getUri());
-    }
-
-    @CsvSource(textBlock = """
-      https://repo1.maven.org/maven2/, https://repo1.maven.org/maven2/
-      https://repo1.maven.org/maven2, https://repo1.maven.org/maven2/
-      http://repo1.maven.org/maven2/, https://repo1.maven.org/maven2/
-
-      https://central.sonatype.com/repository/maven-snapshots/, https://central.sonatype.com/repository/maven-snapshots/
-      https://artifactory.moderne.ninja/artifactory/moderne-public/, https://artifactory.moderne.ninja/artifactory/moderne-public/
-      https://repo.maven.apache.org/maven2/, https://repo.maven.apache.org/maven2/
-      https://jitpack.io/, https://jitpack.io/
-      """)
-    @ParameterizedTest
-    void normalizeRepository(String originalUrl, String expectedUrl) throws Throwable {
-        var downloader = new MavenPomDownloader(new InMemoryExecutionContext());
-        var repository = new MavenRepository("id", originalUrl, null, null, null, null, null);
-        MavenRepository normalized = downloader.normalizeRepository(repository);
-        assertThat(normalized).isNotNull();
-        assertThat(normalized.getUri()).isEqualTo(expectedUrl);
-    }
-
     /**
      * Documented in <a href="https://maven.apache.org/guides/mini/guide-multiple-repositories.html">Maven's guide</a>.
      * Effective Maven settings take precedence over the local effective build POM.
@@ -188,17 +156,32 @@ class MavenPomDownloaderTest implements RewriteTest {
         private final ExecutionContext ctx = HttpSenderExecutionContextView.view(new InMemoryExecutionContext())
           .setHttpSender(new HttpUrlConnectionSender(Duration.ofMillis(250), Duration.ofMillis(250)));
 
+        WithNativeHttpURLConnectionAndTLS() {
+            // Each test is about the repositories it sets up, which MavenPomDownloader would otherwise follow with
+            // Maven Central
+            MavenExecutionContextView.view(ctx).setAddCentralRepository(false);
+        }
+
         @Issue("https://github.com/openrewrite/rewrite/issues/3908")
         @Test
         void centralIdOverridesDefaultRepository() {
-            var ctx = MavenExecutionContextView.view(this.ctx);
-            var centralOverride = new MavenRepository("repo", "https://google.com/definitelydoesnotexist/", null, null, true, null, null, null, null);
+            var ctx = MavenExecutionContextView.view(this.ctx).setAddCentralRepository(true);
+            List<String> asked = new ArrayList<>();
+            ctx.setResolutionListener(new ResolutionEventListener() {
+                @Override
+                public void repository(MavenRepository mavenRepository, @Nullable ResolvedPom containing) {
+                    asked.add(mavenRepository.getUri());
+                }
+            });
+            var centralOverride = new MavenRepository("central", "https://google.com/definitelydoesnotexist/", null, null, true, null, null, null, null);
             var downloader = new MavenPomDownloader(emptyMap(), ctx);
             try {
                 downloader.download(new GroupArtifactVersion("org.openrewrite", "nonexistent", "7.0.0"), null, null, List.of(centralOverride));
                 fail();
             } catch (MavenDownloadingException ignore) {
             }
+            // A repository with Central's id takes Maven Central's place
+            assertThat(asked).contains(centralOverride.getUri()).doesNotContain(MAVEN_CENTRAL.getUri());
         }
 
         @Test
@@ -820,15 +803,44 @@ class MavenPomDownloaderTest implements RewriteTest {
 
 
         @Test
-        void deriveMetaDataFromHtmlBasedRepository() {
-            MavenRepository repository = MavenRepository.builder()
-              .id("html-based")
-              .uri("https://central.sonatype.com/repository/maven-snapshots")
-              .knownToExist(true)
-              .deriveMetadataIfMissing(true)
-              .build();
-            assertThrows(MavenDownloadingException.class, () ->
-              new MavenPomDownloader(emptyMap(), ctx).downloadMetadata(new GroupArtifact("does.definitely.not", "exist"), null, List.of(repository)));
+        void deriveMetaDataFromHtmlBasedRepository() throws Exception {
+            try (var server = new MockWebServer()) {
+                List<@Nullable String> paths = synchronizedList(new ArrayList<>());
+                server.setDispatcher(new Dispatcher() {
+                    @Override
+                    public MockResponse dispatch(RecordedRequest request) {
+                        paths.add(request.getPath());
+                        if (request.getPath() != null && request.getPath().endsWith("maven-metadata.xml")) {
+                            return new MockResponse().setResponseCode(404);
+                        }
+                        // Sonatype's snapshot repository answers a directory's URL with this page, which lists no versions
+                        return new MockResponse().setResponseCode(200).setBody(
+                          """
+                            <html><body>
+                            This maven2 hosted repository is not directly browseable at this URL.
+                            Please use the <a href="../../../../../../#browse/browse:maven-snapshots">browse</a>
+                            or <a href="../../../../../../service/rest/repository/browse/maven-snapshots/">HTML index</a>
+                            views to inspect the contents of this repository.
+                            </body></html>
+                            """
+                        );
+                    }
+                });
+                server.start();
+
+                MavenRepository repository = MavenRepository.builder()
+                  .id("html-based")
+                  .uri("http://%s:%d/repository/maven-snapshots".formatted(server.getHostName(), server.getPort()))
+                  .knownToExist(true)
+                  .deriveMetadataIfMissing(true)
+                  .build();
+                assertThrows(MavenDownloadingException.class, () ->
+                  new MavenPomDownloader(emptyMap(), ctx).downloadMetadata(new GroupArtifact("does.definitely.not", "exist"), null, List.of(repository)));
+                // The metadata, and when there is none, the directory listing to derive it from
+                assertThat(paths).containsExactly(
+                  "/repository/maven-snapshots/does/definitely/not/exist/maven-metadata.xml",
+                  "/repository/maven-snapshots/does/definitely/not/exist/");
+            }
         }
 
         @Test
@@ -1219,6 +1231,8 @@ class MavenPomDownloaderTest implements RewriteTest {
         @Test
         void canResolveDifferentVersionOfProjectPom() {
             MavenExecutionContextView.view(ctx).setMavenSettings(MavenSettings.readMavenSettingsFromDisk(ctx));
+            // 3.0.0 isn't one of the project's POMs, so it is downloaded, from Maven Central or what mirrors it
+            MavenExecutionContextView.view(ctx).setAddCentralRepository(true);
             var gav = new GroupArtifactVersion("org.springframework.boot", "spring-boot-starter-parent", "3.0.0");
 
             Path pomPath = Path.of("pom.xml");
@@ -1336,6 +1350,9 @@ class MavenPomDownloaderTest implements RewriteTest {
               .build();
             ctx = HttpSenderExecutionContextView.view(new InMemoryExecutionContext())
               .setHttpSender(new OkHttpSender(client));
+            // This client trusts the local servers alone, so Maven Central, which MavenPomDownloader would otherwise
+            // ask after them, could not answer it anyway
+            MavenExecutionContextView.view(ctx).setAddCentralRepository(false);
         }
 
         private MockWebServer getMockServer() {
@@ -1394,6 +1411,60 @@ class MavenPomDownloaderTest implements RewriteTest {
                 var normalizedRepo = downloader.normalizeRepository(originalRepo, MavenExecutionContextView.view(ctx), null);
                 assertThat(normalizedRepo).isEqualTo(originalRepo);
             });
+        }
+
+        // The local server answers OPTIONS and HEAD with each row's statuses, as the repository named above the row does
+        @CsvSource(textBlock = """
+          # Maven Central
+          https://%s/maven2/, 400, 200, https://%s/maven2/
+          https://%s/maven2, 400, 200, https://%s/maven2/
+          http://%s/maven2/, 400, 200, https://%s/maven2/
+          # Sonatype's snapshot repository
+          https://%s/repository/maven-snapshots/, 405, 404, https://%s/repository/maven-snapshots/
+          # Moderne's Artifactory
+          https://%s/artifactory/moderne-public/, 200, 404, https://%s/artifactory/moderne-public/
+          # JitPack
+          https://%s/, 404, 200, https://%s/
+          """)
+        @ParameterizedTest
+        void normalizeRepository(String originalUrl, int optionsStatus, int headStatus, String expectedUrl) throws Throwable {
+            try (MockWebServer mockRepo = getMockServer()) {
+                mockRepo.setDispatcher(new Dispatcher() {
+                    @Override
+                    public MockResponse dispatch(RecordedRequest recordedRequest) {
+                        return new MockResponse().setResponseCode("OPTIONS".equals(recordedRequest.getMethod()) ? optionsStatus : headStatus);
+                    }
+                });
+                mockRepo.start();
+                String hostAndPort = "%s:%d".formatted(mockRepo.getHostName(), mockRepo.getPort());
+                var downloader = new MavenPomDownloader(ctx);
+                var repository = new MavenRepository("id", originalUrl.formatted(hostAndPort), null, null, null, null, null);
+                MavenRepository normalized = downloader.normalizeRepository(repository);
+                assertThat(normalized).isNotNull();
+                assertThat(normalized.getUri()).isEqualTo(expectedUrl.formatted(hostAndPort));
+            }
+        }
+
+        @Test
+        void ossSonatype() throws Exception {
+            try (MockWebServer mockRepo = getMockServer()) {
+                // As Sonatype's snapshot repository answers at its root: OPTIONS is not allowed, and HEAD finds nothing
+                mockRepo.setDispatcher(new Dispatcher() {
+                    @Override
+                    public MockResponse dispatch(RecordedRequest recordedRequest) {
+                        return new MockResponse().setResponseCode("OPTIONS".equals(recordedRequest.getMethod()) ? 405 : 404);
+                    }
+                });
+                mockRepo.start();
+                MavenRepository ossSonatype = MavenRepository.builder()
+                  .id("oss")
+                  .uri("https://%s:%d/repository/maven-snapshots/".formatted(mockRepo.getHostName(), mockRepo.getPort()))
+                  .snapshots(true)
+                  .build();
+                MavenRepository repo = new MavenPomDownloader(ctx).normalizeRepository(ossSonatype,
+                  MavenExecutionContextView.view(ctx), null);
+                assertThat(repo).isNotNull().extracting((MavenRepository::getUri)).isEqualTo(ossSonatype.getUri());
+            }
         }
 
         @Issue("https://github.com/openrewrite/rewrite/issues/8682")
