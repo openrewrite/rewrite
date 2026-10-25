@@ -44,6 +44,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.UncheckedIOException;
 import java.lang.reflect.Constructor;
+import java.lang.reflect.Field;
 import java.lang.reflect.Parameter;
 import java.net.URI;
 import java.nio.charset.StandardCharsets;
@@ -495,6 +496,13 @@ public class YamlResourceLoader implements ResourceLoader {
             for (Parameter parameter : constructor.getParameters()) {
                 if (parameter.isNamePresent()) {
                     names.add(parameter.getName());
+                }
+            }
+        }
+        for (Class<?> c = recipeClass; c != null && c != Recipe.class; c = c.getSuperclass()) {
+            for (Field field : c.getDeclaredFields()) {
+                if (field.isAnnotationPresent(Option.class)) {
+                    names.add(field.getName());
                 }
             }
         }

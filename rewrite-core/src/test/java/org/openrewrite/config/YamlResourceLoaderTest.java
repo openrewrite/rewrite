@@ -16,6 +16,7 @@
 package org.openrewrite.config;
 
 import org.intellij.lang.annotations.Language;
+import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.*;
@@ -237,6 +238,27 @@ class YamlResourceLoaderTest implements RewriteTest {
               assertThat(failure.getProperty()).isEqualTo("org.openrewrite.text.ChangeText.toTxt");
               assertThat(failure.getMessage()).isEqualTo("is not an option of this recipe; valid options are: toText");
           });
+    }
+
+    @Test
+    void optionFieldThatJacksonCannotSetIsNotReportedAsUnknown() {
+        Environment env = Environment.builder()
+          .load(new YamlResourceLoader(new ByteArrayInputStream(
+            //language=yml
+            """
+              type: specs.openrewrite.org/v1beta/recipe
+              name: test.FieldOption
+              displayName: Field option
+              recipeList:
+                  - org.openrewrite.config.YamlResourceLoaderTest$RecipeWithFieldOption:
+                      fieldOption: value
+              """.getBytes()
+          ), URI.create("rewrite.yml"), new Properties()))
+          .build();
+
+        assertThat(env.activateRecipes("test.FieldOption").validateAll())
+          .flatMap(Validated::failures)
+          .isEmpty();
     }
 
     @Test
@@ -487,6 +509,22 @@ class YamlResourceLoaderTest implements RewriteTest {
     private static YamlResourceLoader marketplaceBackedLoader(@Language("yml") String yaml) {
         return new YamlResourceLoader(new ByteArrayInputStream(yaml.getBytes()),
           URI.create("file:///user.yaml"), new Properties(), new RecipeMarketplace(), emptyList());
+    }
+
+    public static class RecipeWithFieldOption extends Recipe {
+        @Option(displayName = "Field option", description = "Has no constructor parameter or setter.")
+        @Nullable
+        String fieldOption;
+
+        @Override
+        public String getDisplayName() {
+            return "Recipe with field option";
+        }
+
+        @Override
+        public String getDescription() {
+            return "Recipe with field option.";
+        }
     }
 
     private static class RecipeFailingOnFirstLoad extends Recipe {
