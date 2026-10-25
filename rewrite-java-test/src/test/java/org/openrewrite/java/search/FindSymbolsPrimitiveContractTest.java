@@ -211,6 +211,7 @@ class FindSymbolsPrimitiveContractTest implements RewriteTest {
               }
               """,
             source -> source.path(path)
+              .beforeRecipe(cu -> assertSinglePrimitiveMethod(cu, JavaType.Primitive.Int))
           ),
           java(
             """
@@ -224,6 +225,7 @@ class FindSymbolsPrimitiveContractTest implements RewriteTest {
               }
               """,
             source -> source.path("src/main/java/other/Scoped.java")
+              .beforeRecipe(cu -> assertSinglePrimitiveMethod(cu, JavaType.Primitive.Boolean))
           )
         );
     }
@@ -272,5 +274,21 @@ class FindSymbolsPrimitiveContractTest implements RewriteTest {
           .singleElement().satisfies(table -> assertThat(table.getColumns())
             .extracting(ColumnDescriptor::getName)
             .containsExactly("sourcePath", "kind", "name", "parentFqn", "signature", "visibility"));
+    }
+
+    private static void assertSinglePrimitiveMethod(J.CompilationUnit cu, JavaType.Primitive parameterType) {
+        List<String> methods = new ArrayList<>();
+        new JavaIsoVisitor<List<String>>() {
+            @Override
+            public J.MethodDeclaration visitMethodDeclaration(J.MethodDeclaration method, List<String> declarations) {
+                JavaType.Method type = method.getMethodType();
+                assertThat(type).as("normally attributed %s", method.getSimpleName()).isNotNull();
+                assertThat(type.getParameterTypes()).containsExactly(parameterType);
+                assertThat(type.getReturnType()).isEqualTo(JavaType.Primitive.Void);
+                declarations.add(method.getSimpleName());
+                return super.visitMethodDeclaration(method, declarations);
+            }
+        }.visit(cu, methods);
+        assertThat(methods).containsExactly("mix");
     }
 }
