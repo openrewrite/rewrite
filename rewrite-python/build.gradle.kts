@@ -1,7 +1,5 @@
 @file:Suppress("UnstableApiUsage")
 
-import com.gradle.develocity.agent.gradle.test.ImportJUnitXmlReports
-import com.gradle.develocity.agent.gradle.test.JUnitXmlDialect
 import nl.javadude.gradle.plugins.license.LicenseExtension
 import java.time.Instant
 import java.time.ZoneOffset
@@ -234,8 +232,6 @@ val pytestTest by tasks.registering(Exec::class) {
     outputs.file(pythonDir.resolve("build/test-results/pytest/junit.xml"))
     outputs.cacheIf { true }
 }
-
-ImportJUnitXmlReports.register(tasks, pytestTest, JUnitXmlDialect.GENERIC)
 
 tasks.named("check") {
     dependsOn(testing.suites.named("py2CompatibilityTest"))
