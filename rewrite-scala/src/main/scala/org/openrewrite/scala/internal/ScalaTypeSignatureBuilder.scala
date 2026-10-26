@@ -61,7 +61,7 @@ class ScalaTypeSignatureBuilder(using ctx: Context) {
         case at: AndType =>
           signature(at.tp1) + " & " + signature(at.tp2)
         case ot: OrType =>
-          signature(ot.tp1) + " | " + signature(ot.tp2)
+          unionMembers(ot).map(_._1).mkString(" | ")
         case NoType =>
           "{undefined}"
         case _ =>
@@ -189,6 +189,16 @@ class ScalaTypeSignatureBuilder(using ctx: Context) {
     else if (method.is(Flags.JavaDefined)) pt.translateParameterized(ctx.definitions.RepeatedParamClass, ctx.definitions.ArrayClass)
     else pt.translateFromRepeated(toArray = false)
 
+  // Sorted so that `A | B` and `B | A` share one cache key.
+  def unionMembers(ot: OrType): List[(String, Type)] =
+    unionAlternatives(ot).map(t => signature(t) -> t).distinctBy(_._1).sortBy(_._1)
+
+  private def unionAlternatives(tpe: Type): List[Type] = tpe.dealias match {
+    case ot: OrType => unionAlternatives(ot.tp1) ++ unionAlternatives(ot.tp2)
+    case nothing if nothing.isExactlyNothing => Nil
+    case other => List(other)
+  }
+
   /**
    * The FQN of a class by its JVM binary name (`Outer$Inner`, `object A` as `A$`), with `scala.Any`/`scala.AnyRef`
    * as `java.lang.Object`. Java statics live on a module class `X$` and are keyed under `X` like the Java parser does.
@@ -238,6 +248,7 @@ class ScalaTypeSignatureBuilder(using ctx: Context) {
     case "scala.Unit" => "void"
     case "scala.Any" => "java.lang.Object"
     case "scala.AnyRef" => "java.lang.Object"
+    case "scala.Matchable" => "java.lang.Object"
     case "scala.Nothing" => "scala.Nothing"
     case "scala.Null" => "null"
     case other => other
