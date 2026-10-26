@@ -1,6 +1,7 @@
 @file:Suppress("UnstableApiUsage")
 
 import com.github.gradle.node.NodeExtension
+import com.github.gradle.node.npm.task.NpmInstallTask
 import com.github.gradle.node.npm.task.NpmTask
 import nl.javadude.gradle.plugins.license.LicenseExtension
 import java.time.Instant
@@ -117,7 +118,10 @@ val npmVersion = tasks.register<NpmTask>("npmVersion") {
     workingDir = versionDir
 }
 
-val npmInstall = tasks.named("npmInstall")
+val npmInstall = tasks.named<NpmInstallTask>("npmInstall") {
+    // Every install would otherwise print an audit report, fetched from the registry, and a funding appeal
+    args.addAll("--no-audit", "--no-fund")
+}
 
 val npmTest = tasks.register<NpmTask>("npmTest") {
     dependsOn(npmInstall)
@@ -149,11 +153,14 @@ val npmTest = tasks.register<NpmTask>("npmTest") {
     outputs.files("rewrite/build/test-results/vitest/junit.xml")
     outputs.cacheIf { true }
 
-    // -PverboseTests switches vitest to its full per-test reporter (see vitest.config.mts)
+    // vitest prints only failing tests and the summary, or with -PverboseTests every test (see vitest.config.mts)
     if (project.hasProperty("verboseTests")) {
         environment.put("VERBOSE_TESTS", "1")
+    } else {
+        environment.put("QUIET_TESTS", "1")
     }
 
+    // Not --silent: npm exports it as npm_config_loglevel, which would silence the errors of every npm a test runs
     args = listOf("run", "ci:test")
 }
 
@@ -176,7 +183,9 @@ val npmBuild = tasks.register<NpmTask>("npmBuild") {
         versionTxt.writeText(datedSnapshotVersion)
     }
 
-    args = listOf("run", "build")
+    // --silent drops the banner npm prints for each script. The postbuild's npm link sets its own loglevel, so a
+    // failure to link still says why.
+    args = listOf("run", "--silent", "build")
 }
 
 // Because each of these sees rewrite-javascript-version.txt as an input
@@ -219,7 +228,7 @@ val npmFixturesBuild = tasks.register<NpmTask>("npmFixturesBuild") {
         .withPathSensitivity(PathSensitivity.RELATIVE)
     outputs.dir(file("rewrite/dist-fixtures/"))
 
-    args = listOf("run", "build:fixtures")
+    args = listOf("run", "--silent", "build:fixtures")
 }
 
 testing {
@@ -308,7 +317,7 @@ tasks.named("publish") {
 fun cgpPublishToken(): String? =
     project.findProperty("cgpPublishToken")?.toString()?.takeIf { it.isNotBlank() }
 
-val npmPublishCgp by tasks.registering {
+val npmPublishCgp = tasks.register("npmPublishCgp") {
     group = "javascript"
     description = "Publish the npm tarball to the Code Genome Project"
 
@@ -360,7 +369,7 @@ if (cgpPublishToken() != null) {
 
 // Task to generate classpath file for Java RPC server testing (consumed by TS tests
 // in rewrite-javascript/rewrite/test/rpc/ that spawn org.openrewrite.maven.rpc.JavaRewriteRpc).
-val generateTestClasspath by tasks.registering {
+val generateTestClasspath = tasks.register("generateTestClasspath") {
     group = "javascript"
     description = "Generate classpath file for Java RPC server (used by TypeScript tests)"
 
@@ -386,7 +395,7 @@ val generateTestClasspath by tasks.registering {
         ).distinctBy { it.absolutePath }
          .joinToString(File.pathSeparator) { it.absolutePath }
         outputFile.writeText(classpath)
-        logger.lifecycle("Generated test classpath to ${outputFile.absolutePath}")
+        logger.info("Generated test classpath to ${outputFile.absolutePath}")
     }
 }
 

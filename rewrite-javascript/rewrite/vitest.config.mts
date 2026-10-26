@@ -11,9 +11,10 @@ export default defineConfig({
         include: ['**/?(*.)+(spec|test).+(ts|tsx|js)'],
         setupFiles: ['./test/setup.ts'],
         exclude: ['**/node_modules/**', '**/dist/**'],
-        // VERBOSE_TESTS (Gradle: -PverboseTests) restores the full per-test reporter
+        // QUIET_TESTS (Gradle's npmTest) prints only failing tests, with their console output, and the summary.
+        // VERBOSE_TESTS (Gradle: -PverboseTests) restores the full per-test reporter.
         reporters: [
-            process.env.VERBOSE_TESTS ? 'default' : 'dot',
+            process.env.VERBOSE_TESTS ? 'default' : process.env.QUIET_TESTS ? 'minimal' : 'dot',
             ['junit', {
                 outputFile: './build/test-results/vitest/junit.xml',
                 classname: '{classname}',
