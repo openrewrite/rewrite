@@ -234,7 +234,7 @@ val generateTestClasspath by tasks.registering {
         ).distinctBy { it.absolutePath }
          .joinToString(File.pathSeparator) { it.absolutePath }
         outputFile.writeText(classpath)
-        logger.lifecycle("Generated test classpath to ${outputFile.absolutePath}")
+        logger.info("Generated test classpath to ${outputFile.absolutePath}")
     }
 }
 
