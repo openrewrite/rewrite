@@ -351,7 +351,14 @@ public class ExcludeDependency extends Recipe {
     }
 
     static @Nullable String extractNamedArg(J.MethodInvocation method, String name, boolean kotlinDsl) {
-        for (Expression arg : method.getArguments()) {
+        List<Expression> args = method.getArguments();
+        for (int i = 0; i < args.size(); i++) {
+            Expression arg = args.get(i);
+            // Kotlin's `exclude(group, module)` also takes its arguments by position
+            if (kotlinDsl && arg instanceof J.Literal && i == ("group".equals(name) ? 0 : 1)) {
+                Object v = ((J.Literal) arg).getValue();
+                return v == null ? null : v.toString();
+            }
             if (!kotlinDsl && arg instanceof G.MapEntry) {
                 G.MapEntry entry = (G.MapEntry) arg;
                 if (entry.getKey() instanceof J.Literal &&

@@ -224,6 +224,42 @@ class RemoveExclusionTest implements RewriteTest {
     }
 
     @Test
+    void kotlinPositionalExclusion() {
+        rewriteRun(
+          buildGradleKts(
+            """
+              plugins {
+                  java
+              }
+
+              dependencies {
+                  implementation("org.springframework.boot:spring-boot-starter-web:3.5.0") {
+                      exclude("org.springframework.boot", "spring-boot-starter-tomcat")
+                  }
+                  implementation("org.springframework.boot:spring-boot-starter-actuator:3.5.0") {
+                      exclude("org.springframework.boot", module = "spring-boot-starter-tomcat")
+                  }
+                  implementation("org.springframework.boot:spring-boot-starter-webflux:3.5.0") {
+                      exclude(null, "spring-boot-starter-tomcat")
+                  }
+              }
+              """,
+            """
+              plugins {
+                  java
+              }
+
+              dependencies {
+                  implementation("org.springframework.boot:spring-boot-starter-web:3.5.0")
+                  implementation("org.springframework.boot:spring-boot-starter-actuator:3.5.0")
+                  implementation("org.springframework.boot:spring-boot-starter-webflux:3.5.0")
+              }
+              """
+          )
+        );
+    }
+
+    @Test
     void kotlinConfigurationExclusion() {
         rewriteRun(
           buildGradleKts(
@@ -468,6 +504,21 @@ class RemoveExclusionTest implements RewriteTest {
                       implementation('org.springframework.boot:spring-boot-starter-web:3.5.0') {
                           exclude group: 'org.springframework.boot', module: 'spring-boot-starter-logging'
                       }
+                  }
+                  """
+              )
+            );
+        }
+
+        @Test
+        void kotlinPositionalOtherModule() {
+            rewriteRun(
+              buildGradleKts(
+                """
+                  configurations.all {
+                      exclude("org.springframework.boot", "spring-boot-starter-logging")
+                      exclude("org.springframework.boot")
+                      exclude("com.acme", module = "spring-boot-starter-tomcat")
                   }
                   """
               )
