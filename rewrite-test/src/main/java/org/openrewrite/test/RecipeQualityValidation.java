@@ -89,6 +89,13 @@ public class RecipeQualityValidation {
     private boolean importReferencedTypes = true;
 
     /**
+     * Controls whether the recipe is validated to remove the imports that the code it removes was the only use of,
+     * and to add none that nothing uses.
+     */
+    @Builder.Default
+    private boolean removeUnusedImports = true;
+
+    /**
      * Controls whether the recipe is validated to produce the tree that the source's parser makes of the text the
      * recipe's output prints, such as a J.Primitive and not a J.Identifier for {@code int}.
      */
@@ -130,6 +137,7 @@ public class RecipeQualityValidation {
                 .minimalFormatting(quality.minimalFormatting())
                 .matchByTypeNotName(quality.matchByTypeNotName())
                 .importReferencedTypes(quality.importReferencedTypes())
+                .removeUnusedImports(quality.removeUnusedImports())
                 .parserShapedTrees(quality.parserShapedTrees())
                 .orderStepsForEarlierChanges(quality.orderStepsForEarlierChanges())
                 .build();

@@ -28,6 +28,7 @@ import org.openrewrite.*;
 import org.openrewrite.groovy.GroovyIsoVisitor;
 import org.openrewrite.groovy.GroovyParser;
 import org.openrewrite.internal.ListUtils;
+import org.openrewrite.java.AddImport;
 import org.openrewrite.java.ChangeType;
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.JavaVisitor;
@@ -153,11 +154,19 @@ class RewriteTestTest implements RewriteTest {
     void generatedAndDeletedFilesAreNotCountedAsChangedAgainInLaterCycles() {
         rewriteRun(
           spec -> spec.recipe(new DeletesObsoleteGeneratesPlaceholderThenFillsIt())
-            .cycles(3)
             .expectedCyclesThatMakeChanges(2),
           text("obsolete", null, spec -> spec.path("obsolete.txt")),
           text(null, "filled", spec -> spec.path("placeholder.txt"))
         );
+    }
+
+    @Test
+    void runVerificationCycleAfterExpectedCycles() {
+        AssertionError e = assertThrows(AssertionError.class, () -> rewriteRun(
+          spec -> spec.expectedCyclesThatMakeChanges(2).recipe(new AppendExclamationMark()),
+          text("a", "a!!")
+        ));
+        assertThat(e).hasMessageContaining("Expected recipe to complete in 2 cycles, but took at least one more cycle");
     }
 
     @Test
@@ -460,7 +469,7 @@ class RewriteTestTest implements RewriteTest {
         void rejectEqualCopyWhateverTheCycleSettings() {
             // these settings accept a change in the only cycle, but an equal copy is not one
             AssertionError e = assertThrows(AssertionError.class, () -> rewriteRun(
-              spec -> spec.cycles(1).expectedCyclesThatMakeChanges(1).recipe(copiesModifiers()),
+              spec -> spec.recipe(copiesModifiers()),
               java(
                 """
                   public class A {}
@@ -1717,6 +1726,144 @@ class RewriteTestTest implements RewriteTest {
                   class A {
                       boolean test(Object o) {
                           return Objects.isNull(o);
+                      }
+                  }
+                  """
+              )
+            );
+        }
+    }
+
+    @Nested
+    class RemovesUnusedImports {
+
+        @Test
+        void rejectImportsTheRecipeLeavesOrAddsUnused() {
+            AssertionError e = assertThrows(AssertionError.class, () -> rewriteRun(
+              spec -> spec.recipe(new RemoveCalls("emptyList", "java.util.Set")),
+              java(
+                """
+                  import java.util.Collections;
+                  import java.util.List;
+
+                  class A {
+                      void m() {
+                          Collections.emptyList();
+                      }
+                  }
+                  """,
+                """
+                  import java.util.Collections;
+                  import java.util.List;
+                  import java.util.Set;
+
+                  class A {
+                      void m() {
+                      }
+                  }
+                  """
+              )
+            ));
+            assertThat(e).hasMessageStartingWith("Remove the imports the recipe leaves unused")
+              .hasMessageContaining(": import java.util.Collections, import java.util.Set\n")
+              .hasMessageContaining("removeUnusedImports(false)");
+        }
+
+        @Test
+        void acceptImportsThatWereUnusedBefore() {
+            rewriteRun(
+              spec -> spec.recipe(new RenameListImportAndRebuildTheOthers()),
+              java(
+                """
+                  import java.util.List;
+                  import java.util.Map;
+
+                  class A {
+                  }
+                  """,
+                """
+                  import java.util.Set;
+                  import java.util.Map;
+
+                  class A {
+                  }
+                  """
+              )
+            );
+        }
+
+        @Test
+        void skipImportsOfAnInputWithMissingTypes() {
+            rewriteRun(
+              spec -> spec.typeValidationOptions(TypeValidation.none()).recipe(new RemoveCalls("call", null)),
+              java(
+                """
+                  import java.util.List;
+
+                  class A {
+                      void m() {
+                          Unknown.call();
+                      }
+                  }
+                  """,
+                """
+                  import java.util.List;
+
+                  class A {
+                      void m() {
+                      }
+                  }
+                  """
+              )
+            );
+        }
+
+        @Test
+        void skipAdHocRecipe() {
+            rewriteRun(
+              spec -> spec.recipe(toRecipe(() -> new RemoveCalls("emptyList", null).getVisitor())),
+              java(
+                """
+                  import java.util.Collections;
+
+                  class A {
+                      void m() {
+                          Collections.emptyList();
+                      }
+                  }
+                  """,
+                """
+                  import java.util.Collections;
+
+                  class A {
+                      void m() {
+                      }
+                  }
+                  """
+              )
+            );
+        }
+
+        @Test
+        void optOut() {
+            rewriteRun(
+              spec -> spec.recipe(new RemoveCalls("emptyList", null))
+                .recipeQualityValidation(RecipeQualityValidation.builder().removeUnusedImports(false).build()),
+              java(
+                """
+                  import java.util.Collections;
+
+                  class A {
+                      void m() {
+                          Collections.emptyList();
+                      }
+                  }
+                  """,
+                """
+                  import java.util.Collections;
+
+                  class A {
+                      void m() {
                       }
                   }
                   """
@@ -2987,6 +3134,26 @@ class DeletesObsoleteGeneratesPlaceholderThenFillsIt extends ScanningRecipe<Atom
     }
 }
 
+@EqualsAndHashCode(callSuper = false)
+@NullMarked
+@Value
+class AppendExclamationMark extends Recipe {
+
+    String displayName = "Append an exclamation mark";
+
+    String description = "Appends an exclamation mark to every plain text file, in every cycle.";
+
+    @Override
+    public TreeVisitor<?, ExecutionContext> getVisitor() {
+        return new PlainTextVisitor<>() {
+            @Override
+            public PlainText visitText(PlainText text, ExecutionContext ctx) {
+                return text.withText(text.getText() + "!");
+            }
+        };
+    }
+}
+
 @Value
 @With
 class Classpath implements Marker, Heavyweight {
@@ -3174,6 +3341,72 @@ class KeepsPathsByProject extends ScanningRecipe<Map<JavaProject, Set<Path>>> {
                       acc.computeIfAbsent(project, p -> new HashSet<>()).add(s.getSourcePath()));
                 }
                 return tree;
+            }
+        };
+    }
+}
+
+@EqualsAndHashCode(callSuper = false)
+@NullMarked
+@Value
+class RemoveCalls extends Recipe {
+
+    @Option(displayName = "Method name",
+      description = "The name of the method whose call statements are removed.")
+    String methodName;
+
+    @Option(displayName = "Import to add",
+      description = "A type to import whether or not the file uses it.",
+      required = false)
+    @Nullable
+    String addImport;
+
+    String displayName = "Remove calls";
+
+    String description = "Removes the statements that call a method, without removing the imports they used.";
+
+    @Override
+    public TreeVisitor<?, ExecutionContext> getVisitor() {
+        return new JavaIsoVisitor<>() {
+            @Override
+            public J.Block visitBlock(J.Block block, ExecutionContext ctx) {
+                if (addImport != null) {
+                    doAfterVisit(new AddImport<>(addImport, null, false));
+                }
+                J.Block b = super.visitBlock(block, ctx);
+                return b.withStatements(ListUtils.map(b.getStatements(), s ->
+                  s instanceof J.MethodInvocation m && methodName.equals(m.getSimpleName()) ? null : s));
+            }
+        };
+    }
+}
+
+@EqualsAndHashCode(callSuper = false)
+@NullMarked
+@Value
+class RenameListImportAndRebuildTheOthers extends Recipe {
+
+    String displayName = "Rename the `List` import and rebuild the others";
+
+    String description = "Renames an import of `java.util.List` to `java.util.Set`, and gives the other imports new ids.";
+
+    @Override
+    public TreeVisitor<?, ExecutionContext> getVisitor() {
+        return new JavaIsoVisitor<>() {
+            @Override
+            public J.CompilationUnit visitCompilationUnit(J.CompilationUnit cu, ExecutionContext ctx) {
+                if (cu.getImports().stream().noneMatch(i -> "List".equals(i.getQualid().getSimpleName()))) {
+                    return cu;
+                }
+                return cu.withImports(ListUtils.map(cu.getImports(), anImport -> {
+                    J.FieldAccess q = anImport.getQualid();
+                    if ("List".equals(q.getSimpleName())) {
+                        JavaType.ShallowClass set = JavaType.ShallowClass.build("java.util.Set");
+                        return anImport.withQualid(q.withName(q.getName().withSimpleName("Set").withType(set))
+                          .withType(set));
+                    }
+                    return anImport.withId(Tree.randomId());
+                }));
             }
         };
     }

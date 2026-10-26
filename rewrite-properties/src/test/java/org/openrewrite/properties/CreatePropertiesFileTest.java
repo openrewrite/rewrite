@@ -53,7 +53,7 @@ class CreatePropertiesFileTest implements RewriteTest {
             "test/test.properties",
             "after=true",
             true
-          )).cycles(1).expectedCyclesThatMakeChanges(1),
+          )),
           properties(
             "test.property=test",
             "after=true",

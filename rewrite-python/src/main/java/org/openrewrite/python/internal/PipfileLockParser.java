@@ -71,7 +71,7 @@ public class PipfileLockParser {
         }
     }
 
-    static @Nullable Path findLockFile(Path startDir, @Nullable Path boundary) {
+    public static @Nullable Path findLockFile(Path startDir, @Nullable Path boundary) {
         Path dir = startDir;
         while (dir != null) {
             Path lockFile = dir.resolve("Pipfile.lock");

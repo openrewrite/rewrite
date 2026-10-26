@@ -54,6 +54,7 @@ import org.openrewrite.rpc.request.BatchVisitResponse;
 import org.openrewrite.rpc.request.GetObject;
 import org.openrewrite.rpc.request.GetObjectResponse;
 import org.openrewrite.rpc.request.Print;
+import org.openrewrite.text.FindAndReplace;
 import org.openrewrite.text.PlainText;
 import org.openrewrite.text.PlainTextVisitor;
 
@@ -602,15 +603,15 @@ class RewriteRpcTest implements RewriteTest {
           .describedAs("Each prepared child must be its own instance, not a shared/collapsed one")
           .isEqualTo(3);
 
-        List<String> toTexts = children.stream()
+        List<String> replacements = children.stream()
           .map(child -> child.getDescriptor().getOptions().stream()
-            .filter(o -> "toText".equals(o.getName()))
+            .filter(o -> "replace".equals(o.getName()))
             .map(OptionDescriptor::getValue)
             .map(String::valueOf)
             .findFirst()
-            .orElseThrow(() -> new AssertionError("Child is missing its toText option")))
+            .orElseThrow(() -> new AssertionError("Child is missing its replace option")))
           .toList();
-        assertThat(toTexts)
+        assertThat(replacements)
           .describedAs("Each same-type child must retain its own distinct option value")
           .containsExactly("a", "b", "c");
     }
@@ -626,8 +627,7 @@ class RewriteRpcTest implements RewriteTest {
           spec -> spec
             .recipe(client.prepareRecipe(
               "org.openrewrite.rpc.RewriteRpcTest$RecipeWithSameTypeChildren", Map.of()))
-            .validateRecipeSerialization(false)
-            .cycles(1).expectedCyclesThatMakeChanges(1),
+            .validateRecipeSerialization(false),
           text(
             "hello",
             "c",
@@ -636,17 +636,17 @@ class RewriteRpcTest implements RewriteTest {
                   .findFirst(RecipesThatMadeChanges.class)
                   .orElseThrow(() -> new AssertionError("Expected RecipesThatMadeChanges marker"));
 
-                List<String> executedToTexts = marker.getRecipes().stream()
+                List<String> executedReplacements = marker.getRecipes().stream()
                   .map(stack -> stack.get(stack.size() - 1))
-                  .filter(leaf -> "org.openrewrite.text.ChangeText".equals(leaf.getName()))
+                  .filter(leaf -> "org.openrewrite.text.FindAndReplace".equals(leaf.getName()))
                   .map(leaf -> leaf.getDescriptor().getOptions().stream()
-                    .filter(o -> "toText".equals(o.getName()))
+                    .filter(o -> "replace".equals(o.getName()))
                     .map(OptionDescriptor::getValue)
                     .map(String::valueOf)
                     .findFirst()
-                    .orElseThrow(() -> new AssertionError("Executed ChangeText is missing its toText option")))
+                    .orElseThrow(() -> new AssertionError("Executed FindAndReplace is missing its replace option")))
                   .toList();
-                assertThat(executedToTexts)
+                assertThat(executedReplacements)
                   .describedAs("All three same-type children must execute, each with its own distinct option")
                   .containsExactlyInAnyOrder("a", "b", "c");
             })
@@ -659,20 +659,17 @@ class RewriteRpcTest implements RewriteTest {
      * bound to the same RewriteRpc instance, the scheduler batches them into a
      * single BatchVisit RPC call. The remote runs all visitors in sequence and
      * the host fetches the final result at the end. This test verifies that
-     * two consecutive same-RPC ChangeText recipes produce the correct final output.
+     * two consecutive same-RPC FindAndReplace recipes produce the correct final output.
      */
     @Test
     void consecutiveSameRpcRecipesAreBatchedAndProduceCorrectResult() {
-        Recipe r1 = client.prepareRecipe("org.openrewrite.text.ChangeText", Map.of("toText", "step1"));
-        Recipe r2 = client.prepareRecipe("org.openrewrite.text.ChangeText", Map.of("toText", "step2"));
+        Recipe r1 = client.prepareRecipe("org.openrewrite.text.FindAndReplace", Map.of("find", "hello", "replace", "step1"));
+        Recipe r2 = client.prepareRecipe("org.openrewrite.text.FindAndReplace", Map.of("find", "step1", "replace", "step2"));
 
         rewriteRun(
           spec -> spec
             .recipe(new CompositeRecipe(List.of(r1, r2)))
-            .validateRecipeSerialization(false)
-            // Consecutive ChangeText recipes aren't idempotent (r1 re-applies in cycle 2).
-            // We only need 1 cycle to verify deferral correctness.
-            .cycles(1).expectedCyclesThatMakeChanges(1),
+            .validateRecipeSerialization(false),
           text(
             "hello",
             "step2"
@@ -701,15 +698,14 @@ class RewriteRpcTest implements RewriteTest {
      */
     @Test
     void threeConsecutiveSameRpcRecipes() {
-        Recipe r1 = client.prepareRecipe("org.openrewrite.text.ChangeText", Map.of("toText", "A"));
-        Recipe r2 = client.prepareRecipe("org.openrewrite.text.ChangeText", Map.of("toText", "B"));
-        Recipe r3 = client.prepareRecipe("org.openrewrite.text.ChangeText", Map.of("toText", "C"));
+        Recipe r1 = client.prepareRecipe("org.openrewrite.text.FindAndReplace", Map.of("find", "hello", "replace", "A"));
+        Recipe r2 = client.prepareRecipe("org.openrewrite.text.FindAndReplace", Map.of("find", "A", "replace", "B"));
+        Recipe r3 = client.prepareRecipe("org.openrewrite.text.FindAndReplace", Map.of("find", "B", "replace", "C"));
 
         rewriteRun(
           spec -> spec
             .recipe(new CompositeRecipe(List.of(r1, r2, r3)))
-            .validateRecipeSerialization(false)
-            .cycles(1).expectedCyclesThatMakeChanges(1),
+            .validateRecipeSerialization(false),
           text(
             "hello",
             "C"
@@ -725,15 +721,14 @@ class RewriteRpcTest implements RewriteTest {
      */
     @Test
     void batchOnlyAttributesRecipesThatActuallyMadeChanges() {
-        Recipe r1 = client.prepareRecipe("org.openrewrite.text.ChangeText", Map.of("toText", "A"));
+        Recipe r1 = client.prepareRecipe("org.openrewrite.text.FindAndReplace", Map.of("find", "hello", "replace", "A"));
         Recipe r2 = client.prepareRecipe("org.openrewrite.text.Find", Map.of("find", "NOMATCH_PATTERN"));
-        Recipe r3 = client.prepareRecipe("org.openrewrite.text.ChangeText", Map.of("toText", "B"));
+        Recipe r3 = client.prepareRecipe("org.openrewrite.text.FindAndReplace", Map.of("find", "A", "replace", "B"));
 
         rewriteRun(
           spec -> spec
             .recipe(new CompositeRecipe(List.of(r1, r2, r3)))
-            .validateRecipeSerialization(false)
-            .cycles(1).expectedCyclesThatMakeChanges(1),
+            .validateRecipeSerialization(false),
           text(
             "hello",
             "B",
@@ -746,7 +741,7 @@ class RewriteRpcTest implements RewriteTest {
                   .toList();
                 assertThat(recipeNames)
                   .describedAs("Only recipes that modified the tree should be attributed")
-                  .contains("org.openrewrite.text.ChangeText")
+                  .contains("org.openrewrite.text.FindAndReplace")
                   .doesNotContain("org.openrewrite.text.Find");
             })
           )
@@ -760,14 +755,13 @@ class RewriteRpcTest implements RewriteTest {
      */
     @Test
     void sameRpcBatchFollowedByNonRpcRecipe() {
-        Recipe rpc1 = client.prepareRecipe("org.openrewrite.text.ChangeText", Map.of("toText", "from-rpc"));
-        Recipe local = new org.openrewrite.text.ChangeText("from-local");
+        Recipe rpc1 = client.prepareRecipe("org.openrewrite.text.FindAndReplace", Map.of("find", "hello", "replace", "from-rpc"));
+        Recipe local = new FindAndReplace("from-rpc", "from-local", null, null, null, null, null, null);
 
         rewriteRun(
           spec -> spec
             .recipe(new CompositeRecipe(List.of(rpc1, local)))
-            .validateRecipeSerialization(false)
-            .expectedCyclesThatMakeChanges(2), // each ChangeText overwrites the other in every cycle
+            .validateRecipeSerialization(false),
           text(
             "hello",
             "from-local"
@@ -1141,9 +1135,9 @@ class RewriteRpcTest implements RewriteTest {
 
         @Override
         public void buildRecipeList(RecipeList recipes) {
-            recipes.recipe(new org.openrewrite.text.ChangeText("a"));
-            recipes.recipe(new org.openrewrite.text.ChangeText("b"));
-            recipes.recipe(new org.openrewrite.text.ChangeText("c"));
+            recipes.recipe(new FindAndReplace("hello", "a", null, null, null, null, null, null));
+            recipes.recipe(new FindAndReplace("a", "b", null, null, null, null, null, null));
+            recipes.recipe(new FindAndReplace("b", "c", null, null, null, null, null, null));
         }
     }
 

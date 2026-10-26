@@ -27,6 +27,8 @@ import org.openrewrite.marker.Markers;
 import org.openrewrite.marketplace.RecipeBundleResolver;
 import org.openrewrite.marketplace.RecipeMarketplace;
 import org.openrewrite.python.*;
+import org.openrewrite.python.internal.DependencyManifest;
+import org.openrewrite.python.internal.InstalledEnvParser;
 import org.openrewrite.python.marker.PythonResolutionResult;
 import org.openrewrite.python.marker.PythonResolutionResult.ResolvedDependency;
 import org.openrewrite.python.tree.Py;
@@ -36,6 +38,7 @@ import org.openrewrite.rpc.RewriteRpcProcess;
 import org.openrewrite.rpc.RewriteRpcProcessManager;
 import org.openrewrite.rpc.RpcObjectData;
 import org.openrewrite.rpc.RpcReceiveQueue;
+import org.openrewrite.rpc.internal.EngineInstall;
 import org.openrewrite.rpc.request.GetObjectResponse;
 import org.openrewrite.rpc.request.ParseResponse;
 import org.openrewrite.toml.TomlParser;
@@ -238,9 +241,9 @@ public class PythonRewriteRpc extends RewriteRpc {
      * Discovers and parses all relevant source files.
      *
      * @param projectPath Path to the project directory to parse
-     * @param options     Optional parsing inputs — exclusions, relativeTo, and the caller-provisioned
-     *                    dependency environment; see {@link ParseProjectOptions}. This is the only
-     *                    overload that accepts a {@code dependencyPath}.
+     * @param options     Optional parsing inputs — exclusions, relativeTo, and the project's dependency
+     *                    environment, which is provisioned before the parse when none is given; see
+     *                    {@link ParseProjectOptions}. This is the only overload that accepts a {@code dependencyPath}.
      * @param ctx         Execution context for parsing
      * @return Stream of parsed source files
      */
@@ -249,6 +252,17 @@ public class PythonRewriteRpc extends RewriteRpc {
         // The server relativizes only against this, so without it source paths land on the LST absolute.
         Path relativeTo = options.getRelativeTo() == null ? projectPath : options.getRelativeTo();
         @Nullable Path dependencyPath = options.getDependencyPath();
+        if (dependencyPath == null && options.isProvisionDependencies()) {
+            // Before the parse request, so that ty reads the env the dependency markers resolve against
+            DependencyWorkspace.Result provisioned = DependencyWorkspace.provision(projectPath,
+                    DependencyWorkspace.Options.builder().environment(commandEnv).relativeTo(relativeTo).build());
+            if (provisioned.getFailure() != null) {
+                ctx.getOnError().accept(new IllegalStateException("The " + provisioned.getManifest() + " of " +
+                        projectPath + " got no dependency environment: " + provisioned.getFailure()));
+            }
+            dependencyPath = provisioned.getEnv();
+        }
+        @Nullable Path env = dependencyPath;
         ParsingEventListener parsingListener = ParsingExecutionContextView.view(ctx).getParsingListener();
 
         Stream<SourceFile> rpcStream = StreamSupport.stream(new Spliterator<SourceFile>() {
@@ -259,7 +273,8 @@ public class PythonRewriteRpc extends RewriteRpc {
             public boolean tryAdvance(Consumer<? super SourceFile> action) {
                 if (response == null) {
                     parsingListener.intermediateMessage("Starting project parsing: " + projectPath);
-                    response = send("ParseProject", new ParseProject(projectPath, exclusions, relativeTo, dependencyPath, parseOptions(ctx)), ParseProjectResponse.class);
+                    response = send("ParseProject", new ParseProject(projectPath, exclusions, relativeTo, env,
+                            parseOptions(ctx)), ParseProjectResponse.class);
                     // A setup.py-only project's resolution rides on setup.py, so it leads like any other manifest.
                     response.sort(Comparator.comparing((ParseProjectResponse.Item item) ->
                             !"setup.py".equals(Paths.get(item.getSourcePath()).getFileName().toString())));
@@ -320,14 +335,15 @@ public class PythonRewriteRpc extends RewriteRpc {
             }
         }, false);
 
-        // For setup.py-only projects (no pyproject.toml, no setup.cfg),
-        // attach the marker to the Py.CompilationUnit already in the RPC stream
-        boolean hasPyproject = Files.exists(projectPath.resolve("pyproject.toml"));
-        boolean hasSetupCfg = Files.exists(projectPath.resolve("setup.cfg"));
-        boolean hasSetupPy = Files.exists(projectPath.resolve("setup.py"));
-
-        if (!hasPyproject && !hasSetupCfg && hasSetupPy) {
-            PythonResolutionResult marker = createSetupPyMarker(projectPath, relativeTo, ctx);
+        // A setup.py without a setup.cfg beside it carries the marker on the Py.CompilationUnit
+        // already in the RPC stream
+        DependencyManifest manifest = DependencyManifest.choose(projectPath);
+        boolean setupPyAlone = Files.exists(projectPath.resolve("setup.py")) &&
+                               !Files.exists(projectPath.resolve("setup.cfg"));
+        if (env != null && setupPyAlone &&
+            (manifest == DependencyManifest.SetupPy || !Files.exists(projectPath.resolve("pyproject.toml")))) {
+            PythonResolutionResult marker = createSetupPyMarker(projectPath, relativeTo, env,
+                    manifest == DependencyManifest.SetupPy);
             if (marker != null) {
                 final PythonResolutionResult finalMarker = marker;
                 rpcStream = rpcStream.map(sf -> {
@@ -340,7 +356,7 @@ public class PythonRewriteRpc extends RewriteRpc {
             }
         }
 
-        Stream<SourceFile> manifestStream = parseManifest(projectPath, relativeTo, dependencyPath, ctx);
+        Stream<SourceFile> manifestStream = parseManifest(projectPath, relativeTo, manifest, env, ctx);
         // Manifests first, so a consumer can read the resolved dependencies before the sources.
         return Stream.concat(manifestStream, rpcStream);
     }
@@ -483,30 +499,23 @@ public class PythonRewriteRpc extends RewriteRpc {
         return input.startsWith(relativeTo) ? relativeTo.relativize(input) : input;
     }
 
-    private @Nullable PythonResolutionResult createSetupPyMarker(Path projectPath, @Nullable Path relativeTo, ExecutionContext ctx) {
+    /**
+     * The marker of a setup.py, whose roots are the requirements the env was installed from when it was
+     * installed from that setup.py.
+     */
+    private static @Nullable PythonResolutionResult createSetupPyMarker(Path projectPath, @Nullable Path relativeTo,
+                                                                        Path env, boolean installedFromSetupPy) {
         Path setupPyPath = projectPath.resolve("setup.py");
-        if (!Files.exists(setupPyPath)) {
-            return null;
-        }
-
-        String source;
-        try {
-            source = new String(Files.readAllBytes(setupPyPath), java.nio.charset.StandardCharsets.UTF_8);
-        } catch (IOException e) {
-            return null;
-        }
-
-        Path workspace = DependencyWorkspace.getOrCreateSetuptoolsWorkspace(source, projectPath, commandEnv);
-        if (workspace == null) {
-            return null;
-        }
-
-        List<ResolvedDependency> resolvedDeps = RequirementsTxtParser.parseFreezeOutput(workspace);
+        List<ResolvedDependency> resolvedDeps = InstalledEnvParser.parse(env);
         if (resolvedDeps.isEmpty()) {
             return null;
         }
 
-        List<PythonResolutionResult.Dependency> deps = RequirementsTxtParser.dependenciesFromResolved(resolvedDeps);
+        List<String> installed = installedFromSetupPy ? DependencyWorkspace.installedRequirements(env) : null;
+        List<PythonResolutionResult.Dependency> deps = installed == null ?
+                RequirementsTxtParser.dependenciesFromResolved(resolvedDeps) :
+                RequirementsTxtParser.declaredDependencies(resolvedDeps,
+                        RequirementsTxtParser.parseDeclaredPackageNames(String.join("\n", installed)));
 
         Path effectiveRelativeTo = relativeTo != null ? relativeTo : projectPath;
         String path = effectiveRelativeTo.relativize(setupPyPath).toString();
@@ -532,17 +541,23 @@ public class PythonRewriteRpc extends RewriteRpc {
         );
     }
 
+    /**
+     * The chosen manifest's files get markers that resolve against {@code env}. pyproject.toml is parsed
+     * whichever manifest the env is installed from, and so is a setup.cfg with no pyproject.toml or
+     * Pipfile beside it. Such a setup.cfg resolves against an env only when setuptools installed it.
+     */
     private Stream<SourceFile> parseManifest(Path projectPath, @Nullable Path relativeTo,
-                                             @Nullable Path dependencyPath, ExecutionContext ctx) {
+                                             @Nullable DependencyManifest manifest, @Nullable Path env,
+                                             ExecutionContext ctx) {
         Path effectiveRelativeTo = relativeTo != null ? relativeTo : projectPath;
-
-        // Priority: pyproject.toml > Pipfile > setup.cfg > requirements.txt
-        // Note: setup.py is NOT handled here — it's already in the RPC stream as Py.CompilationUnit
+        // setup.py is NOT handled here — it's already in the RPC stream as Py.CompilationUnit
+        Stream<SourceFile> result = Stream.empty();
 
         Path pyprojectPath = projectPath.resolve("pyproject.toml");
-        if (Files.exists(pyprojectPath)) {
+        boolean hasPyproject = Files.exists(pyprojectPath);
+        if (hasPyproject) {
             Parser.Input pyprojectInput = Parser.Input.fromFile(pyprojectPath);
-            Stream<SourceFile> result = new PyProjectTomlParser(commandEnv, dependencyPath).parseInputs(
+            result = new PyProjectTomlParser(env).parseInputs(
                     singletonList(pyprojectInput), effectiveRelativeTo, ctx);
 
             for (String lockFileName : Arrays.asList("uv.lock", "poetry.lock", "pdm.lock")) {
@@ -554,14 +569,13 @@ public class PythonRewriteRpc extends RewriteRpc {
                     result = Stream.concat(result, lockStream);
                 }
             }
-            return result;
         }
 
         Path pipfilePath = projectPath.resolve("Pipfile");
-        if (Files.exists(pipfilePath)) {
+        if (manifest == DependencyManifest.Pipfile) {
             Parser.Input pipfileInput = Parser.Input.fromFile(pipfilePath);
-            Stream<SourceFile> result = new PipfileParser().parseInputs(
-                    singletonList(pipfileInput), effectiveRelativeTo, ctx);
+            result = Stream.concat(result, new PipfileParser(env).parseInputs(
+                    singletonList(pipfileInput), effectiveRelativeTo, ctx));
 
             Path pipfileLockPath = projectPath.resolve("Pipfile.lock");
             if (Files.exists(pipfileLockPath)) {
@@ -570,31 +584,34 @@ public class PythonRewriteRpc extends RewriteRpc {
                         singletonList(pipfileLockInput), effectiveRelativeTo, ctx);
                 result = Stream.concat(result, pipfileLockStream);
             }
-            return result;
         }
 
         Path setupCfgPath = projectPath.resolve("setup.cfg");
-        if (Files.exists(setupCfgPath)) {
+        boolean installedFromSetuptools = manifest == DependencyManifest.SetupPy ||
+                                          manifest == DependencyManifest.SetupCfg;
+        if (Files.exists(setupCfgPath) && (installedFromSetuptools || !hasPyproject && !Files.exists(pipfilePath))) {
             Parser.Input input = Parser.Input.fromFile(setupCfgPath);
-            return new SetupCfgParser(commandEnv).parseInputs(
-                    singletonList(input), effectiveRelativeTo, ctx);
+            result = Stream.concat(result, new SetupCfgParser(installedFromSetuptools ? env : null).parseInputs(
+                    singletonList(input), effectiveRelativeTo, ctx));
         }
 
-        RequirementsTxtParser reqsParser = new RequirementsTxtParser(commandEnv);
-        try (Stream<Path> entries = Files.list(projectPath)) {
-            List<Parser.Input> reqInputs = new ArrayList<>();
-            entries.filter(p -> reqsParser.accept(p.getFileName()))
-                    .sorted()
-                    .map(Parser.Input::fromFile)
-                    .forEach(reqInputs::add);
-            if (!reqInputs.isEmpty()) {
-                return reqsParser.parseInputs(reqInputs, effectiveRelativeTo, ctx);
+        if (manifest == DependencyManifest.RequirementsFiles) {
+            RequirementsTxtParser reqsParser = new RequirementsTxtParser(env);
+            try (Stream<Path> entries = Files.list(projectPath)) {
+                List<Parser.Input> reqInputs = new ArrayList<>();
+                entries.filter(p -> reqsParser.accept(p.getFileName()))
+                        .sorted()
+                        .map(Parser.Input::fromFile)
+                        .forEach(reqInputs::add);
+                if (!reqInputs.isEmpty()) {
+                    result = Stream.concat(result, reqsParser.parseInputs(reqInputs, effectiveRelativeTo, ctx));
+                }
+            } catch (IOException e) {
+                // Silently skip manifest parsing if we can't list the directory
             }
-        } catch (IOException e) {
-            // Silently skip manifest parsing if we can't list the directory
         }
 
-        return Stream.empty();
+        return result;
     }
 
     public static Builder builder() {
@@ -749,6 +766,8 @@ public class PythonRewriteRpc extends RewriteRpc {
          * {@code <pipPackagesPath>/8.74.1/}) is resolved and the openrewrite package is
          * automatically installed there via pip. Dev builds ({@code .dev0}) are not
          * installed this way and require the interpreter to already have the package.
+         * Processes may share the directory, as parallel test forks do: each version is
+         * installed into it once, however many of them start an RPC at the same time.
          *
          * @param pipPackagesPath The base directory under which version-specific pip packages are installed
          * @return This builder
@@ -849,13 +868,12 @@ public class PythonRewriteRpc extends RewriteRpc {
             } else if (!isDevBuild) {
                 // Known version (release or published pre-release) — try to find or
                 // install the pinned version, falling back to any available install.
-                if (pipPackagesPath != null && isVersionInstalled(pipPackagesPath.resolve(version), version)) {
+                if (pipPackagesPath != null && EngineInstall.isInstalled(pipPackagesPath.resolve(version), version)) {
                     resolvedPipPackagesPath = pipPackagesPath.resolve(version);
                 } else if (hasRewriteVersion(pythonPath, version)) {
                     // Interpreter already has the right version; nothing to do
                 } else if (pipPackagesPath != null) {
-                    resolvedPipPackagesPath = pipPackagesPath.resolve(version);
-                    bootstrapOpenrewrite(pythonPath, resolvedPipPackagesPath, version);
+                    resolvedPipPackagesPath = installEngine(pythonPath, pipPackagesPath, version);
                 } else if (canImportRewrite(pythonPath)) {
                     // Interpreter has a different version, but no pipPackagesPath to
                     // install the right one — proceed with what's available (e.g., CI
@@ -1012,23 +1030,6 @@ public class PythonRewriteRpc extends RewriteRpc {
         }
 
         /**
-         * Checks whether the version-specific pip packages directory already has the
-         * correct version installed, based on a marker file.
-         */
-        private static boolean isVersionInstalled(Path pipPackagesPath, String version) {
-            if (!Files.exists(pipPackagesPath.resolve("rewrite"))) {
-                return false;
-            }
-            Path versionMarker = pipPackagesPath.resolve(".openrewrite-version");
-            try {
-                return Files.exists(versionMarker) &&
-                        version.equals(new String(Files.readAllBytes(versionMarker), StandardCharsets.UTF_8).trim());
-            } catch (IOException e) {
-                return false;
-            }
-        }
-
-        /**
          * Whether Pyroscope profiling has been requested for the RPC subprocess, via
          * either the configured builder environment or the inherited process environment.
          * Drives whether the heavier, registry-only {@code [profiling]} extra is installed
@@ -1044,12 +1045,24 @@ public class PythonRewriteRpc extends RewriteRpc {
         }
 
         /**
-         * Installs the pinned openrewrite package into the given pip packages directory.
+         * Installs the pinned openrewrite package into {@code <pipPackagesPath>/<version>} unless it is installed there
+         * already, and returns that directory. Every test fork of a build starts its own RPC, so several processes ask
+         * for a version at once the first time a build needs it, and {@code pip install --target} is not safe to run
+         * into one directory from several of them: one fails with "Directory not empty". {@link EngineInstall} installs
+         * the version once, into a private directory moved into place when pip has finished, while the others wait and
+         * then use it; and a directory that a crashed or raced install left without its completion marker is installed
+         * again rather than used.
          */
-        private void bootstrapOpenrewrite(Path pythonPath, Path pipPackagesPath, String version) {
-            try {
-                Files.createDirectories(pipPackagesPath);
+        Path installEngine(Path pythonPath, Path pipPackagesPath, String version) {
+            return EngineInstall.ensureInstalled(pipPackagesPath.resolve(version), version,
+                    directory -> pipInstall(pythonPath, directory, version));
+        }
 
+        /**
+         * Installs the pinned openrewrite package into {@code target} with pip.
+         */
+        private void pipInstall(Path pythonPath, Path target, String version) {
+            try {
                 // Install the lean engine by default. The [profiling] extra pulls in
                 // pyroscope-io and its transitive (often native) dependencies, which most
                 // deployments never use; request it only when PYROSCOPE_SERVER_ADDRESS is
@@ -1063,7 +1076,7 @@ public class PythonRewriteRpc extends RewriteRpc {
                         pythonPath.toString(),
                         "-m", "pip", "install",
                         "--upgrade",
-                        "--target=" + pipPackagesPath.toAbsolutePath().normalize(),
+                        "--target=" + target.toAbsolutePath().normalize(),
                         packageSpec
                 );
                 pb.environment().putAll(environment);
@@ -1098,8 +1111,6 @@ public class PythonRewriteRpc extends RewriteRpc {
                     }
                     throw new RuntimeException(message);
                 }
-
-                Files.write(pipPackagesPath.resolve(".openrewrite-version"), version.getBytes(StandardCharsets.UTF_8));
             } catch (IOException e) {
                 throw new UncheckedIOException("Failed to bootstrap openrewrite package", e);
             } catch (InterruptedException e) {
