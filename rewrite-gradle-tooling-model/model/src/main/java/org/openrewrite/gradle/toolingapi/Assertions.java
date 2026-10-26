@@ -131,7 +131,8 @@ public class Assertions {
                                  ((gradleWrapper.getDistributionChecksum() == null) ? "" : "distributionSha256Sum=" + gradleWrapper.getDistributionChecksum().getHexValue() + "\n") +
                                  "zipStoreBase=GRADLE_USER_HOME\n" +
                                  "zipStorePath=wrapper/dists").getBytes(StandardCharsets.UTF_8), StandardOpenOption.CREATE_NEW);
-                        Files.write(projectDir.resolve(GradleWrapper.WRAPPER_JAR_LOCATION), gradleWrapper.wrapperJar().printAllAsBytes(), StandardOpenOption.CREATE_NEW);
+                        // No gradle-wrapper.jar: the tooling API reads only the properties, and the jar would have to be
+                        // extracted from a download of most of the distribution
                         Path gradleSh = projectDir.resolve(GradleWrapper.WRAPPER_SCRIPT_LOCATION);
                         Files.copy(gradleWrapper.gradlew().getInputStream(), gradleSh);
                         OperatingSystemProvenance current = OperatingSystemProvenance.current();
