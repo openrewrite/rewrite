@@ -254,6 +254,21 @@ class ScalaParserTest {
     }
 
     @Test
+    void clonesOfABuilderDoNotShareTypes() {
+        // given
+        ScalaParser.Builder builder = ScalaParser.builder();
+        builder.clone().build().parse("class Box\n").collect(Collectors.toList());
+
+        // when
+        S.CompilationUnit cu = (S.CompilationUnit) builder.clone().build()
+          .parse("class Box extends java.util.ArrayList[String]\n").collect(Collectors.toList()).get(0);
+
+        // then
+        J.ClassDeclaration box = (J.ClassDeclaration) cu.getStatements().get(0);
+        assertThat(box.getType().getSupertype().getFullyQualifiedName()).isEqualTo("java.util.ArrayList");
+    }
+
+    @Test
     void doesNotLeakTempDirectories() throws Exception {
         // given
         Path tmpRoot = Paths.get(System.getProperty("java.io.tmpdir"));

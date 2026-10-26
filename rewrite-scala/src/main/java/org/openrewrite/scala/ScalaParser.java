@@ -323,7 +323,9 @@ public class ScalaParser implements Parser {
 
         @Override
         public Builder clone() {
-            return new Builder(this);
+            Builder clone = new Builder(this);
+            clone.typeCache = typeCache.clone();
+            return clone;
         }
     }
 }
