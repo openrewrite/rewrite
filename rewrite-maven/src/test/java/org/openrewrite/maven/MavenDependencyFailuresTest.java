@@ -37,6 +37,7 @@ import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.atomic.AtomicBoolean;
 
+import static java.util.Objects.requireNonNull;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.maven.Assertions.pomXml;
 import static org.openrewrite.test.RewriteTest.toRecipe;
@@ -148,11 +149,10 @@ class MavenDependencyFailuresTest implements RewriteTest {
           MavenExecutionContextView.view(new InMemoryExecutionContext())
             .setLocalRepository(mavenLocal)
             .setPomCache(new InMemoryMavenPomCache()));
-        // Maven Central, or the mirror that stands in for it
-        String central = recipeCtx.getMirrors().stream()
-          .filter(mirror -> mirror.matches(MavenRepository.MAVEN_CENTRAL))
-          .map(mirror -> MavenPomDownloader.normalizedRepositoryUri(mirror.getUrl()))
-          .findFirst().orElse(MavenRepository.MAVEN_CENTRAL.getUri());
+        // Maven Central, or the mirror that stands in for it, as the downloader names it: at https unless only http
+        // answers, as for a mirror on the build's own loopback address
+        MavenRepository central = requireNonNull(new MavenPomDownloader(recipeCtx)
+          .normalizeRepository(MavenRepository.MAVEN_CENTRAL, recipeCtx, null));
 
         rewriteRun(
           spec -> spec
@@ -192,7 +192,7 @@ class MavenDependencyFailuresTest implements RewriteTest {
                   </dependency>
                 </dependencies>
               </project>
-              """.formatted(central),
+              """.formatted(central.getUri()),
             spec -> spec.beforeRecipe(maven ->
                 // make the local pom bad before running the recipe
                 Files.writeString(localPom,
