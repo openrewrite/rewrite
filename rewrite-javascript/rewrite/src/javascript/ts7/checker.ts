@@ -21,6 +21,7 @@ import {
     isQualifiedName,
     isStringLiteral,
     isTypeNode,
+    isTypeReferenceNode,
     type Node,
     type SourceFile,
     type TypeNode,
@@ -38,7 +39,25 @@ import type {Checker, Signature, Symbol as Symbol7, Type} from "typescript/sync"
  */
 export function typeAtLocation(checker: Checker, node: Node): Type | undefined {
     const typeNode = enclosingTypeNode(node);
-    return typeNode ? checker.getTypeFromTypeNode(typeNode) : checker.getTypeAtLocation(node);
+    if (!typeNode) {
+        return checker.getTypeAtLocation(node);
+    }
+    // The name a reference resolves to stands for the type it declares, `Box` in `Box<string>` for the
+    // generic `Box<T>`, as TypeScript 6 attributes it. The reference itself carries the instantiation.
+    if (isTypeReferenceNode(typeNode) && namesReferencedType(node, typeNode.typeName)) {
+        const symbol = checker.getSymbolAtLocation(node);
+        const declared = symbol && checker.getDeclaredTypeOfSymbol(symbol);
+        if (declared) {
+            return declared;
+        }
+    }
+    return checker.getTypeFromTypeNode(typeNode);
+}
+
+/** Whether `node` is `typeName` or, where that is qualified, the name it ends in. */
+function namesReferencedType(node: Node, typeName: Node): boolean {
+    const named = isQualifiedName(typeName) ? [typeName, typeName.right] : [typeName];
+    return named.some(n => n.pos === node.pos && n.end === node.end);
 }
 
 function enclosingTypeNode(node: Node): TypeNode | undefined {
