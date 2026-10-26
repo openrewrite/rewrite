@@ -2776,7 +2776,11 @@ export class JavaScriptParserVisitor {
         return this.visit(expression);
     }
 
-    visitAsExpression(node: ts.AsExpression): JS.As {
+    visitAsExpression(node: ts.AsExpression): JS.As | Expression {
+        // A JSDoc cast, `/** @type {T} */ (x)`, reaches the tree as an assertion with a reparsed type.
+        if (ts.isReparsed(node.type)) {
+            return this.visit(node.expression);
+        }
         return {
             kind: JS.Kind.As,
             id: randomId(),
@@ -2815,7 +2819,10 @@ export class JavaScriptParserVisitor {
         return this.visitUnknown(node);
     }
 
-    visitSatisfiesExpression(node: ts.SatisfiesExpression): JS.SatisfiesExpression {
+    visitSatisfiesExpression(node: ts.SatisfiesExpression): JS.SatisfiesExpression | Expression {
+        if (ts.isReparsed(node.type)) {
+            return this.visit(node.expression);
+        }
         return {
             kind: JS.Kind.SatisfiesExpression,
             id: randomId(),
@@ -3975,6 +3982,7 @@ export class JavaScriptParserVisitor {
     }
 
     visitJsxAttribute(node: ts.JsxAttribute): JSX.Attribute {
+        const equals = node.initializer && this.findChildNode(node, ts.SyntaxKind.EqualsToken)!;
         return {
             kind: JS.Kind.JsxAttribute,
             id: randomId(),
@@ -3982,12 +3990,21 @@ export class JavaScriptParserVisitor {
             markers: emptyMarkers,
             key: this.visit(node.name),
             value: node.initializer
-                ? this.leftPadded(
-                    this.prefix(this.findChildNode(node, ts.SyntaxKind.EqualsToken)!),
-                    this.visit(node.initializer)
-                )
+                ? this.leftPadded(this.prefix(equals!), this.mapJsxAttributeValue(node.initializer, equals!))
                 : undefined
         };
+    }
+
+    /**
+     * TypeScript 7 starts a `{...}` or element value at its first token, so the whitespace after the
+     * `=` belongs to no node. The value's prefix starts with it.
+     */
+    private mapJsxAttributeValue(initializer: ts.JsxAttributeValue, equals: ts.Node): J {
+        const value = this.visit(initializer) as J;
+        const gap = this.sourceFile.text.slice(equals.end, initializer.getFullStart());
+        return gap === "" ? value : produce(value, draft => {
+            draft.prefix.whitespace = gap + draft.prefix.whitespace;
+        });
     }
 
     visitJsxSpreadAttribute(node: ts.JsxSpreadAttribute): JSX.SpreadAttribute {

@@ -62,3 +62,13 @@ test("a parameter JSDoc marks optional prints as written", () =>
             }
         `)
     }));
+
+test("a JSDoc type cast prints as written", () =>
+    new RecipeSpec().rewriteRun({
+        //language=javascript
+        ...javascript(`
+            var x = 1;
+            var s = /** @type {string} */ (x);
+            var t = /** @satisfies {number} */ (x);
+        `)
+    }));
