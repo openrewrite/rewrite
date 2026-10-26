@@ -96,7 +96,7 @@ class CSharpPrinterParityTest {
     @BeforeAll
     static void setUpFactory() {
         CSharpRewriteRpc.setFactory(CSharpRewriteRpc.builder()
-          .csharpServerEntry(csharpDir().resolve("OpenRewrite.Tool/OpenRewrite.Tool.csproj"))
+          .csharpServerEntry(CSharpServer.entry())
           .log(Paths.get(System.getProperty("java.io.tmpdir"), "csharp-printer-parity.log")));
     }
 
