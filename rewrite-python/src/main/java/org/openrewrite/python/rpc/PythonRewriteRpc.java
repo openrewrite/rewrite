@@ -38,6 +38,7 @@ import org.openrewrite.rpc.RewriteRpcProcess;
 import org.openrewrite.rpc.RewriteRpcProcessManager;
 import org.openrewrite.rpc.RpcObjectData;
 import org.openrewrite.rpc.RpcReceiveQueue;
+import org.openrewrite.rpc.internal.EngineInstall;
 import org.openrewrite.rpc.request.GetObjectResponse;
 import org.openrewrite.rpc.request.ParseResponse;
 import org.openrewrite.toml.TomlParser;
@@ -765,6 +766,8 @@ public class PythonRewriteRpc extends RewriteRpc {
          * {@code <pipPackagesPath>/8.74.1/}) is resolved and the openrewrite package is
          * automatically installed there via pip. Dev builds ({@code .dev0}) are not
          * installed this way and require the interpreter to already have the package.
+         * Processes may share the directory, as parallel test forks do: each version is
+         * installed into it once, however many of them start an RPC at the same time.
          *
          * @param pipPackagesPath The base directory under which version-specific pip packages are installed
          * @return This builder
@@ -865,13 +868,12 @@ public class PythonRewriteRpc extends RewriteRpc {
             } else if (!isDevBuild) {
                 // Known version (release or published pre-release) — try to find or
                 // install the pinned version, falling back to any available install.
-                if (pipPackagesPath != null && isVersionInstalled(pipPackagesPath.resolve(version), version)) {
+                if (pipPackagesPath != null && EngineInstall.isInstalled(pipPackagesPath.resolve(version), version)) {
                     resolvedPipPackagesPath = pipPackagesPath.resolve(version);
                 } else if (hasRewriteVersion(pythonPath, version)) {
                     // Interpreter already has the right version; nothing to do
                 } else if (pipPackagesPath != null) {
-                    resolvedPipPackagesPath = pipPackagesPath.resolve(version);
-                    bootstrapOpenrewrite(pythonPath, resolvedPipPackagesPath, version);
+                    resolvedPipPackagesPath = installEngine(pythonPath, pipPackagesPath, version);
                 } else if (canImportRewrite(pythonPath)) {
                     // Interpreter has a different version, but no pipPackagesPath to
                     // install the right one — proceed with what's available (e.g., CI
@@ -1028,23 +1030,6 @@ public class PythonRewriteRpc extends RewriteRpc {
         }
 
         /**
-         * Checks whether the version-specific pip packages directory already has the
-         * correct version installed, based on a marker file.
-         */
-        private static boolean isVersionInstalled(Path pipPackagesPath, String version) {
-            if (!Files.exists(pipPackagesPath.resolve("rewrite"))) {
-                return false;
-            }
-            Path versionMarker = pipPackagesPath.resolve(".openrewrite-version");
-            try {
-                return Files.exists(versionMarker) &&
-                        version.equals(new String(Files.readAllBytes(versionMarker), StandardCharsets.UTF_8).trim());
-            } catch (IOException e) {
-                return false;
-            }
-        }
-
-        /**
          * Whether Pyroscope profiling has been requested for the RPC subprocess, via
          * either the configured builder environment or the inherited process environment.
          * Drives whether the heavier, registry-only {@code [profiling]} extra is installed
@@ -1060,12 +1045,24 @@ public class PythonRewriteRpc extends RewriteRpc {
         }
 
         /**
-         * Installs the pinned openrewrite package into the given pip packages directory.
+         * Installs the pinned openrewrite package into {@code <pipPackagesPath>/<version>} unless it is installed there
+         * already, and returns that directory. Every test fork of a build starts its own RPC, so several processes ask
+         * for a version at once the first time a build needs it, and {@code pip install --target} is not safe to run
+         * into one directory from several of them: one fails with "Directory not empty". {@link EngineInstall} installs
+         * the version once, into a private directory moved into place when pip has finished, while the others wait and
+         * then use it; and a directory that a crashed or raced install left without its completion marker is installed
+         * again rather than used.
          */
-        private void bootstrapOpenrewrite(Path pythonPath, Path pipPackagesPath, String version) {
-            try {
-                Files.createDirectories(pipPackagesPath);
+        Path installEngine(Path pythonPath, Path pipPackagesPath, String version) {
+            return EngineInstall.ensureInstalled(pipPackagesPath.resolve(version), version,
+                    directory -> pipInstall(pythonPath, directory, version));
+        }
 
+        /**
+         * Installs the pinned openrewrite package into {@code target} with pip.
+         */
+        private void pipInstall(Path pythonPath, Path target, String version) {
+            try {
                 // Install the lean engine by default. The [profiling] extra pulls in
                 // pyroscope-io and its transitive (often native) dependencies, which most
                 // deployments never use; request it only when PYROSCOPE_SERVER_ADDRESS is
@@ -1079,7 +1076,7 @@ public class PythonRewriteRpc extends RewriteRpc {
                         pythonPath.toString(),
                         "-m", "pip", "install",
                         "--upgrade",
-                        "--target=" + pipPackagesPath.toAbsolutePath().normalize(),
+                        "--target=" + target.toAbsolutePath().normalize(),
                         packageSpec
                 );
                 pb.environment().putAll(environment);
@@ -1114,8 +1111,6 @@ public class PythonRewriteRpc extends RewriteRpc {
                     }
                     throw new RuntimeException(message);
                 }
-
-                Files.write(pipPackagesPath.resolve(".openrewrite-version"), version.getBytes(StandardCharsets.UTF_8));
             } catch (IOException e) {
                 throw new UncheckedIOException("Failed to bootstrap openrewrite package", e);
             } catch (InterruptedException e) {
