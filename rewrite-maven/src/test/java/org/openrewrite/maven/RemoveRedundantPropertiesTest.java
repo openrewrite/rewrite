@@ -15,11 +15,21 @@
  */
 package org.openrewrite.maven;
 
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 import org.openrewrite.DocumentExample;
+import org.openrewrite.InMemoryExecutionContext;
 import org.openrewrite.marker.BuildTool;
+import org.openrewrite.maven.RemoveRedundantProperties.Comparator;
+import org.openrewrite.maven.tree.MavenRepository;
 import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
+
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
 
 import static org.openrewrite.Tree.randomId;
 import static org.openrewrite.java.Assertions.mavenProject;
@@ -188,7 +198,18 @@ class RemoveRedundantPropertiesTest implements RewriteTest {
     @Test
     void onlyRemoveIfValuesMatchEnabled() {
         rewriteRun(
-          spec -> spec.recipe(new RemoveRedundantProperties(null, true)),
+          spec -> spec.recipeFromYaml(
+            """
+              type: specs.openrewrite.org/v1beta/recipe
+              name: test.RemoveRedundantPropertiesIfValuesMatch
+              displayName: Remove redundant properties if values match
+              description: Uses the deprecated `onlyIfValuesMatch` option.
+              recipeList:
+                - org.openrewrite.maven.RemoveRedundantProperties:
+                    onlyIfValuesMatch: true
+              """,
+            "test.RemoveRedundantPropertiesIfValuesMatch"
+          ),
           mavenProject("parent",
             pomXml(
               """
@@ -430,7 +451,7 @@ class RemoveRedundantPropertiesTest implements RewriteTest {
     @Test
     void removePropertyWithExpressionValue() {
         rewriteRun(
-          spec -> spec.recipe(new RemoveRedundantProperties(null, true)),
+          spec -> spec.recipe(new RemoveRedundantProperties(null, Comparator.EQ)),
           mavenProject("parent",
             pomXml(
               """
@@ -731,7 +752,7 @@ class RemoveRedundantPropertiesTest implements RewriteTest {
     @Test
     void removeSuperPomDefaults() {
         rewriteRun(
-          spec -> spec.recipe(new RemoveRedundantProperties(null, true))
+          spec -> spec.recipe(new RemoveRedundantProperties(null, Comparator.EQ))
             .allSources(source -> source.markers(new BuildTool(randomId(), BuildTool.Type.Maven, "3.10.0"))),
           pomXml(
             """
@@ -764,7 +785,7 @@ class RemoveRedundantPropertiesTest implements RewriteTest {
     @Test
     void keepValuesThatDifferFromSuperPomDefaults() {
         rewriteRun(
-          spec -> spec.recipe(new RemoveRedundantProperties(null, true))
+          spec -> spec.recipe(new RemoveRedundantProperties(null, Comparator.EQ))
             .allSources(source -> source.markers(new BuildTool(randomId(), BuildTool.Type.Maven, "3.10.0"))),
           pomXml(
             """
@@ -786,7 +807,7 @@ class RemoveRedundantPropertiesTest implements RewriteTest {
     @Test
     void keepSuperPomDefaultsBeforeMaven3_10() {
         rewriteRun(
-          spec -> spec.recipe(new RemoveRedundantProperties(null, true))
+          spec -> spec.recipe(new RemoveRedundantProperties(null, Comparator.EQ))
             .allSources(source -> source.markers(new BuildTool(randomId(), BuildTool.Type.Maven, "3.9.11"))),
           pomXml(
             """
@@ -807,7 +828,7 @@ class RemoveRedundantPropertiesTest implements RewriteTest {
     @Test
     void keepSuperPomDefaultsWithoutBuildToolMarker() {
         rewriteRun(
-          spec -> spec.recipe(new RemoveRedundantProperties(null, true)),
+          spec -> spec.recipe(new RemoveRedundantProperties(null, Comparator.EQ)),
           pomXml(
             """
               <project>
@@ -826,7 +847,7 @@ class RemoveRedundantPropertiesTest implements RewriteTest {
     @Test
     void keepSuperPomDefaultThatOverridesParent() {
         rewriteRun(
-          spec -> spec.recipe(new RemoveRedundantProperties(null, true))
+          spec -> spec.recipe(new RemoveRedundantProperties(null, Comparator.EQ))
             .allSources(source -> source.markers(new BuildTool(randomId(), BuildTool.Type.Maven, "3.10.0"))),
           mavenProject("parent",
             pomXml(
@@ -864,5 +885,601 @@ class RemoveRedundantPropertiesTest implements RewriteTest {
             )
           )
         );
+    }
+
+    @Test
+    void removeOnlyPinsOlderThanParent() {
+        rewriteRun(
+          spec -> spec.recipe(new RemoveRedundantProperties("*.version", Comparator.GTE)),
+          pomXml(
+            """
+              <project>
+                <parent>
+                  <groupId>org.springframework.boot</groupId>
+                  <artifactId>spring-boot-starter-parent</artifactId>
+                  <version>3.5.4</version>
+                  <relativePath/>
+                </parent>
+                <artifactId>child</artifactId>
+                <properties>
+                  <java.version>21</java.version>
+                  <hibernate.version>5.2.10.Final</hibernate.version>
+                  <assertj.version>3.24.2</assertj.version>
+                  <h2.version>2.3.232</h2.version>
+                  <lombok.version>1.18.40</lombok.version>
+                  <jtds.version>${my-lib.version}</jtds.version>
+                  <my-lib.version>1.0</my-lib.version>
+                </properties>
+              </project>
+              """,
+            """
+              <project>
+                <parent>
+                  <groupId>org.springframework.boot</groupId>
+                  <artifactId>spring-boot-starter-parent</artifactId>
+                  <version>3.5.4</version>
+                  <relativePath/>
+                </parent>
+                <artifactId>child</artifactId>
+                <properties>
+                  <java.version>21</java.version>
+                  <lombok.version>1.18.40</lombok.version>
+                  <jtds.version>${my-lib.version}</jtds.version>
+                  <my-lib.version>1.0</my-lib.version>
+                </properties>
+              </project>
+              """
+          )
+        );
+    }
+
+    @Test
+    void removeOnlyPinsNewerThanParent() {
+        rewriteRun(
+          spec -> spec.recipe(new RemoveRedundantProperties(null, Comparator.LT)),
+          mavenProject("parent",
+            pomXml(
+              """
+                <project>
+                  <groupId>com.example</groupId>
+                  <artifactId>parent</artifactId>
+                  <version>1.0.0</version>
+                  <packaging>pom</packaging>
+                  <properties>
+                    <junit.version>5.9.1</junit.version>
+                    <spring.version>6.0.0</spring.version>
+                    <slf4j.version>2.0.7</slf4j.version>
+                  </properties>
+                  <modules>
+                    <module>child</module>
+                  </modules>
+                </project>
+                """
+            ),
+            mavenProject("child",
+              pomXml(
+                """
+                  <project>
+                    <parent>
+                      <groupId>com.example</groupId>
+                      <artifactId>parent</artifactId>
+                      <version>1.0.0</version>
+                    </parent>
+                    <artifactId>child</artifactId>
+                    <properties>
+                      <junit.version>5.10.0</junit.version>
+                      <spring.version>6.0.0</spring.version>
+                      <slf4j.version>1.7.36</slf4j.version>
+                    </properties>
+                  </project>
+                  """,
+                """
+                  <project>
+                    <parent>
+                      <groupId>com.example</groupId>
+                      <artifactId>parent</artifactId>
+                      <version>1.0.0</version>
+                    </parent>
+                    <artifactId>child</artifactId>
+                    <properties>
+                      <spring.version>6.0.0</spring.version>
+                      <slf4j.version>1.7.36</slf4j.version>
+                    </properties>
+                  </project>
+                  """
+              )
+            )
+          )
+        );
+    }
+
+    @Test
+    void removeEqualVersionsSpelledDifferently() {
+        rewriteRun(
+          spec -> spec.recipe(new RemoveRedundantProperties(null, Comparator.EQ)),
+          mavenProject("parent",
+            pomXml(
+              """
+                <project>
+                  <groupId>com.example</groupId>
+                  <artifactId>parent</artifactId>
+                  <version>1.0.0</version>
+                  <packaging>pom</packaging>
+                  <properties>
+                    <junit.version>5.9</junit.version>
+                    <spring.version>5.3.0</spring.version>
+                    <slf4j.version>2.0.7</slf4j.version>
+                  </properties>
+                  <modules>
+                    <module>child</module>
+                  </modules>
+                </project>
+                """
+            ),
+            mavenProject("child",
+              pomXml(
+                """
+                  <project>
+                    <parent>
+                      <groupId>com.example</groupId>
+                      <artifactId>parent</artifactId>
+                      <version>1.0.0</version>
+                    </parent>
+                    <artifactId>child</artifactId>
+                    <properties>
+                      <junit.version>5.9.0</junit.version>
+                      <spring.version>5.3.0.RELEASE</spring.version>
+                      <slf4j.version>2.0.8</slf4j.version>
+                    </properties>
+                  </project>
+                  """,
+                """
+                  <project>
+                    <parent>
+                      <groupId>com.example</groupId>
+                      <artifactId>parent</artifactId>
+                      <version>1.0.0</version>
+                    </parent>
+                    <artifactId>child</artifactId>
+                    <properties>
+                      <slf4j.version>2.0.8</slf4j.version>
+                    </properties>
+                  </project>
+                  """
+              )
+            )
+          )
+        );
+    }
+
+    @Test
+    void onlyCompareVersionValuesByOrder() {
+        rewriteRun(
+          spec -> spec.recipe(new RemoveRedundantProperties(null, Comparator.GTE)),
+          mavenProject("parent",
+            pomXml(
+              """
+                <project>
+                  <groupId>com.example</groupId>
+                  <artifactId>parent</artifactId>
+                  <version>1.0.0</version>
+                  <packaging>pom</packaging>
+                  <properties>
+                    <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+                    <project.build.outputTimestamp>2026-01-01T00:00:00Z</project.build.outputTimestamp>
+                    <maven.compiler.release>17</maven.compiler.release>
+                  </properties>
+                  <modules>
+                    <module>child</module>
+                  </modules>
+                </project>
+                """
+            ),
+            mavenProject("child",
+              pomXml(
+                """
+                  <project>
+                    <parent>
+                      <groupId>com.example</groupId>
+                      <artifactId>parent</artifactId>
+                      <version>1.0.0</version>
+                    </parent>
+                    <artifactId>child</artifactId>
+                    <properties>
+                      <project.build.sourceEncoding>ISO-8859-1</project.build.sourceEncoding>
+                      <project.build.outputTimestamp>2025-01-01T00:00:00Z</project.build.outputTimestamp>
+                      <maven.compiler.release>11</maven.compiler.release>
+                    </properties>
+                  </project>
+                  """,
+                """
+                  <project>
+                    <parent>
+                      <groupId>com.example</groupId>
+                      <artifactId>parent</artifactId>
+                      <version>1.0.0</version>
+                    </parent>
+                    <artifactId>child</artifactId>
+                    <properties>
+                      <project.build.sourceEncoding>ISO-8859-1</project.build.sourceEncoding>
+                      <project.build.outputTimestamp>2025-01-01T00:00:00Z</project.build.outputTimestamp>
+                    </properties>
+                  </project>
+                  """
+              )
+            )
+          )
+        );
+    }
+
+    @Test
+    void staleRootPinDoesNotShieldStaleModulePin() {
+        rewriteRun(
+          spec -> spec.recipe(new RemoveRedundantProperties("*.version", Comparator.GTE)),
+          mavenProject("parent",
+            pomXml(
+              """
+                <project>
+                  <parent>
+                    <groupId>org.springframework.boot</groupId>
+                    <artifactId>spring-boot-starter-parent</artifactId>
+                    <version>3.5.4</version>
+                    <relativePath/>
+                  </parent>
+                  <groupId>com.example</groupId>
+                  <artifactId>parent</artifactId>
+                  <version>1.0.0</version>
+                  <packaging>pom</packaging>
+                  <properties>
+                    <h2.version>1.4.196</h2.version>
+                    <derby.version>10.14.2.0</derby.version>
+                  </properties>
+                  <modules>
+                    <module>child</module>
+                  </modules>
+                </project>
+                """,
+              """
+                <project>
+                  <parent>
+                    <groupId>org.springframework.boot</groupId>
+                    <artifactId>spring-boot-starter-parent</artifactId>
+                    <version>3.5.4</version>
+                    <relativePath/>
+                  </parent>
+                  <groupId>com.example</groupId>
+                  <artifactId>parent</artifactId>
+                  <version>1.0.0</version>
+                  <packaging>pom</packaging>
+                  <modules>
+                    <module>child</module>
+                  </modules>
+                </project>
+                """
+            ),
+            mavenProject("child",
+              pomXml(
+                """
+                  <project>
+                    <parent>
+                      <groupId>com.example</groupId>
+                      <artifactId>parent</artifactId>
+                      <version>1.0.0</version>
+                    </parent>
+                    <artifactId>child</artifactId>
+                    <properties>
+                      <h2.version>1.4.200</h2.version>
+                      <derby.version>10.17.1.0</derby.version>
+                    </properties>
+                  </project>
+                  """,
+                """
+                  <project>
+                    <parent>
+                      <groupId>com.example</groupId>
+                      <artifactId>parent</artifactId>
+                      <version>1.0.0</version>
+                    </parent>
+                    <artifactId>child</artifactId>
+                    <properties>
+                      <derby.version>10.17.1.0</derby.version>
+                    </properties>
+                  </project>
+                  """
+              )
+            )
+          )
+        );
+    }
+
+    @Test
+    void compareModulePinWithNewerRootPin() {
+        rewriteRun(
+          spec -> spec.recipe(new RemoveRedundantProperties("*.version", Comparator.GTE)),
+          mavenProject("parent",
+            pomXml(
+              """
+                <project>
+                  <parent>
+                    <groupId>org.springframework.boot</groupId>
+                    <artifactId>spring-boot-starter-parent</artifactId>
+                    <version>3.5.4</version>
+                    <relativePath/>
+                  </parent>
+                  <groupId>com.example</groupId>
+                  <artifactId>parent</artifactId>
+                  <version>1.0.0</version>
+                  <packaging>pom</packaging>
+                  <properties>
+                    <h2.version>2.4.240</h2.version>
+                  </properties>
+                  <modules>
+                    <module>child</module>
+                  </modules>
+                </project>
+                """
+            ),
+            mavenProject("child",
+              pomXml(
+                """
+                  <project>
+                    <parent>
+                      <groupId>com.example</groupId>
+                      <artifactId>parent</artifactId>
+                      <version>1.0.0</version>
+                    </parent>
+                    <artifactId>child</artifactId>
+                    <properties>
+                      <h2.version>2.3.232</h2.version>
+                    </properties>
+                  </project>
+                  """,
+                """
+                  <project>
+                    <parent>
+                      <groupId>com.example</groupId>
+                      <artifactId>parent</artifactId>
+                      <version>1.0.0</version>
+                    </parent>
+                    <artifactId>child</artifactId>
+                  </project>
+                  """
+              )
+            )
+          )
+        );
+    }
+
+    @Nested
+    class CorporateParentBetweenProjectAndSpringBoot implements RewriteTest {
+
+        @TempDir
+        Path localRepository;
+
+        @BeforeEach
+        void publishCorporateParent() throws IOException {
+            Path parentDir = localRepository.resolve("com/corp/corp-parent/1.0.0");
+            Files.createDirectories(parentDir);
+            Files.writeString(parentDir.resolve("corp-parent-1.0.0.pom"),
+              //language=xml
+              """
+                <project>
+                  <modelVersion>4.0.0</modelVersion>
+                  <parent>
+                    <groupId>org.springframework.boot</groupId>
+                    <artifactId>spring-boot-starter-parent</artifactId>
+                    <version>3.5.4</version>
+                    <relativePath/>
+                  </parent>
+                  <groupId>com.corp</groupId>
+                  <artifactId>corp-parent</artifactId>
+                  <version>1.0.0</version>
+                  <packaging>pom</packaging>
+                  <properties>
+                    <h2.version>2.4.240</h2.version> <!-- Spring Boot 3.5.4 manages 2.3.232 -->
+                    <derby.version>10.14.2.0</derby.version> <!-- Spring Boot 3.5.4 manages 10.16.1.1 -->
+                    <corp-lib.version>3.0.0</corp-lib.version>
+                  </properties>
+                </project>
+                """);
+        }
+
+        @Override
+        public void defaults(RecipeSpec spec) {
+            spec.recipe(new RemoveRedundantProperties("*.version", Comparator.GTE))
+              .executionContext(MavenSettingsAutoLoadingExtension.withMavenCentralMirror(
+                MavenExecutionContextView.view(new InMemoryExecutionContext(Throwable::printStackTrace))
+                  .setLocalRepository(MavenRepository.builder()
+                    .id("local")
+                    .uri(localRepository.toUri().toString())
+                    .snapshots(false)
+                    .knownToExist(true)
+                    .build())));
+        }
+
+        @Test
+        void compareWithTheValueTheCorporateParentProvides() {
+            rewriteRun(
+              pomXml(
+                """
+                  <project>
+                    <parent>
+                      <groupId>com.corp</groupId>
+                      <artifactId>corp-parent</artifactId>
+                      <version>1.0.0</version>
+                      <relativePath/>
+                    </parent>
+                    <groupId>com.example</groupId>
+                    <artifactId>app</artifactId>
+                    <version>1.0.0</version>
+                    <properties>
+                      <h2.version>2.4.0</h2.version>
+                      <derby.version>10.15.2.0</derby.version>
+                      <corp-lib.version>2.0.0</corp-lib.version>
+                      <assertj.version>3.24.2</assertj.version>
+                      <lombok.version>1.18.40</lombok.version>
+                    </properties>
+                  </project>
+                  """,
+                """
+                  <project>
+                    <parent>
+                      <groupId>com.corp</groupId>
+                      <artifactId>corp-parent</artifactId>
+                      <version>1.0.0</version>
+                      <relativePath/>
+                    </parent>
+                    <groupId>com.example</groupId>
+                    <artifactId>app</artifactId>
+                    <version>1.0.0</version>
+                    <properties>
+                      <derby.version>10.15.2.0</derby.version>
+                      <lombok.version>1.18.40</lombok.version>
+                    </properties>
+                  </project>
+                  """
+              )
+            );
+        }
+
+        @Test
+        void multiModuleProjectWithCorporateParentOnTheRoot() {
+            rewriteRun(
+              mavenProject("root",
+                pomXml(
+                  """
+                    <project>
+                      <parent>
+                        <groupId>com.corp</groupId>
+                        <artifactId>corp-parent</artifactId>
+                        <version>1.0.0</version>
+                        <relativePath/>
+                      </parent>
+                      <groupId>com.example</groupId>
+                      <artifactId>root</artifactId>
+                      <version>1.0.0</version>
+                      <packaging>pom</packaging>
+                      <properties>
+                        <h2.version>2.4.0</h2.version>
+                        <derby.version>10.13.1.1</derby.version>
+                      </properties>
+                      <modules>
+                        <module>app</module>
+                      </modules>
+                    </project>
+                    """,
+                  """
+                    <project>
+                      <parent>
+                        <groupId>com.corp</groupId>
+                        <artifactId>corp-parent</artifactId>
+                        <version>1.0.0</version>
+                        <relativePath/>
+                      </parent>
+                      <groupId>com.example</groupId>
+                      <artifactId>root</artifactId>
+                      <version>1.0.0</version>
+                      <packaging>pom</packaging>
+                      <modules>
+                        <module>app</module>
+                      </modules>
+                    </project>
+                    """
+                ),
+                mavenProject("app",
+                  pomXml(
+                    """
+                      <project>
+                        <parent>
+                          <groupId>com.example</groupId>
+                          <artifactId>root</artifactId>
+                          <version>1.0.0</version>
+                        </parent>
+                        <artifactId>app</artifactId>
+                        <properties>
+                          <h2.version>2.4.100</h2.version>
+                          <derby.version>10.15.2.0</derby.version>
+                        </properties>
+                      </project>
+                      """,
+                    """
+                      <project>
+                        <parent>
+                          <groupId>com.example</groupId>
+                          <artifactId>root</artifactId>
+                          <version>1.0.0</version>
+                        </parent>
+                        <artifactId>app</artifactId>
+                        <properties>
+                          <derby.version>10.15.2.0</derby.version>
+                        </properties>
+                      </project>
+                      """
+                  )
+                )
+              )
+            );
+        }
+
+        @Test
+        void aggregatedModulesWithTheCorporateParentAsTheirOwnParent() {
+            rewriteRun(
+              mavenProject("aggregator",
+                pomXml(
+                  """
+                    <project>
+                      <groupId>com.example</groupId>
+                      <artifactId>aggregator</artifactId>
+                      <version>1.0.0</version>
+                      <packaging>pom</packaging>
+                      <properties>
+                        <h2.version>2.4.0</h2.version>
+                      </properties>
+                      <modules>
+                        <module>app</module>
+                      </modules>
+                    </project>
+                    """
+                ),
+                mavenProject("app",
+                  pomXml(
+                    """
+                      <project>
+                        <parent>
+                          <groupId>com.corp</groupId>
+                          <artifactId>corp-parent</artifactId>
+                          <version>1.0.0</version>
+                          <relativePath/>
+                        </parent>
+                        <groupId>com.example</groupId>
+                        <artifactId>app</artifactId>
+                        <version>1.0.0</version>
+                        <properties>
+                          <h2.version>2.4.0</h2.version>
+                          <derby.version>10.15.2.0</derby.version>
+                        </properties>
+                      </project>
+                      """,
+                    """
+                      <project>
+                        <parent>
+                          <groupId>com.corp</groupId>
+                          <artifactId>corp-parent</artifactId>
+                          <version>1.0.0</version>
+                          <relativePath/>
+                        </parent>
+                        <groupId>com.example</groupId>
+                        <artifactId>app</artifactId>
+                        <version>1.0.0</version>
+                        <properties>
+                          <derby.version>10.15.2.0</derby.version>
+                        </properties>
+                      </project>
+                      """
+                  )
+                )
+              )
+            );
+        }
     }
 }

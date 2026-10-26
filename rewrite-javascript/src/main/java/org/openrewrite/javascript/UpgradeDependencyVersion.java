@@ -128,7 +128,7 @@ public class UpgradeDependencyVersion extends ScanningRecipe<NodeDependencyEdits
                         matches.add(new MatchedDependency(name, scope.getKey(), value));
                     }
                 } else if (spec == null || spec.getType() != Spec.Type.CATALOG ||
-                           !followCatalog(decision, name, value)) {
+                           !followCatalog(decision, ctx, name, value)) {
                     String protocol = spec == null || spec.getProtocol() == null ? "" : spec.getProtocol();
                     String path = decision.getPath().toString();
                     decision.insertRow(protocolsSkipped, ctx, new NodeDependencyProtocolsSkipped.Row(path, path, name,
@@ -141,12 +141,13 @@ public class UpgradeDependencyVersion extends ScanningRecipe<NodeDependencyEdits
         }
     }
 
-    private boolean followCatalog(NodeDependencyEdits.Decision decision, String name, String value) {
+    private boolean followCatalog(NodeDependencyEdits.Decision decision, ExecutionContext ctx, String name,
+                                  String value) {
         NodeCatalogs catalogs;
         try {
             catalogs = decision.catalogs();
         } catch (Rejected e) {
-            decision.decline(name + "'s catalog entry was not upgraded: " + e.getMessage());
+            decision.decline(ctx, name + "'s catalog entry was not upgraded: " + e.getMessage());
             return true;
         }
         String catalog = catalogs == null ? null : catalogs.catalogOf(value);
@@ -154,7 +155,7 @@ public class UpgradeDependencyVersion extends ScanningRecipe<NodeDependencyEdits
             return false;
         }
         if (catalogs.declined() != null) {
-            decision.decline(name + "'s catalog entry was not upgraded: " + catalogs.declined());
+            decision.decline(ctx, name + "'s catalog entry was not upgraded: " + catalogs.declined());
             return true;
         }
         return decision.editCatalogs(c -> {

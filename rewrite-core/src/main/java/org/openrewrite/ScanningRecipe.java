@@ -31,7 +31,9 @@ import static java.util.Collections.emptyList;
  * we check that a file doesn't yet exist (and perhaps other conditions) before deciding
  * to generate a file.
  *
- * @param <T> The type of the accumulator where scanning data is held until the transformation phase.
+ * @param <T> The type of the accumulator where scanning data is held until the transformation phase. It stays in
+ *            memory until the cycle ends, so it should hold values such as coordinates, paths and ids, not trees or
+ *            other {@link Heavyweight} objects.
  */
 @SuppressWarnings("ALL")
 public abstract class ScanningRecipe<T> extends Recipe {

@@ -22,6 +22,7 @@ import lombok.Value;
 import lombok.With;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.ExecutionContext;
+import org.openrewrite.Heavyweight;
 import org.openrewrite.Tree;
 import org.openrewrite.java.marker.ProjectIdentity;
 import org.openrewrite.marker.Markup;
@@ -46,7 +47,7 @@ import static org.openrewrite.gradle.marker.GradleDependencyConfiguration.update
 @Value
 @AllArgsConstructor(onConstructor_ = {@JsonCreator})
 @Builder
-public class GradleProject implements ProjectIdentity, Serializable {
+public class GradleProject implements ProjectIdentity, Heavyweight, Serializable {
 
     /**
      * Project identity convergence with {@link org.openrewrite.java.marker.JavaProject}: returns

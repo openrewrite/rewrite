@@ -25,6 +25,7 @@ import java.util.List;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.gradle.Assertions.*;
 import static org.openrewrite.gradle.search.EffectiveRepositoryAssertions.expectedWithUrls;
+import static org.openrewrite.gradle.search.EffectiveRepositoryAssertions.gradlePluginPortal;
 import static org.openrewrite.gradle.toolingapi.Assertions.withToolingApi;
 import static org.openrewrite.maven.search.EffectiveMavenRepositoriesTable.Row;
 
@@ -44,7 +45,7 @@ class EffectiveGradlePluginRepositoriesTest implements RewriteTest {
             """
               rootProject.name = 'my-project'
               """,
-            spec -> spec.after(actual -> expectedWithUrls(actual, List.of("https://plugins.gradle.org/m2"), """
+            spec -> spec.after(actual -> expectedWithUrls(actual, List.of(gradlePluginPortal()), """
               rootProject.name = 'my-project'
               """))
           ),
@@ -54,7 +55,7 @@ class EffectiveGradlePluginRepositoriesTest implements RewriteTest {
                   id 'java'
               }
               """,
-            spec -> spec.after(actual -> expectedWithUrls(actual, List.of("https://plugins.gradle.org/m2"), """
+            spec -> spec.after(actual -> expectedWithUrls(actual, List.of(gradlePluginPortal()), """
               plugins {
                   id 'java'
               }
@@ -76,7 +77,7 @@ class EffectiveGradlePluginRepositoriesTest implements RewriteTest {
               }
               """,
             spec -> spec.after(actual -> expectedWithUrls(actual,
-              List.of("https://repo.spring.io/milestone", "https://plugins.gradle.org/m2"), """
+              List.of("https://repo.spring.io/milestone", gradlePluginPortal()), """
               pluginManagement {
                   repositories {
                       maven { url 'https://repo.spring.io/milestone' }
@@ -92,7 +93,7 @@ class EffectiveGradlePluginRepositoriesTest implements RewriteTest {
               }
               """,
             spec -> spec.after(actual -> expectedWithUrls(actual,
-              List.of("https://repo.spring.io/milestone", "https://plugins.gradle.org/m2"), """
+              List.of("https://repo.spring.io/milestone", gradlePluginPortal()), """
               plugins {
                   id 'java'
               }
@@ -142,9 +143,9 @@ class EffectiveGradlePluginRepositoriesTest implements RewriteTest {
             .recipe(new EffectiveGradlePluginRepositories(false))
             .dataTable(Row.class, rows -> assertThat(rows).contains(
               new Row("settings.gradle", "https://repo.spring.io/milestone"),
-              new Row("settings.gradle", "https://plugins.gradle.org/m2"),
+              new Row("settings.gradle", gradlePluginPortal()),
               new Row("build.gradle", "https://repo.spring.io/milestone"),
-              new Row("build.gradle", "https://plugins.gradle.org/m2")
+              new Row("build.gradle", gradlePluginPortal())
             )),
           settingsGradle(
             """
@@ -212,7 +213,7 @@ class EffectiveGradlePluginRepositoriesTest implements RewriteTest {
               }
               """,
             spec -> spec.after(actual -> expectedWithUrls(actual,
-              List.of("https://repo.spring.io/milestone", "https://plugins.gradle.org/m2"), """
+              List.of("https://repo.spring.io/milestone", gradlePluginPortal()), """
               buildscript {
                   repositories {
                       maven { url 'https://repo.spring.io/milestone' }
@@ -243,7 +244,7 @@ class EffectiveGradlePluginRepositoriesTest implements RewriteTest {
               }
               """,
             spec -> spec.after(actual -> expectedWithUrls(actual,
-              List.of("https://repo.spring.io/milestone", "https://plugins.gradle.org/m2"), """
+              List.of("https://repo.spring.io/milestone", gradlePluginPortal()), """
               buildscript {
                   repositories {
                       maven { url = uri("https://repo.spring.io/milestone") }
@@ -271,7 +272,7 @@ class EffectiveGradlePluginRepositoriesTest implements RewriteTest {
                   maven { url 'https://repo.spring.io/milestone' }
               }
               """,
-            spec -> spec.after(actual -> expectedWithUrls(actual, List.of("https://plugins.gradle.org/m2"), """
+            spec -> spec.after(actual -> expectedWithUrls(actual, List.of(gradlePluginPortal()), """
               plugins {
                   id 'java'
               }

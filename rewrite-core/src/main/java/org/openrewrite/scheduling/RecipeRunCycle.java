@@ -627,6 +627,12 @@ public class RecipeRunCycle<LSS extends LargeSourceSet> {
         }
 
         if (deleted) {
+            for (int i = 0; i < response.getResults().size(); i++) {
+                BatchVisitResponse.BatchVisitResult r = response.getResults().get(i);
+                if (r.isModified() || r.isDeleted()) {
+                    recordSourceFileResultAndSearchResults(originalBefore, null, batch.recipeStacks.get(i), emptyList(), ctx);
+                }
+            }
             batch.clear();
             return null;
         }

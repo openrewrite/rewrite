@@ -1,7 +1,5 @@
 @file:Suppress("UnstableApiUsage")
 
-import com.gradle.develocity.agent.gradle.test.ImportJUnitXmlReports
-import com.gradle.develocity.agent.gradle.test.JUnitXmlDialect
 import com.hierynomus.gradle.license.tasks.LicenseCheck
 import com.hierynomus.gradle.license.tasks.LicenseFormat
 import nl.javadude.gradle.plugins.license.License
@@ -267,8 +265,6 @@ val goTest = tasks.register<Exec>("goTest") {
     outputs.file(junitXmlFile)
     outputs.cacheIf { true }
 }
-
-ImportJUnitXmlReports.register(tasks, goTest, JUnitXmlDialect.GENERIC)
 
 tasks.named("check") {
     dependsOn(goTest)
