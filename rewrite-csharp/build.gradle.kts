@@ -183,12 +183,12 @@ testing {
             targets {
                 all {
                     testTask.configure {
-                        // These tests spawn the freshly built C# tool. dependsOn(csharpBuild) is
-                        // also applied by the tasks.withType<Test> block below, but a plain
-                        // dependsOn only orders the build — it does NOT make a C# source change
-                        // invalidate this task's up-to-date/cache state. Declaring the C# sources
-                        // as inputs does: without it a C# regression can slip through a cached test
-                        // run (e.g. the System.Text.Json `IConvertible` break that reached main).
+                        // These tests spawn the freshly built C# tool, and the unit tests do not, so
+                        // only this task depends on csharpBuild. A plain dependsOn only orders the
+                        // build — it does NOT make a C# source change invalidate this task's
+                        // up-to-date/cache state. Declaring the C# sources as inputs does: without it
+                        // a C# regression can slip through a cached test run (e.g. the
+                        // System.Text.Json `IConvertible` break that reached main).
                         dependsOn(csharpBuild)
                         inputs.files(fileTree(csharpDir.resolve("OpenRewrite")) { exclude("**/bin/**", "**/obj/**", "**/build/**") })
                             .withPathSensitivity(PathSensitivity.RELATIVE)
@@ -212,9 +212,6 @@ tasks.named("check") {
 
 // Run tests serially to avoid issues with concurrent C# RPC processes
 tasks.withType<Test> {
-    // Ensure C# is built before running tests
-    dependsOn(csharpBuild)
-
     maxParallelForks = 1
     maxHeapSize = "8g"
     // Exclude working-set tests by default:
@@ -239,7 +236,7 @@ tasks.withType<Test> {
             events("started", "passed", "failed", "skipped")
             showStandardStreams = true
         } else {
-            events("failed", "skipped")
+            events("failed")
         }
     }
 }
