@@ -49,6 +49,10 @@ async function parse(dir: string): Promise<Source[]> {
     return sources;
 }
 
+// Parsed once for the tests that print them, none of which changes the trees it is given.
+let syntax: Promise<Source[]> | undefined;
+const parseSyntax = () => syntax ??= parse(syntaxDir);
+
 /**
  * Marks every tree, and every third comment, left padding and container, as a recipe would.
  */
@@ -97,7 +101,7 @@ class Mark extends JavaScriptVisitor<number> {
 describeJavaRpc("Java printer parity", () => {
 
     testJavaRpc("syntax files", async ({javaRpc}) => {
-        for (const {cu, text} of await parse(syntaxDir)) {
+        for (const {cu, text} of await parseSyntax()) {
             const printed = await TreePrinters.print(cu);
             expect(printed, cu.sourcePath).toEqual(text);
             expect(await javaRpc.rpc.print(cu), cu.sourcePath).toEqual(printed);
@@ -119,7 +123,7 @@ describeJavaRpc("Java printer parity", () => {
             [RequestedMarkerPrinter.FENCED, MarkerPrinter.FENCED],
             [RequestedMarkerPrinter.SANITIZED, MarkerPrinter.SANITIZED],
         ];
-        for (const {cu, text} of await parse(syntaxDir)) {
+        for (const {cu, text} of await parseSyntax()) {
             const marked = await new Mark().visitDefined<JS.CompilationUnit>(cu, 0);
             for (const [requested, markerPrinter] of markerPrinters) {
                 const printed = await TreePrinters.printer(marked).print(marked, new PrintOutputCapture(markerPrinter));
@@ -135,7 +139,7 @@ describeJavaRpc("Java printer parity", () => {
 
     // What is printed for a tree can depend on what encloses it, so both sides are given its cursor.
     testJavaRpc("subtrees", async ({javaRpc}) => {
-        for (const {cu} of await parse(syntaxDir)) {
+        for (const {cu} of await parseSyntax()) {
             const subtrees: [J, Cursor][] = [];
             await new class extends JavaScriptVisitor<number> {
                 protected override async preVisit(tree: J, _p: number): Promise<J | undefined> {
