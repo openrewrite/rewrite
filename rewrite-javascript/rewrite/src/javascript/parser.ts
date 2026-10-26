@@ -711,7 +711,7 @@ export class JavaScriptParserVisitor {
                     const type = types[i];
                     // For the last type, don't consume the suffix - it belongs to the interface body's prefix
                     const after = i < types.length - 1 ? this.suffix(type) : emptySpace;
-                    _extends.push(this.rightPadded(this.visit(type), after));
+                    _extends.push(this.rightPadded(this.mapHeritageClauseElement(type) as TypeTree, after));
                 }
                 return _extends.length > 0 ? {
                     kind: J.Kind.Container,
@@ -736,7 +736,7 @@ export class JavaScriptParserVisitor {
                     const type = types[i];
                     // For the last type, don't consume the suffix - it belongs to the class body's prefix
                     const after = i < types.length - 1 ? this.suffix(type) : emptySpace;
-                    _implements.push(this.rightPadded(this.visit(type), after));
+                    _implements.push(this.rightPadded(this.mapHeritageClauseElement(type) as TypeTree, after));
                 }
                 return _implements.length > 0 ? {
                     kind: J.Kind.Container,
@@ -749,7 +749,7 @@ export class JavaScriptParserVisitor {
         return undefined;
     }
 
-    private mapTypeTree(node: ts.LeftHandSideExpression | ts.ExpressionWithTypeArguments | ts.Expression): TypeTree {
+    private mapTypeTree(node: ts.LeftHandSideExpression | ts.HeritageClauseElement | ts.Expression): TypeTree {
         const expression = this.visit(node);
 
         // Check if the expression is already a TypeTree
@@ -2753,18 +2753,27 @@ export class JavaScriptParserVisitor {
     }
 
     visitExpressionWithTypeArguments(node: ts.ExpressionWithTypeArguments): JS.ExpressionWithTypeArguments | Expression {
+        return this.mapHeritageClauseElement(node);
+    }
+
+    /**
+     * TypeScript 7.1 parses a type an interface extends or a class implements as a type reference.
+     * It maps to the same tree as a class's `extends`, which the compiler parses as an expression with type arguments.
+     */
+    private mapHeritageClauseElement(node: ts.HeritageClauseElement): JS.ExpressionWithTypeArguments | Expression {
+        const expression = ts.isTypeReferenceNode(node) ? node.typeName : node.expression;
         if (node.typeArguments) {
             return {
                 kind: JS.Kind.ExpressionWithTypeArguments,
                 id: randomId(),
                 prefix: this.prefix(node),
                 markers: emptyMarkers,
-                clazz: this.visit(node.expression),
-                typeArguments: this.mapTypeArguments(this.suffix(node.expression), node.typeArguments),
+                clazz: this.visit(expression),
+                typeArguments: this.mapTypeArguments(this.suffix(expression), node.typeArguments),
                 type: this.mapType(node)
             }
         }
-        return this.visit(node.expression);
+        return this.visit(expression);
     }
 
     visitAsExpression(node: ts.AsExpression): JS.As {

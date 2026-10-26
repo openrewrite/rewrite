@@ -78,7 +78,12 @@ export function exportedTypes(ownArtifacts: string[], references: string[]): Typ
         return [];
     }
 
-    const session = openSession(references[0] ?? path.dirname(entries[0]), new Map(), compilerOptions, entries);
+    // The compiler's working directory. A declaration file passed as a reference is not one.
+    const reference = references[0];
+    const root = reference === undefined || declarationFileEntry(reference)
+        ? path.dirname(reference ?? entries[0])
+        : reference;
+    const session = openSession(root, new Map(), compilerOptions, entries);
     const program = session.project.program;
     const checker = session.project.checker;
     const typeMapping = new JavaScriptTypeMapping(checker);

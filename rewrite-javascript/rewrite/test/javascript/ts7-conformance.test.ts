@@ -30,11 +30,16 @@ const TS7_EQUIVALENT: Record<string, string> = {
 };
 
 /** TypeScript 6's name for a node 7 models differently, or 7's own name when the two agree. */
-function equivalentName(name: string, pos: number, end: number): string {
+function equivalentName(node: Node7): string {
+    const name = NAMES_7.get(node.kind)!;
     // An elision in a binding pattern (`const [a, , b] = ...`) is a zero-width BindingElement in 7
     // where 6 emits an OmittedExpression. Non-empty BindingElements mean the same thing in both.
-    if (name === "BindingElement" && pos === end) {
+    if (name === "BindingElement" && node.pos === node.end) {
         return "OmittedExpression";
+    }
+    // 7.1 parses the types an interface extends or a class implements as type references.
+    if (name === "TypeReference" && node.parent?.kind === SyntaxKind7.HeritageClause) {
+        return "ExpressionWithTypeArguments";
     }
     return TS7_EQUIVALENT[name] ?? name;
 }
@@ -65,8 +70,7 @@ function stream6(node: ts.Node, sourceFile: ts.SourceFile, out: string[]): strin
 
 function stream7(node: Node7, sourceFile: SourceFile7, out: string[]): string[] {
     for (const child of childrenOf(node, sourceFile)) {
-        const name = NAMES_7.get(child.kind)!;
-        out.push(`${equivalentName(name, child.pos, child.end)}@${child.pos}:${child.end}`);
+        out.push(`${equivalentName(child)}@${child.pos}:${child.end}`);
         if (childrenOf(child, sourceFile).length > 0) {
             stream7(child, sourceFile, out);
         }

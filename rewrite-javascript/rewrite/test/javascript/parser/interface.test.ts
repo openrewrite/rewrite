@@ -83,6 +83,30 @@ describe('interface mapping', () => {
            `)
         ));
 
+    test('a generic interface extended or implemented is an expression with type arguments', () =>
+        spec.rewriteRun({
+            //language=typescript
+            ...typescript(`
+               interface Box<T> {
+                   value: T;
+               }
+
+               interface Boxes extends Box<string> {
+               }
+
+               class StringBox implements Box<string> {
+                   value = "";
+               }
+           `),
+            afterRecipe: (cu: JS.CompilationUnit) => {
+                const boxes = cu.statements[1].element as J.ClassDeclaration;
+                expect(boxes.implements!.elements[0].element.kind).toBe(JS.Kind.ExpressionWithTypeArguments);
+
+                const stringBox = cu.statements[2].element as J.ClassDeclaration;
+                expect(stringBox.implements!.elements[0].element.kind).toBe(JS.Kind.ExpressionWithTypeArguments);
+            }
+        }));
+
     test('interface with properties', () =>
         spec.rewriteRun(
             //language=typescript

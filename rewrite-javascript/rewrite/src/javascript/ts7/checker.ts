@@ -14,6 +14,7 @@
  * limitations under the License.
  */
 import {
+    type Declaration,
     isExpressionWithTypeArguments,
     isIdentifier,
     isModuleDeclaration,
@@ -60,10 +61,10 @@ function enclosingTypeNode(node: Node): TypeNode | undefined {
  * A symbol's declarations, which cross the IPC boundary as handles. Each resolves against the
  * project that produced it, so callers need no project of their own.
  */
-export function declarationsOf(symbol: Symbol7): Node[] {
+export function declarationsOf(symbol: Symbol7): Declaration[] {
     return symbol.declarations
         .map(handle => handle.resolve())
-        .filter((node): node is Node => node !== undefined);
+        .filter((node): node is Declaration => node !== undefined);
 }
 
 /**

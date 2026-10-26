@@ -13,17 +13,13 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-import fs from "node:fs";
 import path from "node:path";
 import {API, type Project, type Snapshot} from "typescript/sync";
-import type {SourceFile} from "typescript/ast";
-import type {FileSystem} from "typescript/fs";
 import {memoizing} from "./checker";
 
 // The compiler runs as its own process that owns parsing and module resolution, so a program is
-// described to it rather than built here: sources the parser holds in memory are served through
-// filesystem callbacks, and returning undefined defers to the real filesystem for node_modules and
-// the bundled lib files, which the server then resolves against on its own.
+// described to it rather than built here. Each snapshot layers the sources the parser holds in
+// memory over the real filesystem, which the server reads for node_modules and the bundled lib files.
 
 /** One program within a parse: the files it is rooted at, and the options they compile under. */
 export interface ProjectRequest {
@@ -85,19 +81,16 @@ export class Compiler {
         }
         const configPaths = [...configOf.values()];
 
-        const api = this.compilerApi();
         const previous = {snapshot: this.snapshot, configs: this.openConfigs};
-        // A path parsed before may carry different text now, and the compiler holds what it read
-        // last, so every source is announced as changed rather than left to look unchanged.
-        const changed = [...sources.keys(), ...configPaths];
-        this.snapshot = api.updateSnapshot({
-            openProjects: configPaths,
-            ...(previous.configs.length > 0 ? {closeProjects: previous.configs} : {}),
-            fileChanges: {changed},
-        });
+        const fileSystem = {kind: "layer", files: Object.fromEntries(this.files)} as const;
+        // Building on the previous snapshot lets the compiler keep what it already loaded.
+        const snapshot = this.snapshot = previous.snapshot
+            ? previous.snapshot.update({openProjects: configPaths, closeProjects: previous.configs, fileSystem})
+            : this.compilerApi().createSnapshot({openProjects: configPaths, fileSystem});
         this.openConfigs = configPaths;
-        previous.snapshot?.dispose();
-        const snapshot = this.snapshot;
+        if (previous.snapshot !== snapshot) {
+            previous.snapshot?.dispose();
+        }
 
         const opened = new Map<string, Project>();
         return {
@@ -105,7 +98,7 @@ export class Compiler {
                 let project = opened.get(key);
                 if (!project) {
                     const configPath = configOf.get(key);
-                    const found = configPath === undefined ? undefined : snapshot.getProject(configPath);
+                    const found = configPath === undefined ? undefined : snapshot.getConfiguredProject(configPath);
                     if (!found) {
                         throw new Error(`TypeScript did not open a project at ${configPath ?? key}`);
                     }
@@ -124,7 +117,7 @@ export class Compiler {
 
     /** The project options `configFilePath` states, with `extends` resolved, as tsconfig JSON names. */
     parseConfigFile(configFilePath: string): Record<string, unknown> {
-        return this.compilerApi().parseConfigFile(configFilePath).options;
+        return this.compilerApi().parseConfigFile(configFilePath).options as Record<string, unknown>;
     }
 
     /** Shuts the compiler down. A later `open` starts a new one. */
@@ -138,7 +131,7 @@ export class Compiler {
     }
 
     private compilerApi(): API {
-        return this.api ??= new API({cwd: this.root, fs: this.fileSystem()});
+        return this.api ??= new API({cwd: this.root});
     }
 
     private forget(sources: Iterable<string>, configPaths: Iterable<string>): void {
@@ -148,57 +141,6 @@ export class Compiler {
         for (const configPath of configPaths) {
             this.files.delete(configPath);
         }
-    }
-
-    private fileSystem(): FileSystem {
-        const files = this.files;
-        return {
-            readFile: file => files.get(file),
-            fileExists: file => (files.has(file) ? true : undefined),
-            // A directory that only holds in-memory sources exists as far as resolution is
-            // concerned, or the compiler will not look inside it for them.
-            directoryExists: directory => {
-                const prefix = directory.endsWith(path.sep) ? directory : directory + path.sep;
-                return [...files.keys()].some(file => file.startsWith(prefix)) ? true : undefined;
-            },
-            getAccessibleEntries: directory => {
-                const prefix = directory.endsWith(path.sep) ? directory : directory + path.sep;
-                const virtual: string[] = [];
-                const virtualDirectories = new Set<string>();
-                for (const file of files.keys()) {
-                    if (!file.startsWith(prefix)) {
-                        continue;
-                    }
-                    // A file nested below `directory` also makes the directory holding it visible,
-                    // which is how the compiler finds its way down to that file.
-                    const rest = file.slice(prefix.length);
-                    const slash = rest.indexOf(path.sep);
-                    if (slash === -1) {
-                        virtual.push(rest);
-                    } else {
-                        virtualDirectories.add(rest.slice(0, slash));
-                    }
-                }
-                if (virtual.length === 0 && virtualDirectories.size === 0) {
-                    return undefined;
-                }
-                // A directory holding in-memory sources may also exist on disk, and the server
-                // needs one listing covering both.
-                const entries = {files: [] as string[], directories: [] as string[]};
-                try {
-                    for (const entry of fs.readdirSync(directory, {withFileTypes: true})) {
-                        (entry.isDirectory() ? entries.directories : entries.files).push(entry.name);
-                    }
-                } catch {
-                    // Purely virtual directory.
-                }
-                return {
-                    files: [...new Set([...entries.files, ...virtual])],
-                    directories: [...new Set([...entries.directories, ...virtualDirectories])],
-                };
-            },
-            realpath: () => undefined,
-        };
     }
 }
 
@@ -213,14 +155,13 @@ function wellFormed(text: string): string {
     return string.isWellFormed() ? text : string.toWellFormed();
 }
 
-/** Puts a file's own text on its {@link SourceFile}, in place of what the compiler read. */
+/** Puts a file's own text on its source file, in place of what the compiler read. */
 function restoreInputText(project: Project, sources: ReadonlyMap<string, string>,
                           restore: ReadonlySet<string>): void {
-    for (const rootFile of project.rootFiles) {
-        const text = restore.has(rootFile) ? sources.get(rootFile) : undefined;
-        if (text !== undefined) {
-            Object.defineProperty(project.program.getSourceFile(rootFile), "text",
-                {value: text, configurable: true});
+    for (const file of restore) {
+        const sourceFile = project.program.getSourceFile(file);
+        if (sourceFile !== undefined) {
+            Object.defineProperty(sourceFile, "text", {value: sources.get(file), configurable: true});
         }
     }
 }
