@@ -199,6 +199,11 @@ testing {
                         // Include the main test classes so common tests run with the Python 2 parser
                         testClassesDirs += sourceSets["test"].output.classesDirs
                         classpath += sourceSets["test"].runtimeClasspath
+                        // The dependency and lock file machinery tested under internal never starts a parser,
+                        // so here its tests would only repeat the test task's run of them
+                        filter {
+                            excludeTestsMatching("org.openrewrite.python.internal.*")
+                        }
 
                         systemProperty("rewrite.python.version", "2")
 
@@ -251,14 +256,13 @@ tasks.named("check") {
     dependsOn(pytestTest)
 }
 
-// Run tests serially to avoid issues with concurrent Python RPC processes
-// The Python RPC server uses ThreadLocal, but test state can interfere
-// when multiple tests run rapidly on the same thread
+// Each test JVM starts Python RPC processes of its own, so tests in different forks share no RPC state
 tasks.withType<Test> {
     // Ensure Python venv is set up before running tests
     dependsOn(pythonInstall)
 
-    maxParallelForks = 1
+    // A fork costs a Python process besides its JVM, so there are at most four
+    maxParallelForks = maxParallelForks.coerceAtMost(4)
     // Add timeout to identify hanging tests - tests that hang will fail with timeout
     systemProperty("junit.jupiter.execution.timeout.default", "30s")
     testLogging {
@@ -270,6 +274,11 @@ tasks.withType<Test> {
             events("failed")
         }
     }
+}
+
+// integTest includes a throughput measurement, which tests in other forks would disturb
+tasks.named<Test>("integTest") {
+    maxParallelForks = 1
 }
 
 // Note: Python IDE support is configured via the standalone module at:
