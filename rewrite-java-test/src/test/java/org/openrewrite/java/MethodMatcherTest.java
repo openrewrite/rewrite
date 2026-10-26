@@ -200,6 +200,7 @@ class MethodMatcherTest implements RewriteTest {
     void singleWildcardTypeExcludesSubPackages() {
         MethodMatcher singlePackage = new MethodMatcher("java.util.* *(..)");
         assertTrue(singlePackage.matchesTargetType(build("java.util.List")));
+        assertTrue(singlePackage.matchesTargetType(build("java.util.Map$Entry")));
         assertFalse(singlePackage.matchesTargetType(build("java.util.concurrent.ConcurrentMap")));
 
         MethodMatcher withSubPackages = new MethodMatcher("java.util..* *(..)");

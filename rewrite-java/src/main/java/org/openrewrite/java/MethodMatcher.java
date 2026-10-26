@@ -35,7 +35,9 @@ import static java.util.stream.Collectors.toList;
  * #declaring class# #method name#(#argument list#)
  * </B><P>
  * <li>The declaring class must be fully qualified.</li>
- * <li>A wildcard character, "*", may be used in either the declaring class or method name.</li>
+ * <li>A wildcard character, "*", may be used in either the declaring class or method name. In the declaring class it
+ * does not match across a "." separator.</li>
+ * <li>".." can be used in the declaring class to match any number of package segments, e.g. "java.util..*".</li>
  * <li>The argument list is expressed as a comma-separated list of the argument types</li>
  * <li>".." can be used in the argument list to match zero or more arguments of any type.</li>
  * <P><PRE>
