@@ -66,9 +66,15 @@ import java.util.Map;
 import java.util.Set;
 import java.util.TreeSet;
 import java.util.UUID;
+import java.util.concurrent.ConcurrentSkipListSet;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.BiFunction;
+import java.util.function.Function;
 import java.util.regex.Pattern;
 import java.util.stream.Stream;
 
@@ -93,6 +99,17 @@ class CSharpPrinterParityTest {
 
     private static final Pattern FENCE = Pattern.compile("\\{\\{[0-9a-f-]{36}}}");
 
+    /**
+     * Native processes that compare the shards of a large set of sources at once.
+     */
+    static final int PROCESSES = Math.max(1, Math.min(4, Runtime.getRuntime().availableProcessors() / 2));
+
+    /**
+     * A thread for each of those processes, kept for the class, as starting a process and warming
+     * it up takes about as long as comparing a shard.
+     */
+    private static final List<ExecutorService> WORKERS = new ArrayList<>();
+
     @BeforeAll
     static void setUpFactory() {
         CSharpRewriteRpc.setFactory(CSharpRewriteRpc.builder()
@@ -106,8 +123,9 @@ class CSharpPrinterParityTest {
     }
 
     @AfterAll
-    static void shutDown() {
+    static void shutDown() throws InterruptedException {
         CSharpRewriteRpc.shutdownCurrent();
+        stopWorkers();
     }
 
     /**
@@ -128,7 +146,7 @@ class CSharpPrinterParityTest {
      */
     @Test
     @Timeout(value = 15, unit = TimeUnit.MINUTES)
-    void ownSources() throws IOException {
+    void ownSources() throws Exception {
         Path root = csharpDir();
         Map<Path, String> sources = new LinkedHashMap<>();
         try (Stream<Path> files = Files.walk(root)) {
@@ -138,9 +156,90 @@ class CSharpPrinterParityTest {
         }
         assertThat(sources).hasSizeGreaterThan(200);
 
-        List<String> failures = new ArrayList<>();
-        assertParity(sources).forEach((path, cu) -> compareMarkerPrinters(path, mark(cu), failures));
+        List<String> failures = inParallel(sources, shard -> {
+            List<String> shardFailures = new ArrayList<>();
+            assertParity(shard).forEach((path, cu) -> compareMarkerPrinters(path, mark(cu), shardFailures));
+            return shardFailures;
+        });
         assertThat(failures).isEmpty();
+    }
+
+    /**
+     * Compares the shards of the sources at once, each parsed as its own project by its own
+     * native process, as a native process parses and receives trees on one thread.
+     */
+    static List<String> inParallel(Map<Path, String> sources,
+                                   Function<Map<Path, String>, List<String>> compare) throws Exception {
+        List<Map<Path, String>> shards = shards(sources, PROCESSES);
+        while (WORKERS.size() < shards.size()) {
+            WORKERS.add(Executors.newSingleThreadExecutor());
+        }
+
+        List<Future<List<String>>> compared = new ArrayList<>();
+        for (int i = 0; i < shards.size(); i++) {
+            Map<Path, String> shard = shards.get(i);
+            compared.add(WORKERS.get(i).submit(() -> {
+                setUpFactory();
+                List<String> failures = compare.apply(shard);
+                CSharpRewriteRpc.resetCurrent();
+                return failures;
+            }));
+        }
+
+        try {
+            List<String> failures = new ArrayList<>();
+            for (Future<List<String>> shard : compared) {
+                failures.addAll(shard.get());
+            }
+            return failures;
+        } catch (ExecutionException | InterruptedException e) {
+            // a process that a comparison failed or was interrupted in is not used again
+            compared.forEach(shard -> shard.cancel(true));
+            stopWorkers();
+            if (e.getCause() instanceof Error error) {
+                throw error;
+            }
+            throw e.getCause() instanceof Exception cause ? cause : e;
+        }
+    }
+
+    private static void stopWorkers() throws InterruptedException {
+        for (ExecutorService worker : WORKERS) {
+            worker.execute(CSharpRewriteRpc::shutdownCurrent);
+            worker.shutdown();
+        }
+        for (ExecutorService worker : WORKERS) {
+            worker.awaitTermination(1, TimeUnit.MINUTES);
+        }
+        WORKERS.clear();
+    }
+
+    /**
+     * Splits the sources into shards of about the same size, each in the order of the sources.
+     */
+    static List<Map<Path, String>> shards(Map<Path, String> sources, int count) {
+        List<Map.Entry<Path, String>> largestFirst = new ArrayList<>(sources.entrySet());
+        largestFirst.sort(Map.Entry.comparingByValue(Comparator.comparingInt(String::length).reversed()));
+        long[] sizes = new long[count];
+        Map<Path, Integer> shardOf = new HashMap<>();
+        for (Map.Entry<Path, String> source : largestFirst) {
+            int smallest = 0;
+            for (int i = 1; i < count; i++) {
+                if (sizes[i] < sizes[smallest]) {
+                    smallest = i;
+                }
+            }
+            sizes[smallest] += source.getValue().length();
+            shardOf.put(source.getKey(), smallest);
+        }
+
+        List<Map<Path, String>> shards = new ArrayList<>();
+        for (int i = 0; i < count; i++) {
+            shards.add(new LinkedHashMap<>());
+        }
+        sources.forEach((path, source) -> shards.get(shardOf.get(path)).put(path, source));
+        shards.removeIf(Map::isEmpty);
+        return shards;
     }
 
     private static boolean isSource(Path file) {
@@ -338,10 +437,13 @@ class CSharpPrinterParityTest {
 
     @Test
     @Timeout(value = 15, unit = TimeUnit.MINUTES)
-    void subtrees() {
-        List<String> failures = new ArrayList<>();
-        Set<String> ancestorDependent = new TreeSet<>();
-        parse(sources(SYNTAX, DIRECTIVES)).forEach((path, cu) -> compareSubtrees(path, cu, failures, ancestorDependent));
+    void subtrees() throws Exception {
+        Set<String> ancestorDependent = new ConcurrentSkipListSet<>();
+        List<String> failures = inParallel(sources(SYNTAX, DIRECTIVES), shard -> {
+            List<String> shardFailures = new ArrayList<>();
+            parse(shard).forEach((path, cu) -> compareSubtrees(path, cu, shardFailures, ancestorDependent));
+            return shardFailures;
+        });
         assertThat(failures).isEmpty();
         assertThat(ancestorDependent).as("subtrees that were also compared without their ancestors").isNotEmpty();
     }
