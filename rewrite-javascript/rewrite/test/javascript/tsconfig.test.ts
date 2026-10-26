@@ -256,6 +256,25 @@ describe('tsconfig.json compiler options', () => {
         expect(captured.get('deep')).toBe('walled.Thing{name=deep,return=String,parameters=[String]}');
     }, 60000);
 
+    test('a node10 project mapping every specifier into node_modules still reads @types', async () => {
+        const captured = new Map<string, string>();
+        const spec = new RecipeSpec();
+        spec.recipe = captureMethodTypes(['greet'], captured);
+
+        await withDir(async (repo) => {
+            write(repo.path, 'node_modules/untyped/package.json', `{"name": "untyped", "main": "index.js"}`);
+            write(repo.path, 'node_modules/untyped/index.js', `exports.greet = name => "hi " + name;`);
+            write(repo.path, 'node_modules/@types/untyped/package.json', `{"name": "@types/untyped", "types": "index.d.ts"}`);
+            write(repo.path, 'node_modules/@types/untyped/index.d.ts', `export function greet(name: string): string;`);
+            write(repo.path, 'tsconfig.json',
+                `{"compilerOptions": {"moduleResolution": "node", "baseUrl": ".", "paths": {"*": ["node_modules/*"]}}}`);
+
+            await spec.rewriteRun(npm(repo.path, typescript(`import {greet} from "untyped";\ngreet("x");`)));
+        }, {unsafeCleanup: true});
+
+        expect(captured.get('greet')).toBe('untyped{name=greet,return=String,parameters=[String]}');
+    }, 60000);
+
     test('a project\'s `module` kind sets its resolution without being adopted', async () => {
         const resolution = new Map<string, string>();
         const implied = new RecipeSpec();

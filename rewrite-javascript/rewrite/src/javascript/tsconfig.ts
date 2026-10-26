@@ -151,6 +151,9 @@ export class TsConfigResolver {
         const stated = resolution.moduleResolution as number | undefined;
         delete resolution.moduleResolution;
         const mode = stated === undefined ? pairedModuleResolution(projectOptions) : MODULE_RESOLUTION[stated];
+        if (mode === NODE10) {
+            withoutNodeModulesTargets(resolution);
+        }
         return {...defaults, ...mode, ...resolution};
     }
 }
@@ -193,6 +196,34 @@ const MODULE_RESOLUTION: Record<number, CompilerOptions | undefined> = {
     99: {moduleResolution: "nodenext"},
     100: {moduleResolution: "bundler"},
 };
+
+/** The stand-in for `node10`, which the project states as `node` or implies with `commonjs`. */
+const NODE10 = MODULE_RESOLUTION[2];
+
+/**
+ * Drops the `paths` targets inside a `node_modules` directory. `node10` looks for declarations at
+ * every location before it accepts a JavaScript file, so such a target only ever yielded what the
+ * `node_modules` search finds anyway. `bundler`, standing in for it, takes the first file of either
+ * kind, so the same target would end resolution at an untyped package ahead of its `@types`.
+ */
+function withoutNodeModulesTargets(options: CompilerOptions): void {
+    const stated = options.paths as Record<string, string[]> | undefined;
+    if (!stated) {
+        return;
+    }
+    const paths: Record<string, string[]> = {};
+    for (const [pattern, targets] of Object.entries(stated)) {
+        const kept = targets.filter(target => !target.split(/[\\/]/).includes("node_modules"));
+        if (kept.length > 0) {
+            paths[pattern] = kept;
+        }
+    }
+    if (Object.keys(paths).length > 0) {
+        options.paths = paths;
+    } else {
+        delete options.paths;
+    }
+}
 
 /** `ModuleKind` by value, for the module kinds that imply a resolution. */
 const MODULE_KIND = {CommonJS: 1, ESNext: 99, Node16: 100, NodeNext: 199, Preserve: 200};
