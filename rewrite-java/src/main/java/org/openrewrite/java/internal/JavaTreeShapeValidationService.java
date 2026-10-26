@@ -29,6 +29,7 @@ import org.openrewrite.java.tree.Javadoc;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -85,6 +86,22 @@ public class JavaTreeShapeValidationService implements TreeShapeValidationServic
         JavaVersion version = sourceFile.getMarkers().findFirst(JavaVersion.class).orElse(null);
         return version == null || !parserVersion.find() ||
                version.getMajorVersion() <= Integer.parseInt(parserVersion.group(1));
+    }
+
+    @Override
+    public @Nullable String syntaxError(SourceFile sourceFile) {
+        return new TreeVisitor<Tree, AtomicReference<@Nullable String>>() {
+            @Override
+            public Tree preVisit(Tree t, AtomicReference<@Nullable String> text) {
+                if (text.get() != null) {
+                    stopAfterPreVisit();
+                } else if (t instanceof J.Erroneous) {
+                    text.set(((J.Erroneous) t).getText());
+                    stopAfterPreVisit();
+                }
+                return t;
+            }
+        }.reduce(sourceFile, new AtomicReference<>()).get();
     }
 
     @Override

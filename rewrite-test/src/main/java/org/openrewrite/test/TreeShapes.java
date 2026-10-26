@@ -264,6 +264,12 @@ final class TreeShapes {
             return new Reparsed(null, exception == null ? "a ParseError" : firstLine(exception.getMessage()));
         } else if (parse.getClass() != source.getClass()) {
             return null;
+        }
+        // a recipe that keeps text the parser couldn't read, such as a test's deliberately broken code, didn't break it
+        String syntaxError = service == null || service.syntaxError(source) != null ? null : service.syntaxError(parse);
+        if (syntaxError != null) {
+            return new Reparsed(null, syntaxError.trim().isEmpty() ? "the parser recovered from a syntax error" :
+                    "the parser recovered from a syntax error near `" + firstLine(syntaxError) + "`");
         } else if (!printed(parse).equals(printed)) {
             // a parser that reports a syntax error can still return a tree, and one that doesn't print back what it
             // read without one is the parser's to fix
