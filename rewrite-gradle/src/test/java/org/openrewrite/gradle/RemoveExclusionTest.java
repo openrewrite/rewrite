@@ -287,6 +287,30 @@ class RemoveExclusionTest implements RewriteTest {
     }
 
     @Test
+    void kotlinConfigurationLookupInConfigurationsBlock() {
+        rewriteRun(
+          buildGradleKts(
+            """
+              plugins {
+                  java
+              }
+
+              configurations {
+                  named("implementation") {
+                      exclude(group = "org.springframework.boot", module = "spring-boot-starter-tomcat")
+                  }
+              }
+              """,
+            """
+              plugins {
+                  java
+              }
+              """
+          )
+        );
+    }
+
+    @Test
     void keepsCreatedConfiguration() {
         rewriteRun(
           buildGradleKts(

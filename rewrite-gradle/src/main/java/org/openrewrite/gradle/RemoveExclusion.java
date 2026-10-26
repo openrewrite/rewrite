@@ -127,7 +127,7 @@ public class RemoveExclusion extends Recipe {
                     return m;
                 }
                 List<Expression> args = m.getArguments();
-                if (args.size() == 1 || isConfigurationLookup(m)) {
+                if (args.size() == 1 || isConfigurationLookup(m, getCursor())) {
                     remove(m);
                     return m;
                 }
@@ -206,11 +206,15 @@ public class RemoveExclusion extends Recipe {
         return false;
     }
 
-    private static boolean isConfigurationLookup(J.MethodInvocation method) {
+    private static boolean isConfigurationLookup(J.MethodInvocation method, Cursor cursor) {
         if (!"named".equals(method.getSimpleName()) && !"getByName".equals(method.getSimpleName())) {
             return false;
         }
         Expression select = method.getSelect();
+        if (select == null) {
+            Object enclosing = cursor.dropParentUntil(v -> v instanceof J.MethodInvocation || v == Cursor.ROOT_VALUE).getValue();
+            return enclosing instanceof J.MethodInvocation && "configurations".equals(((J.MethodInvocation) enclosing).getSimpleName());
+        }
         return select instanceof J.Identifier && "configurations".equals(((J.Identifier) select).getSimpleName()) ||
                 select instanceof J.FieldAccess && "configurations".equals(((J.FieldAccess) select).getSimpleName());
     }
