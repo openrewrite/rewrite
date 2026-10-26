@@ -49,6 +49,11 @@ public class UpdateJavaCompatibility extends Recipe {
     private static final MethodMatcher TARGET_COMPATIBILITY_DSL = new MethodMatcher("org.gradle.api.Project setTargetCompatibility(..)", true);
     private static final MethodMatcher SOURCE_COMPATIBILITY_METHOD = new MethodMatcher("org.gradle.api.Project sourceCompatibility(..)", true);
     private static final MethodMatcher TARGET_COMPATIBILITY_METHOD = new MethodMatcher("org.gradle.api.Project targetCompatibility(..)", true);
+    // Android's `compileOptions { sourceCompatibility JavaVersion.VERSION_1_8 }` is not attributed in build scripts,
+    // so it is matched by name inside the `compileOptions` block.
+    private static final MethodMatcher COMPILE_OPTIONS = new MethodMatcher("* compileOptions(..)");
+    private static final MethodMatcher COMPILE_OPTIONS_SOURCE_COMPATIBILITY = new MethodMatcher("* sourceCompatibility(..)");
+    private static final MethodMatcher COMPILE_OPTIONS_TARGET_COMPATIBILITY = new MethodMatcher("* targetCompatibility(..)");
 
     @Option(displayName = "Java version",
             description = "The Java version to upgrade to.",
@@ -165,13 +170,18 @@ public class UpdateJavaCompatibility extends Recipe {
             @Override
             public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
                 J.MethodInvocation m = super.visitMethodInvocation(method, ctx);
-                if (SOURCE_COMPATIBILITY_METHOD.matches(m) || SOURCE_COMPATIBILITY_DSL.matches(m)) {
+                boolean inCompileOptions = isInsideCompileOptions(getCursor());
+                boolean source = SOURCE_COMPATIBILITY_DSL.matches(m) ||
+                        inCompileOptions && COMPILE_OPTIONS_SOURCE_COMPATIBILITY.matches(m, true);
+                boolean target = TARGET_COMPATIBILITY_DSL.matches(m) ||
+                        inCompileOptions && COMPILE_OPTIONS_TARGET_COMPATIBILITY.matches(m, true);
+                if (source || SOURCE_COMPATIBILITY_METHOD.matches(m)) {
                     sourceCompatibilityFound = true;
                 }
-                if (TARGET_COMPATIBILITY_METHOD.matches(m) || TARGET_COMPATIBILITY_DSL.matches(m)) {
+                if (target || TARGET_COMPATIBILITY_METHOD.matches(m)) {
                     targetCompatibilityFound = true;
                 }
-                return handleMethodInvocation(m);
+                return handleMethodInvocation(m, source, target);
             }
         });
     }
@@ -298,7 +308,7 @@ public class UpdateJavaCompatibility extends Recipe {
         return declarationStyle != null && declarationStyle != currentStyle;
     }
 
-    private J.MethodInvocation handleMethodInvocation(J.MethodInvocation m) {
+    private J.MethodInvocation handleMethodInvocation(J.MethodInvocation m, boolean source, boolean target) {
         if ("jvmToolchain".equals(m.getSimpleName()) || isMethodInvocation(m, "JavaLanguageVersion", "of")) {
             List<Expression> args = m.getArguments();
 
@@ -331,10 +341,10 @@ public class UpdateJavaCompatibility extends Recipe {
             return m;
         }
 
-        if (SOURCE_COMPATIBILITY_DSL.matches(m) || TARGET_COMPATIBILITY_DSL.matches(m)) {
+        if (source || target) {
             if (compatibilityType != null && (
-                    (compatibilityType == CompatibilityType.source && !SOURCE_COMPATIBILITY_DSL.matches(m)) ||
-                            (compatibilityType == CompatibilityType.target && !TARGET_COMPATIBILITY_DSL.matches(m)))) {
+                    (compatibilityType == CompatibilityType.source && !source) ||
+                            (compatibilityType == CompatibilityType.target && !target))) {
                 return m;
             }
 
@@ -514,6 +524,11 @@ public class UpdateJavaCompatibility extends Recipe {
             return new J.Literal(randomId(), prefix, markers, newJavaVersionDouble, String.valueOf(newJavaVersionDouble), emptyList(), JavaType.Primitive.Double);
         }
         return new J.Literal(randomId(), prefix, markers, version, String.valueOf(version), emptyList(), JavaType.Primitive.Int);
+    }
+
+    private static boolean isInsideCompileOptions(Cursor cursor) {
+        return cursor.getPathAsStream()
+                .anyMatch(o -> o instanceof J.MethodInvocation && COMPILE_OPTIONS.matches((J.MethodInvocation) o, true));
     }
 
     private static boolean isMethodInvocation(J expression, String clazz, String method) {
