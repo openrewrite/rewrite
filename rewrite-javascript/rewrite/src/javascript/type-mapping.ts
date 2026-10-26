@@ -18,7 +18,15 @@ import * as path from "path";
 import {Type} from "../java";
 import FUNCTION_TYPE_NAME = Type.FUNCTION_TYPE_NAME;
 import OBJECT_TYPE_NAME = Type.OBJECT_TYPE_NAME;
-import {declarationsOf, declaredNameOf, fullyQualifiedNameOf, signatureKeyOf, typeAtLocation, valueDeclarationOf} from "./ts7/checker";
+import {
+    declarationsOf,
+    declaredNameOf,
+    fullyQualifiedNameOf,
+    type MemoizingChecker,
+    signatureKeyOf,
+    typeAtLocation,
+    valueDeclarationOf
+} from "./ts7/checker";
 import {isScanned} from "./token-navigation";
 
 /**
@@ -35,6 +43,23 @@ function sortBySignature(bounds: Type[]): void {
     });
 }
 
+/** Whether `symbol` is a variable, parameter or property, rather than a type, function, class or namespace. */
+function isVariableSymbol(symbol: ts.Symbol): boolean {
+    const excluded = ts.SymbolFlags.Function |
+        ts.SymbolFlags.Class |
+        ts.SymbolFlags.Interface |
+        ts.SymbolFlags.Enum |
+        ts.SymbolFlags.ValueModule |
+        ts.SymbolFlags.NamespaceModule |
+        ts.SymbolFlags.TypeAlias |
+        ts.SymbolFlags.TypeParameter;
+    const variable = ts.SymbolFlags.Variable |
+        ts.SymbolFlags.Property |
+        ts.SymbolFlags.FunctionScopedVariable |
+        ts.SymbolFlags.BlockScopedVariable;
+    return !(symbol.flags & excluded) && !!(symbol.flags & variable);
+}
+
 export class JavaScriptTypeMapping {
     // Primary cache: Use type signatures (preferring type.id) as cache keys
     // TypeScript assigns stable IDs to all types, so we don't need secondary caches
@@ -48,7 +73,7 @@ export class JavaScriptTypeMapping {
 
 
     constructor(
-        private readonly checker: ts.TypeChecker,
+        private readonly checker: MemoizingChecker,
         private readonly sourceRoot?: string
     ) {
         this.regExpSymbol = checker.resolveName("RegExp", ts.SymbolFlags.Type, undefined, false);
@@ -70,6 +95,19 @@ export class JavaScriptTypeMapping {
         if (booleanSymbol) {
             this.booleanWrapperType = checker.getDeclaredTypeOfSymbol(booleanSymbol);
         }
+    }
+
+    /** Asks about a file's names, and the types of the variables they refer to, before the file is mapped. */
+    prefetch(sourceFile: ts.SourceFile): void {
+        const variables: (readonly [ts.Symbol, ts.Node])[] = [];
+        for (const name of this.checker.prefetch(sourceFile)) {
+            const symbol = this.checker.getSymbolAtLocation(name);
+            // An alias is left to variableType, since resolving it is a request of its own.
+            if (symbol && !(symbol.flags & ts.SymbolFlags.Alias) && isVariableSymbol(symbol)) {
+                variables.push([symbol, name]);
+            }
+        }
+        this.checker.prefetchTypesOfSymbols(variables);
     }
 
     type(node: ts.Node): Type | undefined {
@@ -565,33 +603,7 @@ export class JavaScriptTypeMapping {
             actualSymbol = this.checker.getAliasedSymbol(symbol);
         }
 
-        // Check if this symbol represents a variable, parameter, or property
-        // Exclude functions, classes, interfaces, namespaces, type aliases
-        const isExcluded = actualSymbol.flags & (
-            ts.SymbolFlags.Function |
-            ts.SymbolFlags.Class |
-            ts.SymbolFlags.Interface |
-            ts.SymbolFlags.Enum |
-            ts.SymbolFlags.ValueModule |
-            ts.SymbolFlags.NamespaceModule |
-            ts.SymbolFlags.TypeAlias |
-            ts.SymbolFlags.TypeParameter
-        );
-
-        if (isExcluded) {
-            // Not a variable - it's a type, function, class, namespace, etc.
-            return undefined;
-        }
-
-        const isVariable = actualSymbol.flags & (
-            ts.SymbolFlags.Variable |
-            ts.SymbolFlags.Property |
-            ts.SymbolFlags.FunctionScopedVariable |
-            ts.SymbolFlags.BlockScopedVariable
-        );
-
-        if (!isVariable) {
-            // Not a variable we recognize
+        if (!isVariableSymbol(actualSymbol)) {
             return undefined;
         }
 
@@ -1520,34 +1532,29 @@ export class JavaScriptTypeMapping {
             }
         }
 
-        // Get properties and methods
-        const properties = this.checker.getPropertiesOfType(type);
-        for (const prop of properties) {
+        // Fields become members. Properties without a declaration (synthetic/built-in ones) and methods do not.
+        // TODO: Create Type.Method when method support is added
+        const fields: (readonly [ts.Symbol, ts.Node])[] = [];
+        for (const prop of this.checker.getPropertiesOfType(type)) {
             const declaration = valueDeclarationOf(prop) || declarationsOf(prop)?.[0];
-            if (!declaration) {
-                // Skip properties without declarations (synthetic/built-in properties)
-                continue;
+            if (declaration && !(prop.flags & ts.SymbolFlags.Method)) {
+                fields.push([prop, declaration]);
             }
-
-            if (prop.flags & ts.SymbolFlags.Method) {
-                // TODO: Create Type.Method when method support is added
-                // For now, skip methods
-                continue;
-            } else {
-                // Create Type.Variable for fields/properties
-                const propType = this.checker.getTypeOfSymbolAtLocation(prop, declaration);
-                const variable: Type.Variable = {
-                    kind: Type.Kind.Variable,
-                    name: prop.name,
-                    owner: classType,  // Cyclic reference to the containing class (already in cache)
-                    type: this.getType(propType), // This will find classType in cache if it's recursive
-                    annotations: [],
-                    toJSON: function () {
-                        return Type.signature(this);
-                    }
-                } as Type.Variable;
-                classType.members.push(variable);
-            }
+        }
+        this.checker.prefetchTypesOfSymbols(fields);
+        for (const [prop, declaration] of fields) {
+            const propType = this.checker.getTypeOfSymbolAtLocation(prop, declaration);
+            const variable: Type.Variable = {
+                kind: Type.Kind.Variable,
+                name: prop.name,
+                owner: classType,  // Cyclic reference to the containing class (already in cache)
+                type: this.getType(propType), // This will find classType in cache if it's recursive
+                annotations: [],
+                toJSON: function () {
+                    return Type.signature(this);
+                }
+            } as Type.Variable;
+            classType.members.push(variable);
         }
     }
 

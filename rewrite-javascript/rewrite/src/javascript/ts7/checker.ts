@@ -26,7 +26,7 @@ import {
     type SourceFile,
     type TypeNode,
 } from "typescript/ast";
-import type {Checker, Signature, Symbol as Symbol7, Type} from "typescript/sync";
+import type {API, Checker, Signature, Symbol as Symbol7, Type} from "typescript/sync";
 
 // The checker runs in the Go process and answers over IPC, which shapes three things the parser has
 // to account for: a type-position identifier resolves through its enclosing type node, a symbol's
@@ -147,11 +147,17 @@ export function signatureKeyOf(checker: Checker, signature: Signature): string {
  * arguments six — so the answers are held for the life of the project they were asked about.
  */
 export interface MemoizingChecker extends Checker {
-    /** Asks about every name in a file at once, so the questions that follow are answered locally. */
-    prefetch(sourceFile: SourceFile): void;
+    /**
+     * Asks about every name in a file at once, so the questions that follow are answered locally.
+     * Returns the names.
+     */
+    prefetch(sourceFile: SourceFile): readonly Node[];
+
+    /** Asks for each symbol's type at its location in one round trip. */
+    prefetchTypesOfSymbols(questions: readonly (readonly [Symbol7, Node])[]): void;
 }
 
-export function memoizing(checker: Checker): MemoizingChecker {
+export function memoizing(checker: Checker, api: Pick<API, "batch">): MemoizingChecker {
     const perNode = new WeakMap<object, Map<string, unknown>>();
     const perId = new Map<string, unknown>();
 
@@ -174,7 +180,7 @@ export function memoizing(checker: Checker): MemoizingChecker {
 
     // A name is what the parser asks about, and asking for all of them in one request costs a single
     // round trip where asking one at a time costs thousands.
-    const prefetch = (sourceFile: SourceFile): void => {
+    const prefetch = (sourceFile: SourceFile): readonly Node[] => {
         const names: Node[] = [];
         const walk = (node: Node): void => {
             if (isIdentifier(node)) {
@@ -187,7 +193,7 @@ export function memoizing(checker: Checker): MemoizingChecker {
         };
         walk(sourceFile as unknown as Node);
         if (names.length === 0) {
-            return;
+            return names;
         }
         const symbols = checker.getSymbolAtLocation(names);
         const types = checker.getTypeAtLocation(names);
@@ -195,6 +201,19 @@ export function memoizing(checker: Checker): MemoizingChecker {
             byNode("getSymbolAtLocation", name, () => symbols[i]);
             byNode("getTypeAtLocation", name, () => types[i]);
         });
+        return names;
+    };
+
+    const typeOfSymbolKey = (symbol: {id: number}) => `getTypeOfSymbolAtLocation:${symbol?.id}`;
+    const prefetchTypesOfSymbols = (questions: readonly (readonly [Symbol7, Node])[]): void => {
+        const unasked = questions.filter(([symbol, location]) =>
+            !perNode.get(location)?.has(typeOfSymbolKey(symbol)));
+        if (unasked.length === 0) {
+            return;
+        }
+        const types = api.batch(...unasked.map(([symbol, location]) =>
+            checker.getTypeOfSymbolAtLocation.gen(symbol, location)));
+        unasked.forEach(([symbol, location], i) => byNode(typeOfSymbolKey(symbol), location, () => types[i]));
     };
 
     // Only the questions whose answer depends on nothing but the arguments are remembered; the rest
@@ -203,6 +222,9 @@ export function memoizing(checker: Checker): MemoizingChecker {
         get(target, property: string, receiver) {
             if (property === "prefetch") {
                 return prefetch;
+            }
+            if (property === "prefetchTypesOfSymbols") {
+                return prefetchTypesOfSymbols;
             }
             const value = Reflect.get(target, property, receiver);
             if (typeof value !== "function") {
@@ -219,7 +241,7 @@ export function memoizing(checker: Checker): MemoizingChecker {
                         : byNode(property, node, () => call(node));
                 case "getTypeOfSymbolAtLocation":
                     return (symbol: {id: number}, location: object) =>
-                        byNode(`${property}:${symbol?.id}`, location, () => call(symbol, location));
+                        byNode(typeOfSymbolKey(symbol), location, () => call(symbol, location));
                 case "getDeclaredTypeOfSymbol":
                 case "getAliasedSymbol":
                 case "getTypeOfSymbol":
@@ -231,6 +253,10 @@ export function memoizing(checker: Checker): MemoizingChecker {
                 case "getBaseTypes":
                 case "getReturnTypeOfSignature":
                     return (type: {id: number}) => byId(`${property}:${type?.id}`, () => call(type));
+                case "typeToString":
+                    return (type: {id: number}, ...context: unknown[]) => context.length === 0
+                        ? byId(`${property}:${type?.id}`, () => call(type))
+                        : call(type, ...context);
                 case "getSignaturesOfType":
                     return (type: {id: number}, kind: unknown) =>
                         byId(`${property}:${type?.id}:${String(kind)}`, () => call(type, kind));

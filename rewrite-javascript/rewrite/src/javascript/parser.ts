@@ -52,8 +52,7 @@ import ComputedPropertyName = JS.ComputedPropertyName;
 import Attribute = JSX.Attribute;
 import SpreadAttribute = JSX.SpreadAttribute;
 import {childAt, childCountOf, childrenOf, firstTokenOf, lastTokenOf} from "./token-navigation";
-import {Compiler} from "./ts7/program";
-import type {Project} from "typescript/sync";
+import {Compiler, type MemoizedProject} from "./ts7/program";
 
 export interface JavaScriptParserOptions extends ParserOptions {
     styles?: NamedStyles[],
@@ -262,7 +261,7 @@ export class JavaScriptParser extends Parser {
         // A JavaScriptTypeMapping deduplicates by `Type.id`, which is only unique within the
         // checker that issued it, so each project needs its own.
         const typeMappings = new Map<string, JavaScriptTypeMapping>();
-        const typeMappingFor = (project: Project, projectKey: string) => {
+        const typeMappingFor = (project: MemoizedProject, projectKey: string) => {
             let typeMapping = typeMappings.get(projectKey);
             if (!typeMapping) {
                 typeMappings.set(projectKey, typeMapping =
@@ -286,9 +285,7 @@ export class JavaScriptParser extends Parser {
                     continue;
                 }
 
-                // One request for the file's names, so the type mapping's questions are answered locally.
-                (project.checker as unknown as {prefetch?: (sf: typeof sourceFile) => void})
-                    .prefetch?.(sourceFile);
+                typeMappingFor(project, projectKey).prefetch(sourceFile);
 
                 const syntaxErrors = checkSyntaxErrors(project.program, sourceFile);
                 if (syntaxErrors.length > 0) {

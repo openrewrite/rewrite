@@ -15,7 +15,7 @@
  */
 import path from "node:path";
 import {API, type Project, type Snapshot} from "typescript/sync";
-import {memoizing} from "./checker";
+import {memoizing, type MemoizingChecker} from "./checker";
 
 // The compiler runs as its own process that owns parsing and module resolution, so a program is
 // described to it rather than built here. Each snapshot layers the sources the parser holds in
@@ -28,8 +28,11 @@ export interface ProjectRequest {
     readonly rootFiles: readonly string[];
 }
 
+/** A compiler project whose checker remembers its answers. */
+export type MemoizedProject = Project & {readonly checker: MemoizingChecker};
+
 export interface ParseSession {
-    projectFor(key: string): Project;
+    projectFor(key: string): MemoizedProject;
 
     close(): void;
 }
@@ -92,7 +95,7 @@ export class Compiler {
             previous.snapshot?.dispose();
         }
 
-        const opened = new Map<string, Project>();
+        const opened = new Map<string, MemoizedProject>();
         return {
             projectFor: key => {
                 let project = opened.get(key);
@@ -103,11 +106,11 @@ export class Compiler {
                         throw new Error(`TypeScript did not open a project at ${configPath ?? key}`);
                     }
                     restoreInputText(found, sources, restore);
-                    const checker = memoizing(found.checker);
+                    const checker = memoizing(found.checker, this.compilerApi());
                     opened.set(key, project = new Proxy(found, {
                         get: (target, property: string, receiver) =>
                             property === "checker" ? checker : Reflect.get(target, property, receiver),
-                    }));
+                    }) as MemoizedProject);
                 }
                 return project;
             },
@@ -172,7 +175,7 @@ export function openSession(
     sources: ReadonlyMap<string, string>,
     compilerOptions: Record<string, unknown>,
     rootFiles?: readonly string[],
-): {project: Project, close(): void} {
+): {project: MemoizedProject, close(): void} {
     const compiler = new Compiler(root);
     const key = "";
     const session = compiler.open(sources, [{key, options: compilerOptions, rootFiles: rootFiles ?? [...sources.keys()]}]);
