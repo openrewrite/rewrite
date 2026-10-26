@@ -409,6 +409,11 @@ public interface JS extends J {
         @Nullable
         TypeTree returnTypeExpression;
 
+        /**
+         * The function an arrow bound to a variable declares, as a function expression's declaration does.
+         */
+        JavaType.@Nullable Method methodType;
+
         @Override
         public @Nullable JavaType getType() {
             return lambda.getType();

@@ -20,6 +20,8 @@ import {javascript, JavaScriptVisitor, JS, npm, packageJson, tsx, typescript} fr
 import {J, Type} from "../../src/java";
 import {ExecutionContext, foundSearchResult, Recipe} from "../../src";
 import {withDir} from "tmp-promise";
+import * as fs from "fs";
+import * as path from "path";
 import FullyQualified = Type.FullyQualified;
 
 describe('JavaScript type mapping', () => {
@@ -2335,6 +2337,67 @@ describe('JavaScript type mapping', () => {
         await withDir(async repo => spec.rewriteRun(npm(repo.path, util, main)), {unsafeCleanup: true});
     });
 
+    test('a function bound to a variable is declared, and called from another tsconfig project, under the variable\'s name', async () => {
+        const spec = new RecipeSpec();
+        spec.recipe = markTypes((node, type) =>
+            [J.Kind.MethodDeclaration, JS.Kind.ArrowFunction, J.Kind.MethodInvocation].includes(node?.kind) && Type.isMethod(type) ?
+                `${FullyQualified.getFullyQualifiedName(type.declaringType)}#${type.name}` +
+                (type.flags & Type.Flag.Static ? ' static' : '') : null);
+
+        const util = typescript(
+            `
+                export const arrow = (n: number): number => n;
+                export const expr = function (n: number): number { return n; };
+                export const named = function inner(n: number): number { return n; };
+                export const cast = ((n: number) => n) as (n: number) => number;
+                export const callbacks = [() => 1];
+                arrow(1);
+                function scoped(): void { var local = function (): void {}; local(); }
+            `,
+            //@formatter:off
+            `
+                export const arrow = /*~~(src/util#arrow static)~~>*/(n: number): number => n;
+                export const expr = /*~~(src/util#expr static)~~>*/function (n: number): number { return n; };
+                export const named = /*~~(src/util#named static)~~>*/function inner(n: number): number { return n; };
+                export const cast = (/*~~(src/util#cast static)~~>*/(n: number) => n) as (n: number) => number;
+                export const callbacks = [() => 1];
+                /*~~(src/util#arrow static)~~>*/arrow(1);
+                /*~~(src/util#scoped static)~~>*/function scoped(): void { var local = /*~~(src/util#local)~~>*/function (): void {}; /*~~(src/util#local)~~>*/local(); }
+            `
+            //@formatter:on
+        );
+        util.path = 'src/util.ts';
+        const main = typescript(
+            `
+                import {arrow, expr as e, named, cast} from '../src/util';
+                import * as u from '../src/util';
+                arrow(1);
+                e(1);
+                named(1);
+                cast(1);
+                u.cast(1);
+            `,
+            //@formatter:off
+            `
+                import {arrow, expr as e, named, cast} from '../src/util';
+                import * as u from '../src/util';
+                /*~~(src/util#arrow static)~~>*/arrow(1);
+                /*~~(src/util#expr static)~~>*/e(1);
+                /*~~(src/util#named static)~~>*/named(1);
+                /*~~(src/util#cast static)~~>*/cast(1);
+                /*~~(src/util#cast static)~~>*/u.cast(1);
+            `
+            //@formatter:on
+        );
+        main.path = 'test/main.ts';
+        await withDir(async repo => {
+            fs.writeFileSync(path.join(repo.path, 'tsconfig.json'), '{"include": ["src"]}');
+            fs.mkdirSync(path.join(repo.path, 'test'));
+            fs.writeFileSync(path.join(repo.path, 'test/tsconfig.json'), '{"extends": "../tsconfig.json", "include": ["."]}');
+            await spec.rewriteRun(npm(repo.path, util, main));
+        }, {unsafeCleanup: true});
+    });
+
     test('FindMissingTypes produces no results on a complex class', async () => {
         const findings: string[] = [];
 
@@ -3405,6 +3468,15 @@ function markTypes(predicate: (node: any, type: Type | undefined) => string | nu
 
                 async visitMethodDeclaration(method: J.MethodDeclaration, p: ExecutionContext): Promise<J.MethodDeclaration> {
                     const visited = await super.visitMethodDeclaration(method, p) as J.MethodDeclaration;
+                    const description = predicate(visited, visited.methodType);
+                    if (description) {
+                        return foundSearchResult(visited, description);
+                    }
+                    return visited;
+                }
+
+                async visitArrowFunction(arrow: JS.ArrowFunction, p: ExecutionContext): Promise<J | undefined> {
+                    const visited = await super.visitArrowFunction(arrow, p) as JS.ArrowFunction;
                     const description = predicate(visited, visited.methodType);
                     if (description) {
                         return foundSearchResult(visited, description);

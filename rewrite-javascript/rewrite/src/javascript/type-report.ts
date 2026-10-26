@@ -184,7 +184,7 @@ export async function buildTypeReport(sourceFile: SourceFile, options: TypeRepor
     const entries: TypeEntry[] = [];
     let nodeCount = 0;
     located.forEach((item, i) => {
-        if (options.all ? !hasTypeSlot(item.node) || callNames.has(item.node) : !DEFAULT_KINDS.has(item.node.kind)) {
+        if (!isListed(item.node, !!options.all) || options.all && callNames.has(item.node)) {
             return;
         }
         nodeCount++;
@@ -392,6 +392,14 @@ async function locate(sourceFile: SourceFile): Promise<{ located: Located[], pri
 }
 
 // `type` also names fields that hold no Type, so a slot counts only when it is empty or typed.
+/** An arrow function is listed only where it declares a function, as its lambda carries its type. */
+function isListed(node: J, all: boolean): boolean {
+    if (node.kind === JS.Kind.ArrowFunction) {
+        return (node as JS.ArrowFunction).methodType !== undefined;
+    }
+    return all ? hasTypeSlot(node) : DEFAULT_KINDS.has(node.kind);
+}
+
 function hasTypeSlot(node: J): boolean {
     return TYPE_SLOTS.some(slot => slot in node &&
         ((node as any)[slot] === undefined || Type.isType((node as any)[slot])));
@@ -505,6 +513,9 @@ function receiverOf(node: J): J | undefined {
 function bodyOf(node: J): J | undefined {
     if (node.kind === J.Kind.MethodDeclaration) {
         return (node as J.MethodDeclaration).body;
+    }
+    if (node.kind === JS.Kind.ArrowFunction) {
+        return (node as JS.ArrowFunction).lambda.body;
     }
     if (node.kind === J.Kind.ClassDeclaration) {
         return (node as J.ClassDeclaration).body;

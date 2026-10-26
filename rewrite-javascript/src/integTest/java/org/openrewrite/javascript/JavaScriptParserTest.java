@@ -25,6 +25,7 @@ import org.openrewrite.InMemoryExecutionContext;
 import org.openrewrite.Parser;
 import org.openrewrite.SourceFile;
 import org.openrewrite.java.tree.J;
+import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.javascript.rpc.JavaScriptRewriteRpc;
 import org.openrewrite.javascript.tree.JS;
 
@@ -32,6 +33,7 @@ import java.io.IOException;
 import java.net.URI;
 import java.net.URL;
 import java.nio.file.Path;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 
@@ -94,6 +96,36 @@ class JavaScriptParserTest {
         assertThat(typescript).containsInstanceOf(JS.CompilationUnit.class);
         assertThat(typescript.get()).satisfies(cu ->
           assertThat(cu.getSourcePath()).isEqualTo(input.getPath()));
+    }
+
+    @Test
+    void arrowBoundToVariableDeclaresTheFunctionItsCallsName() {
+        @Language("ts")
+        String source = """
+          export const half = (n: number) => n / 2;
+          half(4);
+          """;
+        Parser.Input input = Parser.Input.fromString(Path.of("half.ts"), source);
+        SourceFile cu = parser.parseInputs(List.of(input), null, ctx).findFirst().orElseThrow();
+
+        List<JavaType.Method> methodTypes = new ArrayList<>();
+        new JavaScriptIsoVisitor<Integer>() {
+            @Override
+            public JS.ArrowFunction visitArrowFunction(JS.ArrowFunction arrowFunction, Integer p) {
+                methodTypes.add(arrowFunction.getMethodType());
+                return super.visitArrowFunction(arrowFunction, p);
+            }
+
+            @Override
+            public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, Integer p) {
+                methodTypes.add(method.getMethodType());
+                return super.visitMethodInvocation(method, p);
+            }
+        }.visit(cu, 0);
+
+        assertThat(methodTypes)
+          .extracting(m -> m.getDeclaringType().getFullyQualifiedName() + "#" + m.getName())
+          .containsExactly("half#half", "half#half");
     }
 
     @SuppressWarnings({"TypeScriptUnresolvedReference", "HtmlUnknownAttribute"})

@@ -145,6 +145,8 @@ export namespace JS {
         readonly typeParameters?: J.TypeParameters;
         readonly lambda: J.Lambda;
         readonly returnTypeExpression?: TypeTree;
+        /** The function an arrow bound to a variable declares, as a function expression's declaration does. */
+        readonly methodType?: Type.Method;
     }
 
     /**

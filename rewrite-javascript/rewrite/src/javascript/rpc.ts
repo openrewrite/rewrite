@@ -310,6 +310,7 @@ class JavaScriptSender extends JavaScriptRpcVisitor<RpcSendQueue> {
         q.getAndSend(arrowFunction, el => el.typeParameters, el => this.visit(el, q));
         q.getAndSend(arrowFunction, el => el.lambda, el => this.visit(el, q));
         q.getAndSend(arrowFunction, el => el.returnTypeExpression, el => this.visit(el, q));
+        q.getAndSend(arrowFunction, el => asRef(el.methodType), el => this.visitType(el, q));
         return arrowFunction;
     }
 
@@ -851,7 +852,8 @@ class JavaScriptReceiver extends JavaScriptRpcVisitor<RpcReceiveQueue> {
             modifiers: q.receiveListDefined(arrowFunction.modifiers, el => this.visitDefined<J.Modifier>(el, q)),
             typeParameters: q.receive(arrowFunction.typeParameters, el => this.visitDefined<J.TypeParameters>(el, q)),
             lambda: q.receive(arrowFunction.lambda, el => this.visitDefined<J.Lambda>(el, q)),
-            returnTypeExpression: q.receive(arrowFunction.returnTypeExpression, el => this.visitDefined<TypeTree>(el, q))
+            returnTypeExpression: q.receive(arrowFunction.returnTypeExpression, el => this.visitDefined<TypeTree>(el, q)),
+            methodType: q.receive(arrowFunction.methodType, el => this.visitType(el, q) as unknown as Type.Method)
         };
         return updateIfChanged(arrowFunction, updates);
     }

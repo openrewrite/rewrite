@@ -80,7 +80,8 @@ public class JavaScriptReceiver extends JavaScriptVisitor<RpcReceiveQueue> {
                 .withModifiers(q.receiveList(arrowFunction.getModifiers(), mod -> (J.Modifier) visitNonNull(mod, q)))
                 .withTypeParameters(q.receive(arrowFunction.getTypeParameters(), params -> (J.TypeParameters) visitNonNull(params, q)))
                 .withLambda(q.receive(arrowFunction.getLambda(), tree -> (J.Lambda) visitNonNull(tree, q)))
-                .withReturnTypeExpression(q.receive(arrowFunction.getReturnTypeExpression(), tree -> (TypeTree) visitNonNull(tree, q)));
+                .withReturnTypeExpression(q.receive(arrowFunction.getReturnTypeExpression(), tree -> (TypeTree) visitNonNull(tree, q)))
+                .withMethodType(q.receive(arrowFunction.getMethodType(), type -> (JavaType.Method) visitType(type, q)));
     }
 
     @Override
