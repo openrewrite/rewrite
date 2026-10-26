@@ -199,20 +199,16 @@ class ScalaTypeSignatureBuilder(using ctx: Context) {
     case other => List(other)
   }
 
-  /** The FQN of a class by its JVM binary name (`Outer$Inner`): `object A` has the same class type as `class A`, and `scala.Any`/`scala.AnyRef` are `java.lang.Object`. */
-  def classFqn(sym: Symbols.Symbol): String = {
-    val fqn = binaryName(sym)
-    val classFqn = if (sym.is(Flags.ModuleClass)) fqn.stripSuffix("$") else fqn
-    classFqn match {
-      case "scala.Any" | "scala.AnyRef" => "java.lang.Object"
-      case other => other
-    }
+  /**
+   * The FQN of a class by its JVM binary name (`Outer$Inner`, `object A` as `A$`), with `scala.Any`/`scala.AnyRef`
+   * as `java.lang.Object`. Java statics live on a module class `X$` and are keyed under `X` like the Java parser does.
+   */
+  def classFqn(sym: Symbols.Symbol): String = methodOwnerFqn(sym) match {
+    case "scala.Any" | "scala.AnyRef" => "java.lang.Object"
+    case other => other
   }
 
-  /**
-   * The owner of a method in its signature. Java statics live on a module class `X$` and are keyed under `X`
-   * like the Java parser does, while a Scala `object A` keeps its `$` so its methods don't collide with `class A`'s.
-   */
+  /** The owner of a method in its signature: its class by binary name, with Java statics under the Java class. */
   def methodOwnerFqn(owner: Symbols.Symbol): String = {
     val fqn = binaryName(owner)
     if (owner.is(Flags.JavaDefined) && owner.is(Flags.ModuleClass)) fqn.stripSuffix("$") else fqn

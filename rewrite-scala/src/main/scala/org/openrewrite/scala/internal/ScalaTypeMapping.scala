@@ -772,7 +772,8 @@ class ScalaTypeMapping(typeFactory: JavaTypeFactory, typedTree: tpd.Tree,
       })
   }
 
-  def mapClassType(sym: Symbol, fqn: String, sig: String): JavaType.FullyQualified = {
+  def mapClassType(symbol: Symbol, fqn: String, sig: String): JavaType.FullyQualified = {
+    val sym = javaClassOfStatics(symbol)
     // Members of library types are not populated to avoid deep recursive type
     // graphs that cause StackOverflowError in recipes like ChangeType.
     val isSourceDefined = try {
@@ -856,6 +857,11 @@ class ScalaTypeMapping(typeFactory: JavaTypeFactory, typedTree: tpd.Tree,
       clazz.unsafeSet(null, supertype, null, null, interfaces, members, methods)
     })
   }
+
+  /** Java statics live on a module class `X$` that shares its key with the Java class `X`, so `X` describes it. */
+  private def javaClassOfStatics(sym: Symbol): Symbol =
+    if (sym.is(Flags.JavaDefined) && sym.is(Flags.ModuleClass) && sym.companionClass.exists) sym.companionClass
+    else sym
 
   // --- Method and Variable type mapping ---
 
