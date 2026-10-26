@@ -16,8 +16,23 @@
 initscript {
     repositories {
         mavenLocal()
-        maven { url = uri("https://central.sonatype.com/repository/maven-snapshots") }
-        mavenCentral()
+        // If MAVEN_CENTRAL_MIRROR_URL, _USERNAME and _PASSWORD are all set, download the plugin from that mirror
+        // instead of Maven Central and Sonatype's snapshots.
+        def mirrorUrl = System.getenv("MAVEN_CENTRAL_MIRROR_URL")
+        def mirrorUsername = System.getenv("MAVEN_CENTRAL_MIRROR_USERNAME")
+        def mirrorPassword = System.getenv("MAVEN_CENTRAL_MIRROR_PASSWORD")
+        if (mirrorUrl && mirrorUsername && mirrorPassword) {
+            maven {
+                url = uri(mirrorUrl)
+                credentials {
+                    username = mirrorUsername
+                    password = mirrorPassword
+                }
+            }
+        } else {
+            maven { url = uri("https://central.sonatype.com/repository/maven-snapshots") }
+            mavenCentral()
+        }
     }
 
     configurations.all {

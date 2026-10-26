@@ -23,6 +23,7 @@ import org.openrewrite.java.tree.JavaCoordinates;
 import org.openrewrite.scala.internal.template.ScalaSubstitutions;
 import org.openrewrite.scala.internal.template.ScalaTemplateParser;
 
+import javax.annotation.CheckReturnValue;
 import java.util.Set;
 import java.util.function.Consumer;
 
@@ -58,6 +59,7 @@ public class ScalaTemplate extends JavaTemplate {
         return new ScalaSubstitutions(getCode(), parameters);
     }
 
+    @CheckReturnValue
     public static <J2 extends J> J2 apply(String template, Cursor scope, JavaCoordinates coordinates, Object... parameters) {
         return builder(template).build().apply(scope, coordinates, parameters);
     }

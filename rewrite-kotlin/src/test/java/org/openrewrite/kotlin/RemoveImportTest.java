@@ -250,6 +250,22 @@ class RemoveImportTest implements RewriteTest {
     }
 
     @Test
+    void keepTypeImportAlias() {
+        rewriteRun(
+          spec -> spec.recipe(removeTypeImportRecipe("java.util.ArrayList")),
+          kotlin(
+            """
+              import java.util.ArrayList as AL
+
+              class A {
+                  val list = AL<String>()
+              }
+              """
+          )
+        );
+    }
+
+    @Test
     void noImportOfImplicitTypes() {
         rewriteRun(
           spec -> spec.recipe(removeTypeImportRecipe("kotlin.Pair")),
