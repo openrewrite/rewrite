@@ -16,6 +16,7 @@
 package org.openrewrite.scala;
 
 import org.junit.jupiter.api.Test;
+import org.openrewrite.ParseWarning;
 import org.openrewrite.SourceFile;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.Statement;
@@ -233,6 +234,23 @@ class ScalaParserTest {
         assertThat(forLoop.getBody()).isInstanceOf(J.Block.class);
         J.Block block = (J.Block) forLoop.getBody();
         assertThat(block.getStatements()).hasSize(2);
+    }
+
+    @Test
+    void reusedCompilerDoesNotSeeTheSourcesOfEarlierParses() {
+        // given
+        ScalaParser.Builder builder = ScalaParser.builder().reuseCompiler(true);
+        builder.build().parse("package p.q\n\nclass Earlier\n").collect(Collectors.toList());
+
+        // when
+        List<SourceFile> parsed = builder.build()
+          .parse("class Later {\n  val e: p.q.Earlier = null\n}\n")
+          .collect(Collectors.toList());
+
+        // then
+        assertThat(parsed.get(0).getMarkers().findAll(ParseWarning.class))
+          .as("The package and class an earlier parse defined must not resolve")
+          .anyMatch(w -> w.getMessage().contains("Not found: p"));
     }
 
     @Test
