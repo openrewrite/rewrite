@@ -1,3 +1,5 @@
+import com.hierynomus.gradle.license.LicenseBasePlugin
+import nl.javadude.gradle.plugins.license.LicenseExtension
 import java.util.Calendar
 
 plugins {
@@ -14,6 +16,13 @@ allprojects {
     description = "Eliminate tech-debt. Automatically."
 }
 
+// Lombok calls sun.misc.Unsafe, which every JVM from JDK 24 on warns about. JDK 23 added this option to allow
+// that quietly, and older JVMs refuse to start with it.
+fun allowSunMiscUnsafe(jdk: Provider<JavaLanguageVersion>) = object : CommandLineArgumentProvider {
+    override fun asArguments() =
+        if (jdk.orNull?.canCompileOrRun(23) == true) listOf("--sun-misc-unsafe-memory-access=allow") else emptyList()
+}
+
 subprojects {
     // The shared build plugin requests the JUnit BOM as a `6.+` range, which a snapshot in a
     // developer's local Maven repository satisfies. No snapshot carries `junit-platform-suite-*`,
@@ -24,6 +33,34 @@ subprojects {
             if (candidate.group.startsWith("org.junit") && candidate.version.endsWith("-SNAPSHOT")) {
                 reject("no JUnit snapshot carries every artifact an integTest suite needs")
             }
+        }
+    }
+
+    tasks.withType<JavaCompile>().configureEach {
+        // javac's closing notes about deprecated or unchecked API use repeat in every module and only point to -Xlint
+        options.compilerArgs.add("-XDsuppressNotes")
+        val release = options.release
+        options.compilerArgumentProviders.add(object : CommandLineArgumentProvider {
+            // javac 21+ calls `--release 8` obsolete, but Java 8 is the deliberate target
+            override fun asArguments() = if (release.orNull == 8) listOf("-Xlint:-options") else emptyList()
+        })
+        options.forkOptions.jvmArgumentProviders.add(
+            allowSunMiscUnsafe(javaCompiler.map { it.metadata.languageVersion })
+        )
+    }
+
+    tasks.withType<Test>().configureEach {
+        jvmArgumentProviders.add(allowSunMiscUnsafe(javaLauncher.map { it.metadata.languageVersion }))
+    }
+
+    // The header check has no comment style for these files and skips them anyway, logging a line for each one
+    plugins.withType<LicenseBasePlugin> {
+        configure<LicenseExtension> {
+            excludePatterns.addAll(listOf(
+                "**/META-INF/services/**", "**/META-INF/rewrite/mixins/**", "**/LICENSE-*", "**/gradlew-*",
+                "**/mvnw", "**/*.class", "**/*.gz", "**/*.ini", "**/*.jsonl", "**/*.jsx", "**/*.lock", "**/*.mjs",
+                "**/*.sha256", "**/*.tgz", "**/*.tsv", "**/*.tsx"
+            ))
         }
     }
 
