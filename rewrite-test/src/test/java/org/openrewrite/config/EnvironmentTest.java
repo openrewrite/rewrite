@@ -35,7 +35,7 @@ import static org.openrewrite.test.SourceSpecs.text;
 class EnvironmentTest implements RewriteTest {
 
     // Scanning the runtime classpath reads every class file on it, so the tests that list what it holds share one scan
-    private static final Environment RUNTIME_CLASSPATH = Environment.builder().scanRuntimeClasspath().build();
+    private static final Environment RUNTIME_CLASSPATH_ENV = Environment.builder().scanRuntimeClasspath().build();
 
     @DocumentExample
     @Test
@@ -342,7 +342,7 @@ class EnvironmentTest implements RewriteTest {
 
     @Test
     void listRecipeDescriptors() {
-        var recipeDescriptors = RUNTIME_CLASSPATH.listRecipeDescriptors();
+        var recipeDescriptors = RUNTIME_CLASSPATH_ENV.listRecipeDescriptors();
         assertThat(recipeDescriptors).isNotEmpty();
         var changeTextDescriptor = recipeDescriptors.stream().filter(rd -> "org.openrewrite.text.ChangeText".equals(rd.getName()))
           .findAny().orElse(null);
@@ -354,7 +354,7 @@ class EnvironmentTest implements RewriteTest {
 
     @Test
     void listStyles() {
-        var styles = RUNTIME_CLASSPATH.listStyles();
+        var styles = RUNTIME_CLASSPATH_ENV.listStyles();
         assertThat(styles).isNotEmpty();
         var sampleStyle = styles.stream().filter(s -> "org.openrewrite.SampleStyle".equals(s.getName()))
           .findAny().orElse(null);
@@ -382,7 +382,7 @@ class EnvironmentTest implements RewriteTest {
     @Issue("https://github.com/openrewrite/rewrite/issues/543")
     @Test
     void recipeDescriptorsFromCrossResources() {
-        var recipeDescriptors = RUNTIME_CLASSPATH.listRecipeDescriptors();
+        var recipeDescriptors = RUNTIME_CLASSPATH_ENV.listRecipeDescriptors();
         assertThat(recipeDescriptors).isNotEmpty();
         var helloJon2 = recipeDescriptors.stream().filter(rd -> "org.openrewrite.HelloJon2".equals(rd.getName()))
           .findAny().orElseThrow();

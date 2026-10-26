@@ -31,7 +31,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 @Deprecated
 class CategoryTreeTest {
     // Scanning the runtime classpath reads every class file on it, so the tests share one scan
-    private static final Environment RUNTIME_CLASSPATH = Environment.builder()
+    private static final Environment RUNTIME_CLASSPATH_ENV = Environment.builder()
       .scanRuntimeClasspath()
       .build();
 
@@ -45,7 +45,7 @@ class CategoryTreeTest {
 
     private CategoryTree.Root<Group> categoryTree() {
         return CategoryTree.<Group>build()
-          .putAll(Group.Group1, RUNTIME_CLASSPATH)
+          .putAll(Group.Group1, RUNTIME_CLASSPATH_ENV)
           .putAll(Group.Group2, custom);
     }
 
@@ -137,7 +137,7 @@ class CategoryTreeTest {
     @Test
     void reverseDnsPrefixesAreCategoryRoots() {
         CategoryTree.Root<Integer> ct = CategoryTree.<Integer>build()
-          .putAll(1, RUNTIME_CLASSPATH)
+          .putAll(1, RUNTIME_CLASSPATH_ENV)
           .putRecipes(1,
             recipeDescriptor("uk.co.acme.recipes"),
             recipeDescriptor("de.example.recipes"));
