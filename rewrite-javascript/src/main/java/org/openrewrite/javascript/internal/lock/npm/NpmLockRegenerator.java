@@ -235,7 +235,7 @@ public final class NpmLockRegenerator {
 
     /**
      * Where npm {@code release} run in {@code runsIn} installs and writes its lock, by {@link
-     * Inputs#getParentTrees()}; a walk that fails, which {@link #regenerate()} reports as it walks first, stops here.
+     * Inputs#parentTrees}; a walk that fails, which {@link #regenerate()} reports as it walks first, stops here.
      */
     public static InstallRoot installRoot(NpmRelease release, String runsIn, Map<String, String> manifests,
                                           Map<String, Map<String, @Nullable String>> parentTrees) {
