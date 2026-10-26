@@ -84,17 +84,17 @@ class ExtractorPatternTest implements RewriteTest {
 
                 J.DeconstructionPattern some = patterns.get(0);
                 assertThat(TypeUtils.isOfClassType(some.getType(), "scala.Some")).isTrue();
-                assertThat(TypeUtils.isOfClassType(some.getDeconstructor().getType(), "scala.Some")).isTrue();
+                assertThat(TypeUtils.isOfClassType(some.getDeconstructor().getType(), "scala.Some$")).isTrue();
                 assertThat(some.getNested()).singleElement()
                   .satisfies(v -> assertThat(((J.Identifier) v).getType()).isEqualTo(JavaType.Primitive.Int));
 
                 J.DeconstructionPattern cons = patterns.get(1);
                 assertThat(cons.getMarkers().findFirst(InfixNotation.class)).isPresent();
                 assertThat(((J.Identifier) cons.getDeconstructor()).getSimpleName()).isEqualTo("::");
-                assertThat(TypeUtils.isOfClassType(cons.getDeconstructor().getType(), "scala.collection.immutable.::")).isTrue();
+                assertThat(TypeUtils.isOfClassType(cons.getDeconstructor().getType(), "scala.collection.immutable.::$")).isTrue();
                 assertThat(cons.getNested()).extracting(n -> ((J.Identifier) n).getSimpleName()).containsExactly("h", "t");
 
-                assertThat(TypeUtils.isOfClassType(patterns.get(3).getDeconstructor().getType(), "scala.util.control.NonFatal")).isTrue();
+                assertThat(TypeUtils.isOfClassType(patterns.get(3).getDeconstructor().getType(), "scala.util.control.NonFatal$")).isTrue();
                 assertThat(TypeUtils.isOfClassType(patterns.get(3).getType(), "java.lang.Throwable")).isTrue();
             })
           )
@@ -128,7 +128,7 @@ class ExtractorPatternTest implements RewriteTest {
                   "a :: b :: rest", "b :: rest", "List( )", "List(head, _*)", "F.Person( \"x\" , 3 )",
                   "Person(n, a)", "Person(n, a)", "Some(q)", "Empty()", "`Some`(_: String)");
                 assertThat(patterns.get(0).getNested().get(1)).isSameAs(patterns.get(1));
-                assertThat(TypeUtils.isOfClassType(patterns.get(3).getDeconstructor().getType(), "scala.collection.immutable.List")).isTrue();
+                assertThat(TypeUtils.isOfClassType(patterns.get(3).getDeconstructor().getType(), "scala.collection.immutable.List$")).isTrue();
                 assertThat(patterns.get(4).getDeconstructor()).isInstanceOf(J.FieldAccess.class);
                 assertThat(patterns.get(8).getNested()).isEmpty();
             })

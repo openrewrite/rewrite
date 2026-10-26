@@ -261,7 +261,7 @@ class ScalaTypeAttributionTest implements RewriteTest {
                 assertThat(listApply.getMethodType().getName()).isEqualTo("apply");
                 assertThat(method(cu, "->").getMethodType()).isNotNull();
                 assertThat(method(cu, "->").getMethodType().getDeclaringType().getFullyQualifiedName())
-                  .isEqualTo("scala.Predef");
+                  .isEqualTo("scala.Predef$");
             })
           )
         );
@@ -731,7 +731,7 @@ class ScalaTypeAttributionTest implements RewriteTest {
                 assertThat(global.getMarkers().findFirst(ImplicitImport.class)).isPresent();
                 JavaType.Method globalMethod = (JavaType.Method) global.getQualid().getType();
                 assertThat(globalMethod.getName()).isEqualTo("global");
-                assertThat(globalMethod.getDeclaringType().getFullyQualifiedName()).isEqualTo("scala.concurrent.ExecutionContext$Implicits");
+                assertThat(globalMethod.getDeclaringType().getFullyQualifiedName()).isEqualTo("scala.concurrent.ExecutionContext$Implicits$");
 
                 J.Import future = importOf(cu, "Future");
                 assertThat(TypeUtils.asFullyQualified(future.getQualid().getType()).getFullyQualifiedName()).isEqualTo("scala.concurrent.Future");
@@ -739,7 +739,7 @@ class ScalaTypeAttributionTest implements RewriteTest {
                 assertThat(future.getMarkers().findFirst(ImplicitImport.class)).isEmpty();
 
                 JavaType.Method max = (JavaType.Method) importOf(cu, "max").getQualid().getType();
-                assertThat(max.getDeclaringType().getFullyQualifiedName()).isEqualTo("scala.math.package");
+                assertThat(max.getDeclaringType().getFullyQualifiedName()).isEqualTo("scala.math.package$");
 
                 assertThat(importOf(cu, "ActorSystem").getQualid().getType()).isInstanceOf(JavaType.Unknown.class);
                 assertThat(importOf(cu, "_").getQualid().getType()).isNull();
@@ -747,7 +747,7 @@ class ScalaTypeAttributionTest implements RewriteTest {
                 J.Import v = importOf(cu, "v");
                 JavaType.Variable vVariable = (JavaType.Variable) v.getQualid().getType();
                 assertThat(vVariable.getName()).isEqualTo("v");
-                assertThat(TypeUtils.asFullyQualified(vVariable.getOwner()).getFullyQualifiedName()).isEqualTo("Defaults");
+                assertThat(TypeUtils.asFullyQualified(vVariable.getOwner()).getFullyQualifiedName()).isEqualTo("Defaults$");
                 assertThat(v.getQualid().getName().getType()).isEqualTo(JavaType.Primitive.Int);
                 assertThat(v.getQualid().getName().getFieldType()).isEqualTo(vVariable);
                 assertThat(v.getMarkers().findFirst(ImplicitImport.class)).isEmpty();
@@ -757,7 +757,7 @@ class ScalaTypeAttributionTest implements RewriteTest {
                 assertThat(iv.getMarkers().findFirst(ImplicitImport.class)).isPresent();
 
                 J.Import io = importOf(cu, "IO");
-                assertThat(TypeUtils.asFullyQualified(io.getQualid().getType()).getFullyQualifiedName()).isEqualTo("Defaults$IO");
+                assertThat(TypeUtils.asFullyQualified(io.getQualid().getType()).getFullyQualifiedName()).isEqualTo("Defaults$IO$");
                 assertThat(io.getQualid().getName().getFieldType().getName()).isEqualTo("IO");
                 assertThat(io.getMarkers().findFirst(ImplicitImport.class)).isPresent();
 
@@ -794,7 +794,7 @@ class ScalaTypeAttributionTest implements RewriteTest {
                 assertThat(future.getArguments()).singleElement().satisfies(arg -> {
                     JavaType.Method global = (JavaType.Method) arg;
                     assertThat(global.getName()).isEqualTo("global");
-                    assertThat(global.getDeclaringType().getFullyQualifiedName()).isEqualTo("scala.concurrent.ExecutionContext$Implicits");
+                    assertThat(global.getDeclaringType().getFullyQualifiedName()).isEqualTo("scala.concurrent.ExecutionContext$Implicits$");
                 });
 
                 J.MethodInvocation explicit = find(cu, J.MethodInvocation.class, m -> m.getArguments().getFirst() instanceof J.Literal l && Integer.valueOf(2).equals(l.getValue()));
@@ -835,7 +835,7 @@ class ScalaTypeAttributionTest implements RewriteTest {
                 assertThat(greet.getMarkers().findFirst(ImplicitArguments.class).orElseThrow().getArguments()).singleElement().satisfies(arg -> {
                     JavaType.Variable name = (JavaType.Variable) arg;
                     assertThat(name.getName()).isEqualTo("name");
-                    assertThat(TypeUtils.asFullyQualified(name.getOwner()).getFullyQualifiedName()).isEqualTo("Defaults");
+                    assertThat(TypeUtils.asFullyQualified(name.getOwner()).getFullyQualifiedName()).isEqualTo("Defaults$");
                 });
                 assertThat(importOf(cu, "name").getMarkers().findFirst(ImplicitImport.class)).isPresent();
             })
@@ -1115,7 +1115,9 @@ class ScalaTypeAttributionTest implements RewriteTest {
             spec -> spec.afterRecipe(cu -> {
                 J.MethodInvocation some = application(cu, "Some");
                 assertThat(some.getMethodType().getName()).isEqualTo("apply");
-                assertThat(some.getMethodType().getDeclaringType().getFullyQualifiedName()).isEqualTo("scala.Some");
+                assertThat(some.getMethodType().getDeclaringType().getFullyQualifiedName()).isEqualTo("scala.Some$");
+                assertThat(new MethodMatcher("scala.Some$ apply(..)").matches(some)).isTrue();
+                assertThat(new MethodMatcher("scala.Some apply(..)").matches(some)).isFalse();
                 assertThat(method(cu, "to").getMethodType().getName()).isEqualTo("to");
             })
           )
@@ -1572,6 +1574,144 @@ class ScalaTypeAttributionTest implements RewriteTest {
     }
 
     @Test
+    void scalaLibraryClassFirstSeenViaNamedImportHasItsSupertypes() {
+        rewriteRun(
+          scala(
+            """
+            import scala.collection.mutable.ArrayBuffer
+            class ImportedBufferHolder {
+              val xs: ArrayBuffer[Int] = ArrayBuffer.empty[Int]
+            }
+            """,
+            spec -> spec.afterRecipe(cu -> {
+                J.VariableDeclarations.NamedVariable xs = find(cu, J.VariableDeclarations.NamedVariable.class, v -> v.getSimpleName().equals("xs"));
+                JavaType.FullyQualified arrayBuffer = TypeUtils.asFullyQualified(xs.getType());
+                assertThat(arrayBuffer.getFullyQualifiedName()).isEqualTo("scala.collection.mutable.ArrayBuffer");
+                assertThat(arrayBuffer.getSupertype().getFullyQualifiedName()).isEqualTo("scala.collection.mutable.AbstractBuffer");
+                assertThat(TypeUtils.isAssignableTo("scala.collection.mutable.Buffer", arrayBuffer)).isTrue();
+                assertThat(TypeUtils.isAssignableTo("scala.collection.Seq", arrayBuffer)).isTrue();
+            })
+          )
+        );
+    }
+
+    @Test
+    void scalaLibraryClassFirstSeenViaPackageImportHasItsSupertypes() {
+        rewriteRun(
+          scala(
+            """
+            import scala.collection.mutable
+            class QualifiedBufferHolder {
+              val xs: mutable.ArrayBuffer[Int] = mutable.ArrayBuffer.empty[Int]
+            }
+            """,
+            spec -> spec.afterRecipe(cu -> {
+                J.VariableDeclarations.NamedVariable xs = find(cu, J.VariableDeclarations.NamedVariable.class, v -> v.getSimpleName().equals("xs"));
+                JavaType.FullyQualified arrayBuffer = TypeUtils.asFullyQualified(xs.getType());
+                assertThat(arrayBuffer.getFullyQualifiedName()).isEqualTo("scala.collection.mutable.ArrayBuffer");
+                assertThat(TypeUtils.isAssignableTo("scala.collection.mutable.Buffer", arrayBuffer)).isTrue();
+                assertThat(TypeUtils.isAssignableTo("scala.collection.Seq", arrayBuffer)).isTrue();
+            })
+          )
+        );
+    }
+
+    @Test
+    void sourceClassWithCompanionObjectDeclaredFirstHasItsSupertypes() {
+        rewriteRun(
+          scala(
+            """
+            object Names {
+              def empty: Names = new Names
+            }
+            class Names extends java.util.ArrayList[String]
+            """,
+            spec -> spec.afterRecipe(cu -> {
+                J.ClassDeclaration names = findAll(cu, J.ClassDeclaration.class, c -> c.getSimpleName().equals("Names")).getLast();
+                assertThat(names.getType().getSupertype().getFullyQualifiedName()).isEqualTo("java.util.ArrayList");
+                assertThat(TypeUtils.isAssignableTo("java.util.List", names.getType())).isTrue();
+            })
+          )
+        );
+    }
+
+    @Test
+    void companionObjectDeclaredFirstHasItsOwnSupertypesAndMethods() {
+        rewriteRun(
+          scala(
+            """
+            object Box extends Runnable {
+              def run(): Unit = ()
+            }
+            class Box extends java.util.ArrayList[String]
+            """,
+            spec -> spec.afterRecipe(cu -> {
+                List<J.ClassDeclaration> boxes = findAll(cu, J.ClassDeclaration.class, c -> c.getSimpleName().equals("Box"));
+                JavaType.FullyQualified boxObject = boxes.getFirst().getType();
+                JavaType.FullyQualified boxClass = boxes.getLast().getType();
+                assertThat(boxObject.getFullyQualifiedName()).isEqualTo("Box$");
+                assertThat(TypeUtils.isAssignableTo("java.lang.Runnable", boxObject)).isTrue();
+                assertThat(boxObject.getMethods()).extracting(JavaType.Method::getName).contains("run");
+                assertThat(boxClass.getFullyQualifiedName()).isEqualTo("Box");
+                assertThat(TypeUtils.isAssignableTo("java.lang.Runnable", boxClass)).isFalse();
+                assertThat(TypeUtils.isAssignableTo("java.util.List", boxClass)).isTrue();
+            })
+          )
+        );
+    }
+
+    @Test
+    void objectCompanionOfTraitIsAFinalClass() {
+        rewriteRun(
+          scala(
+            """
+            trait Codec
+            object Codec {
+              def apply(): Codec = new Codec {}
+            }
+            class CodecHolder {
+              val c = Codec()
+            }
+            """,
+            spec -> spec.afterRecipe(cu -> {
+                J.MethodInvocation apply = application(cu, "Codec");
+                JavaType.FullyQualified codecObject = apply.getMethodType().getDeclaringType();
+                assertThat(codecObject.getFullyQualifiedName()).isEqualTo("Codec$");
+                assertThat(codecObject.getKind()).isEqualTo(JavaType.FullyQualified.Kind.Class);
+                assertThat(codecObject.hasFlags(Flag.Final)).isTrue();
+                JavaType.FullyQualified codecTrait = find(cu, J.ClassDeclaration.class, c -> c.getSimpleName().equals("Codec") && c.getKind() == J.ClassDeclaration.Kind.Type.Interface).getType();
+                assertThat(codecTrait.getFullyQualifiedName()).isEqualTo("Codec");
+                assertThat(codecTrait.getKind()).isEqualTo(JavaType.FullyQualified.Kind.Interface);
+            })
+          )
+        );
+    }
+
+    @Test
+    void scalaLibraryClassImportedInEarlierFileKeepsSupertypesInLaterFile() {
+        // given
+        JavaTypeCache typeCache = new JavaTypeCache();
+        ScalaParser parser = ScalaParser.builder().typeCache(typeCache).build();
+        String importsBuffer = """
+          import scala.collection.mutable.ArrayBuffer
+          class ImportsBuffer
+          """;
+        String usesBuffer = """
+          class UsesBuffer {
+            val xs: scala.collection.mutable.ArrayBuffer[Int] = scala.collection.mutable.ArrayBuffer.empty[Int]
+          }
+          """;
+
+        // when
+        List<SourceFile> parsed = parser.parse(new InMemoryExecutionContext(), importsBuffer, usesBuffer).toList();
+
+        // then
+        J.VariableDeclarations.NamedVariable xs = find((J) parsed.get(1), J.VariableDeclarations.NamedVariable.class, v -> v.getSimpleName().equals("xs"));
+        assertThat(TypeUtils.isAssignableTo("scala.collection.mutable.Buffer", xs.getType())).isTrue();
+        assertThat(TypeUtils.isAssignableTo("scala.collection.Seq", xs.getType())).isTrue();
+    }
+
+    @Test
     void arrayTypesAreJavaArrays() {
         rewriteRun(
           scala(
@@ -1716,6 +1856,27 @@ class ScalaTypeAttributionTest implements RewriteTest {
     }
 
     @Test
+    void javaStaticOwnerIsTheJavaClassWithItsSupertypes() {
+        rewriteRun(
+          scala(
+            """
+            class IntegerStatics {
+              val n = Integer.parseInt("1")
+              val m = java.util.List.of(1)
+            }
+            """,
+            spec -> spec.afterRecipe(cu -> {
+                JavaType.FullyQualified integer = method(cu, "parseInt").getMethodType().getDeclaringType();
+                assertThat(integer.getFullyQualifiedName()).isEqualTo("java.lang.Integer");
+                assertThat(integer.getSupertype().getFullyQualifiedName()).isEqualTo("java.lang.Number");
+                JavaType.FullyQualified list = method(cu, "of").getMethodType().getDeclaringType();
+                assertThat(list.getKind()).isEqualTo(JavaType.FullyQualified.Kind.Interface);
+            })
+          )
+        );
+    }
+
+    @Test
     void classNameEndingInDollarKeepsItsDollar() {
         rewriteRun(
           scala(
@@ -1733,7 +1894,7 @@ class ScalaTypeAttributionTest implements RewriteTest {
                 J.VariableDeclarations.NamedVariable c = find(cu, J.VariableDeclarations.NamedVariable.class, v -> v.getSimpleName().equals("c"));
                 assertThat(TypeUtils.asFullyQualified(dollarClass.getType()).getFullyQualifiedName()).isEqualTo("Dollar$");
                 assertThat(TypeUtils.asFullyQualified(d.getType()).getFullyQualifiedName()).isEqualTo("Dollar$");
-                assertThat(TypeUtils.asFullyQualified(c.getType()).getFullyQualifiedName()).isEqualTo("Companion");
+                assertThat(TypeUtils.asFullyQualified(c.getType()).getFullyQualifiedName()).isEqualTo("Companion$");
             })
           )
         );
@@ -1816,7 +1977,7 @@ class ScalaTypeAttributionTest implements RewriteTest {
                 JavaType deep = variable(cu, "deep").getType();
                 JavaType member = variable(cu, "member").getType();
                 assertThat(TypeUtils.asFullyQualified(inner).getFullyQualifiedName()).isEqualTo("Outer$Inner");
-                assertThat(TypeUtils.asFullyQualified(nested).getFullyQualifiedName()).isEqualTo("Outer$Nested");
+                assertThat(TypeUtils.asFullyQualified(nested).getFullyQualifiedName()).isEqualTo("Outer$Nested$");
                 assertThat(TypeUtils.asFullyQualified(deep).getFullyQualifiedName()).isEqualTo("Outer$Nested$Deep");
                 assertThat(TypeUtils.asFullyQualified(member).getFullyQualifiedName()).isEqualTo("Holder$Member");
             })
