@@ -31,6 +31,7 @@ import java.util.jar.JarOutputStream;
 
 import static java.util.Collections.emptyList;
 import static java.util.Collections.singletonList;
+import static java.util.Objects.requireNonNull;
 import static java.util.stream.Collectors.toMap;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.java.marker.JavaSourceSet.gavFromPath;
@@ -86,8 +87,9 @@ class JavaSourceSetTest {
     @Test
     void shadedJar() {
         // The build passes the jar's path rather than putting it on the test runtime classpath
-        Path hbaseShadedClient = Paths.get(System.getProperty("org.openrewrite.test.hbaseShadedClientJar"));
-        JavaSourceSet jss = JavaSourceSet.build("test", singletonList(hbaseShadedClient));
+        String jar = requireNonNull(System.getProperty("org.openrewrite.test.hbaseShadedClientJar"),
+          "org.openrewrite.test.hbaseShadedClientJar is set by rewrite-java-test's Gradle test task");
+        JavaSourceSet jss = JavaSourceSet.build("test", singletonList(Paths.get(jar)));
         var shaded = jss.getClasspath().stream()
           .filter(o -> o.getFullyQualifiedName().startsWith("org.apache.hadoop.hbase.CacheEvictionStats"))
           .findAny();

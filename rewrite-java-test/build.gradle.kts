@@ -12,7 +12,7 @@ recipeDependencies {
 
 // JavaSourceSetTest reads this 51 MB jar by its path. It stays off the test runtime classpath because javac
 // indexes every jar there each time a java() source in this module is parsed.
-val hbaseShadedClient by configurations.creating {
+val hbaseShadedClient = configurations.create("hbaseShadedClient") {
     isCanBeConsumed = false
     isTransitive = false
 }
@@ -50,7 +50,9 @@ tasks.withType<Test>().configureEach {
         @get:Classpath
         val jar: FileCollection = hbaseShadedClient
 
-        override fun asArguments() = listOf("-Dorg.openrewrite.test.hbaseShadedClientJar=${jar.singleFile.absolutePath}")
+        override fun asArguments() = listOf(
+            "-Dorg.openrewrite.test.hbaseShadedClientJar=${jar.singleFile.absolutePath}"
+        )
     })
 }
 
