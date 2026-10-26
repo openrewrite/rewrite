@@ -41,9 +41,11 @@ import org.openrewrite.maven.tree.*;
 import org.openrewrite.test.RewriteTest;
 import org.openrewrite.xml.tree.Xml;
 
+import javax.net.ssl.SSLException;
 import javax.net.ssl.SSLSocketFactory;
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
+import java.io.UncheckedIOException;
 import java.net.InetAddress;
 import java.net.URI;
 import java.net.UnknownHostException;
@@ -74,7 +76,17 @@ class MavenPomDownloaderTest implements RewriteTest {
     @Test
     void repositoryOrder() throws IOException {
         // Local servers rather than live repositories, which normalizeRepository() would probe over the network.
-        // oss.sonatype.org, used here before, now redirects to Maven Central.
+        // They serve TLS because that probe tries https first, which a plain HTTP MockWebServer never answers, so
+        // each attempt would stall until the read timeout and then be retried.
+        HeldCertificate certificate = new HeldCertificate.Builder()
+          .addSubjectAlternativeName(InetAddress.getByName("localhost").getCanonicalHostName())
+          .build();
+        HandshakeCertificates serverCertificates = new HandshakeCertificates.Builder()
+          .heldCertificate(certificate)
+          .build();
+        HandshakeCertificates clientCertificates = new HandshakeCertificates.Builder()
+          .addTrustedCertificate(certificate.certificate())
+          .build();
         try (var settingsRepo = new MockWebServer(); var pomRepo = new MockWebServer()) {
             Dispatcher ok = new Dispatcher() {
                 @Override
@@ -82,12 +94,17 @@ class MavenPomDownloaderTest implements RewriteTest {
                     return new MockResponse().setResponseCode(200);
                 }
             };
+            settingsRepo.useHttps(serverCertificates.sslSocketFactory(), false);
+            pomRepo.useHttps(serverCertificates.sslSocketFactory(), false);
             settingsRepo.setDispatcher(ok);
             pomRepo.setDispatcher(ok);
             settingsRepo.start();
             pomRepo.start();
 
-            var ctx = MavenExecutionContextView.view(new InMemoryExecutionContext());
+            var ctx = MavenExecutionContextView.view(HttpSenderExecutionContextView.view(new InMemoryExecutionContext())
+              .setHttpSender(new OkHttpSender(new OkHttpClient.Builder()
+                .sslSocketFactory(clientCertificates.sslSocketFactory(), clientCertificates.trustManager())
+                .build())));
             ctx.setMavenSettings(MavenSettings.parse(Parser.Input.fromString(Path.of("settings.xml"),
               //language=xml
               """
@@ -111,6 +128,7 @@ class MavenPomDownloaderTest implements RewriteTest {
             ), ctx));
 
             rewriteRun(
+              spec -> spec.executionContext(ctx),
               pomXml(
                 //language=xml
                 """
@@ -160,6 +178,21 @@ class MavenPomDownloaderTest implements RewriteTest {
             // Each test is about the repositories it sets up, which MavenPomDownloader would otherwise follow with
             // Maven Central
             MavenExecutionContextView.view(ctx).setAddCentralRepository(false);
+        }
+
+        /**
+         * Fails https requests at once, as a plain HTTP server rejects the TLS handshake of the https probe
+         * normalizeRepository() starts with. A plain HTTP MockWebServer never answers that handshake, so each probe
+         * would wait out the read timeout and its retries.
+         */
+        private void rejectHttps() {
+            HttpSender httpSender = HttpSenderExecutionContextView.view(ctx).getHttpSender();
+            HttpSenderExecutionContextView.view(ctx).setHttpSender(request -> {
+                if ("https".equals(request.getUrl().getProtocol())) {
+                    throw new UncheckedIOException(new SSLException("Unsupported or unrecognized SSL message"));
+                }
+                return httpSender.send(request);
+            });
         }
 
         @Issue("https://github.com/openrewrite/rewrite/issues/3908")
@@ -419,6 +452,7 @@ class MavenPomDownloaderTest implements RewriteTest {
 
         @Test
         void dontFetchSnapshotsFromReleaseRepos() throws Exception {
+            rejectHttps();
             try (var snapshotRepo = new MockWebServer();
                  var releaseRepo = new MockWebServer()) {
                 snapshotRepo.setDispatcher(new Dispatcher() {
@@ -526,6 +560,7 @@ class MavenPomDownloaderTest implements RewriteTest {
 
         @Test
         void datedSnapshotVersionIncludesSnapshotRepositories() throws Exception {
+            rejectHttps();
             try (var snapshotRepo = new MockWebServer()) {
                 snapshotRepo.setDispatcher(new Dispatcher() {
                     @Override
@@ -571,6 +606,7 @@ class MavenPomDownloaderTest implements RewriteTest {
         @Issue("https://github.com/openrewrite/rewrite-maven-plugin/issues/862")
         @Test
         void fetchSnapshotWithCorrectClassifier() throws Exception {
+            rejectHttps();
             try (var snapshotServer = new MockWebServer()) {
                 snapshotServer.setDispatcher(new Dispatcher() {
                     @Override
