@@ -2,8 +2,6 @@
 
 import com.github.gradle.node.NodeExtension
 import com.github.gradle.node.npm.task.NpmTask
-import com.gradle.develocity.agent.gradle.test.ImportJUnitXmlReports
-import com.gradle.develocity.agent.gradle.test.JUnitXmlDialect
 import nl.javadude.gradle.plugins.license.LicenseExtension
 import java.time.Instant
 import java.time.ZoneOffset
@@ -158,8 +156,6 @@ val npmTest = tasks.register<NpmTask>("npmTest") {
 
     args = listOf("run", "ci:test")
 }
-
-ImportJUnitXmlReports.register(tasks, npmTest, JUnitXmlDialect.GENERIC)
 
 tasks.named("check") {
     dependsOn(npmTest)
