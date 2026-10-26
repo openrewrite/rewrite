@@ -374,7 +374,10 @@ public class CSharpRewriteRpc extends RewriteRpc {
         }
 
         /**
-         * Set the working directory for the dotnet process.
+         * Set the working directory for the dotnet process. Ignored when the server entry is a
+         * {@code .csproj}: {@code dotnet run} resolves the SDK from its working directory, so it
+         * runs from the project's directory to avoid the SDK pin in the target repository's
+         * {@code global.json}.
          *
          * @param workingDirectory The working directory for the dotnet process
          * @return This builder
@@ -461,10 +464,16 @@ public class CSharpRewriteRpc extends RewriteRpc {
                 cmd = buildToolPathCommand(dotnetPath, version);
             }
 
-            return startProcess(cmd, dotnetPath);
+            return startProcess(cmd, dotnetPath, processWorkingDirectory(serverEntry, workingDirectory));
         }
 
-        private CSharpRewriteRpc startProcess(Stream<@Nullable String> cmd, Path dotnetPath) {
+        static @Nullable Path processWorkingDirectory(@Nullable Path serverEntry, @Nullable Path workingDirectory) {
+            return serverEntry != null && serverEntry.toString().endsWith(".csproj") ?
+                    serverEntry.toAbsolutePath().normalize().getParent() :
+                    workingDirectory;
+        }
+
+        private CSharpRewriteRpc startProcess(Stream<@Nullable String> cmd, Path dotnetPath, @Nullable Path processWorkingDirectory) {
             String[] cmdArr = cmd.filter(Objects::nonNull).toArray(String[]::new);
             Map<String, String> env = new LinkedHashMap<>(environment);
 
@@ -496,7 +505,7 @@ public class CSharpRewriteRpc extends RewriteRpc {
 
             RewriteRpcProcess process = RewriteRpcProcess.forLanguage("csharp")
                     .command(cmdArr)
-                    .workingDirectory(workingDirectory)
+                    .workingDirectory(processWorkingDirectory)
                     .stderrRedirect(log)
                     .environment(env)
                     .build();
