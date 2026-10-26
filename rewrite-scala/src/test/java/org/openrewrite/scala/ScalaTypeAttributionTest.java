@@ -2031,6 +2031,28 @@ class ScalaTypeAttributionTest implements RewriteTest {
         assertThat(javaMethod(javaCu, "getKey").getMethodType()).isNotNull().isSameAs(method(scalaCu, "getKey").getMethodType());
     }
 
+    @Test
+    void sameNamedLocalsOfDifferentTypesInOneMethod() {
+        rewriteRun(
+          scala(
+            """
+            class SameNamedLocals {
+              def m(): Unit = {
+                { val x = 1 }
+                { val x = "s" }
+              }
+            }
+            """,
+            spec -> spec.afterRecipe(cu -> {
+                List<J.VariableDeclarations.NamedVariable> xs = findAll(cu, J.VariableDeclarations.NamedVariable.class, v -> v.getSimpleName().equals("x"));
+                assertThat(xs).hasSize(2);
+                assertThat(xs.get(0).getVariableType().getType()).isEqualTo(JavaType.Primitive.Int);
+                assertThat(TypeUtils.isString(xs.get(1).getVariableType().getType())).isTrue();
+            })
+          )
+        );
+    }
+
     private static J.Identifier lambdaParameter(J cu, String name) {
         return findAll(cu, J.Lambda.class, l -> true).stream()
           .flatMap(l -> l.getParameters().getParameters().stream())
