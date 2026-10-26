@@ -1856,6 +1856,27 @@ class ScalaTypeAttributionTest implements RewriteTest {
     }
 
     @Test
+    void javaStaticOwnerIsTheJavaClassWithItsSupertypes() {
+        rewriteRun(
+          scala(
+            """
+            class IntegerStatics {
+              val n = Integer.parseInt("1")
+              val m = java.util.List.of(1)
+            }
+            """,
+            spec -> spec.afterRecipe(cu -> {
+                JavaType.FullyQualified integer = method(cu, "parseInt").getMethodType().getDeclaringType();
+                assertThat(integer.getFullyQualifiedName()).isEqualTo("java.lang.Integer");
+                assertThat(integer.getSupertype().getFullyQualifiedName()).isEqualTo("java.lang.Number");
+                JavaType.FullyQualified list = method(cu, "of").getMethodType().getDeclaringType();
+                assertThat(list.getKind()).isEqualTo(JavaType.FullyQualified.Kind.Interface);
+            })
+          )
+        );
+    }
+
+    @Test
     void classNameEndingInDollarKeepsItsDollar() {
         rewriteRun(
           scala(
