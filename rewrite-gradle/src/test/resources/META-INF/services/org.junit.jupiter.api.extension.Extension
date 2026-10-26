@@ -1,2 +1,3 @@
 org.openrewrite.gradle.MavenSettingsAutoLoadingExtension
 org.openrewrite.gradle.SharedMavenPomCacheExtension
+org.openrewrite.gradle.GradleDaemonSlotExtension
