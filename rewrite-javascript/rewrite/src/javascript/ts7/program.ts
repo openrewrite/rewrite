@@ -15,9 +15,9 @@
  */
 import fs from "node:fs";
 import path from "node:path";
-import {API, type Project, type Snapshot} from "typescript/unstable/sync";
-import type {SourceFile} from "typescript/unstable/ast";
-import type {FileSystem} from "typescript/unstable/fs";
+import {API, type Project, type Snapshot} from "typescript/sync";
+import type {SourceFile} from "typescript/ast";
+import type {FileSystem} from "typescript/fs";
 import {memoizing} from "./checker";
 
 // The compiler runs as its own process that owns parsing and module resolution, so a program is

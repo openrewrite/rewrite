@@ -16,8 +16,8 @@
 import fs from "node:fs";
 import path from "node:path";
 import ts from "typescript6";
-import {SyntaxKind as SyntaxKind7, type Node as Node7, type SourceFile as SourceFile7} from "typescript/unstable/ast";
-import {SymbolFlags as SymbolFlags7} from "typescript/unstable/sync";
+import {SyntaxKind as SyntaxKind7, type Node as Node7, type SourceFile as SourceFile7} from "typescript/ast";
+import {SymbolFlags as SymbolFlags7} from "typescript/sync";
 import {typeAtLocation} from "../../src/javascript/ts7/checker";
 import {childrenOf} from "../../src/javascript/ts7/token-navigation";
 import {openSession} from "../../src/javascript/ts7/program";

@@ -23,8 +23,8 @@ import {
     type Node,
     type SourceFile,
     type TypeNode,
-} from "typescript/unstable/ast";
-import type {Checker, Signature, Symbol as Symbol7, Type} from "typescript/unstable/sync";
+} from "typescript/ast";
+import type {Checker, Signature, Symbol as Symbol7, Type} from "typescript/sync";
 
 // The checker runs in the Go process and answers over IPC, which shapes three things the parser has
 // to account for: a type-position identifier resolves through its enclosing type node, a symbol's

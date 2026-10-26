@@ -22,7 +22,7 @@ import {
     type NodeArray,
     type SourceFile,
     SyntaxKind,
-} from "typescript/unstable/ast";
+} from "typescript/ast";
 
 // The compiler sends only the semantic children, so `forEachChild` skips punctuation. Scanning each
 // gap between children recovers the tokens whose offsets the LST hangs whitespace on. They come back

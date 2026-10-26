@@ -18,18 +18,18 @@
 // system from separate entry points and spells some names differently from the release before it,
 // so both are gathered here under the single `ts` namespace the parser reads.
 
-export * from "typescript/unstable/ast";
-export * from "typescript/unstable/sync";
+export * from "typescript/ast";
+export * from "typescript/sync";
 // ModifierFlags comes from both entry points; the syntax one is what the parser reads.
-export {ModifierFlags} from "typescript/unstable/ast";
+export {ModifierFlags} from "typescript/ast";
 
 export type {
     MethodSignatureDeclaration as MethodSignature,
     PropertySignatureDeclaration as PropertySignature,
     SignatureDeclaration as SignatureDeclarationBase,
-} from "typescript/unstable/ast";
+} from "typescript/ast";
 
-import type {Declaration, DeclarationName} from "typescript/unstable/ast";
+import type {Declaration, DeclarationName} from "typescript/ast";
 
 // `Declaration` says only that a node declares something; the declarations that carry a name do so
 // on their own interfaces, and this is the shape of the ones the parser reads a name from.
@@ -38,10 +38,10 @@ export {
     isMethodSignatureDeclaration as isMethodSignature,
     isParameterDeclaration as isParameter,
     isPropertySignatureDeclaration as isPropertySignature,
-} from "typescript/unstable/ast";
-export type {Checker as TypeChecker} from "typescript/unstable/sync";
+} from "typescript/ast";
+export type {Checker as TypeChecker} from "typescript/sync";
 
-import {NodeFlags, skipTrivia, SyntaxKind, type Node, type NodeArray, type SourceFile} from "typescript/unstable/ast";
+import {NodeFlags, skipTrivia, SyntaxKind, type Node, type NodeArray, type SourceFile} from "typescript/ast";
 
 /** Whether a source file is a module, which its export or import marks it as being. */
 export function isExternalModule(sourceFile: SourceFile): boolean {

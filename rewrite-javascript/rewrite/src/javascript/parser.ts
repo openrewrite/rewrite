@@ -53,7 +53,7 @@ import Attribute = JSX.Attribute;
 import SpreadAttribute = JSX.SpreadAttribute;
 import {childAt, childCountOf, childrenOf, firstTokenOf, lastTokenOf} from "./token-navigation";
 import {Compiler} from "./ts7/program";
-import type {Project} from "typescript/unstable/sync";
+import type {Project} from "typescript/sync";
 
 export interface JavaScriptParserOptions extends ParserOptions {
     styles?: NamedStyles[],
