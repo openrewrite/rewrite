@@ -330,8 +330,10 @@ val pythonUpdateVersion by tasks.registering {
 
     doLast {
         val content = pyprojectFile.readText()
+        // The [project] table's own key alone, at a line's start: unanchored, the pattern also matched the end of
+        // ruff's target-version and ty's python-version, which the release then set to rewrite's version.
         val updated = content.replace(
-            Regex("""version\s*=\s*"[^"]*""""),
+            Regex("""(?m)^version\s*=\s*"[^"]*""""),
             """version = "$pythonVersion""""
         )
         pyprojectFile.writeText(updated)
