@@ -63,11 +63,12 @@ export function hasTrailingComma(nodes: NodeArray<Node>, sourceFile: SourceFile)
 /**
  * The `?` a member carries, if any. A named member holds whichever of `?` and `!` follows its name
  * in one `postfixToken`, while the other declarations that can take a `?` keep their own field.
+ * A parameter JSDoc names in brackets also gets a `?`, which the source does not hold.
  */
 export function questionTokenOf(node: Node): Node | undefined {
     const token = (node as {postfixToken?: Node; questionToken?: Node}).postfixToken
         ?? (node as {questionToken?: Node}).questionToken;
-    return token?.kind === SyntaxKind.QuestionToken ? token : undefined;
+    return token?.kind === SyntaxKind.QuestionToken && !isReparsed(token) ? token : undefined;
 }
 
 /** The `!` a member carries, if any; it shares `postfixToken` with `?`. */

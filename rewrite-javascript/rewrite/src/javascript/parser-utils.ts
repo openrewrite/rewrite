@@ -366,6 +366,11 @@ function commentRanges(text: string): Array<[number, number]> {
         if (token === ts.SyntaxKind.SingleLineCommentTrivia || token === ts.SyntaxKind.MultiLineCommentTrivia) {
             ranges.push([scanner.getTokenStart(), scanner.getTokenEnd()]);
         }
+        // A `#` no identifier follows scans as a token of no width, over and over
+        // (microsoft/TypeScript#64968).
+        if (scanner.getTokenEnd() === scanner.getTokenStart()) {
+            scanner.resetTokenState(scanner.getTokenEnd() + 1);
+        }
     }
     return ranges;
 }
@@ -376,7 +381,7 @@ export function checkSyntaxErrors(program: ts.Program, sourceFile: ts.SourceFile
     // Diagnostics arrive already localised and flattened, and carry offsets rather than a file.
     const diagnostics = program.getSyntacticDiagnostics(sourceFile.fileName);
     let syntaxErrors: [errorMsg: string, errorCode: number][] = [];
-    const comments = commentRanges(sourceFile.text);
+    const comments = diagnostics.length > 0 ? commentRanges(sourceFile.text) : [];
     const errors = diagnostics.filter(d =>
         d.category === ts.DiagnosticCategory.Error && isCriticalDiagnostic(d.code, sourceFile)
         && !comments.some(([from, to]) => d.pos >= from && d.pos < to));

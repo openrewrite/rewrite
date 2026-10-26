@@ -50,3 +50,15 @@ test("valid JSDoc with Record syntax", () =>
             }
         `)
     }));
+
+test("a parameter JSDoc marks optional prints as written", () =>
+    new RecipeSpec().rewriteRun({
+        //language=javascript
+        ...javascript(`
+            /**
+             * @param {object} [descriptors]
+             */
+            function inherits(constructor, descriptors) {
+            }
+        `)
+    }));
