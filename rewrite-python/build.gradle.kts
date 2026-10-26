@@ -339,6 +339,13 @@ val pythonUpdateVersion by tasks.registering {
     }
 }
 
+// pythonInstall and pytestTest read pyproject.toml, which pythonUpdateVersion rewrites when a publish or a release
+// builds the distribution in the same build as the tests: Gradle refuses to run a task that reads another's output
+// in no declared order, and they should see the version it sets.
+listOf(pythonInstall, pytestTest).forEach { reader ->
+    reader.configure { mustRunAfter(pythonUpdateVersion) }
+}
+
 // Task to install build dependencies
 val pythonInstallBuildDeps by tasks.registering(Exec::class) {
     group = "python"
