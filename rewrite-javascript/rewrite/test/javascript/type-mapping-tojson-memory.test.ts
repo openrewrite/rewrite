@@ -43,6 +43,21 @@ function forceGc(): void {
     }
 }
 
+// What a test that ran earlier in the worker let go of can take several collections to be freed, which would
+// otherwise read as memory the code under measurement gave back.
+function settledHeapUsed(): number {
+    let used = Infinity;
+    for (let i = 0; i < 10; i++) {
+        forceGc();
+        const now = process.memoryUsage().heapUsed;
+        if (now >= used) {
+            return now;
+        }
+        used = now;
+    }
+    return used;
+}
+
 function collectDistinctToJSON(root: unknown, into: Set<Function>): void {
     const seen = new WeakSet<object>();
     const stack: unknown[] = [root];
@@ -102,8 +117,7 @@ test("per-instance toJSON closures retain heap that a shared function does not",
     });
 
     // when: the pre-fix shape mints a fresh closure per instance
-    forceGc();
-    const baseline = process.memoryUsage().heapUsed;
+    const baseline = settledHeapUsed();
     let perInstance: object[] | null = [];
     const perInstanceFns = new Set<Function>();
     for (let i = 0; i < instances; i++) {
@@ -115,11 +129,10 @@ test("per-instance toJSON closures retain heap that a shared function does not",
     const perInstanceBytes = process.memoryUsage().heapUsed - baseline;
 
     perInstance = null;
-    forceGc();
 
     // and: the post-fix shape references one hoisted function
     const shared = function (this: Type) { return Type.signature(this); };
-    const beforeShared = process.memoryUsage().heapUsed;
+    const beforeShared = settledHeapUsed();
     let sharedInstances: object[] | null = [];
     const sharedFns = new Set<Function>();
     for (let i = 0; i < instances; i++) {
