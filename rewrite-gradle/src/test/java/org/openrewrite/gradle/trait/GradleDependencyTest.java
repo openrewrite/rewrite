@@ -211,12 +211,11 @@ class GradleDependencyTest implements RewriteTest {
         rewriteRun(
           spec -> spec
             .beforeRecipe(withToolingApi())
-            // A later cycle sees the transitives through getResolvedDependency() too, as resolving them is cached
-            .cycles(1)
-            .expectedCyclesThatMakeChanges(1)
             .recipes(
               new ExcludeDependency("commons-logging", "commons-logging", null),
+              // marks once, as a later cycle sees the cached transitives through getResolvedDependency() too
               RewriteTest.toRecipe(() -> new GradleDependency.Matcher().asVisitor(dep ->
+                dep.getTree().getMarkers().findFirst(SearchResult.class).isPresent() ? dep.getTree() :
                 SearchResult.found(dep.getTree(), String.format("shallow: %s, with transitives: %s",
                   dep.getResolvedDependency().findDependency("commons-codec", "commons-codec") != null,
                   dep.getResolvedDependencyWithTransitives().findDependency("commons-codec", "commons-codec") != null))))),

@@ -1270,7 +1270,6 @@ class RecipePluginRewriteTest : RewriteTest {
                 }
                 """.trimIndent(),
                 """
-                import java.util.Arrays;
                 import java.util.List;
                 class A {
                     List<Object> two = List.of(1, 2);
@@ -1342,7 +1341,6 @@ class RecipePluginRewriteTest : RewriteTest {
                 }
                 """.trimIndent(),
                 """
-                import java.util.Arrays;
                 import java.util.List;
                 class A {
                     List<Object> xs = List.of(1, 2, 3);

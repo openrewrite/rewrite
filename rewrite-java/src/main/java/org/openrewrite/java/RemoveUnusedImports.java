@@ -75,9 +75,7 @@ public class RemoveUnusedImports extends Recipe {
             // Collect all unqualified type references upfront for efficiency
             Set<String> unqualifiedTypeNames = collectUnqualifiedTypeNames(cu);
 
-            // Collect all identifier simple names from source (excluding imports) to detect
-            // types that only appear in type attribution but not in actual source references
-            Set<String> sourceIdentifierNames = collectSourceIdentifierNames(cu);
+            Set<String> sourceIdentifierNames = RemoveImport.namesInSource(cu);
 
             for (JavaType.Method method : cu.getTypesInUse().getUsedMethods()) {
                 if (method.hasFlags(Flag.Static)) {
@@ -520,25 +518,6 @@ public class RemoveUnusedImports extends Recipe {
                         cursor = cursor.getParent();
                     }
                     return false;
-                }
-            }.reduce(cu, new HashSet<>());
-        }
-
-        /**
-         * Collect all identifier simple names appearing in source code, excluding import statements.
-         * Used to detect imports whose type name doesn't actually appear in the source.
-         */
-        private Set<String> collectSourceIdentifierNames(J.CompilationUnit cu) {
-            return new JavaIsoVisitor<Set<String>>() {
-                @Override
-                public J.Import visitImport(J.Import import_, Set<String> names) {
-                    return import_;
-                }
-
-                @Override
-                public J.Identifier visitIdentifier(J.Identifier identifier, Set<String> names) {
-                    names.add(identifier.getSimpleName());
-                    return super.visitIdentifier(identifier, names);
                 }
             }.reduce(cu, new HashSet<>());
         }

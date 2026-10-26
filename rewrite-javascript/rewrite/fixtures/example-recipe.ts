@@ -33,6 +33,9 @@ import {ReplaceAssignment} from "./replace-assignment";
 import {JavaChangeMethodName} from "./java-change-method-name";
 import {CrossModuleRecipeList} from "./cross-module-recipe-list";
 import {CompositeWithInvalidChild} from "./composite-with-invalid-child";
+import {GenerateFile} from "./generate-file";
+import {DeleteJsonFile} from "./delete-json-file";
+import {MigrateTslint} from "./migrate-tslint";
 
 export async function activate(marketplace: RecipeMarketplace): Promise<void> {
     await marketplace.install(ChangeText, JavaScript);
@@ -54,4 +57,7 @@ export async function activate(marketplace: RecipeMarketplace): Promise<void> {
     await marketplace.install(JavaChangeMethodName, JavaScript);
     await marketplace.install(CrossModuleRecipeList, JavaScript);
     await marketplace.install(CompositeWithInvalidChild, JavaScript);
+    await marketplace.install(GenerateFile, JavaScript);
+    await marketplace.install(DeleteJsonFile, JavaScript);
+    await marketplace.install(MigrateTslint, JavaScript);
 }

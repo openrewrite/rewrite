@@ -50,6 +50,7 @@ import org.openrewrite.maven.tree.ResolvedDependency;
 import org.openrewrite.properties.PropertiesVisitor;
 import org.openrewrite.properties.tree.Properties;
 import org.openrewrite.semver.DependencyMatcher;
+import org.openrewrite.semver.LatestRelease;
 import org.openrewrite.semver.Semver;
 
 import java.io.ByteArrayInputStream;
@@ -561,6 +562,7 @@ public class UpgradeTransitiveDependencyVersion extends ScanningRecipe<UpgradeTr
 
             private GradleProject updatedModel(GradleProject gp, Map<GroupArtifact, Map<String, String>> toUpdate, ExecutionContext ctx) {
                 Map<String, Set<GroupArtifactVersion>> configsToUpdate = new HashMap<>();
+                SpringBomProperty.Project managed = acc.projectsUsingDependencyManagement.get(getGradleProjectKey(gp));
                 for (Map.Entry<GroupArtifact, Map<String, String>> update : toUpdate.entrySet()) {
                     Map<String, String> configs = update.getValue();
                     String groupId = update.getKey().getGroupId();
@@ -570,6 +572,16 @@ public class UpgradeTransitiveDependencyVersion extends ScanningRecipe<UpgradeTr
                         String newVersion = configToVersion.getValue();
                         configsToUpdate.computeIfAbsent(configName, it -> new HashSet<>())
                                 .add(new GroupArtifactVersion(groupId, artifactId, newVersion));
+                    }
+                    // The model records each version the dependency management plugin changes as a strict constraint on
+                    // every configuration that resolves it, so the upgrade constrains those configurations too.
+                    // One rule cannot carry a different version per configuration.
+                    Set<String> versions = new HashSet<>(configs.values());
+                    if (managed != null && versions.size() == 1) {
+                        GroupArtifactVersion gav = new GroupArtifactVersion(groupId, artifactId, versions.iterator().next());
+                        for (String resolving : managed.getResolvingConfigurations().getOrDefault(update.getKey(), emptySet())) {
+                            configsToUpdate.computeIfAbsent(resolving, it -> new HashSet<>()).add(gav);
+                        }
                     }
                 }
                 return gp.addOrUpdateConstraints(configsToUpdate, ctx);
@@ -667,17 +679,20 @@ public class UpgradeTransitiveDependencyVersion extends ScanningRecipe<UpgradeTr
             return super.visit(tree, ctx);
         }
 
-        // Skips properties gradle.properties defines, which UpdateProperties handles instead.
+        // Skips properties gradle.properties defines, which UpdateProperties handles instead. The script itself is read
+        // too, since the scan misses a declaration an earlier recipe made this cycle. A declaration is only ever raised.
         private JavaSourceFile overrideBomProperties(JavaSourceFile cu, Map<String, GroupArtifact> bomProperties, ExecutionContext ctx) {
+            Set<String> declaredInScript = bomProperties.isEmpty() ? emptySet() : SpringBomProperty.declaredProperties(cu);
             for (Map.Entry<String, GroupArtifact> bomProperty : bomProperties.entrySet()) {
                 String name = bomProperty.getKey();
                 String version = acc.dependenciesToUpdate(dependencyMatcher).get(bomProperty.getValue());
                 if (version == null || acc.gradlePropertiesKeys.contains(name)) {
                     continue;
                 }
-                if (acc.declaredExtProperties.contains(name)) {
+                if (acc.declaredExtProperties.contains(name) || declaredInScript.contains(name)) {
                     cu = (JavaSourceFile) new ExtraProperty.Matcher().propertyName(name).matchVariableDeclarations(false)
-                            .<ExecutionContext>asVisitor((property, c) -> property.withValue(version).getTree())
+                            .<ExecutionContext>asVisitor((property, c) -> new LatestRelease(null).compare(null, property.getValue(), version) < 0 ?
+                                    property.withValue(version).getTree() : property.getTree())
                             .visitNonNull(cu, ctx);
                 } else {
                     cu = SpringBomProperty.addDeclaration(new Cursor(getCursor(), cu), name, version);

@@ -21,6 +21,7 @@ import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.java.internal.PackageNameUtils;
+import org.openrewrite.java.internal.TypesInUse;
 import org.openrewrite.java.marker.JavaSourceSet;
 import org.openrewrite.java.search.UsesType;
 import org.openrewrite.java.service.ImportService;
@@ -29,6 +30,7 @@ import org.openrewrite.marker.Markers;
 import org.openrewrite.marker.SearchResult;
 import org.openrewrite.trait.Reference;
 
+import java.lang.reflect.Method;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.*;
@@ -131,7 +133,7 @@ public class ChangeType extends Recipe implements RenamingRecipe {
                     }
                     // Fully qualified documentation-comment references are excluded from UsesType's
                     // import-retention view, but they still need to be retargeted.
-                    if (cu.getTypesInUse().hasDocReference(oldFullyQualifiedTypeName)) {
+                    if (hasDocReference(cu.getTypesInUse(), oldFullyQualifiedTypeName)) {
                         return SearchResult.found(cu);
                     }
                     if (!Boolean.TRUE.equals(ignoreDefinition) &&
@@ -964,6 +966,29 @@ public class ChangeType extends Recipe implements RenamingRecipe {
      *
      * @param normalizedOldName the old fully qualified type name with {@code $} normalized to {@code .}
      */
+    // Looked up reflectively because recipe modules built against this ChangeType may run alongside an
+    // older TypesInUse that predates the method, which would otherwise fail with NoSuchMethodError.
+    private static final @Nullable Method HAS_DOC_REFERENCE = findHasDocReference();
+
+    private static @Nullable Method findHasDocReference() {
+        try {
+            return TypesInUse.class.getMethod("hasDocReference", String.class);
+        } catch (NoSuchMethodException e) {
+            return null;
+        }
+    }
+
+    private static boolean hasDocReference(TypesInUse typesInUse, String fullyQualifiedTypeName) {
+        if (HAS_DOC_REFERENCE == null) {
+            return false;
+        }
+        try {
+            return (Boolean) HAS_DOC_REFERENCE.invoke(typesInUse, fullyQualifiedTypeName);
+        } catch (ReflectiveOperationException e) {
+            return false;
+        }
+    }
+
     private static boolean mayContainDefinition(JavaSourceFile sourceFile, String normalizedOldName) {
         if (!(sourceFile instanceof J.CompilationUnit)) {
             return true;

@@ -9,7 +9,9 @@ import org.jspecify.annotations.Nullable;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Parser;
 import org.openrewrite.SourceFile;
+import org.openrewrite.python.internal.InstalledEnvParser;
 import org.openrewrite.python.internal.PipfileLockParser;
+import org.openrewrite.python.internal.pipfilelock.PipenvLockEngine;
 import org.openrewrite.python.internal.PyProjectHelper;
 import org.openrewrite.python.internal.PythonResolutionLinker;
 import org.openrewrite.python.marker.PythonResolutionResult;
@@ -39,6 +41,21 @@ public class PipfileParser implements Parser {
 
     private final TomlParser tomlParser = new TomlParser();
 
+    @Nullable
+    private final Path installedEnv;
+
+    public PipfileParser() {
+        this(null);
+    }
+
+    /**
+     * @param installedEnv the project's dependency environment, which the marker resolves against when no
+     *                     Pipfile.lock exists, or null to leave such a marker unresolved
+     */
+    public PipfileParser(@Nullable Path installedEnv) {
+        this.installedEnv = installedEnv;
+    }
+
     @Override
     public Stream<SourceFile> parseInputs(Iterable<Input> sources, @Nullable Path relativeTo, ExecutionContext ctx) {
         return tomlParser.parseInputs(sources, relativeTo, ctx).map(sf -> {
@@ -55,7 +72,7 @@ public class PipfileParser implements Parser {
         });
     }
 
-    private static PythonResolutionResult resolveFromLockFile(PythonResolutionResult marker,
+    private PythonResolutionResult resolveFromLockFile(PythonResolutionResult marker,
                                                               Toml.Document doc,
                                                               @Nullable Path relativeTo) {
         Path sourcePath = doc.getSourcePath();
@@ -68,6 +85,10 @@ public class PipfileParser implements Parser {
         }
 
         List<ResolvedDependency> resolvedDeps = PipfileLockParser.findAndParse(pipfileDir, relativeTo);
+        if (resolvedDeps.isEmpty() && installedEnv != null &&
+            PipfileLockParser.findLockFile(pipfileDir, relativeTo) == null) {
+            resolvedDeps = InstalledEnvParser.parse(installedEnv);
+        }
         if (!resolvedDeps.isEmpty()) {
             return PythonResolutionLinker.applyPipfile(marker, resolvedDeps);
         }
@@ -176,9 +197,48 @@ public class PipfileParser implements Parser {
             if ("*".equals(versionConstraint)) {
                 versionConstraint = null;
             }
-            deps.add(new Dependency(name, versionConstraint, null, null, null));
+            Toml.Table spec = kv.getValue() instanceof Toml.Table ? (Toml.Table) kv.getValue() : null;
+            deps.add(new Dependency(name, versionConstraint, spec == null ? null : getExtras(spec),
+                    spec == null ? null : getMarker(spec), null));
         }
         return deps;
+    }
+
+    private static @Nullable List<String> getExtras(Toml.Table spec) {
+        for (Toml value : spec.getValues()) {
+            if (value instanceof Toml.KeyValue &&
+                "extras".equals(PyProjectHelper.extractKeyName((Toml.KeyValue) value)) &&
+                ((Toml.KeyValue) value).getValue() instanceof Toml.Array) {
+                List<String> extras = new ArrayList<>();
+                for (Toml extra : ((Toml.Array) ((Toml.KeyValue) value).getValue()).getValues()) {
+                    if (extra instanceof Toml.Literal && ((Toml.Literal) extra).getValue() instanceof String) {
+                        extras.add((String) ((Toml.Literal) extra).getValue());
+                    }
+                }
+                return extras.isEmpty() ? null : extras;
+            }
+        }
+        return null;
+    }
+
+    /**
+     * pipenv takes a marker from {@code markers} and from keys named for a marker variable, such as
+     * {@code sys_platform = "== 'win32'"}, which all have to hold.
+     */
+    private static @Nullable String getMarker(Toml.Table spec) {
+        List<String> markers = new ArrayList<>();
+        String declared = getStringValue(spec, "markers");
+        if (declared != null) {
+            markers.add(declared);
+        }
+        for (String variable : PipenvLockEngine.MARKER_KEYS) {
+            String value = getStringValue(spec, variable);
+            if (value != null) {
+                markers.add(variable + " " + value);
+            }
+        }
+        return markers.isEmpty() ? null : markers.size() == 1 ? markers.get(0) :
+                "(" + String.join(") and (", markers) + ")";
     }
 
     private static @Nullable String extractVersion(Toml value) {

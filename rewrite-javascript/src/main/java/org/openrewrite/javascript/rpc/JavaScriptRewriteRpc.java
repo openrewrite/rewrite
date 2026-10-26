@@ -37,6 +37,7 @@ import org.openrewrite.rpc.RewriteRpcProcess;
 import org.openrewrite.rpc.RewriteRpcProcessManager;
 import org.openrewrite.rpc.RpcObjectData;
 import org.openrewrite.rpc.RpcReceiveQueue;
+import org.openrewrite.rpc.internal.EngineInstall;
 import org.openrewrite.rpc.request.GetObjectResponse;
 import org.openrewrite.tree.ParsingEventListener;
 import org.openrewrite.tree.ParsingExecutionContextView;
@@ -46,12 +47,14 @@ import java.io.IOException;
 import java.io.OutputStream;
 import java.io.PrintStream;
 import java.io.UncheckedIOException;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.nio.file.StandardOpenOption;
 import java.time.Duration;
 import java.util.*;
+import java.util.concurrent.TimeUnit;
 import java.util.function.Consumer;
 import java.util.function.Supplier;
 import java.util.stream.Stream;
@@ -471,6 +474,8 @@ public class JavaScriptRewriteRpc extends RewriteRpc {
             DynamicDispatchRpcCodec.requireCodecFor(Json.Document.class.getName());
 
             Stream<@Nullable String> cmd;
+            // The published engine npx installs into its cache, when the RPC runs from one.
+            String packagedVersion = null;
 
             if (inspectBrk != null) {
                 Path serverJs = requireNonNull(inspectBrkRewriteSourcePath).resolve("dist/rpc/server.js");
@@ -490,6 +495,7 @@ public class JavaScriptRewriteRpc extends RewriteRpc {
                 );
             } else {
                 String version = StringUtils.readFully(getClass().getResourceAsStream("/META-INF/rewrite-javascript-version.txt"));
+                packagedVersion = version.endsWith("-SNAPSHOT") ? null : version;
                 cmd = Stream.of(
                         npxPath.toString(),
                         // For SNAPSHOT versions, assume npm link has been run and don't use --package
@@ -511,6 +517,9 @@ public class JavaScriptRewriteRpc extends RewriteRpc {
                 env.put("PATH", npxPath.getParent() + File.pathSeparator +
                         System.getenv("PATH"));
             }
+            if (packagedVersion != null) {
+                installEngine(npxPath, packagedVersion, env);
+            }
             RewriteRpcProcess process = RewriteRpcProcess.forLanguage("javascript")
                     .command(cmdArr)
                     .workingDirectory(workingDirectory)
@@ -530,6 +539,79 @@ public class JavaScriptRewriteRpc extends RewriteRpc {
             } catch (IOException e) {
                 throw new UncheckedIOException(e);
             }
+        }
+
+        /**
+         * Installs {@code @openrewrite/rewrite@<version>} into npx's cache before the RPC's own npx runs it, once,
+         * however many threads and processes start an RPC at the same time. npx installs a package it does not have on
+         * first use, into a directory every npx sharing the cache uses, and several installing it at once, as the test
+         * forks of a build do the first time it needs a version, leave it half-written: the RPC then shuts down early.
+         * So the first start of a version runs npx on its own, asking the RPC for no more than its help, which loads the
+         * package, while the others wait on a lock ({@link EngineInstall}); once it has passed, a record in npm's cache
+         * ({@code _openrewrite/javascript/<version>}) marks the version installed, and every RPC starts from a cache
+         * that holds it. npx owns the install itself: one it left half-written before this was here is npx's to notice.
+         * (The npx of a recent npm 11 locks its own installs; npm 10's, which Node 22 ships, does not.)
+         */
+        void installEngine(Path npxPath, String version, Map<String, String> env) {
+            // The environment npx runs with: this process's, less what the RPC unsets, with the RPC's own on top.
+            Map<String, String> npxEnvironment = new LinkedHashMap<>(System.getenv());
+            unsetEnvNames.forEach(npxEnvironment::remove);
+            npxEnvironment.putAll(env);
+            Path installed = npmCache(npxEnvironment).resolve("_openrewrite").resolve("javascript").resolve(version);
+            EngineInstall.ensureInstalled(installed, version, record -> npxInstall(npxPath, version, env, record));
+        }
+
+        /**
+         * Runs npx as the RPC's command does, for the RPC's help alone, so that npx installs the engine and exits; what
+         * it prints goes to {@code npx.log} in {@code record}.
+         */
+        private void npxInstall(Path npxPath, String version, Map<String, String> env, Path record)
+                throws IOException, InterruptedException {
+            String spec = "@openrewrite/rewrite@" + version;
+            Path output = record.resolve("npx.log");
+            ProcessBuilder pb = new ProcessBuilder(npxPath.toString(), "--yes", "--package=" + spec, "rewrite-rpc",
+                    "--help")
+                    .redirectErrorStream(true)
+                    .redirectOutput(output.toFile());
+            // The environment the RPC itself gets, so npx reads the same registry, credentials and cache.
+            unsetEnvNames.forEach(pb.environment()::remove);
+            pb.environment().putAll(env);
+            if (workingDirectory != null) {
+                pb.directory(workingDirectory.toFile());
+            }
+            Process process = pb.start();
+            process.getOutputStream().close();
+            if (!process.waitFor(10, TimeUnit.MINUTES)) {
+                process.destroyForcibly();
+                throw new IllegalStateException("Timed out installing " + spec + " with " + npxPath);
+            }
+            if (process.exitValue() != 0) {
+                throw new IllegalStateException("Could not install " + spec + " with " + npxPath + " (exit code " +
+                                                process.exitValue() + "):\n" +
+                                                new String(Files.readAllBytes(output), StandardCharsets.UTF_8).trim());
+            }
+        }
+
+        /**
+         * npm's cache directory, which npx installs packages beneath ({@code _npx}), for npx running with
+         * {@code environment}: npm's {@code cache} setting when the environment sets it, in either case, as npm reads
+         * it, or npm's default.
+         */
+        static Path npmCache(Map<String, String> environment) {
+            String configured = null;
+            for (Map.Entry<String, String> variable : environment.entrySet()) {
+                if ("npm_config_cache".equalsIgnoreCase(variable.getKey()) && !StringUtils.isBlank(variable.getValue())) {
+                    configured = variable.getValue();
+                }
+            }
+            if (configured != null) {
+                return Paths.get(configured);
+            }
+            String localAppData = environment.get("LOCALAPPDATA");
+            if (System.getProperty("os.name").toLowerCase().contains("windows") && !StringUtils.isBlank(localAppData)) {
+                return Paths.get(localAppData, "npm-cache");
+            }
+            return Paths.get(System.getProperty("user.home"), ".npm");
         }
 
         private static OutputStream openLog(Path log) throws IOException {
