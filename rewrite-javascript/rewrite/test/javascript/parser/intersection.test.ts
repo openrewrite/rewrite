@@ -39,4 +39,9 @@ describe('intersection type mapping', () => {
                     & GeolocateResponseError;
             `)
         ));
+    test('an intersection inside a type argument of an intersection starts at its first member', () =>
+        spec.rewriteRun(
+            //language=typescript
+            typescript('let c: {a: 1} & Array<{b: 2} & {c: 3}>')
+        ));
 });

@@ -139,6 +139,9 @@ function syntaxListChildren(list: SyntaxListNode, sourceFile: SourceFile): Node[
     const out: Node[] = [];
     let pos = list.pos;
     for (const element of list[SYNTAX_LIST]) {
+        if (element.flags & NodeFlags.Reparsed) {
+            continue;
+        }
         scanBetween(sourceFile, pos, element.pos, list, out);
         out.push(element);
         pos = element.end;

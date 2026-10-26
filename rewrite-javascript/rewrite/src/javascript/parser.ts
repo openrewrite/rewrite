@@ -449,7 +449,8 @@ export class JavaScriptParserVisitor {
     }
 
     private semicolonPaddedStatementList(statements: ts.NodeArray<ts.Statement>) {
-        return [...statements].map(n => {
+        // The compiler turns a JSDoc `@import` or `@typedef` into a statement of the list it sits in.
+        return [...statements].filter(n => !ts.isReparsed(n)).map(n => {
             const j: Statement = this.convert(n);
             if (j.kind === J.Kind.Unknown) {
                 // in case of `J.Unknown` its source will already contain any `;`
@@ -1635,7 +1636,8 @@ export class JavaScriptParserVisitor {
     }
 
     visitUnionType(node: ts.UnionTypeNode): JS.Union {
-        const initialBar = getPreviousSibling(node.types[0]);
+        // A leading `|` is part of the union it opens, so only the union's own first token can be one.
+        const initialBar = firstTokenOf(node, this.sourceFile);
         return {
             kind: JS.Kind.Union,
             id: randomId(),
@@ -1650,7 +1652,7 @@ export class JavaScriptParserVisitor {
     }
 
     visitIntersectionType(node: ts.IntersectionTypeNode): JS.Intersection {
-        const initialAmpersand = getPreviousSibling(node.types[0]);
+        const initialAmpersand = firstTokenOf(node, this.sourceFile);
         return {
             kind: JS.Kind.Intersection,
             id: randomId(),

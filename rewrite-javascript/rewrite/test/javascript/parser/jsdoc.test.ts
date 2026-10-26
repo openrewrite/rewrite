@@ -72,3 +72,33 @@ test("a JSDoc type cast prints as written", () =>
             var t = /** @satisfies {number} */ (x);
         `)
     }));
+
+test("JSDoc @import and @typedef stay in their comments", () =>
+    new RecipeSpec().rewriteRun({
+        //language=javascript
+        ...javascript(`
+            /** @import { Plugin } from 'prettier' */
+            import * as path from "path";
+
+            /**
+             * @typedef Config
+             * @property {string} cwd
+             */
+            function f() {
+                /** @typedef {number} Count */
+                return path.sep;
+            }
+        `)
+    }));
+
+test("a JSDoc @this does not add a parameter", () =>
+    new RecipeSpec().rewriteRun({
+        //language=javascript
+        ...javascript(`
+            /**
+             * @this {Object}
+             */
+            function f(a) {
+            }
+        `)
+    }));
