@@ -77,9 +77,10 @@ public class JavaTypeCache implements Cloneable {
         boolean hasCompactStrings = false;
 
         try {
-            // Java 17+ allows this only with --add-opens java.base/java.lang=ALL-UNNAMED. Java 9 to 16 can also
-            // allow it through --illegal-access=permit, their default up to 15, which prints a warning.
-            String javaVersion = System.getProperty("java.specification.version");
+            // Java 17+ allows this only with --add-opens java.base/java.lang=ALL-UNNAMED. Java 9 to 16 also allow it
+            // under --illegal-access=permit (their default up to 15) with a warning, and Module.isOpen reports
+            // java.lang open in both cases, so those versions skip it.
+            String javaVersion = System.getProperty("java.specification.version", "");
             if (!javaVersion.startsWith("1.") && Integer.parseInt(javaVersion) >= 17) {
                 value = String.class.getDeclaredField("value");
                 value.setAccessible(true);
@@ -100,7 +101,7 @@ public class JavaTypeCache implements Cloneable {
     }
 
     /**
-     * For ASCII and Latin-1 strings this operation is allocation-free.
+     * On Java 17+ with java.lang opened, this operation is allocation-free for ASCII and Latin-1 strings.
      */
     static byte[] getKeyBytes(String s) {
         // Try to get internal representation first
