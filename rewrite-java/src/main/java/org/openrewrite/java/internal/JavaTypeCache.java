@@ -72,24 +72,22 @@ public class JavaTypeCache implements Cloneable {
     private static final boolean USE_REFLECTION;
 
     static {
-        Field value;
-        Field coder;
+        Field value = null;
+        Field coder = null;
         boolean hasCompactStrings = false;
 
         try {
-            // requires: --add-opens java.base/java.lang=ALL-UNNAMED
-            value = String.class.getDeclaredField("value");
-            value.setAccessible(true);
-
-            try {
+            // Java 17+ allows this only with --add-opens java.base/java.lang=ALL-UNNAMED. Java 9 to 16 can also
+            // allow it through --illegal-access=permit, their default up to 15, which prints a warning.
+            String javaVersion = System.getProperty("java.specification.version");
+            if (!javaVersion.startsWith("1.") && Integer.parseInt(javaVersion) >= 17) {
+                value = String.class.getDeclaredField("value");
+                value.setAccessible(true);
                 coder = String.class.getDeclaredField("coder");
                 coder.setAccessible(true);
                 Field compactStrings = String.class.getDeclaredField("COMPACT_STRINGS");
                 compactStrings.setAccessible(true);
                 hasCompactStrings = compactStrings.getBoolean(null);
-            } catch (NoSuchFieldException e) {
-                // Java 8 - field doesn't exist
-                coder = null;
             }
         } catch (Exception e) {
             value = null;
