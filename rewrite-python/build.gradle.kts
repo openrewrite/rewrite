@@ -607,6 +607,9 @@ extensions.configure<LicenseExtension> {
     exclude("**/rewrite-python-version.txt")
     // uv's own marker test cases, kept as JSON data
     exclude("**/marker/uv-*-tree-rows.json")
+    // A package index's and a package's recorded responses, formats with no comment syntax
+    exclude("**/index/pep691-listing-json")
+    exclude("**/metadata/*-METADATA")
 }
 
 // The lock regeneration test fixtures (recorded package-manager output) live in
