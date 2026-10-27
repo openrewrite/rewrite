@@ -21,6 +21,7 @@ import org.junit.jupiter.api.io.TempDir;
 import org.openrewrite.maven.tree.*;
 
 import java.io.ByteArrayInputStream;
+import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InterruptedIOException;
@@ -91,17 +92,9 @@ class LocalMavenArtifactCacheTest {
     void failedWriteLeavesNoArtifact(@TempDir Path tempDir) throws Exception {
         cache = new LocalMavenArtifactCache(tempDir);
         ResolvedDependency dependency = releaseDependency();
-        InputStream brokenDownload = new SequenceInputStream(
-                new ByteArrayInputStream("the start of a jar".getBytes(StandardCharsets.UTF_8)),
-                new InputStream() {
-                    @Override
-                    public int read() throws IOException {
-                        throw new IOException("Connection reset");
-                    }
-                });
         List<Throwable> errors = new ArrayList<>();
 
-        assertThat(cache.putArtifact(dependency, brokenDownload, errors::add)).isNull();
+        assertThat(cache.putArtifact(dependency, brokenDownload(), errors::add)).isNull();
         assertThat(errors).singleElement().extracting(Throwable::getMessage).isEqualTo("Connection reset");
         assertThat(cache.getArtifact(dependency))
                 .as("a later lookup must download the artifact again, not take what was written of it")
@@ -109,6 +102,65 @@ class LocalMavenArtifactCacheTest {
         try (Stream<Path> files = Files.walk(tempDir)) {
             assertThat(files.filter(Files::isRegularFile)).isEmpty();
         }
+    }
+
+    @Test
+    void releaseAnotherWriterPutFirstIsUsedWhenThisWriteFails(@TempDir Path tempDir) throws Exception {
+        cache = new LocalMavenArtifactCache(tempDir);
+        ResolvedDependency release = releaseDependency();
+        byte[] jar = "the whole jar".getBytes(StandardCharsets.UTF_8);
+        List<Throwable> errors = new ArrayList<>();
+
+        Path artifact = cache.computeArtifact(release, () -> {
+            // Another writer puts the release while this one downloads it, and then this write fails, as its move
+            // does on Windows while the other writer's jar is open
+            cache.putArtifact(release, new ByteArrayInputStream(jar), errors::add);
+            return brokenDownload();
+        }, errors::add);
+
+        assertThat(artifact).isEqualTo(cache.getArtifact(release)).hasBinaryContent(jar);
+        assertThat(errors).isEmpty();
+        try (Stream<Path> files = Files.walk(tempDir)) {
+            assertThat(files.filter(Files::isRegularFile)).containsExactly(artifact);
+        }
+    }
+
+    @Test
+    void releaseCanBePutAgainWhileItsJarIsOpen(@TempDir Path tempDir) throws Exception {
+        cache = new LocalMavenArtifactCache(tempDir);
+        ResolvedDependency release = releaseDependency();
+        byte[] jar = "the whole jar".getBytes(StandardCharsets.UTF_8);
+        List<Throwable> errors = new ArrayList<>();
+        Path first = cache.putArtifact(release, new ByteArrayInputStream(jar), errors::add);
+
+        // Opened as JarFile and URLClassLoader open jars, which on Windows keeps them from being replaced
+        try (InputStream open = new FileInputStream(first.toFile())) {
+            assertThat(cache.putArtifact(release, new ByteArrayInputStream(jar), errors::add))
+                    .isEqualTo(first)
+                    .hasBinaryContent(jar);
+        }
+        assertThat(errors).isEmpty();
+        try (Stream<Path> files = Files.walk(tempDir)) {
+            assertThat(files.filter(Files::isRegularFile)).containsExactly(first);
+        }
+    }
+
+    @Test
+    void failedSnapshotRefreshIsReported(@TempDir Path tempDir) throws Exception {
+        cache = new LocalMavenArtifactCache(tempDir);
+        ResolvedDependency snapshot = snapshotDependency();
+        Path first = cache.computeArtifact(snapshot,
+                () -> new ByteArrayInputStream("v1".getBytes(StandardCharsets.UTF_8)),
+                Throwable::printStackTrace);
+        List<Throwable> errors = new ArrayList<>();
+
+        Path second = cache.computeArtifact(snapshot, LocalMavenArtifactCacheTest::brokenDownload, errors::add);
+
+        assertThat(errors)
+                .as("the cached jar may be an older build of the SNAPSHOT")
+                .singleElement().extracting(Throwable::getMessage).isEqualTo("Connection reset");
+        assertThat(second).isEqualTo(first);
+        assertThat(Files.readString(second)).isEqualTo("v1");
     }
 
     @Test
@@ -179,6 +231,20 @@ class LocalMavenArtifactCacheTest {
                 Throwable::printStackTrace);
         assertThat(second).isEqualTo(first);
         assertThat(Files.readString(second)).isEqualTo("v1");
+    }
+
+    /**
+     * Serves the start of a jar, then fails.
+     */
+    private static InputStream brokenDownload() {
+        return new SequenceInputStream(
+                new ByteArrayInputStream("the start of a jar".getBytes(StandardCharsets.UTF_8)),
+                new InputStream() {
+                    @Override
+                    public int read() throws IOException {
+                        throw new IOException("Connection reset");
+                    }
+                });
     }
 
     /**

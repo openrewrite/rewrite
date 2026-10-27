@@ -65,11 +65,26 @@ public class LocalMavenArtifactCache implements MavenArtifactCache {
             } catch (IOException e) {
                 t.addSuppressed(e);
             }
+            // Another writer may have put the same jar there first, whole, and on Windows the move fails while that
+            // jar is open. A non-dated SNAPSHOT's jar may be an older build, though, so the failure is reported.
+            if (!isMutable(dependency) && Files.isRegularFile(path)) {
+                return path;
+            }
             onError.accept(t);
             return null;
         }
 
         return path;
+    }
+
+    /**
+     * Whether a newer build can replace the artifact's jar, as {@link MavenArtifactCache#computeArtifact} assumes of
+     * non-dated SNAPSHOTs.
+     */
+    private static boolean isMutable(ResolvedDependency dependency) {
+        String datedSnapshotVersion = dependency.getDatedSnapshotVersion();
+        return dependency.getVersion().endsWith("-SNAPSHOT") &&
+               (datedSnapshotVersion == null || dependency.getVersion().equals(datedSnapshotVersion));
     }
 
     private Path dependencyPath(ResolvedDependency dependency) {
