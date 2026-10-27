@@ -168,6 +168,11 @@ interface ScriptHandlerSpec extends ScriptHandler {
     void dependencies(@DelegatesTo(strategy=Closure.DELEGATE_ONLY, value=DependencyHandlerSpec) Closure cl)
 }
 
+// Android Gradle Plugin types are named as strings: AGP is only on the parser classpath when the build supplies it
+interface AndroidSpec {
+    void compileOptions(@DelegatesTo(strategy=Closure.DELEGATE_FIRST, type="com.android.build.api.dsl.CompileOptions") Closure cl)
+}
+
 abstract class RewriteGradleProject extends groovy.lang.Script implements Project {
     Map ext
 
@@ -179,6 +184,7 @@ abstract class RewriteGradleProject extends groovy.lang.Script implements Projec
     abstract void repositories(@DelegatesTo(strategy=Closure.DELEGATE_ONLY, value=RepositoryHandlerSpec) Closure cl)
     abstract void subprojects(@DelegatesTo(strategy=Closure.DELEGATE_ONLY, value=RewriteGradleProject) Closure cl)
     abstract void allprojects(@DelegatesTo(strategy=Closure.DELEGATE_ONLY, value=RewriteGradleProject) Closure cl)
+    abstract void android(@DelegatesTo(strategy=Closure.DELEGATE_FIRST, value=AndroidSpec) Closure cl)
     abstract void test(@DelegatesTo(strategy=Closure.DELEGATE_ONLY, value=RewriteTestSpec) Closure cl)
 
     // @Deprecated(since="7.1.0", replacedBy="org.gradle.api.plugins.JavaPluginExtension")

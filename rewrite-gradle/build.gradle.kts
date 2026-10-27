@@ -12,6 +12,11 @@ repositories {
             excludeVersionByRegex(".+", ".+", ".+-rc-?[0-9]*")
         }
     }
+    google {
+        content {
+            includeGroup("com.android.tools.build")
+        }
+    }
     maven {
         url = uri("https://plugins.gradle.org/m2/")
         content {
@@ -35,6 +40,9 @@ recipeDependencies {
     // 3.19.2 is the last release with both the `develocity` and the legacy `gradleEnterprise` extension types;
     // 4.x removed the latter, which settings scripts still awaiting MigrateGradleEnterpriseToDevelocity rely on
     parserClasspath("com.gradle:develocity-gradle-plugin:3.19.2")
+
+    testParserClasspath("com.android.tools.build:gradle-api:9.4.1")
+    testParserClasspath("com.android.tools.build:gradle-common-api:9.4.1")
 }
 
 //val rewriteVersion = rewriteRecipe.rewriteVersion.get()

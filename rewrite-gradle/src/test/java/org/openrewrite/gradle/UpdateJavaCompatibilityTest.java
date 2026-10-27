@@ -19,14 +19,32 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
 import org.openrewrite.DocumentExample;
+import org.openrewrite.InMemoryExecutionContext;
 import org.openrewrite.Issue;
+import org.openrewrite.kotlin.tree.K;
 import org.openrewrite.test.RewriteTest;
+import org.openrewrite.test.SourceSpec;
+import org.openrewrite.test.SourceSpecs;
 
 import static org.openrewrite.gradle.Assertions.buildGradle;
 import static org.openrewrite.gradle.Assertions.buildGradleKts;
 
 @SuppressWarnings("GroovyUnusedAssignment")
 class UpdateJavaCompatibilityTest implements RewriteTest {
+
+    private static GradleParser.Builder withAndroidGradlePlugin() {
+        return GradleParser.builder().buildscriptClasspathFromResources(new InMemoryExecutionContext(),
+          "gradle-base-services", "gradle-core-api", "gradle-language-groovy", "gradle-language-java",
+          "gradle-logging", "gradle-messaging", "gradle-native", "gradle-process-services", "gradle-resources",
+          "gradle-testing-base", "gradle-testing-jvm", "gradle-api", "gradle-common-api");
+    }
+
+    // A method-level parser only replaces the parser of Groovy sources, as GradleParser builds G.CompilationUnit
+    private static SourceSpecs buildGradleKtsWithAndroidGradlePlugin(String before, String after) {
+        SourceSpec<K.CompilationUnit> kts = new SourceSpec<>(K.CompilationUnit.class, "gradle", withAndroidGradlePlugin(), before, s -> after);
+        kts.path("build.gradle.kts");
+        return kts;
+    }
 
     @DocumentExample
     @Test
@@ -848,7 +866,7 @@ class UpdateJavaCompatibilityTest implements RewriteTest {
     @Test
     void androidCompileOptionsMethodCall() {
         rewriteRun(
-          spec -> spec.recipe(new UpdateJavaCompatibility(17, null, null, null, null)),
+          spec -> spec.recipe(new UpdateJavaCompatibility(17, null, null, null, null)).parser(withAndroidGradlePlugin()),
           buildGradle(
             """
               plugins {
@@ -881,7 +899,8 @@ class UpdateJavaCompatibilityTest implements RewriteTest {
     @Test
     void androidCompileOptionsMethodCallSourceOnly() {
         rewriteRun(
-          spec -> spec.recipe(new UpdateJavaCompatibility(17, UpdateJavaCompatibility.CompatibilityType.source, null, null, null)),
+          spec -> spec.recipe(new UpdateJavaCompatibility(17, UpdateJavaCompatibility.CompatibilityType.source, null, null, null))
+            .parser(withAndroidGradlePlugin()),
           buildGradle(
             """
               plugins {
@@ -915,7 +934,7 @@ class UpdateJavaCompatibilityTest implements RewriteTest {
     void androidCompileOptionsInKotlinDSL() {
         rewriteRun(
           spec -> spec.recipe(new UpdateJavaCompatibility(17, null, null, null, null)),
-          buildGradleKts(
+          buildGradleKtsWithAndroidGradlePlugin(
             """
               plugins {
                   id("com.android.application")
@@ -924,7 +943,7 @@ class UpdateJavaCompatibilityTest implements RewriteTest {
               android {
                   compileOptions {
                       sourceCompatibility = JavaVersion.VERSION_1_8
-                      targetCompatibility = JavaVersion.VERSION_1_8
+                      targetCompatibility(JavaVersion.VERSION_1_8)
                   }
               }
               """,
@@ -936,7 +955,27 @@ class UpdateJavaCompatibilityTest implements RewriteTest {
               android {
                   compileOptions {
                       sourceCompatibility = JavaVersion.VERSION_17
-                      targetCompatibility = JavaVersion.VERSION_17
+                      targetCompatibility(JavaVersion.VERSION_17)
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void androidCompileOptionsMethodCallWithoutAndroidGradlePluginOnClasspath() {
+        rewriteRun(
+          spec -> spec.recipe(new UpdateJavaCompatibility(17, null, null, null, null)),
+          buildGradle(
+            """
+              plugins {
+                  id 'com.android.application'
+              }
+
+              android {
+                  compileOptions {
+                      sourceCompatibility JavaVersion.VERSION_1_8
                   }
               }
               """

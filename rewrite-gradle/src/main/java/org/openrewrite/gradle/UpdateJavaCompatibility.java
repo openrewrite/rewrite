@@ -49,11 +49,8 @@ public class UpdateJavaCompatibility extends Recipe {
     private static final MethodMatcher TARGET_COMPATIBILITY_DSL = new MethodMatcher("org.gradle.api.Project setTargetCompatibility(..)", true);
     private static final MethodMatcher SOURCE_COMPATIBILITY_METHOD = new MethodMatcher("org.gradle.api.Project sourceCompatibility(..)", true);
     private static final MethodMatcher TARGET_COMPATIBILITY_METHOD = new MethodMatcher("org.gradle.api.Project targetCompatibility(..)", true);
-    // Android's `compileOptions { sourceCompatibility JavaVersion.VERSION_1_8 }` is not attributed in build scripts,
-    // so it is matched by name inside the `compileOptions` block.
-    private static final MethodMatcher COMPILE_OPTIONS = new MethodMatcher("* compileOptions(..)");
-    private static final MethodMatcher COMPILE_OPTIONS_SOURCE_COMPATIBILITY = new MethodMatcher("* sourceCompatibility(..)");
-    private static final MethodMatcher COMPILE_OPTIONS_TARGET_COMPATIBILITY = new MethodMatcher("* targetCompatibility(..)");
+    private static final MethodMatcher ANDROID_SOURCE_COMPATIBILITY = new MethodMatcher("com.android.build.api.dsl.CompileOptions sourceCompatibility(..)");
+    private static final MethodMatcher ANDROID_TARGET_COMPATIBILITY = new MethodMatcher("com.android.build.api.dsl.CompileOptions targetCompatibility(..)");
 
     @Option(displayName = "Java version",
             description = "The Java version to upgrade to.",
@@ -170,11 +167,8 @@ public class UpdateJavaCompatibility extends Recipe {
             @Override
             public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
                 J.MethodInvocation m = super.visitMethodInvocation(method, ctx);
-                boolean inCompileOptions = isInsideCompileOptions(getCursor());
-                boolean source = SOURCE_COMPATIBILITY_DSL.matches(m) ||
-                        inCompileOptions && COMPILE_OPTIONS_SOURCE_COMPATIBILITY.matches(m, true);
-                boolean target = TARGET_COMPATIBILITY_DSL.matches(m) ||
-                        inCompileOptions && COMPILE_OPTIONS_TARGET_COMPATIBILITY.matches(m, true);
+                boolean source = SOURCE_COMPATIBILITY_DSL.matches(m) || ANDROID_SOURCE_COMPATIBILITY.matches(m);
+                boolean target = TARGET_COMPATIBILITY_DSL.matches(m) || ANDROID_TARGET_COMPATIBILITY.matches(m);
                 if (source || SOURCE_COMPATIBILITY_METHOD.matches(m)) {
                     sourceCompatibilityFound = true;
                 }
@@ -524,11 +518,6 @@ public class UpdateJavaCompatibility extends Recipe {
             return new J.Literal(randomId(), prefix, markers, newJavaVersionDouble, String.valueOf(newJavaVersionDouble), emptyList(), JavaType.Primitive.Double);
         }
         return new J.Literal(randomId(), prefix, markers, version, String.valueOf(version), emptyList(), JavaType.Primitive.Int);
-    }
-
-    private static boolean isInsideCompileOptions(Cursor cursor) {
-        return cursor.getPathAsStream()
-                .anyMatch(o -> o instanceof J.MethodInvocation && COMPILE_OPTIONS.matches((J.MethodInvocation) o, true));
     }
 
     private static boolean isMethodInvocation(J expression, String clazz, String method) {
