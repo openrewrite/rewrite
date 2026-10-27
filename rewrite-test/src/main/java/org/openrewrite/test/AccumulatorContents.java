@@ -19,6 +19,7 @@ import lombok.Value;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
 import org.openrewrite.marker.Marker;
+import org.openrewrite.rpc.RewriteRpc;
 
 import java.lang.ref.Reference;
 import java.lang.reflect.Array;
@@ -60,8 +61,10 @@ final class AccumulatorContents {
         protected Kind computeValue(Class<?> type) {
             if (Heavyweight.class.isAssignableFrom(type)) {
                 return Kind.RETAINED;
-            } else if (Recipe.class.isAssignableFrom(type) || UnchangedTreeIdentity.isJavaType(type)) {
-                // a recipe lives for the whole run anyway, and type attribution refers to no tree
+            } else if (Recipe.class.isAssignableFrom(type) || UnchangedTreeIdentity.isJavaType(type) ||
+                       RewriteRpc.class.isAssignableFrom(type)) {
+                // a recipe lives for the whole run anyway, type attribution refers to no tree, and an RPC recipe's
+                // connection holds what it exchanges with the other process for as long as that process runs
                 return Kind.LEAF;
             } else if (type.isArray()) {
                 return type.getComponentType().isPrimitive() ? Kind.LEAF : Kind.ARRAY;
@@ -111,9 +114,8 @@ final class AccumulatorContents {
         }
     };
 
-    /**
-     * The scanning recipes that ran in this cycle, in the order they first ran.
-     */
+    /// The recipes that ran in this cycle, and of them the scanning recipes, in the order they first ran.
+    private final List<Recipe> recipes = new ArrayList<>();
     private final List<ScanningRecipe<?>> scanningRecipes = new ArrayList<>();
     private final Set<Recipe> ran = newSetFromMap(new IdentityHashMap<>());
 
@@ -123,19 +125,22 @@ final class AccumulatorContents {
     private final Map<String, Map<String, Finding>> findings = new LinkedHashMap<>();
 
     void startCycle() {
+        recipes.clear();
         scanningRecipes.clear();
         ran.clear();
     }
 
     void ran(Recipe recipe) {
-        if (recipe instanceof ScanningRecipe && ran.add(recipe)) {
-            scanningRecipes.add((ScanningRecipe<?>) recipe);
+        if (ran.add(recipe)) {
+            recipes.add(recipe);
+            if (recipe instanceof ScanningRecipe) {
+                scanningRecipes.add((ScanningRecipe<?>) recipe);
+            }
         }
     }
 
-    /**
-     * Walks the accumulator of each scanning recipe that ran in this cycle so far.
-     */
+    /// Walks the accumulator of each scanning recipe that ran in this cycle so far, and the fields of every recipe
+    /// that ran, which outlive any accumulator.
     void check(Cursor rootCursor, ExecutionContext ctx, String when) {
         Set<Object> walked = newSetFromMap(new IdentityHashMap<>());
         for (ScanningRecipe<?> recipe : scanningRecipes) {
@@ -145,6 +150,15 @@ final class AccumulatorContents {
                     new Walk(recipe.getName(), when).walk(acc);
                 } catch (RuntimeException ignored) {
                     // an accumulator the walk can't read is left alone
+                }
+            }
+        }
+        for (Recipe recipe : recipes) {
+            if (!(recipe instanceof AdHocRecipe) && !(recipe instanceof AdHocScanningRecipe)) {
+                try {
+                    new Walk(recipe.getName(), when).walkFields(recipe);
+                } catch (RuntimeException ignored) {
+                    // a recipe the walk can't read is left alone
                 }
             }
         }
@@ -162,6 +176,7 @@ final class AccumulatorContents {
         final Set<Object> visited = newSetFromMap(new IdentityHashMap<>());
         final Deque<Node> queue = new ArrayDeque<>();
         int budget = MAX_OBJECTS;
+        boolean inRecipeFields;
 
         Walk(String recipe, String when) {
             this.recipe = recipe;
@@ -173,6 +188,35 @@ final class AccumulatorContents {
          */
         void walk(Object acc) {
             visit(acc, null, AddedMarkers.typeName(acc.getClass()));
+            drain();
+        }
+
+        /// The fields the recipe declares, static or not. A visitor a recipe keeps, such as a precondition's, and a
+        /// tree short of a whole source file, such as one parsed from an option, are left alone: neither grows with
+        /// the source files the recipe visits.
+        void walkFields(Recipe recipe) {
+            inRecipeFields = true;
+            String name = AddedMarkers.typeName(recipe.getClass());
+            for (Class<?> c = recipe.getClass();
+                 c != null && c != Recipe.class && c != ScanningRecipe.class && !isJdk(c);
+                 c = c.getSuperclass()) {
+                for (Field field : c.getDeclaredFields()) {
+                    if (field.getType().isPrimitive() || field.isSynthetic()) {
+                        continue;
+                    }
+                    try {
+                        field.setAccessible(true);
+                        boolean isStatic = Modifier.isStatic(field.getModifiers());
+                        visit(field.get(isStatic ? null : recipe), null, name + "." + field.getName());
+                    } catch (IllegalAccessException | RuntimeException ignored) {
+                        // a field that can't be read can't be walked
+                    }
+                }
+            }
+            drain();
+        }
+
+        private void drain() {
             while (!queue.isEmpty()) {
                 Node node = queue.poll();
                 Object value = node.getValue();
@@ -230,7 +274,8 @@ final class AccumulatorContents {
          * @param step how the parent reaches the value: a field, an index, a {@link Key} or the text of the step
          */
         private void visit(@Nullable Object value, @Nullable Node parent, Object step) {
-            if (!walks(value)) {
+            if (!walks(value) || inRecipeFields && (value instanceof TreeVisitor ||
+                                                    value instanceof Tree && !(value instanceof SourceFile))) {
                 return;
             }
             if (KINDS.get(value.getClass()) == Kind.RETAINED) {
@@ -321,6 +366,7 @@ final class AccumulatorContents {
                 .append("ends, so what it keeps for each source file adds up over a large repository. A ")
                 .append("MavenResolutionResult or GradleProject can reach the model of a whole build, and a ")
                 .append("JavaSourceSet a whole classpath, while small markers such as JavaProject are fine to keep. ")
+                .append("A recipe's own fields, static or not, count too, since a recipe outlives the cycle. ")
                 .append("A recipe that must keep a Heavyweight object, and can explain why keeping it doesn't add ")
                 .append("up, opts out with ").append(RecipeQualityValidation.optOut("lightweightAccumulators"))
                 .append(". ").append(RecipeQualityValidation.WHEN_STUCK)

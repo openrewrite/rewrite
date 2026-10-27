@@ -2313,6 +2313,24 @@ class RewriteTestTest implements RewriteTest {
         }
 
         @Test
+        void rejectSourceFileKeptInRecipeField() {
+            AssertionError e = assertThrows(AssertionError.class, () -> rewriteRun(
+              spec -> spec.recipe(new KeepsWhatItVisitsInAField()),
+              text("foo", spec -> spec.path("foo.txt"))
+            ));
+            assertThat(e).hasMessageContaining("KeepsWhatItVisitsInAField.visited[0] -> PlainText foo.txt");
+        }
+
+        @Test
+        void rejectSourceFileKeptInStaticField() {
+            AssertionError e = assertThrows(AssertionError.class, () -> rewriteRun(
+              spec -> spec.recipe(new KeepsWhatItVisitsInAStaticField()),
+              text("foo", spec -> spec.path("foo.txt"))
+            ));
+            assertThat(e).hasMessageContaining("KeepsWhatItVisitsInAStaticField.VISITED[foo.txt] -> PlainText foo.txt");
+        }
+
+        @Test
         void acceptValuesAndSmallMarkersKeptInAccumulator() {
             rewriteRun(
               spec -> spec.recipe(new KeepsPathsByProject()),
@@ -3246,6 +3264,56 @@ class KeepsWhatItScans extends ScanningRecipe<KeepsWhatItScans.Scanned> {
             public @Nullable Tree visit(@Nullable Tree tree, ExecutionContext ctx) {
                 if (tree instanceof SourceFile s) {
                     acc.sourceFiles.put(s.getSourcePath(), s);
+                }
+                return tree;
+            }
+        };
+    }
+}
+
+@EqualsAndHashCode(callSuper = false)
+@NullMarked
+@Value
+class KeepsWhatItVisitsInAField extends Recipe {
+
+    String displayName = "Keeps the source files it visits in a field";
+
+    String description = "Keeps each source file it visits in a field of the recipe.";
+
+    transient List<SourceFile> visited = new ArrayList<>();
+
+    @Override
+    public TreeVisitor<?, ExecutionContext> getVisitor() {
+        return new TreeVisitor<>() {
+            @Override
+            public @Nullable Tree visit(@Nullable Tree tree, ExecutionContext ctx) {
+                if (tree instanceof SourceFile s) {
+                    visited.add(s);
+                }
+                return tree;
+            }
+        };
+    }
+}
+
+@EqualsAndHashCode(callSuper = false)
+@NullMarked
+@Value
+class KeepsWhatItVisitsInAStaticField extends Recipe {
+
+    static final Map<Path, SourceFile> VISITED = new HashMap<>();
+
+    String displayName = "Keeps the source files it visits in a static field";
+
+    String description = "Keeps each source file it visits in a static field of the recipe.";
+
+    @Override
+    public TreeVisitor<?, ExecutionContext> getVisitor() {
+        return new TreeVisitor<>() {
+            @Override
+            public @Nullable Tree visit(@Nullable Tree tree, ExecutionContext ctx) {
+                if (tree instanceof SourceFile s) {
+                    VISITED.put(s.getSourcePath(), s);
                 }
                 return tree;
             }
