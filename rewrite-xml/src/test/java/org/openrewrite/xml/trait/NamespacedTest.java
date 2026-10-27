@@ -15,12 +15,65 @@
  */
 package org.openrewrite.xml.trait;
 
+import org.intellij.lang.annotations.Language;
 import org.junit.jupiter.api.Test;
+import org.openrewrite.Cursor;
+import org.openrewrite.xml.XmlParser;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
 class NamespacedTest {
+
+    @Test
+    void defaultNamespaceAppliesToUnprefixedElementsOnly() {
+        String xml = """
+          <root xmlns="urn:default" id="1"/>
+          """;
+        assertThat(namespaced(xml, "root").getNamespaceUri()).hasValue("urn:default");
+
+        assertThat(namespaced(xml, "id").getNamespaceUri()).isEmpty();
+    }
+
+    @Test
+    void emptyDefaultNamespaceUndeclaresIt() {
+        Namespaced child = namespaced(
+          """
+            <root xmlns="urn:default">
+                <child xmlns=""/>
+            </root>
+            """,
+          "child"
+        );
+        assertThat(child.getNamespaceUri()).isEmpty();
+    }
+
+    @Test
+    void innerDeclarationShadowsOuter() {
+        Namespaced inner = namespaced(
+          """
+            <p:root xmlns:p="urn:outer">
+                <p:inner xmlns:p="urn:inner"/>
+            </p:root>
+            """,
+          "p:inner"
+        );
+        assertThat(inner.getAllNamespaces()).containsEntry("p", "urn:inner");
+    }
+
+    @Test
+    void xmlPrefixIsBoundWithoutDeclaration() {
+        assertThat(namespaced("<root xml:lang=\"en\"/>", "xml:lang").getNamespaceUri())
+          .hasValue("http://www.w3.org/XML/1998/namespace");
+    }
+
+    private static Namespaced namespaced(@Language("xml") String xml, String name) {
+        return Namespaced.matcher()
+          .lower(new Cursor(new Cursor(null, Cursor.ROOT_VALUE), new XmlParser().parse(xml).findFirst().orElseThrow()))
+          .filter(n -> n.getName().filter(name::equals).isPresent())
+          .findFirst()
+          .orElseThrow();
+    }
 
     @Test
     void isNamespaceDefinitionAttributeTests() {
