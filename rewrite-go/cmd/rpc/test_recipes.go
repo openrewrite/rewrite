@@ -21,5 +21,5 @@ package main
 import "github.com/openrewrite/rewrite/rewrite-go/internal/testrecipes"
 
 func init() {
-	activators = append(activators, testrecipes.Activate)
+	testActivators = append(testActivators, testrecipes.Activate)
 }

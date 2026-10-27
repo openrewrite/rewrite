@@ -183,7 +183,7 @@ type serverConfig struct {
 	recipeInstallDir string
 }
 
-var activators = []recipe.Activator{recipes.Activate}
+var testActivators []recipe.Activator
 
 func newServer(cfg serverConfig) *server {
 	var logOut io.Writer
@@ -212,7 +212,8 @@ func newServer(cfg serverConfig) *server {
 	rpc.RegisterValueType(reflect.TypeOf((*recipe.ExecutionContext)(nil)), "org.openrewrite.InMemoryExecutionContext")
 
 	reg := recipe.NewRegistry()
-	reg.Activate(activators...)
+	reg.Activate(recipes.Activate)
+	reg.Activate(testActivators...)
 
 	logger := log.New(logOut, "", log.LstdFlags)
 
