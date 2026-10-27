@@ -1380,7 +1380,6 @@ public class ReloadableJava25ParserVisitor extends TreePathScanner<J, Space> {
             case SWITCH:
             case SWITCH_EXPRESSION:
             case SYNCHRONIZED:
-            case TYPE_CAST:
             case WHILE_LOOP:
                 return new J.ControlParentheses<Expression>(randomId(), fmt, Markers.EMPTY,
                         convert(node.getExpression(), t -> sourceBefore(")")));

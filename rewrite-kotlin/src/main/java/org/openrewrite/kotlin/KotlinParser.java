@@ -291,7 +291,7 @@ public class KotlinParser implements Parser {
         private JavaTypeFactory typeFactory;
 
         private boolean logCompilationWarningsAndErrors;
-        private final List<NamedStyles> styles = new ArrayList<>();
+        private List<NamedStyles> styles = new ArrayList<>();
         private String moduleName = "main";
         private KotlinLanguageLevel languageLevel = KotlinLanguageLevel.KOTLIN_2_2;
         private boolean isKotlinScript = false;
@@ -440,6 +440,7 @@ public class KotlinParser implements Parser {
         public KotlinParser.Builder clone() {
             KotlinParser.Builder clone = (KotlinParser.Builder) super.clone();
             clone.typeCache = this.typeCache.clone();
+            clone.styles = new ArrayList<>(this.styles);
             return clone;
         }
     }

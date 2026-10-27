@@ -75,7 +75,10 @@ object TypedNodes {
   }
 }
 
-/** The nodes of an untyped tree that have a source range, by range and kind, in pre-order. */
+/**
+ * The nodes of an untyped tree that have a source range, by range and kind, in pre-order. The
+ * annotations of definitions are included, though the trees' own traversal leaves them out.
+ */
 private[internal] final class UntypedNodeIndex private (nodes: mutable.Map[UntypedNodeIndex.Key, mutable.ArrayBuffer[untpd.Tree]]) {
   def at(key: UntypedNodeIndex.Key): collection.Seq[untpd.Tree] = nodes.getOrElse(key, Nil)
 
@@ -92,6 +95,10 @@ private[internal] object UntypedNodeIndex {
         override def traverse(tree: untpd.Tree)(using Context): Unit = {
           if (tree.span.exists) {
             nodes.getOrElseUpdate((tree.span.start, tree.span.end, tree.getClass), mutable.ArrayBuffer.empty) += tree
+          }
+          tree match {
+            case member: untpd.MemberDef => member.mods.annotations.foreach(traverse)
+            case _ =>
           }
           traverseChildren(tree)
         }

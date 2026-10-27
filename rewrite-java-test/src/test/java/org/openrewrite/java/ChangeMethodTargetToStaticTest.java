@@ -114,6 +114,92 @@ class ChangeMethodTargetToStaticTest implements RewriteTest {
     }
 
     @Test
+    void qualifyCallWhenInheritedMethodShadowsStaticImport() {
+        rewriteRun(
+          spec -> spec.recipes(
+            new ChangeMethodName("a.A equal(Object, Object)", "equals", null, true),
+            new ChangeMethodTargetToStatic("a.A equals(Object, Object)", "java.util.Objects", null, null)
+          ),
+          java(
+            """
+              package a;
+              public class A {
+                 public static boolean equal(Object a, Object b) { return a == b; }
+              }
+              """
+          ),
+          java(
+            """
+              import static a.A.equal;
+
+              class C {
+                 boolean test(Object x, Object y) {
+                     return equal(equal(x, y), y);
+                 }
+              }
+              """,
+            """
+              import java.util.Objects;
+
+              class C {
+                 boolean test(Object x, Object y) {
+                     return Objects.equals(Objects.equals(x, y), y);
+                 }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void qualifyCallToMethodInheritedByAnonymousClass() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeMethodTargetToStatic("a.Logging log(String)", "b.B", null, null)),
+          java(
+            """
+              package a;
+              public interface Logging {
+                 default void log(String s) {}
+              }
+              """
+          ),
+          java(
+            """
+              package b;
+              public class B {
+                 public static void log(String s) {}
+              }
+              """
+          ),
+          java(
+            """
+              import a.Logging;
+
+              class C {
+                 Logging logging = new Logging() {
+                     void test() {
+                         log("x");
+                     }
+                 };
+              }
+              """,
+            """
+              import a.Logging;
+              import b.B;
+
+              class C {
+                 Logging logging = new Logging() {
+                     void test() {
+                         B.log("x");
+                     }
+                 };
+              }
+              """
+          )
+        );
+    }
+
+    @Test
     void targetToStaticWhenMethodHasSameName() {
         rewriteRun(
           spec -> spec.recipe(new ChangeMethodTargetToStatic("a.A method()", "a.A", null, null, false)),

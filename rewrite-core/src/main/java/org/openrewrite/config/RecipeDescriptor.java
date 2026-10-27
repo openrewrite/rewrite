@@ -74,6 +74,7 @@ public class RecipeDescriptor {
     @Deprecated(/* No longer populated */)
     List<Contributor> contributors;
 
+    @With
     List<RecipeExample> examples;
 
     @Deprecated

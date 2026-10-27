@@ -27,6 +27,7 @@ import {
     NodeRuntimeKind,
     PackageManager,
     prettierStyle,
+    sourceFileCache,
     StyleKind
 } from "../../src/javascript";
 import {Marker, marker, MarkersKind} from "../../src/markers";
@@ -128,6 +129,7 @@ const kinds: string[] = [
 ];
 
 describeJavaRpc("markers attached here reach Java and come back", () => {
+    const parser = new JavaScriptParser({sourceFileCache});
 
     test("every marker type has a sample", () => {
         expect(kinds.filter(kind => !samples[kind])).toEqual([]);
@@ -139,7 +141,7 @@ describeJavaRpc("markers attached here reach Java and come back", () => {
         const sample = samples[kind]();
         // sending tags what it sends, so what comes back is compared with a copy taken first
         const expected = structuredClone(sample);
-        const cu = (await new JavaScriptParser().parse({
+        const cu = (await parser.parse({
             text: "function f(b: boolean) {\n    const c = b || false;\n}",
             sourcePath: "markers.ts"
         }).next()).value as JS.CompilationUnit;

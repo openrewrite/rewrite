@@ -25,6 +25,9 @@ import org.openrewrite.java.MinimumJava17;
 import org.openrewrite.test.RewriteTest;
 import org.openrewrite.test.TypeValidation;
 
+import java.util.ArrayList;
+import java.util.List;
+
 import static java.lang.String.format;
 import static java.util.Objects.requireNonNull;
 import static org.assertj.core.api.Assertions.assertThat;
@@ -399,6 +402,52 @@ class VariableDeclarationsTest implements RewriteTest {
                   String field = "";
               }
               """
+          )
+        );
+    }
+
+    @Test
+    void sameNamedLocalsInSiblingScopesKeepOwnFlagsAndAnnotations() {
+        rewriteRun(
+          java(
+            """
+              import java.util.function.Consumer;
+
+              class Test {
+                  void test(boolean b) {
+                      if (b) {
+                          @Deprecated final int x = 1;
+                      } else {
+                          int x = 2;
+                          x++;
+                      }
+                      Consumer<String> c1 = (final String v) -> {};
+                      Consumer<String> c2 = v -> v = "";
+                  }
+              }
+              """,
+            spec -> spec.afterRecipe(cu -> {
+                List<JavaType.Variable> types = new ArrayList<>();
+                new JavaIsoVisitor<List<JavaType.Variable>>() {
+                    @Override
+                    public J.VariableDeclarations.NamedVariable visitVariable(J.VariableDeclarations.NamedVariable variable, List<JavaType.Variable> acc) {
+                        if (variable.getSimpleName().equals("x") || variable.getSimpleName().equals("v")) {
+                            acc.add(requireNonNull(variable.getVariableType()));
+                        }
+                        return super.visitVariable(variable, acc);
+                    }
+                }.visit(cu, types);
+
+                assertThat(types).hasSize(4);
+                JavaType.Variable finalX = types.get(0);
+                JavaType.Variable plainX = types.get(1);
+                assertThat(finalX.hasFlags(Flag.Final)).isTrue();
+                assertThat(finalX.getAnnotations()).hasSize(1);
+                assertThat(plainX.hasFlags(Flag.Final)).isFalse();
+                assertThat(plainX.getAnnotations()).isEmpty();
+                assertThat(types.get(2).hasFlags(Flag.Final)).isTrue();
+                assertThat(types.get(3).hasFlags(Flag.Final)).isFalse();
+            })
           )
         );
     }

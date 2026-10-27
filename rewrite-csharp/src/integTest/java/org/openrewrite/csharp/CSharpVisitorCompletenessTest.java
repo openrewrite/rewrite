@@ -15,11 +15,14 @@
  */
 package org.openrewrite.csharp;
 
+import org.junit.jupiter.api.AfterAll;
+import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
 import org.openrewrite.InMemoryExecutionContext;
 import org.openrewrite.Parser;
 import org.openrewrite.SourceFile;
+import org.openrewrite.csharp.rpc.CSharpRewriteRpc;
 import org.openrewrite.java.tree.Comment;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.Space;
@@ -41,13 +44,22 @@ import static org.assertj.core.api.Assertions.assertThat;
  */
 class CSharpVisitorCompletenessTest {
 
+    @BeforeAll
+    static void setUpFactory() {
+        CSharpPrinterParityTest.setUpFactory();
+    }
+
+    @AfterAll
+    static void shutDown() {
+        CSharpRewriteRpc.shutdownCurrent();
+    }
+
     static long nl(String s) {
         return s == null ? 0 : s.chars().filter(c -> c == '\n').count();
     }
 
     long visitorNewlines(SourceFile cu) {
-        AtomicInteger n = new AtomicInteger();
-        new CSharpVisitor<AtomicInteger>() {
+        return new CSharpVisitor<AtomicInteger>() {
             @Override
             public Space visitSpace(Space s, Space.Location l, AtomicInteger a) {
                 a.addAndGet((int) nl(s.getWhitespace()));
@@ -63,8 +75,7 @@ class CSharpVisitorCompletenessTest {
                 a.addAndGet((int) nl(lit.getValueSource()));
                 return super.visitLiteral(lit, a);
             }
-        }.visit(cu, n);
-        return n.get();
+        }.reduce(cu, new AtomicInteger()).get();
     }
 
     @Test

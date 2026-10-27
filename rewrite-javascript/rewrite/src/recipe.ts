@@ -235,7 +235,7 @@ export function Option(descriptor: OptionDescriptor) {
         // Ensure the constructor has options storage.
         if (!target.constructor.hasOwnProperty(OPTIONS_KEY)) {
             Object.defineProperty(target.constructor, OPTIONS_KEY, {
-                value: {},
+                value: {...(target.constructor[OPTIONS_KEY] ?? {})},
                 writable: true,
                 configurable: true,
             });

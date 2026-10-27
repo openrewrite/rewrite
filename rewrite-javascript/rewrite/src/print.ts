@@ -177,8 +177,8 @@ export class TreePrinters {
         return this._registry.get(sourceFileKind)!;
     }
 
-    static async print(sourceFile: SourceFile): Promise<string> {
-        const printed = await this.printer(sourceFile).print(sourceFile);
+    static async print(sourceFile: SourceFile, out?: PrintOutputCapture): Promise<string> {
+        const printed = await this.printer(sourceFile).print(sourceFile, out);
         // The BOM is a property of the file's encoding rather than of its syntax, so it is held on the
         // source file and put back here. Mirrors `org.openrewrite.Tree.print`.
         return sourceFile.charsetBomMarked && printed.charAt(0) !== "\uFEFF" ? "\uFEFF" + printed : printed;

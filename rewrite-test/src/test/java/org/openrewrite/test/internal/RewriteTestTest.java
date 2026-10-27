@@ -28,6 +28,7 @@ import org.openrewrite.*;
 import org.openrewrite.groovy.GroovyIsoVisitor;
 import org.openrewrite.groovy.GroovyParser;
 import org.openrewrite.internal.ListUtils;
+import org.openrewrite.java.AddImport;
 import org.openrewrite.java.ChangeType;
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.JavaVisitor;
@@ -40,6 +41,7 @@ import org.openrewrite.java.RemoveUnusedImports;
 import org.openrewrite.java.UseStaticImport;
 import org.openrewrite.java.format.AutoFormat;
 import org.openrewrite.java.format.AutoFormatVisitor;
+import org.openrewrite.java.marker.JavaProject;
 import org.openrewrite.java.marker.OmitParentheses;
 import org.openrewrite.java.search.FindAnnotations;
 import org.openrewrite.java.tree.J;
@@ -60,12 +62,17 @@ import org.openrewrite.yaml.YamlIsoVisitor;
 import org.openrewrite.yaml.tree.Yaml;
 
 import java.nio.file.Path;
+import java.util.AbstractMap;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicReference;
 
 import static java.util.Collections.emptyList;
 import static java.util.Comparator.comparing;
@@ -73,6 +80,7 @@ import static java.util.stream.Collectors.toList;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.openrewrite.Tree.randomId;
 import static org.openrewrite.groovy.Assertions.groovy;
 import static org.openrewrite.java.Assertions.java;
 import static org.openrewrite.java.Assertions.javaVersion;
@@ -143,6 +151,25 @@ class RewriteTestTest implements RewriteTest {
     }
 
     @Test
+    void generatedAndDeletedFilesAreNotCountedAsChangedAgainInLaterCycles() {
+        rewriteRun(
+          spec -> spec.recipe(new DeletesObsoleteGeneratesPlaceholderThenFillsIt())
+            .expectedCyclesThatMakeChanges(2),
+          text("obsolete", null, spec -> spec.path("obsolete.txt")),
+          text(null, "filled", spec -> spec.path("placeholder.txt"))
+        );
+    }
+
+    @Test
+    void runVerificationCycleAfterExpectedCycles() {
+        AssertionError e = assertThrows(AssertionError.class, () -> rewriteRun(
+          spec -> spec.expectedCyclesThatMakeChanges(2).recipe(new AppendExclamationMark()),
+          text("a", "a!!")
+        ));
+        assertThat(e).hasMessageContaining("Expected recipe to complete in 2 cycles, but took at least one more cycle");
+    }
+
+    @Test
     void cursorValidation() {
         AssertionError e = assertThrows(AssertionError.class, () ->
           rewriteRun(
@@ -191,6 +218,36 @@ class RewriteTestTest implements RewriteTest {
         ));
         assertThat(e).hasStackTraceContaining("make the edits in getVisitor(acc)")
           .hasStackTraceContaining("noEditsInScanningPhase(false)");
+    }
+
+    @Test
+    void recipeFailureOnUnprintableTreeKeepsCause() {
+        AssertionError e = assertThrows(AssertionError.class, () -> rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {
+              @Override
+              public J.Block visitBlock(J.Block block, ExecutionContext ctx) {
+                  return super.visitBlock(block.withStatements(ListUtils.map(block.getStatements(), s ->
+                    s instanceof J.If ? ((J.If) s).getPadding().withThenPart(null) : s)), ctx);
+              }
+
+              @Override
+              public J.If visitIf(J.If iff, ExecutionContext ctx) {
+                  throw new IllegalStateException("boom");
+              }
+          })),
+          java(
+            """
+              class A {
+                  void m(boolean b) {
+                      if (b) m(b);
+                  }
+              }
+              """
+          )
+        ));
+        assertThat(e).hasMessageStartingWith("Failed to run recipe at Cursor{")
+          .hasRootCauseInstanceOf(IllegalStateException.class)
+          .hasRootCauseMessage("boom");
     }
 
     @Test
@@ -442,7 +499,7 @@ class RewriteTestTest implements RewriteTest {
         void rejectEqualCopyWhateverTheCycleSettings() {
             // these settings accept a change in the only cycle, but an equal copy is not one
             AssertionError e = assertThrows(AssertionError.class, () -> rewriteRun(
-              spec -> spec.cycles(1).expectedCyclesThatMakeChanges(1).recipe(copiesModifiers()),
+              spec -> spec.recipe(copiesModifiers()),
               java(
                 """
                   public class A {}
@@ -1708,6 +1765,144 @@ class RewriteTestTest implements RewriteTest {
     }
 
     @Nested
+    class RemovesUnusedImports {
+
+        @Test
+        void rejectImportsTheRecipeLeavesOrAddsUnused() {
+            AssertionError e = assertThrows(AssertionError.class, () -> rewriteRun(
+              spec -> spec.recipe(new RemoveCalls("emptyList", "java.util.Set")),
+              java(
+                """
+                  import java.util.Collections;
+                  import java.util.List;
+
+                  class A {
+                      void m() {
+                          Collections.emptyList();
+                      }
+                  }
+                  """,
+                """
+                  import java.util.Collections;
+                  import java.util.List;
+                  import java.util.Set;
+
+                  class A {
+                      void m() {
+                      }
+                  }
+                  """
+              )
+            ));
+            assertThat(e).hasMessageStartingWith("Remove the imports the recipe leaves unused")
+              .hasMessageContaining(": import java.util.Collections, import java.util.Set\n")
+              .hasMessageContaining("removeUnusedImports(false)");
+        }
+
+        @Test
+        void acceptImportsThatWereUnusedBefore() {
+            rewriteRun(
+              spec -> spec.recipe(new RenameListImportAndRebuildTheOthers()),
+              java(
+                """
+                  import java.util.List;
+                  import java.util.Map;
+
+                  class A {
+                  }
+                  """,
+                """
+                  import java.util.Set;
+                  import java.util.Map;
+
+                  class A {
+                  }
+                  """
+              )
+            );
+        }
+
+        @Test
+        void skipImportsOfAnInputWithMissingTypes() {
+            rewriteRun(
+              spec -> spec.typeValidationOptions(TypeValidation.none()).recipe(new RemoveCalls("call", null)),
+              java(
+                """
+                  import java.util.List;
+
+                  class A {
+                      void m() {
+                          Unknown.call();
+                      }
+                  }
+                  """,
+                """
+                  import java.util.List;
+
+                  class A {
+                      void m() {
+                      }
+                  }
+                  """
+              )
+            );
+        }
+
+        @Test
+        void skipAdHocRecipe() {
+            rewriteRun(
+              spec -> spec.recipe(toRecipe(() -> new RemoveCalls("emptyList", null).getVisitor())),
+              java(
+                """
+                  import java.util.Collections;
+
+                  class A {
+                      void m() {
+                          Collections.emptyList();
+                      }
+                  }
+                  """,
+                """
+                  import java.util.Collections;
+
+                  class A {
+                      void m() {
+                      }
+                  }
+                  """
+              )
+            );
+        }
+
+        @Test
+        void optOut() {
+            rewriteRun(
+              spec -> spec.recipe(new RemoveCalls("emptyList", null))
+                .recipeQualityValidation(RecipeQualityValidation.builder().removeUnusedImports(false).build()),
+              java(
+                """
+                  import java.util.Collections;
+
+                  class A {
+                      void m() {
+                          Collections.emptyList();
+                      }
+                  }
+                  """,
+                """
+                  import java.util.Collections;
+
+                  class A {
+                      void m() {
+                      }
+                  }
+                  """
+              )
+            );
+        }
+    }
+
+    @Nested
     class ParserShapedTrees {
 
         @Test
@@ -1803,6 +1998,90 @@ class RewriteTestTest implements RewriteTest {
               )
             ));
             assertThat(e).hasMessageContaining("the key `key` appears twice in one mapping, which YAML doesn't allow");
+        }
+
+        @Test
+        void rejectStatementThatLeavesIfWithoutThenPart() {
+            AssertionError e = assertThrows(AssertionError.class, () -> rewriteRun(
+              spec -> spec.recipe(new RemoveThenPart()),
+              java(
+                """
+                  class A {
+                      void f(boolean b) {
+                          if (b) g(); else h();
+                      }
+                      void g() {}
+                      void h() {}
+                  }
+                  """,
+                """
+                  class A {
+                      void f(boolean b) {
+                          if (b) else h();
+                      }
+                      void g() {}
+                      void h() {}
+                  }
+                  """
+              )
+            ));
+            assertThat(e).hasMessageStartingWith("Write code with a template or the format's own parser")
+              .hasMessageContaining("A.java (changed by org.openrewrite.test.internal.RemoveThenPart):\n" +
+                                    "    the text it prints doesn't parse: the parser recovered from a syntax " +
+                                    "error near `h();`");
+        }
+
+        @Test
+        void rejectLiteralWhoseSourceDoesNotParse() {
+            AssertionError e = assertThrows(AssertionError.class, () -> rewriteRun(
+              spec -> spec.recipe(new QuoteToStringByHand()),
+              java(
+                """
+                  class A {
+                      Object f() {
+                          return '"';
+                      }
+                  }
+                  """,
+                """
+                  class A {
+                      Object f() {
+                          return \"\"\";
+                      }
+                  }
+                  """
+              )
+            ));
+            assertThat(e).hasMessageStartingWith("Write code with a template or the format's own parser")
+              .hasMessageContaining("A.java (changed by org.openrewrite.test.internal.QuoteToStringByHand):\n" +
+                                    "    the text it prints doesn't parse: the parser recovered from a syntax " +
+                                    "error near `return \"\"\"`");
+        }
+
+        @Test
+        void acceptSourceThatAlreadyDidNotParse() {
+            rewriteRun(
+              spec -> spec.recipe(new ReturnNullByHand(true))
+                .typeValidationOptions(TypeValidation.all().erroneous(false)),
+              java(
+                """
+                  class A {
+                      Object f() {
+                          owner
+                          return 0;
+                      }
+                  }
+                  """,
+                """
+                  class A {
+                      Object f() {
+                          owner
+                          return null;
+                      }
+                  }
+                  """
+              )
+            );
         }
 
         @Test
@@ -2037,6 +2316,77 @@ class RewriteTestTest implements RewriteTest {
     }
 
     @Nested
+    class LightweightAccumulators {
+
+        @Test
+        void rejectSourceFileKeptInAccumulator() {
+            AssertionError e = assertThrows(AssertionError.class, () -> rewriteRun(
+              spec -> spec.recipe(new KeepsWhatItScans()),
+              text("foo", spec -> spec.path("foo.txt"))
+            ));
+            assertThat(e).hasMessageContaining("A ScanningRecipe's accumulator should keep the values the recipe needs")
+              .hasMessageContaining("org.openrewrite.test.internal.KeepsWhatItScans keeps\n" +
+                                    "    KeepsWhatItScans.Scanned.sourceFiles[foo.txt] -> PlainText foo.txt, after scanning")
+              .hasMessageContaining("lightweightAccumulators(false)");
+        }
+
+        @Test
+        void rejectHeavyweightMarkerKeptInAccumulator() {
+            AssertionError e = assertThrows(AssertionError.class, () -> rewriteRun(
+              spec -> spec.recipe(new KeepsHeavyweightMarker()),
+              text("foo", spec -> spec.markers(new Classpath(randomId(), List.of("a.jar"))))
+            ));
+            assertThat(e).hasMessageContaining("AtomicReference.get() -> Classpath, after scanning");
+        }
+
+        @Test
+        void rejectCursorKeptInAccumulator() {
+            AssertionError e = assertThrows(AssertionError.class, () -> rewriteRun(
+              spec -> spec.recipe(new KeepsCursor()),
+              text("foo")
+            ));
+            assertThat(e).hasMessageContaining("ArrayList[0] -> Cursor, after scanning");
+        }
+
+        @Test
+        void rejectSourceFileKeptWhileEditing() {
+            AssertionError e = assertThrows(AssertionError.class, () -> rewriteRun(
+              spec -> spec.recipe(new KeepsWhatItEdits()),
+              text("foo", spec -> spec.path("foo.txt"))
+            ));
+            assertThat(e).hasMessageContaining("ArrayList[0] -> PlainText foo.txt, after editing");
+        }
+
+        @Test
+        void rejectSourceFileKeptInCollectionOfItsOwn() {
+            AssertionError e = assertThrows(AssertionError.class, () -> rewriteRun(
+              spec -> spec.recipe(new KeepsWhatItScansInItsOwnMap()),
+              text("foo", spec -> spec.path("foo.txt"))
+            ));
+            assertThat(e).hasMessageContaining(
+              "KeepsWhatItScansInItsOwnMap.Index.files[foo.txt] -> PlainText foo.txt, after scanning");
+        }
+
+        @Test
+        void acceptValuesAndSmallMarkersKeptInAccumulator() {
+            rewriteRun(
+              spec -> spec.recipe(new KeepsPathsByProject()),
+              text("foo", spec -> spec.markers(new JavaProject(randomId(), "demo", null)))
+            );
+        }
+
+        @Test
+        void turnedOff() {
+            rewriteRun(
+              spec -> spec
+                .recipeQualityValidation(RecipeQualityValidation.builder().lightweightAccumulators(false).build())
+                .recipe(new KeepsWhatItScans()),
+              text("foo")
+            );
+        }
+    }
+
+    @Nested
     class RecipeValidation {
 
         @Test
@@ -2261,6 +2611,49 @@ class ReturnNullByHand extends Recipe {
                 }
                 return new J.Literal(Tree.randomId(), literal.getPrefix(), Markers.EMPTY,
                   Boolean.TRUE.equals(parserShaped) ? null : "null", "null", null, JavaType.Primitive.Null);
+            }
+        };
+    }
+}
+
+@EqualsAndHashCode(callSuper = false)
+@NullMarked
+@Value
+class RemoveThenPart extends Recipe {
+
+    String displayName = "Remove the then-part of an `if`";
+
+    String description = "Removes a method call that is the whole then-part of an `if`, leaving the `if` without one.";
+
+    @Override
+    public TreeVisitor<?, ExecutionContext> getVisitor() {
+        return new JavaVisitor<>() {
+            @Override
+            public @Nullable J visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
+                return getCursor().getParentTreeCursor().getValue() instanceof J.If ? null : method;
+            }
+        };
+    }
+}
+
+@EqualsAndHashCode(callSuper = false)
+@NullMarked
+@Value
+class QuoteToStringByHand extends Recipe {
+
+    String displayName = "Replace a quote character with a string";
+
+    String description = "Replaces `'\"'` by a string literal, writing its source without escaping the quote.";
+
+    @Override
+    public TreeVisitor<?, ExecutionContext> getVisitor() {
+        return new JavaVisitor<>() {
+            @Override
+            public J visitLiteral(J.Literal literal, ExecutionContext ctx) {
+                if (!Character.valueOf('"').equals(literal.getValue())) {
+                    return literal;
+                }
+                return literal.withValue("\"").withValueSource("\"\"\"").withType(JavaType.Primitive.String);
             }
         };
     }
@@ -2846,5 +3239,332 @@ class RecipeWithOptionalOrValidation extends Recipe {
         return super.validate().and(
           Validated.required("optionA", optionA)
             .or(Validated.required("optionB", optionB)));
+    }
+}
+
+@EqualsAndHashCode(callSuper = false)
+@Value
+class DeletesObsoleteGeneratesPlaceholderThenFillsIt extends ScanningRecipe<AtomicBoolean> {
+
+    String displayName = "Deletes an obsolete file and generates a placeholder, then fills it";
+
+    String description = "A recipe that deletes a file and generates a placeholder in one cycle and fills the placeholder in the next.";
+
+    @Override
+    public AtomicBoolean getInitialValue(ExecutionContext ctx) {
+        return new AtomicBoolean(false);
+    }
+
+    @Override
+    public TreeVisitor<?, ExecutionContext> getScanner(AtomicBoolean placeholderExists) {
+        return new PlainTextVisitor<>() {
+            @Override
+            public PlainText visitText(PlainText text, ExecutionContext ctx) {
+                if ("placeholder.txt".equals(text.getSourcePath().toString())) {
+                    placeholderExists.set(true);
+                }
+                return text;
+            }
+        };
+    }
+
+    @Override
+    public Collection<? extends SourceFile> generate(AtomicBoolean placeholderExists, ExecutionContext ctx) {
+        return placeholderExists.get() ? emptyList() : List.of(PlainText.builder()
+          .text("placeholder")
+          .sourcePath(Path.of("placeholder.txt"))
+          .build());
+    }
+
+    @Override
+    public TreeVisitor<?, ExecutionContext> getVisitor(AtomicBoolean placeholderExists) {
+        return new PlainTextVisitor<>() {
+            @Override
+            public @Nullable PlainText visitText(PlainText text, ExecutionContext ctx) {
+                if ("obsolete.txt".equals(text.getSourcePath().toString())) {
+                    return null;
+                }
+                // Filling only what the scan already saw defers it to the cycle after generation
+                return placeholderExists.get() && "placeholder".equals(text.getText()) ? text.withText("filled") : text;
+            }
+        };
+    }
+}
+
+@EqualsAndHashCode(callSuper = false)
+@NullMarked
+@Value
+class AppendExclamationMark extends Recipe {
+
+    String displayName = "Append an exclamation mark";
+
+    String description = "Appends an exclamation mark to every plain text file, in every cycle.";
+
+    @Override
+    public TreeVisitor<?, ExecutionContext> getVisitor() {
+        return new PlainTextVisitor<>() {
+            @Override
+            public PlainText visitText(PlainText text, ExecutionContext ctx) {
+                return text.withText(text.getText() + "!");
+            }
+        };
+    }
+}
+
+@Value
+@With
+class Classpath implements Marker, Heavyweight {
+    UUID id;
+    List<String> jars;
+}
+
+@EqualsAndHashCode(callSuper = false)
+@NullMarked
+@Value
+class KeepsWhatItScans extends ScanningRecipe<KeepsWhatItScans.Scanned> {
+
+    String displayName = "Keeps the source files it scans";
+
+    String description = "Keeps each source file it scans in its accumulator.";
+
+    static class Scanned {
+        final Map<Path, SourceFile> sourceFiles = new HashMap<>();
+    }
+
+    @Override
+    public Scanned getInitialValue(ExecutionContext ctx) {
+        return new Scanned();
+    }
+
+    @Override
+    public TreeVisitor<?, ExecutionContext> getScanner(Scanned acc) {
+        return new TreeVisitor<>() {
+            @Override
+            public @Nullable Tree visit(@Nullable Tree tree, ExecutionContext ctx) {
+                if (tree instanceof SourceFile s) {
+                    acc.sourceFiles.put(s.getSourcePath(), s);
+                }
+                return tree;
+            }
+        };
+    }
+}
+
+@EqualsAndHashCode(callSuper = false)
+@NullMarked
+@Value
+class KeepsWhatItScansInItsOwnMap extends ScanningRecipe<KeepsWhatItScansInItsOwnMap.Index> {
+
+    String displayName = "Keeps the source files it scans in a map of its own";
+
+    String description = "Keeps each source file it scans in an accumulator that is a map, which the check must not call.";
+
+    static class Index extends AbstractMap<Path, SourceFile> {
+        final Map<Path, SourceFile> files = new HashMap<>();
+
+        @Override
+        public Set<Entry<Path, SourceFile>> entrySet() {
+            throw new UnsupportedOperationException("The check ran code of the accumulator's own");
+        }
+    }
+
+    @Override
+    public Index getInitialValue(ExecutionContext ctx) {
+        return new Index();
+    }
+
+    @Override
+    public TreeVisitor<?, ExecutionContext> getScanner(Index acc) {
+        return new TreeVisitor<>() {
+            @Override
+            public @Nullable Tree visit(@Nullable Tree tree, ExecutionContext ctx) {
+                if (tree instanceof SourceFile s) {
+                    acc.files.put(s.getSourcePath(), s);
+                }
+                return tree;
+            }
+        };
+    }
+}
+
+@EqualsAndHashCode(callSuper = false)
+@NullMarked
+@Value
+class KeepsHeavyweightMarker extends ScanningRecipe<AtomicReference<@Nullable Classpath>> {
+
+    String displayName = "Keeps a heavyweight marker";
+
+    String description = "Keeps the classpath marker of a source file it scans in its accumulator.";
+
+    @Override
+    public AtomicReference<@Nullable Classpath> getInitialValue(ExecutionContext ctx) {
+        return new AtomicReference<>();
+    }
+
+    @Override
+    public TreeVisitor<?, ExecutionContext> getScanner(AtomicReference<@Nullable Classpath> acc) {
+        return new TreeVisitor<>() {
+            @Override
+            public @Nullable Tree visit(@Nullable Tree tree, ExecutionContext ctx) {
+                if (tree instanceof SourceFile s) {
+                    s.getMarkers().findFirst(Classpath.class).ifPresent(acc::set);
+                }
+                return tree;
+            }
+        };
+    }
+}
+
+@EqualsAndHashCode(callSuper = false)
+@NullMarked
+@Value
+class KeepsCursor extends ScanningRecipe<List<Cursor>> {
+
+    String displayName = "Keeps a cursor";
+
+    String description = "Keeps the cursor of each text it scans in its accumulator.";
+
+    @Override
+    public List<Cursor> getInitialValue(ExecutionContext ctx) {
+        return new ArrayList<>();
+    }
+
+    @Override
+    public TreeVisitor<?, ExecutionContext> getScanner(List<Cursor> acc) {
+        return new PlainTextVisitor<>() {
+            @Override
+            public PlainText visitText(PlainText text, ExecutionContext ctx) {
+                acc.add(getCursor());
+                return text;
+            }
+        };
+    }
+}
+
+@EqualsAndHashCode(callSuper = false)
+@NullMarked
+@Value
+class KeepsWhatItEdits extends ScanningRecipe<List<SourceFile>> {
+
+    String displayName = "Keeps the source files it edits";
+
+    String description = "Keeps each source file it visits in the edit phase in its accumulator.";
+
+    @Override
+    public List<SourceFile> getInitialValue(ExecutionContext ctx) {
+        return new ArrayList<>();
+    }
+
+    @Override
+    public TreeVisitor<?, ExecutionContext> getScanner(List<SourceFile> acc) {
+        return TreeVisitor.noop();
+    }
+
+    @Override
+    public TreeVisitor<?, ExecutionContext> getVisitor(List<SourceFile> acc) {
+        return new TreeVisitor<>() {
+            @Override
+            public @Nullable Tree visit(@Nullable Tree tree, ExecutionContext ctx) {
+                if (tree instanceof SourceFile s) {
+                    acc.add(s);
+                }
+                return tree;
+            }
+        };
+    }
+}
+
+@EqualsAndHashCode(callSuper = false)
+@NullMarked
+@Value
+class KeepsPathsByProject extends ScanningRecipe<Map<JavaProject, Set<Path>>> {
+
+    String displayName = "Keeps paths by project";
+
+    String description = "Keeps the path of each source file it scans in its accumulator, by project.";
+
+    @Override
+    public Map<JavaProject, Set<Path>> getInitialValue(ExecutionContext ctx) {
+        return new HashMap<>();
+    }
+
+    @Override
+    public TreeVisitor<?, ExecutionContext> getScanner(Map<JavaProject, Set<Path>> acc) {
+        return new TreeVisitor<>() {
+            @Override
+            public @Nullable Tree visit(@Nullable Tree tree, ExecutionContext ctx) {
+                if (tree instanceof SourceFile s) {
+                    s.getMarkers().findFirst(JavaProject.class).ifPresent(project ->
+                      acc.computeIfAbsent(project, p -> new HashSet<>()).add(s.getSourcePath()));
+                }
+                return tree;
+            }
+        };
+    }
+}
+
+@EqualsAndHashCode(callSuper = false)
+@NullMarked
+@Value
+class RemoveCalls extends Recipe {
+
+    @Option(displayName = "Method name",
+      description = "The name of the method whose call statements are removed.")
+    String methodName;
+
+    @Option(displayName = "Import to add",
+      description = "A type to import whether or not the file uses it.",
+      required = false)
+    @Nullable
+    String addImport;
+
+    String displayName = "Remove calls";
+
+    String description = "Removes the statements that call a method, without removing the imports they used.";
+
+    @Override
+    public TreeVisitor<?, ExecutionContext> getVisitor() {
+        return new JavaIsoVisitor<>() {
+            @Override
+            public J.Block visitBlock(J.Block block, ExecutionContext ctx) {
+                if (addImport != null) {
+                    doAfterVisit(new AddImport<>(addImport, null, false));
+                }
+                J.Block b = super.visitBlock(block, ctx);
+                return b.withStatements(ListUtils.map(b.getStatements(), s ->
+                  s instanceof J.MethodInvocation m && methodName.equals(m.getSimpleName()) ? null : s));
+            }
+        };
+    }
+}
+
+@EqualsAndHashCode(callSuper = false)
+@NullMarked
+@Value
+class RenameListImportAndRebuildTheOthers extends Recipe {
+
+    String displayName = "Rename the `List` import and rebuild the others";
+
+    String description = "Renames an import of `java.util.List` to `java.util.Set`, and gives the other imports new ids.";
+
+    @Override
+    public TreeVisitor<?, ExecutionContext> getVisitor() {
+        return new JavaIsoVisitor<>() {
+            @Override
+            public J.CompilationUnit visitCompilationUnit(J.CompilationUnit cu, ExecutionContext ctx) {
+                if (cu.getImports().stream().noneMatch(i -> "List".equals(i.getQualid().getSimpleName()))) {
+                    return cu;
+                }
+                return cu.withImports(ListUtils.map(cu.getImports(), anImport -> {
+                    J.FieldAccess q = anImport.getQualid();
+                    if ("List".equals(q.getSimpleName())) {
+                        JavaType.ShallowClass set = JavaType.ShallowClass.build("java.util.Set");
+                        return anImport.withQualid(q.withName(q.getName().withSimpleName("Set").withType(set))
+                          .withType(set));
+                    }
+                    return anImport.withId(Tree.randomId());
+                }));
+            }
+        };
     }
 }

@@ -231,13 +231,16 @@ public interface RewriteTest extends SourceSpecs {
             testClassSpec.getRecipePrinter().printTree(recipe);
         }
 
-        int cycles = testMethodSpec.cycles == null ? testClassSpec.getCycles() : testMethodSpec.getCycles();
+        Integer declaredExpectedCycles = testMethodSpec.expectedCyclesThatMakeChanges == null ?
+                testClassSpec.expectedCyclesThatMakeChanges : testMethodSpec.expectedCyclesThatMakeChanges;
+        // The cycle after the expected ones verifies that the recipe settled
+        int cycles = testMethodSpec.cycles != null ? testMethodSpec.cycles :
+                testClassSpec.cycles != null ? testClassSpec.cycles :
+                        declaredExpectedCycles != null ? Math.max(2, declaredExpectedCycles + 1) : 2;
 
         // There may not be any tests that have "after" assertions, but that change file attributes or file names.
         // If so, the test can declare an expected set of cycles that make changes.
-        int expectedCyclesThatMakeChanges = testMethodSpec.expectedCyclesThatMakeChanges == null ?
-                (testClassSpec.expectedCyclesThatMakeChanges == null ? 0 : testClassSpec.expectedCyclesThatMakeChanges) :
-                testMethodSpec.expectedCyclesThatMakeChanges;
+        int expectedCyclesThatMakeChanges = declaredExpectedCycles == null ? 0 : declaredExpectedCycles;
 
         // If there are any tests that have assertions (an "after"), then set the expected cycles.
         for (SourceSpec<?> s : sourceSpecs) {
@@ -447,6 +450,7 @@ public interface RewriteTest extends SourceSpecs {
             addedMarkers = new AddedMarkers(beforeSourceFiles, parsersFor, relativeTo, ctx);
         }
         UnchangedTreeIdentity unchangedTreeIdentity = new UnchangedTreeIdentity();
+        AccumulatorContents accumulatorContents = quality.lightweightAccumulators() ? new AccumulatorContents() : null;
 
         LargeSourceSet lss;
         if (testMethodSpec.getSourceSet() != null) {
@@ -455,7 +459,7 @@ public interface RewriteTest extends SourceSpecs {
             lss = testClassSpec.getSourceSet().apply(runnableSourceFiles);
         } else {
             lss = new LargeSourceSetCheckingExpectedCycles(expectedCyclesThatMakeChanges, runnableSourceFiles,
-                    addedMarkers, unchangedTreeIdentity);
+                    addedMarkers, unchangedTreeIdentity, accumulatorContents);
         }
 
         recipeCtx = CursorValidatingExecutionContextView.view(recipeCtx)
@@ -469,7 +473,7 @@ public interface RewriteTest extends SourceSpecs {
         NameMatching nameMatching = NameMatching.of(recipe, runner, runnerContext, beforeSourceFiles,
                 parsersFor, relativeTo, ctx);
         FormattingScope formattingScope = new FormattingScope(recipe, quality.minimalFormatting());
-        ImportedNames importedNames = ImportedNames.of(quality.importReferencedTypes(), runnableSourceFiles);
+        ImportedNames importedNames = ImportedNames.of(quality, recipe, runnableSourceFiles);
         long runStart = System.nanoTime();
         RecipeRun recipeRun = formattingScope.record(() ->
                 importedNames.record(() -> runner.run(recipe, runnerContext)));
@@ -478,6 +482,9 @@ public interface RewriteTest extends SourceSpecs {
             addedMarkers.assertNoneAdded(recipeRun.getChangeset().getAllResults());
         }
         unchangedTreeIdentity.assertNoneFound();
+        if (accumulatorContents != null) {
+            accumulatorContents.assertNoneFound();
+        }
         boolean probed = runner == RewriteRunner.IN_PROCESS && lss instanceof LargeSourceSetCheckingExpectedCycles;
         EmptySources emptySources = probed ?
                 new EmptySources(recipe, recipeRun.getChangeset().getAllResults()) : null;
@@ -718,7 +725,7 @@ public interface RewriteTest extends SourceSpecs {
                  "    before | after | expected\n" + paths);
         }
         formattingScope.assertFormattedOnlyWhatChanged(recipeRun.getChangeset().getAllResults());
-        importedNames.assertImported(recipeRun.getChangeset().getAllResults());
+        importedNames.assertImports(recipeRun.getChangeset().getAllResults());
         new TreeShapes(quality.parserShapedTrees(), parsersFor, relativeTo, ctx)
                 .assertParserShaped(recipeRun.getChangeset().getAllResults(), runnableSourceFiles);
         if (quality.orderStepsForEarlierChanges()) {
@@ -767,7 +774,17 @@ public interface RewriteTest extends SourceSpecs {
     default ExecutionContext defaultExecutionContext(SourceSpec<?>[] sourceSpecs) {
         InMemoryExecutionContext ctx = new InMemoryExecutionContext(t -> {
             if (t instanceof RecipeRunException) {
-                fail("Failed to run recipe at " + ((RecipeRunException) t).getCursor(), t);
+                Cursor cursor = ((RecipeRunException) t).getCursor();
+                String location;
+                try {
+                    location = String.valueOf(cursor);
+                } catch (RuntimeException e) {
+                    t.addSuppressed(e);
+                    location = cursor.getPathAsStream()
+                            .map(v -> v.getClass().getSimpleName())
+                            .collect(joining("->", "Cursor{", "}"));
+                }
+                fail("Failed to run recipe at " + location, t);
             }
             fail("Failed to parse sources or run recipe", t);
         });

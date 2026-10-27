@@ -86,14 +86,13 @@ class SemanticallyEqualTest {
           .findFirst()
           .map(K.CompilationUnit.class::cast)
           .orElseThrow();
-        List<J.Try.Catch> catches = new ArrayList<>();
-        new KotlinIsoVisitor<List<J.Try.Catch>>() {
+        List<J.Try.Catch> catches = new KotlinIsoVisitor<List<J.Try.Catch>>() {
             @Override
             public J.Try.Catch visitCatch(J.Try.Catch _catch, List<J.Try.Catch> found) {
                 found.add(_catch);
                 return super.visitCatch(_catch, found);
             }
-        }.visit(cu, catches);
+        }.reduce(cu, new ArrayList<>());
         assertThat(catches).hasSize(2);
         return catches;
     }

@@ -44,6 +44,7 @@ For testing visitors directly without a Recipe:
         spec.rewrite_run(python("x = 1", "x = 2"))
 """
 
+from .content_validation import ContentFinding, validate_recipe_content
 from .spec import SourceSpec, AfterRecipeText, python, pyproject, uv, dedent
 from .rewrite_test import RecipeSpec, NoopRecipe, AdHocRecipe, from_visitor, rewrite_run
 
@@ -52,6 +53,9 @@ __all__ = [
     "SourceSpec",
     "AfterRecipeText",
     "RecipeSpec",
+    # Recipe descriptor content validation
+    "ContentFinding",
+    "validate_recipe_content",
     # Recipe helpers
     "NoopRecipe",
     "AdHocRecipe",

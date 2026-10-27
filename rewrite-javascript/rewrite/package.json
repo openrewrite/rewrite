@@ -60,13 +60,12 @@
   "scripts": {
     "prebuild": "bun -e \"require('fs').rmSync('dist',{recursive:true,force:true})\" && bun -e \"require('fs').rmSync('tsconfig.build.tsbuildinfo',{force:true})\"",
     "build": "tsc --build tsconfig.build.json",
-    "postbuild": "bun -e \"require('fs').chmodSync('dist/rpc/server.js', 0o755); require('fs').chmodSync('dist/javascript/type-report-cli.js', 0o755)\" && npm link",
+    "postbuild": "bun -e \"require('fs').chmodSync('dist/rpc/server.js', 0o755); require('fs').chmodSync('dist/javascript/type-report-cli.js', 0o755)\" && npm link --no-audit --no-fund --loglevel=warn",
     "typecheck": "tsc --noEmit -p tsconfig.test.json",
     "dev": "tsc --watch -p tsconfig.json",
     "test": "npm run typecheck && npm run build && vitest run",
     "testhelper": "vitest run",
     "build:fixtures": "tsc --build fixtures/tsconfig.json",
-    "ci:test": "npm run typecheck && vitest run",
     "start": "npm run build && node ./dist/rpc/server.js"
   },
   "dependencies": {

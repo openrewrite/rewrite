@@ -16,7 +16,6 @@
 package org.openrewrite.gradle.search;
 
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.condition.DisabledIfEnvironmentVariable;
 import org.openrewrite.DocumentExample;
 import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
@@ -26,6 +25,7 @@ import java.util.List;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.gradle.Assertions.*;
 import static org.openrewrite.gradle.search.EffectiveRepositoryAssertions.expectedWithUrls;
+import static org.openrewrite.gradle.search.EffectiveRepositoryAssertions.mavenCentral;
 import static org.openrewrite.gradle.toolingapi.Assertions.withToolingApi;
 import static org.openrewrite.maven.search.EffectiveMavenRepositoriesTable.Row;
 
@@ -65,8 +65,6 @@ class EffectiveGradleRepositoriesTest implements RewriteTest {
     }
 
     @Test
-    @DisabledIfEnvironmentVariable(named = "REWRITE_GRADLE_MIRROR_URL", matches = ".+",
-            disabledReason = "An injected mirror adds a repository, defeating the empty-repositories scenario.")
     void emptyRepositories() {
         rewriteRun(
           buildGradle(
@@ -94,7 +92,7 @@ class EffectiveGradleRepositoriesTest implements RewriteTest {
               }
               """,
             spec -> spec.after(actual -> expectedWithUrls(actual,
-              List.of("https://repo.spring.io/milestone", "https://repo.maven.apache.org/maven2/"), """
+              List.of("https://repo.spring.io/milestone", mavenCentral()), """
               plugins {
                   id 'java'
               }
@@ -196,9 +194,9 @@ class EffectiveGradleRepositoriesTest implements RewriteTest {
             .dataTable(Row.class, rows ->
                 assertThat(rows).contains(
                   new Row("build.gradle", "https://repo.spring.io/milestone"),
-                  new Row("build.gradle", "https://repo.maven.apache.org/maven2/"),
+                  new Row("build.gradle", mavenCentral()),
                   new Row("module/build.gradle", "https://repo.spring.io/milestone"),
-                  new Row("module/build.gradle", "https://repo.maven.apache.org/maven2/")
+                  new Row("module/build.gradle", mavenCentral())
                 )),
           settingsGradle(
             """

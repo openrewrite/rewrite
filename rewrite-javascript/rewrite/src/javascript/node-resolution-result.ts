@@ -303,7 +303,8 @@ export function createNodeResolutionResultMarker(
      * out of sync for every subsequent file in the build.
      *
      * Shapes seen in the wild and what we do with them:
-     *  - object: pass through.
+     *  - object: keep the string-valued entries. Cordova nests an object
+     *      under `cordovaDependencies`, which npm does not read.
      *  - ["node >=0.6.0"]: split on the first space → {node: ">=0.6.0"}.
      *  - ["node", "rhino"]: bare names with no version. Preserve the
      *      engine list as {node: "*", rhino: "*"}.
@@ -328,7 +329,13 @@ export function createNodeResolutionResultMarker(
             return Object.keys(result).length > 0 ? result : undefined;
         }
         if (typeof engines !== 'object') return undefined;
-        return engines as Record<string, string>;
+        const result: Record<string, string> = {};
+        for (const [name, constraint] of Object.entries(engines)) {
+            if (typeof constraint === 'string') {
+                result[name] = constraint;
+            }
+        }
+        return result;
     }
 
     /**
@@ -934,16 +941,16 @@ export namespace NodeResolutionResultQueries {
  * Register RPC codec for Npmrc.
  */
 RpcCodecs.registerCodec(NpmrcKind, {
-    async rpcReceive(before: Npmrc, q: RpcReceiveQueue): Promise<Npmrc> {
+    rpcReceive(before: Npmrc, q: RpcReceiveQueue): Npmrc {
         return updateIfChanged(before, {
-            scope: await q.receive(before.scope),
-            properties: await q.receive(before.properties),
+            scope: q.receive(before.scope),
+            properties: q.receive(before.properties),
         });
     },
 
-    async rpcSend(after: Npmrc, q: RpcSendQueue): Promise<void> {
-        await q.getAndSend(after, a => a.scope);
-        await q.getAndSend(after, a => a.properties);
+    rpcSend(after: Npmrc, q: RpcSendQueue): void {
+        q.getAndSend(after, a => a.scope);
+        q.getAndSend(after, a => a.properties);
     }
 });
 
@@ -951,20 +958,20 @@ RpcCodecs.registerCodec(NpmrcKind, {
  * Register RPC codec for Dependency.
  */
 RpcCodecs.registerCodec(DependencyKind, {
-    async rpcReceive(before: Dependency, q: RpcReceiveQueue): Promise<Dependency> {
+    rpcReceive(before: Dependency, q: RpcReceiveQueue): Dependency {
         // Populated in place: the receive queue registered this instance for the ref before calling
         // the codec, so a back-reference closing a cycle resolves to the finished object.
         const dep = castDraft(before);
-        dep.name = await q.receive(before.name);
-        dep.versionConstraint = await q.receive(before.versionConstraint);
-        dep.resolved = await q.receive(before.resolved);
+        dep.name = q.receive(before.name);
+        dep.versionConstraint = q.receive(before.versionConstraint);
+        dep.resolved = q.receive(before.resolved);
         return before;
     },
 
-    async rpcSend(after: Dependency, q: RpcSendQueue): Promise<void> {
-        await q.getAndSend(after, a => a.name);
-        await q.getAndSend(after, a => a.versionConstraint);
-        await q.getAndSend(after, a => asRef(a.resolved));
+    rpcSend(after: Dependency, q: RpcSendQueue): void {
+        q.getAndSend(after, a => a.name);
+        q.getAndSend(after, a => a.versionConstraint);
+        q.getAndSend(after, a => asRef(a.resolved));
     }
 });
 
@@ -972,32 +979,32 @@ RpcCodecs.registerCodec(DependencyKind, {
  * Register RPC codec for ResolvedDependency.
  */
 RpcCodecs.registerCodec(ResolvedDependencyKind, {
-    async rpcReceive(before: ResolvedDependency, q: RpcReceiveQueue): Promise<ResolvedDependency> {
+    rpcReceive(before: ResolvedDependency, q: RpcReceiveQueue): ResolvedDependency {
         const resolved = castDraft(before);
-        resolved.name = await q.receive(before.name);
-        resolved.version = await q.receive(before.version);
-        resolved.dependencies = (await q.receiveList(before.dependencies)) || undefined;
-        resolved.devDependencies = (await q.receiveList(before.devDependencies)) || undefined;
-        resolved.peerDependencies = (await q.receiveList(before.peerDependencies)) || undefined;
-        resolved.optionalDependencies = (await q.receiveList(before.optionalDependencies)) || undefined;
-        resolved.engines = await q.receive(before.engines);
-        resolved.license = await q.receive(before.license);
+        resolved.name = q.receive(before.name);
+        resolved.version = q.receive(before.version);
+        resolved.dependencies = (q.receiveList(before.dependencies)) || undefined;
+        resolved.devDependencies = (q.receiveList(before.devDependencies)) || undefined;
+        resolved.peerDependencies = (q.receiveList(before.peerDependencies)) || undefined;
+        resolved.optionalDependencies = (q.receiveList(before.optionalDependencies)) || undefined;
+        resolved.engines = q.receive(before.engines);
+        resolved.license = q.receive(before.license);
         return before;
     },
 
-    async rpcSend(after: ResolvedDependency, q: RpcSendQueue): Promise<void> {
-        await q.getAndSend(after, a => a.name);
-        await q.getAndSend(after, a => a.version);
-        await q.getAndSendList(after, a => (a.dependencies || []).map(d => asRef(d)),
+    rpcSend(after: ResolvedDependency, q: RpcSendQueue): void {
+        q.getAndSend(after, a => a.name);
+        q.getAndSend(after, a => a.version);
+        q.getAndSendList(after, a => (a.dependencies || []).map(d => asRef(d)),
             dep => `${dep.name}@${dep.versionConstraint}`);
-        await q.getAndSendList(after, a => (a.devDependencies || []).map(d => asRef(d)),
+        q.getAndSendList(after, a => (a.devDependencies || []).map(d => asRef(d)),
             dep => `${dep.name}@${dep.versionConstraint}`);
-        await q.getAndSendList(after, a => (a.peerDependencies || []).map(d => asRef(d)),
+        q.getAndSendList(after, a => (a.peerDependencies || []).map(d => asRef(d)),
             dep => `${dep.name}@${dep.versionConstraint}`);
-        await q.getAndSendList(after, a => (a.optionalDependencies || []).map(d => asRef(d)),
+        q.getAndSendList(after, a => (a.optionalDependencies || []).map(d => asRef(d)),
             dep => `${dep.name}@${dep.versionConstraint}`);
-        await q.getAndSend(after, a => a.engines);
-        await q.getAndSend(after, a => a.license);
+        q.getAndSend(after, a => a.engines);
+        q.getAndSend(after, a => a.license);
     }
 });
 
@@ -1006,51 +1013,52 @@ RpcCodecs.registerCodec(ResolvedDependencyKind, {
  * This handles serialization/deserialization for communication between JS and Java.
  */
 RpcCodecs.registerCodec(NodeResolutionResultKind, {
-    async rpcReceive(before: NodeResolutionResult, q: RpcReceiveQueue): Promise<NodeResolutionResult> {
+    rpcReceive(before: NodeResolutionResult, q: RpcReceiveQueue): NodeResolutionResult {
+        let npmrcConfigs: Npmrc[] | undefined;
         return updateIfChanged(before, {
-            id: await q.receive(before.id),
-            name: await q.receive(before.name),
-            version: await q.receive(before.version),
-            description: await q.receive(before.description),
-            path: await q.receive(before.path),
-            workspacePackagePaths: await q.receive(before.workspacePackagePaths),
-            dependencies: (await q.receiveList(before.dependencies)) || [],
-            devDependencies: (await q.receiveList(before.devDependencies)) || [],
-            peerDependencies: (await q.receiveList(before.peerDependencies)) || [],
-            optionalDependencies: (await q.receiveList(before.optionalDependencies)) || [],
-            bundledDependencies: (await q.receiveList(before.bundledDependencies)) || [],
-            resolvedDependencies: (await q.receiveList(before.resolvedDependencies)) || [],
-            packageManager: await q.receive(before.packageManager),
-            engines: await q.receive(before.engines),
+            id: q.receive(before.id),
+            name: q.receive(before.name),
+            version: q.receive(before.version),
+            description: q.receive(before.description),
+            path: q.receive(before.path),
+            workspacePackagePaths: q.receive(before.workspacePackagePaths),
+            dependencies: (q.receiveList(before.dependencies)) || [],
+            devDependencies: (q.receiveList(before.devDependencies)) || [],
+            peerDependencies: (q.receiveList(before.peerDependencies)) || [],
+            optionalDependencies: (q.receiveList(before.optionalDependencies)) || [],
+            bundledDependencies: (q.receiveList(before.bundledDependencies)) || [],
+            resolvedDependencies: (q.receiveList(before.resolvedDependencies)) || [],
+            packageManager: q.receive(before.packageManager),
+            engines: q.receive(before.engines),
             // an empty list is how having none is sent
-            npmrcConfigs: await q.receiveList(before.npmrcConfigs).then(configs => configs?.length ? configs : undefined),
+            npmrcConfigs: (npmrcConfigs = q.receiveList(before.npmrcConfigs))?.length ? npmrcConfigs : undefined,
         });
     },
 
-    async rpcSend(after: NodeResolutionResult, q: RpcSendQueue): Promise<void> {
-        await q.getAndSend(after, a => a.id);
-        await q.getAndSend(after, a => a.name);
-        await q.getAndSend(after, a => a.version);
-        await q.getAndSend(after, a => a.description);
-        await q.getAndSend(after, a => a.path);
-        await q.getAndSend(after, a => a.workspacePackagePaths);
+    rpcSend(after: NodeResolutionResult, q: RpcSendQueue): void {
+        q.getAndSend(after, a => a.id);
+        q.getAndSend(after, a => a.name);
+        q.getAndSend(after, a => a.version);
+        q.getAndSend(after, a => a.description);
+        q.getAndSend(after, a => a.path);
+        q.getAndSend(after, a => a.workspacePackagePaths);
 
-        await q.getAndSendList(after, a => a.dependencies.map(d => asRef(d)),
+        q.getAndSendList(after, a => a.dependencies.map(d => asRef(d)),
             dep => `${dep.name}@${dep.versionConstraint}`);
-        await q.getAndSendList(after, a => a.devDependencies.map(d => asRef(d)),
+        q.getAndSendList(after, a => a.devDependencies.map(d => asRef(d)),
             dep => `${dep.name}@${dep.versionConstraint}`);
-        await q.getAndSendList(after, a => a.peerDependencies.map(d => asRef(d)),
+        q.getAndSendList(after, a => a.peerDependencies.map(d => asRef(d)),
             dep => `${dep.name}@${dep.versionConstraint}`);
-        await q.getAndSendList(after, a => a.optionalDependencies.map(d => asRef(d)),
+        q.getAndSendList(after, a => a.optionalDependencies.map(d => asRef(d)),
             dep => `${dep.name}@${dep.versionConstraint}`);
-        await q.getAndSendList(after, a => a.bundledDependencies.map(d => asRef(d)),
+        q.getAndSendList(after, a => a.bundledDependencies.map(d => asRef(d)),
             dep => `${dep.name}@${dep.versionConstraint}`);
-        await q.getAndSendList(after, a => a.resolvedDependencies.map(r => asRef(r)),
+        q.getAndSendList(after, a => a.resolvedDependencies.map(r => asRef(r)),
             resolved => `${resolved.name}@${resolved.version}`);
 
-        await q.getAndSend(after, a => a.packageManager);
-        await q.getAndSend(after, a => a.engines);
-        await q.getAndSendList(after, a => a.npmrcConfigs || [],
+        q.getAndSend(after, a => a.packageManager);
+        q.getAndSend(after, a => a.engines);
+        q.getAndSendList(after, a => a.npmrcConfigs || [],
             npmrc => npmrc.scope);
     }
 });

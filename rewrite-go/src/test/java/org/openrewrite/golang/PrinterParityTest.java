@@ -52,6 +52,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -304,8 +305,21 @@ class PrinterParityTest {
                     if (mode != Print.MarkerPrinter.SANITIZED) {
                         assertThat(printed).isNotEqualTo(source.getValue());
                     }
+                    if (mode == Print.MarkerPrinter.FENCED) {
+                        assertThat(unclosedFences(printed)).isEmpty();
+                    }
                     assertThat(printed).isEqualTo(GoRewriteRpc.getOrStart().print(marked, mode));
                 })));
+    }
+
+    private static Set<String> unclosedFences(String printed) {
+        Map<String, Integer> fences = new HashMap<>();
+        Matcher fence = Pattern.compile("\\{\\{[0-9a-f-]{36}}}").matcher(printed);
+        while (fence.find()) {
+            fences.merge(fence.group(), 1, Integer::sum);
+        }
+        fences.values().removeIf(count -> count == 2);
+        return fences.keySet();
     }
 
     private static PrintOutputCapture.MarkerPrinter markerPrinter(Print.MarkerPrinter mode) {

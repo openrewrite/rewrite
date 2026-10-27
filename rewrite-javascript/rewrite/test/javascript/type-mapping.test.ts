@@ -2710,6 +2710,225 @@ describe('JavaScript type mapping', () => {
             );
         });
 
+        test.each([
+            ['javascript', javascript],
+            ['typescript', typescript]
+        ])('a member bound from a require() attributes like a named import in %s', async (_, source) => {
+            const spec = new RecipeSpec();
+            spec.recipe = markTypes((node, type) => {
+                if (node?.kind === J.Kind.Identifier && ['delimiter', 'separator'].includes((node as J.Identifier).simpleName)) {
+                    const fieldType = (node as J.Identifier).fieldType;
+                    return fieldType?.owner ?
+                        `${Type.FullyQualified.getFullyQualifiedName(fieldType.owner)}#${fieldType.name}` : null;
+                }
+                return declaringTypeAndName(node, type);
+            });
+
+            await spec.rewriteRun(
+                source(
+                    `
+                        const a = require('node:fs');
+                        const {truncateSync} = require('node:fs');
+                        const {truncateSync: renamed} = require('node:fs');
+                        const viaProp = require('node:fs').truncateSync;
+                        const {delimiter} = require('node:path');
+                        const {sep: separator} = require('path');
+                        const {default: ok} = require('node:assert');
+                        a.truncateSync(1);
+                        truncateSync(1);
+                        renamed(1);
+                        viaProp(1);
+                        delimiter.length;
+                        separator.length;
+                        ok(true);
+                    `,
+                    //@formatter:off
+                    `
+                        const a = require('node:fs');
+                        const {truncateSync} = require('node:fs');
+                        const {truncateSync: renamed} = require('node:fs');
+                        const viaProp = require('node:fs').truncateSync;
+                        const {/*~~(path#delimiter)~~>*/delimiter} = require('node:path');
+                        const {sep: /*~~(path#sep)~~>*/separator} = require('path');
+                        const {default: ok} = require('node:assert');
+                        /*~~(fs#truncateSync)~~>*/a.truncateSync(1);
+                        /*~~(fs#truncateSync)~~>*/truncateSync(1);
+                        /*~~(fs#truncateSync)~~>*/renamed(1);
+                        /*~~(fs#truncateSync)~~>*/viaProp(1);
+                        /*~~(path#delimiter)~~>*/delimiter.length;
+                        /*~~(path#sep)~~>*/separator.length;
+                        /*~~(assert#<default>)~~>*/ok(true);
+                    `
+                    //@formatter:on
+                )
+            );
+        });
+
+        test.each([
+            ['javascript', javascript],
+            ['typescript', typescript]
+        ])('a rest element or a nested pattern bound from a require() binds no export in %s', async (_, source) => {
+            const spec = new RecipeSpec();
+            spec.recipe = markTypes((node) => {
+                if (node?.kind === J.Kind.Identifier && ['rest', 'sep'].includes((node as J.Identifier).simpleName)) {
+                    const fieldType = (node as J.Identifier).fieldType;
+                    return fieldType?.owner ?
+                        `${Type.FullyQualified.getFullyQualifiedName(fieldType.owner)}#${fieldType.name}` : null;
+                }
+                return null;
+            });
+
+            await spec.rewriteRun(
+                source(
+                    `
+                        const {...rest} = require('node:path');
+                        const {posix: {sep}} = require('node:path');
+                        rest.delimiter;
+                        sep.length;
+                    `
+                )
+            );
+        });
+
+        test.each(
+            ([['javascript', javascript], ['typescript', typescript]] as const).flatMap(([language, source]) =>
+                ['const', 'let', 'var'].map(keyword => [keyword, language, source] as const))
+        )('a whole module and a member bound by a %s require() attribute alike in %s', async (keyword, _, source) => {
+            const spec = new RecipeSpec();
+            spec.recipe = markTypes((node, type) => {
+                if (node?.kind === J.Kind.Identifier && (node as J.Identifier).simpleName === 'delimiter') {
+                    const fieldType = (node as J.Identifier).fieldType;
+                    return fieldType?.owner ?
+                        `${Type.FullyQualified.getFullyQualifiedName(fieldType.owner)}#${fieldType.name}` : null;
+                }
+                return declaringTypeAndName(node, type);
+            });
+            const declarations = `
+                        ${keyword} fs = require('node:fs');
+                        ${keyword} {truncateSync} = require('node:fs');
+                        ${keyword} {truncateSync: renamed} = require('node:fs');
+                        ${keyword} viaProp = require('node:fs').truncateSync;
+                        ${keyword} viaElement = require('node:fs')['truncateSync'];
+                        ${keyword} {delimiter} = require('node:path');`;
+
+            await spec.rewriteRun(
+                source(
+                    `${declarations}
+                        fs.truncateSync(1);
+                        truncateSync(1);
+                        renamed(1);
+                        viaProp(1);
+                        viaElement(1);
+                        delimiter.length;
+                    `,
+                    //@formatter:off
+                    `${declarations.replace('{delimiter}', '{/*~~(path#delimiter)~~>*/delimiter}')}
+                        /*~~(fs#truncateSync)~~>*/fs.truncateSync(1);
+                        /*~~(fs#truncateSync)~~>*/truncateSync(1);
+                        /*~~(fs#truncateSync)~~>*/renamed(1);
+                        /*~~(fs#truncateSync)~~>*/viaProp(1);
+                        /*~~(fs#truncateSync)~~>*/viaElement(1);
+                        /*~~(path#delimiter)~~>*/delimiter.length;
+                    `
+                    //@formatter:on
+                )
+            );
+        });
+
+        test('a default member of a require() names the default export and a computed member names none', async () => {
+            const spec = new RecipeSpec();
+            spec.recipe = markTypes((node) => {
+                if (node?.kind === J.Kind.Identifier && ['dflt', 'computed'].includes((node as J.Identifier).simpleName)) {
+                    const fieldType = (node as J.Identifier).fieldType;
+                    return fieldType?.owner ?
+                        `${Type.FullyQualified.getFullyQualifiedName(fieldType.owner)}#${fieldType.name}` : null;
+                }
+                return null;
+            });
+
+            await spec.rewriteRun(
+                //language=typescript
+                typescript(
+                    `
+                        const key = 'delimiter';
+                        const {default: dflt} = require('node:path');
+                        const computed = require('node:path')[key];
+                        dflt.sep;
+                        computed.length;
+                    `,
+                    //@formatter:off
+                    `
+                        const key = 'delimiter';
+                        const {default: /*~~(path#default)~~>*/dflt} = require('node:path');
+                        const computed = require('node:path')[key];
+                        /*~~(path#default)~~>*/dflt.sep;
+                        computed.length;
+                    `
+                    //@formatter:on
+                )
+            );
+        });
+
+        test('an import-equals require() binds the whole module', async () => {
+            const spec = new RecipeSpec();
+            spec.recipe = markTypes(declaringTypeAndName);
+
+            await spec.rewriteRun(
+                //language=typescript
+                typescript(
+                    `
+                        import assert = require('node:assert');
+                        import fs = require('node:fs');
+                        assert(true);
+                        fs.truncateSync('p');
+                    `,
+                    //@formatter:off
+                    `
+                        import assert = require('node:assert');
+                        import fs = require('node:fs');
+                        /*~~(assert#<default>)~~>*/assert(true);
+                        /*~~(fs#truncateSync)~~>*/fs.truncateSync('p');
+                    `
+                    //@formatter:on
+                )
+            );
+        });
+
+        test.each([
+            ['javascript', javascript],
+            ['typescript', typescript]
+        ])('a whole module and a member bound from an awaited import() attribute like a require() in %s', async (_, source) => {
+            const spec = new RecipeSpec();
+            spec.recipe = markTypes(declaringTypeAndName);
+
+            await spec.rewriteRun(
+                source(
+                    `
+                        async function f() {
+                            const fs = await import('node:fs');
+                            const {truncateSync} = await import('node:fs');
+                            const exists = (await import('node:fs')).existsSync;
+                            fs.truncateSync('p');
+                            truncateSync('p');
+                            exists('p');
+                        }
+                    `,
+                    //@formatter:off
+                    `
+                        async function f() {
+                            const fs = await import('node:fs');
+                            const {truncateSync} = await import('node:fs');
+                            const exists = (await import('node:fs')).existsSync;
+                            /*~~(fs#truncateSync)~~>*/fs.truncateSync('p');
+                            /*~~(fs#truncateSync)~~>*/truncateSync('p');
+                            /*~~(fs#existsSync)~~>*/exists('p');
+                        }
+                    `
+                    //@formatter:on
+                )
+            );
+        });
+
         test('every spelling of a callable module\'s member attributes to its namespace, as a static', async () => {
             const spec = new RecipeSpec();
             spec.recipe = markTypes((node, type) => {
@@ -2923,6 +3142,94 @@ describe('JavaScript type mapping', () => {
             }, {unsafeCleanup: true});
         });
 
+        test('a member bound from a require() is attributed to the required module only in its own file', async () => {
+            const spec = new RecipeSpec();
+            spec.recipe = markTypes((node, type) => {
+                if (node?.kind === J.Kind.Identifier && (node as J.Identifier).simpleName === 'bar') {
+                    const fieldType = (node as J.Identifier).fieldType;
+                    return fieldType?.owner ?
+                        `${Type.FullyQualified.getFullyQualifiedName(fieldType.owner)}#${fieldType.name}` : null;
+                }
+                return null;
+            });
+
+            const local = typescript(
+                `
+                    export const bar = require('node:path').sep;
+                    bar.length;
+                `,
+                //@formatter:off
+                `
+                    export const /*~~(path#sep)~~>*/bar = require('node:path').sep;
+                    /*~~(path#sep)~~>*/bar.length;
+                `
+                //@formatter:on
+            );
+            local.path = 'local.ts';
+            const main = typescript(
+                `
+                    import * as ns from './local';
+                    ns.bar.length;
+                `,
+                //@formatter:off
+                `
+                    import * as ns from './local';
+                    ns./*~~(<unknown>#bar)~~>*/bar.length;
+                `
+                //@formatter:on
+            );
+            main.path = 'main.ts';
+            await withDir(async repo => spec.rewriteRun(npm(repo.path, local, main)), {unsafeCleanup: true});
+        });
+
+        test('members bound from a require() of a package without type declarations attribute to the package', async () => {
+            const spec = new RecipeSpec();
+            spec.recipe = markTypes(declaringTypeAndName);
+
+            await withDir(async (repo) => {
+                await spec.rewriteRun(
+                    npm(
+                        repo.path,
+                        //language=javascript
+                        javascript(
+                            `
+                                const {remove} = require('fs-extra');
+                                const {copy: cp} = require('fs-extra');
+                                const ensureDir = require('fs-extra').ensureDir;
+
+                                remove('a');
+                                cp('a', 'b');
+                                ensureDir('c');
+                            `,
+                            //@formatter:off
+                            `
+                                const {remove} = require('fs-extra');
+                                const {copy: cp} = require('fs-extra');
+                                const ensureDir = require('fs-extra').ensureDir;
+
+                                /*~~(fs-extra#remove)~~>*/remove('a');
+                                /*~~(fs-extra#copy)~~>*/cp('a', 'b');
+                                /*~~(fs-extra#ensureDir)~~>*/ensureDir('c');
+                            `
+                            //@formatter:on
+                        ),
+                        //language=json
+                        packageJson(
+                            `
+                              {
+                                "name": "test-project",
+                                "version": "1.0.0",
+                                "dependencies": {
+                                  "fs-extra": "^11"
+                                }
+                              }
+                            `
+                        )
+                    )
+                );
+            }, {unsafeCleanup: true});
+        });
+
         test('calling an untyped module itself attributes to its default export', async () => {
             const spec = new RecipeSpec();
             spec.recipe = markTypes(declaringTypeAndName);
@@ -2997,6 +3304,34 @@ describe('JavaScript type mapping', () => {
 
             const nested = outer.members[2].type as Type.Class;
             expect(nested.members.map(m => [m.name, Type.signature(m.type)])).toEqual([['deep', 'boolean']]);
+        });
+
+        test('a member keyed by a lone surrogate is named by its escape', async () => {
+            const spec = new RecipeSpec();
+            await spec.rewriteRun({
+                //language=typescript
+                ...typescript(`class K {'f\\uD800' = 1}\nconst c = {'o\\uD800': 1, 'm\\uDC00'() {}};`),
+                afterRecipe: (cu: JS.CompilationUnit) => {
+                    expect(loneSurrogateStrings(cu)).toEqual([]);
+                    const c = (cu.statements[1].element as J.VariableDeclarations).variables[0].element;
+                    expect((c.variableType!.type as Type.Class).members.map(m => m.name)).toEqual(['o\\uD800']);
+                }
+            });
+        });
+
+        test('a call on a `this` typed as a member keyed by a lone surrogate is named by its escape', async () => {
+            const spec = new RecipeSpec();
+            await spec.rewriteRun({
+                //language=typescript
+                ...typescript(`const p = {'\\uDC00'() {}};\nconst g: (this: typeof p['\\uDC00']) => void = function () { this(); };`),
+                afterRecipe: (cu: JS.CompilationUnit) => {
+                    expect(loneSurrogateStrings(cu)).toEqual([]);
+                    const g = (cu.statements[1].element as J.VariableDeclarations).variables[0].element;
+                    const f = (g.initializer!.element as JS.StatementExpression).statement as J.MethodDeclaration;
+                    const call = (f.body!.statements[0].element as JS.ExpressionStatement).expression as JS.FunctionCall;
+                    expect(call.methodType?.name).toBe('\\uDC00');
+                }
+            });
         });
 
         test('a reference to a variable bound to an object literal keeps the object type and its owning variable', async () => {
@@ -3166,4 +3501,21 @@ function objectTypeOf(literals: J.NewClass[], memberName: string): Type.Class {
     });
     expect(match, `no object literal with a '${memberName}' member`).toBeDefined();
     return match!.constructorType!.returnType as Type.Class;
+}
+
+function loneSurrogateStrings(root: unknown): string[] {
+    const found: string[] = [];
+    const seen = new Set<object>();
+    const visit = (value: unknown) => {
+        if (typeof value === 'string') {
+            if (/[\uD800-\uDBFF](?![\uDC00-\uDFFF])|(?<![\uD800-\uDBFF])[\uDC00-\uDFFF]/.test(value)) {
+                found.push(value);
+            }
+        } else if (value && typeof value === 'object' && !seen.has(value)) {
+            seen.add(value);
+            Object.values(value).forEach(visit);
+        }
+    };
+    visit(root);
+    return found;
 }

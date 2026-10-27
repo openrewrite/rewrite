@@ -790,6 +790,71 @@ describe('AddImport visitor', () => {
                 )
             );
         });
+
+        test('should fill an empty named import list', async () => {
+            const spec = new RecipeSpec();
+            spec.recipe = fromVisitor(new AddImport({module: 'fs', member: 'readFile', onlyIfReferenced: false}));
+
+            //language=typescript
+            await spec.rewriteRun(
+                typescript(
+                    `import {} from 'fs';\n`,
+                    `import {readFile} from 'fs';\n`
+                )
+            );
+        });
+
+        test('should fill an empty named import list that has a space inside its braces', async () => {
+            const spec = new RecipeSpec();
+            spec.recipe = fromVisitor(new AddImport({module: 'fs', member: 'readFile', onlyIfReferenced: false}));
+
+            //language=typescript
+            await spec.rewriteRun(
+                typescript(
+                    `import { } from 'fs';\n`,
+                    `import {readFile} from 'fs';\n`
+                )
+            );
+        });
+
+        test('should fill an empty named import list following the brace spacing of the file', async () => {
+            const spec = new RecipeSpec();
+            spec.recipe = fromVisitor(new AddImport({module: 'fs', member: 'readFile', onlyIfReferenced: false}));
+
+            //language=typescript
+            await spec.rewriteRun(
+                typescript(
+                    `import { join } from 'path';\nimport {} from 'fs';\n`,
+                    `import { join } from 'path';\nimport { readFile } from 'fs';\n`
+                )
+            );
+        });
+
+        test('should fill an empty type-only named import list', async () => {
+            const spec = new RecipeSpec();
+            spec.recipe = fromVisitor(new AddImport({module: 'fs', member: 'Stats', typeOnly: true, onlyIfReferenced: false}));
+
+            //language=typescript
+            await spec.rewriteRun(
+                typescript(
+                    `import type {} from 'fs';\n`,
+                    `import type {Stats} from 'fs';\n`
+                )
+            );
+        });
+
+        test('should fill an empty named import list next to a default import', async () => {
+            const spec = new RecipeSpec();
+            spec.recipe = fromVisitor(new AddImport({module: 'react', member: 'useState', onlyIfReferenced: false}));
+
+            //language=typescript
+            await spec.rewriteRun(
+                typescript(
+                    `import React, {} from 'react';\n`,
+                    `import React, {useState} from 'react';\n`
+                )
+            );
+        });
     });
 
     describe('CommonJS require detection', () => {
@@ -887,6 +952,27 @@ describe('AddImport visitor', () => {
                         import {readFile} from 'fs';
 
                         const fs = require('fs');
+                    `
+                )
+            );
+        });
+
+        test('should fill an empty destructuring require', async () => {
+            const spec = new RecipeSpec();
+            spec.recipe = fromVisitor(new AddImport({module: 'fs', member: 'readFile', onlyIfReferenced: false}));
+
+            //language=javascript
+            await spec.rewriteRun(
+                javascript(
+                    `
+                        const {} = require('fs');
+
+                        module.exports = {};
+                    `,
+                    `
+                        const {readFile} = require('fs');
+
+                        module.exports = {};
                     `
                 )
             );

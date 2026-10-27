@@ -22,6 +22,7 @@ import {
     Expression,
     J,
     NameTree,
+    space,
     Statement,
     TextComment,
     TrailingComma,
@@ -42,6 +43,8 @@ import {
     getNextSibling,
     getPreviousSibling,
     hasFlowAnnotation,
+    escapeLoneSurrogates,
+    extractSurrogateEscapes,
     isStatement,
     TextSpan
 } from "./parser-utils";
@@ -353,6 +356,12 @@ export class JavaScriptParser extends Parser {
             host.getCurrentDirectory = () => this.relativeTo || originalGetCurrentDirectory();
         }
 
+        // TypeScript keeps a resolution cache for a program only when it resolves modules itself. Without one, every
+        // import and every file's module format reads the package.json files on its path again.
+        const moduleResolutionCache = ts.createModuleResolutionCache(host.getCurrentDirectory(),
+            fileName => host.getCanonicalFileName(fileName), compilerOptions);
+        host.getModuleResolutionCache = () => moduleResolutionCache;
+
         // Override getSourceFile
         host.getSourceFile = (fileName, languageVersion, onError) => {
             const normalizedFileName = path.normalize(fileName);
@@ -476,7 +485,7 @@ export class JavaScriptParser extends Parser {
                     normalizedFileName,
                     compilerOptions,
                     host,
-                    undefined,
+                    moduleResolutionCache,
                     undefined,
                     ts.getModeForUsageLocation(containingSourceFile, moduleLiteral, compilerOptions)
                 );
@@ -5023,7 +5032,7 @@ function prefixFromNode(node: ts.Node, sourceFile: ts.SourceFile): J.Space {
         whitespace = text.slice(nodeStart, leadingWhitespacePos);
     }
 
-    return {kind: J.Kind.Space, comments: comments, whitespace: whitespace};
+    return comments.length === 0 ? space(whitespace) : {kind: J.Kind.Space, comments: comments, whitespace: whitespace};
 }
 
 class FlowSyntaxNotSupportedError extends SyntaxError {
@@ -5031,89 +5040,6 @@ class FlowSyntaxNotSupportedError extends SyntaxError {
         super(message);
         this.name = "FlowSyntaxNotSupportedError";
     }
-}
-
-const SURR_FIRST = 0xD800;
-const SURR_LAST = 0xDFFF;
-const HIGH_SURR_LAST = 0xDBFF;
-const LOW_SURR_FIRST = 0xDC00;
-
-/**
- * Extracts invalid UTF-16 surrogate pairs from a string literal's value source.
- * Unmatched UTF-16 surrogate pairs (composed of two escape and code point pairs) are unserializable
- * by technologies like Jackson. So we separate and store the code point off and reconstruct
- * the escape sequence when printing later.
- * We only escape unicode characters that are part of UTF-16 surrogate pairs. Others are generally
- * treated well by tools like Jackson.
- *
- * Handles both:
- * 1. Unicode escape sequences (\uXXXX) where XXXX is in the surrogate range
- * 2. Raw surrogate characters in the source (character codes 0xD800-0xDFFF)
- */
-/** The form {@link extractSurrogateEscapes} can hold, against which print idempotence is measured. */
-function escapeLoneSurrogates(source: string): string {
-    let escaped = '';
-    for (let j = 0; j < source.length; j++) {
-        const charCode = source.charCodeAt(j);
-        if (charCode >= SURR_FIRST && charCode <= SURR_LAST) {
-            const next = source.charCodeAt(j + 1);
-            if (charCode <= HIGH_SURR_LAST && next >= LOW_SURR_FIRST && next <= SURR_LAST) {
-                escaped += source.charAt(j) + source.charAt(j + 1);
-                j++;
-                continue;
-            }
-            escaped += "\\u" + charCode.toString(16).toUpperCase().padStart(4, '0');
-            continue;
-        }
-        escaped += source.charAt(j);
-    }
-    return escaped;
-}
-
-function extractSurrogateEscapes(valueSource: string): { cleanedSource: string, unicodeEscapes: J.LiteralUnicodeEscape[] } {
-    const unicodeEscapes: J.LiteralUnicodeEscape[] = [];
-    let cleanedSource = '';
-    let cleanedIndex = 0;
-
-    for (let j = 0; j < valueSource.length; j++) {
-        const c = valueSource.charAt(j);
-        const charCode = valueSource.charCodeAt(j);
-
-        // Check for unicode escape sequence: \uXXXX
-        // Ensure we're not escaped (previous char is not \) or we're at the start
-        if (c === '\\' && j < valueSource.length - 1 && (j === 0 || valueSource.charAt(j - 1) !== '\\')) {
-            if (valueSource.charAt(j + 1) === 'u' && j < valueSource.length - 5) {
-                const codePoint = valueSource.substring(j + 2, j + 6);
-                const codePointNumeric = parseInt(codePoint, 16);
-                if (!isNaN(codePointNumeric) && codePointNumeric >= SURR_FIRST && codePointNumeric <= SURR_LAST) {
-                    unicodeEscapes.push({ valueSourceIndex: cleanedIndex, codePoint });
-                    j += 5; // Skip the \uXXXX sequence (we're already at \, skip u and 4 hex digits)
-                    continue;
-                }
-            }
-        }
-
-        // A raw surrogate pair spells one code point — an emoji, say — and is carried as itself. A lone
-        // surrogate is not text on its own and does not survive serialization (#6599), so it is held as a
-        // `\uXXXX` escape and prints back as one.
-        if (charCode >= SURR_FIRST && charCode <= SURR_LAST) {
-            const next = valueSource.charCodeAt(j + 1);
-            if (charCode <= HIGH_SURR_LAST && next >= LOW_SURR_FIRST && next <= SURR_LAST) {
-                cleanedSource += c + valueSource.charAt(j + 1);
-                cleanedIndex += 2;
-                j++;
-                continue;
-            }
-            const codePoint = charCode.toString(16).toUpperCase().padStart(4, '0');
-            unicodeEscapes.push({ valueSourceIndex: cleanedIndex, codePoint });
-            continue;
-        }
-
-        cleanedSource += c;
-        cleanedIndex++;
-    }
-
-    return { cleanedSource, unicodeEscapes };
 }
 
 Parsers.registerParser("javascript", JavaScriptParser);

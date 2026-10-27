@@ -40,7 +40,7 @@ import static org.openrewrite.python.Assertions.pyproject;
 
 /**
  * End-to-end recipe test of native poetry.lock regeneration against recorded pypi.org responses
- * (fixtures under {@code /poetrylock/}); the expected lock is byte-identical to what Poetry 2.4.1
+ * (fixtures under {@code /lock/poetry/}); the expected lock is byte-identical to what Poetry 2.4.1
  * wrote for the same edit.
  */
 class UpgradeDependencyVersionPoetryLockTest implements RewriteTest {
@@ -97,7 +97,7 @@ class UpgradeDependencyVersionPoetryLockTest implements RewriteTest {
     }
 
     private static String resource(String name) {
-        try (InputStream is = UpgradeDependencyVersionPoetryLockTest.class.getResourceAsStream("/poetrylock/" + name)) {
+        try (InputStream is = UpgradeDependencyVersionPoetryLockTest.class.getResourceAsStream("/lock/poetry/" + name)) {
             assertThat(is).as(name).isNotNull();
             return new String(is.readAllBytes(), StandardCharsets.UTF_8);
         } catch (IOException e) {

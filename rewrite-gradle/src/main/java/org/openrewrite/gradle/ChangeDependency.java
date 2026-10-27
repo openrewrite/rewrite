@@ -21,6 +21,7 @@ import lombok.Value;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
 import org.openrewrite.gradle.internal.ChangeStringLiteral;
+import org.openrewrite.gradle.internal.ProjectRepositories;
 import org.openrewrite.gradle.marker.GradleDependencyConfiguration;
 import org.openrewrite.gradle.marker.GradleProject;
 import org.openrewrite.gradle.search.FindGradleProject;
@@ -167,7 +168,12 @@ public class ChangeDependency extends ScanningRecipe<ChangeDependency.Accumulato
         Map<String, Object> versionVariableUpdates = new HashMap<>();
         Map<String, Set<GroupArtifact>> versionVariableUsages = new HashMap<>();
         Set<GroupArtifact> failedResolutions = new HashSet<>();
-        AtomicReference<@Nullable GradleProject> gradleProject = new AtomicReference<>();
+
+        /**
+         * The root project's repositories if it was scanned, otherwise the first one's, which a catalog resolves
+         * against.
+         */
+        AtomicReference<@Nullable ProjectRepositories> repositories = new AtomicReference<>();
     }
 
     @Override
@@ -194,8 +200,8 @@ public class ChangeDependency extends ScanningRecipe<ChangeDependency.Accumulato
                     if (gradleProject == null) {
                         return (J) tree;
                     }
-                    if (acc.gradleProject.get() == null || ":".equals(gradleProject.getPath())) {
-                        acc.gradleProject.set(gradleProject);
+                    if (acc.repositories.get() == null || ":".equals(gradleProject.getPath())) {
+                        acc.repositories.set(ProjectRepositories.of(gradleProject));
                     }
                 }
                 return super.visit(tree, ctx);
@@ -514,9 +520,12 @@ public class ChangeDependency extends ScanningRecipe<ChangeDependency.Accumulato
 
         DependencyMatcher propsMatcher = requireNonNull(DependencyMatcher.build(oldGroupId + ":" + oldArtifactId).getValue());
         DependencyMatcher catalogDependencyMatcher = new DependencyMatcher(oldGroupId, oldArtifactId, null);
-        TreeVisitor<?, ExecutionContext> updateVersionCatalog = new VersionCatalog.Matcher().asVisitor((catalog, ctx) ->
-                changeVersionCatalog(catalog, catalogDependencyMatcher,
-                        new DependencyVersionSelector(metadataFailures, acc.gradleProject.get(), null), ctx));
+        TreeVisitor<?, ExecutionContext> updateVersionCatalog = new VersionCatalog.Matcher().asVisitor((catalog, ctx) -> {
+            ProjectRepositories repositories = acc.repositories.get();
+            return changeVersionCatalog(catalog, catalogDependencyMatcher, repositories == null ?
+                    new DependencyVersionSelector(metadataFailures, null, null) :
+                    repositories.selector(metadataFailures), ctx);
+        });
         return new TreeVisitor<Tree, ExecutionContext>() {
             @Override
             public boolean isAcceptable(SourceFile sourceFile, ExecutionContext ctx) {

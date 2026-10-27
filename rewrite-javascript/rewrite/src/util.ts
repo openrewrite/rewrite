@@ -125,10 +125,19 @@ export function updateIfChanged<O extends object>(original: O, updates: Partial<
         return original;
     }
     // A merged node built through a shared spread overflows into a PropertyArray; a compiled
-    // literal builder keeps its fields inline. Symbol-keyed originals fall back to the spread,
-    // since only string keys survive the JSON-serialized builder body.
-    if (typeof original === "object" && Object.getOwnPropertySymbols(original).length === 0) {
+    // literal builder keeps its fields inline. Originals with an enumerable symbol key fall back
+    // to the spread, since only string keys survive the JSON-serialized builder body.
+    if (typeof original === "object" && !hasEnumerableSymbol(original)) {
         return mergeBuilderFor(Object.keys(original), Object.keys(updates as object))(original, updates);
     }
     return {...original, ...updates};
+}
+
+function hasEnumerableSymbol(o: object): boolean {
+    for (const s of Object.getOwnPropertySymbols(o)) {
+        if (Object.prototype.propertyIsEnumerable.call(o, s)) {
+            return true;
+        }
+    }
+    return false;
 }

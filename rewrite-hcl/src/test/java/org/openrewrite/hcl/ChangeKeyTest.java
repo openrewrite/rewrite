@@ -46,6 +46,37 @@ class ChangeKeyTest implements RewriteTest {
     }
 
     @Test
+    void renameAttributeInBlockSelectedByLabels() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeKey("$.resource.aws_db_instance.default.name", "db_name")),
+          hcl(
+            """
+              resource "aws_db_instance" "default" {
+                name = "mydb"
+              }
+              resource "aws_db_instance" "other" {
+                name = "otherdb"
+              }
+              resource "aws_rds_cluster" "default" {
+                name = "cluster"
+              }
+              """,
+            """
+              resource "aws_db_instance" "default" {
+                db_name = "mydb"
+              }
+              resource "aws_db_instance" "other" {
+                name = "otherdb"
+              }
+              resource "aws_rds_cluster" "default" {
+                name = "cluster"
+              }
+              """
+          )
+        );
+    }
+
+    @Test
     void renameAttributeInNestedBlock() {
         rewriteRun(
           spec -> spec.recipe(new ChangeKey("$.provider.features.key_vault.purge_soft_delete_on_destroy", "purge_on_destroy")),

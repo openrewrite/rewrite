@@ -29,6 +29,7 @@ import org.openrewrite.java.tree.Javadoc;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -88,6 +89,22 @@ public class JavaTreeShapeValidationService implements TreeShapeValidationServic
     }
 
     @Override
+    public @Nullable String syntaxError(SourceFile sourceFile) {
+        return new TreeVisitor<Tree, AtomicReference<@Nullable String>>() {
+            @Override
+            public Tree preVisit(Tree t, AtomicReference<@Nullable String> text) {
+                if (text.get() != null) {
+                    stopAfterPreVisit();
+                } else if (t instanceof J.Erroneous) {
+                    text.set(((J.Erroneous) t).getText());
+                    stopAfterPreVisit();
+                }
+                return t;
+            }
+        }.reduce(sourceFile, new AtomicReference<>()).get();
+    }
+
+    @Override
     public boolean equivalent(Tree tree, Tree parsed) {
         // a type annotation can sit on a declaration, on its type or on a part of the type, and recipes place it
         // where the parser doesn't
@@ -96,8 +113,7 @@ public class JavaTreeShapeValidationService implements TreeShapeValidationServic
     }
 
     private static boolean hasAnnotations(Tree tree) {
-        AtomicBoolean found = new AtomicBoolean();
-        new TreeVisitor<Tree, AtomicBoolean>() {
+        return new TreeVisitor<Tree, AtomicBoolean>() {
             @Override
             public Tree preVisit(Tree t, AtomicBoolean f) {
                 if (t instanceof J.Annotation || t instanceof J.AnnotatedType) {
@@ -106,16 +122,14 @@ public class JavaTreeShapeValidationService implements TreeShapeValidationServic
                 }
                 return t;
             }
-        }.visit(tree, found);
-        return found.get();
+        }.reduce(tree, new AtomicBoolean()).get();
     }
 
     /**
      * The kinds of node in a tree in the order they are visited, without annotations and what holds them.
      */
     private static List<Class<?>> kindsWithoutAnnotations(Tree tree) {
-        List<Class<?>> kinds = new ArrayList<>();
-        new TreeVisitor<Tree, List<Class<?>>>() {
+        return new TreeVisitor<Tree, List<Class<?>>>() {
             @Override
             public Tree preVisit(Tree t, List<Class<?>> k) {
                 if (t instanceof J.Annotation || t instanceof J.Empty || t instanceof Javadoc) {
@@ -125,7 +139,6 @@ public class JavaTreeShapeValidationService implements TreeShapeValidationServic
                 }
                 return t;
             }
-        }.visit(tree, kinds);
-        return kinds;
+        }.reduce(tree, new ArrayList<>());
     }
 }

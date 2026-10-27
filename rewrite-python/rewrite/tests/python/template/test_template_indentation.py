@@ -192,3 +192,36 @@ def test_template_reindents_a_substituted_block_moved_deeper():
             "            b( 1 )\n",
         )
     )
+
+
+def test_template_replacement_keeps_crlf_line_breaks():
+    spec = RecipeSpec(recipe=_ReplaceTryWithWith())
+    spec.rewrite_run(
+        python(
+            "def f():\r\n"
+            "    try:\r\n"
+            "        do_stuff()\r\n"
+            "    except KeyError:\r\n"
+            "        pass\r\n",
+            #
+            "def f():\r\n"
+            "    with suppress(KeyError):\r\n"
+            "        do_stuff()\r\n",
+        )
+    )
+
+
+def test_template_with_a_substituted_block_keeps_crlf_line_breaks():
+    spec = RecipeSpec(recipe=_WrapIfInWith())
+    spec.rewrite_run(
+        python(
+            "def f():\r\n"
+            "    if a :\r\n"
+            "        b( 1 )\r\n",
+            #
+            "def f():\r\n"
+            "    with lock:\r\n"
+            "        if a :\r\n"
+            "            b( 1 )\r\n",
+        )
+    )

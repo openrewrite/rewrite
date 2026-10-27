@@ -15,7 +15,7 @@
 """Recipe to change Python imports from one module/name to another."""
 
 from dataclasses import dataclass, field
-from typing import Any, Optional
+from typing import Any
 
 from rewrite import ExecutionContext, Recipe, TreeVisitor
 from rewrite.category import CategoryDescriptor
@@ -67,11 +67,11 @@ class ChangeImport(Recipe):
 
     old_module: str = field(default="", metadata=option(
         display_name="Old module",
-        description="The module to change imports from",
+        description="The module to change imports from.",
         example="collections"
     ))
 
-    old_name: Optional[str] = field(default=None, metadata=option(
+    old_name: str | None = field(default=None, metadata=option(
         display_name="Old name",
         description="The name to change (for 'from X import name' style). Leave empty for direct imports.",
         example="Mapping",
@@ -80,24 +80,24 @@ class ChangeImport(Recipe):
 
     new_module: str = field(default="", metadata=option(
         display_name="New module",
-        description="The module to change imports to",
+        description="The module to change imports to.",
         example="collections.abc"
     ))
 
-    new_name: Optional[str] = field(default=None, metadata=option(
+    new_name: str | None = field(default=None, metadata=option(
         display_name="New name",
         description="The new name. If not specified, uses the old name.",
         example="Mapping",
         required=False
     ))
 
-    new_alias: Optional[str] = field(default=None, metadata=option(
+    new_alias: str | None = field(default=None, metadata=option(
         display_name="New alias",
-        description="Optional alias for the new import",
+        description="Optional alias for the new import.",
         required=False
     ))
 
-    new_declaring_module: Optional[str] = field(default=None, metadata=option(
+    new_declaring_module: str | None = field(default=None, metadata=option(
         display_name="New declaring module",
         description="The module that defines the new member, where the new module re-exports it "
                     "from another. Type attribution names the member after it.",

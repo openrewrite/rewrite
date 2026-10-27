@@ -111,9 +111,12 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
     }
 
     static class ProjectState {
-        @Nullable SourceFile capturedDepsFile;
+        /**
+         * The edit of the deps file as scanned, used when its lock file is visited first.
+         */
+        PyProjectHelper.@Nullable DepsEdit capturedEdit;
         @Nullable String capturedLockContent;
-        @Nullable SourceFile modifiedDepsFile;
+        boolean computed;
         LockFileRegeneration.@Nullable Result regenResult;
         boolean failureRecorded;
     }
@@ -169,7 +172,8 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
                 PythonDependencyFile trait = matcher.get(getCursor()).orElse(null);
                 if (trait != null) {
                     ProjectState ps = acc.projects.computeIfAbsent(sourcePath, k -> new ProjectState());
-                    ps.capturedDepsFile = sourceFile;
+                    ps.capturedEdit = matchesUpgrade(trait) ?
+                            PyProjectHelper.DepsEdit.of(trait, upgrade()) : null;
                 }
                 return tree;
             }
@@ -181,6 +185,12 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
                 trait.getMarker(), packageName, scope, groupName);
         return dep != null && !PyProjectHelper.normalizeVersionConstraint(newVersion)
                 .equals(dep.getVersionConstraint());
+    }
+
+    private Function<PythonDependencyFile, PythonDependencyFile> upgrade() {
+        Map<String, String> upgrades = singletonMap(
+                PythonResolutionResult.normalizeName(packageName), newVersion);
+        return t -> t.withUpgradedVersions(upgrades, scope, groupName);
     }
 
     @Override
@@ -200,17 +210,16 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
                 ProjectState ps = acc.projects.get(sourcePath);
                 if (ps != null) {
                     PythonDependencyFile trait = matcher.get(getCursor()).orElse(null);
-                    if (trait != null && matchesUpgrade(trait)) {
-                        ensureComputed(ps, trait, ctx);
-                    }
-                    if (ps.modifiedDepsFile != null) {
-                        SourceFile out = ps.modifiedDepsFile;
+                    SourceFile modified = trait != null && (ps.computed || matchesUpgrade(trait)) ?
+                            edit(ps, trait, ctx) : null;
+                    if (modified != null) {
+                        SourceFile out = modified;
                         if (ps.regenResult != null && !ps.regenResult.isSuccess()) {
                             recordFailure(ctx, ps, sourcePath);
                             out = Markup.warn(out, new RuntimeException(
                                     "lock regeneration failed: " + ps.regenResult.getErrorMessage()));
                         }
-                        PyProjectHelper.putLiveDepsTree(ctx, sourcePath, out);
+                        PyProjectHelper.putLiveDeps(ctx, sourcePath, modified.printAll(), ps.regenResult);
                         return out;
                     }
                 }
@@ -223,20 +232,19 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
                 if (lockPs == null) {
                     return tree;
                 }
-                if (lockPs.modifiedDepsFile == null) {
+                if (!lockPs.computed) {
+                    PyProjectHelper.DepsEdit depsEdit = lockPs.capturedEdit;
                     SourceFile depsTree = PyProjectHelper.getLiveDepsTree(ctx, depsPath);
-                    if (depsTree == null) {
-                        depsTree = lockPs.capturedDepsFile;
-                    }
                     if (depsTree != null) {
                         Cursor synth = new Cursor(new Cursor(null, Cursor.ROOT_VALUE), depsTree);
                         PythonDependencyFile trait = matcher.get(synth).orElse(null);
-                        if (trait != null && matchesUpgrade(trait)) {
-                            ensureComputed(lockPs, trait, ctx);
-                            if (lockPs.modifiedDepsFile != null) {
-                                PyProjectHelper.putLiveDepsTree(ctx, depsPath, lockPs.modifiedDepsFile);
-                            }
-                        }
+                        depsEdit = trait != null && matchesUpgrade(trait) ?
+                                PyProjectHelper.DepsEdit.of(trait, upgrade()) : null;
+                    }
+                    if (depsEdit != null) {
+                        lockPs.computed = true;
+                        lockPs.regenResult = depsEdit.regenerate(lockPs.capturedLockContent, ctx);
+                        PyProjectHelper.putLiveDeps(ctx, depsPath, depsEdit.getModifiedContent(), lockPs.regenResult);
                     }
                 }
                 if (lockPs.regenResult != null) {
@@ -257,20 +265,17 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
                 return tree;
             }
 
-            private void ensureComputed(ProjectState ps, PythonDependencyFile trait, ExecutionContext ctx) {
-                if (ps.modifiedDepsFile != null) {
-                    return;
+            private @Nullable SourceFile edit(ProjectState ps, PythonDependencyFile trait, ExecutionContext ctx) {
+                if (ps.computed) {
+                    return PyProjectHelper.edit(trait, upgrade(), ps.regenResult);
                 }
-                Map<String, String> upgrades = singletonMap(
-                        PythonResolutionResult.normalizeName(packageName), newVersion);
-                Function<PythonDependencyFile, PythonDependencyFile> editFn =
-                        t -> t.withUpgradedVersions(upgrades, scope, groupName);
                 PyProjectHelper.EditAndRegenerateResult r =
-                        PyProjectHelper.editAndRegenerate(trait, editFn, ps.capturedLockContent, ctx);
+                        PyProjectHelper.editAndRegenerate(trait, upgrade(), ps.capturedLockContent, ctx);
                 if (r.isChanged()) {
-                    ps.modifiedDepsFile = r.getModifiedDepsFile();
+                    ps.computed = true;
                     ps.regenResult = r.getRegenResult();
                 }
+                return r.getModifiedDepsFile();
             }
         };
     }

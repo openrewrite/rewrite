@@ -65,16 +65,13 @@ class MergeSpacesVisitorTest {
           .findFirst()
           .orElseThrow();
 
-        AtomicReference<J.Parentheses<?>> parentheses = new AtomicReference<>();
-        new ScalaIsoVisitor<AtomicReference<J.Parentheses<?>>>() {
+        return new ScalaIsoVisitor<AtomicReference<J.Parentheses<?>>>() {
             @Override
             public <T extends J> J.Parentheses<T> visitParentheses(J.Parentheses<T> parens,
                                                                     AtomicReference<J.Parentheses<?>> found) {
                 found.set(parens);
                 return super.visitParentheses(parens, found);
             }
-        }.visit(cu, parentheses);
-
-        return parentheses.get();
+        }.reduce(cu, new AtomicReference<>()).get();
     }
 }
