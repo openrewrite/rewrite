@@ -73,7 +73,9 @@ class LocalMavenArtifactCacheTest {
 
         FutureTask<Path> put = new FutureTask<>(() -> cache.putArtifact(dependency,
                 pausingHalfway(jar, halfWritten, resume), Throwable::printStackTrace));
-        new Thread(put).start();
+        Thread writer = new Thread(put);
+        writer.setDaemon(true);
+        writer.start();
         try {
             assertThat(halfWritten.await(10, TimeUnit.SECONDS)).isTrue();
             assertThat(cache.getArtifact(dependency))

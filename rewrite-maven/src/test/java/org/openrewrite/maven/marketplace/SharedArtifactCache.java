@@ -52,8 +52,8 @@ final class SharedArtifactCache {
     private static void delete(Path dir) {
         try (Stream<Path> files = Files.walk(dir)) {
             files.sorted(reverseOrder()).forEach(file -> file.toFile().delete());
-        } catch (IOException e) {
-            throw new UncheckedIOException(e);
+        } catch (IOException | UncheckedIOException ignored) {
+            // Best effort as the JVM exits, like File.deleteOnExit
         }
     }
 }
