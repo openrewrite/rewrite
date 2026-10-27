@@ -109,6 +109,19 @@ public class RecipeQualityValidation {
     @Builder.Default
     private boolean orderStepsForEarlierChanges = true;
 
+    /// How a failed check's message ends. Without an honest way out, an agent told to get a build green works around
+    /// the check instead, such as by rebuilding an object from a few of its fields so that the recipe no longer keeps
+    /// the real one.
+    static final String WHEN_STUCK = "If you can neither fix the recipe nor explain why it must opt out, leave this " +
+                                     "test failing and explain what the recipe needs: there may not be a supported " +
+                                     "way to do it yet, and a failing test tells the next person more than a " +
+                                     "workaround.";
+
+    static String optOut(String check) {
+        return "spec.recipeQualityValidation(RecipeQualityValidation.builder()." + check + "(false).build()), " +
+               "with a comment next to it that says why";
+    }
+
     /**
      * Enable all recipe quality checks.
      */

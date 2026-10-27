@@ -255,7 +255,8 @@ public class RecipeRunCycle<LSS extends LargeSourceSet> {
                                             ", and the scanning phase discards edits. Record what the scanner finds " +
                                             "in the accumulator, and make the edits in getVisitor(acc). A scanner " +
                                             "that reuses an editing visitor opts out with " +
-                                            "RecipeQualityValidation.builder().noEditsInScanningPhase(false).";
+                                            "RecipeQualityValidation.builder().noEditsInScanningPhase(false), " +
+                                            "with a comment next to it that says why.";
                                 }
                                 return source;
                             });

@@ -182,7 +182,7 @@ final class NameMatching {
         }
         String failure = respellingFailures(changed);
         if (failure != null) {
-            fail(failure);
+            fail(failure + "\n\n" + RecipeQualityValidation.WHEN_STUCK);
         }
     }
 
@@ -248,8 +248,7 @@ final class NameMatching {
                          "A static import and a qualified call name the same method, and an imported and a fully " +
                          "qualified name the same type, so a recipe that changes one spelling must change the other. " +
                          "If only one spelling is meant to change, add " +
-                         "spec.recipeQualityValidation(RecipeQualityValidation.builder().matchByTypeNotName(false)" +
-                         ".build()).");
+                         RecipeQualityValidation.optOut("matchByTypeNotName") + ".");
         }
         return failures.isEmpty() ? null : String.join("\n\n", failures);
     }

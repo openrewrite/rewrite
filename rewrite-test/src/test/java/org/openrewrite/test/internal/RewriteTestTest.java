@@ -166,7 +166,9 @@ class RewriteTestTest implements RewriteTest {
           spec -> spec.expectedCyclesThatMakeChanges(2).recipe(new AppendExclamationMark()),
           text("a", "a!!")
         ));
-        assertThat(e).hasMessageContaining("Expected recipe to complete in 2 cycles, but took at least one more cycle");
+        assertThat(e).hasMessageContaining("Expected recipe to complete in 2 cycles, but took at least one more cycle")
+          .hasMessageContaining("return true from causesAnotherCycle()")
+          .hasMessageContaining("leave this test failing");
     }
 
     @Test
@@ -207,7 +209,8 @@ class RewriteTestTest implements RewriteTest {
           ));
         assertThat(e).hasStackTraceContaining("in a ScanningRecipe's accumulator")
           .hasStackTraceContaining("in Cursor messages")
-          .hasStackTraceContaining("executionContextUnchanged(false)");
+          .hasStackTraceContaining("executionContextUnchanged(false), with a comment next to it that says why")
+          .hasStackTraceContaining("leave this test failing");
     }
 
     @Test
@@ -2213,7 +2216,8 @@ class RewriteTestTest implements RewriteTest {
             assertThat(e).hasMessageContaining("A ScanningRecipe's accumulator should keep the values the recipe needs")
               .hasMessageContaining("org.openrewrite.test.internal.KeepsWhatItScans keeps\n" +
                                     "    KeepsWhatItScans.Scanned.sourceFiles[foo.txt] -> PlainText foo.txt, after scanning")
-              .hasMessageContaining("lightweightAccumulators(false)");
+              .hasMessageContaining("lightweightAccumulators(false).build()), with a comment next to it that says why")
+              .hasMessageContaining("leave this test failing");
         }
 
         @Test

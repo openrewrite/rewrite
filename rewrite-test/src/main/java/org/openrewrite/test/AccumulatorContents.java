@@ -321,8 +321,9 @@ final class AccumulatorContents {
                 .append("ends, so what it keeps for each source file adds up over a large repository. A ")
                 .append("MavenResolutionResult or GradleProject can reach the model of a whole build, and a ")
                 .append("JavaSourceSet a whole classpath, while small markers such as JavaProject are fine to keep. ")
-                .append("A recipe that must keep a Heavyweight object opts out with ")
-                .append("RecipeQualityValidation.builder().lightweightAccumulators(false).")
+                .append("A recipe that must keep a Heavyweight object, and can explain why keeping it doesn't add ")
+                .append("up, opts out with ").append(RecipeQualityValidation.optOut("lightweightAccumulators"))
+                .append(". ").append(RecipeQualityValidation.WHEN_STUCK)
                 .toString();
     }
 

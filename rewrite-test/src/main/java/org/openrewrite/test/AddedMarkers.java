@@ -292,6 +292,7 @@ final class AddedMarkers {
                 .append("accumulator of a ScanningRecipe\n")
                 .append("  - keep the recipe idempotent by recognizing code it has already changed, rather than tagging that code\n")
                 .append("  - report a finding with SearchResult, and a problem with Markup\n")
+                .append(RecipeQualityValidation.WHEN_STUCK).append('\n')
                 .toString();
     }
 
