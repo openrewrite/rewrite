@@ -221,6 +221,36 @@ class RewriteTestTest implements RewriteTest {
     }
 
     @Test
+    void recipeFailureOnUnprintableTreeKeepsCause() {
+        AssertionError e = assertThrows(AssertionError.class, () -> rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {
+              @Override
+              public J.Block visitBlock(J.Block block, ExecutionContext ctx) {
+                  return super.visitBlock(block.withStatements(ListUtils.map(block.getStatements(), s ->
+                    s instanceof J.If ? ((J.If) s).getPadding().withThenPart(null) : s)), ctx);
+              }
+
+              @Override
+              public J.If visitIf(J.If iff, ExecutionContext ctx) {
+                  throw new IllegalStateException("boom");
+              }
+          })),
+          java(
+            """
+              class A {
+                  void m(boolean b) {
+                      if (b) m(b);
+                  }
+              }
+              """
+          )
+        ));
+        assertThat(e).hasMessageStartingWith("Failed to run recipe at Cursor{")
+          .hasRootCauseInstanceOf(IllegalStateException.class)
+          .hasRootCauseMessage("boom");
+    }
+
+    @Test
     void typeValidationAppliedToNewSourceFiles() {
         assertThrows(AssertionError.class, () ->
           rewriteRun(
