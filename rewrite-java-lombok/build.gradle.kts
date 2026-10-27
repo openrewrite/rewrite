@@ -84,4 +84,7 @@ tasks.withType<Javadoc>().configureEach {
     executable = javaToolchains.javadocToolFor {
         languageVersion.set(JavaLanguageVersion.of(8))
     }.get().executablePath.toString()
+    // Java 8 lacks the ElementType.MODULE that jspecify's annotations target. This silences javac's warning
+    // about it while javadoc's own warnings still print.
+    (options as CoreJavadocOptions).addBooleanOption("XD-Xlint:none", true)
 }
