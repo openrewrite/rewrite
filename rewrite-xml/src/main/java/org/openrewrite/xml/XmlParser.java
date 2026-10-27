@@ -141,7 +141,7 @@ public class XmlParser implements Parser {
             return false;
         }
         String p = path.toString().toLowerCase();
-        return p.endsWith(".jsp") || p.endsWith(".jspx") || p.endsWith(".html") || p.endsWith(".htm");
+        return p.endsWith(".jsp") || p.endsWith(".html") || p.endsWith(".htm");
     }
 
     @Override

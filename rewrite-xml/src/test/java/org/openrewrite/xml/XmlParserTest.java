@@ -493,6 +493,22 @@ class XmlParserTest implements RewriteTest {
         );
     }
 
+    @ParameterizedTest
+    @CsvSource(delimiter = '|', value = {
+      "<jsp:root><Div></div></jsp:root> | Mismatched closing tag </div>",
+      "<jsp:root><b><i>x</b></i></jsp:root> | Mismatched closing tag </b>",
+      "<jsp:root><br></jsp:root> | Mismatched closing tag </jsp:root>",
+    })
+    void jspxIsParsedAsStrictXml(String source, String expectedMessage) {
+        SourceFile parsed = XmlParser.builder().build()
+          .parseInputs(List.of(Input.fromString(Path.of("page.jspx"), source)), null,
+            new InMemoryExecutionContext(t -> {
+            }))
+          .findFirst().orElseThrow();
+        assertThat(parsed.getMarkers().findFirst(ParseExceptionResult.class).orElseThrow().getMessage())
+          .contains(expectedMessage);
+    }
+
     @Test
     void htmlReportsTheMismatchBehindAnUnclosedElement() {
         SourceFile parsed = XmlParser.builder().build()
