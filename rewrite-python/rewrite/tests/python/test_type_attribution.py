@@ -554,19 +554,14 @@ class TestByteOffsetConversion:
 
         mapping.close()
 
-    def test_multibyte_chars(self):
-        """Test byte offset conversion with UTF-8 multi-byte characters."""
-        source = 'x = "héllo"\n'  # é is 2 bytes in UTF-8
+    def test_multibyte_chars_count_as_their_utf8_bytes(self):
+        source = 'x = "héllo"; y = 1\nz = 2\n'
         mapping = PythonTypeMapping(source)
 
-        # Line 1, col 0 -> byte 0
-        assert mapping._pos_to_byte_offset(1, 0) == 0
-        # Line 1, col 5 -> byte 5 (x, space, =, space, ")
-        assert mapping._pos_to_byte_offset(1, 5) == 5
-        # Line 1, col 6 -> byte 7 (h, é takes 2 bytes)
-        assert mapping._pos_to_byte_offset(1, 6) == 6
-        # After é: col 7 is the character after é, byte is 8
-        assert mapping._pos_to_byte_offset(1, 7) == 8
+        for name in ast.walk(ast.parse(source)):
+            if isinstance(name, ast.Name):
+                assert mapping._pos_to_byte_offset(name.lineno, name.col_offset) == \
+                       source.encode('utf-8').index(name.id.encode())
 
         mapping.close()
 
@@ -2693,13 +2688,13 @@ def _parse_with_types(files: dict, main_filename: str = 'm.py'):
     for name, src in files.items():
         path = os.path.join(tmpdir, name)
         os.makedirs(os.path.dirname(path), exist_ok=True)
-        with open(path, 'w') as f:
+        with open(path, 'w', encoding='utf-8') as f:
             f.write(src)
     client = TyTypesClient()
     client.initialize(tmpdir)
     main_src = files[main_filename]
     main_path = os.path.join(tmpdir, main_filename)
-    cu = ParserVisitor(main_src, main_path, client).visit_Module(ast.parse(main_src))
+    cu = ParserVisitor(main_src, main_path, client).visit_Module(ast.parse(main_src.removeprefix('\ufeff')))
     return cu, tmpdir, client
 
 
@@ -2708,6 +2703,35 @@ def _cleanup_parse(tmpdir, client):
     client.shutdown()
     import shutil
     shutil.rmtree(tmpdir, ignore_errors=True)
+
+
+@requires_ty_types_cli
+def test_a_file_opening_with_a_byte_order_mark_is_attributed():
+    cu, tmpdir, client = _parse_with_types({'m.py': '\ufeffdef helper(x: int) -> int:\n    return x\n\n\nhelper(1)\n'})
+    try:
+        [call] = _collect_method_invocations(cu)
+        assert call.method_type.declaring_type.fully_qualified_name == 'm'
+        assert call.method_type.return_type == JavaType.Primitive.Int
+    finally:
+        _cleanup_parse(tmpdir, client)
+
+
+def test_a_call_after_a_non_ascii_character_on_its_line_is_attributed():
+    cu, tmpdir, client = _parse_with_types({'m.py': 'def helper(x: int) -> int:\n    return x\n\n\ns = "é"; helper(1)\n'})
+    try:
+        [call] = _collect_method_invocations(cu)
+        assert call.method_type.declaring_type.fully_qualified_name == 'm'
+    finally:
+        _cleanup_parse(tmpdir, client)
+
+
+def test_a_call_after_a_form_feed_is_attributed():
+    cu, tmpdir, client = _parse_with_types({'m.py': 'def helper(x: int) -> int:\n    return x\n\x0c\n\nhelper(1)\n'})
+    try:
+        [call] = _collect_method_invocations(cu)
+        assert call.method_type.declaring_type.fully_qualified_name == 'm'
+    finally:
+        _cleanup_parse(tmpdir, client)
 
 
 def _collect_method_invocations(cu) -> list:

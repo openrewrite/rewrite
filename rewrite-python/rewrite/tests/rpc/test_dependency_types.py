@@ -503,6 +503,18 @@ class TestExportedTypes:
         greeting = next(v for v in module_type._members or [] if v._name == "GREETING")
         assert greeting._type == JavaType.Primitive.String
 
+    def test_module_level_api_of_a_file_opening_with_a_byte_order_mark(self, tmp_path):
+        pkg = tmp_path / "bomlib"
+        pkg.mkdir()
+        (pkg / "__init__.py").write_bytes(
+            "\ufeffGREETING = 'hello'\n\ndef shout(text: str) -> str:\n    return text.upper()\n".encode())
+
+        by_fqn = self._enumerate(tmp_path, pkg)
+
+        module_type = by_fqn.get("bomlib")
+        assert isinstance(module_type, JavaType.Class)
+        assert {m._name for m in (module_type._methods or [])} == {"shout"}
+
     def test_a_file_in_another_encoding_costs_only_its_own_types(self, tmp_path):
         pkg = tmp_path / "latinlib"
         pkg.mkdir()
