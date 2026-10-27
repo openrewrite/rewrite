@@ -60,6 +60,13 @@ public interface JavaParser extends Parser {
      */
     String SKIP_SOURCE_SET_TYPE_GENERATION = "org.openrewrite.java.skipSourceSetTypeGeneration";
 
+    /**
+     * Set to <code>true</code> on an {@link ExecutionContext} supplied to parsing to list the jars at the end of the
+     * classpath from an index that every parser in the JVM shares. Tests set it, since they build a parser per test.
+     * The index outlives the parsers and holds what it read until memory runs short.
+     */
+    String SHARE_CLASSPATH_JAR_INDEX = "org.openrewrite.java.shareClasspathJarIndex";
+
     static List<Path> runtimeClasspath() {
         return RuntimeClasspathCache.getRuntimeClasspath();
     }
@@ -278,7 +285,7 @@ public interface JavaParser extends Parser {
             return (B) this;
         }
 
-        public B typeFactory(JavaTypeFactory javaTypeFactory) {
+        public B typeFactory(@Nullable JavaTypeFactory javaTypeFactory) {
             this.javaTypeFactory = javaTypeFactory;
             return (B) this;
         }

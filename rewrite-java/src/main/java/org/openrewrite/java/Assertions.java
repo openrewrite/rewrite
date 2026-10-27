@@ -63,6 +63,9 @@ public class Assertions {
         if (ctx.getMessage(JavaParser.SKIP_SOURCE_SET_TYPE_GENERATION) == null) {
             ctx.putMessage(JavaParser.SKIP_SOURCE_SET_TYPE_GENERATION, true);
         }
+        if (ctx.getMessage(JavaParser.SHARE_CLASSPATH_JAR_INDEX) == null) {
+            ctx.putMessage(JavaParser.SHARE_CLASSPATH_JAR_INDEX, true);
+        }
     }
 
     public static SourceFile validateTypes(SourceFile source, TypeValidation typeValidation) {

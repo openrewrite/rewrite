@@ -77,6 +77,14 @@ public interface TreeShapeValidationService {
     }
 
     /**
+     * @return A parser that builds the same tree as {@code parser}, which may leave out type attribution, as the
+     * check compares no types.
+     */
+    default Parser.Builder untypedParser(Parser.Builder parser) {
+        return parser;
+    }
+
+    /**
      * @return Whether {@code parser} reads the version of the language that {@code sourceFile} is written in, which
      * a parser for an older version doesn't.
      */
