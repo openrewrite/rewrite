@@ -176,8 +176,9 @@ fun NpmTask.vitest(vitestProject: String, junitXml: String) {
         environment.put("QUIET_TESTS", "1")
     }
 
-    // npm exec prints no banner, and unlike `npm run --silent` leaves the loglevel of every npm a test runs alone
-    args = listOf("exec", "--", "vitest", "run", "--project", vitestProject, "--outputFile.junit=$junitXml")
+    // npm exec prints no banner, and unlike `npm run --silent` leaves the loglevel of every npm a test runs alone.
+    // --no fails the task when vitest is missing from node_modules, where npm would otherwise download the latest one.
+    args = listOf("exec", "--no", "--", "vitest", "run", "--project", vitestProject, "--outputFile.junit=$junitXml")
 }
 
 val npmTestTypeScript = tasks.register<NpmTask>("npmTestTypeScript") {
