@@ -109,6 +109,18 @@ tasks.withType<Test>().configureEach {
         )
     })
     maxHeapSize = "2g"
+    // Each fork runs up to four test classes at once, slowest first, so it balances its own classes instead of leaving
+    // that to Gradle, which deals the classes to the forks round-robin before any of them starts
+    val concurrentClasses = minOf(maxParallelForks, gradle.startParameter.maxWorkerCount)
+    val classesPerFork = minOf(4, concurrentClasses)
+    maxParallelForks = concurrentClasses / classesPerFork
+    systemProperty("junit.jupiter.execution.parallel.enabled", "true")
+    systemProperty("junit.jupiter.execution.parallel.mode.classes.default", "concurrent")
+    systemProperty("junit.jupiter.execution.parallel.config.strategy", "fixed")
+    systemProperty("junit.jupiter.execution.parallel.config.fixed.parallelism", classesPerFork)
+    // Otherwise the pool starts another class for every test that waits on a tooling API build
+    systemProperty("junit.jupiter.execution.parallel.config.fixed.max-pool-size", classesPerFork)
+    systemProperty("junit.jupiter.testclass.order.default", "org.openrewrite.gradle.SlowestFirstClassOrderer")
 }
 
 // This seems to be the only way to get the groovy compiler to emit java-8 compatible bytecode
