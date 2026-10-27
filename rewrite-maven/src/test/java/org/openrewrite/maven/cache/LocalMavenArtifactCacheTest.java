@@ -21,9 +21,19 @@ import org.junit.jupiter.api.io.TempDir;
 import org.openrewrite.maven.tree.*;
 
 import java.io.ByteArrayInputStream;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.InterruptedIOException;
+import java.io.SequenceInputStream;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.FutureTask;
+import java.util.concurrent.TimeUnit;
+import java.util.stream.Stream;
 
 import static java.util.Collections.emptyList;
 import static org.assertj.core.api.Assertions.assertThat;
@@ -50,6 +60,55 @@ class LocalMavenArtifactCacheTest {
         Path output = cache.putArtifact(releaseDependency(), null, Throwable::printStackTrace);
         assertThat(output).isNull();
         assertThat(tempDir).isEmptyDirectory();
+    }
+
+    @Test
+    void artifactIsNotVisibleWhileItIsWritten(@TempDir Path tempDir) throws Exception {
+        cache = new LocalMavenArtifactCache(tempDir);
+        ResolvedDependency dependency = releaseDependency();
+        byte[] jar = "the whole jar".getBytes(StandardCharsets.UTF_8);
+        CountDownLatch halfWritten = new CountDownLatch(1);
+        CountDownLatch resume = new CountDownLatch(1);
+
+        FutureTask<Path> put = new FutureTask<>(() -> cache.putArtifact(dependency,
+                pausingHalfway(jar, halfWritten, resume), Throwable::printStackTrace));
+        new Thread(put).start();
+        try {
+            assertThat(halfWritten.await(10, TimeUnit.SECONDS)).isTrue();
+            assertThat(cache.getArtifact(dependency))
+                    .as("another reader of the cache must not get half a jar")
+                    .isNull();
+        } finally {
+            resume.countDown();
+        }
+
+        Path written = put.get(10, TimeUnit.SECONDS);
+        assertThat(cache.getArtifact(dependency)).isEqualTo(written);
+        assertThat(written).hasBinaryContent(jar);
+    }
+
+    @Test
+    void failedWriteLeavesNoArtifact(@TempDir Path tempDir) throws Exception {
+        cache = new LocalMavenArtifactCache(tempDir);
+        ResolvedDependency dependency = releaseDependency();
+        InputStream brokenDownload = new SequenceInputStream(
+                new ByteArrayInputStream("the start of a jar".getBytes(StandardCharsets.UTF_8)),
+                new InputStream() {
+                    @Override
+                    public int read() throws IOException {
+                        throw new IOException("Connection reset");
+                    }
+                });
+        List<Throwable> errors = new ArrayList<>();
+
+        assertThat(cache.putArtifact(dependency, brokenDownload, errors::add)).isNull();
+        assertThat(errors).singleElement().extracting(Throwable::getMessage).isEqualTo("Connection reset");
+        assertThat(cache.getArtifact(dependency))
+                .as("a later lookup must download the artifact again, not take what was written of it")
+                .isNull();
+        try (Stream<Path> files = Files.walk(tempDir)) {
+            assertThat(files.filter(Files::isRegularFile)).isEmpty();
+        }
     }
 
     @Test
@@ -120,6 +179,42 @@ class LocalMavenArtifactCacheTest {
                 Throwable::printStackTrace);
         assertThat(second).isEqualTo(first);
         assertThat(Files.readString(second)).isEqualTo("v1");
+    }
+
+    /**
+     * Serves the first half of {@code content}, then waits for {@code resume} before serving the rest.
+     */
+    private static InputStream pausingHalfway(byte[] content, CountDownLatch halfWritten, CountDownLatch resume) {
+        return new InputStream() {
+            private final int half = content.length / 2;
+            private int position;
+
+            @Override
+            public int read() throws IOException {
+                byte[] b = new byte[1];
+                return read(b, 0, 1) < 0 ? -1 : b[0] & 0xFF;
+            }
+
+            @Override
+            public int read(byte[] b, int off, int len) throws IOException {
+                if (position == half) {
+                    // The caller wrote the first half out before reading again
+                    halfWritten.countDown();
+                    try {
+                        resume.await();
+                    } catch (InterruptedException e) {
+                        throw new InterruptedIOException();
+                    }
+                }
+                if (position == content.length) {
+                    return -1;
+                }
+                int n = Math.min(len, (position < half ? half : content.length) - position);
+                System.arraycopy(content, position, b, off, n);
+                position += n;
+                return n;
+            }
+        };
     }
 
     private static ResolvedDependency snapshotDependency() {

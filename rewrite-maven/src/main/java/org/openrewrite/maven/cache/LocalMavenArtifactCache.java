@@ -22,11 +22,12 @@ import org.openrewrite.maven.tree.ResolvedDependency;
 
 import java.io.IOException;
 import java.io.InputStream;
-import java.io.OutputStream;
 import java.io.UncheckedIOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.nio.file.StandardCopyOption;
+import java.util.UUID;
 import java.util.function.Consumer;
 
 @EqualsAndHashCode
@@ -53,14 +54,17 @@ public class LocalMavenArtifactCache implements MavenArtifactCache {
             return null;
         }
         Path path = dependencyPath(dependency);
-        try (InputStream is = artifactInputStream;
-             OutputStream out = Files.newOutputStream(path)) {
-            byte[] buffer = new byte[1024];
-            int read;
-            while ((read = is.read(buffer, 0, 1024)) >= 0) {
-                out.write(buffer, 0, read);
-            }
+        // Written beside the artifact and moved into place, so that no reader ever sees part of one
+        Path partial = path.resolveSibling(path.getFileName() + "." + UUID.randomUUID() + ".part");
+        try (InputStream is = artifactInputStream) {
+            Files.copy(is, partial);
+            Files.move(partial, path, StandardCopyOption.ATOMIC_MOVE);
         } catch (Throwable t) {
+            try {
+                Files.deleteIfExists(partial);
+            } catch (IOException e) {
+                t.addSuppressed(e);
+            }
             onError.accept(t);
             return null;
         }
