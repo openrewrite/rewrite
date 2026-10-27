@@ -28,6 +28,7 @@ public interface ResourceLoader {
         @Deprecated(/* No longer populated */)
         CONTRIBUTORS,
         MAINTAINERS,
+        @Deprecated(/* No longer populated */)
         EXAMPLES;
 
         boolean includedIn(RecipeDetail... include) {
@@ -58,5 +59,6 @@ public interface ResourceLoader {
     @Deprecated(/* No longer populated */)
     Map<String, List<Contributor>> listContributors();
 
+    @Deprecated(/* No longer populated */)
     Map<String, List<RecipeExample>> listRecipeExamples();
 }

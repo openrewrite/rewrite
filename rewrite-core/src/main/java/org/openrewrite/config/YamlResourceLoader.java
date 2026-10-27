@@ -21,6 +21,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.PropertyName;
 import com.fasterxml.jackson.databind.exc.InvalidTypeIdException;
 import com.fasterxml.jackson.databind.introspect.BeanPropertyDefinition;
+import com.google.errorprone.annotations.InlineMe;
 import lombok.Getter;
 import org.intellij.lang.annotations.Language;
 import org.jspecify.annotations.Nullable;
@@ -79,8 +80,7 @@ public class YamlResourceLoader implements ResourceLoader {
     private enum ResourceType {
         Recipe("specs.openrewrite.org/v1beta/recipe"),
         Style("specs.openrewrite.org/v1beta/style"),
-        Category("specs.openrewrite.org/v1beta/category"),
-        Example("specs.openrewrite.org/v1beta/example");
+        Category("specs.openrewrite.org/v1beta/category");
 
         private final String spec;
 
@@ -251,7 +251,7 @@ public class YamlResourceLoader implements ResourceLoader {
                 continue;
             }
 
-            DeclarativeRecipe recipe = mapToRecipe(r, EnumSet.of(RecipeDetail.MAINTAINERS, RecipeDetail.EXAMPLES));
+            DeclarativeRecipe recipe = mapToRecipe(r, EnumSet.of(RecipeDetail.MAINTAINERS));
             recipes.add(recipe);
         }
         return recipes;
@@ -567,11 +567,10 @@ public class YamlResourceLoader implements ResourceLoader {
 
     @Override
     public Collection<RecipeDescriptor> listRecipeDescriptors() {
-        return listRecipeDescriptors(emptyList(), listRecipeExamples());
+        return listRecipeDescriptors(emptyList());
     }
 
-    public Collection<RecipeDescriptor> listRecipeDescriptors(Collection<Recipe> externalRecipes,
-                                                              Map<String, List<RecipeExample>> recipeNamesToExamples) {
+    public Collection<RecipeDescriptor> listRecipeDescriptors(Collection<Recipe> externalRecipes) {
         Collection<Recipe> internalRecipes = listRecipes();
         Collection<Recipe> allRecipes = Stream.concat(
                 Stream.concat(
@@ -585,19 +584,26 @@ public class YamlResourceLoader implements ResourceLoader {
         for (Recipe recipe : internalRecipes) {
             DeclarativeRecipe declarativeRecipe = (DeclarativeRecipe) recipe;
             declarativeRecipe.initialize(allRecipes);
-            declarativeRecipe.setExamples(recipeNamesToExamples.get(recipe.getName()));
             recipeDescriptors.add(declarativeRecipe.getDescriptor());
         }
         return recipeDescriptors;
 
     }
 
+    @Deprecated
+    @InlineMe(replacement = "this.listRecipeDescriptors(externalRecipes)")
+    public Collection<RecipeDescriptor> listRecipeDescriptors(Collection<Recipe> externalRecipes,
+                                                              Map<String, List<RecipeExample>> recipeNamesToExamples) {
+        return listRecipeDescriptors(externalRecipes);
+    }
+
     @SuppressWarnings("unused")
     @Deprecated
+    @InlineMe(replacement = "this.listRecipeDescriptors(externalRecipes)")
     public Collection<RecipeDescriptor> listRecipeDescriptors(Collection<Recipe> externalRecipes,
                                                               Map<String, List<Contributor>> recipeNamesToContributors,
                                                               Map<String, List<RecipeExample>> recipeNamesToExamples) {
-        return listRecipeDescriptors(externalRecipes, recipeNamesToExamples);
+        return listRecipeDescriptors(externalRecipes);
     }
 
     @SuppressWarnings("unchecked")
@@ -707,55 +713,7 @@ public class YamlResourceLoader implements ResourceLoader {
 
     @Override
     public Map<String, List<RecipeExample>> listRecipeExamples() {
-        Map<String, List<RecipeExample>> recipeNameToExamples = new HashMap<>();
-        Collection<Map<String, Object>> rawExamples = loadResources(ResourceType.Example);
-
-        for (Map<String, Object> examplesMap : rawExamples) {
-            String recipeName = (String) examplesMap.get("recipeName");
-            recipeNameToExamples.computeIfAbsent(recipeName, key -> new ArrayList<>());
-
-
-            @SuppressWarnings("unchecked") List<Map<String, Object>> examples =
-                    (List<Map<String, Object>>) examplesMap.get("examples");
-
-            List<RecipeExample> newExamples = examples.stream().map(exam -> {
-                        RecipeExample recipeExample = new RecipeExample();
-                        recipeExample.setDescription((String) exam.get("description"));
-
-                        if (exam.get("parameters") != null) {
-                            //noinspection unchecked
-                            recipeExample.setParameters(((List<Object>) exam.get("parameters")).stream()
-                                    .filter(Objects::nonNull)
-                                    .map(Object::toString).collect(toList()));
-                        }
-
-                        List<RecipeExample.Source> sources = new ArrayList<>();
-                        //noinspection unchecked
-                        List<Object> ss = (List<Object>) exam.get("sources");
-                        if (ss != null) {
-                            for (Object s : ss) {
-                                //noinspection rawtypes
-                                HashMap sMap = (HashMap) s;
-                                String before = (String) sMap.get("before");
-                                String after = (String) sMap.get("after");
-                                String path = (String) sMap.get("path");
-                                //noinspection rawtypes
-                                String language = (String) ((HashMap) s).get("language");
-
-                                RecipeExample.Source source = new RecipeExample.Source(before, after, path, language);
-                                sources.add(source);
-                            }
-                        }
-
-                        recipeExample.setSources(sources);
-                        return recipeExample;
-                    }
-            ).collect(toList());
-
-            recipeNameToExamples.get(recipeName).addAll(newExamples);
-        }
-
-        return recipeNameToExamples;
+        return emptyMap();
     }
 
     @Override

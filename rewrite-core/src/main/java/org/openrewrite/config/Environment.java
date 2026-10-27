@@ -51,13 +51,6 @@ public class Environment {
         Map<String, Recipe> dependencyRecipeMap = new HashMap<>();
         dependencyRecipes.forEach(r -> dependencyRecipeMap.putIfAbsent(r.getName(), r));
 
-        Map<String, List<RecipeExample>> recipeExamples = new HashMap<>();
-        for (ResourceLoader r : resourceLoaders) {
-            if (r instanceof YamlResourceLoader) {
-                recipeExamples.putAll(r.listRecipeExamples());
-            }
-        }
-
         List<Recipe> recipes = new ArrayList<>();
         for (ResourceLoader r : resourceLoaders) {
             recipes.addAll(r.listRecipes());
@@ -67,10 +60,6 @@ public class Environment {
         recipes.forEach(r -> availableRecipeMap.putIfAbsent(r.getName(), r));
 
         for (Recipe recipe : recipes) {
-            if (recipeExamples.containsKey(recipe.getName())) {
-                recipe.setExamples(recipeExamples.get(recipe.getName()));
-            }
-
             if (recipe instanceof DeclarativeRecipe) {
                 ((DeclarativeRecipe) recipe).initialize(availableRecipeMap::get);
             }
@@ -85,42 +74,9 @@ public class Environment {
     }
 
     public Collection<RecipeDescriptor> listRecipeDescriptors() {
-        // Loaders cache their descriptors and share example lists with them, so merge into copies
-        Map<String, List<RecipeExample>> recipeToExamples = new HashMap<>();
-        for (ResourceLoader r : resourceLoaders) {
-            if (r instanceof YamlResourceLoader) {
-                r.listRecipeExamples().forEach((name, examples) ->
-                        recipeToExamples.put(name, new ArrayList<>(examples)));
-            } else if (r instanceof ClasspathScanningLoader) {
-                r.listRecipeExamples().forEach((name, examples) ->
-                        recipeToExamples.computeIfAbsent(name, k -> new ArrayList<>()).addAll(examples));
-            }
-        }
-
-        List<RecipeDescriptor> result = new ArrayList<>();
-        for (ResourceLoader r : resourceLoaders) {
-            if (r instanceof YamlResourceLoader) {
-                result.addAll((((YamlResourceLoader) r).listRecipeDescriptors(emptyList(), recipeToExamples)));
-            } else {
-                for (RecipeDescriptor descriptor : r.listRecipeDescriptors()) {
-                    List<RecipeExample> examples = recipeToExamples.get(descriptor.getName());
-                    result.add(examples == null ? descriptor :
-                            descriptor.withExamples(mergeExamples(descriptor.getExamples(), examples)));
-                }
-            }
-        }
-        return result;
-    }
-
-    private static List<RecipeExample> mergeExamples(List<RecipeExample> examples, List<RecipeExample> more) {
-        List<RecipeExample> merged = new ArrayList<>(examples);
-        for (RecipeExample example : more) {
-            // A declarative recipe's descriptor already holds its own loader's examples
-            if (!merged.contains(example)) {
-                merged.add(example);
-            }
-        }
-        return merged;
+        return resourceLoaders.stream()
+                .flatMap(r -> r.listRecipeDescriptors().stream())
+                .collect(toList());
     }
 
     public Recipe activateRecipes(Collection<String> activeRecipes) {
@@ -190,21 +146,6 @@ public class Environment {
         }
         if (recipe == null) {
             return null;
-        }
-
-        boolean includeExamples = ResourceLoader.RecipeDetail.EXAMPLES.includedIn(details);
-
-        Map<String, List<RecipeExample>> recipeExamples = new HashMap<>();
-        if (includeExamples) {
-            for (ResourceLoader r : resourceLoaders) {
-                if (r instanceof YamlResourceLoader) {
-                    recipeExamples.putAll(r.listRecipeExamples());
-                }
-            }
-        }
-
-        if (includeExamples && recipeExamples.containsKey(recipe.getName())) {
-            recipe.setExamples(recipeExamples.get(recipe.getName()));
         }
 
         if (recipe instanceof DeclarativeRecipe) {
