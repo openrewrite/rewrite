@@ -1003,7 +1003,7 @@ public class GradleDependency implements Trait<J.MethodInvocation> {
                     J.Literal newLiteral = literal.withValue(replacement)
                             .withValueSource(replacement);
                     G.GString updatedGString = gstring.withStrings(ListUtils.mapFirst(strings, s -> newLiteral));
-                    updated = m.withArguments(singletonList(updatedGString));
+                    updated = m.withArguments(ListUtils.mapFirst(m.getArguments(), arg -> updatedGString));
                 }
             }
         } else if (firstArg instanceof G.MapEntry || firstArg instanceof G.MapLiteral) {
@@ -1070,7 +1070,7 @@ public class GradleDependency implements Trait<J.MethodInvocation> {
                     J.Literal newLiteral = literal.withValue(replacement)
                             .withValueSource(replacement);
                     K.StringTemplate updatedTemplate = template.withStrings(ListUtils.mapFirst(strings, s -> newLiteral));
-                    updated = m.withArguments(singletonList(updatedTemplate));
+                    updated = m.withArguments(ListUtils.mapFirst(m.getArguments(), arg -> updatedTemplate));
                 }
             }
         }
@@ -1148,7 +1148,7 @@ public class GradleDependency implements Trait<J.MethodInvocation> {
                     J.Literal newLiteral = literal.withValue(replacement)
                             .withValueSource(replacement);
                     G.GString updatedGString = gstring.withStrings(ListUtils.mapFirst(strings, s -> newLiteral));
-                    updated = m.withArguments(singletonList(updatedGString));
+                    updated = m.withArguments(ListUtils.mapFirst(m.getArguments(), arg -> updatedGString));
                 }
             }
         } else if (firstArg instanceof G.MapEntry || firstArg instanceof G.MapLiteral) {
@@ -1215,7 +1215,7 @@ public class GradleDependency implements Trait<J.MethodInvocation> {
                     J.Literal newLiteral = literal.withValue(replacement)
                             .withValueSource(replacement);
                     K.StringTemplate updatedTemplate = template.withStrings(ListUtils.mapFirst(strings, s -> newLiteral));
-                    updated = m.withArguments(singletonList(updatedTemplate));
+                    updated = m.withArguments(ListUtils.mapFirst(m.getArguments(), arg -> updatedTemplate));
                 }
             }
         }
@@ -1290,7 +1290,7 @@ public class GradleDependency implements Trait<J.MethodInvocation> {
                     J.Literal newLiteral = literal.withValue(replacement)
                             .withValueSource(replacement);
                     G.GString collapsed = gstring.withStrings(singletonList(newLiteral));
-                    updated = m.withArguments(singletonList(collapsed));
+                    updated = m.withArguments(ListUtils.mapFirst(m.getArguments(), arg -> collapsed));
                 }
             }
         } else if (firstArg instanceof G.MapEntry || firstArg instanceof G.MapLiteral) {
@@ -1376,7 +1376,7 @@ public class GradleDependency implements Trait<J.MethodInvocation> {
                     J.Literal newLiteral = literal.withValue(replacement)
                             .withValueSource(template.getDelimiter() + replacement + template.getDelimiter())
                             .withPrefix(template.getPrefix());
-                    updated = m.withArguments(singletonList(newLiteral));
+                    updated = m.withArguments(ListUtils.mapFirst(m.getArguments(), arg -> newLiteral));
                 }
             }
         }
