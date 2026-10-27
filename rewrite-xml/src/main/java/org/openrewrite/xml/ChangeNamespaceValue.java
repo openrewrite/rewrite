@@ -216,10 +216,8 @@ public class ChangeNamespaceValue extends Recipe {
                 return Optional.empty();
             }
             private Xml.Tag maybeAddNamespace(Xml.Tag root) {
-                Namespaced n = new Namespaced(new Cursor(null, root));
-                Map<String, String> namespaces = n.getNamespaces();
-                if (namespaces.containsValue(newValue) && !namespaces.containsValue(XML_SCHEMA_INSTANCE_URI)) {
-                    Map<String, String> newNamespaces = new LinkedHashMap<>(namespaces);
+                if (schemaInstancePrefix(root) == null) {
+                    Map<String, String> newNamespaces = new LinkedHashMap<>(new Namespaced(new Cursor(null, root)).getNamespaces());
                     newNamespaces.put(XML_SCHEMA_INSTANCE_PREFIX, XML_SCHEMA_INSTANCE_URI);
                     root = withNamespaces(root, newNamespaces);
                 }
@@ -228,12 +226,27 @@ public class ChangeNamespaceValue extends Recipe {
 
             public Xml.Tag withNamespaces(Xml.Tag tag, Map<String, String> namespaces) {
                 List<Xml.Attribute> attributes = tag.getAttributes();
-                if (attributes.isEmpty()) {
-                    for (Map.Entry<String, String> ns : namespaces.entrySet()) {
-                        String key = Namespaced.getAttributeNameForPrefix(ns.getKey());
+                Map<String, Xml.Attribute> attributeByKey = attributes.stream()
+                        .collect(toMap(
+                                Xml.Attribute::getKeyAsString,
+                                a -> a,
+                                (first, repeated) -> first
+                        ));
+
+                for (Map.Entry<String, String> ns : namespaces.entrySet()) {
+                    String key = Namespaced.getAttributeNameForPrefix(ns.getKey());
+                    if (attributeByKey.containsKey(key)) {
+                        Xml.Attribute attribute = attributeByKey.get(key);
+                        if (!ns.getValue().equals(attribute.getValueAsString())) {
+                            attributes = ListUtils.map(attributes, a -> a == attribute ?
+                                    a.withValue(a.getValue().withValue(ns.getValue())) :
+                                    a
+                            );
+                        }
+                    } else {
                         attributes = ListUtils.concat(attributes, new Xml.Attribute(
                                 randomId(),
-                                "",
+                                " ",
                                 Markers.EMPTY,
                                 new Xml.Ident(
                                         randomId(),
@@ -249,44 +262,6 @@ public class ChangeNamespaceValue extends Recipe {
                                         Xml.Attribute.Value.Quote.Double, ns.getValue()
                                 )
                         ));
-                    }
-                } else {
-                    Map<String, Xml.Attribute> attributeByKey = attributes.stream()
-                            .collect(toMap(
-                                    Xml.Attribute::getKeyAsString,
-                                    a -> a
-                            ));
-
-                    for (Map.Entry<String, String> ns : namespaces.entrySet()) {
-                        String key = Namespaced.getAttributeNameForPrefix(ns.getKey());
-                        if (attributeByKey.containsKey(key)) {
-                            Xml.Attribute attribute = attributeByKey.get(key);
-                            if (!ns.getValue().equals(attribute.getValueAsString())) {
-                                attributes = ListUtils.map(attributes, a -> a == attribute ?
-                                        a.withValue(a.getValue().withValue(ns.getValue())) :
-                                        a
-                                );
-                            }
-                        } else {
-                            attributes = ListUtils.concat(attributes, new Xml.Attribute(
-                                    randomId(),
-                                    " ",
-                                    Markers.EMPTY,
-                                    new Xml.Ident(
-                                            randomId(),
-                                            "",
-                                            Markers.EMPTY,
-                                            key
-                                    ),
-                                    "",
-                                    new Xml.Attribute.Value(
-                                            randomId(),
-                                            "",
-                                            Markers.EMPTY,
-                                            Xml.Attribute.Value.Quote.Double, ns.getValue()
-                                    )
-                            ));
-                        }
                     }
                 }
                 return tag.withAttributes(attributes);
@@ -324,7 +299,20 @@ public class ChangeNamespaceValue extends Recipe {
                 return newRoot.withAttributes(ListUtils.map(newRoot.getAttributes(), a -> a == attribute ? newAttribute : a));
             }
 
+            private @Nullable String schemaInstancePrefix(Xml.Tag root) {
+                for (Map.Entry<String, String> ns : new Namespaced(new Cursor(null, root)).getNamespaces().entrySet()) {
+                    if (XML_SCHEMA_INSTANCE_URI.equals(ns.getValue()) && !ns.getKey().isEmpty()) {
+                        return ns.getKey();
+                    }
+                }
+                return null;
+            }
+
             private Xml.Tag addSchemaLocation(Xml.Tag newRoot) {
+                String prefix = schemaInstancePrefix(newRoot);
+                if (prefix == null) {
+                    prefix = XML_SCHEMA_INSTANCE_PREFIX;
+                }
                 return newRoot.withAttributes(
                         ListUtils.concat(
                                 newRoot.getAttributes(),
@@ -336,7 +324,7 @@ public class ChangeNamespaceValue extends Recipe {
                                                 randomId(),
                                                 "",
                                                 Markers.EMPTY,
-                                                String.format("%s:schemaLocation", XML_SCHEMA_INSTANCE_PREFIX)
+                                                prefix + ":schemaLocation"
                                         ),
                                         "",
                                         new Xml.Attribute.Value(
