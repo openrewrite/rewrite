@@ -36,6 +36,7 @@ recipeList:
   - org.openrewrite.gradle.RemoveNonReproducibleArchiveSettings
   - org.openrewrite.gradle.UseLoggingGetLogger
   - org.openrewrite.gradle.UsePluginsBlock
+  - org.openrewrite.gradle.RemoveExplicitKotlinStdlibDependency
 #  - org.openrewrite.gradle.UseDefaultPathSensitivity  # changes task cache keys; a task that writes its input's
 #    path into its output would start taking wrong cache hits, silently
 ---
@@ -58,3 +59,26 @@ recipeList:
       key: org.gradle.parallel
       value: true
       filePattern: gradle.properties
+---
+type: specs.openrewrite.org/v1beta/recipe
+name: org.openrewrite.gradle.RemoveExplicitKotlinStdlibDependency
+displayName: Remove explicit Kotlin standard library dependency
+description: >-
+  The Kotlin Gradle plugin adds the version of `kotlin-stdlib` that matches itself, so declaring the dependency
+  explicitly is redundant and can pin a version that disagrees with the plugin. Removes
+  `org.jetbrains.kotlin:kotlin-stdlib` and its `-jdk7`, `-jdk8` and `-common` variants, written either as coordinates
+  or with the Kotlin DSL `kotlin("stdlib")` helper, but only from a project that applies a Kotlin plugin — without one
+  the standard library is an ordinary dependency the project needs, and removing it would stop the build compiling.
+  Only `implementation` declarations are removed, because that is the one configuration the Kotlin plugin contributes
+  the standard library to: a declaration on `api` is consumer-visible through the published compile scope, and one on
+  a configuration of the project's own has nothing putting it back.
+  See the
+  [Gradle best practice](https://docs.gradle.org/current/userguide/best_practices_dependencies.html#dont_depend_on_kotlin_stdlib).
+preconditions:
+  - org.openrewrite.gradle.search.FindPlugins:
+      pluginId: org.jetbrains.kotlin*
+recipeList:
+  - org.openrewrite.gradle.RemoveDependency:
+      groupId: org.jetbrains.kotlin
+      artifactId: kotlin-stdlib*
+      configuration: implementation
