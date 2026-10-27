@@ -245,7 +245,7 @@ public interface JavaParser extends Parser {
         protected Charset charset = Charset.defaultCharset();
         protected boolean logCompilationWarningsAndErrors = false;
         protected boolean typeAttribution = true;
-        protected final List<NamedStyles> styles = new ArrayList<>();
+        protected List<NamedStyles> styles = new ArrayList<>();
 
         public Builder() {
             super(J.CompilationUnit.class);
@@ -398,6 +398,7 @@ public interface JavaParser extends Parser {
         public Builder<P, B> clone() {
             Builder<P, B> clone = (Builder<P, B>) super.clone();
             clone.javaTypeCache = this.javaTypeCache.clone();
+            clone.styles = new ArrayList<>(this.styles);
             return clone;
         }
     }
