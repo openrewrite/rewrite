@@ -122,6 +122,11 @@ final class AccumulatorContents {
      */
     private final Map<String, Map<String, Finding>> findings = new LinkedHashMap<>();
 
+    /// The distinct build models and markers kept at each shape of path, by recipe name and then by that shape. One
+    /// instance that the source files it came from share, such as their source set, doesn't grow with the repository;
+    /// a second one at the same place shows that it does.
+    private final Map<String, Map<String, Set<Object>>> models = new HashMap<>();
+
     void startCycle() {
         scanningRecipes.clear();
         ran.clear();
@@ -242,10 +247,21 @@ final class AccumulatorContents {
         }
 
         private void found(Node node) {
+            Object value = node.getValue();
             String path = node.path();
-            String what = describe(node.getValue());
-            findings.computeIfAbsent(recipe, r -> new LinkedHashMap<>()).putIfAbsent(
-                    KEY_OR_INDEX.matcher(path).replaceAll("[]") + " -> " + what, new Finding(path, what, when));
+            String what = describe(value);
+            String shape = KEY_OR_INDEX.matcher(path).replaceAll("[]") + " -> " + what;
+            if (!(value instanceof Tree || value instanceof Cursor || value instanceof TreeVisitor ||
+                  value instanceof ExecutionContext)) {
+                Set<Object> kept = models.computeIfAbsent(recipe, r -> new HashMap<>())
+                        .computeIfAbsent(shape, s -> newSetFromMap(new IdentityHashMap<>()));
+                kept.add(value);
+                if (kept.size() < 2) {
+                    return;
+                }
+            }
+            findings.computeIfAbsent(recipe, r -> new LinkedHashMap<>())
+                    .putIfAbsent(shape, new Finding(path, what, when));
         }
     }
 
@@ -321,7 +337,8 @@ final class AccumulatorContents {
                 .append("ends, so what it keeps for each source file adds up over a large repository. A ")
                 .append("MavenResolutionResult or GradleProject can reach the model of a whole build, and a ")
                 .append("JavaSourceSet a whole classpath, while small markers such as JavaProject are fine to keep. ")
-                .append("Instead:\n")
+                .append("One build model or marker that the source files share, such as their source set, is fine ")
+                .append("to keep; one for each source file or project adds up. Instead:\n")
                 .append("  - keep what the recipe needs from a tree or build model as values: a path, a coordinate, ")
                 .append("a property value, an id\n")
                 .append("  - to change one source file based on another, record what you need from the first while ")

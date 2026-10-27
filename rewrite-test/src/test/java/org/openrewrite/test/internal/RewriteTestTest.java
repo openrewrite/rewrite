@@ -2335,12 +2335,31 @@ class RewriteTestTest implements RewriteTest {
         }
 
         @Test
-        void rejectHeavyweightMarkerKeptInAccumulator() {
+        void rejectHeavyweightMarkerKeptForEachSourceFile() {
             AssertionError e = assertThrows(AssertionError.class, () -> rewriteRun(
+              spec -> spec.recipe(new KeepsHeavyweightMarkers()),
+              text("foo", spec -> spec.path("foo.txt").markers(new Classpath(randomId(), List.of("a.jar")))),
+              text("bar", spec -> spec.path("bar.txt").markers(new Classpath(randomId(), List.of("b.jar"))))
+            ));
+            assertThat(e).hasMessageContaining("ArrayList[1] -> Classpath, after scanning");
+        }
+
+        @Test
+        void acceptOneHeavyweightMarkerTheSourceFilesShare() {
+            Classpath shared = new Classpath(randomId(), List.of("a.jar"));
+            rewriteRun(
+              spec -> spec.recipe(new KeepsHeavyweightMarkers()),
+              text("foo", spec -> spec.path("foo.txt").markers(shared)),
+              text("bar", spec -> spec.path("bar.txt").markers(shared))
+            );
+        }
+
+        @Test
+        void acceptOneHeavyweightMarkerKeptForTheRun() {
+            rewriteRun(
               spec -> spec.recipe(new KeepsHeavyweightMarker()),
               text("foo", spec -> spec.markers(new Classpath(randomId(), List.of("a.jar"))))
-            ));
-            assertThat(e).hasMessageContaining("AtomicReference.get() -> Classpath, after scanning");
+            );
         }
 
         @Test
@@ -3384,6 +3403,34 @@ class KeepsWhatItScansInItsOwnMap extends ScanningRecipe<KeepsWhatItScansInItsOw
             public @Nullable Tree visit(@Nullable Tree tree, ExecutionContext ctx) {
                 if (tree instanceof SourceFile s) {
                     acc.files.put(s.getSourcePath(), s);
+                }
+                return tree;
+            }
+        };
+    }
+}
+
+@EqualsAndHashCode(callSuper = false)
+@NullMarked
+@Value
+class KeepsHeavyweightMarkers extends ScanningRecipe<List<Classpath>> {
+
+    String displayName = "Keeps a heavyweight marker of each source file";
+
+    String description = "Keeps the classpath marker of each source file it scans in its accumulator.";
+
+    @Override
+    public List<Classpath> getInitialValue(ExecutionContext ctx) {
+        return new ArrayList<>();
+    }
+
+    @Override
+    public TreeVisitor<?, ExecutionContext> getScanner(List<Classpath> acc) {
+        return new TreeVisitor<>() {
+            @Override
+            public @Nullable Tree visit(@Nullable Tree tree, ExecutionContext ctx) {
+                if (tree instanceof SourceFile s) {
+                    s.getMarkers().findFirst(Classpath.class).ifPresent(acc::add);
                 }
                 return tree;
             }
