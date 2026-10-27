@@ -258,6 +258,10 @@ val npmPack = tasks.register<Tar>("npmPack") {
     from(npmBuild) {
         into("package/dist/")
     }
+    // Published packages carry the version the jar embeds as dist/rewrite-javascript-version.txt
+    from(generateVersionTxt) {
+        into("package/dist/")
+    }
     from(npmVersion) {
         into("package")
     }
