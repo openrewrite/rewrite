@@ -55,6 +55,8 @@ This writes `rewrite-javascript/rewrite/test-classpath.txt` (gitignored). Altern
 
 Name such a test `test/rpc/java-*.test.ts`, or add it to `javaTests` in `vitest.config.mts`. That puts it in the `java` vitest project, which Gradle runs as `npmTestJava` and reruns when the Java side changes. Gradle runs the `typescript` project as `npmTestTypeScript`, without the Java classpath.
 
+`./gradlew :rewrite-javascript:npmTest` runs `npmTypecheck`, `npmTestTypeScript` and `npmTestJava` but does no work itself, so `npmTest --rerun` reruns nothing. To force a rerun, pass `--rerun` to `npmTestTypeScript` or `npmTestJava`.
+
 ## Directory Structure
 
 ```
