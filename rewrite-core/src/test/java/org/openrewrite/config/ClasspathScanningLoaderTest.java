@@ -27,7 +27,6 @@ import java.util.List;
 import java.util.Properties;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.tuple;
 
 class ClasspathScanningLoaderTest {
 
@@ -122,62 +121,6 @@ class ClasspathScanningLoaderTest {
                 .extracting(RecipeDescriptor::getName)
                 .contains(AbstractRecipeFixtures.ConcreteRecipe.class.getName())
                 .doesNotContain(AbstractRecipeFixtures.AbstractlyMarkedRecipe.class.getName());
-    }
-
-    @Test
-    void environmentListsEachYamlExampleOnce(@TempDir Path tempDir) throws Exception {
-        Path resourcesDir = tempDir.resolve("resources");
-        Path metaInf = resourcesDir.resolve("META-INF/rewrite");
-        Files.createDirectories(metaInf);
-        Files.writeString(metaInf.resolve("recipe.yml"),
-                """
-                type: specs.openrewrite.org/v1beta/recipe
-                name: com.example.DeclarativeRecipe
-                displayName: Declarative
-                description: A declarative recipe.
-                recipeList:
-                  - org.openrewrite.text.ChangeText:
-                      toText: hello
-                ---
-                type: specs.openrewrite.org/v1beta/example
-                recipeName: com.example.DeclarativeRecipe
-                examples:
-                  - description: Declarative example
-                    sources:
-                      - before: world
-                        after: hello
-                        language: text
-                ---
-                type: specs.openrewrite.org/v1beta/example
-                recipeName: org.openrewrite.config.AbstractRecipeFixtures$ConcreteRecipe
-                examples:
-                  - description: Imperative example
-                    sources:
-                      - before: world
-                        language: text
-                """);
-        // The imperative recipe comes from a class scan, the declarative recipe and both examples from the YAML
-        ClasspathScanningLoader classes = new ClasspathScanningLoader(
-                new Properties(),
-                new String[]{AbstractRecipeFixtures.class.getPackageName()});
-        ClassLoader cl = new URLClassLoader(new URL[]{resourcesDir.toUri().toURL()}, Recipe.class.getClassLoader());
-        Environment env = new Environment(List.of(classes,
-                new ClasspathScanningLoader(resourcesDir, new Properties(), List.of(), cl)));
-
-        // The first loader also reads every YAML file on the test classpath, so only look at these two recipes
-        List<String> recipeNames = List.of("com.example.DeclarativeRecipe",
-                AbstractRecipeFixtures.ConcreteRecipe.class.getName());
-        for (int call = 1; call <= 3; call++) {
-            assertThat(env.listRecipeDescriptors())
-                    .as("call %d", call)
-                    .filteredOn(descriptor -> recipeNames.contains(descriptor.getName()))
-                    .extracting(RecipeDescriptor::getName, descriptor -> descriptor.getExamples().stream()
-                            .map(RecipeExample::getDescription).toList())
-                    .containsExactlyInAnyOrder(
-                            tuple("com.example.DeclarativeRecipe", List.of("Declarative example")),
-                            tuple(AbstractRecipeFixtures.ConcreteRecipe.class.getName(),
-                                    List.of("Imperative example")));
-        }
     }
 
     @Test
