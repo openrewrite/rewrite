@@ -1,8 +1,8 @@
 {
   "compilerOptions": {
     "target": "es2017",
-    "module": "Node16",
-    "moduleResolution": "node16",
+    "module": "node20",
+    "moduleResolution": "nodenext",
     "isolatedModules": true,
     "declaration": true,
     "declarationMap": true,

@@ -77,6 +77,7 @@ describe("exportedTypes", () => {
             expect(Type.isClass(greeter!)).toBe(true);
             const greeterClass = greeter as Type.Class;
             expect(greeterClass.classKind).toBe(Type.Class.Kind.Class);
+            expect(greeterClass.members.map(m => m.name)).toEqual(["name"]);
 
             // The gap fix: methods must come out non-empty (the normal mapping path skips them).
             const methodNames = greeterClass.methods.map(m => m.name);

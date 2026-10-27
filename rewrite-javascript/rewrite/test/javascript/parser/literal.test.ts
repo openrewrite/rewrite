@@ -142,3 +142,14 @@ describe('surrogate pairs', () => {
             typescript('const s = "\u{1F42D}";')
         ));
 });
+
+describe('regular expressions', () => {
+    test('a regular expression holding a lone # parses in a file the compiler reports errors in', () =>
+        spec.rewriteRun(
+            //language=javascript
+            javascript(`
+                var mode = 0777;
+                var r = /a#/g;
+            `)
+        ));
+});

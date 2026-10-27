@@ -1190,6 +1190,24 @@ describe('JavaScript type mapping', () => {
             await spec.rewriteRun(script, augmentation, moduleNamedGlobal);
         });
 
+        test('a class in a CommonJS module is named after the module, and one in a script is not', async () => {
+            const spec = new RecipeSpec();
+            spec.recipe = markTypes((node, type) =>
+                node?.kind === J.Kind.ClassDeclaration && Type.isClass(type) ? type.fullyQualifiedName : null);
+
+            const module = javascript(
+                `class Exported {}\nmodule.exports = Exported;`,
+                `/*~~(src/lib.Exported)~~>*/class Exported {}\nmodule.exports = Exported;`
+            );
+            module.path = 'src/lib.js';
+            const script = javascript(
+                `class Local {}`,
+                `/*~~(Local)~~>*/class Local {}`
+            );
+            script.path = 'src/script.js';
+            await spec.rewriteRun(module, script);
+        });
+
         test('a local class in a dependency\'s source is named after its package', async () => {
             const spec = new RecipeSpec();
             spec.recipe = markTypes((node, type) =>
@@ -1741,6 +1759,29 @@ describe('JavaScript type mapping', () => {
                     `
                 )
             );
+        });
+
+        test('a type name in a reference is attributed the type it declares', async () => {
+            const label = (t: Type | undefined) => {
+                const name = Type.isFullyQualified(t) ? FullyQualified.getFullyQualifiedName(t) : '-';
+                return `${t?.kind.split('$').pop()} ${name}`;
+            };
+            await new RecipeSpec().rewriteRun({
+                //language=typescript
+                ...typescript(`
+                    type Box<T> = { b: T };
+                    interface Bag<T> { items: T[] }
+                    let y: Box<string>;
+                    let z: Bag<number>;
+                `),
+                afterRecipe: (cu: JS.CompilationUnit) => {
+                    const classes = cu.statements.slice(2).map(s => {
+                        const typeInfo = (s.element as J.VariableDeclarations).typeExpression as JS.TypeInfo;
+                        return ((typeInfo.typeIdentifier as J.ParameterizedType).class as J.Identifier).type;
+                    });
+                    expect(classes.map(label)).toEqual(['Class Box', 'Class Bag']);
+                }
+            });
         });
 
         test('should map namespace-qualified parameterized type (React.Ref)', async () => {

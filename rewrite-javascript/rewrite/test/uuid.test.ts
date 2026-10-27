@@ -18,7 +18,8 @@ import {execFileSync} from "node:child_process";
 import * as fs from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
-import * as ts from "typescript";
+// TypeScript 7 transpiles only through a compiler process, which this test has no other use for.
+import ts from "typescript6";
 import {randomId} from "../src/uuid";
 
 describe("randomId", () => {

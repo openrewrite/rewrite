@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-import ts from "typescript";
+import fs from "node:fs";
 import * as path from "path";
 
 /**
@@ -50,8 +50,14 @@ export interface ResolvedTsConfig {
      * config applied, in which case {@link options} are the parser's defaults.
      */
     readonly configFilePath?: string;
-    readonly options: ts.CompilerOptions;
+    readonly options: CompilerOptions;
 }
+
+/** Compiler options under the names a tsconfig states them with. */
+export type CompilerOptions = Record<string, unknown>;
+
+/** Reads the options a config file states, resolving its `extends` chain. */
+export type ConfigParser = (configFilePath: string) => CompilerOptions;
 
 /**
  * Finds the config file governing each file and merges its resolution options over a set of
@@ -59,15 +65,18 @@ export interface ResolvedTsConfig {
  */
 export class TsConfigResolver {
     private readonly configByDir = new Map<string, string | undefined>();
-    private readonly optionsByConfig = new Map<string, ts.CompilerOptions | undefined>();
+    private readonly optionsByConfig = new Map<string, CompilerOptions | undefined>();
     private readonly root?: string;
 
     /**
      * @param defaults Options to fall back on, and to merge a project config over.
+     * @param parse Reads a config file. The compiler owns config parsing, so this is supplied
+     *   rather than done here.
      * @param relativeTo Root of the project being parsed, bounding the search. Without one,
      *   walking up from the process working directory picks up whatever config sits above it.
      */
-    constructor(private readonly defaults: ts.CompilerOptions, relativeTo?: string) {
+    constructor(private readonly defaults: CompilerOptions, private readonly parse: ConfigParser,
+                relativeTo?: string) {
         this.root = relativeTo ? path.resolve(relativeTo) : undefined;
     }
 
@@ -99,7 +108,7 @@ export class TsConfigResolver {
 
             for (const configFileName of CONFIG_FILE_NAMES) {
                 const candidate = path.join(dir, configFileName);
-                if (ts.sys.fileExists(candidate)) {
+                if (fs.existsSync(candidate)) {
                     return memoize(candidate);
                 }
             }
@@ -109,7 +118,7 @@ export class TsConfigResolver {
         }
     }
 
-    private optionsFor(configFilePath: string): ts.CompilerOptions | undefined {
+    private optionsFor(configFilePath: string): CompilerOptions | undefined {
         if (!this.optionsByConfig.has(configFilePath)) {
             this.optionsByConfig.set(configFilePath, this.merge(configFilePath));
         }
@@ -117,47 +126,104 @@ export class TsConfigResolver {
     }
 
     /** Undefined where the config cannot be read, leaving the caller on its defaults. */
-    private merge(configFilePath: string): ts.CompilerOptions | undefined {
-        let projectOptions: ts.CompilerOptions;
+    private merge(configFilePath: string): CompilerOptions | undefined {
+        let projectOptions: CompilerOptions;
         try {
-            const {config, error} = ts.readConfigFile(configFilePath, ts.sys.readFile);
-            if (error || !config) {
-                return undefined;
-            }
-            // `readDirectory` answers empty because only `options` is read here; left to `ts.sys` it
-            // walks the whole tree under the config to build a file list, once per config found.
-            const parseConfigHost: ts.ParseConfigHost = {...ts.sys, readDirectory: () => []};
-            projectOptions = ts.parseJsonConfigFileContent(
-                config, parseConfigHost, path.dirname(configFilePath), undefined, configFilePath).options;
+            projectOptions = this.parse(configFilePath);
         } catch {
             return undefined;
         }
 
-        // A project's `baseUrl` stands alone, including where it states none: `baseUrl` takes
-        // precedence over `pathsBasePath`, so a default rooted at the repository would resolve a
-        // nested project's `paths` against the wrong directory.
-        const {baseUrl: _, ...defaults} = this.defaults;
+        // A project's own `paths` stand alone, including where it states none, so that a nested
+        // project resolves as its config says rather than against the repository root.
+        const {paths: _, ...defaults} = this.defaults;
 
-        const resolution: ts.CompilerOptions = {};
+        const resolution: CompilerOptions = {};
         for (const option of RESOLUTION_OPTIONS) {
             if (projectOptions[option] !== undefined) {
                 resolution[option] = projectOptions[option];
             }
         }
-        if (isNodeModuleResolution(resolution.moduleResolution)) {
-            delete resolution.moduleResolution;
+        rootPaths(resolution, path.dirname(configFilePath));
+
+        // Where the project states an option of its own that its resolution mode also implies,
+        // the project's is the more direct statement of the two.
+        const stated = resolution.moduleResolution as number | undefined;
+        delete resolution.moduleResolution;
+        const mode = stated === undefined ? undefined : MODULE_RESOLUTION[stated];
+        if (mode === NODE10) {
+            withoutNodeModulesTargets(resolution);
         }
-        return {...defaults, ...resolution};
+        return {...defaults, ...mode, ...resolution};
     }
 }
 
 /**
- * Under the pinned `preserve` module kind every import resolves in ESM mode, where the `node16`
- * family demands extensions on relative paths (TypeScript rejects the pairing, TS5110). The default
- * `bundler` picks the same `import` branch of a dual package without that demand.
+ * Rewrites `baseUrl` and `paths` into the absolute `paths` that stand for them. `baseUrl` names
+ * a directory every bare specifier is tried under, which is a `*` pattern rooted there; a relative
+ * `paths` entry resolves against the config stating it, which is not the config the parser writes.
  */
-function isNodeModuleResolution(kind: ts.ModuleResolutionKind | undefined): boolean {
-    return kind === ts.ModuleResolutionKind.Node16 || kind === ts.ModuleResolutionKind.NodeNext;
+function rootPaths(options: CompilerOptions, configDirectory: string): void {
+    const basePath = (options.pathsBasePath as string | undefined) ?? configDirectory;
+    const baseUrl = options.baseUrl as string | undefined;
+    const stated = options.paths as Record<string, string[]> | undefined;
+    delete options.pathsBasePath;
+    delete options.baseUrl;
+    if (!stated && !baseUrl) {
+        return;
+    }
+    const paths: Record<string, string[]> = {};
+    for (const [pattern, targets] of Object.entries(stated ?? {})) {
+        paths[pattern] = targets.map(target => path.resolve(basePath, target));
+    }
+    // A pattern the project states for `*` is the more specific statement of the two.
+    if (baseUrl && !paths["*"]) {
+        paths["*"] = [path.join(baseUrl, "*")];
+    }
+    options.paths = paths;
+}
+
+/**
+ * What a `ModuleResolutionKind` states in a config, by value, the enum itself not being on the
+ * compiler's public surface. TypeScript 7 has dropped `node10`, which reads neither an `exports`
+ * nor an `imports` map, and `bundler` states that directly. The rest give way to the default.
+ * `classic` searches no `node_modules`. Under the pinned `preserve` module kind every import
+ * resolves in ESM mode, where the `node16` family demands extensions on relative paths.
+ */
+const MODULE_RESOLUTION: Record<number, CompilerOptions | undefined> = {
+    1: undefined,
+    2: {moduleResolution: "bundler", resolvePackageJsonExports: false, resolvePackageJsonImports: false},
+    3: undefined,
+    99: undefined,
+    100: {moduleResolution: "bundler"},
+};
+
+/** The stand-in for `node10`, which the project states as `node` or implies with `commonjs`. */
+const NODE10 = MODULE_RESOLUTION[2];
+
+/**
+ * Drops the `paths` targets inside a `node_modules` directory. `node10` looks for declarations at
+ * every location before it accepts a JavaScript file, so such a target only ever yielded what the
+ * `node_modules` search finds anyway. `bundler`, standing in for it, takes the first file of either
+ * kind, so the same target would end resolution at an untyped package ahead of its `@types`.
+ */
+function withoutNodeModulesTargets(options: CompilerOptions): void {
+    const stated = options.paths as Record<string, string[]> | undefined;
+    if (!stated) {
+        return;
+    }
+    const paths: Record<string, string[]> = {};
+    for (const [pattern, targets] of Object.entries(stated)) {
+        const kept = targets.filter(target => !target.split(/[\\/]/).includes("node_modules"));
+        if (kept.length > 0) {
+            paths[pattern] = kept;
+        }
+    }
+    if (Object.keys(paths).length > 0) {
+        options.paths = paths;
+    } else {
+        delete options.paths;
+    }
 }
 
 function isAtOrUnder(dir: string, root: string): boolean {

@@ -136,6 +136,12 @@ describe("jsx mapping", () => {
             tsx("/*a*/<div /*b*/></div >/*d*/"),
         ));
 
+    test("whitespace between = and an attribute value", () =>
+        spec.rewriteRun(
+            //language=jsx
+            tsx("<A b= {1} c=\n    {2} d= <B/> />"),
+        ));
+
     test("jsx namespace element", () => {
         return spec.rewriteRun(
             //language=jsx

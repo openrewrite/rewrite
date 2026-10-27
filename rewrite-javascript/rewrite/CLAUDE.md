@@ -22,7 +22,8 @@ Via Gradle (from repo root):
 ./gradlew :rewrite-javascript:npm_run_build
 ```
 
-Requires Node.js 18+.
+Requires Node.js 22.12+, which supports `require(esm)`. The build uses `module: node20` so this
+CommonJS package can reach the ESM-only `typescript7`.
 
 ## Running Tests
 

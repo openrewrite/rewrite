@@ -38,4 +38,9 @@ describe('union type mapping', () => {
                    | GeolocateResponseError;
            `)
         ));
+    test('a union inside a type argument of a union starts at its first member', () =>
+        spec.rewriteRun(
+            //language=typescript
+            typescript('let c: null | Array<string | number>')
+        ));
 });
