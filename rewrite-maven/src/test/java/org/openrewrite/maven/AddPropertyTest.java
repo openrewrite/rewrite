@@ -19,6 +19,7 @@ import org.junit.jupiter.api.Test;
 import org.openrewrite.DocumentExample;
 import org.openrewrite.Issue;
 import org.openrewrite.test.RecipeSpec;
+import org.openrewrite.test.RecipeQualityValidation;
 import org.openrewrite.test.RewriteTest;
 import org.openrewrite.test.SourceSpec;
 
@@ -622,8 +623,9 @@ class AddPropertyTest implements RewriteTest {
           spec -> spec.recipes(
             new AddProperty("key", "value", null, false),
             new AddProperty("key", "v", null, false)
+          ).cycles(1).expectedCyclesThatMakeChanges(1)
             // the two steps set the property to different values in every cycle
-          ).cycles(1).expectedCyclesThatMakeChanges(1),
+            .recipeQualityValidation(RecipeQualityValidation.builder().settles(false).build()),
           pomXml(
             """
               <project>

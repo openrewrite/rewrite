@@ -24,6 +24,7 @@ import org.openrewrite.javascript.marker.NodeResolutionResult.PackageManager;
 import org.openrewrite.javascript.table.NodeDependencyEditsDeclined;
 import org.openrewrite.javascript.table.NodeDependencyProtocolsSkipped;
 import org.openrewrite.marker.Markup;
+import org.openrewrite.test.RecipeQualityValidation;
 import org.openrewrite.test.RewriteTest;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -212,8 +213,9 @@ class ChangeDependencyCatalogTest implements RewriteTest {
         rewriteRun(
           spec -> spec.recipes(new AddDependency("left-pad", "^1.3.0", null),
               new ChangeDependency("left-pad", "pad-left", "^2.0.0", null))
+            .cycles(1).expectedCyclesThatMakeChanges(1)
             // the addition restores what the change of the previous cycle renamed away
-            .cycles(1).expectedCyclesThatMakeChanges(1),
+            .recipeQualityValidation(RecipeQualityValidation.builder().settles(false).build()),
           packageJson("""
             {
               "name": "consumer",

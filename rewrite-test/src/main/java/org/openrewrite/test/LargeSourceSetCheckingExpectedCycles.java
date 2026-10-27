@@ -129,7 +129,7 @@ class LargeSourceSetCheckingExpectedCycles extends InMemoryLargeSourceSet {
                                 "but took at least one more cycle. Between the last two executed cycles there were changes to \"" + before.getSourcePath() + "\". " +
                                 "A recipe that changes its own output again repeats its edit every time it runs, so make it recognize code it already changed. " +
                                 "If one of its changes enables another, return true from causesAnotherCycle() and declare expectedCyclesThatMakeChanges(..) to match. " +
-                                "Pinning cycles(..) doesn't make the recipe settle; it only skips the cycle that shows it doesn't. " +
+                                "A test of a recipe that is meant not to settle opts out with " + RecipeQualityValidation.optOut("settles") + ". " +
                                 RecipeQualityValidation.WHEN_STUCK
                         )
                         .isEqualTo(before.printAllTrimmed());
