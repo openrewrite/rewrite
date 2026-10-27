@@ -138,7 +138,11 @@ fun Task.typeScriptInputs() {
         include("*.json")
         include("vitest.config.mts")
     }).withPathSensitivity(PathSensitivity.RELATIVE)
-    inputs.files(fileTree("rewrite/src"), fileTree("rewrite/test"), fileTree("rewrite/fixtures"))
+    inputs.files(fileTree("rewrite/src"))
+        .withPathSensitivity(PathSensitivity.RELATIVE)
+    inputs.files(fileTree("rewrite/test"))
+        .withPathSensitivity(PathSensitivity.RELATIVE)
+    inputs.files(fileTree("rewrite/fixtures"))
         .withPathSensitivity(PathSensitivity.RELATIVE)
 }
 
