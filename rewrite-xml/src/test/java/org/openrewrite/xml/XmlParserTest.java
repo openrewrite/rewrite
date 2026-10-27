@@ -986,6 +986,25 @@ class XmlParserTest implements RewriteTest {
         );
     }
 
+    @Test
+    void jspxDocument() {
+        rewriteRun(
+          xml(
+            """
+              <?xml version="1.0" encoding="UTF-8"?>
+              <jsp:root xmlns:jsp="http://java.sun.com/JSP/Page" xmlns:c="http://java.sun.com/jsp/jstl/core" version="2.0">
+                <jsp:directive.page contentType="text/html; charset=UTF-8"/>
+                <c:forEach var="item" items="${items}">
+                  <p>${item.name}</p>
+                </c:forEach>
+                <jsp:text><![CDATA[<br>]]></jsp:text>
+              </jsp:root>
+              """,
+            spec -> spec.path("WEB-INF/views/items.jspx")
+          )
+        );
+    }
+
     @DisabledOnOs(OS.WINDOWS)
     @ParameterizedTest
     @ValueSource(strings = {
@@ -994,6 +1013,8 @@ class XmlParserTest implements RewriteTest {
       "proj.csproj",
       "proj.Csproj",
       "/foo/bar/baz.jsp",
+      "/foo/bar/baz.jspx",
+      "WEB-INF/tags/greeting.tagx",
       "ejbModule/META-INF/Map.mapxmi",
       "ejbModule/META-INF/Schema/CUSTOMER.tblxmi",
       "ejbModule/META-INF/Schema/SAMPLE.dbxmi",

@@ -50,6 +50,9 @@ public class XmlParser implements Parser {
             "jxb",
             "xjb",
             "jsp",
+            // JSP documents and tag files in XML syntax
+            "jspx",
+            "tagx",
             // WebSphere/Rational Application Developer object-relational mapping for CMP entity beans
             "mapxmi",
             "tblxmi",
