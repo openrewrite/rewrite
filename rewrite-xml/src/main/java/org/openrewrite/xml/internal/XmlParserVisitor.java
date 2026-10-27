@@ -57,6 +57,7 @@ public class XmlParserVisitor extends XMLParserBaseVisitor<Xml> {
     /// The first unbalanced tag found, thrown only once the whole document has been visited: it may be an artifact
     /// of ANTLR recovering from a later malformed attribute, whose own error then pinpoints the cause instead.
     private @Nullable IllegalStateException unbalancedTag;
+    private boolean unclosedElement;
 
     /**
      * Track position within the file by character
@@ -96,7 +97,7 @@ public class XmlParserVisitor extends XMLParserBaseVisitor<Xml> {
                 visitElement(ctx.element()),
                 source.substring(cursor))
         );
-        if (unbalancedTag != null) {
+        if (unbalancedTag != null && (unclosedElement || !htmlMode)) {
             throw unbalancedTag;
         }
         return document;
@@ -416,20 +417,25 @@ public class XmlParserVisitor extends XMLParserBaseVisitor<Xml> {
     /// Note an element whose closing tag is missing or names another element. The grammar does not compare the
     /// two names, so `<a><b></a>` would otherwise close `<b>` with `</a>` and shift every enclosing close tag by
     /// one level, leaving ANTLR to recover at end of input by discarding the outermost element's content.
+    ///
+    /// HTML and JSP tolerate a mismatch as long as every element still gets a closing tag, since misnested inline
+    /// markup like `<b><i>x</b></i>` and scriptlet-conditional tags round-trip exactly; only once an element is left
+    /// unclosed is the first mismatch reported, as the likely cause of the shift.
     private void recordUnbalancedTag(String name, XMLParser.ElementContext ctx) {
-        if (unbalancedTag != null) {
-            return;
-        }
         Token open = ctx.getStart();
         if (!isSourceToken(ctx.OPEN(1)) || !isSourceToken(ctx.SLASH()) ||
             !isSourceToken(ctx.Name(1)) || !isSourceToken(ctx.CLOSE(1))) {
+            unclosedElement = true;
+            if (unbalancedTag != null) {
+                return;
+            }
             unbalancedTag = new IllegalStateException(String.format(
                     "Unclosed element <%s> in %s opened at line %d, column %d.",
                     name, path, open.getLine(), open.getCharPositionInLine() + 1));
             return;
         }
         String closeName = ctx.Name(1).getText();
-        if (htmlMode ? !closeName.equalsIgnoreCase(name) : !closeName.equals(name)) {
+        if (unbalancedTag == null && (htmlMode ? !closeName.equalsIgnoreCase(name) : !closeName.equals(name))) {
             Token close = ctx.OPEN(1).getSymbol();
             unbalancedTag = new IllegalStateException(String.format(
                     "Mismatched closing tag </%s> at line %d, column %d for <%s> opened at line %d, column %d in %s.",

@@ -482,6 +482,29 @@ class XmlParserTest implements RewriteTest {
           .contains("Malformed attribute in head.html at line 3");
     }
 
+    @ParameterizedTest
+    @CsvSource(delimiter = '|', value = {
+      "misnested.html | <div><b><i>x</b></i></div>",
+      "conditional.jsp | <div><% if (x) { %><a href=\"/x\"><% } else { %><span><% } %>text<% if (x) { %></a><% } else { %></span><% } %></div>",
+    })
+    void htmlToleratesMismatchedClosingTagsThatStillBalance(String path, String source) {
+        rewriteRun(
+          xml(source, spec -> spec.path(path))
+        );
+    }
+
+    @Test
+    void htmlReportsTheMismatchBehindAnUnclosedElement() {
+        SourceFile parsed = XmlParser.builder().build()
+          .parseInputs(List.of(Input.fromString(Path.of("rest.html"),
+            "<table><tr><td><label><details><summary>Request</summary></label></td></tr></table>")),
+            null, new InMemoryExecutionContext(t -> {
+          }))
+          .findFirst().orElseThrow();
+        assertThat(parsed.getMarkers().findFirst(ParseExceptionResult.class).orElseThrow().getMessage())
+          .contains("Mismatched closing tag </label>");
+    }
+
     @Test
     void htmlClosingTagsMatchIgnoringCase() {
         rewriteRun(
