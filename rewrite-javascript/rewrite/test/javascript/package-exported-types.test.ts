@@ -147,12 +147,16 @@ describe("exportedTypes", () => {
                     }
                     return original.call(this, node);
                 });
+            const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
             try {
                 const names = fqns(exportedTypes([pkg], [nodeModules]));
                 expect(names).toContain("isolation-fixture.Good");
                 expect(names).not.toContain("isolation-fixture.Bad");
+                expect(warn).toHaveBeenCalledWith(
+                    "exportedTypes: skipping export 'Bad': Error: deliberately odd export");
             } finally {
                 spy.mockRestore();
+                warn.mockRestore();
             }
         }, {unsafeCleanup: true});
     }, 60000);
