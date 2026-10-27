@@ -180,40 +180,6 @@ class YamlResourceLoaderTest implements RewriteTest {
     }
 
     @Test
-    void maintainers() {
-        Environment env = Environment.builder()
-          .load(new YamlResourceLoader(new ByteArrayInputStream(
-            //language=yml
-            """
-              type: specs.openrewrite.org/v1beta/recipe
-              name: test.ChangeTextToHello
-              displayName: Change text to hello
-              recipeList:
-                  - org.openrewrite.text.ChangeText:
-                      toText: Hello!
-              maintainers:
-                  - maintainer: Sam
-                    logo: https://sam.com/logo.svg
-                  - maintainer: Jon
-              """.getBytes()
-          ), URI.create("rewrite.yml"), new Properties()))
-          .build();
-
-        Collection<RecipeDescriptor> recipeDescriptors = env.listRecipeDescriptors();
-        assertThat(recipeDescriptors).hasSize(1);
-        RecipeDescriptor descriptor = recipeDescriptors.iterator().next();
-        assertThat(descriptor.getDataTables()).isNotEmpty();
-        assertThat(descriptor.getMaintainers()).hasSize(2);
-        Maintainer sam = descriptor.getMaintainers().getFirst();
-        assertThat(sam.getMaintainer()).isEqualTo("Sam");
-        assertThat(sam.getLogo()).isNotNull();
-        assertThat(sam.getLogo().toString()).isEqualTo("https://sam.com/logo.svg");
-        Maintainer jon = descriptor.getMaintainers().get(1);
-        assertThat(jon.getMaintainer()).isEqualTo("Jon");
-        assertThat(jon.getLogo()).isNull();
-    }
-
-    @Test
     void caseInsensitiveEnums() {
         rewriteRun(
           spec -> spec.recipeFromYaml(

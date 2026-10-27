@@ -27,6 +27,7 @@ public interface ResourceLoader {
     enum RecipeDetail {
         @Deprecated(/* No longer populated */)
         CONTRIBUTORS,
+        @Deprecated(/* No longer populated */)
         MAINTAINERS,
         @Deprecated(/* No longer populated */)
         EXAMPLES;

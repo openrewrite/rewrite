@@ -69,6 +69,7 @@ public class RecipeDescriptor {
     @With
     List<DataTableDescriptor> dataTables;
 
+    @Deprecated(/* No longer populated */)
     List<Maintainer> maintainers;
 
     @Deprecated(/* No longer populated */)

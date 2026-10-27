@@ -229,8 +229,7 @@ public class YamlResourceLoader implements ResourceLoader {
             if (!recipeResource.containsKey("name") || !recipeName.equals(recipeResource.get("name"))) {
                 continue;
             }
-            return mapToRecipe(recipeResource,
-                    details.length == 0 ? EnumSet.noneOf(RecipeDetail.class) : EnumSet.copyOf(Arrays.asList(details)));
+            return mapToRecipe(recipeResource);
         }
         try {
             return recipeLoader.apply(recipeName, null);
@@ -250,14 +249,14 @@ public class YamlResourceLoader implements ResourceLoader {
                 continue;
             }
 
-            DeclarativeRecipe recipe = mapToRecipe(r, EnumSet.of(RecipeDetail.MAINTAINERS));
+            DeclarativeRecipe recipe = mapToRecipe(r);
             recipes.add(recipe);
         }
         return recipes;
     }
 
     @SuppressWarnings("unchecked")
-    private DeclarativeRecipe mapToRecipe(Map<String, Object> yaml, EnumSet<RecipeDetail> details) {
+    private DeclarativeRecipe mapToRecipe(Map<String, Object> yaml) {
         @Language("markdown") String name = (String) yaml.get("name");
 
         @Language("markdown")
@@ -292,27 +291,6 @@ public class YamlResourceLoader implements ResourceLoader {
             estimatedEffortPerOccurrence = Duration.parse(estimatedEffortPerOccurrenceStr);
         }
 
-        List<Maintainer> maintainers;
-        if (details.contains(RecipeDetail.MAINTAINERS) && yaml.containsKey("maintainers")) {
-            List<Object> rawMaintainers = (List<Object>) yaml.getOrDefault("maintainers", emptyList());
-            if (rawMaintainers.isEmpty()) {
-                maintainers = emptyList();
-            } else {
-                maintainers = new ArrayList<>(rawMaintainers.size());
-                for (Object rawMaintainer : rawMaintainers) {
-                    if (rawMaintainer instanceof Map) {
-                        Map<String, Object> maintainerMap = (Map<String, Object>) rawMaintainer;
-                        String maintainerName = (String) maintainerMap.get("maintainer");
-                        String logoString = (String) maintainerMap.get("logo");
-                        URI logo = (logoString == null) ? null : URI.create(logoString);
-                        maintainers.add(new Maintainer(maintainerName, logo));
-                    }
-                }
-            }
-        } else {
-            maintainers = emptyList();
-        }
-
         DeclarativeRecipe recipe = new DeclarativeRecipe(
                 name,
                 displayName,
@@ -321,7 +299,7 @@ public class YamlResourceLoader implements ResourceLoader {
                 estimatedEffortPerOccurrence,
                 source,
                 (boolean) yaml.getOrDefault("causesAnotherCycle", false),
-                maintainers);
+                emptyList());
 
         for (Object invalidTag : invalidTags) {
             recipe.addValidation(invalid(
