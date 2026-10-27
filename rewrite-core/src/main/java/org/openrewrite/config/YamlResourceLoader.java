@@ -21,7 +21,6 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.PropertyName;
 import com.fasterxml.jackson.databind.exc.InvalidTypeIdException;
 import com.fasterxml.jackson.databind.introspect.BeanPropertyDefinition;
-import com.google.errorprone.annotations.InlineMe;
 import lombok.Getter;
 import org.intellij.lang.annotations.Language;
 import org.jspecify.annotations.Nullable;
@@ -591,7 +590,6 @@ public class YamlResourceLoader implements ResourceLoader {
     }
 
     @Deprecated
-    @InlineMe(replacement = "this.listRecipeDescriptors(externalRecipes)")
     public Collection<RecipeDescriptor> listRecipeDescriptors(Collection<Recipe> externalRecipes,
                                                               Map<String, List<RecipeExample>> recipeNamesToExamples) {
         return listRecipeDescriptors(externalRecipes);
@@ -599,7 +597,6 @@ public class YamlResourceLoader implements ResourceLoader {
 
     @SuppressWarnings("unused")
     @Deprecated
-    @InlineMe(replacement = "this.listRecipeDescriptors(externalRecipes)")
     public Collection<RecipeDescriptor> listRecipeDescriptors(Collection<Recipe> externalRecipes,
                                                               Map<String, List<Contributor>> recipeNamesToContributors,
                                                               Map<String, List<RecipeExample>> recipeNamesToExamples) {
