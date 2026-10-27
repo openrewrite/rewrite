@@ -285,7 +285,7 @@ public interface JavaParser extends Parser {
             return (B) this;
         }
 
-        public B typeFactory(JavaTypeFactory javaTypeFactory) {
+        public B typeFactory(@Nullable JavaTypeFactory javaTypeFactory) {
             this.javaTypeFactory = javaTypeFactory;
             return (B) this;
         }

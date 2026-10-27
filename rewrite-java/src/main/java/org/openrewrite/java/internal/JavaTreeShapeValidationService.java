@@ -96,7 +96,12 @@ public class JavaTreeShapeValidationService implements TreeShapeValidationServic
         if (!(parser instanceof JavaParser.Builder)) {
             return parser;
         }
-        return ((JavaParser.Builder<?, ?>) parser.clone()).classpath(emptyList()).typeAttribution(false);
+        // the copy's types are incomplete, so they stay out of a type factory the test's builder holds
+        return ((JavaParser.Builder<?, ?>) parser.clone())
+                .classpath(emptyList())
+                .dependsOn(emptyList())
+                .typeAttribution(false)
+                .typeFactory(null);
     }
 
     @Override

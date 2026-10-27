@@ -29,18 +29,21 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 class JavaTreeShapeValidationServiceTest {
 
-    private static final String SOURCE =
-            "class A { org.jspecify.annotations.NullMarked m; Object o = java.util.Collections.emptyList(); }";
+    private static final String SOURCE = "class A { org.jspecify.annotations.NullMarked m; b.B d; " +
+                                         "Object o = java.util.Collections.emptyList(); }";
 
     @Test
-    void untypedParserLeavesOutTheClasspathAndAttributionButTheParserItCopiesKeepsThem() {
-        JavaParser.Builder<?, ?> typed = JavaParser.fromJavaVersion().classpath("jspecify");
+    void untypedParserResolvesNoTypesWhileTheParserItCopiesStillDoes() {
+        JavaParser.Builder<?, ?> typed = JavaParser.fromJavaVersion()
+                .classpath("jspecify")
+                .dependsOn("package b; public class B {}");
         J.ClassDeclaration untyped = parse(new JavaTreeShapeValidationService().untypedParser(typed));
 
-        assertThat(TypeUtils.isOfClassType(fieldType(untyped), "org.jspecify.annotations.NullMarked")).isFalse();
+        assertThat(TypeUtils.isOfClassType(fieldType(untyped, 0), "org.jspecify.annotations.NullMarked")).isFalse();
+        assertThat(TypeUtils.isOfClassType(fieldType(untyped, 1), "b.B")).isFalse();
         assertThat(emptyList(untyped).getMethodType()).isNull();
 
-        assertThat(TypeUtils.isOfClassType(fieldType(parse(typed)), "org.jspecify.annotations.NullMarked")).isTrue();
+        assertThat(TypeUtils.isOfClassType(fieldType(parse(typed), 0), "org.jspecify.annotations.NullMarked")).isTrue();
     }
 
     private static J.ClassDeclaration parse(Parser.Builder parser) {
@@ -51,12 +54,12 @@ class JavaTreeShapeValidationServiceTest {
         return cu.getClasses().get(0);
     }
 
-    private static @Nullable JavaType fieldType(J.ClassDeclaration a) {
-        return ((J.VariableDeclarations) a.getBody().getStatements().get(0)).getVariables().get(0).getType();
+    private static @Nullable JavaType fieldType(J.ClassDeclaration a, int index) {
+        return ((J.VariableDeclarations) a.getBody().getStatements().get(index)).getVariables().get(0).getType();
     }
 
     private static J.MethodInvocation emptyList(J.ClassDeclaration a) {
-        J.VariableDeclarations o = (J.VariableDeclarations) a.getBody().getStatements().get(1);
+        J.VariableDeclarations o = (J.VariableDeclarations) a.getBody().getStatements().get(2);
         return (J.MethodInvocation) requireNonNull(o.getVariables().get(0).getInitializer());
     }
 }
