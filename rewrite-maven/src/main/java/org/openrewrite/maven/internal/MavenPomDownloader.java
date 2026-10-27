@@ -66,6 +66,14 @@ public class MavenPomDownloader {
             .withMaxRetries(5)
             .build();
 
+    /**
+     * Repository reachability probes retry a timeout once rather than five times. Each probe of a host that accepts
+     * connections but never answers would otherwise wait out six timeouts before normalization moved on.
+     */
+    private static final RetryPolicy<Object> probeRetryPolicy = RetryPolicy.builder(retryPolicy.getConfig())
+            .withMaxRetries(1)
+            .build();
+
     private static final Duration THROTTLE_COOLDOWN = Duration.ofSeconds(60);
 
     private static final Pattern SNAPSHOT_TIMESTAMP = Pattern.compile("^(.*-)?([0-9]{8}\\.[0-9]{6}-[0-9]+)$");
@@ -152,9 +160,14 @@ public class MavenPomDownloader {
     }
 
     byte[] sendRequest(HttpSender.Request request) throws IOException, HttpSenderResponseException {
+        return sendRequest(request, retryPolicy);
+    }
+
+    private byte[] sendRequest(HttpSender.Request request, RetryPolicy<Object> policy)
+            throws IOException, HttpSenderResponseException {
         long start = System.nanoTime();
         try {
-            return Failsafe.with(retryPolicy).get(() -> {
+            return Failsafe.with(policy).get(() -> {
                 try (HttpSender.Response response = httpSender.send(request)) {
                     if (!response.isSuccessful()) {
                         throw new HttpSenderResponseException(null, response.getCode(),
@@ -1122,7 +1135,7 @@ public class MavenPomDownloader {
 
     private ReachabilityResult reachable(HttpSender.Request.Builder request) {
         try {
-            sendRequest(request.build());
+            sendRequest(request.build(), probeRetryPolicy);
             return ReachabilityResult.success();
         } catch (Throwable t) {
             if (t instanceof HttpSenderResponseException) {
