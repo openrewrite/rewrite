@@ -39,6 +39,7 @@ public class SpacesVisitor<P> extends KotlinIsoVisitor<P> {
 
     @Nullable
     private final Tree stopAfter;
+    private boolean stopped;
 
     private final SpacesStyle style;
 
@@ -1199,14 +1200,14 @@ public class SpacesVisitor<P> extends KotlinIsoVisitor<P> {
     @Override
     public @Nullable J postVisit(J tree, P p) {
         if (stopAfter != null && stopAfter.isScope(tree)) {
-            getCursor().getRoot().putMessage("stop", true);
+            stopped = true;
         }
         return super.postVisit(tree, p);
     }
 
     @Override
     public @Nullable J visit(@Nullable Tree tree, P p) {
-        if (getCursor().getNearestMessage("stop") != null) {
+        if (stopped) {
             return (J) tree;
         }
         return super.visit(tree, p);
