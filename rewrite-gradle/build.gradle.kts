@@ -109,6 +109,9 @@ tasks.withType<Test>().configureEach {
         )
     })
     maxHeapSize = "2g"
+    // Gradle deals test classes to the forks round-robin before any fork starts, so the fork that drew the slowest
+    // classes decided how long this task took. Each fork now runs four at once (see junit-platform.properties).
+    maxParallelForks = maxOf(1, minOf(maxParallelForks, gradle.startParameter.maxWorkerCount) / 4)
 }
 
 // This seems to be the only way to get the groovy compiler to emit java-8 compatible bytecode
