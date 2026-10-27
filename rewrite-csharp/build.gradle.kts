@@ -66,7 +66,7 @@ fun findDotnet(): String {
     throw GradleException(".NET SDK not found. Please install .NET 10.0+ SDK and ensure 'dotnet' is on your PATH.")
 }
 
-val csharpBuild by tasks.registering(Exec::class) {
+val csharpBuild = tasks.register<Exec>("csharpBuild") {
     group = "csharp"
     description = "Build C# projects"
 
@@ -93,7 +93,7 @@ val csharpBuild by tasks.registering(Exec::class) {
 
 // Writes the test runtime classpath to a file so the C# RpcFixture can
 // launch JavaRewriteRpc via `java -cp <classpath> ...` without a fat JAR.
-val rpcTestClasspath by tasks.registering {
+val rpcTestClasspath = tasks.register("rpcTestClasspath") {
     group = "csharp"
     description = "Write the Java RPC test server classpath for C# integration tests"
     dependsOn(tasks.named("testClasses"))
@@ -120,7 +120,7 @@ val rpcTestClasspath by tasks.registering {
 
 val junitXmlFile = csharpDir.resolve("build/test-results/xunit/junit.xml")
 
-val csharpTest by tasks.registering(Exec::class) {
+val csharpTest = tasks.register<Exec>("csharpTest") {
     group = "csharp"
     description = "Run C# xunit tests"
     dependsOn(csharpBuild, rpcTestClasspath)
@@ -283,7 +283,7 @@ val nugetVersion: String = if (System.getenv("CI") != null) {
 fun nugetApiKey(): String? =
     project.findProperty("nugetApiKey")?.toString()?.takeIf { it.isNotBlank() }
 
-val generateVersionTxt by tasks.registering {
+val generateVersionTxt = tasks.register("generateVersionTxt") {
     group = "csharp"
     description = "Generate META-INF/rewrite-csharp-version.txt for RPC version pinning"
 
@@ -309,7 +309,7 @@ listOf("sourcesJar", "processResources", "licenseMain", "assemble").forEach {
 
 // Task to pack C# projects as NuGet packages
 // Packs both the SDK library and the tool; version is injected via /p:Version
-val csharpBuildRelease by tasks.registering(Exec::class) {
+val csharpBuildRelease = tasks.register<Exec>("csharpBuildRelease") {
     group = "csharp"
     description = "Build C# projects in Release configuration"
 
@@ -327,7 +327,7 @@ val csharpBuildRelease by tasks.registering(Exec::class) {
     }
 }
 
-val csharpPack by tasks.registering(Exec::class) {
+val csharpPack = tasks.register<Exec>("csharpPack") {
     group = "csharp"
     description = "Pack C# projects as NuGet packages"
 
@@ -354,7 +354,7 @@ val csharpPack by tasks.registering(Exec::class) {
 }
 
 // Task to publish NuGet package
-val csharpPublish by tasks.registering(Exec::class) {
+val csharpPublish = tasks.register<Exec>("csharpPublish") {
     group = "csharp"
     description = "Publish C# NuGet package"
 
@@ -381,7 +381,7 @@ fun cgpPublishToken(): String? =
     project.findProperty("cgpPublishToken")?.toString()?.takeIf { it.isNotBlank() }
 
 // Task to publish NuGet packages to the Code Genome Project
-val csharpPublishCgp by tasks.registering(Exec::class) {
+val csharpPublishCgp = tasks.register<Exec>("csharpPublishCgp") {
     group = "csharp"
     description = "Publish C# NuGet packages to the Code Genome Project"
 
@@ -426,7 +426,7 @@ val csharpPublishCgp by tasks.registering(Exec::class) {
 
 // Task to publish the C# SDK library to a local NuGet feed for cross-repo development.
 // Usage: ./gradlew :rewrite-csharp:csharpPublishLocal
-val csharpPublishLocal by tasks.registering {
+val csharpPublishLocal = tasks.register("csharpPublishLocal") {
     group = "csharp"
     description = "Pack and install C# NuGet packages into local NuGet cache"
 
@@ -554,7 +554,7 @@ extensions.configure<LicenseExtension> {
     header = file("${rootProject.projectDir}/gradle/msalLicenseHeader.txt")
 }
 
-val licenseCsharp by tasks.registering(LicenseCheck::class) {
+val licenseCsharp = tasks.register<LicenseCheck>("licenseCsharp") {
     group = "license"
     description = "Check license headers on C# files"
     source = fileTree(csharpDir) { include("**/*.cs"); exclude("**/obj/**", "**/bin/**") }
@@ -563,7 +563,7 @@ val licenseCsharp by tasks.registering(LicenseCheck::class) {
     ext["year"] = Calendar.getInstance().get(Calendar.YEAR)
 }
 
-val licenseFormatCsharp by tasks.registering(LicenseFormat::class) {
+val licenseFormatCsharp = tasks.register<LicenseFormat>("licenseFormatCsharp") {
     group = "license"
     description = "Apply license headers to C# files"
     source = fileTree(csharpDir) { include("**/*.cs"); exclude("**/obj/**", "**/bin/**") }
