@@ -35,6 +35,8 @@ recipeList:
   - org.openrewrite.gradle.RemoveInheritedDependencies
   - org.openrewrite.gradle.RemoveNonReproducibleArchiveSettings
   - org.openrewrite.gradle.UseLoggingGetLogger
+#  - org.openrewrite.gradle.UseDefaultPathSensitivity  # changes task cache keys; a task that writes its input's
+#    path into its output would start taking wrong cache hits, silently
 ---
 type: specs.openrewrite.org/v1beta/recipe
 name: org.openrewrite.gradle.EnableGradleBuildCache
