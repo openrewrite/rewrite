@@ -32,6 +32,7 @@ recipeList:
   - org.openrewrite.gradle.RemoveEmptyBuildscriptBlock
   - org.openrewrite.gradle.AddRootProjectName
   - org.openrewrite.gradle.MoveRepositoriesToSettings
+  - org.openrewrite.gradle.RemoveInheritedDependencies
 ---
 type: specs.openrewrite.org/v1beta/recipe
 name: org.openrewrite.gradle.EnableGradleBuildCache
