@@ -224,7 +224,8 @@ final class TreeShapes {
         }
         Map<UUID, Reparsed> reparsed = new HashMap<>();
         List<Throwable> errors = new ArrayList<>();
-        List<SourceFile> parsed = parse(builder, inputs, errors);
+        TreeShapeValidationService service = sources.isEmpty() ? null : service(sources.get(0));
+        List<SourceFile> parsed = parse(service == null ? builder : service.untypedParser(builder), inputs, errors);
         if (parsed == null) {
             return reparsed;
         }
