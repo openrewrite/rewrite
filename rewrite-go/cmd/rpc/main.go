@@ -2221,8 +2221,15 @@ func (s *server) handleVisit(params json.RawMessage) (any, *rpcError) {
 	s.seedCursor(v, req.Cursor, req.SourceFileType)
 	before := treeNode
 	after := v.Visit(treeNode, ctx)
-	if after == nil {
+	if after == nil && phase == "scan" {
 		after = before
+	}
+	if after == nil {
+		if q, ok := v.(visitor.AfterVisitsProvider); ok {
+			q.AfterVisits()
+		}
+		delete(s.localObjects, req.TreeID)
+		return &visitResponse{Modified: true}, nil
 	}
 	// Drain any after-visits queued via GoVisitor.DoAfterVisit during
 	// the main visit. Mirrors JavaVisitor's afterVisit drain — recipes
@@ -2235,12 +2242,8 @@ func (s *server) handleVisit(params json.RawMessage) (any, *rpcError) {
 
 	// Store the result — update both localObjects (for forward GetObject)
 	// and reverseRemoteObjects (baseline for reverse getObjectFromJava in Print)
-	if after != nil {
-		s.localObjects[req.TreeID] = after
-		s.reverseRemoteObjects[req.TreeID] = after
-	} else {
-		delete(s.localObjects, req.TreeID)
-	}
+	s.localObjects[req.TreeID] = after
+	s.reverseRemoteObjects[req.TreeID] = after
 
 	return &visitResponse{Modified: modified}, nil
 }
