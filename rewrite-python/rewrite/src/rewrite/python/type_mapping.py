@@ -26,6 +26,7 @@ from __future__ import annotations
 
 import ast
 import os
+import re
 import tempfile
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -34,10 +35,19 @@ from typing import Any, Dict, Iterator, List, Optional, Sequence, Set, Tuple, Un
 from ..java import JavaType
 
 
+_BOM = '\ufeff'
+
+# Python ends a line at \r\n, \r or \n only, where str.splitlines also breaks at \f, \v and others.
+_LINE = re.compile(r'[^\r\n]*(?:\r\n|\r|\n)|[^\r\n]+')
+
+
 def compute_source_line_data(
         source: str,
 ) -> Tuple[List[str], List[int], Optional[Dict[int, List[int]]]]:
     """Split source into lines and compute byte offsets and byte-to-char mappings in one pass.
+
+    A leading byte order mark is no part of the first line, but its bytes count in every offset,
+    as they do in ty's.
 
     Returns:
         source_lines: Lines with line endings stripped.
@@ -45,10 +55,13 @@ def compute_source_line_data(
         byte_to_char: Per-line byte-offset → char-offset mapping for non-ASCII lines only,
                       or None when the source is pure ASCII.
     """
+    bom = source.startswith(_BOM)
+    if bom:
+        source = source[1:]
     is_ascii = source.isascii()
-    lines_with_endings = source.splitlines(True)
+    lines_with_endings = _LINE.findall(source)
     source_lines: List[str] = []
-    offsets: List[int] = [0]
+    offsets: List[int] = [len(_BOM.encode('utf-8')) if bom else 0]
     byte_to_char: Dict[int, List[int]] = {}
 
     for lineno, line in enumerate(lines_with_endings, start=1):
@@ -353,7 +366,7 @@ class PythonTypeMapping:
                          together with line_byte_offsets, avoids re-splitting source.
             line_byte_offsets: Pre-computed cumulative byte offsets per line.
         """
-        self._source = source
+        self._source = source.removeprefix(_BOM)
         self._file_path = file_path
         self._temp_file: Optional[Path] = None
 
@@ -365,8 +378,7 @@ class PythonTypeMapping:
         else:
             self._source_lines, self._line_byte_offsets, _ = compute_source_line_data(source)
 
-        # Caches for byte offset and type ID lookups
-        self._byte_offset_cache: Dict[Tuple[int, int], int] = {}
+        # Cache for type ID lookups
         self._lookup_cache: Dict[tuple, Optional[int]] = {}
 
         # Lazily populated by _module_ast / _import_bindings / _source_module_name
@@ -470,22 +482,11 @@ class PythonTypeMapping:
                 return None
 
     def _pos_to_byte_offset(self, lineno: int, col_offset: int) -> int:
-        """Convert AST (lineno, col_offset) to an absolute byte offset.
+        """Convert AST (lineno, col_offset) to the absolute byte offset ty-types uses.
 
-        Python's ast uses 1-based lineno and 0-based character col_offset (Python 3.8+).
-        ty-types uses absolute byte offsets (ruff convention).
-        Results are cached since the same position is often queried multiple times.
+        Python's ast counts lines from 1, and columns in UTF-8 bytes from 0.
         """
-        key = (lineno, col_offset)
-        cached = self._byte_offset_cache.get(key)
-        if cached is not None:
-            return cached
-        line_start = self._line_byte_offsets[lineno - 1]
-        line_text = self._source_lines[lineno - 1] if lineno <= len(self._source_lines) else ""
-        byte_col = len(line_text[:col_offset].encode('utf-8'))
-        result = line_start + byte_col
-        self._byte_offset_cache[key] = result
-        return result
+        return self._line_byte_offsets[lineno - 1] + col_offset
 
     def _build_index(self, result: Dict[str, Any]) -> None:
         """Build the byte-offset lookup index from a getTypes response."""
