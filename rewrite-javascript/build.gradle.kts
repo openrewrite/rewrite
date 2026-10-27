@@ -129,6 +129,9 @@ val nodeModules = fileTree("rewrite/node_modules") { exclude(".vite-temp/**", ".
 // What tsc type-checks and vitest runs, none of it from the Java side
 fun Task.typeScriptInputs() {
     dependsOn(npmInstall)
+    // Without the configuration cache Gradle runs one task of a project at a time. These wait for compileJava rather
+    // than hold it up, since rewrite-kotlin's compilation, and rewrite-gradle's tests after it, need its classes.
+    mustRunAfter(tasks.named("compileJava"))
     inputs.files(nodeModules)
         .withPathSensitivity(PathSensitivity.RELATIVE)
     inputs.files(fileTree("rewrite") {
