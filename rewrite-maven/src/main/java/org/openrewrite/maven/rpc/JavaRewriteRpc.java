@@ -44,9 +44,7 @@ import org.openrewrite.Parser;
 import org.openrewrite.rpc.RewriteRpc;
 import org.openrewrite.xml.XmlParser;
 
-import java.io.FilterInputStream;
 import java.io.IOException;
-import java.io.InputStream;
 import java.io.PrintStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -54,14 +52,12 @@ import java.nio.file.Paths;
 import java.nio.file.StandardOpenOption;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.concurrent.CountDownLatch;
 
 /**
  * A standalone RPC server application that communicates via stdin/stdout.
  * <p>
  * This application is designed to be spawned as a subprocess by Python, JavaScript,
- * or any other language that needs to use Java-based OpenRewrite recipes. It exits
- * when its stdin closes, so it does not outlive the process that spawned it.
+ * or any other language that needs to use Java-based OpenRewrite recipes.
  * <p>
  * Usage:
  * <pre>
@@ -130,8 +126,6 @@ public class JavaRewriteRpc {
                 logStream.close();
             }
         }
-        // Exit even if recipe code left a non-daemon thread running, e.g. a Timer or an Executors thread pool
-        System.exit(0);
     }
 
     private static void run(@Nullable Path marketplaceCsv, boolean trace, @Nullable PrintStream logStream) {
@@ -197,9 +191,7 @@ public class JavaRewriteRpc {
         module.addDeserializer(Path.class, new PathDeserializer());
 
         JsonMessageFormatter formatter = new JsonMessageFormatter(module, new ParameterNamesModule());
-        CountDownLatch stdinClosed = new CountDownLatch(1);
-        MessageHandler handler = new HeaderDelimitedMessageHandler(formatter,
-                new EofSignalingInputStream(System.in, stdinClosed), System.out);
+        MessageHandler handler = new HeaderDelimitedMessageHandler(formatter, System.in, System.out);
 
         if (trace) {
             handler = new TraceMessageHandler("server", handler);
@@ -227,45 +219,26 @@ public class JavaRewriteRpc {
         }
 
         // The JsonRpc.bind() call in RewriteRpc constructor starts the message handler
-        // that reads from stdin in a background thread. Keep the main thread alive until
-        // that reader reaches EOF, which is when the parent process closes stdin or dies.
-        try {
-            stdinClosed.await();
-        } catch (InterruptedException e) {
-            Thread.currentThread().interrupt();
-            if (logStream != null) {
-                logStream.println("Server interrupted");
-                logStream.flush();
+        // that reads from stdin in a background thread.
+
+        // Keep the main thread alive while the RPC handler processes messages.
+        // Use Object.wait() to block indefinitely - the process will be terminated
+        // externally when the parent process closes stdin or kills this process.
+        Object lock = new Object();
+        synchronized (lock) {
+            try {
+                // Wait indefinitely - this keeps the JVM alive
+                lock.wait();
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                if (logStream != null) {
+                    logStream.println("Server interrupted");
+                    logStream.flush();
+                }
             }
         }
 
         server.shutdown();
-    }
-
-    private static class EofSignalingInputStream extends FilterInputStream {
-        private final CountDownLatch eof;
-
-        EofSignalingInputStream(InputStream in, CountDownLatch eof) {
-            super(in);
-            this.eof = eof;
-        }
-
-        @Override
-        public int read() throws IOException {
-            return signalEof(super.read());
-        }
-
-        @Override
-        public int read(byte[] b, int off, int len) throws IOException {
-            return signalEof(super.read(b, off, len));
-        }
-
-        private int signalEof(int read) {
-            if (read == -1) {
-                eof.countDown();
-            }
-            return read;
-        }
     }
 
     private static class PathSerializer extends JsonSerializer<Path> {

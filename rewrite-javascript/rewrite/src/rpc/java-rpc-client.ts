@@ -164,7 +164,8 @@ export class JavaRpcTestServer {
         }
 
         // End the connection before killing the process: killing first can race with
-        // in-flight requests and leak the connection-close handler.
+        // in-flight requests and leak the connection-close handler. The JVM does not exit
+        // when its stdin closes, so waiting for it to would only run out the grace period.
         try {
             this.rpc.end();
         } catch { /* ignore — already closed */ }
