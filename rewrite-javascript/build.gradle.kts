@@ -123,6 +123,9 @@ val npmInstall = tasks.named<NpmInstallTask>("npmInstall") {
     args.addAll("--no-audit", "--no-fund")
 }
 
+// What npmInstall installed, without the caches vitest and vite keep in node_modules and rewrite on every test run
+val nodeModules = fileTree("rewrite/node_modules") { exclude(".vite-temp/**", ".vite/**", ".cache/**") }
+
 val npmTest = tasks.register<NpmTask>("npmTest") {
     dependsOn(npmInstall)
     // RPC integration tests under test/rpc/ need the classpath of org.openrewrite.maven.rpc.JavaRewriteRpc.
@@ -131,7 +134,7 @@ val npmTest = tasks.register<NpmTask>("npmTest") {
     dependsOn(tasks.named("generateTestClasspath"))
     // test/rpc/server.test.ts starts the built server
     dependsOn("npmBuild")
-    inputs.files(fileTree("rewrite/node_modules") { exclude(".vite-temp/**", ".vite/**", ".cache/**") })
+    inputs.files(nodeModules)
         .withPathSensitivity(PathSensitivity.RELATIVE)
     inputs.files(fileTree("rewrite") {
         include("*.json")
@@ -169,29 +172,39 @@ tasks.named("check") {
 }
 
 val npmBuild = tasks.register<NpmTask>("npmBuild") {
-    inputs.files(npmInstall)
+    dependsOn(npmInstall)
+    inputs.files(nodeModules)
         .withPathSensitivity(PathSensitivity.RELATIVE)
-    inputs.files(file("rewrite/package.json"))
+    inputs.files("rewrite/package.json", "rewrite/tsconfig.json", "rewrite/tsconfig.build.json")
         .withPathSensitivity(PathSensitivity.RELATIVE)
     inputs.files(fileTree("rewrite/src"))
         .withPathSensitivity(PathSensitivity.RELATIVE)
     outputs.dir(file("rewrite/dist/"))
-
-    val versionTxt = file("src/main/resources/META-INF/rewrite-javascript-version.txt")
-    outputs.file(versionTxt)
-    doLast {
-        versionTxt.writeText(datedSnapshotVersion)
-    }
 
     // --silent drops the banner npm prints for each script. The postbuild's npm link sets its own loglevel, so a
     // failure to link still says why.
     args = listOf("run", "--silent", "build")
 }
 
+tasks.named("assemble") {
+    dependsOn(npmBuild)
+}
+
+// The version the jar embeds. On CI it changes with every commit, which would rerun npmBuild if that wrote it.
+val generateVersionTxt = tasks.register("generateVersionTxt") {
+    val versionTxt = file("src/main/resources/META-INF/rewrite-javascript-version.txt")
+    val version = datedSnapshotVersion
+    inputs.property("version", version)
+    outputs.file(versionTxt)
+    doLast {
+        versionTxt.writeText(version)
+    }
+}
+
 // Because each of these sees rewrite-javascript-version.txt as an input
-listOf("sourcesJar", "processResources", "licenseMain", "assemble").forEach {
+listOf("sourcesJar", "processResources", "licenseMain").forEach {
     tasks.named(it) {
-        dependsOn(npmBuild)
+        dependsOn(generateVersionTxt)
     }
 }
 
@@ -218,7 +231,8 @@ val npmPack = tasks.register<Tar>("npmPack") {
 }
 
 val npmFixturesBuild = tasks.register<NpmTask>("npmFixturesBuild") {
-    inputs.files(npmInstall)
+    dependsOn(npmInstall)
+    inputs.files(nodeModules)
         .withPathSensitivity(PathSensitivity.RELATIVE)
     inputs.files(file("rewrite/package.json"))
         .withPathSensitivity(PathSensitivity.RELATIVE)
