@@ -84,6 +84,8 @@ testing {
                         useJUnitPlatform()
                         testClassesDirs += javaTckClasses
                         jvmArgs = listOf("-XX:+UnlockDiagnosticVMOptions", "-XX:+ShowHiddenFrames")
+                        // Open java.lang as Gradle daemons do, so JavaTypeCache uses its fast path for String keys
+                        jvmArgs("--add-opens=java.base/java.lang=ALL-UNNAMED")
                         shouldRunAfter(test)
                     }
                 }
