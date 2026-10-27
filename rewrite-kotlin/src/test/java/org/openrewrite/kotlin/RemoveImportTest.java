@@ -266,6 +266,26 @@ class RemoveImportTest implements RewriteTest {
     }
 
     @Test
+    void keepImportOfConstructorReference() {
+        rewriteRun(
+          spec -> spec.recipe(removeTypeImportRecipe("a.b.Original")),
+          kotlin(
+            """
+              package a.b
+              class Original
+              """
+          ),
+          kotlin(
+            """
+              import a.b.Original
+
+              val f = ::Original
+              """
+          )
+        );
+    }
+
+    @Test
     void noImportOfImplicitTypes() {
         rewriteRun(
           spec -> spec.recipe(removeTypeImportRecipe("kotlin.Pair")),
