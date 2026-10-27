@@ -164,10 +164,13 @@ class ClasspathScanningLoaderTest {
         Environment env = new Environment(List.of(classes,
                 new ClasspathScanningLoader(resourcesDir, new Properties(), List.of(), cl)));
 
+        // The first loader also reads every YAML file on the test classpath, so only look at these two recipes
+        List<String> recipeNames = List.of("com.example.DeclarativeRecipe",
+                AbstractRecipeFixtures.ConcreteRecipe.class.getName());
         for (int call = 1; call <= 3; call++) {
             assertThat(env.listRecipeDescriptors())
                     .as("call %d", call)
-                    .filteredOn(descriptor -> !descriptor.getExamples().isEmpty())
+                    .filteredOn(descriptor -> recipeNames.contains(descriptor.getName()))
                     .extracting(RecipeDescriptor::getName, descriptor -> descriptor.getExamples().stream()
                             .map(RecipeExample::getDescription).toList())
                     .containsExactlyInAnyOrder(
